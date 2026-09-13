@@ -70,33 +70,36 @@ relative, not a schedule — this is weeks of work, not months.
    `dbt-duckdb`/`soda-core-duckdb`/`datacontract-cli` release new
    versions; this could resolve cleanly on its own, or break differently.
 
-9. **[open, medium]** Two of the three Child Protection cross-table
-   business rules (Phase 2 — see `plans/wider.md` #2) fail on *every* run,
-   dirty or clean, at a stable rate: placement/carer approval compliance
-   (37/242 placements, ~15%) and closed-case investigation hygiene
-   (16/181 investigations, ~9%). Confirmed for real and triangulated
-   across all three tools — `datacontract test`, `dbt test`, and
-   `soda scan` all independently report the same 37 and 16 on the same
-   data. Not a bug in the rules: `synthetic-data-generator/child_protection.py`
-   genuinely doesn't enforce either invariant (`carer_for_placement` is
-   drawn from the full carer pool regardless of `approval_status`;
-   `case_status` and investigation `end_date` are generated
-   independently) — real findings the rules are right to keep surfacing,
-   documented in `contract/child-protection-contract.yaml`,
-   `contract/child-protection-soda-checks.yml`, and
-   `dbt_project/tests/*.sql` rather than loosened to hide them. The third
-   rule (escalation completeness) has no such issue — 0 on every clean
-   run, correctly firing (2-6) only on dirty runs, since
-   `cp_investigations` is built directly from notifications with the
-   matching outcome. **Follow-up, a call for Keith:** leave these two
-   rules as permanently-red findings on the dashboard (accurate to a real,
-   ongoing compliance risk), soften them to a warning tier so they read as
-   "known issue" rather than "broken check", or adjust the generator so
-   clean runs satisfy both invariants and only a future dirty preset
-   violates them (bigger change — would need new dirty.py presets for
-   cp_placements/cp_investigations, which don't exist today). No action
-   taken yet — worth deciding before Phase 3 wires this collection into
-   the dashboard, since that's what will make the choice visible.
+9. **[done, medium]** Two of the three Child Protection cross-table
+   business rules used to fail on *every* run, dirty or clean, at a stable
+   rate: placement/carer approval compliance (37/242 placements, ~15%) and
+   closed-case investigation hygiene (16/181 investigations, ~9%).
+   Confirmed for real and triangulated across all three tools —
+   `datacontract test`, `dbt test`, and `soda scan` all independently
+   reported the same 37 and 16 on the same data. Not a bug in the rules:
+   `synthetic-data-generator/child_protection.py` genuinely didn't enforce
+   either invariant (`carer_for_placement` was drawn from the full carer
+   pool regardless of `approval_status`; `case_status` and investigation
+   `end_date` were generated independently).
+   **Fixed** (Keith's call: fix the generator, strict 0% on clean runs,
+   case closure derives from investigation state): `child_protection.py`
+   now only ever assigns an Approved carer to a placement, and only ever
+   marks a case Closed once none of that client's own investigations are
+   still open (case_status is drawn as a candidate early, same as before,
+   then overridden to "Open" for any client with a still-open
+   investigation — keeps every other column's RNG stream byte-identical to
+   pre-fix output; row counts are unchanged). Both business rules now pass
+   0/0 on every clean run. `generator/dirty.py` gained two new presets
+   (`apply_cp_placements_presets`, `apply_cp_investigations_presets`,
+   mirrored into `synthetic-data-generator/dirty.py` to keep the two
+   copies in sync) so amber/red runs still demonstrate a real,
+   controlled violation — confirmed for real and triangulated again across
+   all three tools: 0 clean / 3 amber / 17 red (placement/carer) and
+   0 clean / 1-3 amber / 6 red (closed-case hygiene). `data/cp_raw/` was
+   regenerated; `plans/wider.md` #2's row-count calibration in the
+   contract was rechecked and didn't need changes (row counts are
+   unaffected by the fix, only which values land in `carer_id`/
+   `case_status`/`end_date`).
 
 ## Held over from the original (equivalent-only) build
 

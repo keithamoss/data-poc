@@ -12,12 +12,23 @@ the Child Protection tables are built ONCE (fixed seed), then re-extracted
 which is what a real periodic extract of an active caseload would look
 like, unlike birth-registrations' fresh-cohort-per-day model.
 
-Dirty injection only exists today for cp_notifications
-(dirty.py's apply_cp_notifications_presets, calibrated separately from the
-other five tables) - so only cp_notifications varies clean/amber/red
-across snapshots; the other five tables are clean in every run. This
-mirrors how birth-registrations only demonstrates dirty behaviour on 2 of
-its 13 columns, not an oversight.
+Dirty injection touches 3 of the 6 tables on amber/red runs:
+cp_notifications (dirty.py's apply_cp_notifications_presets - an unknown
+concern_type code, near-duplicate notifications), cp_placements
+(apply_cp_placements_presets - a placement reassigned to a non-Approved
+carer), and cp_investigations (apply_cp_investigations_presets - a
+closed-case investigation reopened). The other three tables (cp_clients,
+cp_carers, cp_case_workers) are clean in every run - this mirrors how
+birth-registrations only demonstrates dirty behaviour on 2 of its 13
+columns, not an oversight.
+
+child_protection.py's own generation logic makes all three of these
+tables' cross-table business rules (escalation completeness,
+placement/carer approval compliance, closed-case investigation hygiene -
+see contract/child-protection-contract.yaml) pass cleanly by construction
+on a clean run; the three dirty presets above are what reintroduce a
+controlled, non-zero violation count on amber/red runs, the same
+traffic-light pattern as concern_type.
 
 extract_timestamp isn't a column child_protection.py produces (unlike
 agency_datasets.py's birth_registrations, which has one) - added here per
@@ -92,6 +103,10 @@ def main() -> None:
         if severity:
             tables["cp_notifications"] = dirty_mod.apply_cp_notifications_presets(
                 tables["cp_notifications"], severity, seed=BASE_SEED + 4100 + i)
+            tables["cp_placements"] = dirty_mod.apply_cp_placements_presets(
+                tables["cp_placements"], tables["cp_carers"], severity, seed=BASE_SEED + 4200 + i)
+            tables["cp_investigations"] = dirty_mod.apply_cp_investigations_presets(
+                tables["cp_investigations"], tables["cp_clients"], severity, seed=BASE_SEED + 4300 + i)
 
         row_counts = {}
         for name in TABLES:

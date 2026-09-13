@@ -15,13 +15,16 @@
 # literal join to it works - confirmed by actually running `datacontract
 # test`, not assumed from the docs).
 #
-# Two of the three business rules are REAL FINDINGS, not bugs in these
-# rules: child_protection.py (the generator) doesn't enforce them, so they
-# fail at a stable, nonzero rate on every run, dirty or clean - see each
-# rule's own description below and plans/qa-pipeline.md for the tracked
-# follow-up. Left in and documented rather than quietly dropped or
-# loosened, same practice as the dbt-duckdb bug in
-# dbt_project/models/staging/schema.yml.
+# All three business rules pass cleanly (0 violations) on every clean run,
+# by construction: child_protection.py only ever assigns Approved carers
+# to a placement, and only ever closes a case once none of its own
+# investigations are still open. Two of the three business rules used to
+# fail on EVERY run, dirty or clean, before that fix (see
+# plans/qa-pipeline.md #9 for the full account, kept as a resolved entry
+# rather than deleted) - generator/dirty.py's apply_cp_placements_presets
+# and apply_cp_investigations_presets are what reintroduce a controlled,
+# real violation count on amber/red runs now, the same traffic-light
+# pattern as concern_type/escalation completeness.
 #
 # Vocabulary matches contract/bdm-birth-registrations-contract.yaml exactly
 # (metric: nullValues/invalidValues/duplicateValues/rowCount, the real
@@ -439,16 +442,16 @@ schema:
         description: >
           Closed-case investigation hygiene: an investigation should not
           still be open (end_date NULL) once its client's case_status is
-          Closed. REAL FINDING, not a bug in this rule: currently fails on
-          every run at a stable rate (16/181 investigations, ~9%, on the
-          base collection - confirmed by actually running this query)
-          because child_protection.py generates case_status and
-          investigation end_date independently, with no invariant tying
-          them together. dirty.py has no preset for this table, so the
-          count never varies run to run - a genuine, currently-unaddressed
-          business-process risk this rule is right to keep surfacing
-          rather than hide. Tracked as a generator follow-up in
-          plans/qa-pipeline.md.
+          Closed. Passes 0/0 on every clean run - child_protection.py only
+          ever marks a case Closed once none of that client's own
+          investigations are still open, so the two are consistent by
+          construction. dirty.py's apply_cp_investigations_presets
+          (amber/red only) reopens a controlled number of Closed-case
+          investigations to demonstrate a real violation - confirmed for
+          real: 0 on clean runs, 1-3 on amber runs, 6 on the red run.
+          Previously (see plans/qa-pipeline.md #9) this rule failed on
+          every run at a stable ~9% rate because the generator didn't tie
+          case_status to investigation state at all - fixed, not hidden.
 
   - name: cp_placements
     physicalType: table
@@ -551,15 +554,16 @@ schema:
         severity: error
         description: >
           Placement/carer approval compliance: a placement's carer must be
-          Approved, not Provisional or Under review. REAL FINDING, not a
-          bug in this rule: currently fails on every run at a stable rate
-          (37/242 placements, ~15%, on the base collection - confirmed by
-          actually running this query) because child_protection.py assigns
-          carer_for_placement from the full carer pool regardless of
-          approval_status. dirty.py has no preset for this table either,
-          so the count never varies run to run. Same honest-finding
-          treatment as the investigation-hygiene rule above; tracked
-          alongside it in plans/qa-pipeline.md.
+          Approved, not Provisional or Under review. Passes 0/0 on every
+          clean run - child_protection.py only ever assigns an Approved
+          carer to a placement, so this holds by construction.
+          dirty.py's apply_cp_placements_presets (amber/red only)
+          reassigns a controlled number of placements to a non-Approved
+          carer to demonstrate a real violation - confirmed for real: 0 on
+          clean runs, 3 on amber runs, 17 on the red run. Previously (see
+          plans/qa-pipeline.md #9) this rule failed on every run at a
+          stable ~15% rate because the generator drew from the full carer
+          pool regardless of approval_status - fixed, not hidden.
 
   - name: cp_carers
     physicalType: table

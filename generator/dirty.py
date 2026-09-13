@@ -90,6 +90,24 @@ def inject_duplicate_rows(df: pd.DataFrame, rate: float, seed: int, near_duplica
     return pd.concat([df, sample], ignore_index=True)
 
 
+def inject_nulls_in_subset(df: pd.DataFrame, column: str, eligible_mask, rate: float, seed: int) -> pd.DataFrame:
+    """Like inject_nulls, but the null-injection candidates are only ever
+    sampled from rows where `eligible_mask` is True - e.g. only
+    investigations belonging to a Closed-case client are eligible to be
+    "reopened" by this injector, matching a real process lapse (a case
+    closed just before its investigation was actually finished) rather
+    than corrupting an arbitrary, unrelated row."""
+    out = df.copy()
+    rng = np.random.default_rng(seed)
+    eligible_idx = out.index[eligible_mask]
+    if len(eligible_idx) == 0 or rate == 0:
+        return out
+    mask = rng.random(len(eligible_idx)) < rate
+    chosen = eligible_idx[mask]
+    out.loc[chosen, column] = None
+    return out
+
+
 def inject_drift_batch(df: pd.DataFrame, column: str, invalid_pool: list, batch_column: str,
                         onset_value, rate_after_onset: float, seed: int) -> pd.DataFrame:
     """Failure rate is 0 before `onset_value` in `batch_column` (e.g. a
@@ -130,3 +148,38 @@ def apply_cp_notifications_presets(df: pd.DataFrame, severity: str, seed: int) -
     df = inject_duplicate_rows(df, rate=0.015 if severity == "amber" else 0.05, seed=seed + 1,
                                 near_duplicate_columns=["notification_id"])
     return df
+
+
+def apply_cp_placements_presets(placements_df: pd.DataFrame, carers_df: pd.DataFrame,
+                                 severity: str, seed: int) -> pd.DataFrame:
+    """Reassigns a fraction of placements to a non-Approved carer - a real
+    compliance lapse the placement/carer approval business rule
+    (contract/child-protection-contract.yaml, dbt_project/tests/
+    placement_carer_approval.sql) is built to catch. child_protection.py
+    only ever assigns Approved carers by construction, so every violation
+    on a run this preset touches is this preset's doing, not baseline
+    noise - unlike the pre-fix generator, where the rule always failed.
+    Reuses inject_invalid_values: a non-approved carer_id is still a
+    structurally valid FK (a real cp_carers row), just one the business
+    rule says shouldn't be used - the same "replace with values from a
+    pool" mechanism, a different kind of pool."""
+    rate = 0.02 if severity == "amber" else 0.08
+    non_approved = carers_df.loc[carers_df["approval_status"] != "Approved", "carer_id"].values
+    return inject_invalid_values(placements_df, "carer_id", list(non_approved), rate, seed)
+
+
+def apply_cp_investigations_presets(investigations_df: pd.DataFrame, clients_df: pd.DataFrame,
+                                     severity: str, seed: int) -> pd.DataFrame:
+    """Reopens (nulls end_date on) a fraction of investigations belonging
+    to a Closed-case client - a real process lapse the closed-case
+    investigation hygiene business rule (contract/child-protection-
+    contract.yaml, dbt_project/tests/closed_case_investigation_hygiene.sql)
+    is built to catch. child_protection.py only ever closes a case once
+    its own investigations have concluded by construction, so every
+    violation on a run this preset touches is this preset's doing, not
+    baseline noise - unlike the pre-fix generator, where the rule always
+    failed."""
+    rate = 0.03 if severity == "amber" else 0.10
+    closed_client_ids = set(clients_df.loc[clients_df["case_status"] == "Closed", "cp_client_id"])
+    eligible = investigations_df["cp_client_id"].isin(closed_client_ids) & investigations_df["end_date"].notna()
+    return inject_nulls_in_subset(investigations_df, "end_date", eligible, rate, seed)

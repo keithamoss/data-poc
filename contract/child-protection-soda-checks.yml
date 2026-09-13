@@ -81,11 +81,13 @@ checks for cp_investigations:
         FROM cp_investigations i
         JOIN cp_clients c ON i.cp_client_id = c.cp_client_id
         WHERE c.case_status = 'Closed' AND i.end_date IS NULL
-      # REAL FINDING, not a bug in this check: fails at a stable ~9% rate
-      # (16/181 investigations) on every run, dirty or clean, because
-      # child_protection.py generates case_status and investigation
-      # end_date independently - see child-protection-contract.yaml's
-      # matching rule and plans/qa-pipeline.md for the tracked follow-up.
+      # Passes 0/0 on every clean run - child_protection.py only ever
+      # marks a case Closed once none of that client's investigations are
+      # still open. dirty.py's apply_cp_investigations_presets (amber/red
+      # only) reopens a controlled number to demonstrate a real violation:
+      # 0 clean, 1-3 amber, 6 on the red run. See child-protection-
+      # contract.yaml's matching rule and plans/qa-pipeline.md #9 for the
+      # fuller account (this rule used to always fail - fixed, not hidden).
 
 checks for cp_placements:
   - values in (cp_client_id) must exist in cp_clients (cp_client_id)
@@ -99,8 +101,11 @@ checks for cp_placements:
         FROM cp_placements p
         JOIN cp_carers c ON p.carer_id = c.carer_id
         WHERE c.approval_status != 'Approved'
-      # REAL FINDING, not a bug in this check: fails at a stable ~15% rate
-      # (37/242 placements) on every run, dirty or clean, because
-      # child_protection.py assigns carers from the full pool regardless
-      # of approval_status - see child-protection-contract.yaml's matching
-      # rule and plans/qa-pipeline.md for the tracked follow-up.
+      # Passes 0/0 on every clean run - child_protection.py only ever
+      # assigns an Approved carer to a placement. dirty.py's
+      # apply_cp_placements_presets (amber/red only) reassigns a
+      # controlled number to a non-Approved carer to demonstrate a real
+      # violation: 0 clean, 3 amber, 17 on the red run. See
+      # child-protection-contract.yaml's matching rule and
+      # plans/qa-pipeline.md #9 for the fuller account (this rule used to
+      # always fail - fixed, not hidden).

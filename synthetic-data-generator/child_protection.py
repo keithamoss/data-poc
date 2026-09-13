@@ -82,7 +82,14 @@ def generate_child_protection_collection(population: pd.DataFrame, seed: int = 1
         agency_prefix="CPS", seed=seed + 1)
     opened_lag_days = rng.integers(30, 365 * 4, size=n)
     opened_date = TODAY - pd.to_timedelta(np.minimum(opened_lag_days, (TODAY - flagged["date_of_birth"]).dt.days.values), unit="D")
-    case_status = rng.choice(["Open", "Closed"], size=n, p=[0.42, 0.58])
+    # Drawn here (not assigned yet) so every later draw from `rng` keeps
+    # the exact same stream position/values as before this column existed
+    # - only overridden further down, once cp_investigations exists: a
+    # case can only become Closed once none of its investigations are
+    # still open (closing a case with an active investigation would itself
+    # be the "closed-case investigation hygiene" violation the QA
+    # pipeline's business rule checks for - see that section below).
+    case_status_candidate = rng.choice(["Open", "Closed"], size=n, p=[0.42, 0.58])
 
     cp_clients = pd.DataFrame({
         "cp_client_id": cp_client_id,
@@ -91,7 +98,6 @@ def generate_child_protection_collection(population: pd.DataFrame, seed: int = 1
         "sex": flagged["sex"].values,
         "suburb": flagged["suburb"].values, "postcode": flagged["postcode"].values,
         "case_opened_date": opened_date,
-        "case_status": case_status,
         "_person_uid": flagged["person_uid"].values,   # internal join key only - see README
         "_household_id": flagged["household_id"].values,
     })
@@ -150,6 +156,22 @@ def generate_child_protection_collection(population: pd.DataFrame, seed: int = 1
         "lead_worker_id": lead_worker,
     })
 
+    # --- case_status (deferred from the cp_clients block above, using the
+    #     candidate values drawn there so no later draw from `rng` shifts):
+    #     a client can only be Closed once none of their own investigations
+    #     are still open. Clients with no investigation at all (most of
+    #     them - only notifications with outcome 'Investigation opened'
+    #     produce one) are unconstrained and just get the random draw.
+    #     This is what makes the "closed-case investigation hygiene"
+    #     business rule pass cleanly by construction on every clean run -
+    #     dirty.py's apply_cp_investigations_presets (amber/red only) is
+    #     what reintroduces a controlled number of violations. -----------
+    clients_with_open_investigation = set(
+        cp_investigations.loc[cp_investigations["end_date"].isna(), "cp_client_id"])
+    case_status = np.where(
+        np.isin(cp_client_id, list(clients_with_open_investigation)), "Open", case_status_candidate)
+    cp_clients["case_status"] = case_status
+
     # --- cp_carers (kinship carers reuse a relative from the same household;
     #     foster/residential carers are unrelated people) --------------------
     carer_rng = _rng(seed, 5)
@@ -187,7 +209,13 @@ def generate_child_protection_collection(population: pd.DataFrame, seed: int = 1
     placement_end = placement_start + pd.to_timedelta(place_duration, unit="D")
     ongoing = place_rng.random(n_place) < 0.22
     placement_end = pd.Series(placement_end).where(~ongoing, pd.NaT)
-    carer_for_placement = place_rng.choice(cp_carers["carer_id"].values, size=n_place)
+    # Only Approved carers are used for a placement by construction - this
+    # is what makes the "placement/carer approval compliance" business
+    # rule pass cleanly on every clean run. dirty.py's
+    # apply_cp_placements_presets (amber/red only) is what reintroduces a
+    # controlled number of violations.
+    approved_carer_ids = cp_carers.loc[cp_carers["approval_status"] == "Approved", "carer_id"].values
+    carer_for_placement = place_rng.choice(approved_carer_ids, size=n_place)
     place_suburb_idx = place_rng.integers(0, len(suburb_names), size=n_place)
 
     cp_placements = pd.DataFrame({

@@ -43,21 +43,28 @@ version: 2
 # generic-test syntax (`relationships: {to: ref('...'), field: ...}`),
 # confirmed by actually running `dbt test` against a real per-run CP
 # warehouse (real_tools/build_cp_warehouses.py). All 7 pass on every run,
-# dirty or clean - the FK columns themselves are never touched by
-# generator/dirty.py's cp_notifications-only presets (see
-# contract/child-protection-contract.yaml's matching SQL-rule versions of
-# these same 7 checks for the fuller account, including why they're a
-# genuine backstop even though this fixture never exercises a failure).
+# dirty or clean: generator/dirty.py's placement/investigation presets
+# reassign a placement's carer_id to a still-real (just non-Approved)
+# carer, and null an investigation's end_date - neither ever points a FK
+# column at a row that doesn't exist, so referential integrity itself
+# always holds even on a dirty run (see contract/child-protection-
+# contract.yaml's matching SQL-rule versions of these same 7 checks for
+# the fuller account of why they're still a genuine backstop against a
+# dropped join or truncated parent extract).
 #
 # The three cross-table business rules approved alongside these FKs
 # (escalation completeness, placement/carer approval compliance,
 # closed-case investigation hygiene) are dbt SINGULAR tests instead of
 # generic ones - each is a row-level cross-table SELECT with no reusable
-# "column vs column" shape, which is exactly what tests/*.sql is for. See
-# tests/escalation_completeness.sql, tests/placement_carer_approval.sql,
+# "column vs column" shape, which is exactly what tests/*.sql is for. All
+# three pass cleanly (0 violations) on every clean run, by construction -
+# child_protection.py only assigns Approved carers to a placement and only
+# closes a case once its investigations have concluded - and dirty.py's
+# amber/red-only presets are what reintroduce a controlled, real violation
+# count. See tests/escalation_completeness.sql, tests/placement_carer_approval.sql,
 # tests/closed_case_investigation_hygiene.sql - each header documents the
-# same real, stable non-zero baseline already found and explained in the
-# contract file, rather than repeating it here.
+# same real numbers already found and explained in the contract file,
+# rather than repeating them here.
 
 models:
   - name: stg_birth_registrations
