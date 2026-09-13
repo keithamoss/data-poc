@@ -3,16 +3,19 @@ A datacontract-cli EQUIVALENT: parses the real
 contract/bdm-birth-registrations-contract.yaml (unmodified ODCS v3 YAML -
 nothing about the rules below is invented for this engine, they're read
 straight out of the contract file) and evaluates its actual quality rules
-against one run's rows in the SQLite warehouse.
+against one run's rows in the DuckDB warehouse.
 
-This is NOT datacontract-cli. That binary isn't pip-installable in this
-sandbox (see README.md for the network-constraint note and the real-tool
-swap-in instructions). This module hand-implements just the rule types
-this one contract actually uses - nullCheck, regexPattern, validDateRange,
-validValues, fieldComparison, duplicateCheck, rowCount - reading their
+This is NOT datacontract-cli (real_tools/run_datacontract_real.py runs the
+actual tool). This module hand-implements the real ODCS v3 quality-rule
+vocabulary this contract actually uses - metric: nullValues/invalidValues/
+duplicateValues/rowCount, and type: sql for the two rules with no direct
+metric equivalent (date-range, cross-field comparison) - reading their
 thresholds and severities from the YAML at run time, not from Python
-constants. If the contract file changes, this engine's behaviour changes
-with it, the same as a real contract engine.
+constants. This vocabulary (and the contract file itself) was rewritten
+from an earlier, invented `rule: nullCheck/regexPattern/...` shape once
+real datacontract-cli actually parsed it and rejected that shape outright -
+see the contract file's own comments and README.md's known-disagreements
+section.
 
 Every finding is emitted in the check-result record shape used across this
 project (see data-contract-engines-landscape.md's "QA reporting layers"
@@ -25,7 +28,6 @@ which row.
 from __future__ import annotations
 import re
 from datetime import date, datetime
-from typing import Any
 
 import duckdb
 import yaml
@@ -83,22 +85,25 @@ def evaluate_contract(contract_path: str, db_path: str, run_id: str, run_timesta
     table_schema = contract["schema"][0]
     columns = table_schema["properties"]
 
+    def _is_percent(rule: dict) -> bool:
+        return str(rule.get("unit", "")).strip().lower() == "percent"
+
     for col in columns:
         name = col["name"]
         values = [r.get(name) for r in rows]
 
         for rule in col.get("quality", []):
-            rtype = rule["rule"]
             severity = rule.get("severity", "error")
             dimension = rule.get("dimension", "")
+            metric = rule.get("metric")
 
-            if rtype == "nullCheck":
+            if metric == "nullValues":
                 n_null = sum(1 for v in values if v is None or v == "")
                 rate = n_null / n if n else 0.0
                 if "mustBe" in rule:
                     threshold = rule["mustBe"]
                     violated = n_null != threshold
-                    metric, unit = n_null, "count"
+                    metric_value, unit = n_null, "count"
                     # ODCS severity is single-tier (a rule is either "error" -
                     # pass/fail with no amber band - or "warning"/"info" -
                     # pass/warn with NO red band at all). A downstream
@@ -116,96 +121,66 @@ def evaluate_contract(contract_path: str, db_path: str, run_id: str, run_timesta
                         warn_t, fail_t = threshold, max(threshold, n) + 1
                 else:
                     threshold = rule["mustBeLessThan"]
-                    violated = rate >= threshold
-                    # expressed in percentage-points (not a bare fraction) so
-                    # this lines up with the Soda/dbt engines' own "%"-unit
-                    # results for the same kind of rate check.
-                    metric, unit = round(rate * 100, 4), "%"
-                    threshold_pct = round(threshold * 100, 4)
+                    violated = (rate * 100 if _is_percent(rule) else n_null) >= threshold
+                    metric_value, unit = (round(rate * 100, 4), "%") if _is_percent(rule) else (n_null, "count")
                     if severity == "error":
-                        warn_t, fail_t = threshold_pct, threshold_pct
+                        warn_t, fail_t = threshold, threshold
                     else:
-                        warn_t, fail_t = threshold_pct, 100.0  # rate can't exceed 100% - an honest "no red tier" ceiling
+                        warn_t, fail_t = threshold, (100.0 if _is_percent(rule) else n + 1)
                 status = _severity_to_status(severity, violated)
-                results.append(_result(run_id, run_timestamp, name, "nullCheck", dimension,
-                                        metric, unit, warn_t, fail_t, status,
+                results.append(_result(run_id, run_timestamp, name, "nullValues", dimension,
+                                        metric_value, unit, warn_t, fail_t, status,
                                         "quarantine" if severity == "error" else "flag", n, n_null))
 
-            elif rtype == "regexPattern":
-                pattern = re.compile(rule["mustBeRegex"])
-                n_invalid = sum(1 for v in values if v is not None and not pattern.match(str(v)))
+            elif metric == "invalidValues":
+                args = rule.get("arguments") or {}
+                if "pattern" in args:
+                    pattern = re.compile(args["pattern"])
+                    n_invalid = sum(1 for v in values if v is not None and not pattern.match(str(v)))
+                elif "validValues" in args:
+                    valid_set = set(args["validValues"])
+                    n_invalid = sum(1 for v in values if v is not None and v not in valid_set)
+                else:
+                    continue
                 violated = n_invalid > 0
                 status = _severity_to_status(severity, violated)
-                results.append(_result(run_id, run_timestamp, name, "regexPattern", dimension,
+                results.append(_result(run_id, run_timestamp, name, "invalidValues", dimension,
                                         n_invalid, "count", None, 0, status,
                                         "quarantine" if severity == "error" else "flag", n, n_invalid))
 
-            elif rtype == "validDateRange":
-                lo_raw, hi_raw = rule["mustBeBetween"]
-                lo = datetime.strptime(lo_raw, "%Y-%m-%d").date()
-                hi = date.today() if hi_raw == "$today" else datetime.strptime(hi_raw, "%Y-%m-%d").date()
-                n_invalid = 0
-                for v in values:
-                    if v is None:
-                        continue
-                    try:
-                        d = datetime.strptime(str(v)[:10], "%Y-%m-%d").date()
-                    except ValueError:
-                        n_invalid += 1
-                        continue
-                    if not (lo <= d <= hi):
-                        n_invalid += 1
-                violated = n_invalid > 0
+            elif metric == "duplicateValues":
+                col_values = [r.get(name) for r in rows]
+                n_dupe = len(col_values) - len(set(col_values))
+                threshold = rule.get("mustBe", 0)
+                violated = n_dupe != threshold
                 status = _severity_to_status(severity, violated)
-                results.append(_result(run_id, run_timestamp, name, "validDateRange", dimension,
-                                        n_invalid, "count", None, 0, status,
-                                        "quarantine" if severity == "error" else "flag", n, n_invalid))
+                results.append(_result(run_id, run_timestamp, name, "duplicateValues", dimension,
+                                        n_dupe, "count", None, threshold, status,
+                                        "quarantine" if severity == "error" else "flag", n, n_dupe))
 
-            elif rtype == "validValues":
-                valid_set = set(rule["mustBe"])
-                n_invalid = sum(1 for v in values if v is not None and v not in valid_set)
-                violated = n_invalid > 0
+            elif rule.get("type") == "sql":
+                query = rule["query"].format(model=TABLE, field=name)
+                # emulate datacontract-cli's {model}/{field} placeholder
+                # substitution (see prepare_query in its create_checks.py)
+                # against this run's rows specifically, via a scoped view.
+                safe_run_id = run_id.replace("'", "''")
+                conn.execute(f"CREATE OR REPLACE TEMP VIEW _rule_scope AS SELECT * FROM {TABLE} WHERE run_id = '{safe_run_id}'")
+                scoped_query = query.replace(TABLE, "_rule_scope")
+                n_invalid = conn.execute(scoped_query).fetchone()[0]
+                threshold = rule.get("mustBe", 0)
+                violated = n_invalid != threshold
                 status = _severity_to_status(severity, violated)
-                results.append(_result(run_id, run_timestamp, name, "validValues", dimension,
-                                        n_invalid, "count", None, 0, status,
-                                        "quarantine" if severity == "error" else "flag", n, n_invalid))
-
-            elif rtype == "fieldComparison":
-                other_col = rule["mustBeGreaterThanOrEqualTo"]
-                other_values = [r.get(other_col) for r in rows]
-                n_invalid = 0
-                for v, ov in zip(values, other_values):
-                    if v is None or ov is None:
-                        continue
-                    try:
-                        dv = datetime.strptime(str(v)[:10], "%Y-%m-%d").date()
-                        dov = datetime.strptime(str(ov)[:10], "%Y-%m-%d").date()
-                    except ValueError:
-                        continue
-                    if dv < dov:
-                        n_invalid += 1
-                violated = n_invalid > 0
-                status = _severity_to_status(severity, violated)
-                results.append(_result(run_id, run_timestamp, name, "fieldComparison", dimension,
-                                        n_invalid, "count", None, 0, status,
+                results.append(_result(run_id, run_timestamp, name, "sql", dimension,
+                                        n_invalid, "count", None, threshold, status,
                                         "quarantine" if severity == "error" else "flag", n, n_invalid))
 
     # table-level quality rules
     for rule in table_schema.get("quality", []):
-        rtype = rule["rule"]
         severity = rule.get("severity", "error")
         dimension = rule.get("dimension", "")
+        metric = rule.get("metric")
 
-        if rtype == "duplicateCheck":
-            reg_numbers = [r.get("registration_number") for r in rows]
-            n_dupe = len(reg_numbers) - len(set(reg_numbers))
-            violated = n_dupe != rule["mustBe"]
-            status = _severity_to_status(severity, violated)
-            results.append(_result(run_id, run_timestamp, "registration_number", "duplicateCheck", dimension,
-                                    n_dupe, "count", None, rule["mustBe"], status,
-                                    "quarantine" if severity == "error" else "flag", n, n_dupe))
-
-        elif rtype == "rowCount":
+        if metric == "rowCount":
             lo, hi = rule["mustBeBetween"]
             violated = not (lo <= n <= hi)
             status = _severity_to_status(severity, violated)

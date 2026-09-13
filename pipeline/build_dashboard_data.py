@@ -37,7 +37,7 @@ ENGINE_SHORT = {
 # headline "current vs previous" / trend chart)
 CHECK_PRIORITY = {
     ("sex", "invalid_percent[all]"): 0,
-    ("sex", "validValues"): 1,
+    ("sex", "invalidValues"): 1,
     ("sex", "dbt:accepted_values"): 2,
     ("sex", "sex validity, last 24h only"): 3,
     ("sex", "drift:PSI"): 4,

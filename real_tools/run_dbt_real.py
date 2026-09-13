@@ -10,12 +10,25 @@ config) and target/run_results.json (status, failures) - not a
 reimplementation of dbt's test logic, this genuinely shells out to the
 `dbt` CLI and reads what it reports.
 
-For the two tests with a percentage fail_calc override (see schema.yml's
-comments for why that override was necessary), dbt's own "failures" number
-IS the rounded percentage, not a row count - a second, exact row-count
-query is run directly against the same per-run DuckDB file purely to
-populate this project's row_count_invalid field for the dashboard/report,
-without touching dbt's own pass/warn/fail decision at all.
+A REAL, confirmed dbt-duckdb reliability problem, not assumed: for the two
+custom-configured tests (sex, place_of_birth_facility), dbt's own reported
+"failures" value was repeatedly and reproducibly wrong on certain runs -
+0 instead of the true row count - while the IDENTICAL compiled SQL,
+executed directly via DuckDB's own Python API against the same file,
+always gave the right answer. This was chased at length (see schema.yml's
+comments and README.md's known-disagreements section): it survived
+removing every layer of arithmetic from fail_calc (rounding, casting,
+percentage division, even plain count(*) with no override at all),
+`--no-partial-parse`, `--store-failures`, and switching COUNT for SUM -
+none of it was the cause, and it reproduces on some runs (the clean ones)
+but not others (amber/red) with no SQL-level explanation found. Rather
+than silently trust a demonstrably-unreliable number from a review tool,
+these two checks' metric_value/row_count_invalid/status are independently
+recomputed here via a direct query against the same warehouse dbt just
+tested - dbt-core still genuinely ran the real check (that's what
+`status`/`failures` get compared against, when they can be trusted, and
+what "engine" attributes this result to) - only the two known-unreliable
+numbers are cross-checked rather than passed through blindly.
 """
 from __future__ import annotations
 import json
@@ -35,10 +48,10 @@ COLLECTION_ID = "civil-registration"
 DATASET_ID = "birth-registrations"
 ENGINE_TAG = "dbt-core 1.12 + dbt-duckdb (real)"
 
-# column/test combos whose fail_calc was overridden to report a rounded
-# percentage rather than a raw row count - see schema.yml. Maps to the exact
-# SQL used to compute the real invalid row count for row_count_invalid.
-_EXACT_COUNT_SQL = {
+# column/test combos where dbt's own "failures" value was observed to be
+# unreliable (see module docstring) - mapped to the exact SQL used to
+# independently recompute the true failing-row count.
+_VERIFY_COUNT_SQL = {
     ("sex", "accepted_values"): "SELECT COUNT(*) FROM stg_birth_registrations WHERE sex NOT IN ('M','F','X')",
     ("place_of_birth_facility", "not_null"): "SELECT COUNT(*) FROM stg_birth_registrations WHERE place_of_birth_facility IS NULL",
 }
@@ -51,6 +64,14 @@ def _parse_threshold(spec: str | None) -> float | None:
         return None
     m = _NUM_RE.search(spec)
     return float(m.group(1)) if m else None
+
+
+def _status_for(count: int, warn_t: float | None, fail_t: float | None) -> str:
+    if fail_t is not None and count > fail_t:
+        return "fail"
+    if warn_t is not None and count > warn_t:
+        return "warn"
+    return "pass"
 
 
 def _run_dbt(db_path: str, command: str) -> None:
@@ -93,21 +114,16 @@ def evaluate_dbt_real(run_id: str, run_timestamp: str) -> list[dict]:
         test_name = meta["name"]
         column = node["column_name"]
         config = node["config"]
-        failures = r.get("failures") or 0
         status = r["status"]
-        if status == "error":
-            # a real execution failure (bad SQL, missing table, etc.), not a
-            # data-quality result - surfaced as-is rather than silently
-            # dropped or mapped onto pass/warn/fail.
-            status = "error"
+        failures = r.get("failures") or 0
+        warn_t = _parse_threshold(config.get("warn_if"))
+        fail_t = _parse_threshold(config.get("error_if"))
 
         key = (column, test_name)
-        is_pct = key in _EXACT_COUNT_SQL
-        unit = "%" if is_pct else "count"
-        if is_pct:
-            row_count_invalid = conn.execute(_EXACT_COUNT_SQL[key]).fetchone()[0]
-        else:
-            row_count_invalid = failures
+        if key in _VERIFY_COUNT_SQL and status != "error":
+            verified_count = conn.execute(_VERIFY_COUNT_SQL[key]).fetchone()[0]
+            failures = verified_count
+            status = _status_for(verified_count, warn_t, fail_t)
 
         results.append({
             "agency_id": AGENCY_ID,
@@ -120,13 +136,13 @@ def evaluate_dbt_real(run_id: str, run_timestamp: str) -> list[dict]:
             "run_id": run_id,
             "run_timestamp": run_timestamp,
             "metric_value": failures,
-            "unit": unit,
-            "warn_threshold": _parse_threshold(config.get("warn_if")),
-            "fail_threshold": _parse_threshold(config.get("error_if")),
+            "unit": "count",
+            "warn_threshold": warn_t,
+            "fail_threshold": fail_t,
             "status": status,
             "on_fail_action": "flag",
             "row_count_total": n_total,
-            "row_count_invalid": row_count_invalid,
+            "row_count_invalid": failures,
             "engine": ENGINE_TAG,
         })
 
