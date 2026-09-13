@@ -64,3 +64,24 @@ not a schedule.
    GitHub repo); worth revisiting once cleanup starts — does it stay
    merged into this repo, or get split out now that we can actually push
    to GitHub?
+
+7. **[investigate]** Data pipeline observability — flagged as a tangent,
+   not yet scoped. Distinct from what's already built: the QA
+   dashboard/real-tools pipeline checks *data quality* at a point in time;
+   this would be about the health of the *pipeline itself* — did a run
+   happen, how long did it take, did it fail silently, is the data stale.
+   Also distinct from action 3 above (which is specifically "catch
+   upstream tool breakage via a scheduled re-run"). Needs scoping before
+   it becomes an actionable item — open questions:
+   - Instrumentation (run metrics/tracing — e.g. OpenTelemetry, run
+     duration/success history) vs. cataloging (the governance/catalog
+     tools surveyed in `docs/data-contract-engines-landscape.md`'s
+     Category C — DataHub, OpenMetadata) vs. alerting (notify someone
+     when a check fails, rather than only surfacing it on the dashboard
+     next time someone looks)? Could be more than one of these.
+   - Scoped to this PoC's own pipeline runs, or meant to model what a
+     *real* production multi-agency pipeline would need operationally
+     (i.e. part of the PoC's demonstration value, not just this repo's
+     own housekeeping)?
+   - Does it belong as a feature of the existing QA dashboard (a new
+     tier/tab), or as a genuinely separate concern?
