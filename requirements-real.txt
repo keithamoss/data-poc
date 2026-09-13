@@ -1,23 +1,33 @@
-# The actual named tools this pipeline's engines/ stand in for, pinned to
-# recent versions as of early 2026. None of these are pip-installable in
-# the sandbox this repo was built in (PyPI is unreachable there - see
-# README.md's "What's real vs. equivalent" section) - this file is for
-# whichever machine you run this on next with real internet access,
-# whether that's a linked local computer or your own workstation/CI.
+# The actual named tools this pipeline's engines/ stand in for. Verified
+# working together in this exact combination - not just requested versions,
+# actually pip-installed and run end to end via real_tools/*.py.
 #
 #   pip install -r requirements-real.txt
 #
-# Swapping each engine for the real tool is described per-engine in
-# README.md; none of it requires changing the contract/checks YAML files
-# themselves, since those were written as real ODCS/SodaCL/dbt syntax from
-# the start.
+# Wiring up each real tool is described in README.md's "What's real vs.
+# equivalent" table and real_tools/*.py's docstrings. Contrary to what this
+# file originally claimed before any of these were actually run: the Soda
+# checks file and dbt SQL model didn't need to change, but
+# contract/bdm-birth-registrations-contract.yaml needed real, structural
+# fixes to lint at all under datacontract-cli (wrong shapes for
+# description/support/team, an invented rule vocabulary in place of real
+# ODCS `metric` names, invalid dimension/enum values), and
+# dbt_project/models/staging/schema.yml needed its severity config fixed
+# (a "%" suffix on warn_if/error_if isn't real dbt-core syntax) - see each
+# file's own comments and README.md's known-disagreements section for the
+# full account of what was wrong and how it was found.
 
-dbt-core>=1.8
-dbt-duckdb>=1.8          # or dbt-postgres / another warehouse adapter - swap data/warehouse.db (SQLite) for DuckDB or Postgres first
-duckdb>=1.0
-soda-core-duckdb>=3.3    # or soda-core-postgres, matching whichever warehouse you pick above
-datacontract-cli>=0.10
-evidently>=0.4
+dbt-core>=1.12
+dbt-duckdb>=1.11
+# datacontract-cli's [duckdb] extra pulls in ibis-framework, which wants a
+# newer duckdb than soda-core-duckdb (<1.1.0) allows - duckdb 1.0.0 is the
+# version both actually tolerate together, confirmed by running both real
+# tools against the same environment. Bump only after re-checking that
+# constraint still holds.
+duckdb==1.0.0
+soda-core-duckdb>=3.5
+datacontract-cli[duckdb]>=1.2
+evidently>=0.7
 pandas>=2.2
 numpy>=1.26
 PyYAML>=6.0

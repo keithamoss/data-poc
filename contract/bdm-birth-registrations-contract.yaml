@@ -18,7 +18,14 @@
 # see "Planned changes" in customProperties below, and the worked-example
 # section of the report for how that transition would actually play out.
 
-apiVersion: v3.0.2
+# datacontract-cli 1.2.0 lints every contract against its own bundled
+# odcs-3.2.0.schema.json regardless of the apiVersion declared here (see
+# datacontract.lint.resolve's `resolve_data_contract` - the schema_location
+# is hardcoded to "odcs-3.2.0.schema.json" unless one is passed explicitly)
+# - found by tracing why a 3.0.2-shaped `team:` kept failing lint even
+# though it matched the real odcs-3.0.2.schema.json's own `team` definition
+# exactly. Declaring v3.2.0 here matches what is actually enforced.
+apiVersion: v3.2.0
 kind: DataContract
 id: bdm-birth-registrations
 status: draft
@@ -26,24 +33,41 @@ version: 1.0.0
 
 name: Birth Registrations Feed
 domain: civil-registration
-description: >
-  Daily extract of birth registrations from the Registry of Births, Deaths
-  and Marriages (BDM), supplied to the central multi-agency data asset for
-  identity and eligibility matching by consuming agencies.
+# ODCS v3's `description` is an object (usage/purpose/limitations), not a
+# bare string - the original draft had a plain string here, which
+# `datacontract lint` rejects outright ("data.description must be object").
+# Found by actually linting this file for the first time, per this file's
+# own header comment asking for exactly that.
+description:
+  purpose: >
+    Daily extract of birth registrations from the Registry of Births, Deaths
+    and Marriages (BDM), supplied to the central multi-agency data asset for
+    identity and eligibility matching by consuming agencies.
 
+# v3.2.0's `team` is a single object with a `members:` list (v3.0.2's was
+# itself the list) - see the apiVersion comment above for why 3.2.0 is what
+# actually gets validated here. Each TeamMember also requires `username`
+# (found by lint) - these are placeholders, same as the real-contact TODOs
+# already in this file.
 team:
-  - role: dataOwner
-    name: Registry of Births, Deaths and Marriages
-  - role: dataSteward
-    description: BDM data governance contact - update with a real name/email before use
-  - role: consumer
-    name: Central multi-agency data asset
+  members:
+    - role: dataOwner
+      name: Registry of Births, Deaths and Marriages
+      username: bdm-data-owner@example.gov.au  # placeholder - update before use
+    - role: dataSteward
+      username: bdm-data-steward@example.gov.au  # placeholder - update before use
+      description: BDM data governance contact - update with a real name/email before use
+    - role: consumer
+      name: Central multi-agency data asset
+      username: multi-agency-data-asset@example.gov.au  # placeholder - update before use
 
+# ODCS v3's `support` is itself the array of channels - not wrapped in a
+# `channels:` key as originally written (data.support must be array, per
+# real lint).
 support:
-  channels:
-    - channel: email
-      tool: email
-      description: BDM data supply team - replace with a real contact before use
+  - channel: email
+    tool: email
+    description: BDM data supply team - replace with a real contact before use
 
 servers:
   - server: production
@@ -66,28 +90,46 @@ schema:
         required: true
         unique: true
         description: BDM's unique registration identifier. Primary key of the feed.
+        # `rule: nullCheck`/`regexPattern`/etc (below and throughout this
+        # file) were never real ODCS v3 vocabulary - the DataQuality model
+        # datacontract-cli actually validates against has no `rule` field
+        # (deprecated in favour of `metric`) and no `mustBeRegex` at all.
+        # The real metric names/shapes (nullValues, invalidValues with a
+        # `pattern`/`validValues` argument, duplicateValues, rowCount, and
+        # `type: sql` for anything else) were found by reading
+        # datacontract-cli's own check-building code after `datacontract
+        # lint`/`test` rejected the original invented names outright - see
+        # README.md's known-disagreements section for the full account.
         quality:
-          - rule: nullCheck
+          - metric: nullValues
             dimension: completeness
             mustBe: 0
             severity: error
             description: Every record must carry a registration number.
-          - rule: regexPattern
-            dimension: validity
-            mustBeRegex: "^BDM-[0-9]{9}$"
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              pattern: "^BDM-[0-9]{9}$"
+            mustBe: 0
             severity: error
             description: >
               Catches upstream ID-format changes (e.g. a source-system
               migration) before they reach consumers as silent garbage.
+          - metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+            description: No two rows may share a registration_number.
 
       - name: child_given_names
         logicalType: string
         physicalType: varchar(200)
         required: true
         quality:
-          - rule: nullCheck
+          - metric: nullValues
             dimension: completeness
-            mustBeLessThan: 0.01
+            unit: percent
+            mustBeLessThan: 1
             severity: error
             description: >
               Allows a small non-zero null rate (data-entry lag at source)
@@ -99,9 +141,10 @@ schema:
         physicalType: varchar(200)
         required: true
         quality:
-          - rule: nullCheck
+          - metric: nullValues
             dimension: completeness
-            mustBeLessThan: 0.01
+            unit: percent
+            mustBeLessThan: 1
             severity: error
 
       - name: date_of_birth
@@ -109,13 +152,16 @@ schema:
         physicalType: date
         required: true
         quality:
-          - rule: nullCheck
+          - metric: nullValues
             dimension: completeness
             mustBe: 0
             severity: error
-          - rule: validDateRange
-            dimension: validity
-            mustBeBetween: ["1900-01-01", "$today"]
+          - type: sql
+            dimension: conformity
+            # mustBeBetween is numeric-only in the real ODCS model (no date
+            # strings) - a date-range rule needs a custom SQL check instead.
+            query: "SELECT COUNT(*) FROM {model} WHERE {field} < DATE '1900-01-01' OR {field} > CURRENT_DATE"
+            mustBe: 0
             severity: error
             description: >
               Guards against a type/format change upstream (e.g. a
@@ -128,9 +174,11 @@ schema:
         physicalType: varchar(1)
         required: true
         quality:
-          - rule: validValues
-            dimension: validity
-            mustBe: ["M", "F", "X"]
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["M", "F", "X"]
+            mustBe: 0
             severity: error
             description: >
               A closed value set. If BDM's source system starts emitting a
@@ -142,9 +190,10 @@ schema:
         physicalType: varchar(100)
         required: true
         quality:
-          - rule: nullCheck
+          - metric: nullValues
             dimension: completeness
-            mustBeLessThan: 0.02
+            unit: percent
+            mustBeLessThan: 2
             severity: warning
 
       - name: place_of_birth_facility
@@ -158,13 +207,21 @@ schema:
         physicalType: date
         required: true
         quality:
-          - rule: nullCheck
+          - metric: nullValues
             dimension: completeness
             mustBe: 0
             severity: error
-          - rule: fieldComparison
-            dimension: validity
-            mustBeGreaterThanOrEqualTo: date_of_birth
+          - type: sql
+            # a cross-field logical rule, not a format/pattern match -
+            # ODCS's "consistency" dimension (not "conformity") fits a
+            # relationship holding true across a record's own fields. No
+            # mustBeGreaterThanOrEqualTo-against-another-field shape exists
+            # in the real model (its mustBeGreaterOrEqualTo/etc compare
+            # against a fixed number, not another column) - a cross-field
+            # comparison needs a custom SQL check instead.
+            dimension: consistency
+            query: "SELECT COUNT(*) FROM {model} WHERE date_registered < date_of_birth"
+            mustBe: 0
             severity: error
             description: A registration date earlier than the birth date indicates a corrupt or misjoined record.
 
@@ -173,9 +230,10 @@ schema:
         physicalType: varchar(200)
         required: false
         quality:
-          - rule: nullCheck
+          - metric: nullValues
             dimension: completeness
-            mustBeLessThan: 0.05
+            unit: percent
+            mustBeLessThan: 5
             severity: warning
 
       - name: registering_parent_2_name
@@ -183,9 +241,10 @@ schema:
         physicalType: varchar(200)
         required: false
         quality:
-          - rule: nullCheck
+          - metric: nullValues
             dimension: completeness
-            mustBeLessThan: 0.30
+            unit: percent
+            mustBeLessThan: 30
             severity: info
             description: Higher tolerance - single-parent registrations are legitimately common.
 
@@ -194,7 +253,7 @@ schema:
         physicalType: boolean
         required: true
         quality:
-          - rule: nullCheck
+          - metric: nullValues
             dimension: completeness
             mustBe: 0
             severity: error
@@ -212,12 +271,12 @@ schema:
         description: When this record was extracted from BDM's source system, not when the file landed in S3.
 
     quality:
-      - rule: duplicateCheck
-        dimension: uniqueness
-        mustBe: 0
-        severity: error
-        description: No two rows may share a registration_number.
-      - rule: rowCount
+      # the duplicateCheck rule that used to live here moved to
+      # registration_number's own quality list above: real ODCS's
+      # duplicateValues metric works at field level directly (no need for
+      # the arguments.properties list a table-level composite-key check
+      # would need for a single column).
+      - metric: rowCount
         dimension: completeness
         mustBeBetween: [500, 20000]
         severity: warning
