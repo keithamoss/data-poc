@@ -1,0 +1,595 @@
+# Open Data Contract Standard (ODCS) v3.2.0 contract for the Child
+# Protection Casework collection - six related tables, one contract,
+# matching how a real "collection" (Agency -> Collection -> Dataset ->
+# Column, per docs/data-contract-engines-landscape.md's QA reporting
+# layers section) is genuinely one governed unit, not six independent
+# datasets that happen to share a name.
+#
+# Phase 1 of wiring this collection into the QA pipeline (see
+# plans/wider.md action 2): per-table column-level quality rules only.
+# The seven real foreign-key relationships between these tables, and the
+# three cross-table business rules (escalation completeness, placement/
+# carer approval compliance, closed-case investigation hygiene), come in
+# phase 2 - both need `type: sql` rules that reference more than one
+# table's rows, which ODCS supports (a rule's query isn't restricted to
+# its own schema object), but are being added once phase 1's per-table
+# rules are confirmed working end to end first.
+#
+# Vocabulary matches contract/bdm-birth-registrations-contract.yaml exactly
+# (metric: nullValues/invalidValues/duplicateValues/rowCount, the real
+# dimension enum, apiVersion v3.2.0) - see that file's comments and
+# README.md's known-disagreements section for why, found the hard way by
+# actually running datacontract-cli against the birth-registrations
+# contract first.
+
+apiVersion: v3.2.0
+kind: DataContract
+id: child-protection-casework
+status: draft
+version: 1.0.0
+
+name: Child Protection Casework Collection
+domain: child-and-family-safety
+description:
+  purpose: >
+    The Child Protection Casework collection: notifications received about
+    a child, the investigations they may escalate to, the carer placements
+    that may result, and the case workers and carers involved. Six related
+    tables under one collection, with real foreign keys between them -
+    unlike the single-table Birth Registrations feed, this is where the
+    QA pipeline demonstrates whole-collection checks (see phase 2).
+
+team:
+  members:
+    - role: dataOwner
+      name: Department for Child Protection and Family Support
+      username: cp-data-owner@example.gov.au  # placeholder - update before use
+    - role: dataSteward
+      username: cp-data-steward@example.gov.au  # placeholder - update before use
+      description: Child Protection data governance contact - update with a real name/email before use
+    - role: consumer
+      name: Central multi-agency data asset
+      username: multi-agency-data-asset@example.gov.au  # placeholder - update before use
+
+support:
+  - channel: email
+    tool: email
+    description: Child Protection data supply team - replace with a real contact before use
+
+servers:
+  - server: production
+    type: s3
+    location: s3://gov-data-exchange/child-protection/casework/
+    format: csv
+    delimiter: comma
+    description: >
+      Current delivery mechanism: a full periodic extract of the active
+      casework collection, dropped into this bucket. No direct source
+      connection yet.
+
+schema:
+  - name: cp_clients
+    physicalType: table
+    description: One row per child with a Child Protection casework history.
+    properties:
+      - name: cp_client_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        unique: true
+        description: This agency's unique client identifier. Primary key of this table.
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+          - metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+      - name: given_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: family_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: date_of_birth
+        logicalType: date
+        physicalType: date
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: sex
+        logicalType: string
+        physicalType: varchar(1)
+        required: true
+        quality:
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["M", "F", "X"]
+            mustBe: 0
+            severity: error
+      - name: suburb
+        logicalType: string
+        physicalType: varchar(100)
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: postcode
+        logicalType: string
+        physicalType: varchar(4)
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: case_opened_date
+        logicalType: date
+        physicalType: date
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: case_status
+        logicalType: string
+        physicalType: varchar(10)
+        required: true
+        description: Open or Closed.
+        quality:
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Open", "Closed"]
+            mustBe: 0
+            severity: error
+      - name: extract_timestamp
+        logicalType: date
+        physicalType: timestamp
+        required: true
+        description: When this snapshot was extracted from the casework system.
+    quality:
+      - metric: rowCount
+        dimension: completeness
+        mustBeBetween: [300, 900]
+        severity: warning
+        description: >
+          A rough sanity band for the active client population per
+          extract - catches a truncated or duplicated-file extract, same
+          rationale as the Birth Registrations contract's rowCount rule.
+
+  - name: cp_notifications
+    physicalType: table
+    description: >
+      One row per notification (a report of concern about a child) -
+      1-4 per client, more for children with a higher-risk history.
+    properties:
+      - name: notification_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        unique: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+          - metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+            description: >
+              The dirty(amber/red) presets on this table (see
+              generator/dirty.py's apply_cp_notifications_presets)
+              deliberately inject near-duplicate notifications - a real
+              double-submission scenario - so this rule has something
+              genuine to catch on those runs.
+      - name: cp_client_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: notification_date
+        logicalType: date
+        physicalType: date
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: source_type
+        logicalType: string
+        physicalType: varchar(30)
+        required: true
+        quality:
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["School", "Police", "Health service", "Family member", "Neighbour", "Anonymous", "Self-report"]
+            mustBe: 0
+            severity: error
+      - name: concern_type
+        logicalType: string
+        physicalType: varchar(50)
+        required: true
+        description: >
+          Closed value set. The dirty(amber/red) presets inject unknown
+          codes here - the deliberate traffic-light demo column for this
+          collection, same role sex plays for Birth Registrations.
+        quality:
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Neglect", "Physical abuse", "Emotional abuse", "Sexual abuse",
+                            "Domestic violence exposure", "Parental substance use", "Parental mental health concern"]
+            mustBe: 0
+            severity: error
+      - name: risk_rating
+        logicalType: string
+        physicalType: varchar(10)
+        required: true
+        quality:
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Low", "Medium", "High", "Critical"]
+            mustBe: 0
+            severity: error
+      - name: assigned_worker_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: outcome
+        logicalType: string
+        physicalType: varchar(30)
+        required: true
+        quality:
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["No further action", "Referred to family support", "Investigation opened"]
+            mustBe: 0
+            severity: error
+      - name: extract_timestamp
+        logicalType: date
+        physicalType: timestamp
+        required: true
+    quality:
+      - metric: rowCount
+        dimension: completeness
+        mustBeBetween: [600, 1600]
+        severity: warning
+
+  - name: cp_investigations
+    physicalType: table
+    description: One row per investigation opened from an escalated notification.
+    properties:
+      - name: investigation_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        unique: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+          - metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+      - name: notification_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: cp_client_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: start_date
+        logicalType: date
+        physicalType: date
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: end_date
+        logicalType: date
+        physicalType: date
+        required: false
+        description: Nullable - the investigation may still be open (~12% of them are, by generator design).
+      - name: substantiated
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Substantiated", "Not substantiated", "Inconclusive"]
+            mustBe: 0
+            severity: error
+      - name: lead_worker_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: extract_timestamp
+        logicalType: date
+        physicalType: timestamp
+        required: true
+    quality:
+      - metric: rowCount
+        dimension: completeness
+        mustBeBetween: [80, 350]
+        severity: warning
+
+  - name: cp_placements
+    physicalType: table
+    description: One row per out-of-home-care placement (0-2 per client; not every client has one).
+    properties:
+      - name: placement_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        unique: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+          - metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+      - name: cp_client_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: placement_type
+        logicalType: string
+        physicalType: varchar(30)
+        required: true
+        quality:
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Kinship care", "Foster care", "Residential care", "Family group home"]
+            mustBe: 0
+            severity: error
+      - name: carer_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: placement_start
+        logicalType: date
+        physicalType: date
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: placement_end
+        logicalType: date
+        physicalType: date
+        required: false
+        description: Nullable - the placement may still be ongoing (~22% of them are, by generator design).
+      - name: placement_suburb
+        logicalType: string
+        physicalType: varchar(100)
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: extract_timestamp
+        logicalType: date
+        physicalType: timestamp
+        required: true
+    quality:
+      - metric: rowCount
+        dimension: completeness
+        mustBeBetween: [100, 450]
+        severity: warning
+
+  - name: cp_carers
+    physicalType: table
+    description: One row per approved (or in-approval) carer available for placements.
+    properties:
+      - name: carer_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        unique: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+          - metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+      - name: given_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: family_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: carer_type
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Kinship", "Foster", "Residential-staff"]
+            mustBe: 0
+            severity: error
+      - name: approval_status
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Approved", "Provisional", "Under review"]
+            mustBe: 0
+            severity: error
+      - name: extract_timestamp
+        logicalType: date
+        physicalType: timestamp
+        required: true
+    quality:
+      - metric: rowCount
+        dimension: completeness
+        mustBeBetween: [150, 500]
+        severity: warning
+
+  - name: cp_case_workers
+    physicalType: table
+    description: One row per case worker who may be assigned notifications or lead investigations.
+    properties:
+      - name: worker_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        unique: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+          - metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+      - name: given_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: family_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: true
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+      - name: team_region
+        logicalType: string
+        physicalType: varchar(30)
+        required: true
+        quality:
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Metro North", "Metro South", "Metro East", "South West", "Great Southern",
+                            "Goldfields", "Kimberley", "Pilbara", "Wheatbelt", "Midwest-Gascoyne"]
+            mustBe: 0
+            severity: error
+      - name: extract_timestamp
+        logicalType: date
+        physicalType: timestamp
+        required: true
+    quality:
+      - metric: rowCount
+        dimension: completeness
+        mustBeBetween: [40, 80]
+        severity: warning
+
+slaProperties:
+  - property: frequency
+    value: 7
+    unit: d
+    element: cp_clients
+  - property: latency
+    value: 24
+    unit: h
+    element: cp_clients
+    description: Maximum acceptable delay between an extract being pulled and it landing in S3.
+
+customProperties:
+  - property: currentDeliveryFormat
+    value: csv
+  - property: piiClassification
+    value: "Contains sensitive personal information about children and families. Confirm and record the correct security/handling classification for your agency before this leaves draft status."
