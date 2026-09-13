@@ -22,7 +22,7 @@ ROOT = os.path.join(os.path.dirname(__file__), "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
 SODA_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-soda-checks.yml")
 DBT_PROJECT_DIR = os.path.join(ROOT, "dbt_project")
-DB_PATH = os.path.join(ROOT, "data", "warehouse.db")
+DB_PATH = os.path.join(ROOT, "data", "warehouse.duckdb")
 MANIFEST_PATH = os.path.join(ROOT, "data", "raw", "manifest.json")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results.json")
 

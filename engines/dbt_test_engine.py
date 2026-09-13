@@ -20,8 +20,8 @@ here by counting failing rows and applying the operator string
 """
 from __future__ import annotations
 import re
-import sqlite3
 
+import duckdb
 import jinja2
 import yaml
 
@@ -39,10 +39,9 @@ def _render_model_sql(sql_path: str, source_table: str) -> str:
     return template.render(source=lambda *a: source_table)
 
 
-def _build_staging_view(conn: sqlite3.Connection, sql_path: str, source_table: str = "birth_registrations") -> None:
+def _build_staging_view(conn: duckdb.DuckDBPyConnection, sql_path: str, source_table: str = "birth_registrations") -> None:
     select_sql = _render_model_sql(sql_path, source_table)
-    conn.execute(f"DROP VIEW IF EXISTS {VIEW_NAME}")
-    conn.execute(f"CREATE VIEW {VIEW_NAME} AS {select_sql}")
+    conn.execute(f"CREATE OR REPLACE VIEW {VIEW_NAME} AS {select_sql}")
 
 
 def _parse_threshold(spec: str) -> tuple[str, float, bool]:
@@ -104,7 +103,7 @@ def evaluate_dbt_tests(project_dir: str, db_path: str, run_id: str, run_timestam
     with open(schema_path) as f:
         schema = yaml.safe_load(f)
 
-    conn = sqlite3.connect(db_path)
+    conn = duckdb.connect(db_path)
     _build_staging_view(conn, sql_path)
 
     results = []
@@ -119,7 +118,7 @@ def evaluate_dbt_tests(project_dir: str, db_path: str, run_id: str, run_timestam
                     cfg = (spec or {}).get("config", {}) if isinstance(spec, dict) else {}
 
                 n_total = conn.execute(
-                    f"SELECT COUNT(*) FROM {VIEW_NAME} WHERE run_id = ?", (run_id,)
+                    f"SELECT COUNT(*) FROM {VIEW_NAME} WHERE run_id = ?", [run_id]
                 ).fetchone()[0]
 
                 if test_name == "unique":
@@ -127,13 +126,13 @@ def evaluate_dbt_tests(project_dir: str, db_path: str, run_id: str, run_timestam
                         f"""SELECT COALESCE(SUM(c - 1), 0) FROM (
                                 SELECT COUNT(*) AS c FROM {VIEW_NAME}
                                 WHERE run_id = ? GROUP BY {col_name} HAVING COUNT(*) > 1
-                            )""", (run_id,)
+                            )""", [run_id]
                     ).fetchone()[0]
 
                 elif test_name == "not_null":
                     n_fail = conn.execute(
                         f"SELECT COUNT(*) FROM {VIEW_NAME} WHERE run_id = ? AND {col_name} IS NULL",
-                        (run_id,)
+                        [run_id]
                     ).fetchone()[0]
 
                 elif test_name == "accepted_values":
@@ -143,7 +142,7 @@ def evaluate_dbt_tests(project_dir: str, db_path: str, run_id: str, run_timestam
                         f"""SELECT COUNT(*) FROM {VIEW_NAME}
                             WHERE run_id = ? AND {col_name} IS NOT NULL
                             AND {col_name} NOT IN ({placeholders})""",
-                        (run_id, *values)
+                        [run_id, *values]
                     ).fetchone()[0]
 
                 else:
@@ -180,7 +179,7 @@ if __name__ == "__main__":
     import os
     from datetime import datetime
     project_dir = os.path.join(os.path.dirname(__file__), "..", "dbt_project")
-    db_path = os.path.join(os.path.dirname(__file__), "..", "data", "warehouse.db")
+    db_path = os.path.join(os.path.dirname(__file__), "..", "data", "warehouse.duckdb")
     for run_id in ["run_01_2026-09-01", "run_04_2026-09-04", "run_09_2026-09-09"]:
         res = evaluate_dbt_tests(project_dir, db_path, run_id, datetime.utcnow().isoformat())
         print(f"--- {run_id} ---")

@@ -15,9 +15,9 @@ behaviour per check.
 """
 from __future__ import annotations
 import re
-import sqlite3
 from datetime import datetime, timedelta
 
+import duckdb
 import yaml
 
 AGENCY_ID = "registry-services"
@@ -119,9 +119,10 @@ def evaluate_soda(checks_path: str, db_path: str, run_id: str, run_timestamp: st
         doc = yaml.safe_load_all(f)
         docs = list(doc)
 
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    rows = [dict(r) for r in conn.execute(f"SELECT * FROM {TABLE} WHERE run_id = ?", (run_id,)).fetchall()]
+    conn = duckdb.connect(db_path)
+    df = conn.execute(f"SELECT * FROM {TABLE} WHERE run_id = ?", [run_id]).df()
+    df = df.astype(object).where(df.notna(), None)
+    rows = df.to_dict("records")
     n_total = len(rows)
     results: list[dict] = []
 
@@ -143,13 +144,13 @@ def evaluate_soda(checks_path: str, db_path: str, run_id: str, run_timestamp: st
             # timestamps (the latest extract_timestamp in the run stands in
             # for "now", since these are historical synthetic runs rather
             # than a live feed with a real wall-clock "today").
-            extract_dates = [r["extract_timestamp"] for r in rows if r.get("extract_timestamp")]
-            as_of = max(extract_dates) if extract_dates else run_timestamp
+            extract_dates = [str(r["extract_timestamp"]) for r in rows if r.get("extract_timestamp")]
+            as_of = max(extract_dates) if extract_dates else str(run_timestamp)
             as_of_date = datetime.strptime(as_of[:10], "%Y-%m-%d")
             cutoff = as_of_date - timedelta(days=1)
             scoped_rows = [
                 r for r in rows
-                if r.get("extract_timestamp") and datetime.strptime(r["extract_timestamp"][:10], "%Y-%m-%d") >= cutoff
+                if r.get("extract_timestamp") and datetime.strptime(str(r["extract_timestamp"])[:10], "%Y-%m-%d") >= cutoff
             ]
             # extract_timestamp is same-day as run_date for every synthetic
             # row in this dataset, so "recent" == "all" here in practice -
@@ -207,6 +208,6 @@ if __name__ == "__main__":
     import json
     import os
     checks_path = os.path.join(os.path.dirname(__file__), "..", "contract", "bdm-birth-registrations-soda-checks.yml")
-    db_path = os.path.join(os.path.dirname(__file__), "..", "data", "warehouse.db")
+    db_path = os.path.join(os.path.dirname(__file__), "..", "data", "warehouse.duckdb")
     res = evaluate_soda(checks_path, db_path, "run_04_2026-09-04", datetime.utcnow().isoformat())
     print(json.dumps(res, indent=2))

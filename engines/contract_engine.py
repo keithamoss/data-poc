@@ -24,10 +24,10 @@ which row.
 """
 from __future__ import annotations
 import re
-import sqlite3
 from datetime import date, datetime
 from typing import Any
 
+import duckdb
 import yaml
 
 AGENCY_ID = "registry-services"
@@ -65,17 +65,17 @@ def _result(run_id, run_ts, column, check_name, dimension, metric_value, unit,
     }
 
 
-def _rows_for_run(conn: sqlite3.Connection, run_id: str) -> list[dict]:
-    conn.row_factory = sqlite3.Row
-    cur = conn.execute(f"SELECT * FROM {TABLE} WHERE run_id = ?", (run_id,))
-    return [dict(r) for r in cur.fetchall()]
+def _rows_for_run(conn: duckdb.DuckDBPyConnection, run_id: str) -> list[dict]:
+    df = conn.execute(f"SELECT * FROM {TABLE} WHERE run_id = ?", [run_id]).df()
+    df = df.astype(object).where(df.notna(), None)
+    return df.to_dict("records")
 
 
 def evaluate_contract(contract_path: str, db_path: str, run_id: str, run_timestamp: str) -> list[dict]:
     with open(contract_path) as f:
         contract = yaml.safe_load(f)
 
-    conn = sqlite3.connect(db_path)
+    conn = duckdb.connect(db_path)
     rows = _rows_for_run(conn, run_id)
     n = len(rows)
     results: list[dict] = []
@@ -221,6 +221,6 @@ if __name__ == "__main__":
     import json
     import os
     contract_path = os.path.join(os.path.dirname(__file__), "..", "contract", "bdm-birth-registrations-contract.yaml")
-    db_path = os.path.join(os.path.dirname(__file__), "..", "data", "warehouse.db")
+    db_path = os.path.join(os.path.dirname(__file__), "..", "data", "warehouse.duckdb")
     res = evaluate_contract(contract_path, db_path, "run_09_2026-09-09", datetime.utcnow().isoformat())
     print(json.dumps(res, indent=2))

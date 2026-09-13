@@ -16,12 +16,13 @@ by embed_dashboard_data.py as a JS const.
 from __future__ import annotations
 import json
 import os
-import sqlite3
 from datetime import datetime
+
+import duckdb
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results.json")
-DB_PATH = os.path.join(ROOT, "data", "warehouse.db")
+DB_PATH = os.path.join(ROOT, "data", "warehouse.duckdb")
 OUT_PATH = os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")
 
 ENGINE_SHORT = {
@@ -63,9 +64,9 @@ COLUMN_META = {
 ALL_COLUMNS = list(COLUMN_META.keys())
 
 
-def _sex_value_counts(conn: sqlite3.Connection, run_id: str) -> list[list]:
+def _sex_value_counts(conn: duckdb.DuckDBPyConnection, run_id: str) -> list[list]:
     rows = conn.execute(
-        "SELECT sex, COUNT(*) FROM birth_registrations WHERE run_id = ? GROUP BY sex", (run_id,)
+        "SELECT sex, COUNT(*) FROM birth_registrations WHERE run_id = ? GROUP BY sex", [run_id]
     ).fetchall()
     counts = {"M": 0, "F": 0, "X": 0}
     other = 0
@@ -86,7 +87,7 @@ def build() -> dict:
     manifest = sorted(payload["runs"], key=lambda r: r["run_date"])
     results = payload["results"]
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = duckdb.connect(DB_PATH)
 
     # column_name -> (engine, check_name) -> {unit, warn, fail, by_run_id: {run_id: value}}
     by_column: dict[str, dict[tuple, dict]] = {}
@@ -198,13 +199,13 @@ def build() -> dict:
     latest_entry = next(m for m in manifest if m["run_id"] == latest_run)
     prev_entry = next(m for m in manifest if m["run_id"] == prev_run)
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = duckdb.connect(DB_PATH)
     max_lag_hours = conn.execute(
-        """SELECT MAX((julianday(extract_timestamp) - julianday(date_registered)) * 24)
-           FROM birth_registrations WHERE run_id = ?""", (latest_run,)
+        """SELECT MAX(date_diff('second', date_registered, extract_timestamp)) / 3600.0
+           FROM birth_registrations WHERE run_id = ?""", [latest_run]
     ).fetchone()[0]
     earliest_extract = conn.execute(
-        "SELECT MIN(extract_timestamp) FROM birth_registrations WHERE run_id = ?", (latest_run,)
+        "SELECT MIN(extract_timestamp) FROM birth_registrations WHERE run_id = ?", [latest_run]
     ).fetchone()[0]
     conn.close()
 

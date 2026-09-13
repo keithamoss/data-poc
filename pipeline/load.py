@@ -1,7 +1,8 @@
 """
-Loads every generated run CSV in data/raw/ into one SQLite table,
+Loads every generated run CSV in data/raw/ into one DuckDB table,
 birth_registrations, tagged with run_id/run_date - the "warehouse" that all
-four check engines (contract, soda, dbt, drift) query against.
+four check engines (contract, soda, dbt, drift) query against, and that
+real dbt-duckdb / soda-core-duckdb also connect to directly.
 
 One table with a run_id column (rather than one table per run) is what lets
 the drift engine compare across runs, and lets the "last 24h" scoped Soda
@@ -9,21 +10,20 @@ check (bdm-birth-registrations-soda-checks.yml's `filter ... [recent]`
 block) filter on extract_timestamp within a single unified table, exactly
 as it would against a real warehouse.
 
-Booleans and dates come back from pandas.to_csv as plain strings, so they're
-normalized on the way in (SQLite has no native boolean/date type; this
-engine stores them as TEXT/INTEGER and each check engine parses what it
-needs).
+is_multiple_birth comes back from pandas.to_csv as a "True"/"False" string;
+normalized to 0/1 on the way in so every engine (equivalent and real alike)
+sees the same representation DuckDB itself would use for a BOOLEAN column
+cast from an integer.
 """
 from __future__ import annotations
-import glob
 import json
 import os
-import sqlite3
 
+import duckdb
 import pandas as pd
 
 RAW_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "warehouse.db")
+DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "warehouse.duckdb")
 
 TABLE = "birth_registrations"
 
@@ -42,7 +42,7 @@ def load_all(db_path: str = DB_PATH, raw_dir: str = RAW_DIR) -> None:
 
     if os.path.exists(db_path):
         os.remove(db_path)
-    conn = sqlite3.connect(db_path)
+    conn = duckdb.connect(db_path)
 
     frames = []
     for entry in manifest:
@@ -59,9 +59,20 @@ def load_all(db_path: str = DB_PATH, raw_dir: str = RAW_DIR) -> None:
         {"True": 1, "False": 0, "true": 1, "false": 0}
     ).fillna(0).astype(int)
 
-    full.to_sql(TABLE, conn, if_exists="replace", index=False)
+    # Registering a pandas dataframe straight into DuckDB couples this loader
+    # to whichever arrow/pandas dtype backend happens to be installed (pandas
+    # 3.x's default 'str' text dtype isn't one DuckDB 1.0's registration path
+    # recognizes) - round-tripping through a plain CSV and DuckDB's own
+    # read_csv_auto sidesteps that entirely, the same as loading a real daily
+    # extract would.
+    combined_csv = os.path.join(raw_dir, "_combined.csv")
+    full.to_csv(combined_csv, index=False)
+    conn.execute(
+        f"CREATE OR REPLACE TABLE {TABLE} AS SELECT * FROM read_csv_auto(?, header=true)",
+        [combined_csv],
+    )
     conn.execute(f"CREATE INDEX idx_{TABLE}_run ON {TABLE}(run_id)")
-    conn.commit()
+    os.remove(combined_csv)
 
     n = conn.execute(f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0]
     runs = conn.execute(f"SELECT COUNT(DISTINCT run_id) FROM {TABLE}").fetchone()[0]

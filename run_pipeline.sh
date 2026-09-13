@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# End-to-end: generate synthetic runs -> load into SQLite -> run all four
-# check engines -> aggregate results.json -> reshape for the dashboard ->
-# re-embed real data into the dashboard HTML.
+# End-to-end: generate synthetic runs -> load into DuckDB -> run all four
+# equivalent check engines -> aggregate results.json -> reshape for the
+# dashboard -> re-embed real data into the dashboard HTML.
 #
 # Run this from the repo root. Every step is deterministic (seeded), so
 # re-running regenerates byte-for-byte the same runs/results.

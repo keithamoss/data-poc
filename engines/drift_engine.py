@@ -24,17 +24,18 @@ from __future__ import annotations
 import json
 import math
 import os
-import sqlite3
+
+import duckdb
 
 REFERENCE_RUN_ID = "run_01_2026-09-01"
 CATEGORIES = ["M", "F", "X"]  # closed set per the contract; anything else is out-of-set
 EPS = 1e-4
 
 
-def _distribution(conn: sqlite3.Connection, run_id: str, column: str = "sex") -> dict[str, float]:
+def _distribution(conn: duckdb.DuckDBPyConnection, run_id: str, column: str = "sex") -> dict[str, float]:
     rows = conn.execute(
         f"SELECT {column}, COUNT(*) FROM birth_registrations WHERE run_id = ? GROUP BY {column}",
-        (run_id,)
+        [run_id]
     ).fetchall()
     total = sum(c for _, c in rows)
     counts = {cat: 0 for cat in CATEGORIES}
@@ -65,11 +66,11 @@ def _status_for_psi(psi: float) -> str:
 
 
 def evaluate_drift(db_path: str, run_id: str, run_timestamp: str, reference_run_id: str = REFERENCE_RUN_ID) -> list[dict]:
-    conn = sqlite3.connect(db_path)
+    conn = duckdb.connect(db_path)
     reference = _distribution(conn, reference_run_id)
     actual = _distribution(conn, run_id)
     n_total = conn.execute(
-        "SELECT COUNT(*) FROM birth_registrations WHERE run_id = ?", (run_id,)
+        "SELECT COUNT(*) FROM birth_registrations WHERE run_id = ?", [run_id]
     ).fetchone()[0]
     conn.close()
 
@@ -102,7 +103,7 @@ def evaluate_drift(db_path: str, run_id: str, run_timestamp: str, reference_run_
 
 if __name__ == "__main__":
     from datetime import datetime
-    db_path = os.path.join(os.path.dirname(__file__), "..", "data", "warehouse.db")
+    db_path = os.path.join(os.path.dirname(__file__), "..", "data", "warehouse.duckdb")
     with open(os.path.join(os.path.dirname(__file__), "..", "data", "raw", "manifest.json")) as f:
         manifest = json.load(f)
     for entry in manifest:
