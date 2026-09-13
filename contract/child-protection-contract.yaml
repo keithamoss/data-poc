@@ -5,15 +5,23 @@
 # layers section) is genuinely one governed unit, not six independent
 # datasets that happen to share a name.
 #
-# Phase 1 of wiring this collection into the QA pipeline (see
-# plans/wider.md action 2): per-table column-level quality rules only.
-# The seven real foreign-key relationships between these tables, and the
-# three cross-table business rules (escalation completeness, placement/
-# carer approval compliance, closed-case investigation hygiene), come in
-# phase 2 - both need `type: sql` rules that reference more than one
-# table's rows, which ODCS supports (a rule's query isn't restricted to
-# its own schema object), but are being added once phase 1's per-table
-# rules are confirmed working end to end first.
+# Phase 2 adds the seven real foreign-key relationships between these
+# tables, plus three cross-table business rules (escalation completeness,
+# placement/carer approval compliance, closed-case investigation hygiene) -
+# all as `type: sql` rules on the child table, referencing the parent
+# table's view by its literal name (datacontract-cli only substitutes
+# `{model}` for the rule's OWN schema object; every other schema object's
+# name is created as a real view/table on the same connection, so a
+# literal join to it works - confirmed by actually running `datacontract
+# test`, not assumed from the docs).
+#
+# Two of the three business rules are REAL FINDINGS, not bugs in these
+# rules: child_protection.py (the generator) doesn't enforce them, so they
+# fail at a stable, nonzero rate on every run, dirty or clean - see each
+# rule's own description below and plans/qa-pipeline.md for the tracked
+# follow-up. Left in and documented rather than quietly dropped or
+# loosened, same practice as the dbt-duckdb bug in
+# dbt_project/models/staging/schema.yml.
 #
 # Vocabulary matches contract/bdm-birth-registrations-contract.yaml exactly
 # (metric: nullValues/invalidValues/duplicateValues/rowCount, the real
@@ -290,6 +298,38 @@ schema:
         dimension: completeness
         mustBeBetween: [600, 1600]
         severity: warning
+      - type: sql
+        dimension: consistency
+        query: "SELECT COUNT(*) FROM {model} n LEFT JOIN cp_clients c ON n.cp_client_id = c.cp_client_id WHERE c.cp_client_id IS NULL"
+        mustBe: 0
+        severity: error
+        description: Every notification's cp_client_id must reference an existing cp_clients row.
+      - type: sql
+        dimension: consistency
+        query: "SELECT COUNT(*) FROM {model} n LEFT JOIN cp_case_workers w ON n.assigned_worker_id = w.worker_id WHERE w.worker_id IS NULL"
+        mustBe: 0
+        severity: error
+        description: Every notification's assigned_worker_id must reference an existing cp_case_workers row.
+      - type: sql
+        dimension: completeness
+        query: >-
+          SELECT COUNT(*) FROM {model} n LEFT JOIN cp_investigations i
+          ON n.notification_id = i.notification_id
+          WHERE n.outcome = 'Investigation opened' AND i.investigation_id IS NULL
+        mustBe: 0
+        severity: error
+        description: >
+          Escalation completeness: a notification recorded with outcome
+          'Investigation opened' must have a matching cp_investigations row.
+          Passes 0/0 on every clean run (child_protection.py only ever
+          builds cp_investigations from notifications with this exact
+          outcome, so the two tables start in sync) - genuinely catches
+          the dirty(amber/red) near-duplicate notifications
+          apply_cp_notifications_presets injects, since each duplicate
+          keeps its source row's outcome but gets a perturbed
+          notification_id that cp_investigations was built before and
+          never references. Confirmed for real: 0 on clean runs, 2-3 on
+          amber runs, 6 on the red run.
 
   - name: cp_investigations
     physicalType: table
@@ -370,6 +410,45 @@ schema:
         dimension: completeness
         mustBeBetween: [80, 350]
         severity: warning
+      - type: sql
+        dimension: consistency
+        query: "SELECT COUNT(*) FROM {model} i LEFT JOIN cp_notifications n ON i.notification_id = n.notification_id WHERE n.notification_id IS NULL"
+        mustBe: 0
+        severity: error
+        description: Every investigation's notification_id must reference an existing cp_notifications row.
+      - type: sql
+        dimension: consistency
+        query: "SELECT COUNT(*) FROM {model} i LEFT JOIN cp_clients c ON i.cp_client_id = c.cp_client_id WHERE c.cp_client_id IS NULL"
+        mustBe: 0
+        severity: error
+        description: Every investigation's cp_client_id must reference an existing cp_clients row.
+      - type: sql
+        dimension: consistency
+        query: "SELECT COUNT(*) FROM {model} i LEFT JOIN cp_case_workers w ON i.lead_worker_id = w.worker_id WHERE w.worker_id IS NULL"
+        mustBe: 0
+        severity: error
+        description: Every investigation's lead_worker_id must reference an existing cp_case_workers row.
+      - type: sql
+        dimension: consistency
+        query: >-
+          SELECT COUNT(*) FROM {model} i JOIN cp_clients c
+          ON i.cp_client_id = c.cp_client_id
+          WHERE c.case_status = 'Closed' AND i.end_date IS NULL
+        mustBe: 0
+        severity: error
+        description: >
+          Closed-case investigation hygiene: an investigation should not
+          still be open (end_date NULL) once its client's case_status is
+          Closed. REAL FINDING, not a bug in this rule: currently fails on
+          every run at a stable rate (16/181 investigations, ~9%, on the
+          base collection - confirmed by actually running this query)
+          because child_protection.py generates case_status and
+          investigation end_date independently, with no invariant tying
+          them together. dirty.py has no preset for this table, so the
+          count never varies run to run - a genuine, currently-unaddressed
+          business-process risk this rule is right to keep surfacing
+          rather than hide. Tracked as a generator follow-up in
+          plans/qa-pipeline.md.
 
   - name: cp_placements
     physicalType: table
@@ -450,6 +529,37 @@ schema:
         dimension: completeness
         mustBeBetween: [100, 450]
         severity: warning
+      - type: sql
+        dimension: consistency
+        query: "SELECT COUNT(*) FROM {model} p LEFT JOIN cp_clients c ON p.cp_client_id = c.cp_client_id WHERE c.cp_client_id IS NULL"
+        mustBe: 0
+        severity: error
+        description: Every placement's cp_client_id must reference an existing cp_clients row.
+      - type: sql
+        dimension: consistency
+        query: "SELECT COUNT(*) FROM {model} p LEFT JOIN cp_carers c ON p.carer_id = c.carer_id WHERE c.carer_id IS NULL"
+        mustBe: 0
+        severity: error
+        description: Every placement's carer_id must reference an existing cp_carers row.
+      - type: sql
+        dimension: consistency
+        query: >-
+          SELECT COUNT(*) FROM {model} p JOIN cp_carers c
+          ON p.carer_id = c.carer_id
+          WHERE c.approval_status != 'Approved'
+        mustBe: 0
+        severity: error
+        description: >
+          Placement/carer approval compliance: a placement's carer must be
+          Approved, not Provisional or Under review. REAL FINDING, not a
+          bug in this rule: currently fails on every run at a stable rate
+          (37/242 placements, ~15%, on the base collection - confirmed by
+          actually running this query) because child_protection.py assigns
+          carer_for_placement from the full carer pool regardless of
+          approval_status. dirty.py has no preset for this table either,
+          so the count never varies run to run. Same honest-finding
+          treatment as the investigation-hygiene rule above; tracked
+          alongside it in plans/qa-pipeline.md.
 
   - name: cp_carers
     physicalType: table

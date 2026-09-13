@@ -1,0 +1,106 @@
+# SodaCL checks for the Child Protection Casework collection - the
+# relationships + cross-table business rules half of Phase 2 (see
+# plans/wider.md action 2 and contract/child-protection-contract.yaml's
+# matching ODCS quality rules, which cover the same 7 FKs and 3 business
+# rules in the contract-native vocabulary).
+#
+# Real SodaCL syntax, confirmed by actually running `soda scan` against a
+# real per-run CP warehouse (real_tools/build_cp_warehouses.py), not just
+# written to look plausible - the two real tokens this file leans on:
+#   - a reference check: `values in (<fk column>) must exist in <parent
+#     table> (<parent column>)` - soda's own dedicated FK check type.
+#   - a `failed rows` check with a nested `fail query:` - the rows a full
+#     SQL query returns ARE the failing rows, which is what a cross-table
+#     business rule needs (a reference check only ever compares one
+#     column to one other column).
+# One real gotcha, found by actually running this (not visible from the
+# SodaCL docs alone): plain YAML forbids two top-level `checks for <table>:`
+# keys for the same table in one file - a later duplicate silently replaces
+# the earlier one before Soda ever parses it. Each table's checks (row
+# count, FK references, business rule) are combined into one block below
+# rather than split by "kind of check" the way this repo's comments might
+# otherwise group them.
+#
+# Usage (once you have Soda Core set up, one scan per run - see
+# real_tools/run_soda_real.py's docstring for why):
+#   soda scan -d cp_collection -c real_tools/soda_configuration.yml \
+#       contract/child-protection-soda-checks.yml
+
+checks for cp_clients:
+  - row_count:
+      warn: when < 300
+      fail:
+        when < 100
+        when > 2000
+
+checks for cp_notifications:
+  - row_count:
+      warn: when < 600
+      fail:
+        when < 200
+        when > 3000
+
+  # --- 2 of the 7 real foreign-key relationships (the rest are on the ---
+  # other tables' blocks below). All pass on every run, dirty or clean, on
+  # this fixture - generator/dirty.py only ever touches cp_notifications'
+  # concern_type/notification_id columns, never the FK columns themselves.
+  # Kept as real checks anyway: the same genuine backstop against a
+  # dropped join or truncated parent-table extract that
+  # child-protection-contract.yaml's matching SQL rules explain in more
+  # depth.
+  - values in (cp_client_id) must exist in cp_clients (cp_client_id)
+  - values in (assigned_worker_id) must exist in cp_case_workers (worker_id)
+
+  # --- Business rule 1 of 3: escalation completeness ---------------------
+  - failed rows:
+      name: Escalation completeness
+      fail query: |
+        SELECT n.notification_id
+        FROM cp_notifications n
+        LEFT JOIN cp_investigations i ON n.notification_id = i.notification_id
+        WHERE n.outcome = 'Investigation opened' AND i.investigation_id IS NULL
+      # 0/0 on clean runs (cp_investigations is only ever built from
+      # notifications with this exact outcome) - genuinely catches the
+      # dirty(amber/red) near-duplicate notifications
+      # apply_cp_notifications_presets injects, since each duplicate keeps
+      # its source row's outcome but gets a perturbed notification_id that
+      # cp_investigations never references. Confirmed for real: 0 clean,
+      # 2-3 amber, 6 on the red run - same numbers
+      # child-protection-contract.yaml's matching rule found.
+
+checks for cp_investigations:
+  - values in (notification_id) must exist in cp_notifications (notification_id)
+  - values in (cp_client_id) must exist in cp_clients (cp_client_id)
+  - values in (lead_worker_id) must exist in cp_case_workers (worker_id)
+
+  # --- Business rule 2 of 3: closed-case investigation hygiene -----------
+  - failed rows:
+      name: Closed-case investigation hygiene
+      fail query: |
+        SELECT i.investigation_id
+        FROM cp_investigations i
+        JOIN cp_clients c ON i.cp_client_id = c.cp_client_id
+        WHERE c.case_status = 'Closed' AND i.end_date IS NULL
+      # REAL FINDING, not a bug in this check: fails at a stable ~9% rate
+      # (16/181 investigations) on every run, dirty or clean, because
+      # child_protection.py generates case_status and investigation
+      # end_date independently - see child-protection-contract.yaml's
+      # matching rule and plans/qa-pipeline.md for the tracked follow-up.
+
+checks for cp_placements:
+  - values in (cp_client_id) must exist in cp_clients (cp_client_id)
+  - values in (carer_id) must exist in cp_carers (carer_id)
+
+  # --- Business rule 3 of 3: placement/carer approval compliance ---------
+  - failed rows:
+      name: Placement/carer approval compliance
+      fail query: |
+        SELECT p.placement_id
+        FROM cp_placements p
+        JOIN cp_carers c ON p.carer_id = c.carer_id
+        WHERE c.approval_status != 'Approved'
+      # REAL FINDING, not a bug in this check: fails at a stable ~15% rate
+      # (37/242 placements) on every run, dirty or clean, because
+      # child_protection.py assigns carers from the full pool regardless
+      # of approval_status - see child-protection-contract.yaml's matching
+      # rule and plans/qa-pipeline.md for the tracked follow-up.

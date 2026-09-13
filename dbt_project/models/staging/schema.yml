@@ -38,11 +38,26 @@ version: 2
 # See README.md's "known simplifications and honest disagreements" for the
 # fuller account of all three.
 #
-# No `relationships` test here: this pipeline's birth-registrations dataset
-# is a single table with no foreign key to another loaded model (unlike the
-# synthetic-data-generator repo's Child Protection collection, which has
-# real FKs across 6 tables) - adding one would mean inventing a join that
-# doesn't reflect this dataset, so it's left out rather than faked in.
+# The `relationships` test this file lacked (see the comment this replaces)
+# now exists below, on the 6 Child Protection staging models - real dbt
+# generic-test syntax (`relationships: {to: ref('...'), field: ...}`),
+# confirmed by actually running `dbt test` against a real per-run CP
+# warehouse (real_tools/build_cp_warehouses.py). All 7 pass on every run,
+# dirty or clean - the FK columns themselves are never touched by
+# generator/dirty.py's cp_notifications-only presets (see
+# contract/child-protection-contract.yaml's matching SQL-rule versions of
+# these same 7 checks for the fuller account, including why they're a
+# genuine backstop even though this fixture never exercises a failure).
+#
+# The three cross-table business rules approved alongside these FKs
+# (escalation completeness, placement/carer approval compliance,
+# closed-case investigation hygiene) are dbt SINGULAR tests instead of
+# generic ones - each is a row-level cross-table SELECT with no reusable
+# "column vs column" shape, which is exactly what tests/*.sql is for. See
+# tests/escalation_completeness.sql, tests/placement_carer_approval.sql,
+# tests/closed_case_investigation_hygiene.sql - each header documents the
+# same real, stable non-zero baseline already found and explained in the
+# contract file, rather than repeating it here.
 
 models:
   - name: stg_birth_registrations
@@ -115,3 +130,95 @@ models:
               # arithmetic proved unreliable on this dbt-duckdb version.
               # 300/600 sit clear of this fixture's actual clean (38-57),
               # amber (424/437), and red (769) null counts (see README.md).
+
+  - name: stg_cp_clients
+    description: One row per child with a Child Protection casework history, per snapshot.
+    columns:
+      - name: cp_client_id
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_cp_notifications
+    description: One row per notification, per snapshot.
+    columns:
+      - name: notification_id
+        tests:
+          - unique:
+              config:
+                warn_if: ">0"
+                error_if: ">10"
+              # mirrors the contract's duplicateValues rule on this column -
+              # apply_cp_notifications_presets' near-duplicate injection is
+              # the only thing that ever makes this fail. Absolute
+              # row-count threshold, not a true percentage, for the same
+              # dbt-duckdb fail_calc-reliability reason as sex/
+              # place_of_birth_facility above.
+          - not_null
+      - name: cp_client_id
+        tests:
+          - relationships:
+              to: ref('stg_cp_clients')
+              field: cp_client_id
+      - name: assigned_worker_id
+        tests:
+          - relationships:
+              to: ref('stg_cp_case_workers')
+              field: worker_id
+
+  - name: stg_cp_investigations
+    description: One row per investigation opened from an escalated notification, per snapshot.
+    columns:
+      - name: investigation_id
+        tests:
+          - unique
+          - not_null
+      - name: notification_id
+        tests:
+          - relationships:
+              to: ref('stg_cp_notifications')
+              field: notification_id
+      - name: cp_client_id
+        tests:
+          - relationships:
+              to: ref('stg_cp_clients')
+              field: cp_client_id
+      - name: lead_worker_id
+        tests:
+          - relationships:
+              to: ref('stg_cp_case_workers')
+              field: worker_id
+
+  - name: stg_cp_placements
+    description: One row per out-of-home-care placement, per snapshot.
+    columns:
+      - name: placement_id
+        tests:
+          - unique
+          - not_null
+      - name: cp_client_id
+        tests:
+          - relationships:
+              to: ref('stg_cp_clients')
+              field: cp_client_id
+      - name: carer_id
+        tests:
+          - relationships:
+              to: ref('stg_cp_carers')
+              field: carer_id
+
+  - name: stg_cp_carers
+    description: One row per approved (or in-approval) carer, per snapshot.
+    columns:
+      - name: carer_id
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_cp_case_workers
+    description: One row per case worker, per snapshot.
+    columns:
+      - name: worker_id
+        tests:
+          - unique
+          - not_null

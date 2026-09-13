@@ -13,3 +13,14 @@ sources:
       record, undifferentiated across runs.
     tables:
       - name: birth_registrations
+
+      # Child Protection collection (real_tools/build_cp_warehouses.py) -
+      # one snapshot's worth of all 6 tables per DuckDB file, same "raw"
+      # schema convention birth_registrations uses. See
+      # generator/generate_cp_runs.py for how these snapshots are built.
+      - name: cp_clients
+      - name: cp_notifications
+      - name: cp_investigations
+      - name: cp_placements
+      - name: cp_carers
+      - name: cp_case_workers
