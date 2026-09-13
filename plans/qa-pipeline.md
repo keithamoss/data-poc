@@ -253,6 +253,98 @@ relative, not a schedule — this is weeks of work, not months.
     check's real-tool triangulation (dbt/Soda/datacontract-cli agreeing
     on the same violation counts) visible on the relevant drawers.
 
+12. **[done, medium]** Two more checks Keith asked for directly: a
+    freshness / relative-date check (flag if no record anywhere in a run
+    has a `date_of_birth` within the last 7 days of the REAL wall-clock
+    date), and a row-count-growth check ("rows should go up, more or less
+    - some daily reduction is fine"). Both real-tools-only, both
+    triangulated across every tool that can express them.
+    Freshness landed on `date_of_birth` in contract/dbt/Soda, using each
+    check-result's own "count violations, mustBe 0" convention rather than
+    a new comparator: the query flips "must have at least one recent row"
+    into "1 if none exist, else 0" so no dashboard/engine code needed to
+    learn a new check shape. Honest, deliberate limitation, same as the
+    Soda checks file's pre-existing `[recent]` filter (see item 3 above):
+    this fixture's dates are fixed at Sept 2026, so the check's pass/fail
+    split will drift as real wall-clock time moves away from that window,
+    independent of anything actually being wrong - regenerating on a
+    rolling window (item 3's own follow-up) would fix both at once. Real
+    and reproducible for now: runs dated too early relative to today
+    genuinely fail, runs with recent-enough dates genuinely pass - visible
+    as a real red-to-green transition across the 10-run history.
+    Row-count-growth has no natural per-run-warehouse home (dbt/Soda/
+    datacontract-cli all evaluate one run in isolation, by design - see
+    `build_per_run_warehouses.py`) and no config-file-driven backing the
+    way every other check has, so it's Evidently-only: `RowCount()` (real
+    Evidently 0.7 metric) computed separately for a run and its
+    immediately-preceding run (not PSI's fixed run_01 baseline - "did
+    rows grow" is inherently about consecutive runs), then compared with
+    this project's own two-tier band, same "the tool computes the real
+    number, this file's own convention decides warn/fail" pattern as PSI.
+    Attributed to `registration_number` (the row-identifying column) for
+    lack of a real per-column home.
+    `dirty.py` gained `truncate_rows`/`truncate_to_row_count` (a genuine
+    truncated-extract scenario, the first injector in this module that
+    changes row count rather than corrupting values within existing rows)
+    and `generate_runs.py` now threads each run's actual row count into
+    the next run's preset call, so the truncation lands a specific
+    percentage below the PREVIOUS run specifically (matching what the
+    check itself compares) rather than a self-referential rate that
+    drifts with this dataset's own natural run-to-run size variance.
+    Three more real, live bugs found along the way:
+    - Truncating rows *after* the other presets diluted their ABSOLUTE-
+      count-based thresholds (dbt's `place_of_birth_facility` not_null
+      `error_if ">600"`) by the same fraction as the truncation - a red
+      run's count dropped from 769 to 526, silently downgrading fail to
+      warn. Fixed by truncating first and recalibrating the affected
+      rates against the post-truncation row count instead.
+    - `contract_engine.py`'s `type: sql` rules all shared one hardcoded
+      check_name ("sql") - harmless while every property had at most one
+      such rule, but `date_of_birth` now has two (the original range
+      check plus the new freshness check), which collided under this
+      dashboard's (engine, check_name)-per-column grouping and silently
+      merged two different checks' 10-run histories into one. Fixed by
+      deriving a short slug from each rule's own description (truncated
+      to a word boundary, not sentence-split - "e.g." inside a couple of
+      these descriptions defeats a naive split on ". ").
+    - A third, newer instance of the dbt-duckdb reliability bug from item
+      1 below: the `recent_births_present` singular test (no config, no
+      fail_calc arithmetic - the simplest possible test shape, ruling out
+      an arithmetic explanation) reported "fail" for a run that a direct
+      re-query of the identical compiled SQL, against the same warehouse
+      file, correctly showed "pass" for. No SQL/config explanation found;
+      treated the same way as the other two - independently verified via
+      direct query rather than trusted blindly.
+    Verified with Playwright: both checks visible with correct labels/
+    dimensions, real amber/red history driven by the new dirty presets
+    (row-growth) and by genuine date-vs-wall-clock arithmetic (freshness),
+    and no regression on any of the existing 13 columns' other checks.
+
+13. **[investigate]** Look more closely at what Evidently AI is actually
+    doing today and consider expanding it - flagged by Keith, not yet
+    scoped. Currently exercises exactly two checks for Birth Registrations
+    (PSI drift on `sex` against a fixed run_01 baseline; the row-count-
+    growth check added in item 12, against the immediately preceding run)
+    plus one for Child Protection (`real_tools/run_evidently_real_cp.py`,
+    PSI on `concern_type`). Candidates worth investigating before
+    committing to any of them:
+    - Evidently 0.7's other preset reports/tests beyond `DataDriftPreset`
+      - a data-quality preset, other drift methods besides PSI, tests on
+        more metrics than `RowCount` (row-growth's own implementation
+        found `evidently.tests`' `gte`/`Reference` API mid-way through -
+        a built-in reference-relative test - but ended up computing the
+        real value and applying this project's own two-tier band instead,
+        matching PSI's precedent; worth a proper look at what that API
+        buys over doing it by hand).
+    - Applying drift/quality checks to more columns, not just `sex`/
+      `concern_type` - is there a real column elsewhere in either dataset
+      where distributional drift is a genuinely useful signal?
+    - Whether "Evidently as the cross-run/trend tool" (distinct from
+      contract/dbt/Soda's point-in-time-per-run role) is a role worth
+      making explicit, now that it owns two genuinely different kinds of
+      cross-run comparison (a fixed baseline for PSI, a rolling previous-
+      run comparison for row-growth).
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

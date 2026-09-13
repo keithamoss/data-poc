@@ -134,3 +134,43 @@ not a schedule.
    different agency IDs — worth doing once there are enough datasets
    wired into the dashboard (action 2) that cross-agency identity
    resolution becomes a meaningful thing to demonstrate, not before.
+
+9. **[todo, low]** Explore alternative dashboard output types/tools —
+   Streamlit and Power BI named specifically — as alternatives or
+   complements to the current hand-rolled static HTML dashboard. Not yet
+   scoped: worth comparing what each would actually buy (native
+   interactivity and widgets, real data-source connectors instead of a
+   baked-in JS const, embedding into BI tooling the agency likely already
+   runs) against the cost of a rebuild and what it'd mean for the
+   "publish as a static file, zero external dependency" property the
+   current dashboard was deliberately built to have (self-hosted fonts,
+   no CDN calls — see `plans/qa-pipeline.md`'s dashboard-readability
+   entries). Decide replace vs. supplement before committing to either.
+
+10. **[todo, medium]** Repo review and tidy-up before continuing much
+    further — Keith flagged this given the pace of recent changes (Phase
+    3/4, the QA-check battery, several real bugs found and fixed along the
+    way). Not yet scoped: likely candidates are a dead-code/stale-comment
+    pass, a consistency check across `real_tools/*.py` and `engines/*.py`
+    (naming, structure, how closely each pair actually mirrors the
+    other), a README accuracy pass against everything that's shipped
+    since it was last substantially updated, confirming `.gitignore`
+    coverage is still complete, and revisiting action 6 above (does
+    `synthetic-data-generator/` split into its own repo now).
+
+11. **[todo, low]** Document/explain how the synthetic data population is
+    generated and how `dirty.py`'s failure injection reflects real
+    government data quality issues — Keith wants to understand the
+    current approach's realism, not just confirm that it runs. Distinct
+    from action 8 above (which is about wiring cross-agency linkage into
+    the pipeline) — this is about explaining and reviewing the *model*
+    itself: what `population.py`/`presentation.py`/`daily_batch.py`
+    actually simulate (household structure vs. this repo's deliberately
+    separate event-flow generator, ordinary cross-agency name/ID
+    variation, nickname/typo drift) and whether `dirty.py`'s presets
+    (null-rate creep, invalid codes, near-duplicates, drift, the newer
+    format/cross-record presets) are a fair proxy for the kinds of
+    defects real agency data actually has, or read as generic "data
+    quality gremlins" a reviewer familiar with real WA government data
+    would find unconvincing. Could land as a design-note doc, a README
+    section, or a live walkthrough — not yet decided.

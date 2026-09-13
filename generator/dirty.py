@@ -143,6 +143,32 @@ def inject_extract_timestamp_disorder(df: pd.DataFrame, rate: float, seed: int) 
     return out
 
 
+def truncate_rows(df: pd.DataFrame, rate: float, seed: int) -> pd.DataFrame:
+    """Drops `rate` of rows entirely - a truncated or partially-failed
+    extract, the scenario the real-tools row-count-growth check (and the
+    ODCS contract's own rowCount mustBeBetween rule) are built to catch.
+    Unlike every other injector in this module, this changes the ROW COUNT
+    itself rather than corrupting values within existing rows."""
+    rng = np.random.default_rng(seed)
+    keep_mask = rng.random(len(df)) >= rate
+    return df.loc[keep_mask].reset_index(drop=True)
+
+
+def truncate_to_row_count(df: pd.DataFrame, target_rows: int, seed: int) -> pd.DataFrame:
+    """Like truncate_rows, but calibrated against an absolute target row
+    count rather than a self-referential rate - used for the row-count-
+    growth check specifically, since that check compares against the
+    PREVIOUS run's actual row count, and this dataset's own base row count
+    already varies run to run (see generate_runs.py's RUN_PLAN) enough
+    that a fixed drop-rate from THIS run's own count doesn't reliably land
+    a specific percentage below whatever the previous run happened to be."""
+    if target_rows >= len(df):
+        return df.copy()
+    rng = np.random.default_rng(seed)
+    keep_idx = np.sort(rng.choice(len(df), size=target_rows, replace=False))
+    return df.iloc[keep_idx].reset_index(drop=True)
+
+
 def break_multiple_birth_siblings(df: pd.DataFrame, severity: str, seed: int) -> pd.DataFrame:
     """Drops one row from a fraction of real multiple-birth sibling pairs
     (daily_batch.py now generates genuine pairs - same date_of_birth,
@@ -195,16 +221,48 @@ def inject_drift_batch(df: pd.DataFrame, column: str, invalid_pool: list, batch_
 _JUNK_TEXT_POOL = ["N/A", "TEST1", "UNKNOWN9", "XXXX0", "Baby1"]
 
 
-def apply_birth_registrations_presets(df: pd.DataFrame, severity: str, seed: int) -> pd.DataFrame:
+def apply_birth_registrations_presets(df: pd.DataFrame, severity: str, seed: int,
+                                       previous_row_count: int | None = None) -> pd.DataFrame:
     """severity: 'amber' or 'red' - matches the warn/fail bands in
     bdm-birth-registrations-soda-checks.yml exactly, so a QA run against
     this output should land in the band you asked for. Covers all of the
     checks this dataset's QA battery has calibrated presets for - the
     original 2 (sex, place_of_birth_facility) plus the newer battery
     (source_system_record_id duplicates, child_given_names format junk,
-    extract_timestamp ordering, multiple-birth sibling records)."""
-    rate_sex = 0.008 if severity == "amber" else 0.028      # warn>0%, fail>2%
-    rate_facility_null = 0.20 if severity == "amber" else 0.40  # warn>15%, fail>35%
+    extract_timestamp ordering, multiple-birth sibling records, and the
+    row-count-growth check's truncation scenario).
+
+    previous_row_count: the immediately preceding run's actual row count
+    (generate_runs.py tracks this across its own loop) - when given, this
+    run gets truncated down to a specific percentage below THAT number
+    (10-25% for amber, past 25% for red - matching the row-count-growth
+    check's own warn/fail bands) rather than a fixed self-referential
+    rate, since that check compares against the previous run specifically
+    and this dataset's own base row count already varies enough run to
+    run that a fixed rate wouldn't reliably land in either band. None
+    (the very first run, which has no previous run to under-cut) skips
+    truncation entirely."""
+    # applied FIRST, not last: every rate below is calibrated against this
+    # run's FINAL row count (including dbt's own absolute-count thresholds
+    # for sex/place_of_birth_facility, not just the percentage-based Soda/
+    # datacontract-cli checks) - truncating afterwards would dilute those
+    # absolute counts by the same fraction as the truncation itself,
+    # pushing e.g. place_of_birth_facility's red-run null count below
+    # dbt's error_if ">600" and silently downgrading fail to warn. Found
+    # live: truncating last dropped that exact count from 769 to 526.
+    if previous_row_count:
+        drop_frac = 0.18 if severity == "amber" else 0.35  # warn>10%, fail>25% vs. previous run
+        target = int(previous_row_count * (1 - drop_frac))
+        df = truncate_to_row_count(df, target, seed + 6)
+
+    # facility-null and sex rates are bumped up from this dataset's
+    # original (pre-truncation) calibration specifically so their ABSOLUTE
+    # counts still clear dbt's fixed thresholds (facility: warn_if ">300",
+    # error_if ">600"; sex: error_if ">30") against a run that may now be
+    # 18-35% smaller than before truncation existed - the PERCENTAGE-based
+    # Soda/datacontract-cli checks land in the same bands either way.
+    rate_sex = 0.008 if severity == "amber" else 0.035      # warn>0%, fail>2% (Soda); >0/>30 count (dbt)
+    rate_facility_null = 0.30 if severity == "amber" else 0.55  # warn>15%, fail>35% (Soda); >300/>600 count (dbt)
     rate_dup_id = 0.004 if severity == "amber" else 0.02
     rate_junk_name = 0.006 if severity == "amber" else 0.03   # warn>0%, fail>3%
     rate_ts_disorder = 0.01 if severity == "amber" else 0.04

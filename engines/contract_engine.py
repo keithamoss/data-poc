@@ -185,7 +185,22 @@ def evaluate_contract(contract_path: str, db_path: str, run_id: str, run_timesta
                 threshold = rule.get("mustBe", 0)
                 violated = n_invalid != threshold
                 status = _severity_to_status(severity, violated)
-                results.append(_result(run_id, run_timestamp, name, "sql", dimension,
+                # A property can now carry more than one type: sql rule
+                # (date_of_birth has both its original range check and the
+                # newer freshness check) - a bare "sql" check_name for both
+                # would collide under this dashboard's (engine, check_name)
+                # -per-column grouping, silently merging two different
+                # checks' histories into one 10-run series. Disambiguated
+                # with a slug from the rule's own description (truncated
+                # to a word boundary, not sentence-split - "e.g." in a
+                # couple of these descriptions defeats a naive split on
+                # ". "), a real, live bug found while adding the freshness
+                # check, not a hypothetical.
+                desc = (rule.get("description") or "").strip().replace("\n", " ")
+                desc = " ".join(desc.split())  # collapse the YAML block scalar's internal whitespace
+                slug = desc[:50].rsplit(" ", 1)[0] if len(desc) > 50 else desc
+                check_name = f"sql: {slug}" if slug else "sql"
+                results.append(_result(run_id, run_timestamp, name, check_name, dimension,
                                         n_invalid, "count", None, threshold, status,
                                         "quarantine" if severity == "error" else "flag", n, n_invalid))
 

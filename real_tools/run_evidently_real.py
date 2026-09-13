@@ -19,6 +19,7 @@ categories the shift is binned into, and this is a real example of that,
 not a bug in either. See README.md's known-disagreements section.
 """
 from __future__ import annotations
+import json
 import os
 
 import pandas as pd
@@ -40,6 +41,18 @@ REFERENCE_RUN_ID = "run_01_2026-09-01"
 WARN_THRESHOLD = 0.10
 FAIL_THRESHOLD = 0.25
 
+# Row-growth check: "some reduction in a daily refresh is fine" (Keith's
+# own words) - so only a genuinely large drop trips this, not any decrease
+# at all. Same two-tier-band-is-our-convention-not-the-tool's approach as
+# PSI above: Evidently's RowCount metric does support a built-in Reference-
+# based test (gte(Reference(relative=...))), tried first, but that only
+# gives one pass/fail band and buries the actual reference value inside a
+# free-text test description rather than a clean field - computing the
+# real row count via Evidently for both runs and applying our own two-tier
+# comparison, exactly like PSI, is both simpler and consistent.
+WARN_ROW_DROP = 0.10
+FAIL_ROW_DROP = 0.25
+
 
 def _status_for_psi(psi: float, is_reference: bool) -> str:
     if is_reference:
@@ -49,6 +62,34 @@ def _status_for_psi(psi: float, is_reference: bool) -> str:
     if psi > WARN_THRESHOLD:
         return "warn"
     return "pass"
+
+
+def _status_for_row_drop(rate_drop: float) -> str:
+    if rate_drop > FAIL_ROW_DROP:
+        return "fail"
+    if rate_drop > WARN_ROW_DROP:
+        return "warn"
+    return "pass"
+
+
+def _row_count(csv_filename: str) -> int:
+    from evidently import Report
+    from evidently.metrics import RowCount
+
+    df = pd.read_csv(os.path.join(RAW_DIR, csv_filename))
+    snapshot = Report(metrics=[RowCount()]).run(df, None)
+    return int(snapshot.dict()["metrics"][0]["value"])
+
+
+def _previous_run_file(manifest: list[dict], run_id: str) -> str | None:
+    """The immediately preceding run in manifest order, or None for the
+    first run - unlike PSI's comparison against a fixed baseline run,
+    "did row count grow" is inherently about consecutive runs, not a
+    fixed reference."""
+    for i, entry in enumerate(manifest):
+        if entry["run_id"] == run_id:
+            return manifest[i - 1]["file"] if i > 0 else None
+    return None
 
 
 def evaluate_evidently_real(run_id: str, csv_filename: str, run_timestamp: str,
@@ -73,7 +114,7 @@ def evaluate_evidently_real(run_id: str, csv_filename: str, run_timestamp: str,
 
     status = _status_for_psi(psi, run_id == reference_run_id)
 
-    return [{
+    results = [{
         "agency_id": AGENCY_ID,
         "collection_id": COLLECTION_ID,
         "dataset_id": DATASET_ID,
@@ -95,14 +136,51 @@ def evaluate_evidently_real(run_id: str, csv_filename: str, run_timestamp: str,
         "reference_run_id": reference_run_id,
     }]
 
+    with open(os.path.join(RAW_DIR, "manifest.json")) as f:
+        manifest = json.load(f)
+    previous_file = _previous_run_file(manifest, run_id)
+    if previous_file is not None:
+        current_count = _row_count(csv_filename)
+        previous_count = _row_count(previous_file)
+        rate_drop = (previous_count - current_count) / previous_count if previous_count else 0.0
+        results.append({
+            "agency_id": AGENCY_ID,
+            "collection_id": COLLECTION_ID,
+            "dataset_id": DATASET_ID,
+            # No single column "owns" a whole-dataset row count; attributed
+            # to registration_number (the row-identifying primary key) as
+            # the least-arbitrary home, rather than "(table)" - which
+            # birth-registrations' dashboard builder silently drops (see
+            # pipeline/build_dashboard_data.py; there's no "(table-level
+            # checks)" pseudo-column here the way Child Protection has).
+            "column_name": "registration_number",
+            "check_name": "evidently:row_count_growth",
+            "dimension": "timeliness",
+            "label": "Row count vs. previous run",
+            "run_id": run_id,
+            "run_timestamp": run_timestamp,
+            "metric_value": round(rate_drop * 100, 2),
+            "unit": "%",
+            "warn_threshold": round(WARN_ROW_DROP * 100, 2),
+            "fail_threshold": round(FAIL_ROW_DROP * 100, 2),
+            "status": _status_for_row_drop(rate_drop),
+            "on_fail_action": "flag",
+            "row_count_total": current_count,
+            "row_count_invalid": None,
+            "engine": ENGINE_TAG,
+            "reference_run_id": None,
+        })
+
+    return results
+
 
 if __name__ == "__main__":
-    import json
     from datetime import datetime, timezone
 
     with open(os.path.join(RAW_DIR, "manifest.json")) as f:
         manifest = json.load(f)
     for entry in manifest:
         res = evaluate_evidently_real(entry["run_id"], entry["file"], datetime.now(timezone.utc).isoformat())
-        r = res[0]
-        print(f"{entry['run_id']:25s} PSI={r['metric_value']}  status={r['status']:5s}")
+        psi, growth = res[0], (res[1] if len(res) > 1 else None)
+        growth_str = f"row_growth={growth['metric_value']:+.1f}%  status={growth['status']:5s}" if growth else "row_growth=n/a (first run)"
+        print(f"{entry['run_id']:25s} PSI={psi['metric_value']}  status={psi['status']:5s}  |  {growth_str}")

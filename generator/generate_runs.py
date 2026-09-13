@@ -50,6 +50,10 @@ START_DATE = date(2026, 9, 1)
 def main() -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
     manifest = []
+    previous_row_count = None  # tracks each run's actual row count, for the
+    # row-count-growth check's dirty preset - see apply_birth_registrations_
+    # presets' own docstring for why this needs the ACTUAL previous run's
+    # count rather than a fixed rate.
 
     for i, (day_offset, n_rows, severity) in enumerate(RUN_PLAN, start=1):
         run_date = START_DATE + timedelta(days=day_offset)
@@ -58,7 +62,9 @@ def main() -> None:
 
         df = generate_daily_batch(run_date, seed=seed, n_rows=n_rows, id_offset=id_offset)
         if severity:
-            df = apply_birth_registrations_presets(df, severity=severity, seed=seed + 500)
+            df = apply_birth_registrations_presets(df, severity=severity, seed=seed + 500,
+                                                    previous_row_count=previous_row_count)
+        previous_row_count = len(df)
 
         run_id = f"run_{i:02d}_{run_date.isoformat()}"
         out_path = os.path.join(OUT_DIR, f"{run_id}.csv")

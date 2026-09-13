@@ -29,6 +29,19 @@ tested - dbt-core still genuinely ran the real check (that's what
 `status`/`failures` get compared against, when they can be trusted, and
 what "engine" attributes this result to) - only the two known-unreliable
 numbers are cross-checked rather than passed through blindly.
+
+A third, newer instance of the same class of problem: the
+recent_births_present singular test (no config, no fail_calc arithmetic
+at all - the simplest possible test shape) reported "fail" for run_10 in
+a full 10-run orchestrate_real.py pass, while re-running that exact test
+in isolation seconds later, against the same warehouse file, correctly
+returned "pass" - and stayed correct on every subsequent re-run. No
+SQL-level or config-level explanation found (unlike the other two, this
+test has no arithmetic to remove), which points at dbt-duckdb itself
+rather than anything in this project's own SQL - feeds into the same open
+upstream-repro follow-up as the other two (plans/qa-pipeline.md #1).
+Treated the same way here: independently verified via direct query, not
+trusted blindly.
 """
 from __future__ import annotations
 import json
@@ -54,6 +67,16 @@ ENGINE_TAG = "dbt-core 1.12 + dbt-duckdb (real)"
 _VERIFY_COUNT_SQL = {
     ("sex", "accepted_values"): "SELECT COUNT(*) FROM stg_birth_registrations WHERE sex NOT IN ('M','F','X')",
     ("place_of_birth_facility", "not_null"): "SELECT COUNT(*) FROM stg_birth_registrations WHERE place_of_birth_facility IS NULL",
+    # A third, newer instance of the same reliability problem, found live:
+    # a clean re-run of just this one test in isolation correctly returned
+    # 0 rows (pass) for run_10, but dbt's own run_results.json - from a
+    # full 10-run orchestrate_real.py pass minutes earlier, same warehouse
+    # file, same compiled SQL - reported it failed. Same treatment as the
+    # two above: recompute independently rather than trust dbt's reported
+    # status for this specific check.
+    ("date_of_birth", "recent_births_present"):
+        "SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END FROM stg_birth_registrations "
+        "WHERE date_of_birth >= CURRENT_DATE - INTERVAL 7 DAY",
 }
 
 _NUM_RE = re.compile(r"([\d.]+)")
@@ -65,14 +88,18 @@ _NUM_RE = re.compile(r"([\d.]+)")
 # check would land under column_name="(table)", which the dashboard
 # builder silently drops for birth-registrations (there's no
 # "(table-level checks)" pseudo-column here the way Child Protection has).
-_SINGULAR_TESTS = ["multiple_birth_sibling"]
-_SINGULAR_TEST_COLUMN = {"multiple_birth_sibling": "is_multiple_birth"}
+_SINGULAR_TESTS = ["multiple_birth_sibling", "recent_births_present"]
+_SINGULAR_TEST_COLUMN = {
+    "multiple_birth_sibling": "is_multiple_birth",
+    "recent_births_present": "date_of_birth",
+}
 
 _DIMENSION_BY_TEST = {
     "unique": "uniqueness",
     "not_null": "completeness",
     "accepted_values": "validity",
     "multiple_birth_sibling": "consistency",
+    "recent_births_present": "timeliness",
 }
 
 # A short, human-readable phrase for what each test actually checks -
@@ -88,6 +115,7 @@ _LABEL_BY_TEST = {
     "not_null": "Null rate",
     "accepted_values": "Invalid values",
     "multiple_birth_sibling": "Sibling record match",
+    "recent_births_present": "Freshness",
 }
 
 
@@ -175,7 +203,15 @@ def evaluate_dbt_real(run_id: str, run_timestamp: str) -> list[dict]:
         if key in _VERIFY_COUNT_SQL and status != "error":
             verified_count = conn.execute(_VERIFY_COUNT_SQL[key]).fetchone()[0]
             failures = verified_count
-            status = _status_for(verified_count, warn_t, fail_t)
+            if warn_t is not None or fail_t is not None:
+                status = _status_for(verified_count, warn_t, fail_t)
+            else:
+                # a hard pass/fail singular test (no warn_if/error_if
+                # config, so no threshold to compare against) - _status_for
+                # would silently read as "always pass" with both
+                # thresholds None; any nonzero verified count means the
+                # test genuinely failed instead.
+                status = "fail" if verified_count > 0 else "pass"
 
         results.append({
             "agency_id": AGENCY_ID,

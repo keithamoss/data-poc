@@ -312,6 +312,16 @@ held from the original equivalent-only build.
   made it fail. Neither is wrong: the equivalent faithfully modeled "if
   this ran on the day of the extract"; real Soda faithfully modeled "if
   this ran today, on a fixture built for a different day."
+- **The newer freshness / relative-date check shares that same real-
+  wall-clock property, deliberately.** Unlike the `[recent]` filter above,
+  this one (contract + Soda + dbt, `date_of_birth`) is genuinely useful
+  precisely because it uses the real `CURRENT_DATE`: it exists to catch a
+  stalled upstream feed, which is inherently a "right now" question. The
+  honest cost is the same one the `[recent]` filter already pays — this
+  fixture's dates are fixed at Sept 2026, so its pass/fail split will
+  drift as real time moves away from that window. Regenerating on a
+  rolling window near "today" (`plans/qa-pipeline.md`'s open follow-up
+  for the `[recent]` filter) would fix both at once.
 - **Evidently's PSI and the equivalent's PSI genuinely differ, and both
   are correct.** Evidently's `DataDriftPreset` treats every distinct value
   actually observed in a column as its own category, so run_09's three

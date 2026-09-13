@@ -47,6 +47,7 @@ ENGINE_TAG = "Soda Core 3.5 (real)"
 _CUSTOM_CHECK_COLUMN = {
     "extract timestamp is logically ordered after date_registered": "extract_timestamp",
     "multiple birth records have a matching sibling": "is_multiple_birth",
+    "recent birth dates present (freshness)": "date_of_birth",
 }
 
 # A short, human-readable phrase shared with the same rule's dbt/
@@ -55,6 +56,7 @@ _CUSTOM_CHECK_COLUMN = {
 _CUSTOM_CHECK_LABEL = {
     "extract timestamp is logically ordered after date_registered": "Timestamp ordering",
     "multiple birth records have a matching sibling": "Sibling record match",
+    "recent birth dates present (freshness)": "Freshness",
 }
 
 # Explicit per-metric dimension, rather than a substring guess against
@@ -79,6 +81,7 @@ _CUSTOM_CHECK_DIMENSION = {
     "sex validity, last 24h only": "validity",
     "extract timestamp is logically ordered after date_registered": "consistency",
     "multiple birth records have a matching sibling": "consistency",
+    "recent birth dates present (freshness)": "timeliness",
 }
 
 

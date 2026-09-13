@@ -131,6 +131,24 @@ checks for birth_registrations:
           )
       name: multiple birth records have a matching sibling
 
+  # --- Freshness / relative-date check ---------------------------------------
+  # Another "failed rows" check via a custom fail query, real SodaCL - but
+  # unlike every other check in this file (which counts VIOLATING rows),
+  # this one's healthy state is "at least one row exists" - so the query
+  # itself flips that back into "0 or 1 failing rows" (a single synthetic
+  # row when the inner EXISTS finds nothing) rather than needing a new
+  # check shape. Same rule as the ODCS contract's matching type: sql check
+  # on date_of_birth - see that file's own comment for the honest
+  # limitation this shares with the [recent] filter below (real wall-clock
+  # CURRENT_DATE vs. this fixture's fixed Sept 2026 dates). Routed to the
+  # date_of_birth column explicitly, same reason as the two checks above.
+  - failed rows:
+      fail query: |
+        SELECT 1 WHERE NOT EXISTS (
+          SELECT 1 FROM birth_registrations WHERE date_of_birth >= CURRENT_DATE - INTERVAL '7' DAY
+        )
+      name: recent birth dates present (freshness)
+
 # --- "Proportion of records since a certain date" ---------------------------
 # Scopes the same invalid-value check to only the last 24 hours of extracts,
 # so a brand-new drift is caught fast rather than being diluted by months of

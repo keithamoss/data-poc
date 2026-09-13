@@ -75,6 +75,7 @@ _LABEL_BY_METRIC = {
 _CUSTOM_SQL_LABEL = {
     "Multiple-birth sibling match:": "Sibling record match",
     "Extract timestamp ordering:": "Timestamp ordering",
+    "Freshness / relative-date check:": "Freshness",
 }
 
 

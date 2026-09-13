@@ -191,6 +191,42 @@ schema:
               datetime-with-timezone field arriving where a plain date is
               expected) turning into silently unparseable or nonsensical
               dates downstream.
+          - type: sql
+            # "timeliness" (not "conformity"/"consistency" like this
+            # column's other 2 rules) - the real ODCS dimension enum's word
+            # for "is the data current enough to be useful", not used
+            # anywhere else in this contract yet.
+            dimension: timeliness
+            # Every existing check in this project counts VIOLATING rows
+            # (mustBe 0) - this rule is the opposite shape ("must have at
+            # least one recent row"), so the query itself flips it back to
+            # that same "0 = healthy" convention (1 if the inner COUNT is
+            # zero, else 0) rather than needing new comparator support
+            # (mustBeGreaterThan) in contract_engine.py or the dashboard's
+            # threshold handling - both only ever expect mustBe: 0 today.
+            query: >
+              SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END
+              FROM {model}
+              WHERE {field} >= CURRENT_DATE - INTERVAL 7 DAY
+            mustBe: 0
+            severity: error
+            description: >
+              Freshness / relative-date check: if no record in this batch
+              has a date_of_birth within the last 7 days of the REAL
+              wall-clock date this check runs on (not this run's own
+              date_registered - that would trivially always pass, since
+              date_of_birth is always within ~10 days of date_registered
+              by construction), the upstream feed has likely gone stale -
+              still delivering files, but with old or replayed data.
+              Honest limitation, same shape as the Soda checks file's
+              [recent] filter (see that file's own comment and
+              plans/qa-pipeline.md #3): this fixture's dates are fixed at
+              Sept 2026, so this check will read as increasingly failing
+              the further real wall-clock time drifts from that fixed
+              window, independent of anything actually being wrong -
+              regenerating the fixture on a rolling window near "today"
+              (the same follow-up already tracked for the [recent] filter)
+              would fix both at once.
 
       - name: sex
         logicalType: string

@@ -129,6 +129,17 @@ _REAL_ONLY_CHECK_KEYS = {
     ("place_of_birth_suburb", "invalid_percent[all]"),
     ("registering_parent_1_name", "invalid_percent[all]"),
     ("registering_parent_2_name", "invalid_percent[all]"),
+    # date_of_birth's freshness/relative-date check: contract_engine.py
+    # already computes this correctly (its type: sql handler is generic -
+    # see that rule's own comment on the contract yaml), so only dbt's and
+    # Soda's gaps need merging - same reasons as above (no singular-test
+    # support, no "failed rows" support).
+    ("date_of_birth", "dbt:recent_births_present"),
+    ("date_of_birth", "recent birth dates present (freshness)"),
+    # Row-count-growth: no equivalent exists at all (a run-over-run
+    # comparison via Evidently's own RowCount metric, not config-file-
+    # driven like everything else here) - entirely real-tools-only.
+    ("registration_number", "evidently:row_count_growth"),
 }
 
 
