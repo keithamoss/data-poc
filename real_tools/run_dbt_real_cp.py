@@ -87,8 +87,16 @@ def _table_for_test(node: dict) -> str | None:
 
 def evaluate_dbt_real_cp(run_id: str, run_timestamp: str) -> list[dict]:
     db_path = os.path.join(CP_DUCKDB_RUNS_DIR, f"{run_id}.duckdb")
-    _run_dbt(db_path, "run", CP_MODELS)
-    _run_dbt(db_path, "test", CP_MODELS + CP_SINGULAR_TESTS)
+    # A single `dbt build` (build the 6 models, then run their tests)
+    # instead of separate `dbt run` + `dbt test` calls - dbt-core's fixed
+    # per-invocation startup cost was being paid twice per run for no
+    # benefit; verified directly, this halves the time (9.5s -> 4.2s for
+    # one run - see plans/performance.md). run_results.json then also
+    # contains the 6 models' own build results, which _table_for_test
+    # already silently skips via node["test_metadata"] being absent from
+    # non-test nodes entirely (KeyError-safe since we only look them up
+    # for uids present in `nodes`, which is test-only).
+    _run_dbt(db_path, "build", CP_MODELS + CP_SINGULAR_TESTS)
 
     with open(os.path.join(DBT_PROJECT_DIR, "target", "manifest.json")) as f:
         manifest = json.load(f)

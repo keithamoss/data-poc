@@ -2,7 +2,8 @@
 
 Tracks the whole multi-agency data pipelines proof-of-concept, not just
 the birth-registrations QA pipeline (that has its own plan:
-`plans/qa-pipeline.md`). This is a working document, not a spec — update
+`plans/qa-pipeline.md`) or the real-tool orchestration scripts' runtime
+(`plans/performance.md`). This is a working document, not a spec — update
 it as things move, don't let it go stale.
 
 **Context:** Keith is Director of Data Technology at a Western Australian
@@ -54,7 +55,10 @@ not a schedule.
    wouldn't know. A scheduled job (even a simple cron/GitHub Action) that
    runs the real pipeline and diffs against `reports/results_real.json`
    would catch regressions early — including possibly resolving or
-   changing the dbt-duckdb bug (`plans/qa-pipeline.md` #1) on its own.
+   changing the dbt-duckdb bug (`plans/qa-pipeline.md` #1) on its own. If
+   this happens, revisit `plans/performance.md` #4/#5 (parallelizing the
+   ~2.5min runs) — worth the complexity for something that runs on a
+   schedule in a way it isn't for an occasional manual run.
 
 4. **[todo, low]** Try Postgres as the warehouse instead of DuckDB (the
    original HANDOFF suggested it as an alternative). Would tell us

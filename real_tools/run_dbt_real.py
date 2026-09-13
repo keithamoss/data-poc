@@ -79,7 +79,17 @@ def _run_dbt(db_path: str, command: str) -> None:
     env["DBT_DB_PATH"] = db_path
     env["DBT_SEND_ANONYMOUS_USAGE_STATS"] = "False"
     subprocess.run(
-        ["dbt", command, "--profiles-dir", PROFILES_DIR, "--project-dir", DBT_PROJECT_DIR, "--quiet"],
+        # --select scopes this to stg_birth_registrations only - required
+        # since Phase 2 added 6 Child Protection models + 3 singular tests
+        # to this same dbt_project/: an unscoped call picks those up too
+        # and (a) errors trying to build them against a birth-registrations
+        # -only warehouse that has none of the CP tables, and (b) the CP
+        # singular tests have no test_metadata, which this file's own
+        # parsing below assumed every result would have. Found as a real,
+        # live KeyError while implementing the `dbt build` change just
+        # below - a genuine regression from Phase 2, not hypothetical.
+        ["dbt", command, "--profiles-dir", PROFILES_DIR, "--project-dir", DBT_PROJECT_DIR, "--quiet",
+         "--select", "stg_birth_registrations"],
         env=env, cwd=ROOT, check=False, capture_output=True, text=True,
     )
 
@@ -93,8 +103,17 @@ def _test_nodes(manifest: dict) -> dict[str, dict]:
 
 def evaluate_dbt_real(run_id: str, run_timestamp: str) -> list[dict]:
     db_path = os.path.join(DUCKDB_RUNS_DIR, f"{run_id}.duckdb")
-    _run_dbt(db_path, "run")
-    _run_dbt(db_path, "test")
+    # A single `dbt build` (build the model, then run its tests) instead of
+    # separate `dbt run` + `dbt test` subprocess calls - dbt-core's fixed
+    # per-invocation startup cost (~2.4s just for `dbt --version`, before
+    # any project work) was being paid twice per run for no benefit; one
+    # call does identical work in about half the wall-clock time, verified
+    # directly (9.5s -> 4.2s on the Child Protection project this was
+    # first measured against - see plans/performance.md). run_results.json
+    # then also contains the model-build step's own result, which the
+    # parsing below already silently skips (nodes.get() returns None for
+    # anything that isn't a test node), so nothing further changes.
+    _run_dbt(db_path, "build")
 
     with open(os.path.join(DBT_PROJECT_DIR, "target", "manifest.json")) as f:
         manifest = json.load(f)
