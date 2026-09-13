@@ -30,14 +30,23 @@ not a schedule.
    left out a stale, pre-real-tools snapshot of the pipeline files bundled
    in the same upload. Commit `8a1028f`.
 
-2. **[todo, high]** Wire a second dataset into the QA dashboard end to
-   end, as a template for the rest. `synthetic-data-generator/`'s Child
-   Protection collection (real FKs across 6 tables) or School Enrollment
-   are the natural next candidates — unlike birth registrations, Child
-   Protection would exercise a `relationships` dbt test for the first
-   time (deliberately skipped so far for lack of a second table to join).
-   This is the highest-value item: it proves the birth-registrations
-   pipeline's approach generalizes rather than being a one-off.
+2. **[done]** Wired the Child Protection collection (6 tables, real FKs)
+   into the QA dashboard end to end, across 4 phased pushes: (1) periodic
+   snapshot generation + per-table ODCS contract, (2) the 7 `relationships`
+   checks + 3 cross-table business rules across all three tools, a fix for
+   2 business rules that used to always fail (a real generator gap, see
+   `plans/qa-pipeline.md` #9), and (3) the dashboard Collection tier itself
+   — merged with real-tool wiring (originally its own separate phase)
+   since a genuinely real dashboard tile needed it anyway, and
+   `engines/*.py`'s equivalents don't support cross-table checks at all.
+   **Department for Child Protection and Family Support → Child
+   Protection**, 6 datasets, all tagged "Real pipeline data" — see
+   README.md's "The Child Protection collection" section for the full
+   account, including a real dashboard display bug (a `severity: warning`
+   check's missing fail_threshold defaulting to 0) caught only by actually
+   rendering it in a browser before calling this done. This proves the
+   birth-registrations pipeline's approach generalizes rather than being a
+   one-off, and was the highest-value item on this list.
 
 3. **[todo, medium]** No CI. Nothing re-runs `real_tools/orchestrate_real.py`
    against upstream tool releases, so a `dbt-core`/`soda-core-duckdb`/

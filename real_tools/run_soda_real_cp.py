@@ -1,0 +1,128 @@
+"""
+Runs REAL Soda Core (soda-core-duckdb) against
+contract/child-protection-soda-checks.yml, via Soda's own Python Scan API -
+the Child Protection counterpart to run_soda_real.py. Soda's own scan
+results carry which table each check belongs to (`c["table"]`), so unlike
+run_dbt_real_cp.py there's no separate lookup needed to attribute a result
+to one of the 6 CP dataset_ids.
+
+Run once per run against its own per-run CP DuckDB file
+(real_tools/build_cp_warehouses.py) - same rationale as run_soda_real.py.
+"""
+from __future__ import annotations
+import os
+import sys
+
+import duckdb
+
+sys.path.insert(0, os.path.dirname(__file__))
+import cp_common
+
+ROOT = os.path.join(os.path.dirname(__file__), "..")
+SODA_CHECKS_PATH = os.path.join(ROOT, "contract", "child-protection-soda-checks.yml")
+CP_DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
+
+ENGINE_TAG = "Soda Core 3.5 (real)"
+
+# dimension for the 3 named `failed rows` business-rule checks - matches
+# the dimension each rule's contract/child-protection-contract.yaml quality
+# entry uses (escalation completeness is a completeness concern; the other
+# two are a cross-table consistency concern).
+_BUSINESS_RULE_DIMENSION = {
+    "Escalation completeness": "completeness",
+    "Closed-case investigation hygiene": "consistency",
+    "Placement/carer approval compliance": "consistency",
+}
+
+
+def _threshold(spec: dict | None) -> float | None:
+    if not spec:
+        return None
+    for key in ("greaterThan", "greaterThanOrEqual"):
+        if key in spec:
+            return spec[key]
+    return next(iter(spec.values()), None)
+
+
+def evaluate_soda_real_cp(run_id: str, run_timestamp: str) -> list[dict]:
+    from soda.scan import Scan
+
+    db_path = os.path.join(CP_DUCKDB_RUNS_DIR, f"{run_id}.duckdb")
+    conn = duckdb.connect(db_path, read_only=True)
+    conn.execute("SET search_path = 'raw'")
+    n_total_by_table = {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in cp_common.TABLES}
+
+    scan = Scan()
+    scan.set_data_source_name("cp_collection")
+    scan.add_duckdb_connection(conn, data_source_name="cp_collection")
+    scan.add_sodacl_yaml_file(SODA_CHECKS_PATH)
+    scan.disable_telemetry()
+    scan.execute()
+    scan_results = scan.get_scan_results()
+    metric_name_by_id = {m["identity"]: m["metricName"] for m in scan_results["metrics"]}
+
+    results = []
+    for c in scan_results["checks"]:
+        table = c["table"]
+        if table not in cp_common.TABLE_DATASET_ID:
+            continue  # not a CP table (shouldn't happen - guard anyway)
+
+        column = c["column"] or "(table)"
+        diagnostics = c["diagnostics"]
+        value = diagnostics.get("value")
+        outcome = c["outcome"]
+
+        base_check = metric_name_by_id.get(c["metrics"][0], c["name"]) if c["metrics"] else c["name"]
+        is_custom_name = "when" not in c["name"]
+        check_name = c["name"] if is_custom_name else base_check
+        is_pct = base_check.endswith("percent")
+
+        row_count_invalid = None
+        if diagnostics.get("blocks"):
+            row_count_invalid = diagnostics["blocks"][0].get("totalFailingRows")
+        elif base_check == "row_count":
+            row_count_invalid = 0
+        elif base_check == "reference":
+            row_count_invalid = int(value) if value is not None else None
+
+        if is_custom_name:
+            dimension = _BUSINESS_RULE_DIMENSION.get(check_name, "")
+        elif base_check == "reference":
+            dimension = "consistency"
+        elif base_check == "row_count":
+            dimension = "completeness"
+        else:
+            dimension = ""
+
+        results.append({
+            "agency_id": cp_common.AGENCY_ID,
+            "collection_id": cp_common.COLLECTION_ID,
+            "dataset_id": cp_common.TABLE_DATASET_ID[table],
+            "column_name": column,
+            "check_name": check_name,
+            "dimension": dimension,
+            "run_id": run_id,
+            "run_timestamp": run_timestamp,
+            "metric_value": value,
+            "unit": "%" if is_pct else "count",
+            "warn_threshold": _threshold(diagnostics.get("warn")),
+            "fail_threshold": _threshold(diagnostics.get("fail")),
+            "status": outcome,
+            "on_fail_action": "flag",
+            "row_count_total": n_total_by_table[table],
+            "row_count_invalid": row_count_invalid,
+            "engine": ENGINE_TAG,
+        })
+
+    conn.close()
+    return results
+
+
+if __name__ == "__main__":
+    from datetime import datetime, timezone
+    for run_id in ["cp_run_01_2026-07-06", "cp_run_04_2026-07-27", "cp_run_09_2026-08-31"]:
+        res = evaluate_soda_real_cp(run_id, datetime.now(timezone.utc).isoformat())
+        print(f"--- {run_id} ---")
+        for r in res:
+            if r["status"] != "pass":
+                print(" ", r["dataset_id"], r["column_name"], r["check_name"], r["status"], r["metric_value"])

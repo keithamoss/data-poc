@@ -101,7 +101,9 @@ generator/
                                deliberately different from the sibling synthetic-data-generator
                                repo's whole-population snapshot model — see the file's docstring)
   generate_runs.py             orchestrates 10 daily runs, 3 deliberately dirty, into data/raw/
-  names_au.py, presentation.py, dirty.py   reused unmodified from synthetic-data-generator
+  generate_cp_runs.py          orchestrates 10 weekly Child Protection snapshots into data/cp_raw/
+  names_au.py, presentation.py, dirty.py   dirty.py has 2 new CP-specific presets;
+                               kept in sync with synthetic-data-generator/dirty.py (see its docstring)
 dbt_project/                 a real (if minimal) dbt project — dbt_project.yml, a staging model,
                                schema.yml with genuine two-tier severity config
 engines/                     the Python/DuckDB equivalents (kept as a fallback)
@@ -119,15 +121,24 @@ real_tools/                  runs the actual dbt/soda/datacontract-cli/evidently
   run_evidently_real.py          runs the real evidently.Report + DataDriftPreset
   orchestrate_real.py            all four, across every run -> reports/results_real.json
   compare_real_vs_equivalent.py  diffs results.json against results_real.json -> reports/comparison.txt
+  cp_common.py                   shared agency/collection/dataset id constants for the 6 CP scripts below
+  build_cp_warehouses.py         one DuckDB file per CP snapshot run, all 6 tables under a `raw` schema
+  run_dbt_real_cp.py, run_soda_real_cp.py, run_datacontract_real_cp.py, run_evidently_real_cp.py
+                                  the CP counterparts to the 4 birth-registrations real-tool scripts above
+  orchestrate_real_cp.py         all four, across every CP run -> reports/results_real_cp.json
 pipeline/
   load.py                       loads every generated run into one DuckDB table
   orchestrate.py                generate -> load -> all 4 equivalent engines -> reports/results.json
   build_dashboard_data.py       reshapes results.json into the dashboard's data shape
+  build_cp_dashboard_data.py    reshapes results_real_cp.json into 6 datasets' worth of dashboard data
 dashboard/
-  qa-reporting-dashboard.html   the 3-tier QA dashboard, with Birth Registrations wired to real data
-  embed_dashboard_data.py       re-embeds reports/birth_registrations_dashboard.json into the HTML
-data/                          generated - raw run CSVs, manifest.json, warehouse.duckdb, duckdb_runs/ (not checked in)
-reports/                       generated - results.json, results_real.json, birth_registrations_dashboard.json
+  qa-reporting-dashboard.html   the 3-tier QA dashboard, with Birth Registrations and the whole Child
+                               Protection collection wired to real data
+  embed_dashboard_data.py       re-embeds both real datasets (REAL_BIRTH_REG_DATA, REAL_CP_DATA) into the HTML
+data/                          generated - raw run CSVs, manifest.json, warehouse.duckdb, duckdb_runs/,
+                               cp_raw/, cp_duckdb_runs/ (not checked in)
+reports/                       generated - results.json, results_real.json, results_real_cp.json,
+                               birth_registrations_dashboard.json, child_protection_dashboard.json
                                (not checked in); comparison.txt is checked in
 run_pipeline.sh                runs the equivalent-engine pipeline end to end
 requirements-real.txt          the real tool packages - verified installing and running together
@@ -152,22 +163,85 @@ noise. Verified after generation, not just intended:
 
 Only **Registry Services → Civil Registration → Birth Registrations** is
 wired to this pipeline's real output — tagged "Real pipeline data" on that
-dataset's row and drawer. Every other dataset on the page (Death/Marriage
-Registrations, and everything outside Registry Services) is untouched: the
-same illustrative, browser-fabricated mock data as before, still clearly
-labeled as such in the footer. Each real column's drawer shows every check
-that actually ran on it, across all four *equivalent* engines side by side
-(the real-tool results live in `reports/results_real.json`/`comparison.txt`
-rather than the dashboard, which was built against the equivalents first)
-— e.g. `sex` shows Soda's `invalid_percent`, the contract's `invalidValues`,
-dbt's `accepted_values`, Soda's scoped last-24h check, *and* the drift
-engine's PSI, all computed independently against the same real data, so you
-can see where different tools agree and where their models genuinely
-differ (see below) — e.g. `place_of_birth_facility`'s Soda check reports a
-percentage while its dbt check reports an absolute row count (a real
-dbt-duckdb reliability issue forced that switch — see below), so the two
-numbers won't visually match even though both come from the same 38-769
-null counts.
+dataset's row and drawer. Every other dataset on the page except the Child
+Protection collection (see below) is untouched: the same illustrative,
+browser-fabricated mock data as before, still clearly labeled as such in
+the footer. Each real column's drawer shows every check that actually ran
+on it, across all four *equivalent* engines side by side (the real-tool
+results live in `reports/results_real.json`/`comparison.txt` rather than
+the dashboard, which was built against the equivalents first) — e.g. `sex`
+shows Soda's `invalid_percent`, the contract's `invalidValues`, dbt's
+`accepted_values`, Soda's scoped last-24h check, *and* the drift engine's
+PSI, all computed independently against the same real data, so you can see
+where different tools agree and where their models genuinely differ (see
+below) — e.g. `place_of_birth_facility`'s Soda check reports a percentage
+while its dbt check reports an absolute row count (a real dbt-duckdb
+reliability issue forced that switch — see below), so the two numbers
+won't visually match even though both come from the same 38-769 null
+counts.
+
+## The Child Protection collection
+
+**Department for Child Protection and Family Support → Child Protection**
+(6 datasets: Client Register, Notifications, Investigations, Placements,
+Carer Register, Case Workers) is also wired to real output — but unlike
+Birth Registrations, straight to the actual tools, not the equivalents:
+`engines/*.py` are hard-coded single-table implementations with no
+cross-table join support, and this collection's whole point is cross-table
+checks (7 foreign-key relationships, 3 business rules spanning two tables
+each), so retrofitting the equivalents for it would have been more work
+than just running the real tools, which were already proven to work here.
+
+```bash
+python3 generator/generate_cp_runs.py       # -> data/cp_raw/ (10 weekly snapshots)
+python3 real_tools/orchestrate_real_cp.py   # -> reports/results_real_cp.json
+python3 pipeline/build_cp_dashboard_data.py # -> reports/child_protection_dashboard.json
+python3 dashboard/embed_dashboard_data.py   # re-embeds BOTH real datasets into the HTML
+```
+
+A few things specific to this collection, each found by actually running
+it end to end rather than assumed:
+
+- **Generation model is different on purpose.** Birth Registrations is an
+  event feed (a fresh cohort of newborns each day); Child Protection is a
+  periodic *snapshot* extract of the same underlying casework collection,
+  re-pulled weekly (`generator/generate_cp_runs.py`) — row counts stay
+  roughly stable run to run, matching what a real active-caseload extract
+  looks like.
+- **The 7 FK relationship checks never fail on this fixture** — `dirty.py`'s
+  CP presets never touch a foreign-key column, only `concern_type` (the
+  traffic-light demo column, same role `sex` plays for Birth
+  Registrations) and two business-rule-adjacent columns (`carer_id`,
+  `end_date`). Kept as real checks anyway: a genuine backstop against a
+  dropped join or truncated parent extract, not a check invented just to
+  demonstrate something.
+- **Two of the three business rules used to always fail**, on every run,
+  dirty or clean — a real finding, not a bug in the rules:
+  `synthetic-data-generator/child_protection.py` didn't originally enforce
+  "a placement's carer must be Approved" or "a case can't close with an
+  open investigation". Fixed at the generator level (both hold by
+  construction on clean data now), with two new `dirty.py` presets
+  (`apply_cp_placements_presets`, `apply_cp_investigations_presets`)
+  reintroducing controlled violations on amber/red runs. See
+  `plans/qa-pipeline.md` #9 for the full account.
+- **A real dashboard display bug, caught by actually rendering this in a
+  browser before calling it done**: `row_count` checks have
+  `severity: warning` in the contract, so their real `fail_threshold` is
+  `None` — and the dashboard's checks-building code defaults a missing
+  `fail_threshold` to `0`, which made `checkStatus()` (`current > fail`)
+  read any healthy positive row count as red. Fixed by excluding
+  `row_count` from the per-column checks entirely
+  (`pipeline/build_cp_dashboard_data.py`), the same way
+  `build_dashboard_data.py` already handles Birth Registrations' rowCount
+  rule (it only ever feeds the dataset's own `rowCount`/`prevRowCount`
+  fields, never a column tile) — this bug was latent in that shared
+  pattern the whole time, just never triggered until a check with
+  `severity: warning` was shown as a column check.
+- **Cross-table checks (the 7 FKs, the 3 business rules) have no single
+  column to live on**, so they're grouped under a synthetic
+  `(table-level checks)` pseudo-column per dataset rather than a new
+  dashboard UI section — a deliberate scope trade-off, see
+  `plans/wider.md` action 2.
 
 ## Known simplifications and honest disagreements
 
