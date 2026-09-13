@@ -55,17 +55,16 @@ not a schedule.
 
 5. **[done]** The old claude.ai Artifact copy is no longer a concern —
    decided to stop maintaining it; this repo's HTML is the sole source of
-   truth going forward. **Public hosting decided and set up**: the repo
-   itself is now public (Keith's call, given the data involved is
-   synthetic), so GitHub Pages works on the free plan with no workaround
-   needed. `.github/workflows/deploy-pages.yml` publishes
+   truth going forward. **Public hosting live**: the repo itself is now
+   public (Keith's call, given the data involved is synthetic), so GitHub
+   Pages works on the free plan with no workaround needed.
+   `.github/workflows/deploy-pages.yml` publishes
    `dashboard/qa-reporting-dashboard.html` (as `index.html`) on every push
    that touches `dashboard/` — no separate build step, since the file
-   already has its data baked in at commit time. One manual step still
-   needed (can't be done via the GitHub API access available here):
-   **Settings → Pages → Build and deployment → Source: "GitHub Actions"**,
-   one time, in the repo's web UI. Once that's flipped, the live URL will
-   be `https://keithamoss.github.io/data-poc/`. This also means: as more
+   already has its data baked in at commit time. Pages source flipped to
+   "GitHub Actions" in Settings, workflow run confirmed successful
+   (`conclusion: success`, run `34756094074`) — **live at
+   https://keithamoss.github.io/data-poc/**. This also means: as more
    datasets get wired in (action 2) and a scheduled re-run job exists
    (action 3), the public dashboard updates itself automatically on every
    push — no extra work per dataset added.
