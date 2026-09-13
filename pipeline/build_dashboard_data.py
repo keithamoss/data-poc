@@ -190,7 +190,11 @@ def build() -> dict:
             for run_id in run_ids_in_order:
                 if run_id in slot["by_run"]:
                     run_date = next(m["run_date"] for m in manifest if m["run_id"] == run_id)
-                    history.append({"run_date": run_date, "value": slot["by_run"][run_id]})
+                    history.append({
+                        "run_date": run_date, "value": slot["by_run"][run_id],
+                        "row_count_total": slot["row_count_total"].get(run_id),
+                        "row_count_invalid": slot["row_count_invalid"].get(run_id),
+                    })
             if not history:
                 continue
             engine_short = ENGINE_SHORT.get(engine, engine)

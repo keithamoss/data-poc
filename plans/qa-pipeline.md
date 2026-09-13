@@ -345,6 +345,61 @@ relative, not a schedule — this is weeks of work, not months.
       cross-run comparison (a fixed baseline for PSI, a rolling previous-
       run comparison for row-growth).
 
+14. **[done, medium]** Dashboard follow-ups from actually using it: a real
+    accessibility bug fix, plus the click-a-check detail view Keith asked
+    for (with clarifying questions asked first).
+    - **Tooltip dark-mode contrast bug, real and confirmed.** The trend-
+      chart hover tooltip used `background: var(--accent-ink); color:
+      #fff` - `--accent-ink` is dark navy in light mode (fine against
+      white text) but flips to a near-white blue in dark mode (it's meant
+      as readable *text* on `--accent-soft` there, e.g. `.pill.tag`), so
+      reusing it as this tooltip's background with hardcoded white text
+      produced white-on-light-blue: unreadable. Fixed with fixed,
+      theme-invariant colors (`#1B2420`/`#F5F2EA`) instead of chasing
+      another token through both themes - a floating overlay tooltip
+      reading "inverted" from the page underneath it is normal either way.
+      Verified in both color schemes with Playwright.
+    - **Click-a-check detail panel.** Previously only `checks[0]` (worst-
+      status, picked arbitrarily) got a compare-grid + trend-chart at the
+      top of the column drawer; every other check was a flat, non-
+      interactive card. Asked Keith 4 questions to scope this before
+      building (panel placement, content, history integration, whether
+      checks[0] keeps special status) - answers: a nested panel sliding
+      over the drawer; the existing compare/trend/table content plus
+      row-level detail; its own back/forward history entry, same pattern
+      as the drawer; and keep an automatic top section, but make it a
+      genuine all-checks summary rather than one arbitrary check's own
+      view. Built: every check-card is now clickable (and keyboard-
+      operable), opening `#check-panel` - a second drawer-like panel with
+      its own backdrop, above the column drawer's z-index - showing that
+      specific check's current-vs-previous comparison, its own trend
+      chart, and row-level detail (`row_count_total`/`row_count_invalid`,
+      newly threaded through each history point in both dashboard
+      builders - previously only ever exposed at the column-stats level
+      for checks[0]). Honestly noted rather than faked: genuine per-row
+      failing-record samples aren't captured by any real tool's output
+      today, only the aggregate counts each one already reports.
+      `STATE` gained an optional `checkKey` field alongside `columnName`,
+      pushed/restored the same way column-drawer state already is -
+      verified with Playwright: open → back closes the check panel only →
+      back again closes the drawer; forward replays both; reload on a
+      check-deep-linked URL restores the exact same nested state. Works
+      identically for Child Protection (shares `buildRealDataset`) and
+      the illustrative mock datasets (checks there already had every
+      field this reuses; row-level detail degrades gracefully to "not
+      captured" since mock checks never had real row counts).
+      The drawer's own top section is now a genuine all-checks rollup
+      instead of one check's view: current-run pass/warn/fail counts, and
+      a worst-status-per-run dot timeline computed entirely client-side
+      from each check's own history + fixed thresholds (no new Python-
+      side "column status over time" field needed). This surfaced a real,
+      previously-invisible fact rather than a bug: a column's worst-across-
+      all-checks status can be red even on an "amber" dirty run, because
+      some checks (e.g. datacontract-cli's `mustBe: 0` rules) have zero
+      tolerance while others (Soda's percentage bands) have a genuine
+      amber tier - both correct, now visibly disagreeing where they used
+      to be hidden behind whichever check happened to be checks[0].
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
