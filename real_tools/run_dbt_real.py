@@ -58,17 +58,36 @@ _VERIFY_COUNT_SQL = {
 
 _NUM_RE = re.compile(r"([\d.]+)")
 
+# multiple_birth_sibling has no attached column of its own (a singular
+# test, not a generic column test) - same class of gap run_dbt_real_cp.py
+# solves with cp_common.BUSINESS_RULE_HOME_TABLE, just column- rather than
+# table-scoped since this dataset is a single table. Without this, the
+# check would land under column_name="(table)", which the dashboard
+# builder silently drops for birth-registrations (there's no
+# "(table-level checks)" pseudo-column here the way Child Protection has).
+_SINGULAR_TESTS = ["multiple_birth_sibling"]
+_SINGULAR_TEST_COLUMN = {"multiple_birth_sibling": "is_multiple_birth"}
+
+_DIMENSION_BY_TEST = {
+    "unique": "uniqueness",
+    "not_null": "completeness",
+    "accepted_values": "validity",
+    "multiple_birth_sibling": "consistency",
+}
+
 # A short, human-readable phrase for what each test actually checks -
 # written here, at the point each check result is constructed (the one
 # place that genuinely knows what a check tests), not guessed later from
-# the check's name string by the dashboard-building code. None means "this
-# check's own name is already plain enough" (not used by this file today,
-# but kept for parity with run_dbt_real_cp.py's singular business-rule
-# tests, which do use it).
+# the check's name string by the dashboard-building code. multiple_birth_
+# sibling gets an explicit shared label (unlike the CP singular business-
+# rule tests, whose own names already read plainly) because it's the same
+# rule as the contract's and Soda's own version of it, under different
+# names - the label is what makes that overlap visible on the dashboard.
 _LABEL_BY_TEST = {
     "unique": "Duplicate rate",
     "not_null": "Null rate",
     "accepted_values": "Invalid values",
+    "multiple_birth_sibling": "Sibling record match",
 }
 
 
@@ -92,17 +111,18 @@ def _run_dbt(db_path: str, command: str) -> None:
     env["DBT_DB_PATH"] = db_path
     env["DBT_SEND_ANONYMOUS_USAGE_STATS"] = "False"
     subprocess.run(
-        # --select scopes this to stg_birth_registrations only - required
-        # since Phase 2 added 6 Child Protection models + 3 singular tests
-        # to this same dbt_project/: an unscoped call picks those up too
-        # and (a) errors trying to build them against a birth-registrations
-        # -only warehouse that has none of the CP tables, and (b) the CP
-        # singular tests have no test_metadata, which this file's own
-        # parsing below assumed every result would have. Found as a real,
-        # live KeyError while implementing the `dbt build` change just
-        # below - a genuine regression from Phase 2, not hypothetical.
+        # --select scopes this to stg_birth_registrations + its own
+        # singular test(s) only - required since Phase 2 added 6 Child
+        # Protection models + 3 singular tests to this same dbt_project/:
+        # an unscoped call picks those up too and (a) errors trying to
+        # build them against a birth-registrations-only warehouse that has
+        # none of the CP tables, and (b) the CP singular tests have no
+        # test_metadata, which this file's own parsing below assumed every
+        # result would have. Found as a real, live KeyError while
+        # implementing the `dbt build` change just below - a genuine
+        # regression from Phase 2, not hypothetical.
         ["dbt", command, "--profiles-dir", PROFILES_DIR, "--project-dir", DBT_PROJECT_DIR, "--quiet",
-         "--select", "stg_birth_registrations"],
+         "--select", "stg_birth_registrations", *_SINGULAR_TESTS],
         env=env, cwd=ROOT, check=False, capture_output=True, text=True,
     )
 
@@ -142,10 +162,10 @@ def evaluate_dbt_real(run_id: str, run_timestamp: str) -> list[dict]:
         node = nodes.get(r["unique_id"])
         if node is None:
             continue
-        meta = node["test_metadata"]
-        test_name = meta["name"]
-        column = node["column_name"]
-        config = node["config"]
+        meta = node.get("test_metadata")
+        test_name = meta["name"] if meta else node["name"]
+        column = node["column_name"] if meta else _SINGULAR_TEST_COLUMN.get(node["name"], "(table)")
+        config = node.get("config", {})
         status = r["status"]
         failures = r.get("failures") or 0
         warn_t = _parse_threshold(config.get("warn_if"))
@@ -163,8 +183,7 @@ def evaluate_dbt_real(run_id: str, run_timestamp: str) -> list[dict]:
             "dataset_id": DATASET_ID,
             "column_name": column,
             "check_name": f"dbt:{test_name}",
-            "dimension": "uniqueness" if test_name == "unique" else
-                         "completeness" if test_name == "not_null" else "validity",
+            "dimension": _DIMENSION_BY_TEST.get(test_name, ""),
             "label": _LABEL_BY_TEST.get(test_name),
             "run_id": run_id,
             "run_timestamp": run_timestamp,

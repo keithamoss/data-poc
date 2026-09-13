@@ -138,6 +138,16 @@ models:
               # 300/600 sit clear of this fixture's actual clean (38-57),
               # amber (424/437), and red (769) null counts (see README.md).
 
+      - name: source_system_record_id
+        description: BDM's internal record ID.
+        tests:
+          - unique
+          - not_null
+
+      - name: extract_timestamp
+        tests:
+          - not_null
+
   - name: stg_cp_clients
     description: One row per child with a Child Protection casework history, per snapshot.
     columns:

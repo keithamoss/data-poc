@@ -54,16 +54,35 @@ _DIMENSION_BY_METRIC = {
 
 # A short, human-readable phrase for what each metric actually measures -
 # written here, where each check result is constructed, not guessed later
-# from check_name by the dashboard-building code. custom_sql has no entry:
-# this contract's 2 custom_sql rules (a date-range check, a cross-field
-# comparison) are each a one-off with nothing else to pair against, so
-# there's no grouping benefit to labeling them.
+# from check_name by the dashboard-building code. custom_sql has no entry
+# here: unlike _CUSTOM_SQL_LABEL below, most of this contract's custom_sql
+# rules (the date-range check, the date_registered cross-field comparison)
+# are each a one-off with nothing else to pair against, so there's no
+# grouping benefit to labeling them.
 _LABEL_BY_METRIC = {
     "missing_count": "Null rate",
     "invalid_count": "Invalid values",
     "duplicate_count": "Duplicate rate",
     "row_count": "Row count",
 }
+
+# The 2 custom_sql rules below DO get an explicit shared label: each is
+# the same real-world check as a dbt (and, for the sibling check, Soda)
+# counterpart under a different name - the label is what makes that
+# overlap visible on the dashboard, same rationale as run_dbt_real.py's
+# and run_soda_real.py's own versions of this dict. Matched by the rule's
+# own description prefix (this contract's own text, not a guess).
+_CUSTOM_SQL_LABEL = {
+    "Multiple-birth sibling match:": "Sibling record match",
+    "Extract timestamp ordering:": "Timestamp ordering",
+}
+
+
+def _custom_sql_label(description: str) -> str | None:
+    for prefix, label in _CUSTOM_SQL_LABEL.items():
+        if description.startswith(prefix):
+            return label
+    return None
 
 
 def evaluate_datacontract_real(run_id: str, csv_filename: str, run_timestamp: str) -> list[dict]:
@@ -95,6 +114,8 @@ def evaluate_datacontract_real(run_id: str, csv_filename: str, run_timestamp: st
         row_count_total = diag.get("row_count")
         row_count_invalid = None if metric == "row_count" else diag.get("value")
 
+        label = _custom_sql_label(c.name) if metric == "custom_sql" else _LABEL_BY_METRIC.get(metric)
+
         results.append({
             "agency_id": AGENCY_ID,
             "collection_id": COLLECTION_ID,
@@ -102,7 +123,7 @@ def evaluate_datacontract_real(run_id: str, csv_filename: str, run_timestamp: st
             "column_name": c.field or "(table)",
             "check_name": f"datacontract:{metric}",
             "dimension": c.dimension or _DIMENSION_BY_METRIC.get(metric, ""),
-            "label": _LABEL_BY_METRIC.get(metric),
+            "label": label,
             "run_id": run_id,
             "run_timestamp": run_timestamp,
             "metric_value": value,

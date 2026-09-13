@@ -24,6 +24,7 @@ from dashboard_check_labels import rank_for_headline, display_name
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results.json")
+REAL_RESULTS_PATH = os.path.join(ROOT, "reports", "results_real.json")
 DB_PATH = os.path.join(ROOT, "data", "warehouse.duckdb")
 OUT_PATH = os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")
 
@@ -32,6 +33,16 @@ ENGINE_SHORT = {
     "soda_engine (Soda Core equivalent)": "Soda Core equiv.",
     "dbt_test_engine (dbt-core equivalent)": "dbt equiv.",
     "drift_engine (Evidently AI equivalent)": "Evidently AI equiv.",
+    # The newer QA-check battery (source_system_record_id, extract_
+    # timestamp, the multiple-birth sibling match, the 5 text-format
+    # checks) was built real-tools-only, per Keith's explicit instruction
+    # ("real tools only, like Child Protection") - not reimplemented in
+    # engines/*.py. Same short-name convention as build_cp_dashboard_
+    # data.py's own ENGINE_SHORT for these 4 tags.
+    "dbt-core 1.12 + dbt-duckdb (real)": "dbt-core",
+    "Soda Core 3.5 (real)": "Soda Core",
+    "datacontract-cli 1.2.0 (real)": "datacontract-cli",
+    "Evidently 0.7 (real)": "Evidently AI",
 }
 
 COLUMN_META = {
@@ -70,11 +81,71 @@ def _sex_value_counts(conn: duckdb.DuckDBPyConnection, run_id: str) -> list[list
     return out
 
 
+# The newer QA-check battery (source_system_record_id, extract_timestamp,
+# the multiple-birth sibling match, 5 text-format checks) was built real-
+# tools-only per Keith's explicit instruction ("real tools only, like
+# Child Protection") - not reimplemented in engines/*.py. Most of these
+# checks ARE nonetheless already computed correctly by the existing
+# equivalent engines, because contract_engine.py and dbt_test_engine.py
+# generically interpret whatever's in the shared contract.yaml/schema.yml
+# (the same files real dbt-core/datacontract-cli read) - they just execute
+# the SQL/regex/threshold logic those files describe, so they picked up
+# duplicateValues, invalidValues (pattern), the two new type: sql rules,
+# and the two new generic dbt tests for free, correctly, with no code
+# changes. Only genuinely uncoverable gaps are listed here for merging in
+# from real_tools/orchestrate_real.py's output:
+#  - soda_engine.py has no duplicate_count or "failed rows" support at all
+#    (never built to - it only implements the SodaCL shapes the ORIGINAL
+#    checks file used), so it silently skips those checks entirely; and
+#  - soda_engine.py's invalid_percent(...) handler only understands
+#    `valid values` (a whitelist), not the newer checks' `valid regex` -
+#    engines/soda_engine.py now skips those explicitly instead of
+#    fabricating a result (see that file's own comment: this WAS silently
+#    computing a false 100%-invalid figure before the guard was added);
+#  - dbt_test_engine.py has no singular-test support at all (schema.yml
+#    generic tests only), so the multiple_birth_sibling singular test has
+#    no equivalent.
+# This is a hand-picked allowlist, not a diff against results.json, on
+# purpose: datacontract-cli's two implementations name the same rule
+# differently (contract_engine.py uses the YAML's own `metric:` key -
+# "nullValues" - while run_datacontract_real.py uses the tool's own
+# diagnostic metric name - "datacontract:missing_count"), so a same-column
+# diff would have treated every PRE-EXISTING datacontract-cli check as
+# "new" and merged in a duplicate, wrongly-thresholded card for it - found
+# live: registering_parent_1_name's existing warning-severity null-rate
+# check gained a false-red duplicate this way, because run_datacontract_
+# real.py's warn/fail-threshold defaulting (real, pre-existing, just never
+# previously displayed) reads a "severity: warning" rule's missing
+# fail_threshold as 0, unlike contract_engine.py's own correct ODCS-
+# severity-to-two-threshold conversion (see qa-pipeline.md #7).
+_REAL_ONLY_CHECK_KEYS = {
+    ("source_system_record_id", "duplicate_count[all]"),
+    ("source_system_record_id", "invalid_percent[all]"),
+    ("extract_timestamp", "extract timestamp is logically ordered after date_registered"),
+    ("is_multiple_birth", "dbt:multiple_birth_sibling"),
+    ("is_multiple_birth", "multiple birth records have a matching sibling"),
+    ("child_given_names", "invalid_percent[all]"),
+    ("child_family_name", "invalid_percent[all]"),
+    ("place_of_birth_suburb", "invalid_percent[all]"),
+    ("registering_parent_1_name", "invalid_percent[all]"),
+    ("registering_parent_2_name", "invalid_percent[all]"),
+}
+
+
+def _merge_real_only_checks(results: list[dict]) -> list[dict]:
+    if not os.path.exists(REAL_RESULTS_PATH):
+        return results
+    with open(REAL_RESULTS_PATH) as f:
+        real_payload = json.load(f)
+    extra = [r for r in real_payload["results"] if (r["column_name"], r["check_name"]) in _REAL_ONLY_CHECK_KEYS]
+    return results + extra
+
+
 def build() -> dict:
     with open(RESULTS_PATH) as f:
         payload = json.load(f)
     manifest = sorted(payload["runs"], key=lambda r: r["run_date"])
-    results = payload["results"]
+    results = _merge_real_only_checks(payload["results"])
 
     conn = duckdb.connect(DB_PATH)
 
@@ -216,8 +287,11 @@ def build() -> dict:
         "prevRowCount": prev_entry["n_rows_generated"],
         "runs": manifest,
         "columns": columns_out,
-        "_provenance": "Computed by pipeline/orchestrate.py from real generated CSVs, the real ODCS contract, "
-                        "the real Soda checks YAML, and a real dbt schema.yml — see README.md.",
+        "_provenance": "Computed by pipeline/orchestrate.py (engines/*.py equivalents) from real generated CSVs, "
+                        "the real ODCS contract, the real Soda checks YAML, and a real dbt schema.yml, with the "
+                        "newer QA-check battery (source_system_record_id, extract_timestamp, the multiple-birth "
+                        "sibling match, text-format checks) layered in from real_tools/orchestrate_real.py's "
+                        "output (actual dbt-core/Soda Core/datacontract-cli runs) — see README.md.",
     }
 
 

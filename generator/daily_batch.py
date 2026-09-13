@@ -87,10 +87,24 @@ def generate_daily_batch(run_date: date, seed: int, n_rows: int, id_offset: int 
                               np.char.add(np.char.add(p2_given.astype(str), " "), p2_family.astype(str)),
                               None)
 
-    is_multiple_birth = rng.random(n) < 0.032
     extract_timestamp = pd.to_datetime(date_registered) + pd.to_timedelta(rng.integers(1, 20, size=n), unit="h")
 
-    return pd.DataFrame({
+    # twin_rate of rows below become the FIRST twin of a real sibling pair
+    # (a second row is appended for each, below) - previously is_multiple_
+    # birth was an independent random flag with no sibling row backing it
+    # at all, so a "does a multiple-birth record have a matching sibling"
+    # check would fail on every single flagged row, on every run, by
+    # construction - the same "generator doesn't enforce the invariant"
+    # gap already found and fixed for two Child Protection business rules
+    # (see plans/qa-pipeline.md #9). ~half the previous 3.2% flat rate,
+    # since each twin pair now contributes 2 flagged rows for every 1
+    # chosen here - keeps the overall is_multiple_birth rate close to what
+    # it was.
+    twin_rate = 0.016
+    is_multiple_birth = rng.random(n) < twin_rate
+    twin_idx = np.where(is_multiple_birth)[0]
+
+    base = pd.DataFrame({
         "registration_number": registration_number,
         "child_given_names": given_p,
         "child_family_name": family_p,
@@ -105,3 +119,47 @@ def generate_daily_batch(run_date: date, seed: int, n_rows: int, id_offset: int 
         "source_system_record_id": source_system_record_id,
         "extract_timestamp": extract_timestamp,
     })
+
+    if len(twin_idx) == 0:
+        return base
+
+    # Sibling rows: same birth event (date_of_birth, facility/suburb,
+    # date_registered, both parents), each its own registration with a
+    # freshly drawn name/sex/IDs - real twins aren't identical rows, just
+    # rows that share the event they were born into. person_seq for
+    # siblings continues straight after the base batch's own range (still
+    # well inside this run's id_offset block - see generate_runs.py's
+    # ID_BLOCK), so registration_number/source_system_record_id stay
+    # globally unique.
+    n_sib = len(twin_idx)
+    sib_seq = np.arange(id_offset + n, id_offset + n + n_sib)
+    sib_sex = rng.choice(["M", "F", "X"], size=n_sib, p=[0.492, 0.492, 0.016])
+    sib_given_raw = np.empty(n_sib, dtype=object)
+    for sx, key in (("M", "male"), ("F", "female"), ("X", "unisex")):
+        mask = sib_sex == sx
+        pool, w = names[key]
+        sib_given_raw[mask] = rng.choice(pool, size=mask.sum(), p=w)
+    sib_family_raw = base["child_family_name"].values[twin_idx]  # same surname as the twin they're paired with
+
+    sib_given_p, sib_family_p, sib_registration_number = present_identity_batch(
+        sib_given_raw, sib_family_raw, sib_seq, agency_prefix="BDM", seed=seed + 3)
+    _, _, sib_source_system_record_id = present_identity_batch(
+        sib_given_raw, sib_family_raw, sib_seq, agency_prefix="SRC", seed=seed + 4)
+
+    sibling = pd.DataFrame({
+        "registration_number": sib_registration_number,
+        "child_given_names": sib_given_p,
+        "child_family_name": sib_family_p,
+        "date_of_birth": base["date_of_birth"].values[twin_idx],
+        "sex": sib_sex,
+        "place_of_birth_suburb": base["place_of_birth_suburb"].values[twin_idx],
+        "place_of_birth_facility": base["place_of_birth_facility"].values[twin_idx],
+        "date_registered": base["date_registered"].values[twin_idx],
+        "registering_parent_1_name": base["registering_parent_1_name"].values[twin_idx],
+        "registering_parent_2_name": base["registering_parent_2_name"].values[twin_idx],
+        "is_multiple_birth": True,
+        "source_system_record_id": sib_source_system_record_id,
+        "extract_timestamp": base["extract_timestamp"].values[twin_idx],
+    })
+
+    return pd.concat([base, sibling], ignore_index=True)

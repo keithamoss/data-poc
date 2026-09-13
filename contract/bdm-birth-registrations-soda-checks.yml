@@ -53,6 +53,84 @@ checks for birth_registrations:
       warn: when > 15%
       fail: when > 35%
 
+  # --- source_system_record_id: uniqueness + format ------------------------
+  # BDM's internal record ID - a duplicate means a re-extract landed twice;
+  # an unexpected format means an upstream ID-scheme change, same rationale
+  # as registration_number's own checks.
+  - duplicate_count(source_system_record_id):
+      warn: when > 0
+      fail: when > 3
+
+  - invalid_percent(source_system_record_id):
+      valid regex: '^SRC-[0-9]{9}$'
+      warn: when > 0%
+      fail: when > 1%
+
+  # --- Text field format/junk checks ----------------------------------------
+  # A name should be letters, spaces, periods and hyphens only - same rule
+  # as the ODCS contract's matching invalidValues rules on these 5 columns
+  # (see that file's own comment for why this is a character-set check,
+  # not a dictionary of known junk words: DuckDB's regex engine - the same
+  # one Soda's `valid regex` compiles down to here - is RE2, which has no
+  # lookahead support at all, so "reject any value containing a digit or
+  # symbol" is as precise as this check can get).
+  - invalid_percent(child_given_names):
+      valid regex: '^[A-Za-z][A-Za-z. -]*$'
+      warn: when > 0%
+      fail: when > 3%
+
+  - invalid_percent(child_family_name):
+      valid regex: '^[A-Za-z][A-Za-z. -]*$'
+      warn: when > 0%
+      fail: when > 3%
+
+  - invalid_percent(place_of_birth_suburb):
+      valid regex: '^[A-Za-z][A-Za-z. -]*$'
+      warn: when > 0%
+      fail: when > 3%
+
+  - invalid_percent(registering_parent_1_name):
+      valid regex: '^[A-Za-z][A-Za-z. -]*$'
+      warn: when > 0%
+      fail: when > 3%
+
+  - invalid_percent(registering_parent_2_name):
+      valid regex: '^[A-Za-z][A-Za-z. -]*$'
+      warn: when > 0%
+      fail: when > 3%
+
+  # --- Extract timestamp ordering -------------------------------------------
+  # A "failed rows" check with a custom fail condition - real SodaCL, not a
+  # column metric, so run_soda_real.py routes this custom-named check to
+  # the extract_timestamp column explicitly (it has no natural `column`
+  # of its own to report). Same rule as the ODCS contract's matching
+  # type: sql check on extract_timestamp.
+  - failed rows:
+      fail condition: extract_timestamp < date_registered OR extract_timestamp > date_registered + INTERVAL '1' DAY
+      name: extract timestamp is logically ordered after date_registered
+
+  # --- Multiple-birth sibling match -----------------------------------------
+  # A self-join "failed rows" check via a custom fail query - real SodaCL.
+  # Flags every is_multiple_birth record with no matching sibling row (same
+  # birth event). See daily_batch.py's generator fix: previously this flag
+  # had no sibling logic behind it, so this would have failed on every
+  # flagged row, every run, by construction. Routed to the is_multiple_birth
+  # column explicitly, same reason as the check above.
+  - failed rows:
+      fail query: |
+        SELECT a.registration_number
+        FROM birth_registrations a
+        WHERE a.is_multiple_birth = true
+          AND NOT EXISTS (
+            SELECT 1 FROM birth_registrations b
+            WHERE b.is_multiple_birth = true
+              AND b.registration_number != a.registration_number
+              AND b.date_of_birth = a.date_of_birth
+              AND b.place_of_birth_facility IS NOT DISTINCT FROM a.place_of_birth_facility
+              AND b.registering_parent_1_name IS NOT DISTINCT FROM a.registering_parent_1_name
+          )
+      name: multiple birth records have a matching sibling
+
 # --- "Proportion of records since a certain date" ---------------------------
 # Scopes the same invalid-value check to only the last 24 hours of extracts,
 # so a brand-new drift is caught fast rather than being diluted by months of

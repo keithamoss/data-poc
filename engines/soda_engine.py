@@ -208,7 +208,18 @@ def evaluate_soda(checks_path: str, db_path: str, run_id: str, run_timestamp: st
                                         _numeric_threshold(spec.get("warn")), _numeric_threshold(spec.get("fail")),
                                         status, n_scope, n_missing))
 
-            elif check_name.startswith("invalid_percent("):
+            elif check_name.startswith("invalid_percent(") and "valid values" in spec:
+                # "valid regex" (the newer QA-check battery's source_system_
+                # record_id/text-format checks) is real SodaCL this hand-
+                # rolled equivalent was never built to interpret - without
+                # this guard, spec.get("valid values", []) silently fell
+                # back to an empty set, and "nothing is ever in an empty
+                # set" meant every non-null value counted invalid: a real,
+                # live false 100%-invalid-on-a-clean-run bug, found by
+                # actually looking at the dashboard rather than assumed.
+                # Skipping (not fabricating a wrong number) is honest here;
+                # real_tools/run_soda_real.py computes these checks for
+                # real and build_dashboard_data.py's merge fills the gap.
                 col = check_name[len("invalid_percent("):-1]
                 valid_set = set(spec.get("valid values", []))
                 vals = [r.get(col) for r in scoped_rows if r.get(col) is not None and r.get(col) != ""]

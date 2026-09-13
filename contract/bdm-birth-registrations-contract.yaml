@@ -135,6 +135,22 @@ schema:
               Allows a small non-zero null rate (data-entry lag at source)
               but alerts if it creeps up - this is the "null rate creeping
               up" failure mode named as a real, recurring problem.
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              pattern: "^[A-Za-z][A-Za-z. -]*$"
+            mustBe: 0
+            severity: error
+            description: >
+              A name should be letters, spaces, periods, and hyphens only
+              - a digit or a symbol like "/" means a form was submitted
+              incomplete (e.g. "N/A") or a test/dummy record leaked into
+              the real feed (e.g. "Baby1"). Honest limitation: this is a
+              character-set check, not a dictionary of known junk words -
+              DuckDB's regex engine (RE2, the same engine Soda's checks
+              compile down to) has no lookahead support, so a purely
+              alphabetic junk word like a bare "TEST" or "UNKNOWN" with no
+              digit or symbol in it would NOT be caught by this rule alone.
 
       - name: child_family_name
         logicalType: string
@@ -146,6 +162,13 @@ schema:
             unit: percent
             mustBeLessThan: 1
             severity: error
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              pattern: "^[A-Za-z][A-Za-z. -]*$"
+            mustBe: 0
+            severity: error
+            description: Same format rule as child_given_names - see that property's description.
 
       - name: date_of_birth
         logicalType: date
@@ -195,6 +218,13 @@ schema:
             unit: percent
             mustBeLessThan: 2
             severity: warning
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              pattern: "^[A-Za-z][A-Za-z. -]*$"
+            mustBe: 0
+            severity: error
+            description: Same format rule as child_given_names - see that property's description.
 
       - name: place_of_birth_facility
         logicalType: string
@@ -235,6 +265,13 @@ schema:
             unit: percent
             mustBeLessThan: 5
             severity: warning
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              pattern: "^[A-Za-z][A-Za-z. -]*$"
+            mustBe: 0
+            severity: error
+            description: Same format rule as child_given_names - see that property's description.
 
       - name: registering_parent_2_name
         logicalType: string
@@ -247,28 +284,105 @@ schema:
             mustBeLessThan: 30
             severity: info
             description: Higher tolerance - single-parent registrations are legitimately common.
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              pattern: "^[A-Za-z][A-Za-z. -]*$"
+            mustBe: 0
+            severity: error
+            description: Same format rule as child_given_names - see that property's description.
 
       - name: is_multiple_birth
         logicalType: boolean
         physicalType: boolean
         required: true
+        description: >
+          A boolean's only two non-null states are both valid values by
+          definition - the nullValues rule below is already the complete
+          "strict values" check this column needs; there's no separate
+          "invalid code" state a boolean column can land in the way a
+          string column like sex can.
         quality:
           - metric: nullValues
             dimension: completeness
             mustBe: 0
             severity: error
+          - type: sql
+            dimension: consistency
+            # A self-join within one model - datacontract-cli's {model}
+            # template resolves to the same view both times it's used, so
+            # this genuinely joins the table to itself. Every row this
+            # flags is an is_multiple_birth record with no matching sibling
+            # row (same birth event: date_of_birth, facility, parent 1) -
+            # see daily_batch.py's generator fix (plans/qa-pipeline.md):
+            # previously this flag had no sibling logic behind it at all,
+            # so this check would have failed on every flagged row, every
+            # run, by construction. 0 on every clean run now; dirty.py's
+            # break_multiple_birth_siblings (amber/red only) drops one
+            # twin from a fraction of real pairs to demonstrate a real
+            # violation.
+            # IS NOT DISTINCT FROM (not plain =) on place_of_birth_facility
+            # and registering_parent_1_name: both can legitimately be null
+            # (home births; the ~2% parent1-name null rate), and plain =
+            # against NULL is never true in SQL even when both sides are
+            # the same NULL - found as a real, live false-positive (4
+            # flagged rows on a clean run where every sibling pair
+            # genuinely matched) before switching to null-safe equality.
+            query: >
+              SELECT COUNT(*) FROM {model} a
+              WHERE a.is_multiple_birth = true
+                AND NOT EXISTS (
+                  SELECT 1 FROM {model} b
+                  WHERE b.is_multiple_birth = true
+                    AND b.registration_number != a.registration_number
+                    AND b.date_of_birth = a.date_of_birth
+                    AND b.place_of_birth_facility IS NOT DISTINCT FROM a.place_of_birth_facility
+                    AND b.registering_parent_1_name IS NOT DISTINCT FROM a.registering_parent_1_name
+                )
+            mustBe: 0
+            severity: error
+            description: "Multiple-birth sibling match: every is_multiple_birth record must have a matching sibling row from the same birth event."
 
       - name: source_system_record_id
         logicalType: string
         physicalType: varchar(50)
         required: true
         description: BDM's internal record ID. Kept alongside registration_number to help trace re-extractions.
+        quality:
+          - metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+            description: No two rows may share a source_system_record_id - a re-extract landing twice would double-count downstream.
+          - metric: invalidValues
+            dimension: conformity
+            arguments:
+              pattern: "^SRC-[0-9]{9}$"
+            mustBe: 0
+            severity: error
+            description: Catches an upstream ID-format change, same rationale as registration_number's own pattern rule.
 
       - name: extract_timestamp
         logicalType: date
         physicalType: timestamp
         required: true
         description: When this record was extracted from BDM's source system, not when the file landed in S3.
+        quality:
+          - metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+          - type: sql
+            dimension: consistency
+            query: "SELECT COUNT(*) FROM {model} WHERE extract_timestamp < date_registered OR extract_timestamp > date_registered + INTERVAL 1 DAY"
+            mustBe: 0
+            severity: error
+            description: >
+              Extract timestamp ordering: an extract must be timestamped
+              on or after its own record's date_registered, and within the
+              24h latency SLA (see slaProperties below) - anything else
+              indicates clock skew or a backfilled record misdated at
+              extraction.
 
     quality:
       # the duplicateCheck rule that used to live here moved to

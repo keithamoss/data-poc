@@ -108,6 +108,64 @@ def inject_nulls_in_subset(df: pd.DataFrame, column: str, eligible_mask, rate: f
     return out
 
 
+def inject_duplicate_values(df: pd.DataFrame, column: str, rate: float, seed: int) -> pd.DataFrame:
+    """Overwrites `rate` of `column`'s values with another existing value
+    from the same column - creates real, exact duplicate values (a source
+    system accidentally reusing an ID) without touching any other column
+    or duplicating a whole row, unlike inject_duplicate_rows' whole-record
+    re-extract scenario."""
+    out = df.copy()
+    rng = np.random.default_rng(seed)
+    n = len(out)
+    mask = rng.random(n) < rate
+    idx = np.where(mask)[0]
+    if len(idx) == 0:
+        return out
+    donor_idx = rng.integers(0, n, size=len(idx))
+    col_loc = out.columns.get_loc(column)
+    out.iloc[idx, col_loc] = out.iloc[donor_idx][column].values
+    return out
+
+
+def inject_extract_timestamp_disorder(df: pd.DataFrame, rate: float, seed: int) -> pd.DataFrame:
+    """Shifts a fraction of extract_timestamp values to before their own
+    row's date_registered - a clock-skew or backfill bug at the source,
+    the scenario extract_timestamp's ordering/latency check is built to
+    catch."""
+    out = df.copy()
+    rng = np.random.default_rng(seed)
+    mask = rng.random(len(out)) < rate
+    n = int(mask.sum())
+    if n == 0:
+        return out
+    shift = pd.to_timedelta(rng.integers(1, 5, size=n), unit="h")
+    out.loc[mask, "extract_timestamp"] = pd.to_datetime(out.loc[mask, "date_registered"]) - shift
+    return out
+
+
+def break_multiple_birth_siblings(df: pd.DataFrame, severity: str, seed: int) -> pd.DataFrame:
+    """Drops one row from a fraction of real multiple-birth sibling pairs
+    (daily_batch.py now generates genuine pairs - same date_of_birth,
+    facility, and parent 1 - for every is_multiple_birth row) - the
+    remaining twin's is_multiple_birth=True flag is left with no sibling
+    row to match, the "one twin's registration never arrived" failure
+    mode the sibling-match check is built to catch."""
+    rate = 0.15 if severity == "amber" else 0.5
+    rng = np.random.default_rng(seed)
+    out = df.copy()
+    twins = out[out["is_multiple_birth"]]
+    groups = twins.groupby(
+        ["date_of_birth", "place_of_birth_facility", "registering_parent_1_name"], dropna=False
+    ).groups
+    pairs = [idx for idx in groups.values() if len(idx) >= 2]
+    n_break = int(len(pairs) * rate)
+    if n_break == 0:
+        return out
+    chosen = rng.choice(len(pairs), size=n_break, replace=False)
+    drop_idx = [pairs[i][0] for i in chosen]
+    return out.drop(index=drop_idx).reset_index(drop=True)
+
+
 def inject_drift_batch(df: pd.DataFrame, column: str, invalid_pool: list, batch_column: str,
                         onset_value, rate_after_onset: float, seed: int) -> pd.DataFrame:
     """Failure rate is 0 before `onset_value` in `batch_column` (e.g. a
@@ -128,14 +186,35 @@ def inject_drift_batch(df: pd.DataFrame, column: str, invalid_pool: list, batch_
 # --- ready-made presets tied to the checks already defined elsewhere in
 #     this project (bdm-birth-registrations-soda-checks.yml, the CP concern
 #     type / risk rating value sets) - apply with apply_dirty_presets(). ---
+# Each value here contains a digit or a symbol outside a name's normal
+# letters/period/space/hyphen alphabet - deliberately, so every one of
+# them trips the name-format checks (contract/Soda/dbt regex has no
+# lookahead support on DuckDB's RE2 engine, so it can only catch "outside
+# the allowed character set", not "is a specific junk word" - see the
+# contract's own comment on this).
+_JUNK_TEXT_POOL = ["N/A", "TEST1", "UNKNOWN9", "XXXX0", "Baby1"]
+
+
 def apply_birth_registrations_presets(df: pd.DataFrame, severity: str, seed: int) -> pd.DataFrame:
     """severity: 'amber' or 'red' - matches the warn/fail bands in
     bdm-birth-registrations-soda-checks.yml exactly, so a QA run against
-    this output should land in the band you asked for."""
+    this output should land in the band you asked for. Covers all of the
+    checks this dataset's QA battery has calibrated presets for - the
+    original 2 (sex, place_of_birth_facility) plus the newer battery
+    (source_system_record_id duplicates, child_given_names format junk,
+    extract_timestamp ordering, multiple-birth sibling records)."""
     rate_sex = 0.008 if severity == "amber" else 0.028      # warn>0%, fail>2%
     rate_facility_null = 0.20 if severity == "amber" else 0.40  # warn>15%, fail>35%
+    rate_dup_id = 0.004 if severity == "amber" else 0.02
+    rate_junk_name = 0.006 if severity == "amber" else 0.03   # warn>0%, fail>3%
+    rate_ts_disorder = 0.01 if severity == "amber" else 0.04
+
     df = inject_invalid_values(df, "sex", ["U", "O", "9"], rate_sex, seed)
     df = inject_nulls(df, "place_of_birth_facility", rate_facility_null, seed + 1)
+    df = inject_duplicate_values(df, "source_system_record_id", rate_dup_id, seed + 2)
+    df = inject_invalid_values(df, "child_given_names", _JUNK_TEXT_POOL, rate_junk_name, seed + 3)
+    df = inject_extract_timestamp_disorder(df, rate_ts_disorder, seed + 4)
+    df = break_multiple_birth_siblings(df, severity, seed + 5)
     return df
 
 

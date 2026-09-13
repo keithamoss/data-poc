@@ -160,6 +160,99 @@ relative, not a schedule — this is weeks of work, not months.
     `notification_id` and `cp_client_id`'s drawers and the executive/
     agency views; no regressions on either real dataset.
 
+11. **[done, medium]** Birth Registrations' QA coverage was thin outside
+    `sex`/`place_of_birth_facility`: two columns (`source_system_record_id`,
+    `extract_timestamp`) had no rule at all, five free-text columns only
+    had a null check, and there was no cross-record consistency check
+    anywhere in this dataset. Keith asked for a battery covering all of
+    that, real-tools-only (dbt-core/Soda Core/datacontract-cli - not
+    `engines/*.py`), with matching dirty-data presets.
+    **Added**: `source_system_record_id` uniqueness + `^SRC-[0-9]{9}$`
+    format; `extract_timestamp` null + an ordering/latency rule (must fall
+    within a day of `date_registered`, on or after it); a format check on
+    `child_given_names`/`child_family_name`/`place_of_birth_suburb`/
+    `registering_parent_1_name`/`registering_parent_2_name` (letters,
+    spaces, periods, hyphens only); and a genuine cross-record check - every
+    `is_multiple_birth` record must have a matching sibling row from the
+    same birth event (same `date_of_birth`, facility, registering parent 1).
+    Two categorical/numerical scoping calls, made rather than asked twice:
+    `is_multiple_birth`'s existing null check is already its complete
+    "strict values" check (a boolean has no third "invalid code" state the
+    way `sex` does); no pure numeric column exists in this schema at all
+    (both ID fields are string-typed), so "logical checks for numerical
+    columns" is covered by the closest fit - the date/timestamp ordering
+    rules.
+    A real generator gap surfaced immediately: `is_multiple_birth` was a
+    pure independent random flag (3.2% rate) with no sibling-record logic
+    behind it at all - the sibling check would have failed on every
+    flagged row, every run, by construction, the same "generator doesn't
+    enforce the invariant" pattern as #9 below. **Fixed** the same way:
+    `daily_batch.py` now actually generates a real sibling row for ~1.6%
+    of rows (each pair together landing close to the old 3.2% flat rate),
+    reusing the birth event's own `date_of_birth`/facility/parents with a
+    freshly drawn name, sex and IDs. `dirty.py` gained
+    `break_multiple_birth_siblings` (drops one twin from a fraction of
+    real pairs) plus `inject_duplicate_values` and
+    `inject_extract_timestamp_disorder`, folded into
+    `apply_birth_registrations_presets` alongside the existing two.
+    Two real, live bugs found by actually running this, not assumed:
+    - The sibling-match SQL (contract, dbt, Soda) initially used plain `=`
+      on `place_of_birth_facility`/`registering_parent_1_name`, both of
+      which can legitimately be null (home births; ~2% parent-name null
+      rate) - `NULL = NULL` is never true in SQL, so genuinely matching
+      pairs were flagged as siblingless whenever either shared field was
+      null (4 false positives on a clean run). Fixed with
+      `IS NOT DISTINCT FROM` (null-safe equality) in all three tools.
+    - DuckDB's regex engine (RE2, what both `REGEXP_MATCHES` and Soda's
+      `valid regex` compile down to) has no lookahead support at all - the
+      first draft of the text-format pattern
+      (`^(?!.*[0-9])(?!^(N/A|TEST|...)$)...`) is standard Python `re` but
+      not valid RE2, and separately its embedded apostrophe (for names
+      like "O'Brien" - though none exist in this fixture's name pools)
+      broke the SQL string it got embedded into. Simplified to a plain
+      character-class pattern (`^[A-Za-z][A-Za-z. -]*$`) with an honest,
+      documented limitation: this catches a digit or symbol in a name
+      field, not a dictionary of known junk words - a bare alphabetic
+      junk word like "TEST" with no digit/symbol in it would pass. The
+      dirty preset's junk pool was adjusted to values that genuinely trip
+      this narrower rule (e.g. "TEST1", not "TEST").
+    Wiring the new checks into the dashboard surfaced a third, unrelated
+    real bug and a genuine architecture question:
+    - `build_dashboard_data.py` reads `reports/results.json`
+      (`pipeline/orchestrate.py`'s equivalent-engine output), not
+      `results_real.json` - unlike Child Protection, which has no
+      equivalent engine at all and reads real-tool output directly. Most
+      of the new checks turned out to already be computed correctly by
+      the existing equivalent engines for free (`contract_engine.py`/
+      `dbt_test_engine.py` generically interpret whatever's in the shared
+      contract/schema files, so a new SQL rule or pattern just works with
+      no code change) - only `soda_engine.py`'s hand-rolled interpreter
+      has real gaps (no `duplicate_count`/`failed rows` support at all,
+      and its `invalid_percent` handler only understands `valid values`,
+      not the newer checks' `valid regex`). `build_dashboard_data.py` now
+      merges in exactly those gaps from `results_real.json` via an
+      explicit, hand-verified allowlist (not a diff against `results.json`
+      - datacontract-cli's two implementations name the same rule
+      differently, so a diff would have treated every pre-existing
+      datacontract-cli check as "new" - see that file's own comment).
+    - Found via that same near-miss: `soda_engine.py`'s `invalid_percent`
+      handler was silently computing a false 100%-invalid result for
+      every column using the new `valid regex` syntax (its `spec.get(
+      "valid values", [])` fallback to an empty set meant "nothing is
+      ever valid") - a real bug, not merge-only fallout, fixed by having
+      it skip (not fabricate) a check shape it doesn't understand.
+      `run_datacontract_real.py`'s own warn/fail-threshold defaulting
+      (real, pre-existing, just never previously displayed) also surfaced
+      this way: merging its check for `registering_parent_1_name`
+      alongside the equivalent's correctly-thresholded one would have
+      shown a duplicate false-red card, caught before it shipped by the
+      allowlist approach above rather than a same-column check_name diff.
+    Verified with Playwright throughout: all-green on the latest clean
+    run across all 13 columns (including the 2 previously-uncovered
+    ones), correct amber/red history on the 3 dirty runs, and each new
+    check's real-tool triangulation (dbt/Soda/datacontract-cli agreeing
+    on the same violation counts) visible on the relevant drawers.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

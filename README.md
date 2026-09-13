@@ -349,13 +349,31 @@ held from the original equivalent-only build.
   `_numeric_threshold()` reduces it to the upper bound only for display,
   and this is the one place where a piece of real information (the lower
   bound) is dropped for the sake of a single scalar.
-- **`source_system_record_id` and `extract_timestamp` have no quality rule
-  at all**, in the real contract or the real checks file. Rather than
-  inventing one, the dashboard says so directly on those columns' drawers.
-- **No `relationships` dbt test.** This dataset is a single table with no
-  other loaded model to join against (unlike synthetic-data-generator's
-  Child Protection collection, which has real FKs across 6 tables) — adding
-  one here would mean fabricating a join, so it's left out.
+- **`source_system_record_id` and `extract_timestamp` now have real quality
+  rules** (uniqueness/format, null/ordering-and-latency respectively),
+  added along with a wider QA-check battery: format checks on 5 free-text
+  columns, and a genuine cross-record consistency rule (every
+  `is_multiple_birth` record must have a matching sibling row from the
+  same birth event — `daily_batch.py` was fixed to actually generate that
+  sibling row; see `plans/qa-pipeline.md`). Built real-tools-only (dbt-
+  core/Soda Core/datacontract-cli, not `engines/*.py`) — most of it is
+  nonetheless computed correctly by the existing equivalent engines too,
+  since `contract_engine.py`/`dbt_test_engine.py` generically interpret
+  whatever's in the shared contract/schema files. The genuine gaps
+  (`soda_engine.py` has no `duplicate_count`/`failed rows`/`valid regex`
+  support, `dbt_test_engine.py` has no singular-test support) are filled
+  in on the dashboard from `real_tools/orchestrate_real.py`'s own output —
+  see `pipeline/build_dashboard_data.py`'s merge comment for the full
+  account, including a real false-positive this surfaced and fixed along
+  the way (`soda_engine.py`'s `invalid_percent` handler silently treated
+  an unrecognised `valid regex` check as "0 valid values", reporting every
+  non-null value invalid).
+- **No `relationships` dbt test between different tables.** This dataset
+  is a single table with no other loaded model to join against (unlike
+  synthetic-data-generator's Child Protection collection, which has real
+  FKs across 6 tables) — adding one here would mean fabricating a join, so
+  it's left out. The new `multiple_birth_sibling` dbt test is a *self*-join
+  within this one table instead, which needs no second model.
 - **Arrival timing is real but not very interesting**: every synthetic
   run's extract lag is generated under 20 hours, comfortably inside the
   contract's 24-hour SLA, so "on time" is always true in this fixture. It's
