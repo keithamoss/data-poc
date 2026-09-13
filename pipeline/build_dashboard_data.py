@@ -20,6 +20,8 @@ from datetime import datetime
 
 import duckdb
 
+from dashboard_check_labels import rank_for_headline, display_name
+
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results.json")
 DB_PATH = os.path.join(ROOT, "data", "warehouse.duckdb")
@@ -30,19 +32,6 @@ ENGINE_SHORT = {
     "soda_engine (Soda Core equivalent)": "Soda Core equiv.",
     "dbt_test_engine (dbt-core equivalent)": "dbt equiv.",
     "drift_engine (Evidently AI equivalent)": "Evidently AI equiv.",
-}
-
-# lower number = shown first in a column's check list (keeps the most
-# narratively-relevant check as checks[0], which the drawer uses for the
-# headline "current vs previous" / trend chart)
-CHECK_PRIORITY = {
-    ("sex", "invalid_percent[all]"): 0,
-    ("sex", "invalidValues"): 1,
-    ("sex", "dbt:accepted_values"): 2,
-    ("sex", "sex validity, last 24h only"): 3,
-    ("sex", "drift:PSI"): 4,
-    ("place_of_birth_facility", "missing_percent[all]"): 0,
-    ("place_of_birth_facility", "dbt:not_null"): 1,
 }
 
 COLUMN_META = {
@@ -123,7 +112,7 @@ def build() -> dict:
                 continue
             engine_short = ENGINE_SHORT.get(engine, engine)
             checks_out.append({
-                "name": f"{check_name} ({engine_short})",
+                "name": display_name(check_name, engine_short),
                 "dimension": "",
                 "unit": slot["unit"],
                 "warn": slot["warn"] if slot["warn"] is not None else 0,
@@ -132,7 +121,6 @@ def build() -> dict:
                 "previous": slot["by_run"].get(prev_run, 0),
                 "history": history,
                 "note": f"Computed by {engine} against this run's real data — not a fabricated figure.",
-                "_priority": CHECK_PRIORITY.get((col, check_name), 99),
             })
 
         if not checks_out:
@@ -144,12 +132,9 @@ def build() -> dict:
                 "history": [{"run_date": m["run_date"], "value": 0} for m in manifest],
                 "note": "Neither the ODCS contract nor the Soda/dbt check files define a rule for this "
                         "column today — this is a real gap, not a hidden failure.",
-                "_priority": 0,
             }]
 
-        checks_out.sort(key=lambda c: c["_priority"])
-        for c in checks_out:
-            del c["_priority"]
+        rank_for_headline(checks_out)
 
         # representative row counts for the stats block: the manifest's own
         # generated row count for that run (every column shares one table,

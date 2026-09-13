@@ -34,6 +34,7 @@ import duckdb
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "real_tools"))
 import cp_common
+from dashboard_check_labels import rank_for_headline, display_name
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_real_cp.json")
@@ -48,17 +49,6 @@ ENGINE_SHORT = {
 }
 
 BUSINESS_RULE_PSEUDO_COLUMN = "(table-level checks)"
-
-# lower number = shown first in a column's check list, same convention
-# build_dashboard_data.py uses
-CHECK_PRIORITY = {
-    ("concern_type", "invalidValues"): 0,
-    ("concern_type", "datacontract:invalid_count"): 0,
-    ("concern_type", "drift:PSI"): 1,
-    (BUSINESS_RULE_PSEUDO_COLUMN, "dbt:escalation_completeness"): 0,
-    (BUSINESS_RULE_PSEUDO_COLUMN, "dbt:closed_case_investigation_hygiene"): 0,
-    (BUSINESS_RULE_PSEUDO_COLUMN, "dbt:placement_carer_approval"): 0,
-}
 
 TABLE_META = {
     "cp_clients": "One row per child with a Child Protection casework history, per weekly snapshot extract.",
@@ -211,7 +201,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict]) -> di
                 continue
             engine_short = ENGINE_SHORT.get(engine, engine)
             checks_out.append({
-                "name": f"{check_name} ({engine_short})",
+                "name": display_name(check_name, engine_short),
                 "dimension": "",
                 "unit": slot["unit"],
                 "warn": slot["warn"] if slot["warn"] is not None else 0,
@@ -220,7 +210,6 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict]) -> di
                 "previous": slot["by_run"].get(prev_run, 0),
                 "history": history,
                 "note": f"Computed by {engine} against this run's real data — not a fabricated figure.",
-                "_priority": CHECK_PRIORITY.get((col, check_name), 99),
             })
 
         if not checks_out:
@@ -231,12 +220,9 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict]) -> di
                 "history": [{"run_date": m["run_date"], "value": 0} for m in manifest],
                 "note": "Neither the ODCS contract nor the Soda/dbt check files define a rule for this "
                         "column today — this is a real gap, not a hidden failure.",
-                "_priority": 0,
             }]
 
-        checks_out.sort(key=lambda c: c["_priority"])
-        for c in checks_out:
-            del c["_priority"]
+        rank_for_headline(checks_out)
 
         total_latest = next(m for m in manifest if m["run_id"] == latest_run)["row_counts"][table]
         total_prev = next(m for m in manifest if m["run_id"] == prev_run)["row_counts"][table]
