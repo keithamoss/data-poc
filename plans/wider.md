@@ -195,3 +195,57 @@ not a schedule.
     if the multi-decade dimension is ever actually wanted, adopt a real
     dynamic microsimulation engine like `neworder` or LIAM2 rather than
     faking time-evolution in a point-in-time snapshot generator).
+
+12. **[done, medium - generator layer only]** Resupply-chain simulation
+    for Birth Registrations, Keith's own real-world practice: a delivery
+    with a RED failing check (never amber) gets a resupply request, and
+    the corrected (or still-broken) resupply arrives some working days
+    later - "no single fixed resupply rate," deliberately. Scoped up
+    front via 2 rounds of questions before building: generator/manifest
+    layer only, real rows-largely-the-same-plus-organic-churn on
+    resupply (not a fresh random draw), a real per-attempt retry chance
+    rather than "one resupply always fixes it," Birth Registrations only
+    for now.
+    `generator/generate_runs.py` now walks each of its 10 scheduled
+    deliveries through a full attempt chain when the first attempt is
+    red: a business-day-aware delay (skewed fast - days 1-3 carry ~79%
+    of the probability mass, tailing out to day 10), a 60%-per-attempt
+    chance the resupply is ALSO red (calibrated so ~13% of red chains
+    need 5+ attempts - "sometimes, in a really bad scenario," most
+    resolve in 1-2 - matches Keith's own framing), and small-rate organic
+    churn between attempts (~2% rows added, ~2% modified, ~1% removed -
+    the source system keeps moving between attempts, a resupply isn't a
+    time-frozen resend of byte-identical data). Bumped RUN_PLAN from 1
+    red delivery to 2 so there'd be two independent chains to compare,
+    not one data point.
+    `data/raw/manifest.json` gained `delivery_id` (stable across every
+    attempt of one logical delivery), `delivery_date` (the originally
+    scheduled date), `attempt_number`, `arrived_date` (when this specific
+    attempt's file was actually received), `is_resupply`, and
+    `supersedes_run_id` - one delivery can now produce several manifest
+    entries. Verified end to end: a real 2-attempt chain and a real
+    4-attempt chain both generated and resolved correctly, with correct
+    business-day arithmetic (every resupply `arrived_date` lands Mon-Fri)
+    and correctly-scoped churn (isolated-tested at the designed ~1%/~2%
+    rates; the larger add/remove deltas visible between a red delivery's
+    own consecutive attempts are the combined effect of churn *and* that
+    attempt's own freshly reapplied red-severity defects, not a churn
+    bug).
+    **Deliberately left untouched**: `real_tools/*.py`, both dashboard
+    builders, and the dashboard UI all still assume one manifest entry =
+    one calendar day. Checked what that mismatch actually looks like
+    rather than guessing: pointed the existing (unmodified) equivalent-
+    engine pipeline at the new 15-entry manifest and it does NOT crash -
+    it silently treats every attempt as its own independent "day," so
+    `run_date`-sorted logic (e.g. `build_dashboard_data.py`'s
+    `latest_run`) ends up picking whichever attempt arrived most recently
+    *across every delivery's chain*, conflating separate deliveries'
+    timelines into one sequence instead of representing "5+ attempts,
+    same delivery" as what it is. That's the concrete, real input for
+    designing what the reporting UI needs - not yet designed. Keith's own
+    framing for that follow-up, already agreed: the dashboard should
+    track delivery attempts (each with its own outcome and a
+    supersedes-link) and derive "what's current" purely from attempt
+    recency within its own data - no need for it to know anything about
+    whether a downstream publishing/consumption system has acted on a
+    corrected resupply yet.
