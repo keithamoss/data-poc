@@ -2,36 +2,41 @@ version: 2
 
 # Real dbt generic-test syntax, run for real by `dbt test` (dbt-core 1.12 +
 # dbt-duckdb) via real_tools/run_dbt_real.py, and separately by
-# engines/dbt_test_engine.py's SQLite/DuckDB-equivalent evaluator.
+# engines/dbt_test_engine.py's DuckDB-equivalent evaluator.
 #
-# error_if/warn_if with a "%" suffix (as originally written here) is NOT
-# real dbt-core syntax - confirmed by actually running `dbt test`, which
-# splices these strings verbatim into `{{ fail_calc }} {{ error_if }}` (see
-# dbt-core's own default__get_test_sql macro), producing literally invalid
-# SQL like `count(*) >2%`. dbt-core's severity thresholds only compare a
-# raw failing-row count by default; getting a genuine percentage-of-rows
-# threshold (to mirror the Soda checks file's own warn/fail % bands) means
-# overriding `fail_calc` itself to compute the percentage explicitly, which
-# is what the two tests below do - real, valid dbt-core syntax, not a
-# workaround invented for this project. fail_calc references the model by
-# its bare view name rather than `{{ ref(...) }}`: dbt's generic-test config
-# parser explicitly rejects custom macros (including ref) in a config value,
-# only bare Jinja-free SQL - confirmed by trying it.
+# Several things below aren't what a plausible-looking first draft of this
+# file assumed - each only found by actually running `dbt test`:
 #
-# Two more things dbt-core's real behaviour required, not assumed: (1) the
-# `failures` column its own test-result schema validates is int-only, so a
-# fractional percentage has to be rounded to the nearest whole point - a
-# real, if very unlikely, edge case is a <0.5% invalid rate rounding down to
-# 0 and silently skipping the warn>0% tier, unlike Soda's exact float
-# comparison. (2) `config.severity` isn't a display label layered on top of
-# warn_if/error_if - dbt/task/test.py's own status logic only ever reaches
-# "fail" when severity is (the default) "error"; setting `severity: warn`
-# caps every run of this test at warn/pass forever, no matter what error_if
-# says. So neither test below sets `severity` at all - the two-tier warn/
-# error split comes entirely from warn_if vs. error_if against the default
-# "error" severity. See README.md's "known simplifications and honest
-# disagreements" for how all of this was found by actually running `dbt
-# test`, not assumed from the YAML shape.
+# 1. error_if/warn_if with a "%" suffix (e.g. ">2%") is NOT real dbt-core
+#    syntax. It's spliced verbatim into `{{ fail_calc }} {{ error_if }}`
+#    (dbt-core's own default__get_test_sql macro), producing literally
+#    invalid SQL like `count(*) >2%`. A genuine percentage-of-rows
+#    threshold needs `fail_calc` overridden to compute the percentage
+#    itself - and fail_calc can't reference the model via `{{ ref(...) }}`
+#    either: dbt's generic-test config parser explicitly rejects custom
+#    macros in a config value, only bare Jinja-free SQL.
+# 2. `config.severity` isn't a display label layered on top of warn_if/
+#    error_if - dbt/task/test.py's own status logic only ever reaches
+#    "fail" when severity is (the default) "error"; `severity: warn` caps
+#    every run of a test at warn/pass forever, no matter what error_if
+#    says. So neither test below sets `severity` at all.
+# 3. A confirmed dbt-duckdb reliability bug (not this project's SQL):
+#    dbt-core's own reported `failures` for a percentage-based `fail_calc`
+#    was reproducibly wrong - 0 instead of the true row count - on some
+#    runs, while the identical compiled SQL executed directly via DuckDB's
+#    own Python API against the same file always gave the right answer.
+#    This survived removing every layer of arithmetic (rounding, casting,
+#    plain division, even a bare unmodified `count(*)`), disabling partial
+#    parsing, forcing `--store-failures`, and substituting SUM for COUNT -
+#    none of it was the cause, and no SQL-level explanation was found
+#    despite extensive isolation. The two tests below use absolute
+#    row-count thresholds instead of a computed percentage as a result,
+#    and real_tools/run_dbt_real.py independently re-verifies both tests'
+#    result via a direct query against the same warehouse dbt just tested,
+#    rather than trust a demonstrated-unreliable number.
+#
+# See README.md's "known simplifications and honest disagreements" for the
+# fuller account of all three.
 #
 # No `relationships` test here: this pipeline's birth-registrations dataset
 # is a single table with no foreign key to another loaded model (unlike the
