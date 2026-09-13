@@ -96,6 +96,16 @@ def evaluate_soda_real(run_id: str, run_timestamp: str) -> list[dict]:
         elif base_check == "row_count":
             row_count_invalid = 0
 
+        # A short, human-readable phrase for what this check actually
+        # measures - written here, where the check result is constructed,
+        # not guessed later from check_name by the dashboard-building
+        # code. None for a custom-named check (only "sex validity, last
+        # 24h only" today): its own name is already plain.
+        label = None if is_custom_name else {
+            "missing_count": "Null rate", "missing_percent": "Null rate",
+            "invalid_percent": "Invalid values", "row_count": "Row count",
+        }.get(base_check)
+
         results.append({
             "agency_id": AGENCY_ID,
             "collection_id": COLLECTION_ID,
@@ -103,6 +113,7 @@ def evaluate_soda_real(run_id: str, run_timestamp: str) -> list[dict]:
             "column_name": column,
             "check_name": check_name,
             "dimension": "validity" if "invalid" in base_check else "completeness",
+            "label": label,
             "run_id": run_id,
             "run_timestamp": run_timestamp,
             "metric_value": value,

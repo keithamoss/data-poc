@@ -44,6 +44,31 @@ _DIMENSION_BY_METRIC = {
     "row_count": "completeness",
 }
 
+# A short, human-readable phrase for what each metric actually measures -
+# written here, where each check result is constructed, not guessed later
+# from check_name by the dashboard-building code.
+_LABEL_BY_METRIC = {
+    "missing_count": "Null rate",
+    "invalid_count": "Invalid values",
+    "duplicate_count": "Duplicate rate",
+    "row_count": "Row count",
+}
+
+
+def _custom_sql_label(description: str) -> str | None:
+    """custom_sql covers both the 7 FK checks and the 3 business rules -
+    distinguished here by whether the rule's own description (this
+    contract's own text, not a guess) opens with one of the 3 known
+    business-rule names. FK checks get "Referential integrity" (they
+    otherwise read as 7 unrelated one-off sentences); business rules get
+    None, since their own name already matches dbt's and Soda's names for
+    the same rule closely enough to read as the same thing without a
+    further prefix."""
+    for name in cp_common.BUSINESS_RULE_DISPLAY_NAME.values():
+        if description.startswith(name + ":"):
+            return None
+    return "Referential integrity"
+
 
 def evaluate_datacontract_real_cp(run_id: str, run_timestamp: str) -> list[dict]:
     from datacontract.data_contract import DataContract
@@ -88,8 +113,10 @@ def evaluate_datacontract_real_cp(run_id: str, run_timestamp: str) -> list[dict]
         if metric == "custom_sql":
             first_sentence = c.name.split(". ", 1)[0].rstrip(".") + "."
             check_name = f"datacontract:sql: {first_sentence}"
+            label = _custom_sql_label(c.name)
         else:
             check_name = f"datacontract:{metric}"
+            label = _LABEL_BY_METRIC.get(metric)
 
         results.append({
             "agency_id": cp_common.AGENCY_ID,
@@ -98,6 +125,7 @@ def evaluate_datacontract_real_cp(run_id: str, run_timestamp: str) -> list[dict]
             "column_name": c.field or "(table)",
             "check_name": check_name,
             "dimension": c.dimension or _DIMENSION_BY_METRIC.get(metric, ""),
+            "label": label,
             "run_id": run_id,
             "run_timestamp": run_timestamp,
             "metric_value": value,

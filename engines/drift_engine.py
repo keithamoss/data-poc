@@ -84,6 +84,7 @@ def evaluate_drift(db_path: str, run_id: str, run_timestamp: str, reference_run_
         "column_name": "sex",
         "check_name": "drift:PSI",
         "dimension": "consistency",
+        "label": "Distribution drift",
         "run_id": run_id,
         "run_timestamp": run_timestamp,
         "metric_value": round(psi, 4),

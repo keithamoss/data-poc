@@ -27,6 +27,15 @@ import yaml
 
 VIEW_NAME = "stg_birth_registrations"
 
+# A short, human-readable phrase for what each test actually checks -
+# looked up here, at the point each check result is constructed, not
+# guessed later from check_name by the dashboard-building code.
+_LABEL_BY_TEST = {
+    "unique": "Duplicate rate",
+    "not_null": "Null rate",
+    "accepted_values": "Invalid values",
+}
+
 
 def _render_model_sql(sql_path: str, source_table: str) -> str:
     with open(sql_path) as f:
@@ -108,6 +117,17 @@ def evaluate_dbt_tests(project_dir: str, db_path: str, run_id: str, run_timestam
 
     results = []
     for model in schema["models"]:
+        if model["name"] != VIEW_NAME:
+            # Phase 2 added 6 Child Protection models + their own tests to
+            # this same schema.yml. This engine reads the file directly and
+            # has no dbt --select concept to scope itself with (unlike a
+            # real dbt invocation) - it was iterating every model in the
+            # file and evaluating CP tests against columns that don't
+            # exist in this equivalent's birth-registrations-only
+            # warehouse, crashing with a BinderException. Found the same
+            # way as real_tools/run_dbt_real.py's missing --select: by
+            # actually re-running this for the first time since Phase 2.
+            continue
         for col in model.get("columns", []):
             col_name = col["name"]
             for test in col.get("tests", []):
@@ -157,6 +177,7 @@ def evaluate_dbt_tests(project_dir: str, db_path: str, run_id: str, run_timestam
                     "check_name": f"dbt:{test_name}",
                     "dimension": "uniqueness" if test_name == "unique" else
                                  "completeness" if test_name == "not_null" else "validity",
+                    "label": _LABEL_BY_TEST.get(test_name),
                     "run_id": run_id,
                     "run_timestamp": run_timestamp,
                     "metric_value": metric_value,

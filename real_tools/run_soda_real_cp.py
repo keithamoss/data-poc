@@ -94,6 +94,17 @@ def evaluate_soda_real_cp(run_id: str, run_timestamp: str) -> list[dict]:
         else:
             dimension = ""
 
+        # A short, human-readable phrase for what this check actually
+        # measures - written here, where the check result is constructed,
+        # not guessed later from check_name by the dashboard-building
+        # code. None for the 3 named business-rule checks: their own
+        # names are already plain (and match dbt's and datacontract-cli's
+        # own names for the same rule closely enough that a reader sees
+        # the overlap without a further prefix).
+        label = None if is_custom_name else {
+            "row_count": "Row count", "reference": "Referential integrity",
+        }.get(base_check)
+
         results.append({
             "agency_id": cp_common.AGENCY_ID,
             "collection_id": cp_common.COLLECTION_ID,
@@ -101,6 +112,7 @@ def evaluate_soda_real_cp(run_id: str, run_timestamp: str) -> list[dict]:
             "column_name": column,
             "check_name": check_name,
             "dimension": dimension,
+            "label": label,
             "run_id": run_id,
             "run_timestamp": run_timestamp,
             "metric_value": value,

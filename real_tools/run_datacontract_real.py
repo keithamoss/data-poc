@@ -52,6 +52,19 @@ _DIMENSION_BY_METRIC = {
     "row_count": "completeness",
 }
 
+# A short, human-readable phrase for what each metric actually measures -
+# written here, where each check result is constructed, not guessed later
+# from check_name by the dashboard-building code. custom_sql has no entry:
+# this contract's 2 custom_sql rules (a date-range check, a cross-field
+# comparison) are each a one-off with nothing else to pair against, so
+# there's no grouping benefit to labeling them.
+_LABEL_BY_METRIC = {
+    "missing_count": "Null rate",
+    "invalid_count": "Invalid values",
+    "duplicate_count": "Duplicate rate",
+    "row_count": "Row count",
+}
+
 
 def evaluate_datacontract_real(run_id: str, csv_filename: str, run_timestamp: str) -> list[dict]:
     from datacontract.data_contract import DataContract
@@ -89,6 +102,7 @@ def evaluate_datacontract_real(run_id: str, csv_filename: str, run_timestamp: st
             "column_name": c.field or "(table)",
             "check_name": f"datacontract:{metric}",
             "dimension": c.dimension or _DIMENSION_BY_METRIC.get(metric, ""),
+            "label": _LABEL_BY_METRIC.get(metric),
             "run_id": run_id,
             "run_timestamp": run_timestamp,
             "metric_value": value,

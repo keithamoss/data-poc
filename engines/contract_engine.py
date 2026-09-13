@@ -44,6 +44,20 @@ def _severity_to_status(severity: str, violated: bool) -> str:
     return {"error": "fail", "warning": "warn", "info": "warn"}.get(severity, "warn")
 
 
+# A short, human-readable phrase for what each metric actually measures -
+# looked up here, at the one shared point every check result passes
+# through, not guessed later from check_name by the dashboard-building
+# code. "sql" has no entry: this contract's 2 sql rules (a date-range
+# check, a cross-field comparison) are each a one-off with nothing else to
+# pair against, so there's no grouping benefit to labeling them.
+_LABEL_BY_CHECK_NAME = {
+    "nullValues": "Null rate",
+    "invalidValues": "Invalid values",
+    "duplicateValues": "Duplicate rate",
+    "rowCount": "Row count",
+}
+
+
 def _result(run_id, run_ts, column, check_name, dimension, metric_value, unit,
             warn_threshold, fail_threshold, status, on_fail_action, row_count_total, row_count_invalid):
     return {
@@ -53,6 +67,7 @@ def _result(run_id, run_ts, column, check_name, dimension, metric_value, unit,
         "column_name": column,
         "check_name": check_name,
         "dimension": dimension,
+        "label": _LABEL_BY_CHECK_NAME.get(check_name),
         "run_id": run_id,
         "run_timestamp": run_ts,
         "metric_value": metric_value,

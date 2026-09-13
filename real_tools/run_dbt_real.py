@@ -58,6 +58,19 @@ _VERIFY_COUNT_SQL = {
 
 _NUM_RE = re.compile(r"([\d.]+)")
 
+# A short, human-readable phrase for what each test actually checks -
+# written here, at the point each check result is constructed (the one
+# place that genuinely knows what a check tests), not guessed later from
+# the check's name string by the dashboard-building code. None means "this
+# check's own name is already plain enough" (not used by this file today,
+# but kept for parity with run_dbt_real_cp.py's singular business-rule
+# tests, which do use it).
+_LABEL_BY_TEST = {
+    "unique": "Duplicate rate",
+    "not_null": "Null rate",
+    "accepted_values": "Invalid values",
+}
+
 
 def _parse_threshold(spec: str | None) -> float | None:
     if spec is None or spec.strip() == "!= 0":
@@ -152,6 +165,7 @@ def evaluate_dbt_real(run_id: str, run_timestamp: str) -> list[dict]:
             "check_name": f"dbt:{test_name}",
             "dimension": "uniqueness" if test_name == "unique" else
                          "completeness" if test_name == "not_null" else "validity",
+            "label": _LABEL_BY_TEST.get(test_name),
             "run_id": run_id,
             "run_timestamp": run_timestamp,
             "metric_value": failures,

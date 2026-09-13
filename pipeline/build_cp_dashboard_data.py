@@ -173,6 +173,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict]) -> di
         key = (r["engine"], r["check_name"])
         slot = by_column.setdefault(col, {}).setdefault(key, {
             "unit": r["unit"], "warn": r["warn_threshold"], "fail": r["fail_threshold"],
+            "dimension": r["dimension"], "label": r.get("label"),
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {},
         })
         slot["by_run"][r["run_id"]] = r["metric_value"]
@@ -201,8 +202,8 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict]) -> di
                 continue
             engine_short = ENGINE_SHORT.get(engine, engine)
             checks_out.append({
-                "name": display_name(check_name, engine_short),
-                "dimension": "",
+                "name": display_name(check_name, engine_short, slot["label"]),
+                "dimension": slot["dimension"],
                 "unit": slot["unit"],
                 "warn": slot["warn"] if slot["warn"] is not None else 0,
                 "fail": slot["fail"] if slot["fail"] is not None else 0,

@@ -54,6 +54,20 @@ _DIMENSION_BY_TEST = {
     "placement_carer_approval": "consistency",
 }
 
+# A short, human-readable phrase for what each test actually checks -
+# written here, where each check result is constructed, not guessed later
+# from the check's name string by the dashboard-building code. None for
+# the 3 singular business-rule tests: their own names (escalation_
+# completeness, etc.) are already plain enough on their own, and this same
+# business rule also shows up under Soda's and datacontract-cli's own
+# already-plain names - a reader scanning card titles already sees the
+# shared word without a further prefix.
+_LABEL_BY_TEST = {
+    "unique": "Duplicate rate",
+    "not_null": "Null rate",
+    "relationships": "Referential integrity",
+}
+
 
 def _parse_threshold(spec: str | None) -> float | None:
     if spec is None or spec.strip() == "!= 0":
@@ -133,6 +147,7 @@ def evaluate_dbt_real_cp(run_id: str, run_timestamp: str) -> list[dict]:
             "column_name": column,
             "check_name": f"dbt:{test_name}",
             "dimension": _DIMENSION_BY_TEST.get(test_name, ""),
+            "label": _LABEL_BY_TEST.get(test_name),
             "run_id": run_id,
             "run_timestamp": run_timestamp,
             "metric_value": failures,

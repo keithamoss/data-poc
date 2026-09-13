@@ -91,6 +91,29 @@ def _numeric_threshold(spec) -> float | None:
     return conds[0][1]
 
 
+# A short, human-readable phrase for what each check actually measures -
+# looked up here, at the one shared point every check result passes
+# through, not guessed later from check_name by the dashboard-building
+# code. Matched by prefix rather than exact value since these check_names
+# carry a bracketed scope suffix (e.g. "missing_percent[all]"). A
+# check_name with a real custom `name:` in the YAML (only "sex validity,
+# last 24h only" today) matches none of these and gets no label - its own
+# name is already plain.
+_LABEL_PREFIXES = [
+    ("row_count[", "Row count"),
+    ("missing_count[", "Null rate"),
+    ("missing_percent[", "Null rate"),
+    ("invalid_percent[", "Invalid values"),
+]
+
+
+def _label_for(check_name: str) -> str | None:
+    for prefix, label in _LABEL_PREFIXES:
+        if check_name.startswith(prefix):
+            return label
+    return None
+
+
 def _result(run_id, run_ts, column, check_name, metric_value, unit,
             warn_threshold, fail_threshold, status, row_count_total, row_count_invalid):
     return {
@@ -99,7 +122,15 @@ def _result(run_id, run_ts, column, check_name, metric_value, unit,
         "dataset_id": DATASET_ID,
         "column_name": column,
         "check_name": check_name,
-        "dimension": "validity" if "invalid" in check_name else "completeness",
+        # "invalid" alone misses the one custom-named check in this
+        # dataset ("sex validity, last 24h only" - no substring "invalid"
+        # in "validity"), silently mislabeling its dimension as
+        # completeness. Pre-existing, only found now that dimension is
+        # actually shown in the dashboard rather than computed and
+        # discarded - "valid" matches both spellings without also
+        # matching missing_count/missing_percent/row_count.
+        "dimension": "validity" if "valid" in check_name.lower() else "completeness",
+        "label": _label_for(check_name),
         "run_id": run_id,
         "run_timestamp": run_ts,
         "metric_value": metric_value,
