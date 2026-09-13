@@ -1,9 +1,37 @@
 version: 2
 
-# Real dbt generic-test syntax, evaluable as-is by `dbt test` once a real
-# adapter is wired up. engines/dbt_test_engine.py reads this exact file and
-# evaluates equivalent SQL against SQLite, so these tests genuinely run
-# today, not just describe intent.
+# Real dbt generic-test syntax, run for real by `dbt test` (dbt-core 1.12 +
+# dbt-duckdb) via real_tools/run_dbt_real.py, and separately by
+# engines/dbt_test_engine.py's SQLite/DuckDB-equivalent evaluator.
+#
+# error_if/warn_if with a "%" suffix (as originally written here) is NOT
+# real dbt-core syntax - confirmed by actually running `dbt test`, which
+# splices these strings verbatim into `{{ fail_calc }} {{ error_if }}` (see
+# dbt-core's own default__get_test_sql macro), producing literally invalid
+# SQL like `count(*) >2%`. dbt-core's severity thresholds only compare a
+# raw failing-row count by default; getting a genuine percentage-of-rows
+# threshold (to mirror the Soda checks file's own warn/fail % bands) means
+# overriding `fail_calc` itself to compute the percentage explicitly, which
+# is what the two tests below do - real, valid dbt-core syntax, not a
+# workaround invented for this project. fail_calc references the model by
+# its bare view name rather than `{{ ref(...) }}`: dbt's generic-test config
+# parser explicitly rejects custom macros (including ref) in a config value,
+# only bare Jinja-free SQL - confirmed by trying it.
+#
+# Two more things dbt-core's real behaviour required, not assumed: (1) the
+# `failures` column its own test-result schema validates is int-only, so a
+# fractional percentage has to be rounded to the nearest whole point - a
+# real, if very unlikely, edge case is a <0.5% invalid rate rounding down to
+# 0 and silently skipping the warn>0% tier, unlike Soda's exact float
+# comparison. (2) `config.severity` isn't a display label layered on top of
+# warn_if/error_if - dbt/task/test.py's own status logic only ever reaches
+# "fail" when severity is (the default) "error"; setting `severity: warn`
+# caps every run of this test at warn/pass forever, no matter what error_if
+# says. So neither test below sets `severity` at all - the two-tier warn/
+# error split comes entirely from warn_if vs. error_if against the default
+# "error" severity. See README.md's "known simplifications and honest
+# disagreements" for how all of this was found by actually running `dbt
+# test`, not assumed from the YAML shape.
 #
 # No `relationships` test here: this pipeline's birth-registrations dataset
 # is a single table with no foreign key to another loaded model (unlike the
@@ -29,14 +57,24 @@ models:
           - accepted_values:
               values: ['M', 'F', 'X']
               config:
-                severity: warn
+                # accepted_values' own main_sql (see dbt-core's
+                # test_accepted_values macro) already groups invalid rows by
+                # value into one row per distinct bad value with an
+                # `n_records` count column - so count(*) here would count
+                # distinct invalid VALUES, not invalid ROWS (e.g. 1 if every
+                # invalid row happens to share one bad code). sum(n_records)
+                # is the real row count, confirmed by comparing against this
+                # project's own equivalent engine's row-level count.
+                fail_calc: "cast(round(coalesce(sum(n_records), 0) * 100.0 / (select count(*) from stg_birth_registrations)) as integer)"
                 warn_if: ">0"
-                error_if: ">2%"
+                error_if: ">2"
               # two-tier: any invalid value at all raises a warning; once
               # invalid rows exceed 2% of the model, the test result itself
               # escalates to error - mirrors the Soda check's warn>0%/
-              # fail>2% bands, expressed as dbt's own severity config
-              # instead of duplicating Soda's syntax.
+              # fail>2% bands. warn_if/error_if are plain percentage-point
+              # numbers (real dbt-core syntax has no "%" operator), compared
+              # against fail_calc's own percentage - not a bare failing-row
+              # count, which is dbt's default fail_calc.
 
       - name: date_of_birth
         tests:
@@ -55,9 +93,11 @@ models:
         tests:
           - not_null:
               config:
-                severity: warn
-                warn_if: ">15%"
-                error_if: ">35%"
+                fail_calc: "cast(round(count(*) * 100.0 / (select count(*) from stg_birth_registrations)) as integer)"
+                warn_if: ">15"
+                error_if: ">35"
               # mirrors missing_percent(place_of_birth_facility)'s warn/fail
               # bands from the Soda checks file, as a dbt not_null test's own
-              # severity thresholds rather than a hardcoded pass/fail.
+              # severity thresholds rather than a hardcoded pass/fail - see
+              # the file-level comment above for why fail_calc needs
+              # overriding to express this as a real percentage.
