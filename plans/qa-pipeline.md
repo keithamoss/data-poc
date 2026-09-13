@@ -101,6 +101,65 @@ relative, not a schedule — this is weeks of work, not months.
    unaffected by the fix, only which values land in `carer_id`/
    `case_status`/`end_date`).
 
+10. **[done, medium]** Dashboard check display was hard for a human reader
+    to make sense of, flagged against a concrete example
+    (`notification_id`): its drawer headlined `dbt:not_null` (flat 0,
+    "No material change") while the tile itself was Red from a different
+    check several cards down, because `checks[0]` — which drives the
+    headline chart — was ordered by a hand-curated `CHECK_PRIORITY` dict
+    that only had entries for a couple of columns. The 4 raw tool check
+    names (`dbt:unique`, `datacontract:duplicate_count`, ...) also gave no
+    hint that two of them were the same real-world question asked by two
+    tools.
+    **Fixed** in `pipeline/dashboard_check_labels.py` (shared by both
+    dashboard builders): `rank_for_headline()` sorts each column's checks
+    by their own current-run status (worst first, using the exact rule
+    `checkStatus()` renders with) instead of a lookup table that can go
+    stale; `display_name()` prefixes a short plain-language label (Null
+    rate, Duplicate rate, Invalid values, Referential integrity,
+    Distribution drift, Row count) sourced from an explicit `label` field
+    every `real_tools/*.py` script and `engines/*.py` equivalent now
+    writes onto each check result at construction time — not guessed
+    later from the check name string, after Keith pushed back on an
+    earlier version that did exactly that. The dashboard's existing but
+    always-blank `dimension` field is now populated the same way and
+    shown as a badge on each check card.
+    Three real, pre-existing bugs surfaced along the way, each found by
+    actually looking rather than assumed:
+    - `engines/dbt_test_engine.py` (birth-registrations' equivalent dbt
+      engine) reads `dbt_project/models/staging/schema.yml` directly with
+      no `--select` scoping — the same class of regression as
+      `run_dbt_real.py`'s missing `--select` (see performance.md #2), just
+      in the hand-rolled interpreter. It was iterating all 7 models in the
+      shared schema.yml and crashing on the first Child Protection column
+      it hit. This means `pipeline/orchestrate.py` — which produces
+      `reports/results.json`, the file the *live* Birth Registrations
+      dashboard tile actually reads — had been silently broken since
+      Phase 2, showing stale pre-Phase-2 data instead of erroring
+      visibly, until this was found by re-running it for the first time
+      since.
+    - `soda_engine.py`'s dimension logic (`"validity" if "invalid" in
+      check_name else "completeness"`) missed the one custom-named check
+      in the dataset: "sex validity, last 24h only" contains "validity",
+      not "invalid", so it was silently mislabeled completeness. Invisible
+      until dimension was actually rendered.
+    - datacontract-cli's 7 FK checks and 3 Child Protection business rules
+      are both written as table-level `type: sql` rules (ODCS has no
+      per-property home for a rule that joins to another table), so both
+      arrived with `column_name="(table)"` and both landed in the
+      dashboard's `(table-level checks)` pseudo-column — inconsistent with
+      dbt's `relationships` tests and Soda's `values in ... must exist
+      in ...` checks for the exact same FKs, which the dashboard already
+      attributes to the FK column itself. Fixed in
+      `run_datacontract_real_cp.py` by parsing the FK column straight out
+      of each rule's own description (all 7 follow the same "Every
+      `<table>`'s `<column>` must reference an existing `<table>` row."
+      shape) — the 3 business rules' differently-shaped descriptions are
+      untouched.
+    Verified with Playwright throughout, including a full re-check of
+    `notification_id` and `cp_client_id`'s drawers and the executive/
+    agency views; no regressions on either real dataset.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
