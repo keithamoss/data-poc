@@ -53,11 +53,22 @@ not a schedule.
    general dbt-core issue — useful signal for `plans/qa-pipeline.md` #1
    even if Postgres itself isn't adopted.
 
-5. **[todo, medium]** Decide how to handle the dashboard/Artifact split.
-   Options: keep publishing a fresh Artifact copy manually after each
-   repo change; write a small script/workflow to do it; or treat the
-   repo's HTML as the sole source of truth and stop maintaining the
-   Artifact. Needs a decision, not just an observation.
+5. **[done]** The old claude.ai Artifact copy is no longer a concern —
+   decided to stop maintaining it; this repo's HTML is the sole source of
+   truth going forward. **Public hosting decided and set up**: the repo
+   itself is now public (Keith's call, given the data involved is
+   synthetic), so GitHub Pages works on the free plan with no workaround
+   needed. `.github/workflows/deploy-pages.yml` publishes
+   `dashboard/qa-reporting-dashboard.html` (as `index.html`) on every push
+   that touches `dashboard/` — no separate build step, since the file
+   already has its data baked in at commit time. One manual step still
+   needed (can't be done via the GitHub API access available here):
+   **Settings → Pages → Build and deployment → Source: "GitHub Actions"**,
+   one time, in the repo's web UI. Once that's flipped, the live URL will
+   be `https://keithamoss.github.io/data-poc/`. This also means: as more
+   datasets get wired in (action 2) and a scheduled re-run job exists
+   (action 3), the public dashboard updates itself automatically on every
+   push — no extra work per dataset added.
 
 6. **[todo, low]** Decide the long-term home for `synthetic-data-generator/`.
    It's a subdirectory here for now (simplest, since it never had its own
