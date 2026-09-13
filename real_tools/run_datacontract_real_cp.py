@@ -18,6 +18,7 @@ datacontract-cli's own check objects already know which schema object
 from __future__ import annotations
 import copy
 import os
+import re
 import sys
 
 import yaml
@@ -53,6 +54,28 @@ _LABEL_BY_METRIC = {
     "duplicate_count": "Duplicate rate",
     "row_count": "Row count",
 }
+
+
+_FK_DESCRIPTION_RE = re.compile(r"^Every \w+'s (\w+) must reference an existing \w+ row\.")
+
+
+def _fk_column_for(description: str) -> str | None:
+    """The 7 FK checks' descriptions (this contract's own text, written by
+    hand, not a guess) all follow the exact same
+    "Every <table>'s <column> must reference an existing <table> row."
+    shape - so the column they're actually about is parsed straight out
+    of the rule's own words. Returns None for the 3 business rules, whose
+    descriptions don't match this shape at all.
+
+    Without this, every FK check lands under column_name="(table)" (since
+    ODCS has no per-property home for a table-level type: sql rule) and
+    gets grouped into the dashboard's "(table-level checks)" pseudo-
+    column - inconsistent with dbt's `relationships` tests and Soda's
+    `values in ... must exist in ...` checks for the exact same FK, which
+    the dashboard *does* attribute to the FK column itself. Keith asked
+    for this to be consistent across all three tools."""
+    m = _FK_DESCRIPTION_RE.match(description)
+    return m.group(1) if m else None
 
 
 def _custom_sql_label(description: str) -> str | None:
@@ -110,10 +133,12 @@ def evaluate_datacontract_real_cp(run_id: str, run_timestamp: str) -> list[dict]
         # business rules, several paragraphs long (see contract's
         # comments) - only the first sentence is short and descriptive
         # enough for a check_name label, so that's all that's kept here.
+        fk_column = None
         if metric == "custom_sql":
             first_sentence = c.name.split(". ", 1)[0].rstrip(".") + "."
             check_name = f"datacontract:sql: {first_sentence}"
             label = _custom_sql_label(c.name)
+            fk_column = _fk_column_for(c.name)
         else:
             check_name = f"datacontract:{metric}"
             label = _LABEL_BY_METRIC.get(metric)
@@ -122,7 +147,7 @@ def evaluate_datacontract_real_cp(run_id: str, run_timestamp: str) -> list[dict]
             "agency_id": cp_common.AGENCY_ID,
             "collection_id": cp_common.COLLECTION_ID,
             "dataset_id": cp_common.TABLE_DATASET_ID[table],
-            "column_name": c.field or "(table)",
+            "column_name": fk_column or c.field or "(table)",
             "check_name": check_name,
             "dimension": c.dimension or _DIMENSION_BY_METRIC.get(metric, ""),
             "label": label,
