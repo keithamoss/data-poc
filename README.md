@@ -24,6 +24,7 @@ To run the **real** tools instead:
 
 ```bash
 pip install -r requirements-real.txt
+pip install 'datacontract-cli[duckdb]'    # see requirements-real.txt - a second step, not optional
 python3 real_tools/orchestrate_real.py    # -> reports/results_real.json
 python3 real_tools/compare_real_vs_equivalent.py  # -> reports/comparison.txt
 ```
@@ -54,14 +55,19 @@ actually runs `dbt`, `soda`, `datacontract-cli`, and `evidently` today.
 | **Evidently AI** | Population Stability Index (PSI) on the `sex` column vs. a reference run. | `drift_engine.py` computes PSI from scratch with the standard formula and 0.1/0.25 warn/fail bands. | `run_evidently_real.py` runs the real `evidently.Report` + `DataDriftPreset` (the current 0.7.x API). |
 
 `requirements-real.txt` lists the exact package set verified to install and
-run together (including one real, non-obvious version pin conflict between
-`dbt-duckdb` and `soda-core-duckdb` — see that file's comments).
+run together — including a `pip check`-flagged conflict between
+`soda-core-duckdb`'s declared `duckdb<1.1.0` ceiling and the actual duckdb
+version (1.5.5) that all four tools were run against with no observed
+breakage; see that file's comments before assuming the pip warning means
+you must downgrade.
 
 ## Running it for real
 
 Verified working end to end in this environment — not speculative:
 
-1. `pip install -r requirements-real.txt`.
+1. `pip install -r requirements-real.txt`, then `pip install
+   'datacontract-cli[duckdb]'` separately — a hard `pip` dependency
+   conflict otherwise, not just a warning; see that file's comments.
 2. `python3 real_tools/build_per_run_warehouses.py` builds one DuckDB file
    per run under `data/duckdb_runs/` (dbt and Soda each need a real
    warehouse to connect to, and get one file per run rather than the
