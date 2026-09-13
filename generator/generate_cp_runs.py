@@ -63,9 +63,15 @@ TABLES = ["cp_clients", "cp_notifications", "cp_investigations", "cp_placements"
 
 # (week offset from run 1, dirty severity or None) - 10 weekly snapshots,
 # same 7 clean / 2 amber / 1 red ratio as generate_runs.py's RUN_PLAN.
+# Deliberately ends on the red run (unlike generate_runs.py, which ends
+# clean): Keith wanted the dashboard's default/latest view to show real
+# red on this collection specifically, not just buried a few runs back in
+# the trend history - see plans/wider.md and the AskUserQuestion decision
+# that shaped this ("make the latest run itself dirty" / "Child Protection
+# only").
 RUN_PLAN = [
     (0, None), (1, None), (2, None), (3, "amber"), (4, None),
-    (5, None), (6, "amber"), (7, None), (8, "red"), (9, None),
+    (5, None), (6, "amber"), (7, None), (8, None), (9, "red"),
 ]
 
 START_DATE = date(2026, 7, 6)  # a Monday, 10 weeks before the generator's TODAY (2026-09-13)
