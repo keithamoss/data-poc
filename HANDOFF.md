@@ -1,5 +1,19 @@
 # Handoff — read this first
 
+**Status: done.** A Claude Code session with real internet access completed
+every step below — all four real tools (dbt-core, Soda Core,
+datacontract-cli, Evidently) are installed and running against this
+pipeline's real data via `real_tools/*.py`, and `engines/*.py` are kept as
+the documented fallback this file asked for, not deleted. See README.md's
+"What's real vs. equivalent" section and "Known simplifications and honest
+disagreements" for what changed and what real tools required fixing along
+the way (several genuine bugs in the original contract/schema files, only
+visible once the actual binaries parsed them) - and its own "Running it for
+real" section for the exact commands. This file is kept as-is below for
+its original historical context.
+
+---
+
 This repo was built inside a Claude chat session (claude.ai) that has **no
 real internet access** — PyPI is fully blocked there, confirmed repeatedly,
 which is why `engines/*.py` are hand-written Python/SQLite stand-ins for
