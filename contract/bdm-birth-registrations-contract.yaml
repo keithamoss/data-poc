@@ -1,0 +1,250 @@
+# Open Data Contract Standard (ODCS) contract for the BDM birth-registrations feed.
+#
+# Illustrative / worked example, written to accompany the data-contract-engines
+# landscape report. Structured against the documented ODCS v3 schema
+# (bitol-io/open-data-contract-standard). NOT run through `datacontract-cli lint`
+# in this environment (pip install isn't reachable here - see the repo README's
+# network-constraints note) - lint it yourself once datacontract-cli is set up,
+# before treating this as final:
+#
+#   pip install datacontract-cli
+#   datacontract lint bdm-birth-registrations-contract.yaml
+#   datacontract test bdm-birth-registrations-contract.yaml
+#
+# Describes the CURRENT state (CSV dumped to S3). The planned move to Parquet,
+# and eventually pulling directly from source (Postgres/MySQL/SQL
+# Server/Snowflake-shaped systems), is exactly the kind of change this contract
+# is meant to make explicit and versioned rather than a silent, hopeful swap -
+# see "Planned changes" in customProperties below, and the worked-example
+# section of the report for how that transition would actually play out.
+
+apiVersion: v3.0.2
+kind: DataContract
+id: bdm-birth-registrations
+status: draft
+version: 1.0.0
+
+name: Birth Registrations Feed
+domain: civil-registration
+description: >
+  Daily extract of birth registrations from the Registry of Births, Deaths
+  and Marriages (BDM), supplied to the central multi-agency data asset for
+  identity and eligibility matching by consuming agencies.
+
+team:
+  - role: dataOwner
+    name: Registry of Births, Deaths and Marriages
+  - role: dataSteward
+    description: BDM data governance contact - update with a real name/email before use
+  - role: consumer
+    name: Central multi-agency data asset
+
+support:
+  channels:
+    - channel: email
+      tool: email
+      description: BDM data supply team - replace with a real contact before use
+
+servers:
+  - server: production
+    type: s3
+    location: s3://gov-data-exchange/bdm/birth-registrations/
+    format: csv
+    delimiter: comma
+    description: >
+      Current delivery mechanism: a full or incremental CSV dump, dropped
+      into this bucket on a daily schedule. No direct source connection yet.
+
+schema:
+  - name: birth_registrations
+    physicalType: table
+    description: One row per birth registration record, as extracted by BDM.
+    properties:
+      - name: registration_number
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        unique: true
+        description: BDM's unique registration identifier. Primary key of the feed.
+        quality:
+          - rule: nullCheck
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            description: Every record must carry a registration number.
+          - rule: regexPattern
+            dimension: validity
+            mustBeRegex: "^BDM-[0-9]{9}$"
+            severity: error
+            description: >
+              Catches upstream ID-format changes (e.g. a source-system
+              migration) before they reach consumers as silent garbage.
+
+      - name: child_given_names
+        logicalType: string
+        physicalType: varchar(200)
+        required: true
+        quality:
+          - rule: nullCheck
+            dimension: completeness
+            mustBeLessThan: 0.01
+            severity: error
+            description: >
+              Allows a small non-zero null rate (data-entry lag at source)
+              but alerts if it creeps up - this is the "null rate creeping
+              up" failure mode named as a real, recurring problem.
+
+      - name: child_family_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: true
+        quality:
+          - rule: nullCheck
+            dimension: completeness
+            mustBeLessThan: 0.01
+            severity: error
+
+      - name: date_of_birth
+        logicalType: date
+        physicalType: date
+        required: true
+        quality:
+          - rule: nullCheck
+            dimension: completeness
+            mustBe: 0
+            severity: error
+          - rule: validDateRange
+            dimension: validity
+            mustBeBetween: ["1900-01-01", "$today"]
+            severity: error
+            description: >
+              Guards against a type/format change upstream (e.g. a
+              datetime-with-timezone field arriving where a plain date is
+              expected) turning into silently unparseable or nonsensical
+              dates downstream.
+
+      - name: sex
+        logicalType: string
+        physicalType: varchar(1)
+        required: true
+        quality:
+          - rule: validValues
+            dimension: validity
+            mustBe: ["M", "F", "X"]
+            severity: error
+            description: >
+              A closed value set. If BDM's source system starts emitting a
+              new code, this fails loudly instead of quietly landing an
+              unrecognised value in every downstream eligibility check.
+
+      - name: place_of_birth_suburb
+        logicalType: string
+        physicalType: varchar(100)
+        required: true
+        quality:
+          - rule: nullCheck
+            dimension: completeness
+            mustBeLessThan: 0.02
+            severity: warning
+
+      - name: place_of_birth_facility
+        logicalType: string
+        physicalType: varchar(200)
+        required: false
+        description: Nullable - not every birth occurs in a registered facility (e.g. home births).
+
+      - name: date_registered
+        logicalType: date
+        physicalType: date
+        required: true
+        quality:
+          - rule: nullCheck
+            dimension: completeness
+            mustBe: 0
+            severity: error
+          - rule: fieldComparison
+            dimension: validity
+            mustBeGreaterThanOrEqualTo: date_of_birth
+            severity: error
+            description: A registration date earlier than the birth date indicates a corrupt or misjoined record.
+
+      - name: registering_parent_1_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: false
+        quality:
+          - rule: nullCheck
+            dimension: completeness
+            mustBeLessThan: 0.05
+            severity: warning
+
+      - name: registering_parent_2_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: false
+        quality:
+          - rule: nullCheck
+            dimension: completeness
+            mustBeLessThan: 0.30
+            severity: info
+            description: Higher tolerance - single-parent registrations are legitimately common.
+
+      - name: is_multiple_birth
+        logicalType: boolean
+        physicalType: boolean
+        required: true
+        quality:
+          - rule: nullCheck
+            dimension: completeness
+            mustBe: 0
+            severity: error
+
+      - name: source_system_record_id
+        logicalType: string
+        physicalType: varchar(50)
+        required: true
+        description: BDM's internal record ID. Kept alongside registration_number to help trace re-extractions.
+
+      - name: extract_timestamp
+        logicalType: date
+        physicalType: timestamp
+        required: true
+        description: When this record was extracted from BDM's source system, not when the file landed in S3.
+
+    quality:
+      - rule: duplicateCheck
+        dimension: uniqueness
+        mustBe: 0
+        severity: error
+        description: No two rows may share a registration_number.
+      - rule: rowCount
+        dimension: completeness
+        mustBeBetween: [500, 20000]
+        severity: warning
+        description: >
+          A rough daily-volume sanity band. Catches a truncated or
+          accidentally-empty extract (well below the low end) as well as a
+          duplicated/double-loaded file (well above the high end) - the
+          "data drift" failure mode that a schema-only check would miss
+          entirely, since a doubled file has a perfectly valid schema.
+
+slaProperties:
+  - property: frequency
+    value: 1
+    unit: d
+    element: birth_registrations
+  - property: latency
+    value: 24
+    unit: h
+    element: birth_registrations
+    description: Maximum acceptable delay between a registration event at BDM and its extract landing in S3.
+
+customProperties:
+  - property: currentDeliveryFormat
+    value: csv
+  - property: plannedDeliveryFormat
+    value: parquet
+  - property: futureSourceCandidates
+    value: "PostgreSQL, MySQL, SQL Server, Snowflake, or a direct CDC/API feed - once BDM can support a source connection rather than a file drop"
+  - property: piiClassification
+    value: "Contains personal information. Confirm and record the correct security/handling classification for your agency before this leaves draft status."

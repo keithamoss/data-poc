@@ -1,0 +1,15 @@
+version: 2
+
+# The raw table this project's pipeline/load.py actually creates
+# (birth_registrations, in data/warehouse.db) - declared as a dbt source
+# so stg_birth_registrations.sql below is a genuine staging-layer model
+# (source -> typed/cleaned staging view), not a check running on raw
+# input directly.
+sources:
+  - name: raw
+    description: >
+      Runs loaded straight from the generator's CSVs, tagged with
+      run_id/run_date/dirty_severity. One row per birth registration
+      record, undifferentiated across runs.
+    tables:
+      - name: birth_registrations

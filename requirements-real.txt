@@ -1,0 +1,24 @@
+# The actual named tools this pipeline's engines/ stand in for, pinned to
+# recent versions as of early 2026. None of these are pip-installable in
+# the sandbox this repo was built in (PyPI is unreachable there - see
+# README.md's "What's real vs. equivalent" section) - this file is for
+# whichever machine you run this on next with real internet access,
+# whether that's a linked local computer or your own workstation/CI.
+#
+#   pip install -r requirements-real.txt
+#
+# Swapping each engine for the real tool is described per-engine in
+# README.md; none of it requires changing the contract/checks YAML files
+# themselves, since those were written as real ODCS/SodaCL/dbt syntax from
+# the start.
+
+dbt-core>=1.8
+dbt-duckdb>=1.8          # or dbt-postgres / another warehouse adapter - swap data/warehouse.db (SQLite) for DuckDB or Postgres first
+duckdb>=1.0
+soda-core-duckdb>=3.3    # or soda-core-postgres, matching whichever warehouse you pick above
+datacontract-cli>=0.10
+evidently>=0.4
+pandas>=2.2
+numpy>=1.26
+PyYAML>=6.0
+Jinja2>=3.1

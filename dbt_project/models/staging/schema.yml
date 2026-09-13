@@ -1,0 +1,63 @@
+version: 2
+
+# Real dbt generic-test syntax, evaluable as-is by `dbt test` once a real
+# adapter is wired up. engines/dbt_test_engine.py reads this exact file and
+# evaluates equivalent SQL against SQLite, so these tests genuinely run
+# today, not just describe intent.
+#
+# No `relationships` test here: this pipeline's birth-registrations dataset
+# is a single table with no foreign key to another loaded model (unlike the
+# synthetic-data-generator repo's Child Protection collection, which has
+# real FKs across 6 tables) - adding one would mean inventing a join that
+# doesn't reflect this dataset, so it's left out rather than faked in.
+
+models:
+  - name: stg_birth_registrations
+    description: >
+      One row per birth registration, across all loaded runs
+      (run_id/run_date/dirty_severity identify which run a row came from).
+    columns:
+      - name: registration_number
+        description: BDM's unique registration identifier.
+        tests:
+          - unique
+          - not_null
+
+      - name: sex
+        description: Closed value set - M, F, or X.
+        tests:
+          - accepted_values:
+              values: ['M', 'F', 'X']
+              config:
+                severity: warn
+                warn_if: ">0"
+                error_if: ">2%"
+              # two-tier: any invalid value at all raises a warning; once
+              # invalid rows exceed 2% of the model, the test result itself
+              # escalates to error - mirrors the Soda check's warn>0%/
+              # fail>2% bands, expressed as dbt's own severity config
+              # instead of duplicating Soda's syntax.
+
+      - name: date_of_birth
+        tests:
+          - not_null
+
+      - name: date_registered
+        tests:
+          - not_null
+
+      - name: is_multiple_birth
+        tests:
+          - not_null
+
+      - name: place_of_birth_facility
+        description: Nullable - home births have no facility.
+        tests:
+          - not_null:
+              config:
+                severity: warn
+                warn_if: ">15%"
+                error_if: ">35%"
+              # mirrors missing_percent(place_of_birth_facility)'s warn/fail
+              # bands from the Soda checks file, as a dbt not_null test's own
+              # severity thresholds rather than a hardcoded pass/fail.

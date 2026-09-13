@@ -1,0 +1,70 @@
+# SodaCL checks for the BDM birth-registrations feed, demonstrating a
+# traffic-light (warn/fail) threshold model on top of the same feed described
+# in bdm-birth-registrations-contract.yaml.
+#
+# This is real Soda Core syntax (warn:/fail: blocks with `when <condition>`),
+# confirmed against current Soda docs and third-party integration guides.
+# The exact keywords for scoping a check to "records since a date" (the
+# `filter` block below) are a documented SodaCL concept but I haven't
+# independently executed this file - Soda Core isn't pip-installable in this
+# environment (see the tts-repo README from earlier in this thread for why).
+# Run `soda scan` against this yourself to confirm before treating it as
+# final, same caveat as the ODCS contract.
+#
+# Usage (once you have Soda Core set up):
+#   pip install soda-core-postgres   # or whichever source connector you need
+#   soda scan -d birth_registrations -c configuration.yml bdm-birth-registrations-soda-checks.yml
+
+# --- Data drift: a row count that's structurally "fine" but wrong ----------
+# (a doubled or truncated file passes every column-level check; only a
+# volume check catches it - same rule as the ODCS contract's rowCount rule,
+# now with a real amber tier instead of one flat threshold)
+checks for birth_registrations:
+  - row_count:
+      warn: when < 500
+      fail:
+        when < 100
+        when > 20000
+
+  # --- Column rename / type change: missing_count on a required column ----
+  # A silent rename makes this column disappear from the source query
+  # entirely, which Soda surfaces as 100% missing - an immediate fail, no
+  # amber tier needed since there's no acceptable partial-rename state.
+  - missing_count(date_of_birth):
+      warn: when > 0
+      fail: when > 5
+
+  # --- The traffic-light example you asked for: sex -----------------------
+  # A closed value set that downstream systems depend on. Red/amber here
+  # means genuinely different responses: a handful of invalid codes might be
+  # a known source-system quirk worth a dashboard flag (amber); a sustained
+  # spike means BDM's source system changed its coding and every downstream
+  # consumer is about to silently misclassify records (red).
+  - invalid_percent(sex):
+      valid values: [M, F, X]
+      warn: when > 0%
+      fail: when > 2%
+
+  # --- Null rate creeping up, with a genuine amber band --------------------
+  # Unlike date_of_birth above, some null rate here is expected (home births
+  # without a recorded facility) - the amber tier exists specifically to
+  # catch "creeping up" before it becomes bad enough to matter operationally.
+  - missing_percent(place_of_birth_facility):
+      warn: when > 15%
+      fail: when > 35%
+
+# --- "Proportion of records since a certain date" ---------------------------
+# Scopes the same invalid-value check to only the last 24 hours of extracts,
+# so a brand-new drift is caught fast rather than being diluted by months of
+# clean historical data sitting in the same table. This is what turns "check
+# the whole table" into "check what we've received lately" - not a separate
+# feature, just the same metric computed over a filtered subset.
+filter birth_registrations [recent]:
+  where: extract_timestamp >= CURRENT_DATE - 1
+
+checks for birth_registrations [recent]:
+  - invalid_percent(sex):
+      valid values: [M, F, X]
+      warn: when > 0%
+      fail: when > 1%
+      name: sex validity, last 24h only
