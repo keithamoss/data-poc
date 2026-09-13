@@ -174,3 +174,24 @@ not a schedule.
     quality gremlins" a reviewer familiar with real WA government data
     would find unconvincing. Could land as a design-note doc, a README
     section, or a live walkthrough — not yet decided.
+    **Progress:** did the live walkthrough for `population.py` (format/
+    audience/rigor scoped via questions first) — found real, evidence-
+    backed gaps: the hand-authored name pools collide heavily at
+    population scale (`Charlotte Smith` × 5,499 at 200k people; ~5,000
+    genuine full-name+DOB collisions), couple ages are drawn fully
+    independently (32% of couples have a >15-year gap), mortality is
+    computed but never enforced anywhere downstream, and
+    `has_child_protection_history` can structurally never reach an adult
+    despite the code's own comment claiming it's lifelong. Not yet walked
+    through `agency_datasets.py`/`presentation.py`/`daily_batch.py`/
+    `generate_cp_runs.py`/`dirty.py` - pick back up there.
+    Also researched (not yet actioned) whether an existing library would
+    do this better than hand-rolling it further - see
+    `docs/synthetic-data-generation-tools-research.md`. Bottom line: no
+    clean drop-in for "Python, Australian, multi-agency," but a real
+    path exists (swap name pools for Faker/Mimesis now that pip access
+    isn't the blocker it was when they were hand-authored; recalibrate
+    household/age structure against real ABS Census DataPack marginals;
+    if the multi-decade dimension is ever actually wanted, adopt a real
+    dynamic microsimulation engine like `neworder` or LIAM2 rather than
+    faking time-evolution in a point-in-time snapshot generator).
