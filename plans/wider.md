@@ -95,3 +95,29 @@ not a schedule.
      own housekeeping)?
    - Does it belong as a feature of the existing QA dashboard (a new
      tier/tab), or as a genuinely separate concern?
+
+8. **[todo, low]** Birth Registrations and Child Protection currently come
+   from two separate, unlinked synthetic populations — no cross-agency
+   identity linkage is actually exercised in this pipeline, despite the
+   machinery existing. `synthetic-data-generator/population.py` builds a
+   shared master registry (`person_uid`, households) and
+   `synthetic-data-generator/generate.py` + `agency_datasets.py` draw
+   Birth Registrations, Child Protection, and School Enrollment all from
+   that *same* population (each agency gets its own presented name/ID via
+   `presentation.py`, linked underneath by `person_uid`, with an
+   `internal/` linkage answer-key file) — real and present, just not what
+   this pipeline calls. `generator/daily_batch.py` (what
+   `generator/generate_runs.py` actually uses for Birth Registrations) is
+   a deliberately separate event-flow generator with no population.py
+   involvement at all — a fresh cohort of newborns each day, not a
+   resample of an existing population, per its own docstring.
+   `generator/generate_cp_runs.py` (Phase 1, Child Protection) does call
+   `population.py`, but generates its own standalone population instance,
+   not shared with Birth Registrations'. **Follow-up:** re-point Birth
+   Registrations at the shared population (`agency_datasets.py`'s own
+   `generate_birth_registrations()` already does this — a second, genuine
+   implementation that exists but isn't wired into the pipeline) so a
+   synthetic person can genuinely show up in both datasets under
+   different agency IDs — worth doing once there are enough datasets
+   wired into the dashboard (action 2) that cross-agency identity
+   resolution becomes a meaningful thing to demonstrate, not before.
