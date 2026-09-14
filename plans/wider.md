@@ -249,3 +249,85 @@ not a schedule.
     recency within its own data - no need for it to know anything about
     whether a downstream publishing/consumption system has acted on a
     corrected resupply yet.
+
+13. **[done]** Separate "resupply orchestration" from
+    "synthetic data creation per dataset" as a distinct architectural
+    concern. Raised by Keith right after action 12 landed, prompted by two
+    things landing at once: `generate_runs.py`'s new attempt-chain loop
+    (action 12) is currently entangled directly with `daily_batch.py`'s
+    specific generation API (`main()` calls `generate_daily_batch()` and
+    `apply_birth_registrations_presets()` directly; `_churn_rows()` itself
+    calls `generate_daily_batch()` again to manufacture "missing rows that
+    should have been in the original file"), and action 11's research doc
+    (`docs/synthetic-data-generation-tools-research.md`) makes a real case
+    that the underlying generator (`daily_batch.py`, and/or
+    `population.py`'s wider household model) may itself get replaced later
+    (Faker/Mimesis name pools, ABS-calibrated IPF structure, possibly a
+    real dynamic microsimulation engine like `neworder`/LIAM2). If the
+    resupply-chain logic (delay distribution, retry/still-red probability,
+    MAX_ATTEMPTS, manifest bookkeeping, delivery/attempt ID scheme) stays
+    welded to `daily_batch.py`'s specific function signatures, swapping
+    the generator later means rewriting the resupply logic too, not just
+    the generation calls.
+
+    **Draft architecture sketch** (not agreed, not built — the actual
+    design should follow from the questions below): the orchestration loop
+    in `generate_runs.py` doesn't actually need to know anything about
+    *how* a dataset's rows are made — it only needs three operations to
+    exist for whatever dataset it's driving: (1) generate an initial
+    attempt's rows for a given date/seed/row-count/id-offset, optionally
+    dirtied to a severity; (2) churn an existing attempt's rows forward
+    (small add/modify/remove deltas) to produce the next attempt's
+    starting point; (3) (re-)apply a dirty preset at a given severity to
+    an existing attempt's rows. That's close to a `Protocol`/duck-typed
+    "dataset provider" shape — e.g.
+    `generate(date, seed, n_rows, id_offset) -> DataFrame`,
+    `churn(df, seed, run_date, id_offset) -> DataFrame`,
+    `dirty(df, severity, seed, previous_row_count) -> DataFrame` — with
+    `daily_batch.py` + `dirty.py`'s existing Birth-Registrations-specific
+    functions becoming the first (and for now, only) implementation
+    plugged into it. Everything that's genuinely about *resupply
+    behaviour* rather than *row content* (the business-day delay curve,
+    STILL_RED_PROB, MAX_ATTEMPTS, the delivery_id/attempt_number/
+    supersedes_run_id manifest shape) would move to a module that takes a
+    provider as a parameter, rather than living inside a
+    birth-registrations-specific script. Genuinely open, not yet decided:
+    whether "churn" is really a resupply-orchestration-level concept at
+    all (same shape for every dataset) or a dataset-specific concern that
+    belongs behind the provider interface too — churn was designed once,
+    for Birth Registrations' specific columns (`extract_timestamp`
+    nudging), and may not generalise as-is.
+
+    **Scoped via 4 questions, then built** (all recommended answers): do
+    the split now as prep rather than waiting for a second generator to
+    exist; churn stays behind the provider (it's dataset-specific column
+    knowledge, not resupply scheduling); Birth Registrations only for
+    now, not designed around Child Protection too; lands in a new shared
+    module rather than staying inline in `generate_runs.py`.
+
+    `generator/resupply.py` (new) now owns everything that's genuinely
+    about resupply *behaviour*: `MAX_ATTEMPTS`, `STILL_RED_PROB`, the
+    business-day delay distribution, `_add_business_days`, and
+    `run_delivery_chain()` - a generator that walks one delivery through
+    its full attempt chain and yields each `Attempt` (number, arrival
+    date, severity, rows), knowing nothing about how those rows were
+    made. It's driven by a `DatasetProvider` protocol - `generate()`,
+    `dirty()`, `churn()` - three operations any dataset's generator needs
+    to support to get resupply simulation "for free."
+    `generator/generate_runs.py` is now a thin script: a
+    `BirthRegistrationsProvider` class wrapping `daily_batch.py`'s
+    `generate_daily_batch()` and `dirty.py`'s
+    `apply_birth_registrations_presets()` (churn's implementation moved
+    here unchanged, since it's Birth-Registrations-specific -
+    `extract_timestamp` nudging, calling `generate_daily_batch()` for
+    "missing" rows), plus a `main()` that just writes CSVs/builds
+    manifest entries from what `run_delivery_chain()` yields. A future
+    replacement generator (per action 11's research doc) only has to
+    write a new provider class: `resupply.py` and its chain logic don't
+    change.
+    **Verified, not assumed**: regenerated the full 10-delivery/
+    15-attempt batch after the refactor and diffed `manifest.json`
+    against the pre-refactor version byte-for-byte - identical (same
+    delivery_06 3-attempt and delivery_09 4-attempt chains, same arrival
+    dates, same row counts), confirming the split is behaviour-preserving,
+    not just a plausible-looking rewrite.
