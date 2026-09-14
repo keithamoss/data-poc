@@ -68,6 +68,15 @@ Rough layout:
   real-tool run needed) and `uv run ruff check .` (a deliberately lean
   rule set - real bugs only, not style) before considering a change
   done. `pre-commit install` wires ruff into `git commit` automatically.
+- **Whenever an actual bug is found** (not a design gap, not a missing
+  feature - a case where the code produces a genuinely wrong result),
+  add a test to `tests/` that reproduces it and fails against the
+  current (buggy) code first, confirm it actually fails, then fix the
+  bug and confirm the same test now passes. Applies repo-wide, not just
+  to files `tests/` currently covers - a bug outside that scope still
+  gets a new test alongside the fix, not just a fix. Don't retrofit this
+  onto bugs already fixed earlier in this project's history; it's a
+  going-forward convention.
 - The repo is public (Keith's own call, synthetic data only) - GitHub
   Pages hosting depends on that; see `plans/wider.md` #5 for the
   parked note about what happens if/when it goes private again.
