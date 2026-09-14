@@ -457,7 +457,7 @@ relative, not a schedule — this is weeks of work, not months.
     external-provider access mechanism are both explicitly deferred, per
     that doc's own "what's not decided here" section.
 
-16. **[investigate]** Should the dashboard explain *why* checks on the
+16. **[done]** Should the dashboard explain *why* checks on the
     same column can legitimately disagree in severity? Item 14's
     all-checks summary surfaced (not created) a real fact: a column can
     show red on an "amber" run because one check has zero tolerance
@@ -501,10 +501,14 @@ relative, not a schedule — this is weeks of work, not months.
     into exactly a two-tier read on its own.
     Soda Core and dbt tests both do this natively in a single rule (warn:
     /fail: blocks; severity + warn_if/error_if respectively) - no
-    workaround needed. Given two-tier is a must-have, this is real signal
-    against datacontract-cli being one of the eventual 1-2 tools *unless*
-    doubling up quality rules is an acceptable convention - worth
-    weighing when it's time to actually narrow down.
+    workaround needed.
+    **Resolved (both sub-questions, 2026-09-14)**: Keith's call on the
+    two-tier finding - given it's a must-have requirement, needing a
+    workaround is a **real strike against datacontract-cli** for the
+    eventual 1-2-tool decision, not just a footnote to weigh later.
+    Nothing further to build here - both the "confusion" question and
+    this finding stand as closed records informing that future
+    narrowing-down decision, not open items.
 
 ## Held over from the original (equivalent-only) build
 
