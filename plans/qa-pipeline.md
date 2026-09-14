@@ -22,7 +22,7 @@ relative, not a schedule — this is weeks of work, not months.
    `dbt_project/models/staging/schema.yml`'s comments for the full trail).
    Current fix: absolute row-count thresholds instead of a computed
    percentage, plus independent re-verification in
-   `real_tools/run_dbt_real.py`. **Follow-up:** build a minimal standalone
+   `qa_tools/bdm/run_dbt_bdm.py`. **Follow-up:** build a minimal standalone
    repro (no dbt project, just the SQL pattern) and file it upstream
    against `duckdb-labs/dbt-duckdb`; `plans/wider.md` #3/#4 (CI, Postgres)
    might also shed light on this without extra effort.
@@ -31,11 +31,11 @@ relative, not a schedule — this is weeks of work, not months.
    compatibility ceiling — it pins to a DuckDB version with a published
    CVE (GHSA-w2gf-jxc9-pf2q), patched in 1.1.0. Confirmed via upstream
    issue `sodadata/soda-core#2295`. Currently ignored (we run on 1.5.5,
-   verified working end to end — see `requirements-real.txt`'s comments).
-   **Follow-up:** there's a newer `soda-duckdb` V4 package
+   verified working end to end — see `pyproject.toml`'s `[tool.uv]`
+   comments). **Follow-up:** there's a newer `soda-duckdb` V4 package
    (`sodadata/soda-core/soda-duckdb`) that's actively maintained — worth
    checking whether it's the intended replacement and whether
-   `run_soda_real.py`'s `Scan` API still exists there before migrating.
+   `run_soda_bdm.py`'s `Scan` API still exists there before migrating.
 
 3. **[open, low]** Soda's `[recent]` scoped check (`filter ... where:
    extract_timestamp >= CURRENT_DATE - 1`) never gets meaningfully
@@ -46,27 +46,32 @@ relative, not a schedule — this is weeks of work, not months.
    section), not fixed. **Follow-up:** regenerate the synthetic runs on a
    rolling window near "today" instead of a fixed Sept 2026 range, so the
    scoped check has real data to filter — would also un-stale the fixture
-   generally.
+   generally. **In progress (2026-09-14)** - being scoped now, see
+   `plans/wider.md`.
 
-4. **[open, low]** Evidently's PSI and the equivalent engine's PSI
-   genuinely differ (0.144 vs 0.179 on the red run) because Evidently bins
-   by every distinct observed value while `evidently_engine.py` collapses
-   everything outside {M,F,X} into one `_other` bucket. Both valid;
-   documented, not reconciled. **Follow-up:** decide whether to make the
-   equivalent's PSI bin per-distinct-value too (closer fidelity to
-   Evidently, more equivalent-engine complexity) or leave it as a
-   deliberate simplification — either is defensible, just needs a call.
+4. **[moot - `engines/*.py` removed]** Evidently's PSI and the equivalent
+   engine's PSI used to genuinely differ (0.144 vs 0.179 on the red run)
+   because Evidently bins by every distinct observed value while
+   `evidently_engine.py` collapsed everything outside {M,F,X} into one
+   `_other` bucket. Both were valid; documented, never reconciled - moot
+   now that `engines/*.py` (including `evidently_engine.py`) was removed
+   entirely (see `plans/wider.md` action 18) and there's no more
+   equivalent to reconcile against. Left here as historical record, not
+   an active item.
 
-5. **[open, low]** `engines/contract_engine.py`'s `type: sql` rule handling
-   (added when the contract was rewritten to real ODCS vocabulary) uses a
-   temp-view + string-replace to scope each SQL rule to one run's rows.
-   Works, but is fragile — equivalent-only tech debt, not a real-tool
-   issue.
+5. **[moot - `engines/*.py` removed]** `engines/contract_engine.py`'s
+   `type: sql` rule handling (added when the contract was rewritten to
+   real ODCS vocabulary) used a temp-view + string-replace to scope each
+   SQL rule to one run's rows - worked, but was fragile, equivalent-only
+   tech debt. Moot now that the file itself is gone (see `plans/wider.md`
+   action 18). Left here as historical record, not an active item.
 
-6. **[open, low]** The two-step `pip install` requirement
-   (`requirements-real.txt` then separately `pip install
-   'datacontract-cli[duckdb]'`) is brittle — a single combined install is
-   a hard resolver failure today. Worth a periodic recheck as
+6. **[open, low]** The two-step `pip install` requirement is only half
+   fixed: `uv sync --dev` now resolves everything in one step
+   (`pyproject.toml`'s `[tool.uv] override-dependencies`, see action 19 in
+   `plans/wider.md`), but a plain `pip install .` still needs the old
+   two-step dance (`pip` has no equivalent override mechanism) - see
+   README's install note. Worth a periodic recheck as
    `dbt-duckdb`/`soda-core-duckdb`/`datacontract-cli` release new
    versions; this could resolve cleanly on its own, or break differently.
 
@@ -325,7 +330,7 @@ relative, not a schedule — this is weeks of work, not months.
     scoped. Currently exercises exactly two checks for Birth Registrations
     (PSI drift on `sex` against a fixed run_01 baseline; the row-count-
     growth check added in item 12, against the immediately preceding run)
-    plus one for Child Protection (`real_tools/run_evidently_real_cp.py`,
+    plus one for Child Protection (`qa_tools/cp/run_evidently_cp.py`,
     PSI on `concern_type`). Candidates worth investigating before
     committing to any of them:
     - Evidently 0.7's other preset reports/tests beyond `DataDriftPreset`
