@@ -625,3 +625,50 @@ not a schedule.
     left untouched - that file is a development log of what happened and
     when, not a description of current state, so it stays historically
     accurate as originally written.
+
+19. **[done]** Development tooling: `uv`, `ruff`, and `pytest` smoke
+    tests - Keith asked "is there anything you want to do now to set us
+    up well for [adding more code]," scoped via questions before
+    building each piece.
+    - **ruff** (chosen over black+flake8): a deliberately lean rule set
+      (`F` pyflakes + `E9` syntax errors only - real bugs, not style),
+      enforced via a `pre-commit` hook (`.pre-commit-config.yaml`) rather
+      than CI-only or on-demand-only. First run found 6 real, safe
+      findings across the whole repo, not just recently-touched files -
+      5 unused imports, 1 confirmed-dead variable assignment in
+      `build_dashboard_data.py` - all fixed.
+    - **pytest smoke tests** (`tests/`, 13 tests, ~3s) - scope agreed as
+      generator layer + pipeline/dashboard-builder layer, explicitly NOT
+      a real (slow) `real_tools/` integration run:
+      `test_resupply.py` exercises `generator/resupply.py`'s chain
+      orchestration against a trivial stub `DatasetProvider` (business-day
+      arithmetic, clean/amber/red outcomes, chain termination,
+      strictly-advancing dates) - the exact use case that module's own
+      `DatasetProvider` Protocol boundary (action 13) was built to enable;
+      `test_generate_runs.py` runs the real seeded generator and checks
+      manifest shape/invariants (severity counts against `RUN_PLAN`,
+      resupply-only-follows-red, weekday-only arrivals, well-formed
+      supersedes chains); `test_build_dashboard_data.py` exercises
+      `pipeline/build_dashboard_data.py`'s reshaping logic against small
+      fixtures (a tiny `results_real.json` + DuckDB table) via
+      `monkeypatch`, deliberately avoiding a real `real_tools/` run to
+      stay fast.
+    - **uv**, adopted as the full `pyproject.toml` + `uv.lock` setup (not
+      just a faster pip drop-in). Genuinely solved a real, previously-
+      documented problem: `soda-core-duckdb` declares `duckdb<1.1.0`
+      while `datacontract-cli[duckdb]` needs a newer duckdb via
+      `ibis-framework` - a hard `pip` `ResolutionImpossible` error that
+      used to need a manual two-step `pip install` workaround (see
+      `plans/qa-pipeline.md`'s original account). `pyproject.toml`'s
+      `[tool.uv] override-dependencies = ["duckdb>=1.5"]` tells uv's
+      resolver to trust that the declared ceiling is stale - verified
+      repeatedly at runtime, all four tools genuinely work fine together
+      on duckdb 1.5.5 - so `uv sync --dev` now resolves everything in one
+      step. Verified end to end: full pipeline run under the new
+      uv-managed venv produces identical output (same 824 checks, same
+      byte counts embedded into the dashboard) to before the migration.
+      `requirements-real.txt` removed - `pyproject.toml`/`uv.lock` fully
+      supersede it, and keeping both would be the same dual-source-of-
+      truth drift risk action 18 just fixed elsewhere. The old two-step
+      `pip install` dance is only still needed for plain-pip installs
+      (no equivalent override mechanism) - documented as such in README.
