@@ -33,6 +33,7 @@ import duckdb
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from qa_tools.cp import cp_common
+from aggregate_values import categorical_aggregate, numeric_date_aggregate
 from dashboard_check_labels import rank_for_headline, display_name
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -126,6 +127,62 @@ COLUMN_META = {
 }
 
 
+# "Shape 2" aggregate failing-value support (plans/qa-pipeline.md #17) -
+# see build_dashboard_data.py's own AGGREGATE_SPEC comment for the full
+# rationale (same design, CP counterpart). Keyed by (table, column) since
+# CP has 6 tables, not by column alone.
+_POSTCODE_VALID = ["6007", "6008", "6014", "6018", "6019", "6027", "6028", "6030", "6035", "6036", "6050", "6056",
+                    "6061", "6062", "6064", "6069", "6100", "6102", "6107", "6109", "6110", "6112", "6122", "6148",
+                    "6151", "6155", "6160", "6162", "6163", "6164", "6167", "6168", "6171", "6210", "6215", "6225",
+                    "6230", "6258", "6280", "6285", "6312", "6330", "6401", "6430", "6450", "6530", "6714", "6721",
+                    "6725"]
+_CONCERN_TYPE_VALID = ["Neglect", "Physical abuse", "Emotional abuse", "Sexual abuse",
+                        "Domestic violence exposure", "Parental substance use", "Parental mental health concern"]
+
+
+def _sql_list(values: list[str]) -> str:
+    return ",".join("'" + v.replace("'", "''") + "'" for v in values)
+
+
+AGGREGATE_SPEC = {
+    ("cp_clients", "postcode"): {
+        "kind": "categorical",
+        "invalid_condition": f"postcode NOT IN ({_sql_list(_POSTCODE_VALID)}) OR postcode IS NULL",
+        "classification": None,
+        "check_names": {"dbt:accepted_values", "invalid_percent", "datacontract:invalid_count"},
+    },
+    ("cp_clients", "date_of_birth"): {
+        "kind": "numeric_date",
+        "invalid_condition": "date_of_birth < DATE '1900-01-01'",
+        "classification": None,
+        # Both dbt and Soda have their own version of this check for CP
+        # (unlike BDM, where only datacontract-cli does) - deliberately no
+        # datacontract-cli entry here, since this check was never added
+        # there (see generator/dirty.py's apply_cp_clients_presets docstring).
+        "check_names": {"dbt:cp_client_date_of_birth_range", "date_of_birth out of range"},
+    },
+    ("cp_notifications", "concern_type"): {
+        "kind": "categorical",
+        "invalid_condition": f"concern_type NOT IN ({_sql_list(_CONCERN_TYPE_VALID)}) OR concern_type IS NULL",
+        "classification": None,
+        # Only datacontract-cli has this check today - see
+        # child-protection-soda-checks.yml/schema.yml, neither of which
+        # currently test concern_type directly.
+        "check_names": {"datacontract:invalid_count"},
+    },
+}
+
+
+def _aggregate_for(conn: duckdb.DuckDBPyConnection, table: str, col: str) -> dict | None:
+    spec = AGGREGATE_SPEC.get((table, col))
+    if spec is None:
+        return None
+    full_table = f"raw.{table}"
+    if spec["kind"] == "categorical":
+        return categorical_aggregate(conn, full_table, col, spec["invalid_condition"], spec["classification"])
+    return numeric_date_aggregate(conn, full_table, col, spec["invalid_condition"], spec["classification"])
+
+
 def _concern_type_value_counts(conn: duckdb.DuckDBPyConnection, run_id: str) -> list[list]:
     rows = conn.execute(
         "SELECT concern_type, COUNT(*) FROM raw.cp_notifications GROUP BY concern_type"
@@ -186,22 +243,43 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict]) -> di
     latest_db = duckdb.connect(os.path.join(CP_DUCKDB_RUNS_DIR, f"{latest_run}.duckdb"), read_only=True)
     prev_db = duckdb.connect(os.path.join(CP_DUCKDB_RUNS_DIR, f"{prev_run}.duckdb"), read_only=True)
 
+    # Aggregate values need every run's own warehouse (not just latest/
+    # prev, which arrival-lag below only needs the two most recent for) -
+    # opened lazily and cached, since most runs are clean and never
+    # actually get queried (attach_aggregate below only triggers a lookup
+    # when this run appears in a registered check's own by_run).
+    run_db_cache: dict[str, duckdb.DuckDBPyConnection] = {latest_run: latest_db, prev_run: prev_db}
+
+    def _run_db(run_id: str) -> duckdb.DuckDBPyConnection:
+        if run_id not in run_db_cache:
+            run_db_cache[run_id] = duckdb.connect(os.path.join(CP_DUCKDB_RUNS_DIR, f"{run_id}.duckdb"), read_only=True)
+        return run_db_cache[run_id]
+
     columns_out = []
     for col in all_columns:
         logical_type, desc = column_meta[col]
         checks_for_col = by_column.get(col, {})
+        agg_spec = AGGREGATE_SPEC.get((table, col))
+        agg_cache: dict[str, dict] = {}
 
         checks_out = []
         for (engine, check_name), slot in checks_for_col.items():
+            attach_aggregate = agg_spec is not None and check_name in agg_spec["check_names"]
             history = []
             for run_id in run_ids_in_order:
                 if run_id in slot["by_run"]:
                     run_date = next(m["run_date"] for m in manifest if m["run_id"] == run_id)
+                    aggregate_values = None
+                    if attach_aggregate:
+                        if run_id not in agg_cache:
+                            agg_cache[run_id] = _aggregate_for(_run_db(run_id), table, col)
+                        aggregate_values = agg_cache[run_id]
                     history.append({
                         "run_date": run_date, "value": slot["by_run"][run_id],
                         "row_count_total": slot["row_count_total"].get(run_id),
                         "row_count_invalid": slot["row_count_invalid"].get(run_id),
                         "failing_sample_keys": slot["failing_sample_keys"].get(run_id) or [],
+                        "aggregate_values": aggregate_values,
                     })
             if not history:
                 continue
@@ -269,8 +347,8 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict]) -> di
 
     arrival_history = [{"run_date": m["run_date"], "onTime": True} for m in manifest]  # every run's lag < 24h SLA, verified above for the latest
 
-    latest_db.close()
-    prev_db.close()
+    for db in run_db_cache.values():
+        db.close()
 
     return {
         "id": dataset_id,

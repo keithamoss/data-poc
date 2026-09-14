@@ -30,6 +30,7 @@ import os
 
 import duckdb
 
+from aggregate_values import categorical_aggregate, numeric_date_aggregate
 from dashboard_check_labels import rank_for_headline, display_name
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -65,6 +66,64 @@ COLUMN_META = {
 }
 
 ALL_COLUMNS = list(COLUMN_META.keys())
+
+# "Shape 2" aggregate failing-value support (plans/qa-pipeline.md #17) -
+# which columns get an aggregate view, what "invalid" means for each (the
+# exact same valid-value lists dbt_project/models/staging/schema.yml's
+# tests enforce, so this module's notion of "invalid" can't silently drift
+# from what the real checks actually flag), and which specific check(s)
+# on that column the aggregate gets attached to (never every check on the
+# column - e.g. date_of_birth also has a freshness check that has nothing
+# to do with the out-of-range rule this aggregates). `classification` is
+# None for every column registered here today - see aggregate_values.py's
+# own docstring for why the redaction path still exists regardless.
+_SEX_VALID = ["M", "F", "X"]
+_SUBURB_VALID = ["Fremantle", "Subiaco", "Joondalup", "Rockingham", "Mandurah", "Midland", "Armadale", "Cannington",
+                 "Morley", "Cockburn Central", "Scarborough", "Victoria Park", "Bunbury", "Albany", "Geraldton",
+                 "Kalgoorlie", "Broome", "Karratha", "Port Hedland", "Busselton", "Northam", "Narrogin", "Esperance",
+                 "Collie", "Mount Lawley", "Leederville", "Wembley", "Innaloo", "Success", "Baldivis", "Ellenbrook",
+                 "Butler", "Balga", "Girrawheen", "Maddington", "Gosnells", "Kwinana", "Hamilton Hill",
+                 "Beaconsfield", "South Perth", "Bentley", "Willetton", "Riverton", "Karrinyup", "Currambine",
+                 "Clarkson", "Yanchep", "Byford", "Waroona", "Manjimup", "Margaret River"]
+
+
+def _sql_list(values: list[str]) -> str:
+    return ",".join("'" + v.replace("'", "''") + "'" for v in values)
+
+
+AGGREGATE_SPEC = {
+    "sex": {
+        "kind": "categorical",
+        "invalid_condition": f"sex NOT IN ({_sql_list(_SEX_VALID)}) OR sex IS NULL",
+        "classification": None,
+        "check_names": {"dbt:accepted_values", "invalid_percent[all]", "datacontract:invalid_count"},
+    },
+    "place_of_birth_suburb": {
+        "kind": "categorical",
+        "invalid_condition": f"place_of_birth_suburb NOT IN ({_sql_list(_SUBURB_VALID)}) OR place_of_birth_suburb IS NULL",
+        "classification": None,
+        "check_names": {"dbt:accepted_values", "invalid_percent[all]", "datacontract:invalid_count"},
+    },
+    "date_of_birth": {
+        "kind": "numeric_date",
+        # Only datacontract-cli has this rule for BDM (the ODCS type:sql
+        # rule) - no dbt/Soda equivalent exists here, unlike Child
+        # Protection's own version of this check.
+        "invalid_condition": "date_of_birth < DATE '1900-01-01'",
+        "classification": None,
+        "check_names": {"datacontract:custom_sql"},
+    },
+}
+
+
+def _aggregate_for(conn: duckdb.DuckDBPyConnection, col: str, run_id: str) -> dict | None:
+    spec = AGGREGATE_SPEC.get(col)
+    if spec is None:
+        return None
+    condition = f"({spec['invalid_condition']}) AND run_id = ?"
+    if spec["kind"] == "categorical":
+        return categorical_aggregate(conn, "birth_registrations", col, condition, spec["classification"], [run_id])
+    return numeric_date_aggregate(conn, "birth_registrations", col, condition, spec["classification"], [run_id])
 
 
 def _sex_value_counts(conn: duckdb.DuckDBPyConnection, run_id: str) -> list[list]:
@@ -117,17 +176,27 @@ def build() -> dict:
         logical_type, desc = COLUMN_META[col]
         checks_for_col = by_column.get(col, {})
 
+        agg_spec = AGGREGATE_SPEC.get(col)
+        agg_cache: dict[str, dict] = {}
+
         checks_out = []
         for (engine, check_name), slot in checks_for_col.items():
+            attach_aggregate = agg_spec is not None and check_name in agg_spec["check_names"]
             history = []
             for run_id in run_ids_in_order:
                 if run_id in slot["by_run"]:
                     run_date = next(m["run_date"] for m in manifest if m["run_id"] == run_id)
+                    aggregate_values = None
+                    if attach_aggregate:
+                        if run_id not in agg_cache:
+                            agg_cache[run_id] = _aggregate_for(conn, col, run_id)
+                        aggregate_values = agg_cache[run_id]
                     history.append({
                         "run_date": run_date, "value": slot["by_run"][run_id],
                         "row_count_total": slot["row_count_total"].get(run_id),
                         "row_count_invalid": slot["row_count_invalid"].get(run_id),
                         "failing_sample_keys": slot["failing_sample_keys"].get(run_id) or [],
+                        "aggregate_values": aggregate_values,
                     })
             if not history:
                 continue

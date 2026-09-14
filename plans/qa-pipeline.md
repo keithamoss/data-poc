@@ -612,7 +612,7 @@ relative, not a schedule — this is weeks of work, not months.
     this finding stand as closed records informing that future
     narrowing-down decision, not open items.
 
-17. **[in progress]** Aggregate failing-value shapes ("shape 2"), the
+17. **[done, one open follow-up]** Aggregate failing-value shapes ("shape 2"), the
     other half of item 15's "surface more about the nature of the
     failure" idea - item 15 covers WHICH rows failed (PKs only); this
     covers WHAT the actual bad values look like, for closed-value-set/
@@ -723,15 +723,64 @@ relative, not a schedule — this is weeks of work, not months.
     the NULL-swallowing bug). `uv run pytest` (28 tests, up from 23) and
     `uv run ruff check .` both clean.
 
-    **Not yet built**: the aggregate-values backend itself (distinct
-    values + counts for closed-value-set checks, gated by
-    `classification`; min/max/outlier-list and a binned histogram for
-    numeric/date checks - both selected via `AskUserQuestion`
-    `multiSelect`) across dbt/Soda/datacontract-cli, wiring into
-    `pipeline/build_dashboard_data.py`/`build_cp_dashboard_data.py`, and
-    the dashboard UI to render it in the check-detail panel. Everything
-    above is prerequisite check/data-layer setup the aggregate feature
-    will read from.
+    **[done] The aggregate-values backend and UI, built (2026-09-14, same
+    day)**: `pipeline/aggregate_values.py` - two functions
+    (`categorical_aggregate`/`numeric_date_aggregate`), each computed via
+    one direct SQL query against the relevant run's own warehouse table,
+    deliberately independent of which real tool (dbt/Soda/datacontract-
+    cli) actually flagged the check - all three point at the same staging
+    data for a given column, so there's one true answer regardless of
+    which engine's own internal sample/audit-table format happens to
+    carry it (and both Soda's and datacontract-cli's own sample caps - 5
+    rows - are too small to give a real aggregate anyway). `total_invalid`
+    is its own `COUNT(*)`, not derived from the (capped) values list, so
+    it stays correct past the cap. Wired into `build_dashboard_data.py`/
+    `build_cp_dashboard_data.py` via a small per-column
+    `AGGREGATE_SPEC` registry (which checks get it - never every check on
+    a column, e.g. date_of_birth's freshness check gets nothing, only its
+    range check does - and the exact same valid-value lists the real dbt
+    tests enforce, copied not re-derived, so "invalid" can't silently
+    drift from what's actually checked). Rendered in the check-detail
+    panel's existing "Row-level detail" section, right alongside item 15's
+    PK-only sample list - reusing its exact `.value-bar-*` visual language
+    (a new `.agg-value-row`/`.agg-histogram-row` variant with a wider
+    label column, for values like full dates or "Domestic violence
+    exposure" that don't fit the original's 64px code-sized column).
+    Verified for real (not just JSON inspection) via Playwright against
+    the actual regenerated pipeline output: BDM's suburb check (5 distinct
+    invalid values, real counts), CP's postcode check (5 distinct values
+    including the `dirty.py` preset's literal pool), and CP's
+    `date_of_birth` range check (min/max + a 4-bucket histogram, matching
+    `_BAD_DATE_OF_BIRTH_POOL`'s own 4 values) all render correctly.
+
+    **The exact same field-whitelist bug recurred, caught the same way**:
+    `buildRealDataset()`'s explicit history-point field whitelist (see
+    this same item's note above about `failing_sample_keys` hitting this
+    once already) silently dropped the new `aggregate_values` field too -
+    same root cause, same fix (add it to the whitelist), caught the same
+    way (Playwright driving the actual UI showed an empty section despite
+    the JSON being correct, not a JSON-level check). Still no regression
+    test for the same reason as before - this dashboard's rendering logic
+    has no test harness.
+
+    **Sensitivity redaction - mechanism built, not yet exercised by real
+    data**: `classification is not None` suppresses a column's actual
+    value labels (`total_invalid` count still shown - a bare number isn't
+    personal data on its own) - built into both `aggregate_values.py`
+    functions and the dashboard's `aggregateValuesBlock()`, verified
+    directly (not just read) by evaluating it against a synthetic
+    suppressed payload in a real browser. No column registered in either
+    `AGGREGATE_SPEC` today is actually classified - the columns this
+    session gave `classification: pii` (child/parent/carer/case-worker
+    names) are checked via a character-set pattern, not a closed value set
+    or a range, so the redaction path is genuinely unexercised by real
+    data yet. **Still open**: Keith asked a follow-up before this was
+    built ("what is the actual impact that has on redaction? Give me
+    examples") that didn't get answered before the session moved on to
+    the dual-`dirty.py` bug - worth a concrete example (e.g. what would
+    the panel show if `child_given_names` ever became a closed-value-set
+    check) next time this comes up, rather than assuming full suppression
+    is exactly right.
 
 ## Held over from the original (equivalent-only) build
 
