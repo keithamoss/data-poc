@@ -49,7 +49,7 @@ Rough layout:
 | `engines/` | Hand-written Python/DuckDB stand-ins for dbt/Soda/datacontract-cli/Evidently, from before real tool access existed - kept as documented fallback, not the current path |
 | `real_tools/` | The actual dbt-core/Soda Core/datacontract-cli/Evidently runs - this is what's live today |
 | `dashboard/qa-reporting-dashboard.html` | The single-file static dashboard, published via GitHub Pages on every push that touches `dashboard/` |
-| `docs/` | Research and design-note docs - `data-contract-engines-landscape.md` (tooling survey), `synthetic-data-generation-tools-research.md`, `synthetic-data-generator-notes.md` |
+| `docs/` | Research and design-note docs - `data-contract-engines-landscape.md` (tooling survey), `synthetic-data-generation-tools-research.md`, `synthetic-data-generator-notes.md`, `remediation-workflow-design.md` (the bad-data ticketing/case-management design - deliberately out of this PoC's build scope, seam only) |
 | `plans/` | Living project memory - see above |
 
 ## Conventions worth knowing before touching anything
