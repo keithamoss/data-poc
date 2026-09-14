@@ -781,13 +781,33 @@ relative, not a schedule — this is weeks of work, not months.
     session gave `classification: pii` (child/parent/carer/case-worker
     names) are checked via a character-set pattern, not a closed value set
     or a range, so the redaction path is genuinely unexercised by real
-    data yet. **Still open**: Keith asked a follow-up before this was
-    built ("what is the actual impact that has on redaction? Give me
-    examples") that didn't get answered before the session moved on to
-    the dual-`dirty.py` bug - worth a concrete example (e.g. what would
-    the panel show if `child_given_names` ever became a closed-value-set
-    check) next time this comes up, rather than assuming full suppression
-    is exactly right.
+    data yet.
+
+    **Follow-up answered (2026-09-14, later session)**: Keith's original
+    question - "what is the actual impact that has on redaction? Give me
+    examples" - hadn't been worked through before the session moved on to
+    the dual-`dirty.py` bug. Answered with a concrete worked example:
+    `child_given_names` (already `classification: pii`) doesn't hit this
+    path today for the reason above, but `dirty.py`'s own `_JUNK_TEXT_POOL`
+    (`"Baby1"`/`"TEST1"`/`"UNKNOWN9"`/`"XXXX0"`/`"N.A."`) is a realistic
+    stand-in for what a future closed-value-set check on that column would
+    flag - shown side by side, unredacted vs. redacted:
+    ```
+    unredacted:  Baby1: 4   TEST1: 3   UNKNOWN9: 3   N.A.: 2
+    redacted:    🔒 12 distinct bad value(s) found, but not shown —
+                    this column is classified as sensitive data.
+    ```
+    The count (12) stays visible either way - a fully-hidden check row
+    would read as "nothing failed," worse than "something failed, count
+    12, content withheld." Also surfaced the real caveat this session's
+    "not public, synthetic data only" context raises: the mechanism costs
+    nothing to leave in (dormant, changes no currently-visible behaviour)
+    but isn't protecting anything real today either, since nothing
+    currently classified goes through a check that would ever populate
+    it. **Still open, Keith's call**: whether to keep it as forward-
+    looking scaffolding (models what a production deployment against real
+    BDM data would need) or simplify it away for this PoC given the
+    actual stakes are zero right now - not yet decided either way.
 
 18. **[investigate]** Explicit, non-magic null handling in every CSV
     read/write this pipeline does - a spike Keith asked for after item
