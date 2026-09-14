@@ -34,9 +34,9 @@ An end-to-end QA/data-pipeline PoC for a multi-agency government data
 asset, built around one real feed (BDM Birth Registrations) plus a Child
 Protection collection, both backed by synthetic data. `README.md` is the
 detailed technical entry point (what's real vs. "equivalent", how to run
-it); `HANDOFF.md` documents a since-completed session-to-session
-transition (claude.ai, no internet -> Claude Code, real internet) - read
-it for history, not for current state.
+it, including the project's origin in a claude.ai session with no
+internet access, later picked up by a Claude Code session with real
+access to actually run the tools).
 
 Rough layout:
 
