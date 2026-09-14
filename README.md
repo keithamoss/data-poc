@@ -1,5 +1,8 @@
 # Birth Registrations Pipeline
 
+*Project codename: Mothman — a legend remembered for showing up before a*
+*disaster, which is the whole point of a QA/checks pipeline like this one.*
+
 An actually-executable, end-to-end QA pipeline for the BDM Birth
 Registrations feed — built to let you test dbt, Soda Core, datacontract-cli
 and Evidently AI concepts against real generated data and real contract/
