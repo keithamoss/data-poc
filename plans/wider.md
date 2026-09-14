@@ -382,16 +382,21 @@ not a schedule.
     stale-constraint discovery as Faker/Mimesis in
     `docs/synthetic-data-generation-tools-research.md`. Worth revisiting
     IF research holds up that it adds something the current four tools
-    don't - the concrete candidate is GX's `unexpected_index_list`, which
-    `docs/quarantine_sex_column.py` already points to as the real
-    mechanism for genuine per-row failing-record samples, something none
-    of dbt/Soda/datacontract-cli/Evidently currently give this pipeline
-    (see `plans/qa-pipeline.md` #15, raised the same session). Not yet
-    scoped: would it replace one of the four (unlikely - each earns its
-    place: dbt for build-time schema contracts, Soda for lightweight SQL
-    checks, datacontract-cli for the ODCS layer, Evidently for
-    drift/row-growth) or sit alongside them specifically for row-level
-    detail? Compare, don't assume, before wiring anything in.
+    don't. **Rationale downgraded**: the original candidate reason was
+    GX's `unexpected_index_list` as the way to get real per-row
+    failing-record samples - but `plans/qa-pipeline.md` #15's follow-up
+    research (reading the actual installed source of all four current
+    tools, not docs) found THREE of the four already do this natively:
+    `datacontract-cli` via `include_failed_samples=True` (a one-line
+    change to what `run_datacontract_real.py` already calls), Soda Core
+    via SodaCL's `samples limit:` + a custom `Sampler` class, and dbt via
+    `store_failures: true` - none currently turned on, but none need a
+    new tool either. Evidently genuinely doesn't (confirmed - no such
+    concept in its source), consistent with its role here being
+    drift/row-growth, not validity. So GX is no longer motivated by that
+    specific gap. Not yet scoped whether it's worth evaluating for any
+    other reason (pure feature/API comparison, maturity, ecosystem) -
+    Compare, don't assume, before wiring anything in.
 
 15. **[investigate]** Data generation currently duplicates the contract's
     column definitions rather than reading from them - a real pain point

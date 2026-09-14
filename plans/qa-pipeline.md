@@ -414,6 +414,44 @@ relative, not a schedule — this is weeks of work, not months.
     and would let the check-detail panel (item 14 above) show real
     failing-row samples instead of the honest "not captured today" note
     it currently shows.
+    **Researched, findings (read the actual installed source, not just
+    docs)**: this is cheaper than it looked. THREE of the four tools
+    already wired into this pipeline genuinely support this natively:
+    - **datacontract-cli**: `DataContract(..., include_failed_samples=True)`
+      is a real constructor parameter (`data_contract.py`), backed by a
+      dedicated `_collect_failed_samples()` pass
+      (`engines/ibis/ibis_check_execute.py`) that populates a first-class
+      `check.failedSamples` field. `run_datacontract_real.py` already
+      calls this exact API - turning it on is a one-line change, not new
+      plumbing.
+    - **Soda Core**: `samples limit:` is a real, documented SodaCL key on
+      ordinary metric checks (confirmed in `sodacl_parser.py`), executed
+      through a pluggable `Sampler` class - the default sampler computes
+      the failing rows then explicitly discards them ("Samples are not
+      sent to Soda Cloud"), but `scan.sampler = MyOwnSampler()` is a real
+      extension point; a small custom sampler writing rows to JSON
+      instead of discarding them would work. Not currently enabled in
+      `bdm-birth-registrations-soda-checks.yml`.
+    - **dbt tests**: `store_failures: true` (already documented above) -
+      confirmed not currently enabled anywhere in `dbt_project/`.
+    - **Evidently**: genuinely no - searched its source directly for any
+      row-level concept (unexpected_index, failed_rows, row ids) and
+      found nothing, consistent with its actual role here (drift/
+      row-count-growth, not per-column validity).
+    This meaningfully changes GX's case in `plans/wider.md` #14 - GX's
+    `unexpected_index_list` is no longer the only path to this, which was
+    its main selling point for this specific use case; downgraded there
+    accordingly.
+    **Separate, still-open question, explicitly Keith's own**: even
+    though the capability is cheap, should the QA reporting dashboard be
+    the thing that stores/displays actual row-level data (even synthetic
+    government data), or does that belong in a separate remediation/
+    quarantine surface the dashboard only links out to? Same split
+    `docs/quarantine_sex_column.py` already draws between "flag it" and
+    "act on it" - not answerable from the code, a real product-scope
+    call. Suggested next step if pursued: prototype with datacontract-cli
+    alone (cheapest, one flag) to see what it actually looks like on the
+    dashboard before deciding whether it belongs there long-term.
 
 16. **[investigate]** Should the dashboard explain *why* checks on the
     same column can legitimately disagree in severity? Item 14's
@@ -431,6 +469,38 @@ relative, not a schedule — this is weeks of work, not months.
     (already one click away) makes each check's own logic clear enough.
     Low priority - revisit if a real reviewer actually gets confused by
     it.
+    **Resolved (the "confusion" question specifically)**: Keith's call -
+    not a concern right now. This is deliberately a PoC comparison phase
+    with duplicate checks across tools by design, to work out which 1-2
+    tools actually cover what's needed before narrowing down - visible
+    disagreement between tools is expected and fine at this stage, not
+    something to paper over.
+    **New, confirmed finding**: does datacontract-cli genuinely lack
+    native two-tier (warn/fail) thresholds, given Keith's called
+    two-tier a must-have requirement? Confirmed directly in source
+    (`engines/checks/check_spec.py`), not just inferred from the ODCS
+    spec as the original landscape doc did: `CheckSpec` has exactly one
+    `threshold` field and one `severity` field - no dual-threshold
+    construct anywhere in the engine. A single quality rule genuinely
+    cannot express warn-at-X/fail-at-Y.
+    A real workaround exists, also confirmed in source: ODCS's
+    `quality:` list already supports multiple rules per property (the
+    existing contract does this for other reasons), and
+    `create_checks.py` iterates it with
+    `for count, quality in enumerate(quality_list)` - each entry becomes
+    its own independently-evaluated check. Two quality rules on the same
+    field/metric - one `severity: warning` with a looser threshold, one
+    `severity: error` with a stricter one - genuinely produces real
+    two-tier behaviour, no new dashboard code needed: the all-checks
+    summary built for item 14 already computes "worst status across
+    every check on a column," so a warn-rule/fail-rule pair rolls up
+    into exactly a two-tier read on its own.
+    Soda Core and dbt tests both do this natively in a single rule (warn:
+    /fail: blocks; severity + warn_if/error_if respectively) - no
+    workaround needed. Given two-tier is a must-have, this is real signal
+    against datacontract-cli being one of the eventual 1-2 tools *unless*
+    doubling up quality rules is an acceptable convention - worth
+    weighing when it's time to actually narrow down.
 
 ## Held over from the original (equivalent-only) build
 
