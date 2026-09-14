@@ -9,7 +9,7 @@ from datetime import date
 
 import pandas as pd
 
-from resupply import _add_business_days, run_delivery_chain
+from generator.resupply import _add_business_days, run_delivery_chain
 
 
 def test_add_business_days_skips_weekends():

@@ -54,10 +54,10 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from anchor_date import get_anchor_date
-from daily_batch import generate_daily_batch
-from dirty import apply_birth_registrations_presets
-from resupply import MAX_ATTEMPTS, DatasetProvider, run_delivery_chain
+from generator.anchor_date import get_anchor_date
+from generator.daily_batch import generate_daily_batch
+from generator.dirty import apply_birth_registrations_presets
+from generator.resupply import MAX_ATTEMPTS, DatasetProvider, run_delivery_chain
 
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 ID_BLOCK = 100_000  # per-delivery id_offset spacing - well above any single delivery's row count

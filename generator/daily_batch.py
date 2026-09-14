@@ -3,23 +3,25 @@ Generates ONE day's birth-registration extract - a fresh batch of newborn
 registrations, in the exact column shape of
 contract/bdm-birth-registrations-contract.yaml.
 
-This is deliberately a different generation model from the
-synthetic-data-generator repo's population.py: that module builds a
+This is deliberately a different generation model from
+synthetic_data_generator/population.py: that module builds a
 whole-population snapshot (households, mixed ages, mortality) as the
 shared spine for cross-agency identity linkage. A birth-registrations feed
 is an EVENT FLOW, not a population snapshot - each daily file is a fresh
 cohort of newborns, so this module generates that cohort directly rather
-than trying to bend the household/population model to produce it. It reuses
-the same reference name/geo pools and presentation/dirty-injection modules
-(copied from that repo) for consistency and to avoid re-deriving them.
+than trying to bend the household/population model to produce it. It
+shares this package's own name/geo pools (names_au.py) and presentation/
+dirty-injection modules with synthetic_data_generator/ (which imports them
+from here - see this repo's top-level CLAUDE.md) rather than each keeping
+its own copy.
 """
 from __future__ import annotations
 import numpy as np
 import pandas as pd
 from datetime import date, timedelta
 
-from names_au import build_name_pools, build_geo_pools
-from presentation import present_identity_batch
+from generator.names_au import build_name_pools, build_geo_pools
+from generator.presentation import present_identity_batch
 
 FACILITY_SUFFIXES = ["Community Hospital", "Birth Centre", "District Hospital", "Regional Hospital"]
 

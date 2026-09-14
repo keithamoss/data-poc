@@ -16,7 +16,7 @@ should assume a multi-month timeline.
 | Component | Where | Status |
 |---|---|---|
 | Birth-registrations QA pipeline | this repo, root (`contract/`, `dbt_project/`, `generator/`, `pipeline/`, `real_tools/`) | Real tools wired up and running (`real_tools/*.py`); see `plans/qa-pipeline.md` for open items. `engines/` (the original no-internet-access equivalent engines) removed - see action 18 |
-| Synthetic data generator | this repo, `synthetic-data-generator/` | Code present, runs, verified (population-scale, cross-agency identity linkage); **not yet wired into the QA pipeline or dashboard** — see action 2 below |
+| Synthetic data generator | this repo, `synthetic_data_generator/` | Code present, runs, verified (population-scale, cross-agency identity linkage); **not yet wired into the QA pipeline or dashboard** — see action 2 below |
 | QA reporting dashboard | this repo, `dashboard/qa-reporting-dashboard.html` | Only Birth Registrations wired to real data; ~14 other datasets are still fabricated mock, clearly labeled as such. Also separately published as a claude.ai Artifact ("Data Asset QA Register") that is **not** auto-synced with this file — see action 5 |
 | Supporting docs | this repo, `docs/` | `data-contract-engines-landscape.md` (source of the real contract/checks YAML), generator design notes, a standalone quarantine-pattern demo |
 
@@ -90,11 +90,17 @@ not a schedule.
    dashboard is still wanted at that point — may turn out not to be
    needed at all.
 
-6. **[todo, low]** Decide the long-term home for `synthetic-data-generator/`.
+6. **[todo, low]** Decide the long-term home for `synthetic_data_generator/`.
    It's a subdirectory here for now (simplest, since it never had its own
    GitHub repo); worth revisiting once cleanup starts — does it stay
    merged into this repo, or get split out now that we can actually push
-   to GitHub?
+   to GitHub? Note this is now a real dependency-in-the-other-direction,
+   not just physical proximity: `synthetic_data_generator/` imports
+   `generator.dirty`/`generator.names_au`/`generator.presentation`
+   directly (see action 21 below) - splitting it into a separate repo
+   would need to either vendor those three modules back in or make
+   `generator` an actual installable dependency, not just delete the
+   sys.path hack that used to paper over this.
 
 7. **[investigate]** Data pipeline observability — flagged as a tangent,
    not yet scoped. Distinct from what's already built: the QA
@@ -847,3 +853,86 @@ not a schedule.
     it) lost its `"(real)"` suffix, confirmed as the *only* difference;
     every other field, byte-for-byte identical. `uv run pytest`/
     `uv run ruff check .` both clean.
+
+21. **[done]** `generator/`, `pipeline/`, and `synthetic_data_generator/`
+    got the same treatment action 20 gave `real_tools/` -> `qa_tools/`:
+    real Python packages (an `__init__.py` each, `-m` invocation, real
+    absolute imports), not `sys.path.insert()` hacks. Keith asked
+    directly why these three still had the hacks qa_tools/ had already
+    been cleaned out of, and picked the full fix over a smaller
+    "one shared bootstrap helper" alternative he was also offered.
+
+    Triggered by tracing the actual root cause of the dual-`dirty.py`
+    import bug (`plans/qa-pipeline.md` #17): `synthetic-data-generator/`
+    has a hyphen in its name, which makes it impossible to `import` as a
+    real Python package at all - the sys.path hacks in `population.py`,
+    `pipeline/orchestrate.py`, `pipeline/build_cp_dashboard_data.py`, and
+    `generator/generate_cp_runs.py` existed because of that constraint,
+    not just because nobody had cleaned them up yet.
+
+    Surfaced a second, related problem while surveying the damage:
+    `names_au.py` and `presentation.py` were ALSO duplicated between
+    `generator/` and `synthetic-data-generator/` (kept in sync by hand,
+    like `dirty.py` was) - just hadn't drifted apart yet, purely by luck.
+    Fixed at the root rather than just renamed: `generator/` now holds
+    the one canonical copy of `dirty.py`/`names_au.py`/`presentation.py`;
+    `synthetic_data_generator/` imports them from there
+    (`from generator.dirty import ...`) instead of keeping duplicates.
+    Nothing left in the repo to silently drift apart a second time.
+
+    What changed:
+    - `synthetic-data-generator/` -> `synthetic_data_generator/` (`git
+      mv`) - the only reason for the whole exercise: hyphens aren't valid
+      in a Python package/module name.
+    - `generator/__init__.py`, `pipeline/__init__.py`,
+      `synthetic_data_generator/__init__.py` added (`reference/__init__.py`
+      already existed but the directory it marked is gone now - see
+      below); every cross-directory `sys.path.insert()` call site (4
+      files) removed, replaced with real absolute imports.
+    - Deleted `synthetic_data_generator/dirty.py`,
+      `synthetic_data_generator/presentation.py`,
+      `synthetic_data_generator/reference/names_au.py` (and the now-empty
+      `reference/` directory) - all three were exact or near-duplicates
+      of files already canonical in `generator/`. The 6 places that
+      imported the local copies (`generate.py`, `population.py`,
+      `child_protection.py` x3, `agency_datasets.py`) now import from
+      `generator` instead.
+    - Every entry-point script that crosses a package boundary now runs
+      as `python3 -m <package>.<module>` (`generator.generate_cp_runs`,
+      `pipeline.orchestrate`, `pipeline.build_dashboard_data`,
+      `pipeline.build_cp_dashboard_data`,
+      `synthetic_data_generator.generate`) instead of a bare script path -
+      `-m` invocation is what makes the repo root importable at all, which
+      absolute imports across packages need and a bare `python3
+      generator/foo.py` can't provide (Python only auto-adds the script's
+      OWN directory to `sys.path`, not the repo root). `run_pipeline.sh`,
+      README, and CLAUDE.md all updated; `run_pipeline.sh` also switched
+      every step from a bare `python3` to `uv run python3` while this was
+      already being touched (see the `uv`-only item below - the two
+      changes landed together since they touched the same lines).
+      `dashboard/embed_dashboard_data.py` is the one script left alone -
+      it has no cross-package imports at all, so a bare script path still
+      works fine and changing it would've been pure churn.
+    - `pyproject.toml`'s pytest `pythonpath` swapped
+      `["generator", "pipeline", "."]` for just `["."]`; every test file
+      that used to `import generate_runs`/`import dirty`/etc. now does
+      `from generator import generate_runs` etc.
+
+    Verified behaviour-preserving: full pipeline re-run end to end for
+    both datasets post-restructure (839 BDM / 1000 CP check results),
+    identical pass/warn/fail counts to pre-restructure;
+    `synthetic_data_generator.generate` re-run directly and produces the
+    same cross-agency-identity output shape. `uv run pytest` (28 tests)
+    and `uv run ruff check .` both clean.
+
+    Also part of the same session: Playwright browser verification (used
+    throughout `plans/qa-pipeline.md`'s dashboard work) had only ever
+    been run through the sandbox's system Python, which happened to have
+    `playwright` installed - never through `uv`'s own venv. Added as a
+    real `uv` dev dependency instead (`uv run playwright install
+    chromium` once, then `uv run python3 ...` drives a real browser) -
+    the same "don't depend on something that merely happens to be present
+    outside `.venv`" principle as the package-import fixes above, for the
+    same reason: this repo is meant to be checked out and run by other
+    people evaluating the PoC, on their own machines, not just the one it
+    was built on.

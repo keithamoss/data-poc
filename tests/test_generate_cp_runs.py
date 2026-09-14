@@ -1,22 +1,24 @@
-"""Smoke test for generator/generate_cp_runs.py, plus a regression test for
-a real import-resolution bug: generator/ and synthetic-data-generator/ each
-have their own dirty.py (kept manually in sync for 3 shared CP presets -
-see generate_cp_runs.py's own docstring), and `import dirty` inside
-generate_cp_runs.py silently resolved to the WRONG (synthetic-data-
-generator/) copy, because synthetic-data-generator/population.py's own
-module-level code does `sys.path.insert(0, os.path.dirname(__file__))` as
-a side effect of being imported - re-inserting synthetic-data-generator/
-at sys.path[0] and undoing an earlier, one-off attempt to prioritise
-generator/'s own directory. Caught live via a loud AttributeError
-(apply_cp_clients_presets didn't exist yet in the wrong file) - the fix
-moves generator/'s own directory re-insertion to immediately before
-`import dirty`, after every import that could itself touch sys.path."""
+"""Smoke test for generator/generate_cp_runs.py, plus a sanity check left
+over from a real import-resolution bug (2026-09-14, since fixed at the
+root cause): generator/ and synthetic-data-generator/ used to each have
+their own dirty.py (kept manually in sync for 3 shared CP presets), and
+`import dirty` inside generate_cp_runs.py silently resolved to the WRONG,
+stale one via an ad hoc sys.path.insert dance - caught live via a loud
+AttributeError (apply_cp_clients_presets didn't exist yet in the wrong
+file). The real fix wasn't a smarter sys.path ordering (an earlier
+attempt at that didn't hold up); it was making generator/ and
+synthetic_data_generator/ (hyphens renamed to be a real, importable
+package name) both proper Python packages with real absolute imports, and
+deleting the duplicate dirty.py/names_au.py/presentation.py entirely -
+see plans/wider.md's package-layout entry. This test can no longer catch
+the original bug (there's only one dirty.py to resolve to now), but still
+guards against the pattern recurring."""
 from __future__ import annotations
 
 import json
 import os
 
-import generate_cp_runs
+from generator import generate_cp_runs
 
 RAW_DIR = generate_cp_runs.OUT_DIR
 MANIFEST_PATH = os.path.join(RAW_DIR, "manifest.json")
@@ -29,9 +31,6 @@ def _generate():
 
 
 def test_dirty_module_resolves_to_generators_own_copy():
-    # The regression itself: without the fix, dirty_mod.__file__ resolves
-    # to synthetic-data-generator/dirty.py, and apply_cp_clients_presets
-    # (only ever added to generator/dirty.py) is missing.
     dirty_dir = os.path.dirname(generate_cp_runs.dirty_mod.__file__)
     assert os.path.normpath(dirty_dir) == os.path.normpath(os.path.dirname(generate_cp_runs.__file__))
     assert hasattr(generate_cp_runs.dirty_mod, "apply_cp_clients_presets")

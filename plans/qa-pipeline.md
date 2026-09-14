@@ -669,9 +669,16 @@ relative, not a schedule — this is weeks of work, not months.
       `sys.path[0]` right after the other inserts) didn't work either -
       `synthetic-data-generator/population.py` itself does its own
       `sys.path.insert(0, ...)` as an import-time side effect, re-winning
-      the race. Root-cause fixed by moving the re-insertion to
-      immediately before `import dirty`, after every import that could
-      itself touch `sys.path`. Caught loud this time (the new
+      the race. Fixed properly (not just patched) the same day, once
+      Keith asked why this whole class of hack still existed here at all
+      given `qa_tools/` had already been cleaned out of it: `generator/`,
+      `pipeline/`, and `synthetic-data-generator/` (hyphens renamed -
+      that turned out to be *why* the hacks existed, not just untidiness)
+      are now real Python packages with real absolute imports and zero
+      `sys.path` manipulation anywhere - see `plans/wider.md`'s
+      package-layout entry (action 21) for the full change, including a
+      second, undrifted duplicate (`names_au.py`/`presentation.py`) this
+      surfaced along the way. Caught loud this time (the new
       `apply_cp_clients_presets` function simply didn't exist in the
       wrong file yet) - a genuinely dangerous variant of the same bug
       (editing an EXISTING shared preset without updating both copies)

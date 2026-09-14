@@ -6,8 +6,11 @@ same people (BDM birth registrations, school enrollment) - then writes
 everything to CSV, with an optional --dirty mode that seeds known QA
 failure modes into the output.
 
-    python3 generate.py --population 200000 --outdir output/demo
-    python3 generate.py --population 3000000 --outdir output/full_scale --dirty amber
+Run from the repo root (needs generator/ importable alongside this
+package - see synthetic_data_generator/__init__.py):
+
+    python3 -m synthetic_data_generator.generate --population 200000 --outdir synthetic_data_generator/output/demo
+    python3 -m synthetic_data_generator.generate --population 3000000 --outdir synthetic_data_generator/output/full_scale --dirty amber
 
 Output layout:
     <outdir>/public/...        what a downstream QA/test consumer would get -
@@ -32,10 +35,10 @@ import time
 
 import pandas as pd
 
-from population import generate_population
-from child_protection import generate_child_protection_collection
-from agency_datasets import generate_birth_registrations, generate_school_enrollment
-import dirty as dirty_mod
+from synthetic_data_generator.population import generate_population
+from synthetic_data_generator.child_protection import generate_child_protection_collection
+from synthetic_data_generator.agency_datasets import generate_birth_registrations, generate_school_enrollment
+from generator import dirty as dirty_mod
 
 PUBLIC_COLUMNS = {
     "birth_registrations": [c for c in
@@ -134,7 +137,11 @@ def main():
     ap.add_argument("--dirty", choices=["none", "amber", "red"], default="none",
                      help="Seed known QA failure modes into birth_registrations/sex, "
                           "birth_registrations/place_of_birth_facility, and cp_notifications/concern_type")
-    ap.add_argument("--outdir", default="output/demo")
+    # Relative to this file's own directory, not CWD - the documented
+    # invocation (`python3 -m synthetic_data_generator.generate`) runs
+    # from the repo root, not from inside this package, so a bare
+    # "output/demo" would land in the wrong place (repo root) without this.
+    ap.add_argument("--outdir", default=os.path.join(os.path.dirname(__file__), "output", "demo"))
     ap.add_argument("--demo-examples", type=int, default=3, help="How many cross-agency identity examples to print")
     args = ap.parse_args()
 

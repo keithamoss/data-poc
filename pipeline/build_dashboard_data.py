@@ -30,8 +30,8 @@ import os
 
 import duckdb
 
-from aggregate_values import categorical_aggregate, numeric_date_aggregate
-from dashboard_check_labels import rank_for_headline, display_name
+from pipeline.aggregate_values import categorical_aggregate, numeric_date_aggregate
+from pipeline.dashboard_check_labels import rank_for_headline, display_name
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 REAL_RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")

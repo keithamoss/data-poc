@@ -43,9 +43,9 @@ Rough layout:
 | Path | What |
 |---|---|
 | `contract/` | Real ODCS contract + SodaCL check YAML - the actual source of truth for schema/quality rules |
-| `generator/` | Synthetic data generation (`daily_batch.py`, `generate_runs.py`, `resupply.py`, `dirty.py`) - Birth Registrations only; deliberately separate from `synthetic-data-generator/`'s population-scale generator |
-| `synthetic-data-generator/` | A separate, population-scale (millions), cross-agency-identity-linked synthetic data generator - not currently wired into the pipeline (see `plans/wider.md`) |
-| `pipeline/` | `orchestrate.py` generates + loads the combined DuckDB warehouse; `build_dashboard_data.py`/`build_cp_dashboard_data.py` reshape real-tool results into dashboard JSON |
+| `generator/` | Synthetic data generation (`daily_batch.py`, `generate_runs.py`, `resupply.py`, `dirty.py`, `names_au.py`, `presentation.py`) - Birth Registrations only; deliberately separate from `synthetic_data_generator/`'s population-scale generator, though the two share `dirty.py`/`names_au.py`/`presentation.py` (canonical here, imported from there - see `plans/wider.md`'s package-layout entry). A real package (`generator/__init__.py`) - run its scripts as `python3 -m generator.<module>`, not `python3 generator/<module>.py` (the latter can't resolve the absolute imports this needs - see that same entry for why). |
+| `synthetic_data_generator/` | A separate, population-scale (millions), cross-agency-identity-linked synthetic data generator - not currently wired into the pipeline (see `plans/wider.md`). Also a real package, run as `python3 -m synthetic_data_generator.<module>`. |
+| `pipeline/` | `orchestrate.py` generates + loads the combined DuckDB warehouse; `build_dashboard_data.py`/`build_cp_dashboard_data.py` reshape real-tool results into dashboard JSON. Also a real package, run as `python3 -m pipeline.<module>`. |
 | `qa_tools/` | The actual dbt-core/Soda Core/datacontract-cli/Evidently runs - the only pipeline path now (no more "_real" suffix on any of this - see `plans/wider.md` action 20's follow-up for why it dropped, once `engines/` was gone there was nothing left to distinguish it from). A proper Python package: `bdm/` and `cp/` (one per dataset, run as `python3 -m qa_tools.bdm.orchestrate_bdm` / `qa_tools.cp.orchestrate_cp`) plus `common/` (tool-generic subprocess/API invocation shared between them). (An earlier `engines/` directory of hand-written Python/DuckDB stand-ins, from before real tool access existed, was removed once it had drifted out of sync - see `plans/wider.md` action 18. Git history holds it if ever needed.) |
 | `dashboard/qa-reporting-dashboard.html` | The single-file static dashboard, published via GitHub Pages on every push that touches `dashboard/` |
 | `docs/` | Research and design-note docs - `data-contract-engines-landscape.md` (tooling survey), `synthetic-data-generation-tools-research.md`, `synthetic-data-generator-notes.md`, `remediation-workflow-design.md` (the bad-data ticketing/case-management design - deliberately out of this PoC's build scope, seam only) |
@@ -56,15 +56,22 @@ Rough layout:
 - `data/raw/`, `data/warehouse.duckdb`, `reports/*.json` etc. are
   gitignored and fully regenerated - never hand-edit or try to commit
   them. Regenerate via `./run_pipeline.sh` (the whole pipeline end to
-  end, ~45s) or `python3 -m qa_tools.bdm.orchestrate_bdm` (just
+  end, ~45s) or `uv run python3 -m qa_tools.bdm.orchestrate_bdm` (just
   the real-tool check runs, if `data/raw/`/`data/warehouse.duckdb`
-  already exist; `python3 -m qa_tools.cp.orchestrate_cp` for
+  already exist; `uv run python3 -m qa_tools.cp.orchestrate_cp` for
   Child Protection - not part of `run_pipeline.sh`, run separately).
-  `qa_tools` is a proper Python package (`-m` invocation, not a bare
-  script path) - both orchestration scripts run their manifest's runs in
-  parallel by default (`qa_tools/common/parallel_orchestrate.py`) -
-  add `--sequential` if debugging one specific run, since parallel
-  workers interleave their print output and stack traces.
+  `qa_tools`, `generator`, `pipeline`, and `synthetic_data_generator` are
+  all real Python packages now (`-m` invocation, e.g. `uv run python3 -m
+  generator.generate_cp_runs`, never a bare script path like `python3
+  generator/generate_cp_runs.py` - that can't resolve this project's
+  absolute imports across packages) - both orchestration scripts run
+  their manifest's runs in parallel by default (`qa_tools/common/
+  parallel_orchestrate.py`) - add `--sequential` if debugging one
+  specific run, since parallel workers interleave their print output and
+  stack traces. Always through `uv run`, not a bare `python3` - this repo
+  gets run on other people's machines as part of evaluating the PoC, so
+  nothing should depend on an activated `.venv` or a system Python that
+  happens to have the right packages (see README's "Development" section).
 - Everything is seeded - regenerating reproduces the same output, so a
   diff against previous output is a real correctness check, not noise
   (used repeatedly to verify refactors are behaviour-preserving).

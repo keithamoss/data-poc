@@ -9,7 +9,7 @@ import json
 
 import duckdb
 
-import build_dashboard_data as bdd
+from pipeline import build_dashboard_data as bdd
 
 FIXTURE_RUNS = [
     {

@@ -4,7 +4,7 @@ Research pass done in response to Keith digging into `plans/wider.md`'s
 synthetic-data-realism item — specifically the question "are there
 existing Python (or other-language) libraries genuinely built for
 population-scale, multi-decade synthetic data generation, rather than
-what this project's `synthetic-data-generator/` hand-rolled?"
+what this project's `synthetic_data_generator/` hand-rolled?"
 
 Not yet actioned — logged here to come back to. Two prior findings from
 the "digging into population.py" session directly motivate this: the
@@ -17,10 +17,11 @@ comments claim is "lifelong" can structurally never reach an adult.
 
 ## A genuinely useful side-discovery first
 
-`reference/names_au.py`'s own docstring says the name/geo pools were
-hand-authored because there was "no Faker/pip access in this
-environment" at the time of the original build. **That constraint no
-longer holds** — this session has full PyPI access (confirmed installing
+`generator/names_au.py`'s own docstring (imported by `synthetic_data_generator/`
+from there, not a separate copy - see `plans/wider.md`'s package-layout
+entry) says the name/geo pools were hand-authored because there was "no
+Faker/pip access in this environment" at the time of the original build.
+**That constraint no longer holds** — this session has full PyPI access (confirmed installing
 dbt-core, Soda Core, datacontract-cli, Evidently earlier in this
 project). Verified directly:
 
@@ -36,7 +37,7 @@ substantially cut the collision rate.
 fictional place names and doesn't reliably keep state/postcode
 consistent — a test draw produced `"Jennabury, NT, 2106"` (2106 is a
 Sydney postcode, not NT). This project's own hand-rolled `SUBURBS` list
-in `reference/names_au.py` is real WA geography and is *better* than
+in `generator/names_au.py` is real WA geography and is *better* than
 Faker there. So the recommendation isn't "adopt Faker wholesale," it's
 **swap only the name provider, keep the existing real suburb/postcode
 list**. Mimesis is the faster (~12x reported), more localized (34

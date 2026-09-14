@@ -7,23 +7,31 @@
 # re-running regenerates byte-for-byte the same runs/results. Requires the
 # real tool packages already installed - run `uv sync --dev` first (see
 # pyproject.toml/README.md).
+#
+# Every step below runs through `uv run` rather than a bare `python3` -
+# this script doesn't assume you've activated .venv yourself, or that
+# whatever `python3` happens to be first on PATH is the right one. That
+# matters here specifically: this repo gets handed to other people to run
+# on their own machines (see README's "Development" section) - `uv sync
+# --dev` + `./run_pipeline.sh` should be the entire setup, with nothing
+# implicit about shell state in between.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 echo "== 1/4: generate + load the combined warehouse (pipeline/orchestrate.py) =="
-python3 pipeline/orchestrate.py
+uv run python3 -m pipeline.orchestrate
 
 echo
 echo "== 2/4: run the real tools (qa_tools/bdm/orchestrate_bdm.py) =="
-python3 -m qa_tools.bdm.orchestrate_bdm
+uv run python3 -m qa_tools.bdm.orchestrate_bdm
 
 echo
 echo "== 3/4: reshape results_bdm.json for the dashboard =="
-python3 pipeline/build_dashboard_data.py
+uv run python3 -m pipeline.build_dashboard_data
 
 echo
 echo "== 4/4: re-embed real data into the dashboard HTML =="
-python3 dashboard/embed_dashboard_data.py
+uv run python3 dashboard/embed_dashboard_data.py
 
 echo
 echo "Done. Open dashboard/qa-reporting-dashboard.html in a browser to view it,"

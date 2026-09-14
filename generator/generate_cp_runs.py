@@ -40,43 +40,17 @@ the QA-pipeline scenario, not the core generator.
 from __future__ import annotations
 import json
 import os
-import sys
 from datetime import date, timedelta
 
 import numpy as np
 import pandas as pd
 
-from anchor_date import get_anchor_date
+from generator.anchor_date import get_anchor_date
+from generator import dirty as dirty_mod
+from synthetic_data_generator.population import generate_population
+from synthetic_data_generator.child_protection import generate_child_protection_collection
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
-GENERATOR_DIR = os.path.join(ROOT, "synthetic-data-generator")
-sys.path.insert(0, GENERATOR_DIR)
-sys.path.insert(0, os.path.join(GENERATOR_DIR, "reference"))
-
-from population import generate_population  # noqa: E402
-from child_protection import generate_child_protection_collection  # noqa: E402
-# Re-affirmed at index 0 AFTER the population/child_protection imports
-# above, not just once before them - a REAL bug, found live while adding
-# apply_cp_clients_presets below: both this directory and
-# synthetic-data-generator/ have their own dirty.py (kept manually in
-# sync for the 3 shared CP presets - see this module's own docstring).
-# Putting this insert before the imports above wasn't enough:
-# synthetic-data-generator/population.py's own module-level code does
-# `sys.path.insert(0, os.path.dirname(__file__))` as a side effect of
-# being imported, which re-inserts synthetic-data-generator/ at index 0
-# and silently undoes an earlier insert of this directory - confirmed by
-# instrumenting this script directly and printing sys.path right before
-# `import dirty` (it showed synthetic-data-generator/ back at index 0).
-# So this has to run AFTER every import that could itself touch
-# sys.path, immediately before `import dirty`, not just once up front.
-# Caught this time because the new function simply didn't exist in the
-# wrong file yet (a loud AttributeError) - a genuinely dangerous variant
-# of the same bug wouldn't be loud at all: editing an EXISTING shared
-# preset's behaviour here without updating the other copy would silently
-# keep running the stale version, no error at all. See
-# plans/qa-pipeline.md for the regression test this got.
-sys.path.insert(0, os.path.dirname(__file__))
-import dirty as dirty_mod  # noqa: E402
 
 OUT_DIR = os.path.join(ROOT, "data", "cp_raw")
 

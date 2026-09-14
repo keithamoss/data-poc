@@ -8,7 +8,7 @@ import json
 import os
 from datetime import datetime
 
-import generate_runs
+from generator import generate_runs
 
 RAW_DIR = generate_runs.OUT_DIR
 MANIFEST_PATH = os.path.join(RAW_DIR, "manifest.json")

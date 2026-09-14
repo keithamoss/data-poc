@@ -22,7 +22,7 @@ import io
 
 import pandas as pd
 
-import dirty
+from generator import dirty
 
 PANDAS_DEFAULT_NA_VALUES = {
     "", "#N/A", "#N/A N/A", "#NA", "-1.#IND", "-1.#QNAN", "-NaN", "-nan",

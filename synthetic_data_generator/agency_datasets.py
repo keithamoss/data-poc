@@ -19,8 +19,8 @@ registration data has sparse parent fields too.
 from __future__ import annotations
 import numpy as np
 import pandas as pd
-from presentation import present_identity_batch
-from reference.names_au import build_geo_pools
+from generator.presentation import present_identity_batch
+from generator.names_au import build_geo_pools
 
 TODAY = pd.Timestamp("2026-09-13")
 FACILITY_SUFFIXES = ["Community Hospital", "Birth Centre", "District Hospital", "Regional Hospital"]

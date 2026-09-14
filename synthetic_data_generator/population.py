@@ -27,9 +27,8 @@ this is illustrative test data, not a demographic model):
 from __future__ import annotations
 import numpy as np
 import pandas as pd
-import sys, os
-sys.path.insert(0, os.path.dirname(__file__))
-from reference.names_au import build_name_pools, build_geo_pools
+
+from generator.names_au import build_name_pools, build_geo_pools
 
 TODAY = pd.Timestamp("2026-09-13")
 

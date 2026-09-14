@@ -27,14 +27,12 @@ embed_dashboard_data.py as a second JS const (REAL_CP_DATA).
 from __future__ import annotations
 import json
 import os
-import sys
 
 import duckdb
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from qa_tools.cp import cp_common
-from aggregate_values import categorical_aggregate, numeric_date_aggregate
-from dashboard_check_labels import rank_for_headline, display_name
+from pipeline.aggregate_values import categorical_aggregate, numeric_date_aggregate
+from pipeline.dashboard_check_labels import rank_for_headline, display_name
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")

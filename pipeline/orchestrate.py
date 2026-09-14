@@ -20,10 +20,6 @@ but doesn't build this combined one.
 """
 from __future__ import annotations
 import os
-import sys
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "generator"))
-sys.path.insert(0, os.path.dirname(__file__))
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 DB_PATH = os.path.join(ROOT, "data", "warehouse.duckdb")
@@ -31,10 +27,10 @@ DB_PATH = os.path.join(ROOT, "data", "warehouse.duckdb")
 
 def prepare_warehouse(regenerate: bool = True) -> None:
     if regenerate:
-        import generate_runs
+        from generator import generate_runs
         generate_runs.main()
 
-    import load as load_mod
+    from pipeline import load as load_mod
     load_mod.load_all(DB_PATH, os.path.join(ROOT, "data", "raw"))
     print(f"Loaded combined warehouse -> {DB_PATH}")
 

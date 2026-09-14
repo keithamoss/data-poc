@@ -18,7 +18,7 @@ light thresholds" section of the main report for how this ties back to it.
 from __future__ import annotations
 import numpy as np
 import pandas as pd
-from presentation import present_identity_batch
+from generator.presentation import present_identity_batch
 
 TODAY = pd.Timestamp("2026-09-13")
 
@@ -44,7 +44,7 @@ def _rng(seed, salt):
 
 def generate_case_workers(n_workers: int, seed: int) -> pd.DataFrame:
     rng = _rng(seed, 1)
-    from reference.names_au import build_name_pools
+    from generator.names_au import build_name_pools
     names = build_name_pools()
     sex = rng.choice(["M", "F"], size=n_workers, p=[0.32, 0.68])  # child-protection workforce skews female
     given_out = np.empty(n_workers, dtype=object)
@@ -65,7 +65,7 @@ def generate_child_protection_collection(population: pd.DataFrame, seed: int = 1
                                           n_case_workers: int = 60) -> dict[str, pd.DataFrame]:
     """population: the full master registry (from population.py). Returns a
     dict of table_name -> DataFrame for the whole collection."""
-    from reference.names_au import build_geo_pools
+    from generator.names_au import build_geo_pools
     suburb_names, postcodes, street_stems, street_types = build_geo_pools()
 
     flagged = population[population["has_child_protection_history"]].reset_index(drop=True)
@@ -178,7 +178,7 @@ def generate_child_protection_collection(population: pd.DataFrame, seed: int = 1
     # placements need carers to exist first - build a carer pool sized to plausible demand
     n_carers = max(20, int(n * 0.55))
     carer_type = carer_rng.choice(CARER_TYPES, size=n_carers, p=[0.40, 0.42, 0.18])
-    from reference.names_au import build_name_pools
+    from generator.names_au import build_name_pools
     names = build_name_pools()
     carer_sex = carer_rng.choice(["M", "F"], size=n_carers, p=[0.38, 0.62])
     carer_given = np.empty(n_carers, dtype=object)

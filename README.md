@@ -20,9 +20,16 @@ uv sync --dev
 ./run_pipeline.sh
 ```
 
-(No `uv`? `pip install .` reads the same `pyproject.toml` — though see the
-package-conflict note just below before you do; `uv`'s override handles it
-in one step, plain `pip` needs the two-step workaround that note describes.)
+`uv` is the only supported path — deliberately, not an oversight. This
+repo gets handed to other people to run on their own machines as part of
+evaluating the PoC, so "one tool, one lockfile, no per-person Python/venv
+setup to get subtly wrong" matters more than usual here. `run_pipeline.sh`
+itself calls everything through `uv run`, not a bare `python3`, so it
+works the same whether or not you've activated `.venv` yourself. (A plain
+`pip install .` would technically read the same `pyproject.toml`, but
+you'd hit the real package conflict described just below with no
+equivalent one-step override `uv` gives you — not worth the workaround
+when `uv` is one command to install.)
 
 This regenerates 10 scheduled daily deliveries (up to 15 manifest entries
 once red-triggered resupply attempts are included — see "The 10
@@ -77,10 +84,10 @@ Git history holds the actual code if it's ever needed again as a reference.
 
 ```
 contract/                    the two real YAML files, copied verbatim from this project's docs
-generator/
-  daily_batch.py              generates ONE day's birth-registration batch (an event-flow model,
-                               deliberately different from the sibling synthetic-data-generator
-                               repo's whole-population snapshot model — see the file's docstring)
+generator/                   a real package (generator/__init__.py) - `python3 -m generator.<module>`
+  daily_batch.py               generates ONE day's birth-registration batch (an event-flow model,
+                               deliberately different from the sibling synthetic_data_generator
+                               package's whole-population snapshot model — see the file's docstring)
   generate_runs.py             orchestrates 10 scheduled daily deliveries (2 amber, 2 red) into
                                data/raw/ - red ones trigger resupply.py's resupply-chain
                                simulation, so up to 15 manifest entries actually land, not 10
@@ -88,8 +95,9 @@ generator/
                                driven by a DatasetProvider protocol - knows nothing about how
                                a dataset's rows are actually made, see the file's own docstring
   generate_cp_runs.py          orchestrates 10 weekly Child Protection snapshots into data/cp_raw/
-  names_au.py, presentation.py, dirty.py   dirty.py has 2 new CP-specific presets;
-                               kept in sync with synthetic-data-generator/dirty.py (see its docstring)
+  names_au.py, presentation.py, dirty.py   the canonical copies - synthetic_data_generator/
+                               imports these from here rather than keeping its own duplicates
+                               (see "Relationship to the synthetic_data_generator package" below)
 dbt_project/                 a real (if minimal) dbt project — dbt_project.yml, a staging model,
                                schema.yml with genuine two-tier severity config
 qa_tools/                    runs the actual dbt/soda/datacontract-cli/evidently tools - a proper Python
@@ -116,7 +124,7 @@ qa_tools/                    runs the actual dbt/soda/datacontract-cli/evidently
     run_dbt_cp.py, run_soda_cp.py, run_datacontract_cp.py, run_evidently_cp.py
                                     the CP counterparts to the 4 bdm/ real-tool scripts above
     orchestrate_cp.py         all four, across every CP run (parallel by default) -> reports/results_cp.json
-pipeline/
+pipeline/                    a real package (pipeline/__init__.py) - `python3 -m pipeline.<module>`
   load.py                       loads every generated run into one combined DuckDB table (still needed -
                                build_dashboard_data.py's own direct queries, e.g. the sex value-count
                                chart, run against it; qa_tools/ builds its own separate per-run warehouses)
@@ -250,10 +258,10 @@ from the start rather than retrofitting them for something they were
 never built to do.
 
 ```bash
-python3 generator/generate_cp_runs.py            # -> data/cp_raw/ (10 weekly snapshots)
-python3 -m qa_tools.cp.orchestrate_cp            # -> reports/results_cp.json
-python3 pipeline/build_cp_dashboard_data.py      # -> reports/child_protection_dashboard.json
-python3 dashboard/embed_dashboard_data.py        # re-embeds BOTH real datasets into the HTML
+uv run python3 -m generator.generate_cp_runs       # -> data/cp_raw/ (10 weekly snapshots)
+uv run python3 -m qa_tools.cp.orchestrate_cp        # -> reports/results_cp.json
+uv run python3 -m pipeline.build_cp_dashboard_data  # -> reports/child_protection_dashboard.json
+uv run python3 dashboard/embed_dashboard_data.py    # re-embeds BOTH real datasets into the HTML
 ```
 
 A few things specific to this collection, each found by actually running
@@ -274,7 +282,7 @@ it end to end rather than assumed:
   demonstrate something.
 - **Two of the three business rules used to always fail**, on every run,
   dirty or clean — a real finding, not a bug in the rules:
-  `synthetic-data-generator/child_protection.py` didn't originally enforce
+  `synthetic_data_generator/child_protection.py` didn't originally enforce
   "a placement's carer must be Approved" or "a case can't close with an
   open investigation". Fixed at the generator level (both hold by
   construction on clean data now), with two new `dirty.py` presets
@@ -429,7 +437,7 @@ held from the original equivalent-only build.
   values," reporting every non-null value invalid.
 - **No `relationships` dbt test between different tables.** This dataset
   is a single table with no other loaded model to join against (unlike
-  synthetic-data-generator's Child Protection collection, which has real
+  synthetic_data_generator's Child Protection collection, which has real
   FKs across 6 tables) — adding one here would mean fabricating a join, so
   it's left out. The new `multiple_birth_sibling` dbt test is a *self*-join
   within this one table instead, which needs no second model.
@@ -440,14 +448,33 @@ held from the original equivalent-only build.
   hardcoded default — it just never gets to demonstrate a late-arrival
   scenario with the current generator.
 
-## Relationship to the `synthetic-data-generator` repo
+## Relationship to the `synthetic_data_generator` package
 
-This is a separate, smaller repo, not a fork. It reuses
-`names_au.py`/`presentation.py`/`dirty.py` unmodified (copied in under
-`generator/`) for name pools, agency-specific ID presentation, and
-failure-injection primitives. It does **not** reuse `population.py`'s
-whole-population household model — `generator/daily_batch.py` is a
-purpose-built event-flow generator instead, because a daily
-birth-registrations extract is a fresh cohort of newborns each day, not a
-resample of a static population snapshot. See that file's docstring for
-the full reasoning.
+`synthetic_data_generator/` is a separate, larger generator vendored into
+this repo (population-scale, cross-agency identity-linked) - not
+currently wired into the QA pipeline itself (see `plans/wider.md`).
+`generator/` (what the pipeline actually uses) doesn't reuse
+`population.py`'s whole-population household model — `generator/
+daily_batch.py` is a purpose-built event-flow generator instead, because a
+daily birth-registrations extract is a fresh cohort of newborns each day,
+not a resample of a static population snapshot. See that file's docstring
+for the full reasoning.
+
+It does share `names_au.py`/`presentation.py`/`dirty.py` between the two -
+name pools, agency-specific ID presentation, and failure-injection
+primitives that both generators genuinely need the same versions of.
+These live in `generator/` as the one canonical copy;
+`synthetic_data_generator/` imports them from there
+(`from generator.dirty import ...` etc.) rather than keeping its own
+duplicates. That wasn't always true - until this got cleaned up, each
+package kept its own copy, manually kept in sync by hand for the parts
+that overlapped. That's exactly as fragile as it sounds: `dirty.py`'s two
+copies quietly drifted apart, and Python's own import resolution (both
+directories used to add themselves to `sys.path` with plain `import
+dirty`) picked whichever one happened to be earlier on the path - not
+necessarily the one being edited. See `plans/wider.md`'s package-layout
+entry for the real bug this caused and how it's fixed now: `generator/`,
+`pipeline/`, and `synthetic_data_generator/` are all real Python packages
+(each has an `__init__.py`), imported with real absolute imports
+(`from generator import dirty`) - no `sys.path` manipulation anywhere in
+the repo any more, and nothing left to duplicate.
