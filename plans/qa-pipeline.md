@@ -453,6 +453,101 @@ relative, not a schedule — this is weeks of work, not months.
     alone (cheapest, one flag) to see what it actually looks like on the
     dashboard before deciding whether it belongs there long-term.
 
+    **Product-scope discussion, settled (2026-09-14) - several rounds of
+    questions with Keith working through the actual shape.** Answers the
+    "does this belong in the dashboard" question above: it doesn't - it's
+    a genuine case-management/workflow capability, architecturally
+    distinct from the QA reporting dashboard. This PoC's scope is to
+    design the seam/handoff point, not build the thing itself; the choice
+    of platform (Jira Service Management already exists at the agency,
+    but Microsoft-stack tooling - Planner/Power Automate/SharePoint etc -
+    is preferred to avoid extra licensing) is a deliberately separate,
+    later conversation.
+
+    Motivation: today's process (manual review, then a direct email/call
+    to the provider) works at current scale but won't survive the move to
+    daily refreshes - some of this needs to hand off directly to
+    providers while the team keeps oversight, rather than reviewing
+    everything by hand.
+
+    Ticket model:
+    - Every issue automatically becomes a ticket - no gatekeeping on
+      creation - except a check marked "known, expected to stay amber
+      long-term" doesn't spin up a repeat ticket for persisting as
+      expected (a flip to red, or to green, still surfaces as a
+      notification).
+    - **Granularity: one ticket per column** - if several checks on the
+      same column fail at once, that's one ticket, not several.
+    - **Scope: one unified ticket queue across every dataset/agency**,
+      filterable per audience - not separate queues per dataset.
+    - **Recurrence: a fresh occurrence of a previously-closed issue
+      creates a NEW ticket, cross-referenced to the prior one** - not a
+      reopen. Keeps each incident's resolution-time measurement clean and
+      separately trackable (matters for the SLA-reporting ambition
+      below), at the cost of not having one continuous record per check.
+
+    Assignment (the real decision point, not ticket creation):
+    - Automatic default per check/column (e.g. schema/structural breaks
+      default straight to the provider - clear-cut, major; subtler
+      things like null-rate creep default to the team first),
+      human-overridable.
+    - A provider-assigned ticket still notifies the team - assignment
+      isn't "the team goes dark," it's the trigger for the team's own
+      watch/FYI so they can step in if needed.
+    - Ownership can be joint - team and provider both actively engaged on
+      one ticket at once, not necessarily a strict handoff.
+
+    Escalation and suppression (two distinct mechanisms, easy to conflate):
+    - **Escalation**: the same check failing 6+ times in a row is a
+      supply-relationship signal, not routine noise - bumps the ticket's
+      severity so it can't get lost.
+    - **Suppression**: a check marked "known, expected to stay amber
+      long-term" is exempt from both repeat-ticket creation AND the
+      6-in-a-row escalation rule - trusting the deliberate "this is
+      accepted for now" call rather than re-litigating it via a
+      stretch-length trigger.
+
+    Automatic pipeline updates - the underlying principle Keith named
+    directly: **tickets should get a status update from the pipeline
+    automatically anytime something happens that affects that check or
+    column** - a resupply arriving (whether it fixes the issue or not), a
+    quarantine release, any status touch, even non-transitions ("still
+    red, no change" still posts). This maps closely onto infrastructure
+    this repo already has: `generator/resupply.py`'s `run_delivery_chain`
+    already yields exactly this kind of event sequence (severity/arrival
+    date per attempt) for Birth Registrations' resupply chains - a real
+    ticketing integration would consume much the same shape of event
+    stream this generator already produces, not something wholly new.
+    **Closing always requires a human - no auto-close, full stop**
+    (superseded an earlier "maybe auto-close for minor issues" idea from
+    partway through this discussion).
+
+    Quarantine/release - extends `docs/quarantine_sex_column.py`'s
+    existing split-and-hold demo with a release step that doesn't exist
+    there yet: rows held in a dead-letter queue per check; only the
+    internal team can execute a release back into the dataset (providers
+    can be part of the decision, never the executor); any required
+    second-level sign-off is a process convention inside the ticketing
+    tool itself, not a separate technical permission system; the release
+    auto-posts to the ticket per the principle above.
+
+    Time-tracking: captured from the start, internal-only reporting for
+    now, but deliberately designed so it could become a real, shared SLA
+    metric with providers later (e.g. "BDM average resolution time: 4.2
+    days") - worth capturing cleanly even before it's shared anywhere.
+
+    Audiences and access (one point still genuinely open): three
+    distinct roles - data engineers (full detail + workflow tools), their
+    managers (an oversight/rollup view), and external data providers
+    (restricted to what they need to act - e.g. primary keys of bad rows,
+    not full row content). The external access *mechanism* (an
+    authenticated portal, email-threaded notification with no login, or
+    some hybrid) is still open - not really an either/or in practice
+    (most real platforms support both at once), and the real open
+    variable is how much back-and-forth a typical resupply conversation
+    actually needs. Left for the project-context walkthrough
+    (`plans/wider.md` #16) to settle, per Keith's own call.
+
 16. **[investigate]** Should the dashboard explain *why* checks on the
     same column can legitimately disagree in severity? Item 14's
     all-checks summary surfaced (not created) a real fact: a column can
