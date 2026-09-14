@@ -435,10 +435,26 @@ not a schedule.
     thematic fit found across the whole exercise (see below) - a legend
     remembered as a warning that came before a disaster, matching what a
     QA/checks system is actually for: catching problems before they
-    cause real downstream damage. Not yet reflected anywhere in the repo
-    itself (no rename of the GitHub repo, README, dashboard title, etc.)
-    - purely a codename decision so far; revisit if/when Keith wants it
-    to show up somewhere concrete. Full options considered, for context:
+    cause real downstream damage. **Applied**: a subtle mention added to
+    both `README.md` (a small subtitle line under the H1) and the
+    dashboard footer (`dashboard/qa-reporting-dashboard.html`, a faint
+    italic line in the existing small/muted footer) - the dashboard's
+    actual product title ("Data Asset QA Register") and main header were
+    deliberately left untouched.
+    **Parked, Keith's own action item**: renaming the actual GitHub repo
+    (`data-poc`) to something Mothman-branded. Not done here - no
+    available GitHub tool can rename a repo (nothing in the MCP
+    toolset touches repo settings, and there's no `gh` CLI/API access in
+    this environment either), and it's also a genuinely consequential
+    change worth doing deliberately rather than automatically: it would
+    change the live GitHub Pages URL
+    (`https://keithamoss.github.io/data-poc/`, already public) and
+    require updating any local git remotes. Keith will do this himself
+    via GitHub Settings -> General -> Repository name when ready; revisit
+    updating internal references (this README, the Pages workflow, any
+    hardcoded links in the plan docs) afterward if the rename actually
+    breaks anything.
+    Full options considered, for context:
 
     - **Greek philosophy/mythology round**: **Plato**/**The Cave**
       (strongest *conceptual* fit found - the Allegory of the Cave maps
