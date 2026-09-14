@@ -143,6 +143,51 @@ not a schedule.
    wired into the dashboard (action 2) that cross-agency identity
    resolution becomes a meaningful thing to demonstrate, not before.
 
+   **Scoped, not built (2026-09-14)** - Keith asked for this, then
+   stopped short of building once the real shape became clear, to keep
+   focus on the pipeline's actual core (QA) rather than get pulled into
+   generator work. Filed here so the scoping isn't lost if this comes
+   back later:
+   - `agency_datasets.py`'s `generate_birth_registrations()` is NOT a
+     drop-in replacement for `daily_batch.py` - it emits one row per
+     person in a whole-population snapshot in a single call, with no
+     concept of daily deliveries, dirty-severity injection, or resupply
+     chains (the machinery the actual QA pipeline's "multiple runs over
+     time" story depends on). Real linkage means threading a shared
+     identity source underneath both generators' *existing* mechanics,
+     not swapping generators.
+   - Asked how much overlap: **"a meaningful minority (most/all CP
+     clients also get a BDM record)"**, not just a handful. This rules
+     out relying on coincidental overlap between CP's population (ages
+     0-17) and BDM's ~10-day rolling newborn window (statistically
+     near-zero chance of a birthdate landing inside it) - it requires a
+     **historical backfill** dataset (birth registrations for people
+     already in the population, via `generate_birth_registrations()`
+     largely as-is) as an *additional* piece alongside BDM's existing
+     daily event-flow feed, not a replacement for it.
+   - Asked whether the backfill goes through the real dbt/Soda/
+     datacontract-cli checks like any other run: **yes, in scope** - not
+     treated as exempt archival data.
+   - Asked whether the dashboard should visibly surface the linkage:
+     **no, separate follow-up** - this item is scoped as the data-model
+     linkage only (shared population underneath both generators + the
+     historical backfill + a linkage answer-key file, mirroring
+     `synthetic-data-generator/generate.py`'s existing `internal/`
+     convention), not a dashboard feature.
+   - Also surfaced, not yet acted on: `population.py`/`child_protection
+     .py`/`agency_datasets.py` each hardcode their own `TODAY = pd
+     .Timestamp("2026-09-13")` for age/mortality calculation - separate
+     from the rolling-window dates fixed in action 20's freshness-filter
+     follow-up (`generator/anchor_date.py`), but would need the same
+     treatment for population-linked birthdates to land correctly inside
+     BDM's actual rolling window if this is picked back up.
+   - Not scoped at all yet: how the historical backfill is exposed
+     structurally (a new manifest entry type distinct from daily runs?
+     how it interacts with row-count-growth/on-time-arrival checks built
+     around the daily-delivery shape), and exactly how many/which
+     `has_child_protection_history` children get birthdates placed inside
+     the rolling window vs. left at their existing 0-17-year spread.
+
 9. **[todo, low]** Explore alternative dashboard output types/tools —
    Streamlit and Power BI named specifically — as alternatives or
    complements to the current hand-rolled static HTML dashboard. Not yet
