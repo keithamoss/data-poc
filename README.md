@@ -9,55 +9,36 @@ and Evidently AI concepts against real generated data and real contract/
 check files, and to replace the earlier QA reporting dashboard's fabricated
 Birth Registrations numbers with genuinely computed ones. No part of this
 pipeline's output is hand-typed or fabricated in the browser — every number
-on the dashboard's Birth Registrations page traces back through this repo
+on the dashboard's Birth Registrations page traces back through this repo,
+through the actual dbt-core/Soda Core/datacontract-cli/Evidently binaries,
 to a real check evaluated against real generated CSVs.
 
 Run it yourself:
 
 ```bash
+pip install -r requirements-real.txt
+pip install 'datacontract-cli[duckdb]'    # see requirements-real.txt - a second step, not optional
 ./run_pipeline.sh
 ```
 
 This regenerates 10 scheduled daily deliveries (up to 15 manifest entries
 once red-triggered resupply attempts are included — see "The 10
-(scheduled) runs" below), loads them into DuckDB, runs all four
-*equivalent* check engines (see below), and re-embeds the results into
+(scheduled) runs" below), loads them into DuckDB, runs the four real tools
+against every run, and re-embeds the results into
 `dashboard/qa-reporting-dashboard.html`. Every step is seeded, so re-running
 reproduces the same runs and the same numbers.
 
-To run the **real** tools instead:
+## What's actually running
 
-```bash
-pip install -r requirements-real.txt
-pip install 'datacontract-cli[duckdb]'    # see requirements-real.txt - a second step, not optional
-python3 real_tools/orchestrate_real.py    # -> reports/results_real.json
-python3 real_tools/compare_real_vs_equivalent.py  # -> reports/comparison.txt
-```
+Every check is a real tool, reading this project's real config files —
+nothing here is a hand-rolled stand-in:
 
-## What's real vs. "equivalent" — read this first
-
-This repo has two generations. It started in a claude.ai session with **no
-real internet access** (PyPI itself was unreachable there — every
-`pip install` attempt returned "No matching distribution found"), so
-`engines/*.py` are hand-written Python/DuckDB stand-ins for dbt-core, Soda
-Core, datacontract-cli, and Evidently AI. A later Claude Code session, with
-real internet access, installed and ran all four actual tools
-(`real_tools/*.py`) against this same real data and real contract/check
-files — confirming the equivalents were largely faithful, and surfacing
-several genuine bugs in the original contract/schema files that only
-running the real tools could find (see "Known simplifications and honest
-disagreements" below).
-
-**Both generations are real and kept.** The equivalents in `engines/`
-remain a documented, dependency-free fallback; `real_tools/` is what
-actually runs `dbt`, `soda`, `datacontract-cli`, and `evidently` today.
-
-| Tool | What's real | Equivalent (engines/) | Real (real_tools/) |
-|---|---|---|---|
-| **datacontract-cli** | `contract/bdm-birth-registrations-contract.yaml` is a genuine ODCS v3.2.0 contract — `datacontract lint` passes on it. | `contract_engine.py`, a hand-written Python/DuckDB interpreter for the same real ODCS `metric`/`type: sql` rule vocabulary. | `run_datacontract_real.py` runs the actual `datacontract-cli` Python API (`DataContract.test()`) against each run's raw CSV via a `local` server. |
-| **Soda Core** | `contract/bdm-birth-registrations-soda-checks.yml` is genuine SodaCL. | `soda_engine.py`, a hand-written interpreter for the same SodaCL shapes. | `run_soda_real.py` runs the real `soda-core` `Scan` API against a per-run DuckDB warehouse. |
-| **dbt-core** | `dbt_project/` is a real dbt project — `dbt_project.yml`, a staging model, `schema.yml` with real generic tests and severity config. | `dbt_test_engine.py` renders the SQL model with actual Jinja2 into a DuckDB view, then evaluates the schema.yml tests as SQL. | `run_dbt_real.py` shells out to the real `dbt` CLI (`dbt run` + `dbt test`, dbt-duckdb adapter) against a per-run DuckDB warehouse. |
-| **Evidently AI** | Population Stability Index (PSI) on the `sex` column vs. a reference run. | `evidently_engine.py` computes PSI from scratch with the standard formula and 0.1/0.25 warn/fail bands. | `run_evidently_real.py` runs the real `evidently.Report` + `DataDriftPreset` (the current 0.7.x API). |
+| Tool | What's real | What runs it |
+|---|---|---|
+| **datacontract-cli** | `contract/bdm-birth-registrations-contract.yaml` is a genuine ODCS v3.2.0 contract — `datacontract lint` passes on it. | `run_datacontract_real.py` runs the actual `datacontract-cli` Python API (`DataContract.test()`) against each run's raw CSV via a `local` server. |
+| **Soda Core** | `contract/bdm-birth-registrations-soda-checks.yml` is genuine SodaCL. | `run_soda_real.py` runs the real `soda-core` `Scan` API against a per-run DuckDB warehouse. |
+| **dbt-core** | `dbt_project/` is a real dbt project — `dbt_project.yml`, a staging model, `schema.yml` with real generic tests and severity config. | `run_dbt_real.py` shells out to the real `dbt` CLI (`dbt run` + `dbt test`, dbt-duckdb adapter) against a per-run DuckDB warehouse. |
+| **Evidently AI** | Population Stability Index (PSI) on the `sex` column vs. a reference run. | `run_evidently_real.py` runs the real `evidently.Report` + `DataDriftPreset` (the current 0.7.x API). |
 
 `requirements-real.txt` lists the exact package set verified to install and
 run together — including a `pip check`-flagged conflict between
@@ -66,36 +47,20 @@ version (1.5.5) that all four tools were run against with no observed
 breakage; see that file's comments before assuming the pip warning means
 you must downgrade.
 
-## Running it for real
-
-Verified working end to end in this environment — not speculative:
-
-1. `pip install -r requirements-real.txt`, then `pip install
-   'datacontract-cli[duckdb]'` separately — a hard `pip` dependency
-   conflict otherwise, not just a warning; see that file's comments.
-2. `python3 real_tools/build_per_run_warehouses.py` builds one DuckDB file
-   per run under `data/duckdb_runs/` (dbt and Soda each need a real
-   warehouse to connect to, and get one file per run rather than the
-   combined `data/warehouse.duckdb` — see that file's docstring for why).
-3. `dbt run && dbt test --profiles-dir real_tools/dbt_profiles --project-dir dbt_project`,
-   with `DBT_DB_PATH` set to one of those per-run files. The SQL model
-   didn't need to change; `schema.yml`'s two custom-severity tests did —
-   see its own comments and the disagreements section below for what real
-   dbt-core actually required.
-4. `soda scan -d birth_registrations -c real_tools/soda_configuration.yml contract/bdm-birth-registrations-soda-checks.yml` —
-   the checks file itself never changed.
-5. `datacontract lint` / `datacontract test` against
-   `contract/bdm-birth-registrations-contract.yaml` — the contract *did*
-   need real, structural fixes (also detailed below) before it would even
-   lint.
-6. `evidently` — a real `Report(metrics=[DataDriftPreset(columns=["sex"], cat_method="psi")])`
-   comparing the reference run to each subsequent run.
-
-Or just run `python3 real_tools/orchestrate_real.py`, which does all of the
-above across every run and writes `reports/results_real.json`.
-
-`engines/*.py` are kept as a working, dependency-free fallback per the
-original handoff's request — not deleted now that the real tools run.
+**This wasn't always the case.** This repo started in a claude.ai session
+with **no real internet access** (PyPI itself was unreachable there — every
+`pip install` attempt returned "No matching distribution found"), so an
+earlier generation, `engines/*.py`, was a set of hand-written Python/DuckDB
+stand-ins for these four tools. A later Claude Code session, with real
+internet access, installed and ran the actual tools — confirming the
+equivalents had been largely faithful, and surfacing several genuine bugs
+in the original contract/schema files that only running the real tools
+could find (see "Known simplifications and honest disagreements" below).
+`engines/*.py` was kept for a while as a documented, dependency-free
+fallback, but it had already drifted out of sync with newer checks (Child
+Protection, several checks built real-tools-only) by the time it was
+removed — see `plans/wider.md`'s repo-tidy-up entries for the full history.
+Git history holds the actual code if it's ever needed again as a reference.
 
 ## Layout
 
@@ -116,11 +81,6 @@ generator/
                                kept in sync with synthetic-data-generator/dirty.py (see its docstring)
 dbt_project/                 a real (if minimal) dbt project — dbt_project.yml, a staging model,
                                schema.yml with genuine two-tier severity config
-engines/                     the Python/DuckDB equivalents (kept as a fallback)
-  contract_engine.py           datacontract-cli equivalent
-  soda_engine.py                Soda Core equivalent
-  dbt_test_engine.py            dbt-core equivalent (renders the real SQL model via Jinja2)
-  evidently_engine.py           Evidently AI equivalent (real PSI)
 real_tools/                  runs the actual dbt/soda/datacontract-cli/evidently tools
   build_per_run_warehouses.py   one DuckDB file per run, for dbt/Soda to connect to
   dbt_profiles/profiles.yml     dbt-duckdb connection profile (no secrets - just a path)
@@ -130,16 +90,18 @@ real_tools/                  runs the actual dbt/soda/datacontract-cli/evidently
   run_datacontract_real.py       runs the real datacontract-cli Python API
   run_evidently_real.py          runs the real evidently.Report + DataDriftPreset
   orchestrate_real.py            all four, across every run -> reports/results_real.json
-  compare_real_vs_equivalent.py  diffs results.json against results_real.json -> reports/comparison.txt
   cp_common.py                   shared agency/collection/dataset id constants for the 6 CP scripts below
   build_cp_warehouses.py         one DuckDB file per CP snapshot run, all 6 tables under a `raw` schema
   run_dbt_real_cp.py, run_soda_real_cp.py, run_datacontract_real_cp.py, run_evidently_real_cp.py
                                   the CP counterparts to the 4 birth-registrations real-tool scripts above
   orchestrate_real_cp.py         all four, across every CP run -> reports/results_real_cp.json
 pipeline/
-  load.py                       loads every generated run into one DuckDB table
-  orchestrate.py                generate -> load -> all 4 equivalent engines -> reports/results.json
-  build_dashboard_data.py       reshapes results.json into the dashboard's data shape
+  load.py                       loads every generated run into one combined DuckDB table (still needed -
+                               build_dashboard_data.py's own direct queries, e.g. the sex value-count
+                               chart, run against it; real_tools/ builds its own separate per-run warehouses)
+  orchestrate.py                generate -> load the combined warehouse (real_tools/orchestrate_real.py
+                               is the next step, run separately - see run_pipeline.sh)
+  build_dashboard_data.py       reshapes results_real.json into the dashboard's data shape
   build_cp_dashboard_data.py    reshapes results_real_cp.json into 6 datasets' worth of dashboard data
 dashboard/
   qa-reporting-dashboard.html   the 3-tier QA dashboard, with Birth Registrations and the whole Child
@@ -147,10 +109,10 @@ dashboard/
   embed_dashboard_data.py       re-embeds both real datasets (REAL_BIRTH_REG_DATA, REAL_CP_DATA) into the HTML
 data/                          generated - raw run CSVs, manifest.json, warehouse.duckdb, duckdb_runs/,
                                cp_raw/, cp_duckdb_runs/ (not checked in)
-reports/                       generated - results.json, results_real.json, results_real_cp.json,
+reports/                       generated - results_real.json, results_real_cp.json,
                                birth_registrations_dashboard.json, child_protection_dashboard.json
-                               (not checked in); comparison.txt is checked in
-run_pipeline.sh                runs the equivalent-engine pipeline end to end
+                               (not checked in)
+run_pipeline.sh                runs the whole real-tools pipeline end to end
 requirements-real.txt          the real tool packages - verified installing and running together
 ```
 
@@ -190,30 +152,29 @@ dataset's row and drawer. Every other dataset on the page except the Child
 Protection collection (see below) is untouched: the same illustrative,
 browser-fabricated mock data as before, still clearly labeled as such in
 the footer. Each real column's drawer shows every check that actually ran
-on it, across all four *equivalent* engines side by side (the real-tool
-results live in `reports/results_real.json`/`comparison.txt` rather than
-the dashboard, which was built against the equivalents first) — e.g. `sex`
-shows Soda's `invalid_percent`, the contract's `invalidValues`, dbt's
-`accepted_values`, Soda's scoped last-24h check, *and* the drift engine's
-PSI, all computed independently against the same real data, so you can see
-where different tools agree and where their models genuinely differ (see
-below) — e.g. `place_of_birth_facility`'s Soda check reports a percentage
-while its dbt check reports an absolute row count (a real dbt-duckdb
-reliability issue forced that switch — see below), so the two numbers
-won't visually match even though both come from the same 38-769 null
-counts.
+on it — real dbt-core, Soda Core, datacontract-cli, and Evidently checks
+side by side, straight from `reports/results_real.json` — e.g. `sex` shows
+Soda's `invalid_percent`, the contract's `invalidValues`, dbt's
+`accepted_values`, Soda's scoped last-24h check, *and* Evidently's PSI, all
+computed independently against the same real data, so you can see where
+different tools agree and where their models genuinely differ (see below)
+— e.g. `place_of_birth_facility`'s Soda check reports a percentage while
+its dbt check reports an absolute row count (a real dbt-duckdb reliability
+issue forced that switch — see below), so the two numbers won't visually
+match even though both come from the same 38-769 null counts.
 
 ## The Child Protection collection
 
 **Department for Child Protection and Family Support → Child Protection**
 (6 datasets: Client Register, Notifications, Investigations, Placements,
-Carer Register, Case Workers) is also wired to real output — but unlike
-Birth Registrations, straight to the actual tools, not the equivalents:
-`engines/*.py` are hard-coded single-table implementations with no
-cross-table join support, and this collection's whole point is cross-table
-checks (7 foreign-key relationships, 3 business rules spanning two tables
-each), so retrofitting the equivalents for it would have been more work
-than just running the real tools, which were already proven to work here.
+Carer Register, Case Workers) is also wired to real output, straight to
+the actual tools. This collection's whole point is cross-table checks (7
+foreign-key relationships, 3 business rules spanning two tables each) —
+the equivalent engines that existed at the time (`engines/*.py`, since
+removed) were hard-coded single-table implementations with no cross-table
+join support at all, so this collection went straight to the real tools
+from the start rather than retrofitting them for something they were
+never built to do.
 
 ```bash
 python3 generator/generate_cp_runs.py       # -> data/cp_raw/ (10 weekly snapshots)
@@ -327,14 +288,14 @@ held from the original equivalent-only build.
   the answer.** `filter birth_registrations [recent]: where:
   extract_timestamp >= CURRENT_DATE - 1` is evaluated faithfully by real
   Soda Core against `CURRENT_DATE` as of whenever the scan actually runs —
-  not, as the equivalent engine assumed for lack of a real "now", each
-  run's own latest `extract_timestamp`. Since every synthetic run's dates
-  are in the past by the time this runs for real, the `[recent]` scope
-  resolves to 0 rows on every run, and the scoped check always reports
-  pass — including on run_09, where the equivalent's "as-of" simplification
-  made it fail. Neither is wrong: the equivalent faithfully modeled "if
-  this ran on the day of the extract"; real Soda faithfully modeled "if
-  this ran today, on a fixture built for a different day."
+  found while comparing it against the equivalent engine's own assumption
+  (lack of a real "now" meant it used each run's own latest
+  `extract_timestamp` instead). Since every synthetic run's dates are in
+  the past by the time this runs for real, the `[recent]` scope resolves
+  to 0 rows on every run, and the scoped check always reports pass. This
+  is a real, ongoing property of the fixture — not a bug: the check
+  faithfully models "if this ran today," on a fixture built for a
+  different day.
 - **The newer freshness / relative-date check shares that same real-
   wall-clock property, deliberately.** Unlike the `[recent]` filter above,
   this one (contract + Soda + dbt, `date_of_birth`) is genuinely useful
@@ -345,15 +306,15 @@ held from the original equivalent-only build.
   drift as real time moves away from that window. Regenerating on a
   rolling window near "today" (`plans/qa-pipeline.md`'s open follow-up
   for the `[recent]` filter) would fix both at once.
-- **Evidently's PSI and the equivalent's PSI genuinely differ, and both
-  are correct.** Evidently's `DataDriftPreset` treats every distinct value
-  actually observed in a column as its own category, so run_09's three
-  different injected invalid `sex` codes ("9"/"U"/"O") count as three
-  separate categories. `evidently_engine.py`'s equivalent collapses everything
-  outside {M, F, X} into one combined `_other` bucket. Both land in the
-  same 0.1–0.25 "warn" band on run_09, but at different values (real
-  Evidently: 0.144; the equivalent: 0.179) — PSI is genuinely sensitive to
-  how a distributional shift is binned into categories.
+- **Evidently's PSI is genuinely sensitive to how a distributional shift
+  gets binned into categories.** `DataDriftPreset` treats every distinct
+  value actually observed in a column as its own category, so run_09's
+  three different injected invalid `sex` codes ("9"/"U"/"O") count as
+  three separate categories, not one combined bucket — found by comparing
+  against the equivalent engine's own PSI (which did collapse everything
+  outside {M, F, X} into one `_other` bucket): both landed in the same
+  0.1–0.25 "warn" band on run_09, but at genuinely different values (real
+  Evidently: 0.144, the equivalent: 0.179), purely from the binning choice.
 
 ### Held from the original build
 
@@ -367,40 +328,32 @@ held from the original equivalent-only build.
   to agree.
 - **PSI doesn't always agree with the threshold-based checks.** On the
   deliberately "red" run, every threshold-based check (contract, Soda, dbt)
-  correctly fails — but the drift engine's PSI for that run lands well
-  inside the "warn" band, not "fail" (0.18 for the equivalent, 0.14 for
-  real Evidently — see above). This is a genuine, expected property of PSI
-  (it measures distributional *shift*, not "does any single value violate
-  a rule") — not a miscalibration.
+  correctly fails — but real Evidently's PSI for that run lands well
+  inside the "warn" band, not "fail" (0.144). This is a genuine, expected
+  property of PSI (it measures distributional *shift*, not "does any
+  single value violate a rule") — not a miscalibration.
 - **A single warn/fail threshold can't represent every real rule shape.**
   ODCS severity is single-tier (a rule is either strictly pass/fail, or
-  pass/warn-only, never a three-way band); `contract_engine.py` encodes
-  that into the dashboard's two-threshold shape as warn==fail (error
-  severity) or an unreachable fail ceiling (warning/info severity) — see
-  the comments in that file. Soda's `row_count` check is a genuine
-  two-sided range (too few *or* too many rows); `soda_engine.py`'s
-  `_numeric_threshold()` reduces it to the upper bound only for display,
-  and this is the one place where a piece of real information (the lower
-  bound) is dropped for the sake of a single scalar.
+  pass/warn-only, never a three-way band) — `run_datacontract_real.py`
+  encodes that into the dashboard's two-threshold shape as warn==fail
+  (error severity) or an unreachable fail ceiling (warning/info severity).
+  Soda's `row_count` check is a genuine two-sided range (too few *or* too
+  many rows); `run_soda_real.py`'s threshold handling reduces it to the
+  upper bound only for display, and this is the one place where a piece
+  of real information (the lower bound) is dropped for the sake of a
+  single scalar.
 - **`source_system_record_id` and `extract_timestamp` now have real quality
   rules** (uniqueness/format, null/ordering-and-latency respectively),
   added along with a wider QA-check battery: format checks on 5 free-text
   columns, and a genuine cross-record consistency rule (every
   `is_multiple_birth` record must have a matching sibling row from the
   same birth event — `daily_batch.py` was fixed to actually generate that
-  sibling row; see `plans/qa-pipeline.md`). Built real-tools-only (dbt-
-  core/Soda Core/datacontract-cli, not `engines/*.py`) — most of it is
-  nonetheless computed correctly by the existing equivalent engines too,
-  since `contract_engine.py`/`dbt_test_engine.py` generically interpret
-  whatever's in the shared contract/schema files. The genuine gaps
-  (`soda_engine.py` has no `duplicate_count`/`failed rows`/`valid regex`
-  support, `dbt_test_engine.py` has no singular-test support) are filled
-  in on the dashboard from `real_tools/orchestrate_real.py`'s own output —
-  see `pipeline/build_dashboard_data.py`'s merge comment for the full
-  account, including a real false-positive this surfaced and fixed along
-  the way (`soda_engine.py`'s `invalid_percent` handler silently treated
-  an unrecognised `valid regex` check as "0 valid values", reporting every
-  non-null value invalid).
+  sibling row; see `plans/qa-pipeline.md`). Built real-tools-only from the
+  start (dbt-core/Soda Core/datacontract-cli) - a genuine false-positive
+  was found and fixed along the way, in the equivalent engine that
+  existed at the time: `soda_engine.py`'s `invalid_percent` handler
+  silently treated an unrecognised `valid regex` check as "0 valid
+  values," reporting every non-null value invalid.
 - **No `relationships` dbt test between different tables.** This dataset
   is a single table with no other loaded model to join against (unlike
   synthetic-data-generator's Child Protection collection, which has real

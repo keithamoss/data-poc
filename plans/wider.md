@@ -15,7 +15,7 @@ should assume a multi-month timeline.
 
 | Component | Where | Status |
 |---|---|---|
-| Birth-registrations QA pipeline | this repo, root (`contract/`, `dbt_project/`, `engines/`, `generator/`, `pipeline/`, `real_tools/`) | Real tools wired up and running (`real_tools/*.py`); see `plans/qa-pipeline.md` for open items |
+| Birth-registrations QA pipeline | this repo, root (`contract/`, `dbt_project/`, `generator/`, `pipeline/`, `real_tools/`) | Real tools wired up and running (`real_tools/*.py`); see `plans/qa-pipeline.md` for open items. `engines/` (the original no-internet-access equivalent engines) removed - see action 18 |
 | Synthetic data generator | this repo, `synthetic-data-generator/` | Code present, runs, verified (population-scale, cross-agency identity linkage); **not yet wired into the QA pipeline or dashboard** — see action 2 below |
 | QA reporting dashboard | this repo, `dashboard/qa-reporting-dashboard.html` | Only Birth Registrations wired to real data; ~14 other datasets are still fabricated mock, clearly labeled as such. Also separately published as a claude.ai Artifact ("Data Asset QA Register") that is **not** auto-synced with this file — see action 5 |
 | Supporting docs | this repo, `docs/` | `data-contract-engines-landscape.md` (source of the real contract/checks YAML), generator design notes, a standalone quarantine-pattern demo |
@@ -565,3 +565,63 @@ not a schedule.
       GUARDIAN, TRUST, Black Swan Watch, QuokkaCheck, DataMuster.
 
     **Decision (2026-09-14): Mothman.**
+
+18. **[done]** Removed `engines/*.py` entirely, superseding action 10's
+    earlier "rename for consistency" pass. Follow-up to Keith's own
+    question ("do we still need the old equivalent engine code given
+    that's legacy from when we couldn't install packages?") - scoped via
+    questions first (framework/scope for the smoke-tests work landing
+    alongside this, uv adoption), with the engines/ decision itself
+    answered directly: remove it, real internet access isn't going away
+    and it had already drifted out of sync (Child Protection, the
+    row-count-growth/freshness/text-format checks were all built
+    real-tools-only, never backfilled).
+    Confirmed safe first: `reports/results_real.json` (real_tools/
+    orchestrate_real.py's output) is a strict superset of the old
+    equivalent path (824 checks vs. 630) - no coverage gap from dropping
+    the merge.
+    What changed, beyond deleting `engines/*.py` and the now-dead
+    `real_tools/compare_real_vs_equivalent.py`:
+    - `pipeline/orchestrate.py` trimmed to just its real remaining job -
+      generate + load the combined warehouse (`data/warehouse.duckdb`) -
+      dropping the "run 4 equivalent engines -> reports/results.json"
+      half entirely. The combined warehouse itself is still needed:
+      `build_dashboard_data.py`'s own direct DuckDB queries (e.g. the sex
+      value-count chart) run against it; `real_tools/orchestrate_real.py`
+      builds its own separate per-run warehouses for dbt/Soda.
+    - `pipeline/build_dashboard_data.py` rewritten to source solely from
+      `results_real.json` - removed the `_REAL_ONLY_CHECK_KEYS` allowlist
+      and `_merge_real_only_checks()` merge logic entirely (there's no
+      more "base" equivalent result to merge real-only checks into), and
+      simplified `ENGINE_SHORT` to the 4 real tags only.
+    - `run_pipeline.sh` rewritten to run the actual real-tools pipeline
+      end to end (generate+load -> real_tools/orchestrate_real.py ->
+      build_dashboard_data.py -> embed) rather than the old
+      equivalent-only path - there's only one path now.
+    - README.md's whole "two generations" framing rewritten - the intro,
+      quick-start, tool table, Layout section, and "The Child Protection
+      collection"/"Known simplifications" sections all updated. The
+      debugging narrative in "Known simplifications" (the real ODCS
+      validation fixes, the dbt-core %-syntax bug, the dbt-duckdb
+      reliability bug, the Soda wall-clock finding, the PSI binning
+      difference) was kept, not deleted - it's genuine technical history
+      - just reframed as "found by comparing against the equivalent that
+      existed at the time" (past tense) rather than describing an
+      ongoing dual-source dashboard, since there's only one source now.
+    - Swept every other file for stray references to the deleted module
+      names/paths and fixed them in place rather than leaving dangling
+      pointers: `real_tools/*.py` docstrings/comments, `contract/
+      bdm-birth-registrations-contract.yaml`, `dbt_project/dbt_project.yml`
+      and `schema.yml`, and the dashboard HTML (a visible footer line, a
+      JS block comment, and a drawer subtitle template string) - plus one
+      unrelated stale `HANDOFF.md` reference found along the way (that
+      file was deleted earlier this session; missed at the time).
+    **Verified end to end, not assumed**: full `./run_pipeline.sh` run
+    after the rewrite succeeded with no `engines/` dependency anywhere;
+    confirmed the rebuilt dashboard JSON has zero stale "equiv" wording
+    and every check's `engine` field is one of the four real tags.
+    `plans/qa-pipeline.md`'s own historical entries (bug-hunt narrative
+    naming `contract_engine.py`/`soda_engine.py`/etc.) were deliberately
+    left untouched - that file is a development log of what happened and
+    when, not a description of current state, so it stays historically
+    accurate as originally written.

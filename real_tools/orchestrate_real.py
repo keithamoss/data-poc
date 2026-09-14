@@ -1,13 +1,15 @@
 """
 Runs all four REAL tools (dbt-core, Soda Core, datacontract-cli, Evidently)
-against every generated run, the real-tool counterpart to
-pipeline/orchestrate.py (which runs the four Python equivalents in
-engines/). Aggregates into reports/results_real.json, same check-result
-record shape as reports/results.json so the two can be diffed directly.
+against every generated run. Used to be the real-tool counterpart to a
+pipeline/orchestrate.py that also ran four hand-written Python equivalents
+in engines/ (since removed - see plans/wider.md's repo-tidy-up entries);
+this is now the only path. Aggregates into reports/results_real.json.
 
 Assumes data/raw/ (generator output), data/warehouse.duckdb (the combined
-equivalent-engine warehouse) and data/duckdb_runs/*.duckdb (per-run real
-warehouses, real_tools/build_per_run_warehouses.py) already exist - run
+warehouse, still built by pipeline/load.py/orchestrate.py - see that
+file's docstring for why it's still needed) and data/duckdb_runs/*.duckdb
+(per-run real warehouses, real_tools/build_per_run_warehouses.py) already
+exist - run
 ./run_pipeline.sh first if they don't.
 """
 from __future__ import annotations

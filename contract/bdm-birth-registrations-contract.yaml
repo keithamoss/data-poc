@@ -202,8 +202,9 @@ schema:
             # least one recent row"), so the query itself flips it back to
             # that same "0 = healthy" convention (1 if the inner COUNT is
             # zero, else 0) rather than needing new comparator support
-            # (mustBeGreaterThan) in contract_engine.py or the dashboard's
-            # threshold handling - both only ever expect mustBe: 0 today.
+            # (mustBeGreaterThan) in real_tools/run_datacontract_real.py or
+            # the dashboard's threshold handling - both only ever expect
+            # mustBe: 0 today.
             query: >
               SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END
               FROM {model}

@@ -1,14 +1,7 @@
-# Real dbt_project.yml, structured to run for real with actual dbt-core +
-# a dbt-sqlite (or dbt-duckdb, pointed at data/warehouse.db) adapter once
-# one is installable in this environment (dbt-core itself isn't
-# pip-installable in this sandbox - see ../README.md). Nothing here is a
-# stand-in syntax; this is genuine dbt project structure.
-#
-# Until then, engines/dbt_test_engine.py reads this project's own
-# models/staging/schema.yml (the same file `dbt test` would read) and
-# evaluates equivalent SQL directly against the SQLite warehouse, so the
-# generic + severity-tiered tests defined below are actually executed, not
-# just described.
+# Real dbt_project.yml, run for real by actual dbt-core + dbt-duckdb via
+# real_tools/run_dbt_real.py - see ../README.md. Nothing here is a
+# stand-in syntax; this is genuine dbt project structure, actually
+# executed by the real `dbt` CLI, not just described.
 
 name: 'birth_registrations'
 version: '1.0.0'

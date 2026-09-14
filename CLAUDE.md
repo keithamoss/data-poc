@@ -45,9 +45,8 @@ Rough layout:
 | `contract/` | Real ODCS contract + SodaCL check YAML - the actual source of truth for schema/quality rules |
 | `generator/` | Synthetic data generation (`daily_batch.py`, `generate_runs.py`, `resupply.py`, `dirty.py`) - Birth Registrations only; deliberately separate from `synthetic-data-generator/`'s population-scale generator |
 | `synthetic-data-generator/` | A separate, population-scale (millions), cross-agency-identity-linked synthetic data generator - not currently wired into the pipeline (see `plans/wider.md`) |
-| `pipeline/` | Loads generated CSVs into DuckDB, builds dashboard JSON |
-| `engines/` | Hand-written Python/DuckDB stand-ins for dbt/Soda/datacontract-cli/Evidently, from before real tool access existed - kept as documented fallback, not the current path |
-| `real_tools/` | The actual dbt-core/Soda Core/datacontract-cli/Evidently runs - this is what's live today |
+| `pipeline/` | `orchestrate.py` generates + loads the combined DuckDB warehouse; `build_dashboard_data.py`/`build_cp_dashboard_data.py` reshape real-tool results into dashboard JSON |
+| `real_tools/` | The actual dbt-core/Soda Core/datacontract-cli/Evidently runs - the only pipeline path now. (An earlier `engines/` directory of hand-written Python/DuckDB stand-ins, from before real tool access existed, was removed once it had drifted out of sync - see `plans/wider.md` action 18. Git history holds it if ever needed.) |
 | `dashboard/qa-reporting-dashboard.html` | The single-file static dashboard, published via GitHub Pages on every push that touches `dashboard/` |
 | `docs/` | Research and design-note docs - `data-contract-engines-landscape.md` (tooling survey), `synthetic-data-generation-tools-research.md`, `synthetic-data-generator-notes.md`, `remediation-workflow-design.md` (the bad-data ticketing/case-management design - deliberately out of this PoC's build scope, seam only) |
 | `plans/` | Living project memory - see above |
@@ -56,8 +55,9 @@ Rough layout:
 
 - `data/raw/`, `data/warehouse.duckdb`, `reports/*.json` etc. are
   gitignored and fully regenerated - never hand-edit or try to commit
-  them. Regenerate via `./run_pipeline.sh` (equivalent engines) or
-  `python3 real_tools/orchestrate_real.py` (real tools).
+  them. Regenerate via `./run_pipeline.sh` (the whole pipeline end to
+  end) or `python3 real_tools/orchestrate_real.py` (just the real-tool
+  check runs, if `data/raw/`/`data/warehouse.duckdb` already exist).
 - Everything is seeded - regenerating reproduces the same output, so a
   diff against previous output is a real correctness check, not noise
   (used repeatedly to verify refactors are behaviour-preserving).

@@ -1,22 +1,21 @@
 """
 Runs REAL Evidently AI (evidently>=0.7, the current Report/DataDriftPreset
 API - a full rewrite since the 0.4.x API the original requirements-real.txt
-assumed) against each run's `sex` column vs. the reference run
-(run_01, same convention as engines/evidently_engine.py), via the real
-evidently.Report + evidently.presets.DataDriftPreset classes - not a
-reimplementation of PSI.
+assumed) against each run's `sex` column vs. the reference run (run_01),
+via the real evidently.Report + evidently.presets.DataDriftPreset classes -
+not a reimplementation of PSI.
 
 Genuine finding from running the real tool, not assumed: Evidently's PSI
 computation treats every DISTINCT VALUE actually observed in the column as
 its own category (so a dirty run with three different invalid codes - e.g.
-run_09's "9"/"U"/"O" - gets three separate PSI categories), where
-engines/evidently_engine.py's equivalent collapses everything outside {M,F,X}
-into one combined "_other" bucket. Both are real, defensible PSI
-implementations; they land in the same 0.1-0.25 "warn" band on run_09 but
-at genuinely different values (real Evidently: ~0.144; the equivalent's
-own 3-bucket-plus-other scheme: ~0.179) - PSI is sensitive to how many
-categories the shift is binned into, and this is a real example of that,
-not a bug in either. See README.md's known-disagreements section.
+run_09's "9"/"U"/"O" - gets three separate PSI categories). Found by
+comparing against the equivalent engine that existed at the time (since
+removed), which collapsed everything outside {M,F,X} into one combined
+"_other" bucket - both landed in the same 0.1-0.25 "warn" band on run_09
+but at genuinely different values (real Evidently: ~0.144; the
+equivalent's own 3-bucket-plus-other scheme: ~0.179) - PSI is sensitive to
+how many categories the shift is binned into. See README.md's
+known-disagreements section.
 """
 from __future__ import annotations
 import json
@@ -33,11 +32,11 @@ DATASET_ID = "birth-registrations"
 ENGINE_TAG = "Evidently 0.7 (real)"
 
 REFERENCE_RUN_ID = "run_01_2026-09-01"
-# same pass/warn/fail bands engines/evidently_engine.py uses, applied to the
-# real PSI value Evidently computes - Evidently's own DataDriftPreset only
-# carries one drift/no-drift threshold (0.1) by default, not a three-way
-# band, so the warn/fail split here is this project's convention, not
-# Evidently's.
+# same pass/warn/fail bands the equivalent engine that existed at the time
+# used, applied to the real PSI value Evidently computes - Evidently's own
+# DataDriftPreset only carries one drift/no-drift threshold (0.1) by
+# default, not a three-way band, so the warn/fail split here is this
+# project's convention, not Evidently's.
 WARN_THRESHOLD = 0.10
 FAIL_THRESHOLD = 0.25
 

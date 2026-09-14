@@ -1,8 +1,7 @@
 version: 2
 
 # Real dbt generic-test syntax, run for real by `dbt test` (dbt-core 1.12 +
-# dbt-duckdb) via real_tools/run_dbt_real.py, and separately by
-# engines/dbt_test_engine.py's DuckDB-equivalent evaluator.
+# dbt-duckdb) via real_tools/run_dbt_real.py.
 #
 # Several things below aren't what a plausible-looking first draft of this
 # file assumed - each only found by actually running `dbt test`:

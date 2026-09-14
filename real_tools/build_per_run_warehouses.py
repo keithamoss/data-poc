@@ -6,13 +6,13 @@ dbt_project/models/staging/sources.yml declares as the `raw.birth_registrations`
 source.
 
 Why per-run databases rather than one combined warehouse.duckdb (which is
-what pipeline/load.py builds, and what the engines/*.py equivalents query
-with a run_id filter): a real dbt/Soda invocation has no run_id-scoped
-`where` clause to filter by (HANDOFF.md and README.md are both explicit
+what pipeline/load.py builds, still needed for build_dashboard_data.py's
+own direct queries against a run_id filter): a real dbt/Soda invocation
+has no run_id-scoped `where` clause to filter by (README.md is explicit
 that the schema.yml/checks.yml files "don't need to change" to run the real
 tools), so the only way to get a real per-run `dbt test` / `soda scan`
-result - matching the equivalents' per-run breakdown, and this dataset's own
-production reality of one daily extract landed and tested at a time - is to
+result - matching this dataset's own production reality of one daily
+extract landed and tested at a time - is to
 point each invocation at a warehouse containing just that one day's rows.
 Nothing about the SQL model or schema.yml/checks.yml changes; only which
 physical DuckDB file the tool connects to for a given run.

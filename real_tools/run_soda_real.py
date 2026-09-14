@@ -12,13 +12,13 @@ so the daily-batch reality is one file per day, one scan per day).
 Genuine, real finding from actually running this (documented in README.md,
 not "fixed" away): the `filter birth_registrations [recent]: where:
 extract_timestamp >= CURRENT_DATE - 1` block uses Soda's real CURRENT_DATE,
-i.e. today's actual wall-clock date - not, as engines/soda_engine.py's
-equivalent assumed for lack of a real "now", the latest extract_timestamp
-in the run. Since every synthetic run's dates are in the past relative to
-whenever this actually runs, the [recent] filter scopes to 0 rows for every
-historical run, and its check always reports "pass" (0/0) - a real
-divergence from the equivalent's per-run "as-of" interpretation, not a bug
-in either engine.
+i.e. today's actual wall-clock date - not each run's own latest
+extract_timestamp (the assumption the equivalent engine that existed at
+the time made, for lack of a real "now" to test against). Since every
+synthetic run's dates are in the past relative to whenever this actually
+runs, the [recent] filter scopes to 0 rows for every historical run, and
+its check always reports "pass" (0/0) - a real, ongoing property of this
+fixture, not a bug.
 """
 from __future__ import annotations
 import os
@@ -92,8 +92,8 @@ def _threshold(spec: dict | None) -> float | None:
         if key in spec:
             return spec[key]
     # a lower-bound-only spec (row_count's warn/fail also carry a lessThan
-    # side) - same "upper bound wins for a single scalar" convention the
-    # equivalent engine's _numeric_threshold() documents.
+    # side) - "upper bound wins for a single scalar" convention, same one
+    # the now-removed equivalent engine's _numeric_threshold() used.
     return next(iter(spec.values()), None)
 
 

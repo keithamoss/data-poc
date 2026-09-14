@@ -9,8 +9,7 @@ A "local_test" server (type: local, pointed at that run's CSV) is added to
 an in-memory copy of the contract for each call - the file on disk is never
 touched, and its own "production" S3 server is untouched too.
 
-Getting this contract to lint/test at all - not just wiring engines/
-contract_engine.py to a duckdb path - required fixing real, structural
+Getting this contract to lint/test at all required fixing real, structural
 mismatches between the original contract and actual ODCS v3, only visible
 once `datacontract-cli` genuinely parsed it (see the contract file's own
 comments and README.md's known-disagreements section for the full list:
@@ -129,7 +128,7 @@ def evaluate_datacontract_real(run_id: str, csv_filename: str, run_timestamp: st
             "run_timestamp": run_timestamp,
             "metric_value": value,
             "unit": "%" if is_pct else "count",
-            "warn_threshold": None,  # ODCS severity is single-tier - see contract_engine.py's own note
+            "warn_threshold": None,  # ODCS severity is single-tier - see README.md's known-disagreements section
             "fail_threshold": 0 if diag.get("severity") == "error" else None,
             "status": {"passed": "pass", "failed": "fail", "warning": "warn"}.get(c.result.value, c.result.value),
             "on_fail_action": "quarantine" if diag.get("severity") == "error" else "flag",
