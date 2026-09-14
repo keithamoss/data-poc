@@ -1,22 +1,22 @@
 """
 Runs REAL Soda Core (soda-core-duckdb) against
 contract/child-protection-soda-checks.yml, via Soda's own Python Scan API -
-the Child Protection counterpart to real_tools/bdm/run_soda_real_bdm.py.
+the Child Protection counterpart to qa_tools/bdm/run_soda_bdm.py.
 Soda's own scan results carry which table each check belongs to
-(`c["table"]`), so unlike run_dbt_real_cp.py there's no separate lookup
+(`c["table"]`), so unlike run_dbt_cp.py there's no separate lookup
 needed to attribute a result to one of the 6 CP dataset_ids.
 
 Run once per run against its own per-run CP DuckDB file
-(real_tools/cp/build_cp_warehouses.py) - same rationale as
-run_soda_real_bdm.py. Threshold parsing shared via
-real_tools/common/soda_common.py - see plans/wider.md #20.
+(qa_tools/cp/build_cp_warehouses.py) - same rationale as
+run_soda_bdm.py. Threshold parsing shared via
+qa_tools/common/soda_common.py - see plans/wider.md #20.
 """
 from __future__ import annotations
 import os
 
 import duckdb
 
-from real_tools.common.soda_common import ENGINE_TAG, threshold
+from qa_tools.common.soda_common import ENGINE_TAG, threshold
 from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -34,7 +34,7 @@ _BUSINESS_RULE_DIMENSION = {
 }
 
 
-def evaluate_soda_real_cp(run_id: str, run_timestamp: str) -> list[dict]:
+def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
     from soda.scan import Scan
 
     db_path = os.path.join(CP_DUCKDB_RUNS_DIR, f"{run_id}.duckdb")
@@ -123,7 +123,7 @@ def evaluate_soda_real_cp(run_id: str, run_timestamp: str) -> list[dict]:
 if __name__ == "__main__":
     from datetime import datetime, timezone
     for run_id in ["cp_run_01_2026-07-06", "cp_run_04_2026-07-27", "cp_run_09_2026-08-31"]:
-        res = evaluate_soda_real_cp(run_id, datetime.now(timezone.utc).isoformat())
+        res = evaluate_soda_cp(run_id, datetime.now(timezone.utc).isoformat())
         print(f"--- {run_id} ---")
         for r in res:
             if r["status"] != "pass":

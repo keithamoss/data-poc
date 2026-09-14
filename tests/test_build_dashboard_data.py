@@ -1,8 +1,8 @@
 """Smoke test for pipeline/build_dashboard_data.py's reshaping logic,
-against a small fixture rather than a real (slow) real_tools/
-orchestrate_real.py run - this is meant to catch the kind of silent
+against a small fixture rather than a real (slow) qa_tools/bdm/
+orchestrate_bdm.py run - this is meant to catch the kind of silent
 shape/crash regression a full pipeline run wouldn't surface quickly, not
-to duplicate real_tools' own integration coverage."""
+to duplicate qa_tools' own integration coverage."""
 from __future__ import annotations
 
 import json
@@ -43,7 +43,7 @@ FIXTURE_RESULTS = [
 
 
 def test_build_produces_one_entry_per_known_column(tmp_path, monkeypatch):
-    results_path = tmp_path / "results_real.json"
+    results_path = tmp_path / "results_bdm.json"
     results_path.write_text(json.dumps({"runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS}))
 
     db_path = tmp_path / "warehouse.duckdb"
@@ -70,7 +70,7 @@ def test_build_produces_one_entry_per_known_column(tmp_path, monkeypatch):
 
 
 def test_a_column_with_a_real_check_carries_it_through(tmp_path, monkeypatch):
-    results_path = tmp_path / "results_real.json"
+    results_path = tmp_path / "results_bdm.json"
     results_path.write_text(json.dumps({"runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS}))
     db_path = tmp_path / "warehouse.duckdb"
     conn = duckdb.connect(str(db_path))
@@ -92,7 +92,7 @@ def test_a_column_with_a_real_check_carries_it_through(tmp_path, monkeypatch):
 
 
 def test_a_column_with_no_check_gets_an_honest_placeholder(tmp_path, monkeypatch):
-    results_path = tmp_path / "results_real.json"
+    results_path = tmp_path / "results_bdm.json"
     results_path.write_text(json.dumps({"runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS}))
     db_path = tmp_path / "warehouse.duckdb"
     conn = duckdb.connect(str(db_path))

@@ -14,11 +14,11 @@ echo "== 1/4: generate + load the combined warehouse (pipeline/orchestrate.py) =
 python3 pipeline/orchestrate.py
 
 echo
-echo "== 2/4: run the real tools (real_tools/bdm/orchestrate_real_bdm.py) =="
-python3 -m real_tools.bdm.orchestrate_real_bdm
+echo "== 2/4: run the real tools (qa_tools/bdm/orchestrate_bdm.py) =="
+python3 -m qa_tools.bdm.orchestrate_bdm
 
 echo
-echo "== 3/4: reshape results_real.json for the dashboard =="
+echo "== 3/4: reshape results_bdm.json for the dashboard =="
 python3 pipeline/build_dashboard_data.py
 
 echo
@@ -27,4 +27,4 @@ python3 dashboard/embed_dashboard_data.py
 
 echo
 echo "Done. Open dashboard/qa-reporting-dashboard.html in a browser to view it,"
-echo "or inspect reports/results_real.json for the raw check-result records."
+echo "or inspect reports/results_bdm.json for the raw check-result records."

@@ -38,15 +38,15 @@ override-dependencies = ["duckdb>=1.5"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # "generator"/"pipeline" are added directly so their modules import flat
-# (e.g. `import resupply`); "." adds the repo root so real_tools - a
+# (e.g. `import resupply`); "." adds the repo root so qa_tools - a
 # proper package since plans/wider.md #20 - imports as
-# `real_tools.common.parallel_orchestrate` etc.
+# `qa_tools.common.parallel_orchestrate` etc.
 pythonpath = ["generator", "pipeline", "."]
 
 [tool.ruff]
 target-version = "py311"
 line-length = 120
-# Excludes real_tools/dbt_profiles (dbt-generated) and the synthetic-data-
+# Excludes qa_tools/dbt_profiles (dbt-generated) and the synthetic-data-
 # generator subdirectory's own separate history - lint this repo's own
 # actively-developed code, not vendored/generated output.
 exclude = ["dbt_project/target", ".venv"]

@@ -1,16 +1,16 @@
 """
 Generic parallel-or-sequential dispatch across an independent-runs
-manifest, shared by real_tools/bdm/orchestrate_real_bdm.py and
-real_tools/cp/orchestrate_real_cp.py rather than each reimplementing it -
+manifest, shared by qa_tools/bdm/orchestrate_bdm.py and
+qa_tools/cp/orchestrate_cp.py rather than each reimplementing it -
 the two scripts' actual per-run tool calls differ (different argument
-shapes, different real_tools/<dataset>/*.py modules), but "run N
+shapes, different qa_tools/<dataset>/*.py modules), but "run N
 independent things, collect results in manifest order, abort on first
 failure" is identical between them.
 
 Scoped and measured before building (plans/performance.md #4,
 2026-09-14): empirically 2.2x on 4 runs/4 cores for the three
 in-process tools, dbt's own concurrency blocked until each run got its
-own --target-path (now fixed in real_tools/common/dbt_common.py).
+own --target-path (now fixed in qa_tools/common/dbt_common.py).
 Default worker count is os.cpu_count() - portable across whatever
 machine this runs on next, not hardcoded to the VM this was measured on.
 

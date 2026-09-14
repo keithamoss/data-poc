@@ -5,7 +5,7 @@ reports/birth_registrations_dashboard.json and
 reports/child_protection_dashboard.json - the step that turns
 pipeline/build_dashboard_data.py's and pipeline/build_cp_dashboard_data.py's
 output into what the dashboard actually renders. Run this last, after
-orchestrate.py/orchestrate_real_cp.py and the two build_*_dashboard_data.py
+orchestrate.py/orchestrate_cp.py and the two build_*_dashboard_data.py
 scripts, whenever the pipeline is regenerated.
 
 This only replaces those two lines - the rest of the dashboard (its CSS,

@@ -32,10 +32,10 @@ between the two builders.
    The label itself is NOT derived here by pattern-matching the check
    name (an earlier version of this file did exactly that, and it was
    wrong to: a second, invented classification layer, disconnected from
-   what each check actually tests). Every real_tools/*.py script now
+   what each check actually tests). Every qa_tools/*/*.py script now
    writes its own `label` directly onto each check-result record, at the
    one place that genuinely knows what a check measures - this module
-   just passes that value through unchanged. See any real_tools/run_*.py
+   just passes that value through unchanged. See any qa_tools/*/run_*.py
    file's `_LABEL_BY_*` dict for where a label actually comes from.
 """
 from __future__ import annotations

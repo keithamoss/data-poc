@@ -4,7 +4,7 @@ API - a full rewrite since the 0.4.x API this project's dependencies originally
 assumed) against each run's `sex` column vs. the reference run (run_01),
 via the real evidently.Report + evidently.presets.DataDriftPreset classes -
 not a reimplementation of PSI. PSI computation itself is shared with
-run_evidently_real_cp.py via real_tools/common/evidently_common.py - the
+run_evidently_cp.py via qa_tools/common/evidently_common.py - the
 row-count-growth check below is birth-registrations-specific (Child
 Protection's periodic-snapshot extract doesn't have the same "should
 mostly grow" expectation an event feed does) - see plans/wider.md #20.
@@ -27,7 +27,7 @@ import os
 
 import pandas as pd
 
-from real_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, status_for_psi, compute_psi
+from qa_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, status_for_psi, compute_psi
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 RAW_DIR = os.path.join(ROOT, "data", "raw")
@@ -79,7 +79,7 @@ def _previous_run_file(manifest: list[dict], run_id: str) -> str | None:
     return None
 
 
-def evaluate_evidently_real_bdm(run_id: str, csv_filename: str, run_timestamp: str,
+def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
                                  reference_run_id: str = REFERENCE_RUN_ID,
                                  reference_csv: str = f"{REFERENCE_RUN_ID}.csv") -> list[dict]:
     reference = pd.read_csv(os.path.join(RAW_DIR, reference_csv))[["sex"]]
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     with open(os.path.join(RAW_DIR, "manifest.json")) as f:
         manifest = json.load(f)
     for entry in manifest:
-        res = evaluate_evidently_real_bdm(entry["run_id"], entry["file"], datetime.now(timezone.utc).isoformat())
+        res = evaluate_evidently_bdm(entry["run_id"], entry["file"], datetime.now(timezone.utc).isoformat())
         psi, growth = res[0], (res[1] if len(res) > 1 else None)
         growth_str = f"row_growth={growth['metric_value']:+.1f}%  status={growth['status']:5s}" if growth else "row_growth=n/a (first run)"
         print(f"{entry['run_id']:25s} PSI={psi['metric_value']}  status={psi['status']:5s}  |  {growth_str}")

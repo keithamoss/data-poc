@@ -1,10 +1,10 @@
 # Birth-registrations QA pipeline plan
 
 Open items from wiring up the real dbt-core/Soda Core/datacontract-cli/
-Evidently tools (`real_tools/*.py`) against this pipeline. Everything here
+Evidently tools (`qa_tools/*/*.py`) against this pipeline. Everything here
 is either a genuine bug found by actually running the real tools, or a
 documented equivalent-vs-real-tool disagreement worth a second look.
-Scoped to this repo's `contract/`/`dbt_project/`/`engines/`/`real_tools/`
+Scoped to this repo's `contract/`/`dbt_project/`/`engines/`/`qa_tools/`
 work specifically — wider-project items live in `plans/wider.md`.
 
 Status values: `open` / `workaround shipped` / `done`. Priority is

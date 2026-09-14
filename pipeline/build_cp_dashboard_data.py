@@ -1,5 +1,5 @@
 """
-Reshapes reports/results_real_cp.json (real_tools/orchestrate_real_cp.py's
+Reshapes reports/results_cp.json (qa_tools/cp/orchestrate_cp.py's
 output) into the exact JSON shape the QA reporting dashboard's drawer/chart
 code expects - the Child Protection counterpart to build_dashboard_data.py.
 
@@ -31,20 +31,20 @@ import sys
 
 import duckdb
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "real_tools"))
-import cp_common
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from qa_tools.cp import cp_common
 from dashboard_check_labels import rank_for_headline, display_name
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
-RESULTS_PATH = os.path.join(ROOT, "reports", "results_real_cp.json")
+RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
 CP_DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
 OUT_PATH = os.path.join(ROOT, "reports", "child_protection_dashboard.json")
 
 ENGINE_SHORT = {
-    "dbt-core 1.12 + dbt-duckdb (real)": "dbt-core",
-    "Soda Core 3.5 (real)": "Soda Core",
-    "datacontract-cli 1.2.0 (real)": "datacontract-cli",
-    "Evidently 0.7 (real)": "Evidently AI",
+    "dbt-core 1.12 + dbt-duckdb": "dbt-core",
+    "Soda Core 3.5": "Soda Core",
+    "datacontract-cli 1.2.0": "datacontract-cli",
+    "Evidently 0.7": "Evidently AI",
 }
 
 BUSINESS_RULE_PSEUDO_COLUMN = "(table-level checks)"
@@ -287,7 +287,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict]) -> di
         "prevRowCount": prev_entry["row_counts"][table],
         "runs": manifest,
         "columns": columns_out,
-        "_provenance": f"Computed by real_tools/orchestrate_real_cp.py from real generated CSVs, the real "
+        "_provenance": f"Computed by qa_tools/cp/orchestrate_cp.py from real generated CSVs, the real "
                         f"child-protection-contract.yaml, the real child-protection-soda-checks.yml, a real "
                         f"dbt schema.yml, and real Evidently AI drift on concern_type — see README.md. "
                         f"({TABLE_META[table]})",

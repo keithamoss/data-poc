@@ -6,8 +6,8 @@ this dataset's real production shape (BDM drops one CSV file per day), so no
 per-run DuckDB file is needed here the way dbt/Soda needed one.
 
 The "local_test" server construction and DataContract.test() call are
-shared with run_datacontract_real_cp.py via
-real_tools/common/datacontract_common.py - see plans/wider.md #20.
+shared with run_datacontract_cp.py via
+qa_tools/common/datacontract_common.py - see plans/wider.md #20.
 
 Getting this contract to lint/test at all required fixing real, structural
 mismatches between the original contract and actual ODCS v3, only visible
@@ -21,7 +21,7 @@ odcs-3.2.0 schema regardless of a contract's own declared apiVersion).
 from __future__ import annotations
 import os
 
-from real_tools.common.datacontract_common import ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, run_against_local_server
+from qa_tools.common.datacontract_common import ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, run_against_local_server
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
@@ -44,8 +44,8 @@ _QUALITY_CHECK_TYPES = {
 # The 2 custom_sql rules below get an explicit shared label: each is the
 # same real-world check as a dbt (and, for the sibling check, Soda)
 # counterpart under a different name - the label is what makes that
-# overlap visible on the dashboard, same rationale as run_dbt_real_bdm.py's
-# and run_soda_real_bdm.py's own versions of this dict. Matched by the
+# overlap visible on the dashboard, same rationale as run_dbt_bdm.py's
+# and run_soda_bdm.py's own versions of this dict. Matched by the
 # rule's own description prefix (this contract's own text, not a guess).
 _CUSTOM_SQL_LABEL = {
     "Multiple-birth sibling match:": "Sibling record match",
@@ -61,7 +61,7 @@ def _custom_sql_label(description: str) -> str | None:
     return None
 
 
-def evaluate_datacontract_real_bdm(run_id: str, csv_filename: str, run_timestamp: str) -> list[dict]:
+def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str) -> list[dict]:
     run = run_against_local_server(CONTRACT_PATH, os.path.join(RAW_DIR, csv_filename))
 
     results = []
@@ -108,7 +108,7 @@ if __name__ == "__main__":
     with open(os.path.join(RAW_DIR, "manifest.json")) as f:
         manifest = json.load(f)
     for entry in manifest[:1] + [e for e in manifest if e["dirty_severity"]]:
-        res = evaluate_datacontract_real_bdm(entry["run_id"], entry["file"], datetime.now(timezone.utc).isoformat())
+        res = evaluate_datacontract_bdm(entry["run_id"], entry["file"], datetime.now(timezone.utc).isoformat())
         print(f"--- {entry['run_id']} ({entry['dirty_severity']}) ---")
         for r in res:
             if r["status"] != "pass":

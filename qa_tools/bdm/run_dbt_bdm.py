@@ -6,14 +6,14 @@ build_per_run_warehouses.py's docstring for why one file per run rather
 than the combined warehouse.duckdb). --select scopes this call to
 stg_birth_registrations + its own singular test(s) only - the same
 dbt_project/ also holds Child Protection's models, built separately by
-real_tools/cp/run_dbt_real_cp.py.
+qa_tools/cp/run_dbt_cp.py.
 
 Parses dbt's own target/manifest.json (test metadata: column, test type,
 config) and target/run_results.json (status, failures) - not a
 reimplementation of dbt's test logic, this genuinely shells out to the
 `dbt` CLI and reads what it reports. Subprocess invocation and manifest
-parsing are shared with run_dbt_real_cp.py via
-real_tools/common/dbt_common.py; everything below is genuinely
+parsing are shared with run_dbt_cp.py via
+qa_tools/common/dbt_common.py; everything below is genuinely
 dataset-specific (which tests exist, what they mean, a real dbt-duckdb
 reliability workaround this dataset needed) - see plans/wider.md #20.
 
@@ -40,7 +40,7 @@ numbers are cross-checked rather than passed through blindly.
 A third, newer instance of the same class of problem: the
 recent_births_present singular test (no config, no fail_calc arithmetic
 at all - the simplest possible test shape) reported "fail" for run_10 in
-a full 10-run orchestrate_real_bdm.py pass, while re-running that exact
+a full 10-run orchestrate_bdm.py pass, while re-running that exact
 test in isolation seconds later, against the same warehouse file, correctly
 returned "pass" - and stayed correct on every subsequent re-run. No
 SQL-level or config-level explanation found (unlike the other two, this
@@ -56,7 +56,7 @@ import os
 
 import duckdb
 
-from real_tools.common.dbt_common import ENGINE_TAG, parse_threshold, run_dbt, test_nodes
+from qa_tools.common.dbt_common import ENGINE_TAG, parse_threshold, run_dbt, test_nodes
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 DBT_PROJECT_DIR = os.path.join(ROOT, "dbt_project")
@@ -76,7 +76,7 @@ _VERIFY_COUNT_SQL = {
     # A third, newer instance of the same reliability problem, found live:
     # a clean re-run of just this one test in isolation correctly returned
     # 0 rows (pass) for run_10, but dbt's own run_results.json - from a
-    # full 10-run orchestrate_real_bdm.py pass minutes earlier, same
+    # full 10-run orchestrate_bdm.py pass minutes earlier, same
     # warehouse file, same compiled SQL - reported it failed. Same
     # treatment as the two above: recompute independently rather than
     # trust dbt's reported status for this specific check.
@@ -86,7 +86,7 @@ _VERIFY_COUNT_SQL = {
 }
 
 # multiple_birth_sibling has no attached column of its own (a singular
-# test, not a generic column test) - same class of gap run_dbt_real_cp.py
+# test, not a generic column test) - same class of gap run_dbt_cp.py
 # solves with cp_common.BUSINESS_RULE_HOME_TABLE, just column- rather than
 # table-scoped since this dataset is a single table. Without this, the
 # check would land under column_name="(table)", which the dashboard
@@ -131,7 +131,7 @@ def _status_for(count: int, warn_t: float | None, fail_t: float | None) -> str:
     return "pass"
 
 
-def evaluate_dbt_real_bdm(run_id: str, run_timestamp: str) -> list[dict]:
+def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     db_path = os.path.join(DUCKDB_RUNS_DIR, f"{run_id}.duckdb")
     # A single `dbt build` (build the model, then run its tests) instead of
     # separate `dbt run` + `dbt test` subprocess calls - dbt-core's fixed
@@ -212,7 +212,7 @@ def evaluate_dbt_real_bdm(run_id: str, run_timestamp: str) -> list[dict]:
 if __name__ == "__main__":
     from datetime import datetime, timezone
     for run_id in ["run_01_2026-09-01", "run_04_2026-09-04", "run_09_2026-09-09"]:
-        res = evaluate_dbt_real_bdm(run_id, datetime.now(timezone.utc).isoformat())
+        res = evaluate_dbt_bdm(run_id, datetime.now(timezone.utc).isoformat())
         print(f"--- {run_id} ---")
         for r in res:
             print(" ", r["column_name"], r["check_name"], r["status"], r["metric_value"], r["unit"])

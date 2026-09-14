@@ -1,7 +1,7 @@
 """
 Runs REAL dbt-core (dbt-duckdb adapter) against this project's actual
 dbt_project/ for the Child Protection collection - the CP counterpart to
-real_tools/bdm/run_dbt_real_bdm.py, scoped to the 6 stg_cp_* models and
+qa_tools/bdm/run_dbt_bdm.py, scoped to the 6 stg_cp_* models and
 their tests (PK unique/not_null, the 7 `relationships` tests, and the 3
 singular cross-table business-rule tests) rather than
 stg_birth_registrations, via `dbt build --select <the 6 CP models + the 3
@@ -10,10 +10,10 @@ selector, so this never accidentally pulls in (or silently skips) a
 birth-registrations test if the project's DAG shape changes later.
 
 Each run is pointed at its own single-run CP DuckDB file under
-data/cp_duckdb_runs/ (real_tools/cp/build_cp_warehouses.py) - same
-per-run-warehouse rationale as run_dbt_real_bdm.py's docstring.
+data/cp_duckdb_runs/ (qa_tools/cp/build_cp_warehouses.py) - same
+per-run-warehouse rationale as run_dbt_bdm.py's docstring.
 Subprocess invocation and manifest parsing are shared with
-run_dbt_real_bdm.py via real_tools/common/dbt_common.py - see
+run_dbt_bdm.py via qa_tools/common/dbt_common.py - see
 plans/wider.md #20.
 
 Which of the 6 CP tables a test result belongs to (for the dashboard's
@@ -30,7 +30,7 @@ import os
 
 import duckdb
 
-from real_tools.common.dbt_common import ENGINE_TAG, parse_threshold, run_dbt, test_nodes
+from qa_tools.common.dbt_common import ENGINE_TAG, parse_threshold, run_dbt, test_nodes
 from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -77,7 +77,7 @@ def _table_for_test(node: dict) -> str | None:
     return table if table in cp_common.TABLES else None
 
 
-def evaluate_dbt_real_cp(run_id: str, run_timestamp: str) -> list[dict]:
+def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
     db_path = os.path.join(CP_DUCKDB_RUNS_DIR, f"{run_id}.duckdb")
     # A single `dbt build` (build the 6 models, then run their tests)
     # instead of separate `dbt run` + `dbt test` calls - dbt-core's fixed
@@ -147,7 +147,7 @@ def evaluate_dbt_real_cp(run_id: str, run_timestamp: str) -> list[dict]:
 if __name__ == "__main__":
     from datetime import datetime, timezone
     for run_id in ["cp_run_01_2026-07-06", "cp_run_04_2026-07-27", "cp_run_09_2026-08-31"]:
-        res = evaluate_dbt_real_cp(run_id, datetime.now(timezone.utc).isoformat())
+        res = evaluate_dbt_cp(run_id, datetime.now(timezone.utc).isoformat())
         print(f"--- {run_id} ---")
         for r in res:
             if r["status"] != "pass":

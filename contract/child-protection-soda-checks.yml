@@ -5,7 +5,7 @@
 # rules in the contract-native vocabulary).
 #
 # Real SodaCL syntax, confirmed by actually running `soda scan` against a
-# real per-run CP warehouse (real_tools/build_cp_warehouses.py), not just
+# real per-run CP warehouse (qa_tools/cp/build_cp_warehouses.py), not just
 # written to look plausible - the two real tokens this file leans on:
 #   - a reference check: `values in (<fk column>) must exist in <parent
 #     table> (<parent column>)` - soda's own dedicated FK check type.
@@ -21,10 +21,11 @@
 # rather than split by "kind of check" the way this repo's comments might
 # otherwise group them.
 #
-# Usage (once you have Soda Core set up, one scan per run - see
-# real_tools/run_soda_real.py's docstring for why):
-#   soda scan -d cp_collection -c real_tools/soda_configuration.yml \
-#       contract/child-protection-soda-checks.yml
+# Usage: the pipeline runs this via Soda's Python Scan API, one scan per
+# run (qa_tools/cp/run_soda_cp.py - see its docstring for why one per
+# run). A direct `soda scan` CLI invocation would need its own
+# data-source config YAML pointed at a specific per-run warehouse file -
+# not kept in this repo since the CLI path isn't actually used here.
 
 checks for cp_clients:
   - row_count:

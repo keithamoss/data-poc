@@ -1,7 +1,7 @@
 """
 Runs REAL datacontract-cli against contract/child-protection-contract.yaml,
 once per run - the Child Protection counterpart to
-real_tools/bdm/run_datacontract_real_bdm.py.
+qa_tools/bdm/run_datacontract_bdm.py.
 
 Unlike Birth Registrations (one CSV per run), this contract has 6 schema
 objects, so the `local` server's `path` uses datacontract-cli's own
@@ -12,8 +12,8 @@ type: sql rules (the 7 FK checks, the 3 business rules) actually run: every
 schema object becomes a real view/table on one shared duckdb connection,
 so a rule on one model can genuinely join to another by its literal name.
 The "local_test" server construction and DataContract.test() call are
-shared with run_datacontract_real_bdm.py via
-real_tools/common/datacontract_common.py - see plans/wider.md #20.
+shared with run_datacontract_bdm.py via
+qa_tools/common/datacontract_common.py - see plans/wider.md #20.
 
 Each check result's dataset_id comes straight from `c.model` -
 datacontract-cli's own check objects already know which schema object
@@ -23,7 +23,7 @@ from __future__ import annotations
 import os
 import re
 
-from real_tools.common.datacontract_common import ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, run_against_local_server
+from qa_tools.common.datacontract_common import ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, run_against_local_server
 from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -72,7 +72,7 @@ def _custom_sql_label(description: str) -> str | None:
     return "Referential integrity"
 
 
-def evaluate_datacontract_real_cp(run_id: str, run_timestamp: str) -> list[dict]:
+def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
     run = run_against_local_server(CONTRACT_PATH, os.path.join(CP_RAW_DIR, run_id, "{model}.csv"))
 
     results = []
@@ -134,7 +134,7 @@ def evaluate_datacontract_real_cp(run_id: str, run_timestamp: str) -> list[dict]
 if __name__ == "__main__":
     from datetime import datetime, timezone
     for run_id in ["cp_run_01_2026-07-06", "cp_run_04_2026-07-27", "cp_run_09_2026-08-31"]:
-        res = evaluate_datacontract_real_cp(run_id, datetime.now(timezone.utc).isoformat())
+        res = evaluate_datacontract_cp(run_id, datetime.now(timezone.utc).isoformat())
         print(f"--- {run_id} ---")
         for r in res:
             if r["status"] != "pass":

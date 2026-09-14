@@ -49,7 +49,7 @@ not a schedule.
    birth-registrations pipeline's approach generalizes rather than being a
    one-off, and was the highest-value item on this list.
 
-3. **[todo, medium]** No CI. Nothing re-runs `real_tools/bdm/orchestrate_real_bdm.py`
+3. **[todo, medium]** No CI. Nothing re-runs `qa_tools/bdm/orchestrate_bdm.py`
    against upstream tool releases, so a `dbt-core`/`soda-core-duckdb`/
    `datacontract-cli`/`evidently` update could silently break this and we
    wouldn't know. A scheduled job (even a simple cron/GitHub Action) that
@@ -752,3 +752,53 @@ not a schedule.
     results respectively, zero differences. `uv run pytest` (19 tests,
     `tests/test_parallel_orchestrate.py`'s import updated to the new
     module path) and `uv run ruff check .` both clean.
+
+    **Follow-up, same day: dropped `_real` everywhere.** Keith noticed the
+    `_real` qualifier throughout (`real_tools/` itself,
+    `run_dbt_real_bdm.py`, `results_real.json`, the `ENGINE_TAG` values'
+    `"(real)"` suffix) only ever meant "genuinely ran the tool, not the
+    `engines/*.py` hand-written equivalent" - and that distinction has had
+    nothing to contrast against since `engines/*.py` was removed (action
+    18). Confirmed before touching anything: the dashboard's *separate*
+    `REAL_BIRTH_REG_DATA`/`REAL_CP_DATA`/"Real pipeline data" naming is a
+    different "real" (genuinely-computed rows vs. the illustrative mock
+    data still covering most of the dashboard) and was deliberately left
+    alone - not part of this cleanup.
+
+    Scoped via questions (dropping `ENGINE_TAG`'s `"(real)"` is
+    dashboard-visible - each check's note text - so worth confirming
+    before regenerating reports/re-embedding the dashboard; renaming
+    `real_tools/` itself is bigger again, since it touches the import
+    paths just built): both yes. Keith left the new package name to be
+    picked - went with `qa_tools/` (matches "QA reporting dashboard"/
+    "QA pipeline" language used throughout the docs already; avoids
+    `checks/`, which would collide in spirit with the existing
+    `contract/*-soda-checks.yml` naming).
+
+    What changed: `real_tools/` -> `qa_tools/`; every `_real_bdm.py`/
+    `_real_cp.py` file -> `_bdm.py`/`_cp.py` (`run_dbt_bdm.py`,
+    `orchestrate_cp.py`, etc.); every `evaluate_*_real_bdm`/
+    `run_real_pipeline` function -> `evaluate_*_bdm`/`run_pipeline`
+    (same pattern for `_cp`); `reports/results_real.json`/
+    `results_real_cp.json` -> `results_bdm.json`/`results_cp.json`; all
+    four `ENGINE_TAG` values lost their `"(real)"` suffix (`"dbt-core
+    1.12 + dbt-duckdb"` etc.) - which meant updating `ENGINE_SHORT`'s
+    dict keys in both `build_dashboard_data.py`/`build_cp_dashboard_data
+    .py` to match, and regenerating `reports/*.json` + re-embedding the
+    dashboard HTML so the new tag text actually reaches it. Also fixed:
+    `build_cp_dashboard_data.py`'s `sys.path.insert(..., "real_tools")`
+    + flat `import cp_common` (would have broken outright once
+    `real_tools/` stopped existing) now does `from qa_tools.cp import
+    cp_common` instead; a couple of stale `real_tools/soda_configuration
+    .yml` mentions left behind in `contract/child-protection-soda-checks
+    .yml`'s usage comment from that file's earlier deletion (action 20's
+    first round) were also caught and fixed here, not before.
+
+    Verified the same way as the first round: both orchestration scripts
+    re-run end to end, this time diffed against the pre-rename output
+    with an explicit exception for the field that was *supposed* to
+    change - every `engine` string (and the `note` text
+    `build_dashboard_data.py`/`build_cp_dashboard_data.py` derive from
+    it) lost its `"(real)"` suffix, confirmed as the *only* difference;
+    every other field, byte-for-byte identical. `uv run pytest`/
+    `uv run ruff check .` both clean.

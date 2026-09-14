@@ -38,10 +38,10 @@ nothing here is a hand-rolled stand-in:
 
 | Tool | What's real | What runs it |
 |---|---|---|
-| **datacontract-cli** | `contract/bdm-birth-registrations-contract.yaml` is a genuine ODCS v3.2.0 contract — `datacontract lint` passes on it. | `real_tools/bdm/run_datacontract_real_bdm.py` runs the actual `datacontract-cli` Python API (`DataContract.test()`) against each run's raw CSV via a `local` server. |
-| **Soda Core** | `contract/bdm-birth-registrations-soda-checks.yml` is genuine SodaCL. | `real_tools/bdm/run_soda_real_bdm.py` runs the real `soda-core` `Scan` API against a per-run DuckDB warehouse. |
-| **dbt-core** | `dbt_project/` is a real dbt project — `dbt_project.yml`, a staging model, `schema.yml` with real generic tests and severity config. | `real_tools/bdm/run_dbt_real_bdm.py` shells out to the real `dbt` CLI (`dbt build`, dbt-duckdb adapter) against a per-run DuckDB warehouse. |
-| **Evidently AI** | Population Stability Index (PSI) on the `sex` column vs. a reference run. | `real_tools/bdm/run_evidently_real_bdm.py` runs the real `evidently.Report` + `DataDriftPreset` (the current 0.7.x API). |
+| **datacontract-cli** | `contract/bdm-birth-registrations-contract.yaml` is a genuine ODCS v3.2.0 contract — `datacontract lint` passes on it. | `qa_tools/bdm/run_datacontract_bdm.py` runs the actual `datacontract-cli` Python API (`DataContract.test()`) against each run's raw CSV via a `local` server. |
+| **Soda Core** | `contract/bdm-birth-registrations-soda-checks.yml` is genuine SodaCL. | `qa_tools/bdm/run_soda_bdm.py` runs the real `soda-core` `Scan` API against a per-run DuckDB warehouse. |
+| **dbt-core** | `dbt_project/` is a real dbt project — `dbt_project.yml`, a staging model, `schema.yml` with real generic tests and severity config. | `qa_tools/bdm/run_dbt_bdm.py` shells out to the real `dbt` CLI (`dbt build`, dbt-duckdb adapter) against a per-run DuckDB warehouse. |
+| **Evidently AI** | Population Stability Index (PSI) on the `sex` column vs. a reference run. | `qa_tools/bdm/run_evidently_bdm.py` runs the real `evidently.Report` + `DataDriftPreset` (the current 0.7.x API). |
 
 `pyproject.toml` lists the exact package set verified to install and run
 together. It includes a real, documented conflict: `soda-core-duckdb`
@@ -92,45 +92,45 @@ generator/
                                kept in sync with synthetic-data-generator/dirty.py (see its docstring)
 dbt_project/                 a real (if minimal) dbt project — dbt_project.yml, a staging model,
                                schema.yml with genuine two-tier severity config
-real_tools/                  runs the actual dbt/soda/datacontract-cli/evidently tools - a proper Python
-                               package now (real_tools/__init__.py etc.), one subpackage per dataset plus
+qa_tools/                    runs the actual dbt/soda/datacontract-cli/evidently tools - a proper Python
+                               package now (qa_tools/__init__.py etc.), one subpackage per dataset plus
                                a common/ of tool-generic code shared between them (see "Code layout" below)
   dbt_profiles/profiles.yml     dbt-duckdb connection profile (no secrets - just a path) - shared by both
                                datasets, since there's one dbt_project/
   common/
     parallel_orchestrate.py       generic parallel-or-sequential dispatch across a manifest, shared by
-                                 orchestrate_real_bdm.py and orchestrate_real_cp.py - see "Speed" below
+                                 orchestrate_bdm.py and orchestrate_cp.py - see "Speed" below
     dbt_common.py, soda_common.py, datacontract_common.py, evidently_common.py
                                    tool-generic subprocess/API invocation + parsing, shared by each tool's
                                  bdm/cp pair - see "Code layout" below
   bdm/
     build_per_run_warehouses.py   one DuckDB file per run, for dbt/Soda to connect to
-    run_dbt_real_bdm.py            shells out to the real `dbt` CLI
-    run_soda_real_bdm.py           runs the real soda-core Scan API
-    run_datacontract_real_bdm.py   runs the real datacontract-cli Python API
-    run_evidently_real_bdm.py      runs the real evidently.Report + DataDriftPreset
-    orchestrate_real_bdm.py        all four, across every run (parallel by default) -> reports/results_real.json
+    run_dbt_bdm.py            shells out to the real `dbt` CLI
+    run_soda_bdm.py           runs the real soda-core Scan API
+    run_datacontract_bdm.py   runs the real datacontract-cli Python API
+    run_evidently_bdm.py      runs the real evidently.Report + DataDriftPreset
+    orchestrate_bdm.py        all four, across every run (parallel by default) -> reports/results_bdm.json
   cp/
     cp_common.py                   shared agency/collection/dataset id constants for the 6 CP scripts below
     build_cp_warehouses.py         one DuckDB file per CP snapshot run, all 6 tables under a `raw` schema
-    run_dbt_real_cp.py, run_soda_real_cp.py, run_datacontract_real_cp.py, run_evidently_real_cp.py
+    run_dbt_cp.py, run_soda_cp.py, run_datacontract_cp.py, run_evidently_cp.py
                                     the CP counterparts to the 4 bdm/ real-tool scripts above
-    orchestrate_real_cp.py         all four, across every CP run (parallel by default) -> reports/results_real_cp.json
+    orchestrate_cp.py         all four, across every CP run (parallel by default) -> reports/results_cp.json
 pipeline/
   load.py                       loads every generated run into one combined DuckDB table (still needed -
                                build_dashboard_data.py's own direct queries, e.g. the sex value-count
-                               chart, run against it; real_tools/ builds its own separate per-run warehouses)
-  orchestrate.py                generate -> load the combined warehouse (real_tools/bdm/orchestrate_real_bdm.py
+                               chart, run against it; qa_tools/ builds its own separate per-run warehouses)
+  orchestrate.py                generate -> load the combined warehouse (qa_tools/bdm/orchestrate_bdm.py
                                is the next step, run separately - see run_pipeline.sh)
-  build_dashboard_data.py       reshapes results_real.json into the dashboard's data shape
-  build_cp_dashboard_data.py    reshapes results_real_cp.json into 6 datasets' worth of dashboard data
+  build_dashboard_data.py       reshapes results_bdm.json into the dashboard's data shape
+  build_cp_dashboard_data.py    reshapes results_cp.json into 6 datasets' worth of dashboard data
 dashboard/
   qa-reporting-dashboard.html   the 3-tier QA dashboard, with Birth Registrations and the whole Child
                                Protection collection wired to real data
   embed_dashboard_data.py       re-embeds both real datasets (REAL_BIRTH_REG_DATA, REAL_CP_DATA) into the HTML
 data/                          generated - raw run CSVs, manifest.json, warehouse.duckdb, duckdb_runs/,
                                cp_raw/, cp_duckdb_runs/ (not checked in)
-reports/                       generated - results_real.json, results_real_cp.json,
+reports/                       generated - results_bdm.json, results_cp.json,
                                birth_registrations_dashboard.json, child_protection_dashboard.json
                                (not checked in)
 run_pipeline.sh                runs the whole real-tools pipeline end to end
@@ -157,8 +157,8 @@ a codebase ready for a full opinionated linter pass.
 
 ## Speed
 
-`real_tools/bdm/orchestrate_real_bdm.py`/`real_tools/cp/orchestrate_real_cp.py`
-run their manifest's runs **in parallel by default** (`real_tools/common/
+`qa_tools/bdm/orchestrate_bdm.py`/`qa_tools/cp/orchestrate_cp.py`
+run their manifest's runs **in parallel by default** (`qa_tools/common/
 parallel_orchestrate.py`, one process per CPU core via `os.cpu_count()`)
 — measured, not estimated: Birth Registrations' 15-run manifest went from
 2m35s sequential to **45s** (3.4x); Child Protection's 10-run manifest
@@ -172,7 +172,7 @@ affected either way, it just calls them) if you need to debug a specific
 run — parallel workers interleave their print output and stack traces,
 which makes chasing down one run's problem harder than it needs to be.
 A single run's real-tool failure aborts the whole batch either way (no
-partial `results_real*.json` ever gets written), matching the original
+partial `results_*.json` ever gets written), matching the original
 sequential behaviour.
 
 See `plans/performance.md` for the full timing investigation, including
@@ -215,7 +215,7 @@ Protection collection (see below) is untouched: the same illustrative,
 browser-fabricated mock data as before, still clearly labeled as such in
 the footer. Each real column's drawer shows every check that actually ran
 on it — real dbt-core, Soda Core, datacontract-cli, and Evidently checks
-side by side, straight from `reports/results_real.json` — e.g. `sex` shows
+side by side, straight from `reports/results_bdm.json` — e.g. `sex` shows
 Soda's `invalid_percent`, the contract's `invalidValues`, dbt's
 `accepted_values`, Soda's scoped last-24h check, *and* Evidently's PSI, all
 computed independently against the same real data, so you can see where
@@ -240,7 +240,7 @@ never built to do.
 
 ```bash
 python3 generator/generate_cp_runs.py            # -> data/cp_raw/ (10 weekly snapshots)
-python3 -m real_tools.cp.orchestrate_real_cp     # -> reports/results_real_cp.json
+python3 -m qa_tools.cp.orchestrate_cp            # -> reports/results_cp.json
 python3 pipeline/build_cp_dashboard_data.py      # -> reports/child_protection_dashboard.json
 python3 dashboard/embed_dashboard_data.py        # re-embeds BOTH real datasets into the HTML
 ```
@@ -340,9 +340,9 @@ held from the original equivalent-only build.
   partial parsing, forcing `--store-failures`, and substituting `SUM` for
   `COUNT` — none of it was the cause, and no SQL-level explanation was
   found despite extensive isolation (documented in `schema.yml` and
-  `real_tools/bdm/run_dbt_real_bdm.py`). The two affected tests now use
+  `qa_tools/bdm/run_dbt_bdm.py`). The two affected tests now use
   absolute row-count thresholds instead of a computed percentage, and
-  `run_dbt_real_bdm.py` independently re-verifies both tests' result via a
+  `run_dbt_bdm.py` independently re-verifies both tests' result via a
   direct query against the same warehouse dbt just tested, rather than
   trust a demonstrated-unreliable number — dbt-core still genuinely runs
   the real check; only the two known-unreliable numbers are cross-checked.
@@ -396,11 +396,11 @@ held from the original equivalent-only build.
   single value violate a rule") — not a miscalibration.
 - **A single warn/fail threshold can't represent every real rule shape.**
   ODCS severity is single-tier (a rule is either strictly pass/fail, or
-  pass/warn-only, never a three-way band) — `run_datacontract_real_bdm.py`
+  pass/warn-only, never a three-way band) — `run_datacontract_bdm.py`
   encodes that into the dashboard's two-threshold shape as warn==fail
   (error severity) or an unreachable fail ceiling (warning/info severity).
   Soda's `row_count` check is a genuine two-sided range (too few *or* too
-  many rows); `run_soda_real_bdm.py`'s threshold handling reduces it to the
+  many rows); `run_soda_bdm.py`'s threshold handling reduces it to the
   upper bound only for display, and this is the one place where a piece
   of real information (the lower bound) is dropped for the sake of a
   single scalar.

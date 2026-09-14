@@ -1,7 +1,7 @@
 version: 2
 
 # Real dbt generic-test syntax, run for real by `dbt test` (dbt-core 1.12 +
-# dbt-duckdb) via real_tools/run_dbt_real.py.
+# dbt-duckdb) via qa_tools/bdm/run_dbt_bdm.py.
 #
 # Several things below aren't what a plausible-looking first draft of this
 # file assumed - each only found by actually running `dbt test`:
@@ -30,7 +30,7 @@ version: 2
 #    none of it was the cause, and no SQL-level explanation was found
 #    despite extensive isolation. The two tests below use absolute
 #    row-count thresholds instead of a computed percentage as a result,
-#    and real_tools/run_dbt_real.py independently re-verifies both tests'
+#    and qa_tools/bdm/run_dbt_bdm.py independently re-verifies both tests'
 #    result via a direct query against the same warehouse dbt just tested,
 #    rather than trust a demonstrated-unreliable number.
 #
@@ -41,7 +41,7 @@ version: 2
 # now exists below, on the 6 Child Protection staging models - real dbt
 # generic-test syntax (`relationships: {to: ref('...'), field: ...}`),
 # confirmed by actually running `dbt test` against a real per-run CP
-# warehouse (real_tools/build_cp_warehouses.py). All 7 pass on every run,
+# warehouse (qa_tools/cp/build_cp_warehouses.py). All 7 pass on every run,
 # dirty or clean: generator/dirty.py's placement/investigation presets
 # reassign a placement's carer_id to a still-real (just non-Approved)
 # carer, and null an investigation's end_date - neither ever points a FK

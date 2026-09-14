@@ -2,15 +2,15 @@
 # so this is committed rather than gitignored like a normal profiles.yml
 # with credentials would be.
 #
-# DBT_DB_PATH is set per-invocation by real_tools/bdm/run_dbt_real_bdm.py
-# (or real_tools/cp/run_dbt_real_cp.py), pointed at either the combined
+# DBT_DB_PATH is set per-invocation by qa_tools/bdm/run_dbt_bdm.py
+# (or qa_tools/cp/run_dbt_cp.py), pointed at either the combined
 # data/warehouse.duckdb or one of the per-run data/duckdb_runs/<run_id>
 # .duckdb files - see that file's docstring for why dbt is run once per
 # run rather than once against the combined warehouse. This one profile
 # is shared by both datasets (one dbt_project/), even though its name
 # ("birth_registrations") predates Child Protection being added.
 #
-# Usage: dbt run --profiles-dir real_tools/dbt_profiles --project-dir dbt_project
+# Usage: dbt run --profiles-dir qa_tools/dbt_profiles --project-dir dbt_project
 birth_registrations:
   target: dev
   outputs:

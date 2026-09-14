@@ -6,10 +6,10 @@ reimplementation, this hands the real SodaCL file to the real soda-core
 engine and reads back its own scan results.
 
 Run once per run against its own per-run DuckDB file (same rationale as
-real_tools/bdm/run_dbt_real_bdm.py - the checks file has no run_id-scoped
+qa_tools/bdm/run_dbt_bdm.py - the checks file has no run_id-scoped
 `where`, so the daily-batch reality is one file per day, one scan per
-day). Threshold parsing shared with run_soda_real_cp.py via
-real_tools/common/soda_common.py - see plans/wider.md #20.
+day). Threshold parsing shared with run_soda_cp.py via
+qa_tools/common/soda_common.py - see plans/wider.md #20.
 
 Genuine, real finding from actually running this (documented in README.md,
 not "fixed" away): the `filter birth_registrations [recent]: where:
@@ -27,7 +27,7 @@ import os
 
 import duckdb
 
-from real_tools.common.soda_common import ENGINE_TAG, threshold
+from qa_tools.common.soda_common import ENGINE_TAG, threshold
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 SODA_CHECKS_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-soda-checks.yml")
@@ -41,7 +41,7 @@ DATASET_ID = "birth-registrations"
 # "failed rows" checks (extract_timestamp ordering, the multiple-birth
 # sibling match) have no natural `column` of their own to report - Soda
 # scopes them to the whole table, same class of gap
-# run_datacontract_real_cp.py solves for datacontract-cli's table-level
+# run_datacontract_cp.py solves for datacontract-cli's table-level
 # type: sql rules. Routed here by the check's own custom `name:` (the only
 # stable identifier a "failed rows" check carries) to the column each rule
 # is actually about, so it lands on a real column tile instead of falling
@@ -88,7 +88,7 @@ _CUSTOM_CHECK_DIMENSION = {
 }
 
 
-def evaluate_soda_real_bdm(run_id: str, run_timestamp: str) -> list[dict]:
+def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     from soda.scan import Scan
 
     db_path = os.path.join(DUCKDB_RUNS_DIR, f"{run_id}.duckdb")
@@ -185,7 +185,7 @@ def evaluate_soda_real_bdm(run_id: str, run_timestamp: str) -> list[dict]:
 if __name__ == "__main__":
     from datetime import datetime, timezone
     for run_id in ["run_01_2026-09-01", "run_04_2026-09-04", "run_09_2026-09-09"]:
-        res = evaluate_soda_real_bdm(run_id, datetime.now(timezone.utc).isoformat())
+        res = evaluate_soda_bdm(run_id, datetime.now(timezone.utc).isoformat())
         print(f"--- {run_id} ---")
         for r in res:
             print(" ", r["column_name"], r["check_name"], r["status"], r["metric_value"], r["unit"])

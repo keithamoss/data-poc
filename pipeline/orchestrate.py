@@ -14,7 +14,7 @@ the full history.
 What's left here is still a real prerequisite, not a leftover: this
 combined warehouse (one `birth_registrations` table, tagged by run_id) is
 what pipeline/build_dashboard_data.py's own direct DuckDB queries (e.g.
-the sex value-count chart) run against - real_tools/orchestrate_real.py
+the sex value-count chart) run against - qa_tools/bdm/orchestrate_bdm.py
 builds its own separate PER-RUN warehouses for dbt/Soda to connect to,
 but doesn't build this combined one.
 """

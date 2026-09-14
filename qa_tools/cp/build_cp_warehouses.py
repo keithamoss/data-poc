@@ -2,7 +2,7 @@
 Builds one DuckDB file per Child Protection snapshot run under
 data/cp_duckdb_runs/<run_id>.duckdb, each containing that run's 6 tables
 under a `raw` schema - the Child Protection counterpart to
-real_tools/bdm/build_per_run_warehouses.py, for the same reason: dbt's
+qa_tools/bdm/build_per_run_warehouses.py, for the same reason: dbt's
 source config and the Soda checks file both refer to bare table names
 with no run_id-scoped `where`, so a real per-run `dbt test` / `soda scan`
 result needs its own physical warehouse, one per periodic extract.

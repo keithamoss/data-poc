@@ -1,13 +1,13 @@
 """
-Tool-generic Soda Core helpers, shared by real_tools/bdm/run_soda_real_bdm.py
-and real_tools/cp/run_soda_real_cp.py. The actual check-to-dashboard-field
+Tool-generic Soda Core helpers, shared by qa_tools/bdm/run_soda_bdm.py
+and qa_tools/cp/run_soda_cp.py. The actual check-to-dashboard-field
 mapping (dimension/label per check, custom-name handling) is genuinely
 different per dataset and stays in each dataset's own file - see
 plans/wider.md #20.
 """
 from __future__ import annotations
 
-ENGINE_TAG = "Soda Core 3.5 (real)"
+ENGINE_TAG = "Soda Core 3.5"
 
 
 def threshold(spec: dict | None) -> float | None:

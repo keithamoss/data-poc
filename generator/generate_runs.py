@@ -32,7 +32,7 @@ docs/synthetic-data-generation-tools-research.md) only has to implement a
 new DatasetProvider, not touch the resupply logic at all.
 
 Scope, deliberately: this is a GENERATOR-LAYER change only.
-real_tools/*.py, both dashboard builders, and the dashboard UI all still
+qa_tools/*/*.py, both dashboard builders, and the dashboard UI all still
 assume "one manifest entry = one calendar day" and have NOT been updated
 to understand attempt chains - that mismatch is intentional (see
 plans/wider.md's synthetic-data-realism item), left as the concrete input

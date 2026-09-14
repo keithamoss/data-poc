@@ -1,6 +1,6 @@
 """
 Tool-generic dbt-core invocation and manifest-parsing helpers, shared by
-real_tools/bdm/run_dbt_real_bdm.py and real_tools/cp/run_dbt_real_cp.py.
+qa_tools/bdm/run_dbt_bdm.py and qa_tools/cp/run_dbt_cp.py.
 The actual test-to-dashboard-field mapping (which tests exist, what
 dimension/label each one gets, any tool-reliability workarounds a
 dataset needed) is genuinely different per dataset and stays in each
@@ -15,7 +15,7 @@ import os
 import re
 import subprocess
 
-ENGINE_TAG = "dbt-core 1.12 + dbt-duckdb (real)"
+ENGINE_TAG = "dbt-core 1.12 + dbt-duckdb"
 
 _NUM_RE = re.compile(r"([\d.]+)")
 

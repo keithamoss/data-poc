@@ -4,11 +4,11 @@ Child Protection collection's traffic-light demo column - dirty.py's
 apply_cp_notifications_presets is the only preset that touches it, the
 same role sex plays for Birth Registrations) vs. the first clean run as
 reference - the Child Protection counterpart to
-real_tools/bdm/run_evidently_real_bdm.py.
+qa_tools/bdm/run_evidently_bdm.py.
 
 Same real evidently.Report + evidently.presets.DataDriftPreset API, same
 per-distinct-observed-value PSI binning behaviour documented there. PSI
-computation shared via real_tools/common/evidently_common.py - see
+computation shared via qa_tools/common/evidently_common.py - see
 plans/wider.md #20.
 """
 from __future__ import annotations
@@ -16,7 +16,7 @@ import os
 
 import pandas as pd
 
-from real_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, status_for_psi, compute_psi
+from qa_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, status_for_psi, compute_psi
 from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -27,7 +27,7 @@ DATASET_ID = cp_common.TABLE_DATASET_ID["cp_notifications"]
 REFERENCE_RUN_ID = "cp_run_01_2026-07-06"
 
 
-def evaluate_evidently_real_cp(run_id: str, run_timestamp: str,
+def evaluate_evidently_cp(run_id: str, run_timestamp: str,
                                 reference_run_id: str = REFERENCE_RUN_ID) -> list[dict]:
     reference = pd.read_csv(os.path.join(CP_RAW_DIR, reference_run_id, "cp_notifications.csv"))[["concern_type"]]
     current = pd.read_csv(os.path.join(CP_RAW_DIR, run_id, "cp_notifications.csv"))[["concern_type"]]
@@ -66,6 +66,6 @@ if __name__ == "__main__":
     with open(os.path.join(CP_RAW_DIR, "manifest.json")) as f:
         manifest = json.load(f)
     for entry in manifest:
-        res = evaluate_evidently_real_cp(entry["run_id"], datetime.now(timezone.utc).isoformat())
+        res = evaluate_evidently_cp(entry["run_id"], datetime.now(timezone.utc).isoformat())
         r = res[0]
         print(f"{entry['run_id']:25s} PSI={r['metric_value']}  status={r['status']:5s}")

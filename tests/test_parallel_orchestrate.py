@@ -1,4 +1,4 @@
-"""Tests for real_tools/common/parallel_orchestrate.py's generic dispatch
+"""Tests for qa_tools/common/parallel_orchestrate.py's generic dispatch
 logic, using fast stub workers rather than the real tools (which are
 explicitly out of pytest's scope - see tests/test_build_dashboard_data.py's
 own docstring). Covers the two behavioural guarantees Keith specifically
@@ -11,7 +11,7 @@ import time
 
 import pytest
 
-from real_tools.common.parallel_orchestrate import run_manifest
+from qa_tools.common.parallel_orchestrate import run_manifest
 
 MANIFEST = [{"run_id": f"run_{i:02d}"} for i in range(6)]
 

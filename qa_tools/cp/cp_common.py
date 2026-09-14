@@ -1,7 +1,7 @@
 """
 Shared constants for the Child Protection real-tool scripts
-(run_dbt_real_cp.py, run_soda_real_cp.py, run_datacontract_real_cp.py,
-run_evidently_real_cp.py, orchestrate_real_cp.py, and
+(run_dbt_cp.py, run_soda_cp.py, run_datacontract_cp.py,
+run_evidently_cp.py, orchestrate_cp.py, and
 pipeline/build_cp_dashboard_data.py) - kept in one place so the
 agency/collection/dataset id scheme can't drift between the four tools'
 scripts the way copy-pasting it four times would risk.

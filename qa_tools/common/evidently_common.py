@@ -1,14 +1,14 @@
 """
 Tool-generic Evidently PSI-drift computation, shared by
-real_tools/bdm/run_evidently_real_bdm.py and
-real_tools/cp/run_evidently_real_cp.py. The actual reference run,
+qa_tools/bdm/run_evidently_bdm.py and
+qa_tools/cp/run_evidently_cp.py. The actual reference run,
 comparison column, and any dataset-specific extra checks (e.g. birth
 registrations' row-count-growth check, which Child Protection doesn't
 have) stay in each dataset's own file - see plans/wider.md #20.
 """
 from __future__ import annotations
 
-ENGINE_TAG = "Evidently 0.7 (real)"
+ENGINE_TAG = "Evidently 0.7"
 
 # same pass/warn/fail bands both existing datasets use, applied to the
 # real PSI value Evidently computes - Evidently's own DataDriftPreset only

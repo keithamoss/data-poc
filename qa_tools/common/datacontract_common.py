@@ -1,7 +1,7 @@
 """
 Tool-generic datacontract-cli helpers, shared by
-real_tools/bdm/run_datacontract_real_bdm.py and
-real_tools/cp/run_datacontract_real_cp.py. Constructing an in-memory
+qa_tools/bdm/run_datacontract_bdm.py and
+qa_tools/cp/run_datacontract_cp.py. Constructing an in-memory
 contract copy with a "local_test" server added and calling
 DataContract.test() is identical regardless of dataset; only which
 contract file and which local CSV path get used differs.
@@ -15,7 +15,7 @@ import copy
 
 import yaml
 
-ENGINE_TAG = "datacontract-cli 1.2.0 (real)"
+ENGINE_TAG = "datacontract-cli 1.2.0"
 
 DIMENSION_BY_METRIC = {
     "missing_count": "completeness",

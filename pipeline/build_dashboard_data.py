@@ -1,5 +1,5 @@
 """
-Reshapes reports/results_real.json (real_tools/orchestrate_real.py's real,
+Reshapes reports/results_bdm.json (qa_tools/bdm/orchestrate_bdm.py's real,
 computed check output - actual dbt-core/Soda Core/datacontract-cli/
 Evidently runs) into the exact JSON shape the QA reporting dashboard's
 drawer/chart code expects for a dataset - the "reskin the same 3-tier
@@ -10,13 +10,13 @@ This does NOT touch the dashboard's rendering code or its other 14
 datasets (Death/Marriage Registrations and everything outside Registry
 Services) - those stay the existing illustrative mock, clearly labeled as
 such. Only Birth Registrations' columns/checks/stats are replaced, with
-every number traceable back to a real tool run in real_tools/*.py.
+every number traceable back to a real tool run in qa_tools/bdm/*.py.
 
 Previously merged this with reports/results.json, the output of a set of
 four hand-written equivalent check engines (engines/*.py) built when the
 original session had no PyPI access. Those engines were removed once that
 constraint no longer applied and they'd drifted out of sync with newer
-checks that were only ever built real-tools-only - results_real.json
+checks that were only ever built real-tools-only - results_bdm.json
 alone is now a complete superset (824 checks vs. the old equivalent
 path's 630), so the merge logic is gone too. See plans/wider.md's
 repo-tidy-up entries for the full history.
@@ -33,17 +33,19 @@ import duckdb
 from dashboard_check_labels import rank_for_headline, display_name
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
-REAL_RESULTS_PATH = os.path.join(ROOT, "reports", "results_real.json")
+REAL_RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
 DB_PATH = os.path.join(ROOT, "data", "warehouse.duckdb")
 OUT_PATH = os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")
 
 ENGINE_SHORT = {
     # Same short-name convention as build_cp_dashboard_data.py's own
-    # ENGINE_SHORT for these 4 tags.
-    "dbt-core 1.12 + dbt-duckdb (real)": "dbt-core",
-    "Soda Core 3.5 (real)": "Soda Core",
-    "datacontract-cli 1.2.0 (real)": "datacontract-cli",
-    "Evidently 0.7 (real)": "Evidently AI",
+    # ENGINE_SHORT for these 4 tags. No "(real)" suffix on the tag itself
+    # any more - there's nothing left to distinguish it from since
+    # engines/*.py was removed (see plans/wider.md #20's follow-up).
+    "dbt-core 1.12 + dbt-duckdb": "dbt-core",
+    "Soda Core 3.5": "Soda Core",
+    "datacontract-cli 1.2.0": "datacontract-cli",
+    "Evidently 0.7": "Evidently AI",
 }
 
 COLUMN_META = {
@@ -231,7 +233,7 @@ def build() -> dict:
         "prevRowCount": prev_entry["n_rows_generated"],
         "runs": manifest,
         "columns": columns_out,
-        "_provenance": "Computed by real_tools/orchestrate_real.py - actual dbt-core, Soda Core, datacontract-cli "
+        "_provenance": "Computed by qa_tools/bdm/orchestrate_bdm.py - actual dbt-core, Soda Core, datacontract-cli "
                         "and Evidently runs against real generated CSVs, the real ODCS contract, the real Soda "
                         "checks YAML, and a real dbt schema.yml — see README.md.",
     }
