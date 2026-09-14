@@ -420,3 +420,16 @@ not a schedule.
     its literal column spec, rather than either side hand-authoring
     independently). Worth scoping properly rather than picking blind -
     revisit alongside actions 11/13's generator work, not in isolation.
+
+16. **[parked]** Keith wants to give a dedicated walkthrough of *why* this
+    project exists and its actual goals, once the current loop of smaller
+    follow-ups winds down - explicitly so future analysis/recommendations
+    here are better informed by that context rather than inferred
+    piecemeal from individual requests. Nothing to do yet - revisit when
+    he raises it.
+
+17. **[parked]** Give this project a cute/proper name, rather than just
+    "data-poc." Not scoped - no constraints given yet on tone, whether it
+    should be an acronym/backronym tied to the actual subject matter
+    (birth registrations, multi-agency data, WA government), or purely
+    playful. Revisit when it comes up again.
