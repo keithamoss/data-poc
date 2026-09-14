@@ -78,32 +78,48 @@ separate subprocess calls (`dbt run` then `dbt test`).
    setup? something reducible without changing what's tested?) — lower
    confidence this pays off, needs investigation before it needs code.
 
-4. **[open, medium]** Parallelize across the now-15 independent runs
+4. **[done, medium]** Parallelize across the independent runs
    (multiprocessing — each run is its own isolated DuckDB file, no shared
-   mutable state between runs by design). Not a small change: dbt writes
-   to a shared `dbt_project/target/` directory by default, so concurrent
-   `dbt build` invocations for *different* runs would clobber each
-   other's `manifest.json`/`run_results.json` mid-write unless each
-   parallel worker is given its own `--target-path`.
-   **Empirically tested for Birth Registrations (2026-09-14), correcting
-   the "theoretically up to ~10x, realistically 3-5x" estimate above**,
-   which was never actually measured. Couldn't safely test dbt included
-   (the `target/` collision above would corrupt results, not just give a
-   noisy number), so tested Soda + datacontract-cli + Evidently only,
-   4 runs across 4 worker processes on this machine's 4 cores: sequential
-   27.57s -> parallel **12.46s wall-clock - a real 2.2x speedup**, but
-   with genuine contention visible (each run's own duration went from
-   5-10s to 10.5-12s under load - parallel workers compete for the same
-   cores/disk, they don't get a free ride). Extrapolating that measured
-   ratio to the full pipeline (dbt included, reasoned rather than
-   measured - it's a subprocess competing for the same resources, likely
-   similar behaviour once the `target/` fix exists): the current 2m36s
-   (155.8s) sequential run would land around **60-80s, roughly 2-2.5x**,
-   not the un-measured 3-5x guess. Still a real, worthwhile win if this
-   becomes a frequently-run CI job (`plans/wider.md` action 3); the
-   original "probably not worth it for occasional local/manual runs"
-   call still holds, maybe more so now that the realistic ceiling is
-   lower than first guessed.
+   mutable state between runs by design). Scoped via questions first
+   (2026-09-14): both `orchestrate_real.py` and `orchestrate_real_cp.py`
+   together (shared implementation, `real_tools/parallel_orchestrate.py`)
+   rather than Birth Registrations alone; a worker failure aborts the
+   whole batch (matches the original sequential behaviour - no partial
+   `results_real*.json` ever gets written); a `--sequential` flag kept
+   for easier debugging (parallel workers interleave print output/stack
+   traces); worker count dynamic (`os.cpu_count()`), not hardcoded to
+   this session's specific 4-core VM.
+
+   The real blocker this item always named - dbt writes to a shared
+   `dbt_project/target/` directory by default, so concurrent `dbt build`
+   calls for different runs would clobber each other's `manifest.json`/
+   `run_results.json` mid-write - is fixed: `run_dbt_real.py`/
+   `run_dbt_real_cp.py` now pass `--target-path <run_id>` per run,
+   applied unconditionally (safe and free even sequentially, not just
+   under parallel execution).
+
+   **Measured end to end, not the earlier extrapolated 60-80s guess**:
+   - Birth Registrations (15 runs): 2m35s sequential -> **45s parallel -
+     a real 3.4x**.
+   - Child Protection (10 runs): 1m52s sequential -> **36s parallel - a
+     real 3.1x**.
+   - Both beat the corrected 2-2.5x extrapolation above - dbt (a
+     subprocess, not Python-GIL-bound) parallelizes at least as well as
+     the three in-process tools did in the smaller 4-run test that
+     extrapolation was based on.
+   - Output verified byte-for-byte identical to sequential for both
+     (every field except the run-timestamp), not just same check counts -
+     confirms the `--target-path` fix and manifest-order reassembly are
+     both correct, not just fast.
+   - `tests/test_parallel_orchestrate.py` covers the dispatch logic
+     itself (manifest-order preservation regardless of completion order,
+     abort-on-failure) with fast stub workers - real-tool integration
+     stays out of pytest's scope per its own established boundary.
+
+   Given the real numbers landed better than estimated, and CI wasn't
+   even required to make this worthwhile, the original "probably not
+   worth it for occasional local/manual runs" framing turned out wrong -
+   worth having by default regardless of how often this actually runs.
 
 5. **[open, low]** Smaller-scope parallelism: within a single run, run
    the dbt subprocess concurrently with the three in-process Python calls
@@ -123,9 +139,12 @@ separate subprocess calls (`dbt run` then `dbt test`).
    bottleneck is dbt-core and datacontract-cli specifically, not "the
    four tools' sum." Threading dbt concurrently with the other three
    would overlap dbt's ~5s against datacontract-cli's ~6s instead of
-   summing them - **per-run time ~11s -> ~6s, roughly 5s/run saved, ~75s
-   across the current 15-run manifest (measured 2m36s full run -> an
-   estimated ~1m20-30s)** - a ~45-50% cut, larger than "smaller win than
-   #4" suggested. Still real engineering (thread-safety of the Python API
-   calls, correctly collecting/ordering results), but worth revisiting
-   the low-priority tag given the corrected number.
+   summing them - per-run time ~11s -> ~6s, roughly 5s/run saved, ~75s
+   across the 15-run manifest (an estimated ~1m20-30s) - a ~45-50% cut,
+   larger than "smaller win than #4" suggested at the time.
+   **Superseded**: #4 was then actually built and measured at 45s for
+   the same 15-run manifest - a bigger win than this item's own estimate,
+   for less engineering (no thread-safety concerns, since separate
+   processes rather than threads sharing one interpreter). Not worth
+   doing on top of #4 now - staying `[open, low]` only as a record of
+   the analysis, no longer an active candidate.

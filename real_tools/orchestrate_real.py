@@ -5,6 +5,15 @@ pipeline/orchestrate.py that also ran four hand-written Python equivalents
 in engines/ (since removed - see plans/wider.md's repo-tidy-up entries);
 this is now the only path. Aggregates into reports/results_real.json.
 
+Runs the manifest's runs IN PARALLEL by default (real_tools/
+parallel_orchestrate.py, one process per CPU core - measured ~2.2x on
+this project's own manifest, see plans/performance.md #4), with a
+--sequential flag for easier debugging (parallel workers interleave
+their print output and stack traces; a single run under investigation is
+simpler to chase down sequentially). Either way, results come back in
+manifest order, so output stays byte-for-byte reproducible for a given
+manifest.
+
 Assumes data/raw/ (generator output), data/warehouse.duckdb (the combined
 warehouse, still built by pipeline/load.py/orchestrate.py - see that
 file's docstring for why it's still needed) and data/duckdb_runs/*.duckdb
@@ -21,6 +30,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(__file__))
 
 import build_per_run_warehouses
+import parallel_orchestrate
 import run_dbt_real
 import run_soda_real
 import run_datacontract_real
@@ -31,24 +41,27 @@ MANIFEST_PATH = os.path.join(ROOT, "data", "raw", "manifest.json")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_real.json")
 
 
-def run_real_pipeline() -> dict:
+def _run_one(entry: dict, run_timestamp: str) -> list[dict]:
+    run_id = entry["run_id"]
+    csv_filename = entry["file"]
+    print(f"--- {run_id} ---")
+
+    results: list[dict] = []
+    results.extend(run_dbt_real.evaluate_dbt_real(run_id, run_timestamp))
+    results.extend(run_soda_real.evaluate_soda_real(run_id, run_timestamp))
+    results.extend(run_datacontract_real.evaluate_datacontract_real(run_id, csv_filename, run_timestamp))
+    results.extend(run_evidently_real.evaluate_evidently_real(run_id, csv_filename, run_timestamp))
+    return results
+
+
+def run_real_pipeline(sequential: bool = False) -> dict:
     build_per_run_warehouses.build_all()
 
     with open(MANIFEST_PATH) as f:
         manifest = json.load(f)
 
     run_timestamp = datetime.now(timezone.utc).isoformat()
-    all_results: list[dict] = []
-
-    for entry in manifest:
-        run_id = entry["run_id"]
-        csv_filename = entry["file"]
-        print(f"--- {run_id} ---")
-
-        all_results.extend(run_dbt_real.evaluate_dbt_real(run_id, run_timestamp))
-        all_results.extend(run_soda_real.evaluate_soda_real(run_id, run_timestamp))
-        all_results.extend(run_datacontract_real.evaluate_datacontract_real(run_id, csv_filename, run_timestamp))
-        all_results.extend(run_evidently_real.evaluate_evidently_real(run_id, csv_filename, run_timestamp))
+    all_results = parallel_orchestrate.run_manifest(manifest, _run_one, run_timestamp, sequential=sequential)
 
     n_pass = sum(1 for r in all_results if r["status"] == "pass")
     n_warn = sum(1 for r in all_results if r["status"] == "warn")
@@ -80,4 +93,4 @@ def run_real_pipeline() -> dict:
 
 
 if __name__ == "__main__":
-    run_real_pipeline()
+    run_real_pipeline(sequential="--sequential" in sys.argv)

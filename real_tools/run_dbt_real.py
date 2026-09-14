@@ -134,7 +134,7 @@ def _status_for(count: int, warn_t: float | None, fail_t: float | None) -> str:
     return "pass"
 
 
-def _run_dbt(db_path: str, command: str) -> None:
+def _run_dbt(db_path: str, command: str, target_path: str) -> None:
     env = dict(os.environ)
     env["DBT_DB_PATH"] = db_path
     env["DBT_SEND_ANONYMOUS_USAGE_STATS"] = "False"
@@ -149,7 +149,17 @@ def _run_dbt(db_path: str, command: str) -> None:
         # result would have. Found as a real, live KeyError while
         # implementing the `dbt build` change just below - a genuine
         # regression from Phase 2, not hypothetical.
+        #
+        # --target-path gives each run its OWN target/ subdirectory rather
+        # than dbt's shared default - required for cross-run
+        # parallelization (plans/performance.md #4): without this,
+        # concurrent `dbt build` calls for different runs clobber each
+        # other's manifest.json/run_results.json mid-write. Always applied
+        # (not just under parallel execution) since it's strictly safer
+        # and free even sequentially - one run's target/ never lingers to
+        # confuse the next.
         ["dbt", command, "--profiles-dir", PROFILES_DIR, "--project-dir", DBT_PROJECT_DIR, "--quiet",
+         "--target-path", target_path,
          "--select", "stg_birth_registrations", *_SINGULAR_TESTS],
         env=env, cwd=ROOT, check=False, capture_output=True, text=True,
     )
@@ -174,11 +184,12 @@ def evaluate_dbt_real(run_id: str, run_timestamp: str) -> list[dict]:
     # then also contains the model-build step's own result, which the
     # parsing below already silently skips (nodes.get() returns None for
     # anything that isn't a test node), so nothing further changes.
-    _run_dbt(db_path, "build")
+    target_path = os.path.join(DBT_PROJECT_DIR, "target", run_id)
+    _run_dbt(db_path, "build", target_path)
 
-    with open(os.path.join(DBT_PROJECT_DIR, "target", "manifest.json")) as f:
+    with open(os.path.join(target_path, "manifest.json")) as f:
         manifest = json.load(f)
-    with open(os.path.join(DBT_PROJECT_DIR, "target", "run_results.json")) as f:
+    with open(os.path.join(target_path, "run_results.json")) as f:
         run_results = json.load(f)
 
     nodes = _test_nodes(manifest)

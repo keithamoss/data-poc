@@ -100,12 +100,14 @@ real_tools/                  runs the actual dbt/soda/datacontract-cli/evidently
   run_soda_real.py               runs the real soda-core Scan API
   run_datacontract_real.py       runs the real datacontract-cli Python API
   run_evidently_real.py          runs the real evidently.Report + DataDriftPreset
-  orchestrate_real.py            all four, across every run -> reports/results_real.json
+  parallel_orchestrate.py        generic parallel-or-sequential dispatch across a manifest, shared by
+                                 orchestrate_real.py and orchestrate_real_cp.py - see "Speed" below
+  orchestrate_real.py            all four, across every run (parallel by default) -> reports/results_real.json
   cp_common.py                   shared agency/collection/dataset id constants for the 6 CP scripts below
   build_cp_warehouses.py         one DuckDB file per CP snapshot run, all 6 tables under a `raw` schema
   run_dbt_real_cp.py, run_soda_real_cp.py, run_datacontract_real_cp.py, run_evidently_real_cp.py
                                   the CP counterparts to the 4 birth-registrations real-tool scripts above
-  orchestrate_real_cp.py         all four, across every CP run -> reports/results_real_cp.json
+  orchestrate_real_cp.py         all four, across every CP run (parallel by default) -> reports/results_real_cp.json
 pipeline/
   load.py                       loads every generated run into one combined DuckDB table (still needed -
                                build_dashboard_data.py's own direct queries, e.g. the sex value-count
@@ -144,6 +146,29 @@ uv run pre-commit install  # one-time: wires ruff into `git commit` so lint issu
 Ruff's rule set is deliberately narrow (`pyproject.toml`'s `[tool.ruff.lint]`)
 — this is still a fast-moving PoC with a narrative-comment-heavy style, not
 a codebase ready for a full opinionated linter pass.
+
+## Speed
+
+`real_tools/orchestrate_real.py`/`orchestrate_real_cp.py` run their
+manifest's runs **in parallel by default** (`real_tools/
+parallel_orchestrate.py`, one process per CPU core via `os.cpu_count()`)
+— measured, not estimated: Birth Registrations' 15-run manifest went from
+2m35s sequential to **45s** (3.4x); Child Protection's 10-run manifest
+went from 1m52s to **36s** (3.1x). Output is byte-for-byte identical to
+sequential (verified directly - same seeded property this project relies
+on everywhere else), since results always get reassembled in manifest
+order regardless of which run's worker process finishes first.
+
+Pass `--sequential` to either script (or `./run_pipeline.sh` isn't
+affected either way, it just calls them) if you need to debug a specific
+run — parallel workers interleave their print output and stack traces,
+which makes chasing down one run's problem harder than it needs to be.
+A single run's real-tool failure aborts the whole batch either way (no
+partial `results_real*.json` ever gets written), matching the original
+sequential behaviour.
+
+See `plans/performance.md` for the full timing investigation, including
+what was tried and measured before landing here.
 
 ## The 10 (scheduled) runs — and resupply attempts on top
 

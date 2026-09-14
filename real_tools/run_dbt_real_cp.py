@@ -76,13 +76,18 @@ def _parse_threshold(spec: str | None) -> float | None:
     return float(m.group(1)) if m else None
 
 
-def _run_dbt(db_path: str, command: str, select: list[str]) -> None:
+def _run_dbt(db_path: str, command: str, select: list[str], target_path: str) -> None:
     env = dict(os.environ)
     env["DBT_DB_PATH"] = db_path
     env["DBT_SEND_ANONYMOUS_USAGE_STATS"] = "False"
     subprocess.run(
+        # --target-path gives each run its OWN target/ subdirectory rather
+        # than dbt's shared default - required for cross-run
+        # parallelization (plans/performance.md #4), same fix as
+        # run_dbt_real.py's own - see that file's comment for the full
+        # reasoning. Always applied, not just under parallel execution.
         ["dbt", command, "--profiles-dir", PROFILES_DIR, "--project-dir", DBT_PROJECT_DIR,
-         "--quiet", "--select", *select],
+         "--quiet", "--target-path", target_path, "--select", *select],
         env=env, cwd=ROOT, check=False, capture_output=True, text=True,
     )
 
@@ -110,11 +115,12 @@ def evaluate_dbt_real_cp(run_id: str, run_timestamp: str) -> list[dict]:
     # already silently skips via node["test_metadata"] being absent from
     # non-test nodes entirely (KeyError-safe since we only look them up
     # for uids present in `nodes`, which is test-only).
-    _run_dbt(db_path, "build", CP_MODELS + CP_SINGULAR_TESTS)
+    target_path = os.path.join(DBT_PROJECT_DIR, "target", run_id)
+    _run_dbt(db_path, "build", CP_MODELS + CP_SINGULAR_TESTS, target_path)
 
-    with open(os.path.join(DBT_PROJECT_DIR, "target", "manifest.json")) as f:
+    with open(os.path.join(target_path, "manifest.json")) as f:
         manifest = json.load(f)
-    with open(os.path.join(DBT_PROJECT_DIR, "target", "run_results.json")) as f:
+    with open(os.path.join(target_path, "run_results.json")) as f:
         run_results = json.load(f)
 
     nodes = {uid: n for uid, n in manifest["nodes"].items() if n.get("resource_type") == "test"}

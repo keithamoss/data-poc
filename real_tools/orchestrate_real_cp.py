@@ -6,6 +6,11 @@ check-result record shape (agency_id/collection_id/dataset_id/...) as
 reports/results_real.json, except dataset_id varies per result across the
 6 CP tables instead of being one constant.
 
+Runs the manifest's runs IN PARALLEL by default (real_tools/
+parallel_orchestrate.py, shared with orchestrate_real.py - see that
+file's docstring and plans/performance.md #4), with a --sequential flag
+for easier debugging.
+
 Assumes data/cp_raw/ (generator/generate_cp_runs.py's output) already
 exists - run that first if it doesn't. Builds data/cp_duckdb_runs/ itself
 via build_cp_warehouses.build_all().
@@ -20,6 +25,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 import build_cp_warehouses
 import cp_common
+import parallel_orchestrate
 import run_dbt_real_cp
 import run_soda_real_cp
 import run_datacontract_real_cp
@@ -30,23 +36,26 @@ MANIFEST_PATH = os.path.join(ROOT, "data", "cp_raw", "manifest.json")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_real_cp.json")
 
 
-def run_real_pipeline_cp() -> dict:
+def _run_one(entry: dict, run_timestamp: str) -> list[dict]:
+    run_id = entry["run_id"]
+    print(f"--- {run_id} ---")
+
+    results: list[dict] = []
+    results.extend(run_dbt_real_cp.evaluate_dbt_real_cp(run_id, run_timestamp))
+    results.extend(run_soda_real_cp.evaluate_soda_real_cp(run_id, run_timestamp))
+    results.extend(run_datacontract_real_cp.evaluate_datacontract_real_cp(run_id, run_timestamp))
+    results.extend(run_evidently_real_cp.evaluate_evidently_real_cp(run_id, run_timestamp))
+    return results
+
+
+def run_real_pipeline_cp(sequential: bool = False) -> dict:
     build_cp_warehouses.build_all()
 
     with open(MANIFEST_PATH) as f:
         manifest = json.load(f)
 
     run_timestamp = datetime.now(timezone.utc).isoformat()
-    all_results: list[dict] = []
-
-    for entry in manifest:
-        run_id = entry["run_id"]
-        print(f"--- {run_id} ---")
-
-        all_results.extend(run_dbt_real_cp.evaluate_dbt_real_cp(run_id, run_timestamp))
-        all_results.extend(run_soda_real_cp.evaluate_soda_real_cp(run_id, run_timestamp))
-        all_results.extend(run_datacontract_real_cp.evaluate_datacontract_real_cp(run_id, run_timestamp))
-        all_results.extend(run_evidently_real_cp.evaluate_evidently_real_cp(run_id, run_timestamp))
+    all_results = parallel_orchestrate.run_manifest(manifest, _run_one, run_timestamp, sequential=sequential)
 
     n_pass = sum(1 for r in all_results if r["status"] == "pass")
     n_warn = sum(1 for r in all_results if r["status"] == "warn")
@@ -79,4 +88,4 @@ def run_real_pipeline_cp() -> dict:
 
 
 if __name__ == "__main__":
-    run_real_pipeline_cp()
+    run_real_pipeline_cp(sequential="--sequential" in sys.argv)

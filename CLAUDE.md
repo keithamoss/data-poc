@@ -56,8 +56,12 @@ Rough layout:
 - `data/raw/`, `data/warehouse.duckdb`, `reports/*.json` etc. are
   gitignored and fully regenerated - never hand-edit or try to commit
   them. Regenerate via `./run_pipeline.sh` (the whole pipeline end to
-  end) or `python3 real_tools/orchestrate_real.py` (just the real-tool
-  check runs, if `data/raw/`/`data/warehouse.duckdb` already exist).
+  end, ~45s) or `python3 real_tools/orchestrate_real.py` (just the
+  real-tool check runs, if `data/raw/`/`data/warehouse.duckdb` already
+  exist). Both real_tools orchestration scripts run their manifest's
+  runs in parallel by default (`real_tools/parallel_orchestrate.py`) -
+  add `--sequential` if debugging one specific run, since parallel
+  workers interleave their print output and stack traces.
 - Everything is seeded - regenerating reproduces the same output, so a
   diff against previous output is a real correctness check, not noise
   (used repeatedly to verify refactors are behaviour-preserving).
