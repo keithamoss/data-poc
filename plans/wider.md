@@ -81,6 +81,14 @@ not a schedule.
    datasets get wired in (action 2) and a scheduled re-run job exists
    (action 3), the public dashboard updates itself automatically on every
    push — no extra work per dataset added.
+   **Parked, not actioned**: Keith wants to move this repo back to
+   private. That directly breaks free-plan GitHub Pages hosting (only
+   works for public repos) — a known, deliberate trade-off to flag now
+   rather than rediscover later, not something to pre-solve. Don't reach
+   for a different (paid Pages tier, a separate cloud host, etc.) hosting
+   solution until the private-repo move actually happens and a public
+   dashboard is still wanted at that point — may turn out not to be
+   needed at all.
 
 6. **[todo, low]** Decide the long-term home for `synthetic-data-generator/`.
    It's a subdirectory here for now (simplest, since it never had its own
@@ -195,6 +203,19 @@ not a schedule.
     if the multi-decade dimension is ever actually wanted, adopt a real
     dynamic microsimulation engine like `neworder` or LIAM2 rather than
     faking time-evolution in a point-in-time snapshot generator).
+    **Also parked for future synth-data work**: day-of-week seasonality.
+    Raised while analysing whether the row-count-growth check
+    (`plans/qa-pipeline.md` #12) should compare against a run from N
+    calendar days ago rather than the immediately preceding run - the
+    real motivation for date-matching over ordinal-matching would be
+    filtering out day-of-week effects (e.g. registrations naturally
+    dipping on weekends), but `daily_batch.py`/`generate_runs.py` don't
+    model any seasonality at all today, so the distinction is currently
+    moot. Worth reconsidering if/when the generator models realistic
+    weekly (or holiday) patterns - which would also mean revisiting the
+    row-count-growth check's own thresholds, since a same-day-of-week
+    comparison would then behave differently from a previous-run
+    comparison in a way it doesn't yet.
 
 12. **[done, medium - generator layer only]** Resupply-chain simulation
     for Birth Registrations, Keith's own real-world practice: a delivery
@@ -249,6 +270,26 @@ not a schedule.
     recency within its own data - no need for it to know anything about
     whether a downstream publishing/consumption system has acted on a
     corrected resupply yet.
+    **Follow-up finding, verified**: revisited the row-count-growth
+    check's own "compare against the immediately preceding run" logic
+    (`real_tools/run_evidently_real.py`'s `_previous_run_file`, which
+    walks `manifest.json` in list/generation order) in light of this
+    item's own resupply chains - it has a real ordering problem now that
+    generation order and arrival order can diverge. Confirmed directly
+    against the actual `data/raw/manifest.json`: `run_10_2026-09-10`
+    (arrived 2026-09-10) sits at manifest position 15, immediately after
+    `run_09_2026-09-09_resupply3` (position 14) - but that resupply
+    didn't actually arrive until 2026-09-16, six days AFTER run_10.
+    `_previous_run_file` would compare run_10's row count against a
+    delivery that, chronologically, hadn't arrived yet at the time run_10
+    was received. Before this item, generation order and arrival order
+    were always identical (one entry per calendar day, in sequence), so
+    this was structurally impossible - a genuinely new problem this
+    feature introduced, not a pre-existing one just now noticed. Not yet
+    fixed - the same class of issue as the "silently conflates attempt
+    chains" finding above, and probably wants the same fix (group/sort by
+    arrived_date and delivery, not raw manifest order) rather than a
+    point patch to just this one check.
 
 13. **[done]** Separate "resupply orchestration" from
     "synthetic data creation per dataset" as a distinct architectural
@@ -331,3 +372,46 @@ not a schedule.
     delivery_06 3-attempt and delivery_09 4-attempt chains, same arrival
     dates, same row counts), confirming the split is behaviour-preserving,
     not just a plausible-looking rewrite.
+
+14. **[investigate]** Great Expectations (GX Core) as a genuine comparison
+    tool alongside dbt/Soda/datacontract-cli/Evidently in `real_tools/`.
+    `docs/data-contract-engines-landscape.md`'s own worked example noted
+    GX "isn't pip-installable in this environment" at the time it was
+    written - that's no longer true (confirmed via `pip index versions
+    great-expectations`: 1.23.0 available), the same kind of
+    stale-constraint discovery as Faker/Mimesis in
+    `docs/synthetic-data-generation-tools-research.md`. Worth revisiting
+    IF research holds up that it adds something the current four tools
+    don't - the concrete candidate is GX's `unexpected_index_list`, which
+    `docs/quarantine_sex_column.py` already points to as the real
+    mechanism for genuine per-row failing-record samples, something none
+    of dbt/Soda/datacontract-cli/Evidently currently give this pipeline
+    (see `plans/qa-pipeline.md` #15, raised the same session). Not yet
+    scoped: would it replace one of the four (unlikely - each earns its
+    place: dbt for build-time schema contracts, Soda for lightweight SQL
+    checks, datacontract-cli for the ODCS layer, Evidently for
+    drift/row-growth) or sit alongside them specifically for row-level
+    detail? Compare, don't assume, before wiring anything in.
+
+15. **[investigate]** Data generation currently duplicates the contract's
+    column definitions rather than reading from them - a real pain point
+    Keith flagged. Confirmed by reading the code, not assumed:
+    `contract/bdm-birth-registrations-contract.yaml`'s `schema.properties`
+    is the actual source of truth for Birth Registrations' column
+    names/types/quality rules, but `generator/daily_batch.py` builds its
+    output via a hand-written `pd.DataFrame({"registration_number": ...,
+    "child_given_names": ..., ...})` literal with its own independently
+    hand-typed column names - nothing connects the two today. Add, rename,
+    or remove a column in the contract and the generator silently drifts
+    out of sync; nothing would catch it until a QA check started failing
+    unexpectedly, or worse, silently stopped covering a real column at
+    all. Not yet scoped how to fix: options range from a thin
+    generator-side loader that reads column names/types straight out of
+    the ODCS YAML's `schema.properties` at generation time (cheap, doesn't
+    touch what actually gets simulated per column, just what the frame is
+    shaped like) to something deeper tied into the
+    `docs/synthetic-data-generation-tools-research.md` replacement work (a
+    real generator library could plausibly take the contract's schema as
+    its literal column spec, rather than either side hand-authoring
+    independently). Worth scoping properly rather than picking blind -
+    revisit alongside actions 11/13's generator work, not in isolation.

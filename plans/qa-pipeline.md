@@ -400,6 +400,38 @@ relative, not a schedule — this is weeks of work, not months.
       amber tier - both correct, now visibly disagreeing where they used
       to be hidden behind whichever check happened to be checks[0].
 
+15. **[investigate]** Genuine per-row failing-record samples, revisited.
+    Item 14 above honestly noted that no real tool currently wired into
+    this pipeline (dbt, Soda, datacontract-cli, Evidently) captures which
+    SPECIFIC rows failed a check - only aggregate counts
+    (`row_count_total`/`row_count_invalid`). `docs/quarantine_sex_column.py`
+    already identifies the real mechanism for this: Great Expectations'
+    `unexpected_index_list` (or a Pandera boolean mask) gives real
+    row-level output, but GX isn't currently one of this pipeline's wired
+    tools. See `plans/wider.md` #14 - worth pursuing together: if GX gets
+    evaluated as a comparison tool, its row-level output is the concrete
+    reason to actually wire it in rather than just compare it on paper,
+    and would let the check-detail panel (item 14 above) show real
+    failing-row samples instead of the honest "not captured today" note
+    it currently shows.
+
+16. **[investigate]** Should the dashboard explain *why* checks on the
+    same column can legitimately disagree in severity? Item 14's
+    all-checks summary surfaced (not created) a real fact: a column can
+    show red on an "amber" run because one check has zero tolerance
+    (`mustBe: 0`) and another has a genuine percentage-based amber tier,
+    and both are correctly evaluating their own rule. Currently just
+    visible as-is (two dots, two colours, no explanation) - open question
+    is whether a viewer unfamiliar with the underlying tools would read
+    that as a dashboard bug rather than two independently-correct
+    assessments. Options, not yet decided: a short inline note when a
+    summary contains genuinely different severities across checks; a
+    persistent legend explaining zero-tolerance vs percentage-band
+    checks; or leave it as-is on the theory that the check-detail panel
+    (already one click away) makes each check's own logic clear enough.
+    Low priority - revisit if a real reviewer actually gets confused by
+    it.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
