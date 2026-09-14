@@ -60,6 +60,11 @@ BUSINESS_RULE_HOME_TABLE = {
     "escalation_completeness": "cp_notifications",
     "closed_case_investigation_hygiene": "cp_investigations",
     "placement_carer_approval": "cp_placements",
+    # not a cross-table business rule like the 3 above - a genuinely
+    # single-table/single-column singular test (date_of_birth's range
+    # check) that reuses this same "singular test, home table" mechanism
+    # since it's already correct for this shape too.
+    "cp_client_date_of_birth_range": "cp_clients",
 }
 
 BUSINESS_RULE_DISPLAY_NAME = {

@@ -91,8 +91,11 @@ checks for birth_registrations:
       fail: when > 3%
       samples limit: 5
 
+  # Closed value set (generator/names_au.py's SUBURBS pool, 51 real WA
+  # suburb names) rather than a character-set regex - see the ODCS
+  # contract's matching invalidValues rule for the full rationale.
   - invalid_percent(place_of_birth_suburb):
-      valid regex: '^[A-Za-z][A-Za-z. -]*$'
+      valid values: ["Fremantle", "Subiaco", "Joondalup", "Rockingham", "Mandurah", "Midland", "Armadale", "Cannington", "Morley", "Cockburn Central", "Scarborough", "Victoria Park", "Bunbury", "Albany", "Geraldton", "Kalgoorlie", "Broome", "Karratha", "Port Hedland", "Busselton", "Northam", "Narrogin", "Esperance", "Collie", "Mount Lawley", "Leederville", "Wembley", "Innaloo", "Success", "Baldivis", "Ellenbrook", "Butler", "Balga", "Girrawheen", "Maddington", "Gosnells", "Kwinana", "Hamilton Hill", "Beaconsfield", "South Perth", "Bentley", "Willetton", "Riverton", "Karrinyup", "Currambine", "Clarkson", "Yanchep", "Byford", "Waroona", "Manjimup", "Margaret River"]
       warn: when > 0%
       fail: when > 3%
       samples limit: 5

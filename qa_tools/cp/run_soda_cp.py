@@ -27,11 +27,25 @@ CP_DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
 # dimension for the 3 named `failed rows` business-rule checks - matches
 # the dimension each rule's contract/child-protection-contract.yaml quality
 # entry uses (escalation completeness is a completeness concern; the other
-# two are a cross-table consistency concern).
+# two are a cross-table consistency concern). date_of_birth out of range
+# is a genuine single-column check (unlike the 3 business rules, which are
+# real table-level cross-record concerns) - "conformity" matches BDM's own
+# date_of_birth range rule's dimension.
 _BUSINESS_RULE_DIMENSION = {
     "Escalation completeness": "completeness",
     "Closed-case investigation hygiene": "consistency",
     "Placement/carer approval compliance": "consistency",
+    "date_of_birth out of range": "conformity",
+}
+
+# date_of_birth out of range has no natural `column` of its own to report
+# (a "failed rows" check, not a column metric) - routed to date_of_birth
+# explicitly, same class of gap run_soda_bdm.py's _CUSTOM_CHECK_COLUMN
+# solves for BDM's own "failed rows" checks. The 3 genuine cross-table
+# business rules deliberately stay unrouted (land on cp_common's
+# table-level pseudo-column) since they're not really about one column.
+_CUSTOM_CHECK_COLUMN = {
+    "date_of_birth out of range": "date_of_birth",
 }
 
 
@@ -60,7 +74,7 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
         if table not in cp_common.TABLE_DATASET_ID:
             continue  # not a CP table (shouldn't happen - guard anyway)
 
-        column = c["column"] or "(table)"
+        column = c["column"] or _CUSTOM_CHECK_COLUMN.get(c["name"]) or "(table)"
         diagnostics = c["diagnostics"]
         value = diagnostics.get("value")
         outcome = c["outcome"]

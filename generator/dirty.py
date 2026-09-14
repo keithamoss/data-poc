@@ -17,6 +17,8 @@ its own seed, so injecting failures is reproducible and composable - call
 several of these in a row to build up a specific scenario.
 """
 from __future__ import annotations
+from datetime import date
+
 import numpy as np
 import pandas as pd
 
@@ -127,6 +129,26 @@ def inject_duplicate_values(df: pd.DataFrame, column: str, rate: float, seed: in
     return out
 
 
+def inject_out_of_range_dates(df: pd.DataFrame, column: str, bad_date_pool: list, rate: float, seed: int) -> pd.DataFrame:
+    """Overwrites `rate` of `column` with a date drawn from `bad_date_pool`
+    (each one implausibly old - "before civil registration existed"
+    territory, not just "unusual") - a type/format problem upstream
+    producing a nonsensical date rather than a missing one. Deliberately
+    kept to genuinely out-of-range but still-parseable dates: a literally
+    unparseable string would silently downgrade the WHOLE column's
+    inferred type for that run (confirmed empirically - DuckDB's
+    read_csv_auto infers per-file, not per-row), corrupting every other
+    check on the column too - flagged as a real follow-up, not built this
+    round (see plans/qa-pipeline.md)."""
+    out = df.copy()
+    rng = np.random.default_rng(seed)
+    mask = rng.random(len(out)) < rate
+    n = mask.sum()
+    if n:
+        out.loc[mask, column] = rng.choice(bad_date_pool, size=n)
+    return out
+
+
 def inject_extract_timestamp_disorder(df: pd.DataFrame, rate: float, seed: int) -> pd.DataFrame:
     """Shifts a fraction of extract_timestamp values to before their own
     row's date_registered - a clock-skew or backfill bug at the source,
@@ -218,7 +240,46 @@ def inject_drift_batch(df: pd.DataFrame, column: str, invalid_pool: list, batch_
 # lookahead support on DuckDB's RE2 engine, so it can only catch "outside
 # the allowed character set", not "is a specific junk word" - see the
 # contract's own comment on this).
-_JUNK_TEXT_POOL = ["N/A", "TEST1", "UNKNOWN9", "XXXX0", "Baby1"]
+# Deliberately no "N/A" here (a pre-existing gap this session's own
+# _INVALID_SUBURB_POOL/_INVALID_POSTCODE_POOL null-sentinel bug also had -
+# see those pools' comments below): the contract's own invalidValues
+# description names "N/A" as this check's headline example of "a form
+# submitted incomplete", but pandas'/DuckDB's CSV readers treat "N/A" as
+# a null-sentinel string by default, so it would never actually reach the
+# pattern check at all - it'd silently become a real NULL first and only
+# ever be caught by the separate nullValues completeness check instead,
+# contradicting the contract's own description of what this check catches.
+_JUNK_TEXT_POOL = ["TEST1", "UNKNOWN9", "XXXX0", "Baby1", "N.A."]
+
+# Plausible-looking but not-a-real-WA-suburb values - a mix of a common
+# misspelling, a placeholder, and an out-of-jurisdiction-sounding entry -
+# for place_of_birth_suburb's closed-value-set check (converted from a
+# character-set regex - see plans/qa-pipeline.md #15's aggregate-invalid-
+# values follow-up and the ODCS contract's matching rule for why).
+#
+# Deliberately NOT "N/A" (or "NA"/"NULL"/etc.) - a real bug, found live
+# while verifying this preset's calibration: pandas' and DuckDB's CSV
+# readers both treat "N/A" as a null-sentinel string by default, so an
+# injected "N/A" silently becomes an actual NULL on read-back, not the
+# literal string. That changes which check semantics apply: a SQL `NOT
+# IN (...)` (dbt's accepted_values, Soda's invalid_percent) evaluates to
+# NULL - not TRUE - for a NULL value, so the row is silently excluded
+# from the WHERE clause and never counted as invalid at all, undercounting
+# against the calibrated rate (confirmed: 4 of 18 injected postcode
+# values disappeared this way, enough to flip a run from fail to warn -
+# see _INVALID_POSTCODE_POOL below, which had the same bug). datacontract-
+# cli's own Python-level check doesn't have this gap (it treats null as
+# failing a validValues rule), so the three engines disagreed - not a
+# real data-quality signal, just this injection choice colliding with a
+# CSV-format-level null sentinel.
+_INVALID_SUBURB_POOL = ["Freemantle", "Unknown", "TBC", "Perth Metro", "Not stated"]
+
+# Out-of-range date_of_birth values - implausibly old (long before civil
+# registration existed), not just "unusual" - see
+# contract/bdm-birth-registrations-contract.yaml's matching type: sql rule
+# (previously never actually exercised - nothing in this file injected a
+# bad date_of_birth at all).
+_BAD_DATE_OF_BIRTH_POOL = [date(1899, 1, 1), date(1850, 6, 15), date(1820, 11, 30), date(1750, 1, 1)]
 
 
 def apply_birth_registrations_presets(df: pd.DataFrame, severity: str, seed: int,
@@ -266,6 +327,13 @@ def apply_birth_registrations_presets(df: pd.DataFrame, severity: str, seed: int
     rate_dup_id = 0.004 if severity == "amber" else 0.02
     rate_junk_name = 0.006 if severity == "amber" else 0.03   # warn>0%, fail>3%
     rate_ts_disorder = 0.01 if severity == "amber" else 0.04
+    rate_suburb = 0.006 if severity == "amber" else 0.03      # warn>0%, fail>3% (same band as junk names)
+    # small counts on purpose - the ODCS date-range rule is single-tier
+    # (mustBe: 0/error, no amber tolerance at all), so even the amber rate
+    # is a genuine hard fail on this one check - kept small so it reads as
+    # "a few genuinely bad records slipped through", not as the dominant
+    # failure mode of an amber run.
+    rate_dob_range = 0.003 if severity == "amber" else 0.015
 
     df = inject_invalid_values(df, "sex", ["U", "O", "9"], rate_sex, seed)
     df = inject_nulls(df, "place_of_birth_facility", rate_facility_null, seed + 1)
@@ -273,6 +341,8 @@ def apply_birth_registrations_presets(df: pd.DataFrame, severity: str, seed: int
     df = inject_invalid_values(df, "child_given_names", _JUNK_TEXT_POOL, rate_junk_name, seed + 3)
     df = inject_extract_timestamp_disorder(df, rate_ts_disorder, seed + 4)
     df = break_multiple_birth_siblings(df, severity, seed + 5)
+    df = inject_invalid_values(df, "place_of_birth_suburb", _INVALID_SUBURB_POOL, rate_suburb, seed + 7)
+    df = inject_out_of_range_dates(df, "date_of_birth", _BAD_DATE_OF_BIRTH_POOL, rate_dob_range, seed + 8)
     return df
 
 
@@ -303,6 +373,36 @@ def apply_cp_placements_presets(placements_df: pd.DataFrame, carers_df: pd.DataF
     rate = 0.02 if severity == "amber" else 0.08
     non_approved = carers_df.loc[carers_df["approval_status"] != "Approved", "carer_id"].values
     return inject_invalid_values(placements_df, "carer_id", list(non_approved), rate, seed)
+
+
+# Not a real WA postcode from generator/names_au.py's SUBURBS pool - a mix
+# of an obviously-placeholder value and out-of-range-looking numbers, for
+# cp_clients.postcode's new closed-value-set check (previously had no
+# invalid-value check at all - see plans/qa-pipeline.md #15).
+#
+# Deliberately NOT "N/A" - see _INVALID_SUBURB_POOL's comment above for
+# the null-sentinel bug this pool originally had too (found via the same
+# calibration check, on this same pool).
+_INVALID_POSTCODE_POOL = ["0000", "9999", "TBC", "XXXX", "6000X"]
+
+
+def apply_cp_clients_presets(clients_df: pd.DataFrame, severity: str, seed: int) -> pd.DataFrame:
+    """Two new checks for cp_clients, previously untested: postcode's
+    closed-value-set check, and a new out-of-range date_of_birth check
+    (Child Protection had no date-range check at all before this - see
+    contract/child-protection-soda-checks.yml and dbt_project/tests/
+    cp_client_date_of_birth_range.sql).
+
+    date_of_birth's rate is calibrated as an absolute count, not a
+    percentage, against this table's actual ~527-row size - the amber
+    rate lands under the check's own warn>10 threshold (Keith's own
+    framing when this was scoped: "up to ten is tolerable"), the red rate
+    clears the fail>20 threshold by a clear margin, not just barely."""
+    rate_postcode = 0.006 if severity == "amber" else 0.03  # warn>0%, fail>3%, same band as BDM's suburb check
+    rate_dob_range = 0.017 if severity == "amber" else 0.053  # ~9 rows amber (under warn>10), ~28 rows red (over fail>20)
+    out = inject_invalid_values(clients_df, "postcode", _INVALID_POSTCODE_POOL, rate_postcode, seed)
+    out = inject_out_of_range_dates(out, "date_of_birth", _BAD_DATE_OF_BIRTH_POOL, rate_dob_range, seed + 1)
+    return out
 
 
 def apply_cp_investigations_presets(investigations_df: pd.DataFrame, clients_df: pd.DataFrame,

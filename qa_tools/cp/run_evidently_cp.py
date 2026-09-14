@@ -24,6 +24,14 @@ CP_RAW_DIR = os.path.join(ROOT, "data", "cp_raw")
 
 DATASET_ID = cp_common.TABLE_DATASET_ID["cp_notifications"]
 
+# A fallback default only, for calling this function directly with no
+# other context - real callers (orchestrate_cp.py, this file's own
+# __main__ block below) always pass the manifest's actual first run_id
+# instead, since this literal goes stale every time the anchor date rolls
+# forward (generator/anchor_date.py) and data/cp_raw/ isn't cleared
+# between regenerations, so a stale copy can sit there and get silently
+# used instead of raising - see orchestrate_cp.py and
+# plans/qa-pipeline.md for the bug this was found as.
 REFERENCE_RUN_ID = "cp_run_01_2026-07-06"
 
 
@@ -65,7 +73,9 @@ if __name__ == "__main__":
 
     with open(os.path.join(CP_RAW_DIR, "manifest.json")) as f:
         manifest = json.load(f)
+    reference_run_id = manifest[0]["run_id"]  # not the module-level REFERENCE_RUN_ID default - see orchestrate_cp.py
     for entry in manifest:
-        res = evaluate_evidently_cp(entry["run_id"], datetime.now(timezone.utc).isoformat())
+        res = evaluate_evidently_cp(entry["run_id"], datetime.now(timezone.utc).isoformat(),
+                                     reference_run_id=reference_run_id)
         r = res[0]
         print(f"{entry['run_id']:25s} PSI={r['metric_value']}  status={r['status']:5s}")

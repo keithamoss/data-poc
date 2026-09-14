@@ -125,6 +125,15 @@ schema:
         logicalType: string
         physicalType: varchar(200)
         required: true
+        # Real ODCS property - identifies this as personal data, so any
+        # sample-capture mechanism that respects it (datacontract-cli's own
+        # include_failed_samples, and this project's own aggregate-invalid-
+        # values feature - see plans/qa-pipeline.md #15) drops this
+        # column's actual values rather than surfacing them, even in an
+        # aggregate/anonymised-seeming form. Vocabulary matches
+        # datacontract-cli's own _SENSITIVE_CLASSIFICATIONS set exactly -
+        # not a project-invented convention.
+        classification: pii
         quality:
           - metric: nullValues
             dimension: completeness
@@ -156,6 +165,7 @@ schema:
         logicalType: string
         physicalType: varchar(200)
         required: true
+        classification: pii
         quality:
           - metric: nullValues
             dimension: completeness
@@ -258,10 +268,24 @@ schema:
           - metric: invalidValues
             dimension: conformity
             arguments:
-              pattern: "^[A-Za-z][A-Za-z. -]*$"
+              # Was a character-set regex (same as child_given_names) until
+              # generator/names_au.py's SUBURBS pool was noticed to already
+              # be a real closed, enumerable list (51 real WA suburb names -
+              # public geography, no person-level data) - a genuine closed
+              # value set is a stronger, more realistic check than "looks
+              # like a name-shaped string" for a field whose real-world
+              # values genuinely ARE bounded. See plans/qa-pipeline.md #15's
+              # aggregate-invalid-values follow-up for why this conversion
+              # mattered beyond just being a better check on its own.
+              validValues: ["Fremantle", "Subiaco", "Joondalup", "Rockingham", "Mandurah", "Midland", "Armadale", "Cannington", "Morley", "Cockburn Central", "Scarborough", "Victoria Park", "Bunbury", "Albany", "Geraldton", "Kalgoorlie", "Broome", "Karratha", "Port Hedland", "Busselton", "Northam", "Narrogin", "Esperance", "Collie", "Mount Lawley", "Leederville", "Wembley", "Innaloo", "Success", "Baldivis", "Ellenbrook", "Butler", "Balga", "Girrawheen", "Maddington", "Gosnells", "Kwinana", "Hamilton Hill", "Beaconsfield", "South Perth", "Bentley", "Willetton", "Riverton", "Karrinyup", "Currambine", "Clarkson", "Yanchep", "Byford", "Waroona", "Manjimup", "Margaret River"]
             mustBe: 0
             severity: error
-            description: Same format rule as child_given_names - see that property's description.
+            description: >
+              A closed value set - the generator's own reference pool of
+              real WA suburb names (see generator/names_au.py's SUBURBS).
+              An unrecognised suburb means a data-entry typo or a source-
+              system change, not a legitimately new WA suburb appearing
+              mid-fixture.
 
       - name: place_of_birth_facility
         logicalType: string
@@ -296,6 +320,7 @@ schema:
         logicalType: string
         physicalType: varchar(200)
         required: false
+        classification: pii
         quality:
           - metric: nullValues
             dimension: completeness
@@ -314,6 +339,7 @@ schema:
         logicalType: string
         physicalType: varchar(200)
         required: false
+        classification: pii
         quality:
           - metric: nullValues
             dimension: completeness

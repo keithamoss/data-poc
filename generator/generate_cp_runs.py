@@ -12,15 +12,17 @@ the Child Protection tables are built ONCE (fixed seed), then re-extracted
 which is what a real periodic extract of an active caseload would look
 like, unlike birth-registrations' fresh-cohort-per-day model.
 
-Dirty injection touches 3 of the 6 tables on amber/red runs:
+Dirty injection touches 4 of the 6 tables on amber/red runs:
 cp_notifications (dirty.py's apply_cp_notifications_presets - an unknown
 concern_type code, near-duplicate notifications), cp_placements
 (apply_cp_placements_presets - a placement reassigned to a non-Approved
-carer), and cp_investigations (apply_cp_investigations_presets - a
-closed-case investigation reopened). The other three tables (cp_clients,
-cp_carers, cp_case_workers) are clean in every run - this mirrors how
-birth-registrations only demonstrates dirty behaviour on 2 of its 13
-columns, not an oversight.
+carer), cp_investigations (apply_cp_investigations_presets - a
+closed-case investigation reopened), and cp_clients
+(apply_cp_clients_presets - an unrecognised postcode, an out-of-range
+date_of_birth). The other two tables (cp_carers, cp_case_workers) are
+clean in every run - this mirrors how birth-registrations only
+demonstrates dirty behaviour on a subset of its columns, not an
+oversight.
 
 child_protection.py's own generation logic makes all three of these
 tables' cross-table business rules (escalation completeness,
@@ -53,6 +55,27 @@ sys.path.insert(0, os.path.join(GENERATOR_DIR, "reference"))
 
 from population import generate_population  # noqa: E402
 from child_protection import generate_child_protection_collection  # noqa: E402
+# Re-affirmed at index 0 AFTER the population/child_protection imports
+# above, not just once before them - a REAL bug, found live while adding
+# apply_cp_clients_presets below: both this directory and
+# synthetic-data-generator/ have their own dirty.py (kept manually in
+# sync for the 3 shared CP presets - see this module's own docstring).
+# Putting this insert before the imports above wasn't enough:
+# synthetic-data-generator/population.py's own module-level code does
+# `sys.path.insert(0, os.path.dirname(__file__))` as a side effect of
+# being imported, which re-inserts synthetic-data-generator/ at index 0
+# and silently undoes an earlier insert of this directory - confirmed by
+# instrumenting this script directly and printing sys.path right before
+# `import dirty` (it showed synthetic-data-generator/ back at index 0).
+# So this has to run AFTER every import that could itself touch
+# sys.path, immediately before `import dirty`, not just once up front.
+# Caught this time because the new function simply didn't exist in the
+# wrong file yet (a loud AttributeError) - a genuinely dangerous variant
+# of the same bug wouldn't be loud at all: editing an EXISTING shared
+# preset's behaviour here without updating the other copy would silently
+# keep running the stale version, no error at all. See
+# plans/qa-pipeline.md for the regression test this got.
+sys.path.insert(0, os.path.dirname(__file__))
 import dirty as dirty_mod  # noqa: E402
 
 OUT_DIR = os.path.join(ROOT, "data", "cp_raw")
@@ -125,6 +148,8 @@ def main() -> None:
                 tables["cp_placements"], tables["cp_carers"], severity, seed=BASE_SEED + 4200 + i)
             tables["cp_investigations"] = dirty_mod.apply_cp_investigations_presets(
                 tables["cp_investigations"], tables["cp_clients"], severity, seed=BASE_SEED + 4300 + i)
+            tables["cp_clients"] = dirty_mod.apply_cp_clients_presets(
+                tables["cp_clients"], severity, seed=BASE_SEED + 4400 + i)
 
         row_counts = {}
         for name in TABLES:

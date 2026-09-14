@@ -51,20 +51,32 @@ _DIMENSION_BY_TEST = {
     "escalation_completeness": "completeness",
     "closed_case_investigation_hygiene": "consistency",
     "placement_carer_approval": "consistency",
+    "cp_client_date_of_birth_range": "conformity",
 }
 
 # A short, human-readable phrase for what each test actually checks -
 # written here, where each check result is constructed, not guessed later
 # from the check's name string by the dashboard-building code. None for
-# the 3 singular business-rule tests: their own names (escalation_
-# completeness, etc.) are already plain enough on their own, and this same
-# business rule also shows up under Soda's and datacontract-cli's own
-# already-plain names - a reader scanning card titles already sees the
-# shared word without a further prefix.
+# the 3 business-rule tests: their own names (escalation_completeness,
+# etc.) are already plain enough on their own, and this same business rule
+# also shows up under Soda's and datacontract-cli's own already-plain
+# names - a reader scanning card titles already sees the shared word
+# without a further prefix. cp_client_date_of_birth_range DOES get one -
+# unlike those three, its own name reads as an internal test identifier,
+# not a plain description.
 _LABEL_BY_TEST = {
     "unique": "Duplicate rate",
     "not_null": "Null rate",
     "relationships": "Referential integrity",
+    "cp_client_date_of_birth_range": "Date range",
+}
+
+# cp_client_date_of_birth_range genuinely is about one column (unlike the
+# 3 cross-table business rules, which stay at "(table)") - routed here the
+# same way run_dbt_bdm.py routes its own singular tests to a real column,
+# and matching how run_soda_cp.py routes its own version of this check.
+_SINGULAR_TEST_COLUMN = {
+    "cp_client_date_of_birth_range": "date_of_birth",
 }
 
 
@@ -141,7 +153,7 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
 
         meta = node.get("test_metadata")
         test_name = meta["name"] if meta else node["name"]
-        column = node["column_name"] if meta else "(table)"
+        column = node["column_name"] if meta else _SINGULAR_TEST_COLUMN.get(node["name"], "(table)")
         config = node.get("config", {})
         status = r["status"]
         failures = r.get("failures") or 0

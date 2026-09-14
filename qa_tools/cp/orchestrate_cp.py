@@ -38,7 +38,7 @@ MANIFEST_PATH = os.path.join(ROOT, "data", "cp_raw", "manifest.json")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
 
 
-def _run_one(entry: dict, run_timestamp: str) -> list[dict]:
+def _run_one(entry: dict, run_timestamp: str, reference_run_id: str) -> list[dict]:
     run_id = entry["run_id"]
     print(f"--- {run_id} ---")
 
@@ -46,7 +46,7 @@ def _run_one(entry: dict, run_timestamp: str) -> list[dict]:
     results.extend(run_dbt_cp.evaluate_dbt_cp(run_id, run_timestamp))
     results.extend(run_soda_cp.evaluate_soda_cp(run_id, run_timestamp))
     results.extend(run_datacontract_cp.evaluate_datacontract_cp(run_id, run_timestamp))
-    results.extend(run_evidently_cp.evaluate_evidently_cp(run_id, run_timestamp))
+    results.extend(run_evidently_cp.evaluate_evidently_cp(run_id, run_timestamp, reference_run_id=reference_run_id))
     return results
 
 
@@ -56,8 +56,15 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     with open(MANIFEST_PATH) as f:
         manifest = json.load(f)
 
+    # The first manifest entry (cp_run_01, always clean by RUN_PLAN
+    # construction) - NOT run_evidently_cp.REFERENCE_RUN_ID, a hardcoded
+    # literal that goes stale every time the anchor date rolls forward
+    # (generator/anchor_date.py) - see orchestrate_bdm.py's identical fix
+    # and plans/qa-pipeline.md for the bug this was found as.
+    reference_run_id = manifest[0]["run_id"]
     run_timestamp = datetime.now(timezone.utc).isoformat()
-    all_results = parallel_orchestrate.run_manifest(manifest, _run_one, run_timestamp, sequential=sequential)
+    all_results = parallel_orchestrate.run_manifest(
+        manifest, _run_one, run_timestamp, reference_run_id, sequential=sequential)
 
     n_pass = sum(1 for r in all_results if r["status"] == "pass")
     n_warn = sum(1 for r in all_results if r["status"] == "warn")

@@ -612,6 +612,127 @@ relative, not a schedule — this is weeks of work, not months.
     this finding stand as closed records informing that future
     narrowing-down decision, not open items.
 
+17. **[in progress]** Aggregate failing-value shapes ("shape 2"), the
+    other half of item 15's "surface more about the nature of the
+    failure" idea - item 15 covers WHICH rows failed (PKs only); this
+    covers WHAT the actual bad values look like, for closed-value-set/
+    categorical checks (distinct values + counts) and numeric/date checks
+    (min/max/outlier list, and a binned histogram). Scoped with Keith via
+    two rounds of `AskUserQuestion` (2026-09-14), including sensitive-data
+    handling as an explicit design constraint from the start (his own
+    instruction, not something added after the fact):
+    - **Sensitivity gating**: reuses ODCS's own real `classification`
+      property (values like `pii`) - the same vocabulary
+      datacontract-cli's own `_collect_failed_samples()` already respects
+      (drops classified columns' values from samples) - rather than
+      inventing a new boolean flag. Added `classification: pii` to both
+      contracts' name fields (BDM: child/parent given/family names; CP:
+      client/carer/case-worker given/family names).
+    - **Suburb and postcode converted to real closed-value-set checks**:
+      Keith's own preference, not just a shape-2 side effect. BDM's
+      `place_of_birth_suburb` (previously a character-set regex) and a
+      brand-new CP `postcode` check (previously untested at all) now both
+      use `generator/names_au.py`'s `SUBURBS` pool (51 real WA
+      suburb/postcode pairs - public geography, no person-level data) as
+      an `accepted_values`/`invalid_percent`/ODCS `validValues` list
+      across dbt, Soda, and datacontract-cli.
+    - **New CP `date_of_birth` range check**: Child Protection had no
+      date-range check at all before this (BDM already did). Soda's
+      `valid min`/`valid max` don't accept bare date bounds (confirmed
+      empirically: `float() argument must be a string or a real number,
+      not 'datetime.date'`) - worked around with the already-proven
+      `failed rows`/`fail query:` pattern instead. dbt: a new singular
+      test (`dbt_project/tests/cp_client_date_of_birth_range.sql`) with
+      `config(warn_if, error_if)`. Amber/red bands are count-based, not
+      percentage (same `fail_calc` reliability reason as the rest of this
+      file's item 1): up to 10 bad 1/1/1900-territory dates reads amber,
+      more fails - Keith's own specific calibration instruction.
+    - **Malformed (literally unparseable) dates deliberately NOT
+      injected** - a real, empirically-confirmed constraint, not a
+      shortcut: DuckDB's `read_csv_auto` infers a column's type per FILE,
+      not per row, so a single unparseable date string silently
+      downgrades the WHOLE column to VARCHAR for that run, corrupting
+      every other check on it. Keith's call: out-of-range dates only for
+      now; malformed dates flagged here as a real follow-up, not built.
+
+    **Three real bugs found and fixed while building/verifying the above**
+    (each got a regression test per CLAUDE.md's convention - none of
+    these existed before this session, so none are retrofits):
+    - **Dual `dirty.py` import-resolution bug**
+      (`tests/test_generate_cp_runs.py`): `generator/dirty.py` and
+      `synthetic-data-generator/dirty.py` are two separate files with the
+      same module name; `generator/generate_cp_runs.py`'s own sys.path
+      manipulation (needed to reach the population/child-protection
+      generator, which lives in the other directory) caused `import
+      dirty` to silently resolve to the wrong, stale copy. A first
+      attempted fix (re-inserting `generator/`'s own directory at
+      `sys.path[0]` right after the other inserts) didn't work either -
+      `synthetic-data-generator/population.py` itself does its own
+      `sys.path.insert(0, ...)` as an import-time side effect, re-winning
+      the race. Root-cause fixed by moving the re-insertion to
+      immediately before `import dirty`, after every import that could
+      itself touch `sys.path`. Caught loud this time (the new
+      `apply_cp_clients_presets` function simply didn't exist in the
+      wrong file yet) - a genuinely dangerous variant of the same bug
+      (editing an EXISTING shared preset without updating both copies)
+      would have been silent.
+    - **Stale hardcoded Evidently reference-run constants**
+      (`tests/test_orchestrate_reference_run.py`): both
+      `run_evidently_bdm.py` and `run_evidently_cp.py` have a module-level
+      `REFERENCE_RUN_ID` literal (e.g. `"run_01_2026-09-01"`), and neither
+      `orchestrate_bdm.py` nor `orchestrate_cp.py` ever overrode it with
+      the manifest's actual first run - so both always drifted onto the
+      hardcoded default as the rolling anchor date
+      (`generator/anchor_date.py`) advances. Because `data/raw/`/
+      `data/cp_raw/` aren't cleared between regenerations, a stale file
+      under the old literal name can still exist on disk, so this failed
+      silently (Evidently drift comparison against genuinely wrong
+      reference data) rather than loudly - CP's manifest happened not to
+      have a leftover file under that exact stale name, which is what
+      surfaced this as a `FileNotFoundError` and led to finding the BDM
+      side was silently wrong too. Fixed by having both `run_pipeline()`
+      functions derive the reference from `manifest[0]` (always the
+      first, clean run by `RUN_PLAN` construction) and thread it through
+      explicitly, including each file's own `__main__` smoke-test block.
+    - **`"N/A"` as an injected invalid value silently becomes a real NULL**
+      (`tests/test_dirty.py`): pandas' and DuckDB's CSV readers both
+      treat the literal string `"N/A"` as a null-sentinel by default, so
+      an injected `"N/A"` round-trips through the generator's own
+      write-then-read pipeline as an actual NULL, not the string. SQL
+      `NOT IN (...)` (dbt's `accepted_values`, Soda's `invalid_percent`)
+      evaluates to NULL - not TRUE - for a NULL input, so the row is
+      silently excluded from the WHERE clause and never counted as
+      invalid at all. Confirmed live: 4 of 18 injected postcode values on
+      one run disappeared this way, enough to flip dbt's result from fail
+      to warn while datacontract-cli's own Python-level check (which
+      treats null as failing a `validValues` rule) correctly still said
+      fail - three engines actively disagreeing on the same run, not a
+      real data-quality signal. Found in this session's own new
+      `_INVALID_SUBURB_POOL`/`_INVALID_POSTCODE_POOL`, but the same `N/A`
+      literal was also sitting in the pre-existing `_JUNK_TEXT_POOL`
+      (child_given_names' format-junk preset) - genuinely live, not
+      "already fixed history" (CLAUDE.md's retrofit exemption doesn't
+      apply), so fixed there too even though it predates this session.
+      All three pools now avoid every string in pandas' default
+      `na_values` list.
+
+    **Verified**: full pipeline regenerated for both datasets after all
+    three fixes: BDM suburb and CP postcode/date_of_birth checks land on
+    the correct side of their amber/red bands, consistently across dbt,
+    Soda, and datacontract-cli (no more cross-engine disagreement from
+    the NULL-swallowing bug). `uv run pytest` (28 tests, up from 23) and
+    `uv run ruff check .` both clean.
+
+    **Not yet built**: the aggregate-values backend itself (distinct
+    values + counts for closed-value-set checks, gated by
+    `classification`; min/max/outlier-list and a binned histogram for
+    numeric/date checks - both selected via `AskUserQuestion`
+    `multiSelect`) across dbt/Soda/datacontract-cli, wiring into
+    `pipeline/build_dashboard_data.py`/`build_cp_dashboard_data.py`, and
+    the dashboard UI to render it in the check-detail panel. Everything
+    above is prerequisite check/data-layer setup the aggregate feature
+    will read from.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

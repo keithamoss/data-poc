@@ -40,7 +40,7 @@ MANIFEST_PATH = os.path.join(ROOT, "data", "raw", "manifest.json")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
 
 
-def _run_one(entry: dict, run_timestamp: str) -> list[dict]:
+def _run_one(entry: dict, run_timestamp: str, reference_run_id: str, reference_csv: str) -> list[dict]:
     run_id = entry["run_id"]
     csv_filename = entry["file"]
     print(f"--- {run_id} ---")
@@ -49,7 +49,8 @@ def _run_one(entry: dict, run_timestamp: str) -> list[dict]:
     results.extend(run_dbt_bdm.evaluate_dbt_bdm(run_id, run_timestamp))
     results.extend(run_soda_bdm.evaluate_soda_bdm(run_id, run_timestamp))
     results.extend(run_datacontract_bdm.evaluate_datacontract_bdm(run_id, csv_filename, run_timestamp))
-    results.extend(run_evidently_bdm.evaluate_evidently_bdm(run_id, csv_filename, run_timestamp))
+    results.extend(run_evidently_bdm.evaluate_evidently_bdm(
+        run_id, csv_filename, run_timestamp, reference_run_id=reference_run_id, reference_csv=reference_csv))
     return results
 
 
@@ -59,8 +60,20 @@ def run_pipeline(sequential: bool = False) -> dict:
     with open(MANIFEST_PATH) as f:
         manifest = json.load(f)
 
+    # The first manifest entry (run_01, always clean by RUN_PLAN
+    # construction) - NOT run_evidently_bdm.REFERENCE_RUN_ID, a hardcoded
+    # literal that goes stale every time the anchor date rolls forward
+    # (generator/anchor_date.py). A real bug, found live: with the anchor
+    # date advanced, data/raw/'s actual run_01 file no longer matched that
+    # constant, and because old dated files aren't cleaned up between
+    # regenerations, evidently silently compared against a stale leftover
+    # file from a previous anchor date instead of failing loudly - see
+    # plans/qa-pipeline.md for the regression test this got.
+    reference_entry = manifest[0]
     run_timestamp = datetime.now(timezone.utc).isoformat()
-    all_results = parallel_orchestrate.run_manifest(manifest, _run_one, run_timestamp, sequential=sequential)
+    all_results = parallel_orchestrate.run_manifest(
+        manifest, _run_one, run_timestamp, reference_entry["run_id"], reference_entry["file"],
+        sequential=sequential)
 
     n_pass = sum(1 for r in all_results if r["status"] == "pass")
     n_warn = sum(1 for r in all_results if r["status"] == "warn")

@@ -36,6 +36,8 @@ AGENCY_ID = "registry-services"
 COLLECTION_ID = "civil-registration"
 DATASET_ID = "birth-registrations"
 
+# A fallback default only - see run_evidently_cp.py's identical comment
+# and orchestrate_bdm.py for why real callers never rely on it.
 REFERENCE_RUN_ID = "run_01_2026-09-01"
 
 # Row-growth check: "some reduction in a daily refresh is fine" (Keith's
@@ -154,8 +156,10 @@ if __name__ == "__main__":
 
     with open(os.path.join(RAW_DIR, "manifest.json")) as f:
         manifest = json.load(f)
+    ref = manifest[0]  # not the module-level REFERENCE_RUN_ID default - see orchestrate_bdm.py
     for entry in manifest:
-        res = evaluate_evidently_bdm(entry["run_id"], entry["file"], datetime.now(timezone.utc).isoformat())
+        res = evaluate_evidently_bdm(entry["run_id"], entry["file"], datetime.now(timezone.utc).isoformat(),
+                                      reference_run_id=ref["run_id"], reference_csv=ref["file"])
         psi, growth = res[0], (res[1] if len(res) > 1 else None)
         growth_str = f"row_growth={growth['metric_value']:+.1f}%  status={growth['status']:5s}" if growth else "row_growth=n/a (first run)"
         print(f"{entry['run_id']:25s} PSI={psi['metric_value']}  status={psi['status']:5s}  |  {growth_str}")
