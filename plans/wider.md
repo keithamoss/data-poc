@@ -428,12 +428,17 @@ not a schedule.
     piecemeal from individual requests. Nothing to do yet - revisit when
     he raises it.
 
-17. **[parked, in progress]** Give this project a cute/proper name, rather
-    than just "data-poc." Scoped a bit via a few rounds: single or two
-    words max, playful/punny or a backronym, tied to the wider
-    government-data-asset angle rather than narrowly to birth
-    registrations. No name chosen yet - options considered so far, for
-    when this comes back up:
+17. **[decided]** Project codename: **Mothman**. Chosen over "data-poc" -
+    scoped via a few rounds: single or two words max, playful/punny or a
+    backronym, tied to the wider government-data-asset angle rather than
+    narrowly to birth registrations. Landed on Mothman for the strongest
+    thematic fit found across the whole exercise (see below) - a legend
+    remembered as a warning that came before a disaster, matching what a
+    QA/checks system is actually for: catching problems before they
+    cause real downstream damage. Not yet reflected anywhere in the repo
+    itself (no rename of the GitHub repo, README, dashboard title, etc.)
+    - purely a codename decision so far; revisit if/when Keith wants it
+    to show up somewhere concrete. Full options considered, for context:
 
     - **Greek philosophy/mythology round**: **Plato**/**The Cave**
       (strongest *conceptual* fit found - the Allegory of the Cave maps
@@ -487,7 +492,4 @@ not a schedule.
       multi-agency data asset concept); also considered and set aside:
       GUARDIAN, TRUST, Black Swan Watch, QuokkaCheck, DataMuster.
 
-    Current leaning, not yet decided: **Mothman** (best thematic fit
-    overall) vs **Themis** (best fit specifically for the government/
-    regulatory context, cleanest market differentiation). Revisit when
-    Keith wants to actually pick one.
+    **Decision (2026-09-14): Mothman.**
