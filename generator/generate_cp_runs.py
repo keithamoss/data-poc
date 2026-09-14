@@ -44,6 +44,8 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
+from anchor_date import get_anchor_date
+
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 GENERATOR_DIR = os.path.join(ROOT, "synthetic-data-generator")
 sys.path.insert(0, GENERATOR_DIR)
@@ -74,7 +76,17 @@ RUN_PLAN = [
     (5, None), (6, "amber"), (7, None), (8, None), (9, "red"),
 ]
 
-START_DATE = date(2026, 7, 6)  # a Monday, 10 weeks before the generator's TODAY (2026-09-13)
+# Rolling window ending on the anchor date ("today" by default, pinnable
+# via GENERATOR_ANCHOR_DATE - see anchor_date.py), same fix and rationale
+# as generate_runs.py's own START_DATE - un-stales the fixture generally
+# (plans/qa-pipeline.md #3's follow-up covers both). No wall-clock-
+# relative check depends on CP's dates today, unlike BDM's, but there's
+# no reason to leave CP's snapshots drifting stale either. Keeps the
+# "always a Monday" weekly-extract realism touch by anchoring to the most
+# recent Monday on/before the anchor date, not the anchor date itself.
+_anchor = get_anchor_date()
+_last_monday = _anchor - timedelta(days=_anchor.weekday())
+START_DATE = _last_monday - timedelta(weeks=9)
 
 
 def _add_extract_timestamp(df: pd.DataFrame, snapshot_date: date, date_col: str | None, seed: int) -> pd.DataFrame:

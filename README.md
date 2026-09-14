@@ -352,22 +352,22 @@ held from the original equivalent-only build.
   Soda Core against `CURRENT_DATE` as of whenever the scan actually runs —
   found while comparing it against the equivalent engine's own assumption
   (lack of a real "now" meant it used each run's own latest
-  `extract_timestamp` instead). Since every synthetic run's dates are in
-  the past by the time this runs for real, the `[recent]` scope resolves
-  to 0 rows on every run, and the scoped check always reports pass. This
-  is a real, ongoing property of the fixture — not a bug: the check
-  faithfully models "if this ran today," on a fixture built for a
-  different day.
+  `extract_timestamp` instead). **Fixed** (2026-09-14, see `plans/qa-
+  pipeline.md` #3): the fixture's dates used to be pinned to a fixed
+  calendar range, so this scope resolved to 0 rows on every run once real
+  time had drifted away from it — `generator/anchor_date.py` now anchors
+  every generated run's dates to a rolling window ending "today" (real
+  wall-clock by default, pinnable via `GENERATOR_ANCHOR_DATE` for
+  reproducible verification runs), so this check has real data to filter
+  and genuinely passes or fails depending on it.
 - **The newer freshness / relative-date check shares that same real-
   wall-clock property, deliberately.** Unlike the `[recent]` filter above,
   this one (contract + Soda + dbt, `date_of_birth`) is genuinely useful
   precisely because it uses the real `CURRENT_DATE`: it exists to catch a
-  stalled upstream feed, which is inherently a "right now" question. The
-  honest cost is the same one the `[recent]` filter already pays — this
-  fixture's dates are fixed at Sept 2026, so its pass/fail split will
-  drift as real time moves away from that window. Regenerating on a
-  rolling window near "today" (`plans/qa-pipeline.md`'s open follow-up
-  for the `[recent]` filter) would fix both at once.
+  stalled upstream feed, which is inherently a "right now" question. Same
+  fix applies here too — the rolling window means the most recent runs'
+  `date_of_birth` values reliably fall within this check's 7-day lookback,
+  not just a coin-flip few right on a stale boundary.
 - **Evidently's PSI is genuinely sensitive to how a distributional shift
   gets binned into categories.** `DataDriftPreset` treats every distinct
   value actually observed in a column as its own category, so run_09's

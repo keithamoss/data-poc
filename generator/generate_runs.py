@@ -54,6 +54,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
+from anchor_date import get_anchor_date
 from daily_batch import generate_daily_batch
 from dirty import apply_birth_registrations_presets
 from resupply import MAX_ATTEMPTS, DatasetProvider, run_delivery_chain
@@ -79,7 +80,17 @@ RUN_PLAN = [
     (9, 1_830, None),
 ]
 
-START_DATE = date(2026, 9, 1)
+# Rolling window ending on the anchor date ("today" by default, pinnable
+# via GENERATOR_ANCHOR_DATE - see anchor_date.py) rather than a fixed
+# calendar date - the fixed 2026-09-01 this used to be drifted further
+# from real "now" every day, which is exactly why the Soda [recent] filter
+# and the dbt/contract freshness checks on date_of_birth always resolved
+# to 0 rows / "no recent data" once enough real time had passed (see
+# plans/qa-pipeline.md #3). The last scheduled delivery (day_offset=9)
+# lands ON the anchor date so those checks have real, robust margin - most
+# of that delivery's rows have a date_of_birth within the freshness
+# checks' 7-day window, not just a coin-flip few right on the boundary.
+START_DATE = get_anchor_date() - timedelta(days=9)
 
 
 class BirthRegistrationsProvider:

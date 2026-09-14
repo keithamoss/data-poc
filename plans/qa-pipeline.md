@@ -37,17 +37,28 @@ relative, not a schedule — this is weeks of work, not months.
    checking whether it's the intended replacement and whether
    `run_soda_bdm.py`'s `Scan` API still exists there before migrating.
 
-3. **[open, low]** Soda's `[recent]` scoped check (`filter ... where:
-   extract_timestamp >= CURRENT_DATE - 1`) never gets meaningfully
+3. **[done]** Soda's `[recent]` scoped check (`filter ... where:
+   extract_timestamp >= CURRENT_DATE - 1`) never got meaningfully
    exercised against real Soda Core — it uses the actual wall-clock date,
-   and this fixture's synthetic runs are all in the past by the time
-   anyone actually runs it, so the scope always resolves to 0 rows.
-   Documented as a real, honest finding (README's known-disagreements
-   section), not fixed. **Follow-up:** regenerate the synthetic runs on a
-   rolling window near "today" instead of a fixed Sept 2026 range, so the
-   scoped check has real data to filter — would also un-stale the fixture
-   generally. **In progress (2026-09-14)** - being scoped now, see
-   `plans/wider.md`.
+   and this fixture's synthetic runs were all in the past by the time
+   anyone actually ran it, so the scope always resolved to 0 rows.
+   **Fixed (2026-09-14)**: `generator/anchor_date.py` (new, shared by both
+   `generate_runs.py` and `generate_cp_runs.py`) anchors every generated
+   run's dates to a rolling window ending on "today" (real wall-clock by
+   default, pinnable via `GENERATOR_ANCHOR_DATE=YYYY-MM-DD` so a
+   regeneration can still be reproduced byte-for-byte for verification -
+   scoped via questions first, since a fully dynamic anchor would have
+   broken that diffing technique entirely). Verified real behavior
+   change, not just theory: post-fix, the `[recent]` filter now shows
+   genuine pass/fail variation across runs (`row_count_total` nonzero,
+   dirty runs correctly failing) instead of a dead 0/0 pass every time.
+   Same fix un-stales the newer `date_of_birth` freshness check (dbt +
+   Soda + contract) - confirmed passing with real margin on the most
+   recent runs post-fix, not just marginally on one boundary row. Applied
+   to Child Protection too (no wall-clock-dependent check there today,
+   but its dates were equally stale) - CP's weekly-snapshot cadence keeps
+   its "always a Monday" realism touch by anchoring to the most recent
+   Monday on/before the anchor date.
 
 4. **[moot - `engines/*.py` removed]** Evidently's PSI and the equivalent
    engine's PSI used to genuinely differ (0.144 vs 0.179 on the red run)
