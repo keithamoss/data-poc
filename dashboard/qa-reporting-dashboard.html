@@ -333,7 +333,6 @@ const TODAY = new Date("2026-09-13T00:00:00Z");
 function runDate(idxFromToday){ return new Date(TODAY.getTime() - idxFromToday*DAY); }
 function fmtDate(d){ return d.toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}); }
 function fmtDateShort(d){ return d.toLocaleDateString("en-US",{month:"short",day:"numeric"}); }
-function fmtPct(x,dp=2){ return x.toFixed(dp)+"%"; }
 function fmtInt(x){ return x.toLocaleString("en-US"); }
 function fmtMetric(x, unit){
   if(unit==="%") return x.toFixed(2)+"%";
