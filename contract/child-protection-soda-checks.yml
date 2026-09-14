@@ -49,8 +49,10 @@ checks for cp_notifications:
   # dropped join or truncated parent-table extract that
   # child-protection-contract.yaml's matching SQL rules explain in more
   # depth.
-  - values in (cp_client_id) must exist in cp_clients (cp_client_id)
-  - values in (assigned_worker_id) must exist in cp_case_workers (worker_id)
+  - values in (cp_client_id) must exist in cp_clients (cp_client_id):
+      samples limit: 5
+  - values in (assigned_worker_id) must exist in cp_case_workers (worker_id):
+      samples limit: 5
 
   # --- Business rule 1 of 3: escalation completeness ---------------------
   - failed rows:
@@ -70,9 +72,12 @@ checks for cp_notifications:
       # child-protection-contract.yaml's matching rule found.
 
 checks for cp_investigations:
-  - values in (notification_id) must exist in cp_notifications (notification_id)
-  - values in (cp_client_id) must exist in cp_clients (cp_client_id)
-  - values in (lead_worker_id) must exist in cp_case_workers (worker_id)
+  - values in (notification_id) must exist in cp_notifications (notification_id):
+      samples limit: 5
+  - values in (cp_client_id) must exist in cp_clients (cp_client_id):
+      samples limit: 5
+  - values in (lead_worker_id) must exist in cp_case_workers (worker_id):
+      samples limit: 5
 
   # --- Business rule 2 of 3: closed-case investigation hygiene -----------
   - failed rows:
@@ -91,8 +96,10 @@ checks for cp_investigations:
       # fuller account (this rule used to always fail - fixed, not hidden).
 
 checks for cp_placements:
-  - values in (cp_client_id) must exist in cp_clients (cp_client_id)
-  - values in (carer_id) must exist in cp_carers (carer_id)
+  - values in (cp_client_id) must exist in cp_clients (cp_client_id):
+      samples limit: 5
+  - values in (carer_id) must exist in cp_carers (carer_id):
+      samples limit: 5
 
   # --- Business rule 3 of 3: placement/carer approval compliance ---------
   - failed rows:

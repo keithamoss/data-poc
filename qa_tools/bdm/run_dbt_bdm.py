@@ -49,6 +49,13 @@ rather than anything in this project's own SQL - feeds into the same open
 upstream-repro follow-up as the other two (plans/qa-pipeline.md #1).
 Treated the same way here: independently verified via direct query, not
 trusted blindly.
+
+Also captures up to 5 example failing rows' registration_numbers per
+check (via dbt's --store-failures audit tables, see dbt_common.py) -
+identifiers only, never full row content, per plans/qa-pipeline.md #15.
+Not every test shape supports this (recent_births_present has no
+per-row concept at all - see its own .sql comment); see
+_failing_sample_keys()'s docstring for the exact coverage.
 """
 from __future__ import annotations
 import json
@@ -56,7 +63,10 @@ import os
 
 import duckdb
 
-from qa_tools.common.dbt_common import ENGINE_TAG, parse_threshold, run_dbt, test_nodes
+from qa_tools.common.dbt_common import (
+    ENGINE_TAG, parse_threshold, run_dbt, test_nodes,
+    failing_sample_keys_direct, failing_sample_keys_via_values,
+)
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 DBT_PROJECT_DIR = os.path.join(ROOT, "dbt_project")
@@ -123,6 +133,37 @@ _LABEL_BY_TEST = {
 }
 
 
+def _failing_sample_keys(conn, test_name: str, column: str, node: dict, status: str) -> list[str]:
+    """Up to 5 example registration_numbers for the rows that actually
+    failed this test, via dbt's own --store-failures audit table (see
+    dbt_common.py) - never full row content, per plans/qa-pipeline.md
+    #15's "flag it, not full row content" line. Two test shapes are
+    deliberately skipped, not oversights: recent_births_present is a
+    boolean existence check (its audit table has no row/PK concept at
+    all - see its own dbt_project/tests/*.sql comment), and any test with
+    no relation_name (shouldn't happen once --store-failures is always
+    on, guarded anyway)."""
+    if status not in ("warn", "fail"):
+        return []
+    relation_name = node.get("relation_name")
+    if not relation_name:
+        return []
+    if test_name in ("not_null", "multiple_birth_sibling"):
+        # the audit table already IS (a projection of) the failing rows
+        # themselves - not_null keeps every column, multiple_birth_sibling's
+        # own fail query already selects just registration_number.
+        return failing_sample_keys_direct(conn, relation_name, "registration_number")
+    if test_name in ("accepted_values", "unique"):
+        # these two dbt generic-test macros pre-aggregate their audit
+        # table to the offending VALUE (+ a count), not the failing row -
+        # resolve back to real registration_numbers via one follow-up
+        # query against the model itself.
+        value_column = "value_field" if test_name == "accepted_values" else "unique_field"
+        return failing_sample_keys_via_values(
+            conn, relation_name, value_column, "stg_birth_registrations", column, "registration_number")
+    return []
+
+
 def _status_for(count: int, warn_t: float | None, fail_t: float | None) -> str:
     if fail_t is not None and count > fail_t:
         return "fail"
@@ -184,6 +225,8 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
                 # test genuinely failed instead.
                 status = "fail" if verified_count > 0 else "pass"
 
+        failing_sample_keys = _failing_sample_keys(conn, test_name, column, node, status)
+
         results.append({
             "agency_id": AGENCY_ID,
             "collection_id": COLLECTION_ID,
@@ -202,6 +245,7 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
             "on_fail_action": "flag",
             "row_count_total": n_total,
             "row_count_invalid": failures,
+            "failing_sample_keys": failing_sample_keys,
             "engine": ENGINE_TAG,
         })
 

@@ -173,11 +173,12 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict]) -> di
         slot = by_column.setdefault(col, {}).setdefault(key, {
             "unit": r["unit"], "warn": r["warn_threshold"], "fail": r["fail_threshold"],
             "dimension": r["dimension"], "label": r.get("label"),
-            "by_run": {}, "row_count_total": {}, "row_count_invalid": {},
+            "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
         })
         slot["by_run"][r["run_id"]] = r["metric_value"]
         slot["row_count_total"][r["run_id"]] = r["row_count_total"]
         slot["row_count_invalid"][r["run_id"]] = r["row_count_invalid"]
+        slot["failing_sample_keys"][r["run_id"]] = r.get("failing_sample_keys") or []
 
     run_ids_in_order = [m["run_id"] for m in manifest]
     latest_run, prev_run = run_ids_in_order[-1], run_ids_in_order[-2]
@@ -200,6 +201,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict]) -> di
                         "run_date": run_date, "value": slot["by_run"][run_id],
                         "row_count_total": slot["row_count_total"].get(run_id),
                         "row_count_invalid": slot["row_count_invalid"].get(run_id),
+                        "failing_sample_keys": slot["failing_sample_keys"].get(run_id) or [],
                     })
             if not history:
                 continue

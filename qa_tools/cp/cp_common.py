@@ -38,6 +38,19 @@ TABLE_DATASET_NAME = {
     "cp_case_workers": "Case Workers",
 }
 
+# each table's primary key column (all `unique: true` in
+# contract/child-protection-contract.yaml) - used to pull just the
+# identifier out of a failing-row sample, never full row content, per
+# plans/qa-pipeline.md #15's "flag it, not full row content" line.
+TABLE_PK = {
+    "cp_clients": "cp_client_id",
+    "cp_notifications": "notification_id",
+    "cp_investigations": "investigation_id",
+    "cp_placements": "placement_id",
+    "cp_carers": "carer_id",
+    "cp_case_workers": "worker_id",
+}
+
 # where each of the 3 cross-table business-rule singular tests / SQL rules
 # "lives" for dashboard purposes - matches the table their quality: block
 # sits under in contract/child-protection-contract.yaml (the child table in

@@ -18,12 +18,21 @@ qa_tools/common/datacontract_common.py - see plans/wider.md #20.
 Each check result's dataset_id comes straight from `c.model` -
 datacontract-cli's own check objects already know which schema object
 (i.e. which CP table) they belong to.
+
+Also captures up to 5 example failing rows' own primary keys per check
+(see run_datacontract_bdm.py's docstring and datacontract_common.py -
+identical mechanism, just keyed per-table via cp_common.TABLE_PK). Same
+gap as BDM: the 7 FK checks and 3 business rules (all custom_sql) aren't
+covered by datacontract-cli's include_failed_samples at all.
 """
 from __future__ import annotations
 import os
 import re
 
-from qa_tools.common.datacontract_common import ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, run_against_local_server
+from qa_tools.common.datacontract_common import (
+    ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
+    run_against_local_server, failing_sample_keys,
+)
 from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -125,6 +134,7 @@ def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
             "on_fail_action": "quarantine" if diag.get("severity") == "error" else "flag",
             "row_count_total": row_count_total,
             "row_count_invalid": row_count_invalid,
+            "failing_sample_keys": failing_sample_keys(c, cp_common.TABLE_PK[table]) if metric in SAMPLEABLE_METRICS else [],
             "engine": ENGINE_TAG,
         })
 

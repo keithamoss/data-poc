@@ -21,13 +21,22 @@ synthetic run's dates are in the past relative to whenever this actually
 runs, the [recent] filter scopes to 0 rows for every historical run, and
 its check always reports "pass" (0/0) - a real, ongoing property of this
 fixture, not a bug.
+
+Also captures up to 5 example failing rows' registration_numbers per
+check, via a custom Sampler (Soda's own DefaultSampler computes samples
+then discards them - see soda_common.py's CaptureSampler) - identifiers
+only, never full row content, per plans/qa-pipeline.md #15. Metric
+checks (missing_count/invalid_percent/etc.) need `samples limit:` opted
+into per-check in the checks YAML; "failed rows" checks sample
+automatically since their own fail query already returns the offending
+rows.
 """
 from __future__ import annotations
 import os
 
 import duckdb
 
-from qa_tools.common.soda_common import ENGINE_TAG, threshold
+from qa_tools.common.soda_common import ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 SODA_CHECKS_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-soda-checks.yml")
@@ -103,6 +112,8 @@ def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     scan.set_data_source_name("birth_registrations")
     scan.add_duckdb_connection(conn, data_source_name="birth_registrations")
     scan.add_sodacl_yaml_file(SODA_CHECKS_PATH)
+    sampler = CaptureSampler()
+    scan.sampler = sampler
     scan.disable_telemetry()
     scan.execute()
     scan_results = scan.get_scan_results()
@@ -175,6 +186,7 @@ def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
             "on_fail_action": "flag",
             "row_count_total": n_total,
             "row_count_invalid": row_count_invalid,
+            "failing_sample_keys": failing_sample_keys(sampler.captured, c["name"], "registration_number"),
             "engine": ENGINE_TAG,
         })
 

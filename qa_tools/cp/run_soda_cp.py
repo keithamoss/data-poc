@@ -8,15 +8,16 @@ needed to attribute a result to one of the 6 CP dataset_ids.
 
 Run once per run against its own per-run CP DuckDB file
 (qa_tools/cp/build_cp_warehouses.py) - same rationale as
-run_soda_bdm.py. Threshold parsing shared via
-qa_tools/common/soda_common.py - see plans/wider.md #20.
+run_soda_bdm.py. Threshold parsing and failing-row sample capture
+(CaptureSampler - see soda_common.py and run_soda_bdm.py's own docstring)
+shared via qa_tools/common/soda_common.py - see plans/wider.md #20.
 """
 from __future__ import annotations
 import os
 
 import duckdb
 
-from qa_tools.common.soda_common import ENGINE_TAG, threshold
+from qa_tools.common.soda_common import ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys
 from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -46,6 +47,8 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
     scan.set_data_source_name("cp_collection")
     scan.add_duckdb_connection(conn, data_source_name="cp_collection")
     scan.add_sodacl_yaml_file(SODA_CHECKS_PATH)
+    sampler = CaptureSampler()
+    scan.sampler = sampler
     scan.disable_telemetry()
     scan.execute()
     scan_results = scan.get_scan_results()
@@ -113,6 +116,7 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
             "on_fail_action": "flag",
             "row_count_total": n_total_by_table[table],
             "row_count_invalid": row_count_invalid,
+            "failing_sample_keys": failing_sample_keys(sampler.captured, c["name"], cp_common.TABLE_PK[table]),
             "engine": ENGINE_TAG,
         })
 

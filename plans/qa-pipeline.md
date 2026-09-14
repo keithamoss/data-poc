@@ -458,20 +458,106 @@ relative, not a schedule — this is weeks of work, not months.
     `unexpected_index_list` is no longer the only path to this, which was
     its main selling point for this specific use case; downgraded there
     accordingly.
-    **Resolved**: even though the capability is cheap, this doesn't
-    belong in the QA reporting dashboard - it's a genuine case-management/
-    workflow capability, architecturally distinct from reporting. Same
-    split `docs/quarantine_sex_column.py` already draws between "flag it"
-    and "act on it." Settled via several rounds of questions with Keith
+    **Resolved, first round**: even though the capability is cheap, full
+    row-level display (every column, ready to act on) doesn't belong in
+    the QA reporting dashboard - it's a genuine case-management/workflow
+    capability, architecturally distinct from reporting. Same split
+    `docs/quarantine_sex_column.py` already draws between "flag it" and
+    "act on it." Settled via several rounds of questions with Keith
     working through the actual shape (2026-09-14) - moved to its own file
     since it turned out to be a genuinely standalone design, not a
     dashboard feature: **see `docs/remediation-workflow-design.md`** for
     the full ticket model, assignment/escalation rules, automatic
-    pipeline-update principle, and quarantine/release design. This PoC's
-    own scope stays "design the seam, don't build it" - platform choice
-    (Jira Service Management vs. Microsoft-stack tooling) and the
-    external-provider access mechanism are both explicitly deferred, per
-    that doc's own "what's not decided here" section.
+    pipeline-update principle, and quarantine/release design. That
+    document's own scope still stands as written - "design the seam,
+    don't build it," platform choice and external-provider access both
+    explicitly deferred.
+
+    **[done] Built, narrower (2026-09-14, same day)**: Keith came back to
+    this specifically wanting to explore where the line between
+    "reporting" and "workflow" actually sits, deliberately not
+    overriding the resolution above. Landed on: a **read-only sample of
+    just the failing rows' own primary keys** (no full row content, no
+    action affordance - no quarantine/ticket/assignment) is still
+    genuinely "flag it," not "act on it," the same category of
+    information as the aggregate counts the dashboard already showed,
+    just more specific. Also motivated by `docs/remediation-workflow
+    -design.md`'s own principle that external providers should
+    eventually see only "primary keys of bad rows, not full row content"
+    - showing only PKs here stays consistent with that even though this
+    dashboard has no access tiers at all yet.
+
+    Built across all three capable tools, both datasets - up to 5 example
+    primary keys per failing check, capped consistently
+    (`FAILING_SAMPLE_LIMIT`/datacontract-cli's own hardcoded limit),
+    surfaced in the check-detail panel's existing "Row-level detail"
+    section:
+    - **datacontract-cli**: `include_failed_samples=True` - already
+      restricts samples to identifier + offending field itself, cheapest
+      of the three, confirmed matches the research above exactly.
+    - **Soda Core**: a custom `CaptureSampler` (`qa_tools/common/
+      soda_common.py`) replaces the default (which computes samples then
+      discards them) - `samples limit: 5` opted into each metric check in
+      both checks YAMLs; "failed rows" checks sample automatically
+      (confirmed empirically, not just documented).
+    - **dbt**: `--store-failures` (always on now, not opt-in) writes each
+      failing test's own rows into a `main_dbt_test__audit.<test>` table
+      - queried directly for tests whose audit table already carries the
+      row (not_null, and the singular tests that already select their
+      home table's own PK), or via one follow-up query against the model
+      for tests dbt itself pre-aggregates to the offending *value*
+      (`accepted_values`, `unique`) rather than the row.
+
+    **Real, named gaps, not oversights** - noted in code where they bite
+    rather than silently under-delivering:
+    - **Evidently**: no row concept at all (drift/row-growth, not
+      per-column validity) - confirmed already, unchanged.
+    - **`custom_sql`/`type: sql` rules** (both tools' freshness/sibling-
+      match/timestamp-ordering checks, CP's 3 business rules... except
+      Soda's own versions of the 3 CP business rules DO get real samples,
+      since Soda's "failed rows" mechanism is a different, row-native
+      shape from the other two tools' aggregate-metric sampling) - not
+      covered by `include_failed_samples` or dbt's generic-test
+      `--store-failures` shape at all.
+    - **dbt's `relationships` tests** (CP's 7 FK checks specifically):
+      its audit table only carries the offending FK *value*
+      (`from_field`), which would need a further value -> child-row
+      resolution step beyond what `accepted_values`/`unique` already
+      needed - deliberately not built this round. Currently
+      unobservable in practice anyway (the 7 FK checks never fail on
+      this fixture - see item 9 below).
+    - **datacontract-cli's `duplicate_count`**: its own sample shape is
+      `{field: value, duplicate_count: N}` (the offending value, like
+      dbt's `unique`), not the identifier - not resolved via a follow-up
+      query for this tool specifically (would need its own fresh read of
+      the source CSV). Low-impact: Soda's and dbt's own duplicate/unique
+      checks already cover the same underlying rule with real samples.
+
+    Verified real behaviour, not just code review: re-ran the full
+    pipeline for both datasets, diffed against pre-change output with
+    `failing_sample_keys` excluded - zero other differences (824/950
+    results, same pass/warn/fail counts). Confirmed via Playwright in an
+    actual browser (not just JSON inspection) that samples render
+    correctly in the check-detail panel for both datasets, and that
+    checks without a sample correctly show a fallback note instead of a
+    blank or broken section - this caught a real bug along the way (see
+    below).
+
+    **A real bug found and fixed while verifying, not while building**:
+    `qa-reporting-dashboard.html`'s `buildRealDataset()` remaps each raw
+    history point through an explicit field whitelist
+    (`row_count_total`/`row_count_invalid`/etc.) before the check-detail
+    panel ever sees it - `failing_sample_keys` was silently dropped by
+    that whitelist even though the underlying JSON had it correctly, so
+    the panel always fell through to the "no sample available" case.
+    Caught by Playwright-driving the actual UI (a browser test, not
+    reading the code), not by JSON-level verification, which had already
+    looked correct and would have missed it entirely. Fixed by adding
+    the field to the whitelist; per CLAUDE.md's bug-fix convention this
+    is the kind of thing that'd get a regression test, but this
+    dashboard's own rendering logic has no existing test harness (it's
+    hand-verified via Playwright throughout, not unit-tested) - noted
+    here rather than silently skipped.
 
 16. **[done]** Should the dashboard explain *why* checks on the
     same column can legitimately disagree in severity? Item 14's

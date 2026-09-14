@@ -17,11 +17,23 @@ description/support/team shape, the real dimension/severity enums, `rule`
 being deprecated in favour of `metric` with a completely different rule
 vocabulary, and datacontract-cli always linting against its bundled
 odcs-3.2.0 schema regardless of a contract's own declared apiVersion).
+
+Also captures up to 5 example failing rows' registration_numbers per
+check, via datacontract-cli's own include_failed_samples=True (see
+datacontract_common.py) - it already restricts samples to identifier +
+offending-field columns itself, never full row content, matching
+plans/qa-pipeline.md #15's "flag it" scope. Only the 3 SAMPLEABLE_METRICS
+(missing/invalid/duplicate_count) get samples from this tool - custom_sql
+rules (the freshness/sibling/timestamp checks) aren't covered by
+include_failed_samples at all, a real gap noted rather than hidden.
 """
 from __future__ import annotations
 import os
 
-from qa_tools.common.datacontract_common import ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, run_against_local_server
+from qa_tools.common.datacontract_common import (
+    ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
+    run_against_local_server, failing_sample_keys,
+)
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
@@ -95,6 +107,7 @@ def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str
             "on_fail_action": "quarantine" if diag.get("severity") == "error" else "flag",
             "row_count_total": row_count_total,
             "row_count_invalid": row_count_invalid,
+            "failing_sample_keys": failing_sample_keys(c, "registration_number") if metric in SAMPLEABLE_METRICS else [],
             "engine": ENGINE_TAG,
         })
 

@@ -58,5 +58,33 @@ def run_against_local_server(contract_path: str, local_path: str):
         "delimiter": "comma",
     })
 
-    dc = DataContract(data_contract_str=yaml.dump(d), server="local_test")
+    dc = DataContract(data_contract_str=yaml.dump(d), server="local_test", include_failed_samples=True)
     return dc.test()
+
+
+# datacontract-cli's own SAMPLEABLE_METRICS (missing_count/invalid_count/
+# duplicate_count) - the metric types include_failed_samples above
+# actually populates c.failedSamples for. type: sql (custom_sql) rules
+# aren't included - see plans/qa-pipeline.md #15 for why that's a real,
+# separate gap rather than an oversight here. duplicate_count is included
+# but, unlike the other two, its own samples are shaped {field: value,
+# duplicate_count: N} - the offending VALUE, not the identifier - so
+# failing_sample_keys() below correctly returns [] for it (same class of
+# gap as dbt's own `unique` test - see run_dbt_bdm.py's
+# failing_sample_keys_via_values, not replicated here since it needs
+# a fresh read of the source CSV this module doesn't otherwise hold).
+# Soda and dbt each already cover the equivalent duplicate/unique check
+# with real samples, so this is a narrow, single-tool gap, not a blind
+# spot on the check itself.
+SAMPLEABLE_METRICS = {"missing_count", "invalid_count", "duplicate_count"}
+
+
+def failing_sample_keys(check, pk_column: str) -> list[str]:
+    """Pulls just pk_column's value out of check.failedSamples -
+    datacontract-cli's own _samples_for() already restricts each sample
+    dict to {identifier column(s), the failing field}, so this never
+    touches full row content; pk_column narrows further to exactly one
+    column, matching every other tool's samples. Empty when the tool
+    didn't capture any (metric not sampleable, or a passing check)."""
+    samples = getattr(check, "failedSamples", None) or []
+    return [str(s[pk_column]) for s in samples if pk_column in s]

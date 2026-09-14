@@ -33,6 +33,7 @@ checks for birth_registrations:
   - missing_count(date_of_birth):
       warn: when > 0
       fail: when > 5
+      samples limit: 5
 
   # --- The traffic-light example you asked for: sex -----------------------
   # A closed value set that downstream systems depend on. Red/amber here
@@ -44,6 +45,7 @@ checks for birth_registrations:
       valid values: [M, F, X]
       warn: when > 0%
       fail: when > 2%
+      samples limit: 5
 
   # --- Null rate creeping up, with a genuine amber band --------------------
   # Unlike date_of_birth above, some null rate here is expected (home births
@@ -52,6 +54,7 @@ checks for birth_registrations:
   - missing_percent(place_of_birth_facility):
       warn: when > 15%
       fail: when > 35%
+      samples limit: 5
 
   # --- source_system_record_id: uniqueness + format ------------------------
   # BDM's internal record ID - a duplicate means a re-extract landed twice;
@@ -60,11 +63,13 @@ checks for birth_registrations:
   - duplicate_count(source_system_record_id):
       warn: when > 0
       fail: when > 3
+      samples limit: 5
 
   - invalid_percent(source_system_record_id):
       valid regex: '^SRC-[0-9]{9}$'
       warn: when > 0%
       fail: when > 1%
+      samples limit: 5
 
   # --- Text field format/junk checks ----------------------------------------
   # A name should be letters, spaces, periods and hyphens only - same rule
@@ -78,26 +83,31 @@ checks for birth_registrations:
       valid regex: '^[A-Za-z][A-Za-z. -]*$'
       warn: when > 0%
       fail: when > 3%
+      samples limit: 5
 
   - invalid_percent(child_family_name):
       valid regex: '^[A-Za-z][A-Za-z. -]*$'
       warn: when > 0%
       fail: when > 3%
+      samples limit: 5
 
   - invalid_percent(place_of_birth_suburb):
       valid regex: '^[A-Za-z][A-Za-z. -]*$'
       warn: when > 0%
       fail: when > 3%
+      samples limit: 5
 
   - invalid_percent(registering_parent_1_name):
       valid regex: '^[A-Za-z][A-Za-z. -]*$'
       warn: when > 0%
       fail: when > 3%
+      samples limit: 5
 
   - invalid_percent(registering_parent_2_name):
       valid regex: '^[A-Za-z][A-Za-z. -]*$'
       warn: when > 0%
       fail: when > 3%
+      samples limit: 5
 
   # --- Extract timestamp ordering -------------------------------------------
   # A "failed rows" check with a custom fail condition - real SodaCL, not a
@@ -164,3 +174,4 @@ checks for birth_registrations [recent]:
       warn: when > 0%
       fail: when > 1%
       name: sex validity, last 24h only
+      samples limit: 5

@@ -17,6 +17,10 @@ import subprocess
 
 ENGINE_TAG = "dbt-core 1.12 + dbt-duckdb"
 
+# Matches datacontract-cli's own hardcoded sample cap - see
+# datacontract_common.py and plans/qa-pipeline.md #15.
+FAILING_SAMPLE_LIMIT = 5
+
 _NUM_RE = re.compile(r"([\d.]+)")
 
 
@@ -41,8 +45,12 @@ def run_dbt(db_path: str, command: str, select: list[str], target_path: str,
         # (not just under parallel execution) since it's strictly safer
         # and free even sequentially - one run's target/ never lingers to
         # confuse the next.
+        # --store-failures writes each failing test's own offending rows
+        # into a main_dbt_test__audit.<test> table in the same per-run
+        # warehouse - the source failing_sample_keys_* below query for
+        # per-row samples (see plans/qa-pipeline.md #15).
         ["dbt", command, "--profiles-dir", profiles_dir, "--project-dir", project_dir, "--quiet",
-         "--target-path", target_path, "--select", *select],
+         "--target-path", target_path, "--select", *select, "--store-failures"],
         env=env, cwd=root, check=False, capture_output=True, text=True,
     )
 
@@ -52,3 +60,36 @@ def test_nodes(manifest: dict) -> dict[str, dict]:
         uid: node for uid, node in manifest["nodes"].items()
         if node.get("resource_type") == "test"
     }
+
+
+def failing_sample_keys_direct(conn, relation_name: str, pk_column: str,
+                                limit: int = FAILING_SAMPLE_LIMIT) -> list[str]:
+    """For test shapes whose --store-failures audit table already carries
+    the model's own primary key column verbatim (not_null - the whole
+    failing row; the singular tests that already select their home
+    table's PK directly) - just read it straight out.
+    relation_name comes from the test's own manifest node (already
+    fully-qualified/quoted for this warehouse), not constructed by hand."""
+    try:
+        rows = conn.execute(f"SELECT {pk_column} FROM {relation_name} LIMIT {limit}").fetchall()
+    except Exception:
+        return []
+    return [str(r[0]) for r in rows if r[0] is not None]
+
+
+def failing_sample_keys_via_values(conn, relation_name: str, value_column: str,
+                                    model: str, filter_column: str, pk_column: str,
+                                    limit: int = FAILING_SAMPLE_LIMIT) -> list[str]:
+    """For test shapes whose audit table is pre-aggregated to the
+    offending VALUE, not the failing row (accepted_values' `value_field`,
+    unique's `unique_field`, both grouped-by-value + a count) - resolves
+    back to real failing rows' own primary keys via one follow-up query
+    against the model itself, keyed on those values."""
+    try:
+        rows = conn.execute(
+            f"SELECT {pk_column} FROM {model} WHERE {filter_column} "
+            f"IN (SELECT {value_column} FROM {relation_name}) LIMIT {limit}"
+        ).fetchall()
+    except Exception:
+        return []
+    return [str(r[0]) for r in rows if r[0] is not None]

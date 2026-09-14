@@ -30,7 +30,10 @@ import os
 
 import duckdb
 
-from qa_tools.common.dbt_common import ENGINE_TAG, parse_threshold, run_dbt, test_nodes
+from qa_tools.common.dbt_common import (
+    ENGINE_TAG, parse_threshold, run_dbt, test_nodes,
+    failing_sample_keys_direct, failing_sample_keys_via_values,
+)
 from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -77,6 +80,32 @@ def _table_for_test(node: dict) -> str | None:
     return table if table in cp_common.TABLES else None
 
 
+def _failing_sample_keys(conn, test_name: str, column: str, table: str, node: dict, status: str) -> list[str]:
+    """Up to 5 example failing rows' own primary keys, via dbt's
+    --store-failures audit table (see dbt_common.py) - identifiers only,
+    never full row content, per plans/qa-pipeline.md #15. `relationships`
+    (the 7 FK checks) is a deliberate, named gap for now: its audit table
+    only carries the offending FK *value* (`from_field`), which would
+    need a further resolution step (value -> child model row -> child PK)
+    beyond what accepted_values/unique already need - left for a
+    follow-up rather than built speculatively."""
+    if status not in ("warn", "fail"):
+        return []
+    relation_name = node.get("relation_name")
+    if not relation_name:
+        return []
+    pk_column = cp_common.TABLE_PK[table]
+    model = f"stg_{table}"
+    if test_name == "not_null" or test_name in cp_common.BUSINESS_RULE_HOME_TABLE:
+        # not_null's audit table keeps every column; each singular
+        # business-rule test's own query already selects its home
+        # table's PK directly (confirmed per-test, not assumed).
+        return failing_sample_keys_direct(conn, relation_name, pk_column)
+    if test_name == "unique":
+        return failing_sample_keys_via_values(conn, relation_name, "unique_field", model, column, pk_column)
+    return []  # relationships - see docstring above
+
+
 def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
     db_path = os.path.join(CP_DUCKDB_RUNS_DIR, f"{run_id}.duckdb")
     # A single `dbt build` (build the 6 models, then run their tests)
@@ -118,6 +147,7 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
         failures = r.get("failures") or 0
         warn_t = parse_threshold(config.get("warn_if"))
         fail_t = parse_threshold(config.get("error_if"))
+        failing_sample_keys = _failing_sample_keys(conn, test_name, column, table, node, status)
 
         results.append({
             "agency_id": cp_common.AGENCY_ID,
@@ -137,6 +167,7 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
             "on_fail_action": "flag",
             "row_count_total": n_total_by_table[table],
             "row_count_invalid": failures,
+            "failing_sample_keys": failing_sample_keys,
             "engine": ENGINE_TAG,
         })
 
