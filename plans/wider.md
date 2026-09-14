@@ -672,3 +672,42 @@ not a schedule.
       truth drift risk action 18 just fixed elsewhere. The old two-step
       `pip install` dance is only still needed for plain-pip installs
       (no equivalent override mechanism) - documented as such in README.
+
+20. **[investigate]** Code duplication across `real_tools/*_real.py` (BDM)
+    vs `real_tools/*_real_cp.py` (Child Protection) file pairs - asked
+    because more datasets are coming. Confirmed: yes, one file pair per
+    tool, 8 files / 1392 lines total for 2 datasets (dbt 258+181, Soda
+    200+140, datacontract-cli 154+177, Evidently 185+97).
+
+    Diffed the dbt pair (and spot-checked the Soda pair) in full. Same
+    split both times:
+    - **Genuinely shared/generic** (~30-40 lines/pair): subprocess/API
+      invocation boilerplate (`_run_dbt`'s `subprocess.run` call shape,
+      `--target-path` handling), `_parse_threshold`/`_NUM_RE`, path
+      constants, `ENGINE_TAG` pattern, the per-run-warehouse-file
+      convention.
+    - **Genuinely dataset-specific** (the rest): test-name -> dimension/
+      label mapping dicts (different tests exist per dataset), BDM's
+      `_VERIFY_COUNT_SQL` dbt-duckdb reliability workaround (Child
+      Protection has never hit that bug), CP's `_table_for_test()`
+      multi-table attribution (BDM is single-table, doesn't need it).
+      This half isn't boilerplate - it's the actual check-to-dashboard-
+      field mapping logic per dataset, and forcing it into one shared
+      abstraction would fight the grain of "each dataset's tests are
+      genuinely different."
+
+    Not a false-DRY situation, but not nothing either: ~150-260 lines/
+    file with a real (if partial) shared layer inside it, and every new
+    dataset currently means copy-pasting a whole file and manually
+    picking apart which parts to keep. Candidate approach, mirroring the
+    `parallel_orchestrate.py` precedent (action item above, `plans/
+    performance.md` #4) of extracting a *generic* module that dataset-
+    specific files call into rather than a base class datasets subclass:
+    a small `_dbt_common.py`/`_soda_common.py`/etc. per tool holding just
+    the confirmed-shared ~30-40 lines, imported by both existing files
+    and any new dataset's file. Not started - this is a "worth scoping
+    before the 3rd dataset lands" flag, not yet built or asked about in
+    enough detail to commit to a shape (e.g. whether it's worth doing per-
+    tool now vs. waiting to see what a 3rd dataset's files actually need,
+    which would be better evidence than extrapolating from 2 data
+    points).

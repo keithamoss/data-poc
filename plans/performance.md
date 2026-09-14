@@ -69,14 +69,34 @@ separate subprocess calls (`dbt run` then `dbt test`).
 
 ## Open — filed away, not implemented
 
-3. **[open, low]** Investigate datacontract-cli's 7.6s/run. Unlike dbt,
-   this isn't process-startup overhead — the Python import is ~0.45s and
-   `DataContract()` construction is ~0.03s; the cost is genuinely inside
-   `.test()` itself (parsing 6 CSVs into DuckDB views, running every
-   quality rule). Harder to justify a fix without understanding *why*
-   it's slow first (repeated DuckDB extension loading? ibis backend
-   setup? something reducible without changing what's tested?) — lower
-   confidence this pays off, needs investigation before it needs code.
+3. **[investigated, low — no action taken]** datacontract-cli's ~6-7.6s/run
+   cost, profiled properly (2026-09-14) rather than left as a guess.
+   Phase-by-phase timing of `evaluate_datacontract_real()` confirmed the
+   cost is genuinely inside `.test()`, not import/setup: import 0.349s,
+   `DataContract()` construction 0.011s, `.test()` call 6.743s.
+
+   `cProfile`'d the `.test()` call itself to find out *why*. No single
+   dominant fixable bottleneck — the time is spread across genuine work
+   inside datacontract-cli's own implementation:
+   - ibis/DuckDB schema introspection (`ibis.backends.duckdb.table()` /
+     `get_schema()`) — 14 calls, ~4.82s cumulative, the largest chunk.
+   - Raw SQL execution (`_duckdb.sql`) — 29 calls, 2.944s tottime (the
+     single biggest *tottime*, i.e. time not spent in sub-calls).
+   - ibis backend connection setup (`connect_ibis`) — 1.308s, paid once.
+
+   14 `table()`/`get_schema()` calls for what's presumably 6 CSVs (one
+   per table in the contract) stood out as possibly-redundant schema
+   introspection — a plausible investigation lead if this were pursued
+   further, since re-doing schema lookups on tables already introspected
+   would be pure waste. Not chased further: this cost lives inside
+   datacontract-cli's own library code, not this repo's — fixing it means
+   either patching/monkeypatching a dependency (fragile, real ongoing
+   maintenance cost) or upstreaming a fix (a genuinely new commitment vs.
+   the "PoC in weeks" scope). Given item #4 already delivered a bigger,
+   safer win (3.1-3.4x, this repo's own code, zero dependency risk),
+   parking this — same status this item always had ("lower confidence
+   this pays off"), now with real evidence behind that call rather than a
+   guess.
 
 4. **[done, medium]** Parallelize across the independent runs
    (multiprocessing — each run is its own isolated DuckDB file, no shared
