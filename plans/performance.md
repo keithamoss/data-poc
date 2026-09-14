@@ -1,7 +1,7 @@
 # Real-tool pipeline performance
 
-How long `real_tools/orchestrate_real.py` (Birth Registrations) and
-`real_tools/orchestrate_real_cp.py` (Child Protection) actually take, what
+How long `real_tools/bdm/orchestrate_real_bdm.py` (Birth Registrations) and
+`real_tools/cp/orchestrate_real_cp.py` (Child Protection) actually take, what
 was done about it, and what's left on the table. Scoped narrowly to these
 two orchestration scripts — not the whole repo's performance.
 

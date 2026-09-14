@@ -14,8 +14,8 @@ echo "== 1/4: generate + load the combined warehouse (pipeline/orchestrate.py) =
 python3 pipeline/orchestrate.py
 
 echo
-echo "== 2/4: run the real tools (real_tools/orchestrate_real.py) =="
-python3 real_tools/orchestrate_real.py
+echo "== 2/4: run the real tools (real_tools/bdm/orchestrate_real_bdm.py) =="
+python3 -m real_tools.bdm.orchestrate_real_bdm
 
 echo
 echo "== 3/4: reshape results_real.json for the dashboard =="

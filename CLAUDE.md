@@ -46,7 +46,7 @@ Rough layout:
 | `generator/` | Synthetic data generation (`daily_batch.py`, `generate_runs.py`, `resupply.py`, `dirty.py`) - Birth Registrations only; deliberately separate from `synthetic-data-generator/`'s population-scale generator |
 | `synthetic-data-generator/` | A separate, population-scale (millions), cross-agency-identity-linked synthetic data generator - not currently wired into the pipeline (see `plans/wider.md`) |
 | `pipeline/` | `orchestrate.py` generates + loads the combined DuckDB warehouse; `build_dashboard_data.py`/`build_cp_dashboard_data.py` reshape real-tool results into dashboard JSON |
-| `real_tools/` | The actual dbt-core/Soda Core/datacontract-cli/Evidently runs - the only pipeline path now. (An earlier `engines/` directory of hand-written Python/DuckDB stand-ins, from before real tool access existed, was removed once it had drifted out of sync - see `plans/wider.md` action 18. Git history holds it if ever needed.) |
+| `real_tools/` | The actual dbt-core/Soda Core/datacontract-cli/Evidently runs - the only pipeline path now. A proper Python package: `bdm/` and `cp/` (one per dataset, run as `python3 -m real_tools.bdm.orchestrate_real_bdm` / `real_tools.cp.orchestrate_real_cp`) plus `common/` (tool-generic subprocess/API invocation shared between them) - see `plans/wider.md` action 20 for why. (An earlier `engines/` directory of hand-written Python/DuckDB stand-ins, from before real tool access existed, was removed once it had drifted out of sync - see `plans/wider.md` action 18. Git history holds it if ever needed.) |
 | `dashboard/qa-reporting-dashboard.html` | The single-file static dashboard, published via GitHub Pages on every push that touches `dashboard/` |
 | `docs/` | Research and design-note docs - `data-contract-engines-landscape.md` (tooling survey), `synthetic-data-generation-tools-research.md`, `synthetic-data-generator-notes.md`, `remediation-workflow-design.md` (the bad-data ticketing/case-management design - deliberately out of this PoC's build scope, seam only) |
 | `plans/` | Living project memory - see above |
@@ -56,10 +56,13 @@ Rough layout:
 - `data/raw/`, `data/warehouse.duckdb`, `reports/*.json` etc. are
   gitignored and fully regenerated - never hand-edit or try to commit
   them. Regenerate via `./run_pipeline.sh` (the whole pipeline end to
-  end, ~45s) or `python3 real_tools/orchestrate_real.py` (just the
-  real-tool check runs, if `data/raw/`/`data/warehouse.duckdb` already
-  exist). Both real_tools orchestration scripts run their manifest's
-  runs in parallel by default (`real_tools/parallel_orchestrate.py`) -
+  end, ~45s) or `python3 -m real_tools.bdm.orchestrate_real_bdm` (just
+  the real-tool check runs, if `data/raw/`/`data/warehouse.duckdb`
+  already exist; `python3 -m real_tools.cp.orchestrate_real_cp` for
+  Child Protection - not part of `run_pipeline.sh`, run separately).
+  `real_tools` is a proper Python package (`-m` invocation, not a bare
+  script path) - both orchestration scripts run their manifest's runs in
+  parallel by default (`real_tools/common/parallel_orchestrate.py`) -
   add `--sequential` if debugging one specific run, since parallel
   workers interleave their print output and stack traces.
 - Everything is seeded - regenerating reproduces the same output, so a

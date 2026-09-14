@@ -1,28 +1,27 @@
 """
 Runs REAL Soda Core (soda-core-duckdb) against
 contract/child-protection-soda-checks.yml, via Soda's own Python Scan API -
-the Child Protection counterpart to run_soda_real.py. Soda's own scan
-results carry which table each check belongs to (`c["table"]`), so unlike
-run_dbt_real_cp.py there's no separate lookup needed to attribute a result
-to one of the 6 CP dataset_ids.
+the Child Protection counterpart to real_tools/bdm/run_soda_real_bdm.py.
+Soda's own scan results carry which table each check belongs to
+(`c["table"]`), so unlike run_dbt_real_cp.py there's no separate lookup
+needed to attribute a result to one of the 6 CP dataset_ids.
 
 Run once per run against its own per-run CP DuckDB file
-(real_tools/build_cp_warehouses.py) - same rationale as run_soda_real.py.
+(real_tools/cp/build_cp_warehouses.py) - same rationale as
+run_soda_real_bdm.py. Threshold parsing shared via
+real_tools/common/soda_common.py - see plans/wider.md #20.
 """
 from __future__ import annotations
 import os
-import sys
 
 import duckdb
 
-sys.path.insert(0, os.path.dirname(__file__))
-import cp_common
+from real_tools.common.soda_common import ENGINE_TAG, threshold
+from . import cp_common
 
-ROOT = os.path.join(os.path.dirname(__file__), "..")
+ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 SODA_CHECKS_PATH = os.path.join(ROOT, "contract", "child-protection-soda-checks.yml")
 CP_DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
-
-ENGINE_TAG = "Soda Core 3.5 (real)"
 
 # dimension for the 3 named `failed rows` business-rule checks - matches
 # the dimension each rule's contract/child-protection-contract.yaml quality
@@ -33,15 +32,6 @@ _BUSINESS_RULE_DIMENSION = {
     "Closed-case investigation hygiene": "consistency",
     "Placement/carer approval compliance": "consistency",
 }
-
-
-def _threshold(spec: dict | None) -> float | None:
-    if not spec:
-        return None
-    for key in ("greaterThan", "greaterThanOrEqual"):
-        if key in spec:
-            return spec[key]
-    return next(iter(spec.values()), None)
 
 
 def evaluate_soda_real_cp(run_id: str, run_timestamp: str) -> list[dict]:
@@ -117,8 +107,8 @@ def evaluate_soda_real_cp(run_id: str, run_timestamp: str) -> list[dict]:
             "run_timestamp": run_timestamp,
             "metric_value": value,
             "unit": "%" if is_pct else "count",
-            "warn_threshold": _threshold(diagnostics.get("warn")),
-            "fail_threshold": _threshold(diagnostics.get("fail")),
+            "warn_threshold": threshold(diagnostics.get("warn")),
+            "fail_threshold": threshold(diagnostics.get("fail")),
             "status": outcome,
             "on_fail_action": "flag",
             "row_count_total": n_total_by_table[table],

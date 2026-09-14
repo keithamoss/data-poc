@@ -5,9 +5,9 @@ not a reimplementation), once per run against that run's own raw CSV file -
 this dataset's real production shape (BDM drops one CSV file per day), so no
 per-run DuckDB file is needed here the way dbt/Soda needed one.
 
-A "local_test" server (type: local, pointed at that run's CSV) is added to
-an in-memory copy of the contract for each call - the file on disk is never
-touched, and its own "production" S3 server is untouched too.
+The "local_test" server construction and DataContract.test() call are
+shared with run_datacontract_real_cp.py via
+real_tools/common/datacontract_common.py - see plans/wider.md #20.
 
 Getting this contract to lint/test at all required fixing real, structural
 mismatches between the original contract and actual ODCS v3, only visible
@@ -19,19 +19,17 @@ vocabulary, and datacontract-cli always linting against its bundled
 odcs-3.2.0 schema regardless of a contract's own declared apiVersion).
 """
 from __future__ import annotations
-import copy
 import os
 
-import yaml
+from real_tools.common.datacontract_common import ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, run_against_local_server
 
-ROOT = os.path.join(os.path.dirname(__file__), "..")
+ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
 RAW_DIR = os.path.join(ROOT, "data", "raw")
 
 AGENCY_ID = "registry-services"
 COLLECTION_ID = "civil-registration"
 DATASET_ID = "birth-registrations"
-ENGINE_TAG = "datacontract-cli 1.2.0 (real)"
 
 # the real quality-rule-driven check types this project's contract produces
 # (see contract yaml's metric: nullValues/invalidValues/duplicateValues/
@@ -43,34 +41,12 @@ _QUALITY_CHECK_TYPES = {
     "field_quality_sql", "row_count",
 }
 
-_DIMENSION_BY_METRIC = {
-    "missing_count": "completeness",
-    "invalid_count": "validity",
-    "duplicate_count": "uniqueness",
-    "custom_sql": "consistency",
-    "row_count": "completeness",
-}
-
-# A short, human-readable phrase for what each metric actually measures -
-# written here, where each check result is constructed, not guessed later
-# from check_name by the dashboard-building code. custom_sql has no entry
-# here: unlike _CUSTOM_SQL_LABEL below, most of this contract's custom_sql
-# rules (the date-range check, the date_registered cross-field comparison)
-# are each a one-off with nothing else to pair against, so there's no
-# grouping benefit to labeling them.
-_LABEL_BY_METRIC = {
-    "missing_count": "Null rate",
-    "invalid_count": "Invalid values",
-    "duplicate_count": "Duplicate rate",
-    "row_count": "Row count",
-}
-
-# The 2 custom_sql rules below DO get an explicit shared label: each is
-# the same real-world check as a dbt (and, for the sibling check, Soda)
+# The 2 custom_sql rules below get an explicit shared label: each is the
+# same real-world check as a dbt (and, for the sibling check, Soda)
 # counterpart under a different name - the label is what makes that
-# overlap visible on the dashboard, same rationale as run_dbt_real.py's
-# and run_soda_real.py's own versions of this dict. Matched by the rule's
-# own description prefix (this contract's own text, not a guess).
+# overlap visible on the dashboard, same rationale as run_dbt_real_bdm.py's
+# and run_soda_real_bdm.py's own versions of this dict. Matched by the
+# rule's own description prefix (this contract's own text, not a guess).
 _CUSTOM_SQL_LABEL = {
     "Multiple-birth sibling match:": "Sibling record match",
     "Extract timestamp ordering:": "Timestamp ordering",
@@ -85,23 +61,8 @@ def _custom_sql_label(description: str) -> str | None:
     return None
 
 
-def evaluate_datacontract_real(run_id: str, csv_filename: str, run_timestamp: str) -> list[dict]:
-    from datacontract.data_contract import DataContract
-
-    with open(CONTRACT_PATH) as f:
-        contract_dict = yaml.safe_load(f)
-
-    d = copy.deepcopy(contract_dict)
-    d["servers"].append({
-        "server": "local_test",
-        "type": "local",
-        "path": os.path.join(RAW_DIR, csv_filename),
-        "format": "csv",
-        "delimiter": "comma",
-    })
-
-    dc = DataContract(data_contract_str=yaml.dump(d), server="local_test")
-    run = dc.test()
+def evaluate_datacontract_real_bdm(run_id: str, csv_filename: str, run_timestamp: str) -> list[dict]:
+    run = run_against_local_server(CONTRACT_PATH, os.path.join(RAW_DIR, csv_filename))
 
     results = []
     for c in run.checks:
@@ -114,7 +75,7 @@ def evaluate_datacontract_real(run_id: str, csv_filename: str, run_timestamp: st
         row_count_total = diag.get("row_count")
         row_count_invalid = None if metric == "row_count" else diag.get("value")
 
-        label = _custom_sql_label(c.name) if metric == "custom_sql" else _LABEL_BY_METRIC.get(metric)
+        label = _custom_sql_label(c.name) if metric == "custom_sql" else LABEL_BY_METRIC.get(metric)
 
         results.append({
             "agency_id": AGENCY_ID,
@@ -122,7 +83,7 @@ def evaluate_datacontract_real(run_id: str, csv_filename: str, run_timestamp: st
             "dataset_id": DATASET_ID,
             "column_name": c.field or "(table)",
             "check_name": f"datacontract:{metric}",
-            "dimension": c.dimension or _DIMENSION_BY_METRIC.get(metric, ""),
+            "dimension": c.dimension or DIMENSION_BY_METRIC.get(metric, ""),
             "label": label,
             "run_id": run_id,
             "run_timestamp": run_timestamp,
@@ -147,7 +108,7 @@ if __name__ == "__main__":
     with open(os.path.join(RAW_DIR, "manifest.json")) as f:
         manifest = json.load(f)
     for entry in manifest[:1] + [e for e in manifest if e["dirty_severity"]]:
-        res = evaluate_datacontract_real(entry["run_id"], entry["file"], datetime.now(timezone.utc).isoformat())
+        res = evaluate_datacontract_real_bdm(entry["run_id"], entry["file"], datetime.now(timezone.utc).isoformat())
         print(f"--- {entry['run_id']} ({entry['dirty_severity']}) ---")
         for r in res:
             if r["status"] != "pass":

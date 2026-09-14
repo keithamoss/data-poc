@@ -6,8 +6,10 @@ reimplementation, this hands the real SodaCL file to the real soda-core
 engine and reads back its own scan results.
 
 Run once per run against its own per-run DuckDB file (same rationale as
-real_tools/run_dbt_real.py - the checks file has no run_id-scoped `where`,
-so the daily-batch reality is one file per day, one scan per day).
+real_tools/bdm/run_dbt_real_bdm.py - the checks file has no run_id-scoped
+`where`, so the daily-batch reality is one file per day, one scan per
+day). Threshold parsing shared with run_soda_real_cp.py via
+real_tools/common/soda_common.py - see plans/wider.md #20.
 
 Genuine, real finding from actually running this (documented in README.md,
 not "fixed" away): the `filter birth_registrations [recent]: where:
@@ -25,14 +27,15 @@ import os
 
 import duckdb
 
-ROOT = os.path.join(os.path.dirname(__file__), "..")
+from real_tools.common.soda_common import ENGINE_TAG, threshold
+
+ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 SODA_CHECKS_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-soda-checks.yml")
 DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "duckdb_runs")
 
 AGENCY_ID = "registry-services"
 COLLECTION_ID = "civil-registration"
 DATASET_ID = "birth-registrations"
-ENGINE_TAG = "Soda Core 3.5 (real)"
 
 
 # "failed rows" checks (extract_timestamp ordering, the multiple-birth
@@ -85,19 +88,7 @@ _CUSTOM_CHECK_DIMENSION = {
 }
 
 
-def _threshold(spec: dict | None) -> float | None:
-    if not spec:
-        return None
-    for key in ("greaterThan", "greaterThanOrEqual"):
-        if key in spec:
-            return spec[key]
-    # a lower-bound-only spec (row_count's warn/fail also carry a lessThan
-    # side) - "upper bound wins for a single scalar" convention, same one
-    # the now-removed equivalent engine's _numeric_threshold() used.
-    return next(iter(spec.values()), None)
-
-
-def evaluate_soda_real(run_id: str, run_timestamp: str) -> list[dict]:
+def evaluate_soda_real_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     from soda.scan import Scan
 
     db_path = os.path.join(DUCKDB_RUNS_DIR, f"{run_id}.duckdb")
@@ -178,8 +169,8 @@ def evaluate_soda_real(run_id: str, run_timestamp: str) -> list[dict]:
             "run_timestamp": run_timestamp,
             "metric_value": value,
             "unit": "%" if is_pct else "count",
-            "warn_threshold": _threshold(diagnostics.get("warn")),
-            "fail_threshold": _threshold(diagnostics.get("fail")),
+            "warn_threshold": threshold(diagnostics.get("warn")),
+            "fail_threshold": threshold(diagnostics.get("fail")),
             "status": outcome,
             "on_fail_action": "flag",
             "row_count_total": n_total,
@@ -194,7 +185,7 @@ def evaluate_soda_real(run_id: str, run_timestamp: str) -> list[dict]:
 if __name__ == "__main__":
     from datetime import datetime, timezone
     for run_id in ["run_01_2026-09-01", "run_04_2026-09-04", "run_09_2026-09-09"]:
-        res = evaluate_soda_real(run_id, datetime.now(timezone.utc).isoformat())
+        res = evaluate_soda_real_bdm(run_id, datetime.now(timezone.utc).isoformat())
         print(f"--- {run_id} ---")
         for r in res:
             print(" ", r["column_name"], r["check_name"], r["status"], r["metric_value"], r["unit"])

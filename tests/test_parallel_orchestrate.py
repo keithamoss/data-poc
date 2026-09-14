@@ -1,7 +1,7 @@
-"""Tests for real_tools/parallel_orchestrate.py's generic dispatch logic,
-using fast stub workers rather than the real tools (which are explicitly
-out of pytest's scope - see tests/test_build_dashboard_data.py's own
-docstring). Covers the two behavioural guarantees Keith specifically
+"""Tests for real_tools/common/parallel_orchestrate.py's generic dispatch
+logic, using fast stub workers rather than the real tools (which are
+explicitly out of pytest's scope - see tests/test_build_dashboard_data.py's
+own docstring). Covers the two behavioural guarantees Keith specifically
 asked for when this was scoped (2026-09-14): results stay in manifest
 order regardless of completion order, and a worker failure aborts the
 whole batch rather than silently returning partial results."""
@@ -11,7 +11,7 @@ import time
 
 import pytest
 
-from parallel_orchestrate import run_manifest
+from real_tools.common.parallel_orchestrate import run_manifest
 
 MANIFEST = [{"run_id": f"run_{i:02d}"} for i in range(6)]
 

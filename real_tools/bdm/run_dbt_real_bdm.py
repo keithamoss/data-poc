@@ -1,14 +1,21 @@
 """
 Runs REAL dbt-core (dbt-duckdb adapter) against this project's actual
-dbt_project/ - `dbt run` then `dbt test`, once per run, each pointed at its
-own single-run DuckDB file under data/duckdb_runs/ (see
+dbt_project/ - `dbt build` (model + its tests), once per run, each pointed
+at its own single-run DuckDB file under data/duckdb_runs/ (see
 build_per_run_warehouses.py's docstring for why one file per run rather
-than the combined warehouse.duckdb).
+than the combined warehouse.duckdb). --select scopes this call to
+stg_birth_registrations + its own singular test(s) only - the same
+dbt_project/ also holds Child Protection's models, built separately by
+real_tools/cp/run_dbt_real_cp.py.
 
 Parses dbt's own target/manifest.json (test metadata: column, test type,
 config) and target/run_results.json (status, failures) - not a
 reimplementation of dbt's test logic, this genuinely shells out to the
-`dbt` CLI and reads what it reports.
+`dbt` CLI and reads what it reports. Subprocess invocation and manifest
+parsing are shared with run_dbt_real_cp.py via
+real_tools/common/dbt_common.py; everything below is genuinely
+dataset-specific (which tests exist, what they mean, a real dbt-duckdb
+reliability workaround this dataset needed) - see plans/wider.md #20.
 
 A REAL, confirmed dbt-duckdb reliability problem, not assumed: for the two
 custom-configured tests (sex, place_of_birth_facility), dbt's own reported
@@ -33,8 +40,8 @@ numbers are cross-checked rather than passed through blindly.
 A third, newer instance of the same class of problem: the
 recent_births_present singular test (no config, no fail_calc arithmetic
 at all - the simplest possible test shape) reported "fail" for run_10 in
-a full 10-run orchestrate_real.py pass, while re-running that exact test
-in isolation seconds later, against the same warehouse file, correctly
+a full 10-run orchestrate_real_bdm.py pass, while re-running that exact
+test in isolation seconds later, against the same warehouse file, correctly
 returned "pass" - and stayed correct on every subsequent re-run. No
 SQL-level or config-level explanation found (unlike the other two, this
 test has no arithmetic to remove), which points at dbt-duckdb itself
@@ -46,20 +53,19 @@ trusted blindly.
 from __future__ import annotations
 import json
 import os
-import re
-import subprocess
 
 import duckdb
 
-ROOT = os.path.join(os.path.dirname(__file__), "..")
+from real_tools.common.dbt_common import ENGINE_TAG, parse_threshold, run_dbt, test_nodes
+
+ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 DBT_PROJECT_DIR = os.path.join(ROOT, "dbt_project")
-PROFILES_DIR = os.path.join(os.path.dirname(__file__), "dbt_profiles")
+PROFILES_DIR = os.path.join(os.path.dirname(__file__), "..", "dbt_profiles")
 DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "duckdb_runs")
 
 AGENCY_ID = "registry-services"
 COLLECTION_ID = "civil-registration"
 DATASET_ID = "birth-registrations"
-ENGINE_TAG = "dbt-core 1.12 + dbt-duckdb (real)"
 
 # column/test combos where dbt's own "failures" value was observed to be
 # unreliable (see module docstring) - mapped to the exact SQL used to
@@ -70,16 +76,14 @@ _VERIFY_COUNT_SQL = {
     # A third, newer instance of the same reliability problem, found live:
     # a clean re-run of just this one test in isolation correctly returned
     # 0 rows (pass) for run_10, but dbt's own run_results.json - from a
-    # full 10-run orchestrate_real.py pass minutes earlier, same warehouse
-    # file, same compiled SQL - reported it failed. Same treatment as the
-    # two above: recompute independently rather than trust dbt's reported
-    # status for this specific check.
+    # full 10-run orchestrate_real_bdm.py pass minutes earlier, same
+    # warehouse file, same compiled SQL - reported it failed. Same
+    # treatment as the two above: recompute independently rather than
+    # trust dbt's reported status for this specific check.
     ("date_of_birth", "recent_births_present"):
         "SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END FROM stg_birth_registrations "
         "WHERE date_of_birth >= CURRENT_DATE - INTERVAL 7 DAY",
 }
-
-_NUM_RE = re.compile(r"([\d.]+)")
 
 # multiple_birth_sibling has no attached column of its own (a singular
 # test, not a generic column test) - same class of gap run_dbt_real_cp.py
@@ -119,13 +123,6 @@ _LABEL_BY_TEST = {
 }
 
 
-def _parse_threshold(spec: str | None) -> float | None:
-    if spec is None or spec.strip() == "!= 0":
-        return None
-    m = _NUM_RE.search(spec)
-    return float(m.group(1)) if m else None
-
-
 def _status_for(count: int, warn_t: float | None, fail_t: float | None) -> str:
     if fail_t is not None and count > fail_t:
         return "fail"
@@ -134,45 +131,7 @@ def _status_for(count: int, warn_t: float | None, fail_t: float | None) -> str:
     return "pass"
 
 
-def _run_dbt(db_path: str, command: str, target_path: str) -> None:
-    env = dict(os.environ)
-    env["DBT_DB_PATH"] = db_path
-    env["DBT_SEND_ANONYMOUS_USAGE_STATS"] = "False"
-    subprocess.run(
-        # --select scopes this to stg_birth_registrations + its own
-        # singular test(s) only - required since Phase 2 added 6 Child
-        # Protection models + 3 singular tests to this same dbt_project/:
-        # an unscoped call picks those up too and (a) errors trying to
-        # build them against a birth-registrations-only warehouse that has
-        # none of the CP tables, and (b) the CP singular tests have no
-        # test_metadata, which this file's own parsing below assumed every
-        # result would have. Found as a real, live KeyError while
-        # implementing the `dbt build` change just below - a genuine
-        # regression from Phase 2, not hypothetical.
-        #
-        # --target-path gives each run its OWN target/ subdirectory rather
-        # than dbt's shared default - required for cross-run
-        # parallelization (plans/performance.md #4): without this,
-        # concurrent `dbt build` calls for different runs clobber each
-        # other's manifest.json/run_results.json mid-write. Always applied
-        # (not just under parallel execution) since it's strictly safer
-        # and free even sequentially - one run's target/ never lingers to
-        # confuse the next.
-        ["dbt", command, "--profiles-dir", PROFILES_DIR, "--project-dir", DBT_PROJECT_DIR, "--quiet",
-         "--target-path", target_path,
-         "--select", "stg_birth_registrations", *_SINGULAR_TESTS],
-        env=env, cwd=ROOT, check=False, capture_output=True, text=True,
-    )
-
-
-def _test_nodes(manifest: dict) -> dict[str, dict]:
-    return {
-        uid: node for uid, node in manifest["nodes"].items()
-        if node.get("resource_type") == "test"
-    }
-
-
-def evaluate_dbt_real(run_id: str, run_timestamp: str) -> list[dict]:
+def evaluate_dbt_real_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     db_path = os.path.join(DUCKDB_RUNS_DIR, f"{run_id}.duckdb")
     # A single `dbt build` (build the model, then run its tests) instead of
     # separate `dbt run` + `dbt test` subprocess calls - dbt-core's fixed
@@ -185,14 +144,15 @@ def evaluate_dbt_real(run_id: str, run_timestamp: str) -> list[dict]:
     # parsing below already silently skips (nodes.get() returns None for
     # anything that isn't a test node), so nothing further changes.
     target_path = os.path.join(DBT_PROJECT_DIR, "target", run_id)
-    _run_dbt(db_path, "build", target_path)
+    run_dbt(db_path, "build", ["stg_birth_registrations", *_SINGULAR_TESTS], target_path,
+            PROFILES_DIR, DBT_PROJECT_DIR, ROOT)
 
     with open(os.path.join(target_path, "manifest.json")) as f:
         manifest = json.load(f)
     with open(os.path.join(target_path, "run_results.json")) as f:
         run_results = json.load(f)
 
-    nodes = _test_nodes(manifest)
+    nodes = test_nodes(manifest)
     conn = duckdb.connect(db_path, read_only=True)
     n_total = conn.execute("SELECT COUNT(*) FROM stg_birth_registrations").fetchone()[0]
 
@@ -207,8 +167,8 @@ def evaluate_dbt_real(run_id: str, run_timestamp: str) -> list[dict]:
         config = node.get("config", {})
         status = r["status"]
         failures = r.get("failures") or 0
-        warn_t = _parse_threshold(config.get("warn_if"))
-        fail_t = _parse_threshold(config.get("error_if"))
+        warn_t = parse_threshold(config.get("warn_if"))
+        fail_t = parse_threshold(config.get("error_if"))
 
         key = (column, test_name)
         if key in _VERIFY_COUNT_SQL and status != "error":
@@ -252,7 +212,7 @@ def evaluate_dbt_real(run_id: str, run_timestamp: str) -> list[dict]:
 if __name__ == "__main__":
     from datetime import datetime, timezone
     for run_id in ["run_01_2026-09-01", "run_04_2026-09-04", "run_09_2026-09-09"]:
-        res = evaluate_dbt_real(run_id, datetime.now(timezone.utc).isoformat())
+        res = evaluate_dbt_real_bdm(run_id, datetime.now(timezone.utc).isoformat())
         print(f"--- {run_id} ---")
         for r in res:
             print(" ", r["column_name"], r["check_name"], r["status"], r["metric_value"], r["unit"])

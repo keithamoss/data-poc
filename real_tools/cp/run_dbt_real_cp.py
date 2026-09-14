@@ -1,17 +1,20 @@
 """
 Runs REAL dbt-core (dbt-duckdb adapter) against this project's actual
 dbt_project/ for the Child Protection collection - the CP counterpart to
-run_dbt_real.py, scoped to the 6 stg_cp_* models and their tests (PK
-unique/not_null, the 7 `relationships` tests, and the 3 singular
-cross-table business-rule tests) rather than stg_birth_registrations,
-via `dbt run`/`dbt test --select <the 6 CP models + the 3 singular test
-names>` - an explicit node list rather than a graph selector, so this
-never accidentally pulls in (or silently skips) a birth-registrations
-test if the project's DAG shape changes later.
+real_tools/bdm/run_dbt_real_bdm.py, scoped to the 6 stg_cp_* models and
+their tests (PK unique/not_null, the 7 `relationships` tests, and the 3
+singular cross-table business-rule tests) rather than
+stg_birth_registrations, via `dbt build --select <the 6 CP models + the 3
+singular test names>` - an explicit node list rather than a graph
+selector, so this never accidentally pulls in (or silently skips) a
+birth-registrations test if the project's DAG shape changes later.
 
 Each run is pointed at its own single-run CP DuckDB file under
-data/cp_duckdb_runs/ (real_tools/build_cp_warehouses.py) - same
-per-run-warehouse rationale as run_dbt_real.py's docstring.
+data/cp_duckdb_runs/ (real_tools/cp/build_cp_warehouses.py) - same
+per-run-warehouse rationale as run_dbt_real_bdm.py's docstring.
+Subprocess invocation and manifest parsing are shared with
+run_dbt_real_bdm.py via real_tools/common/dbt_common.py - see
+plans/wider.md #20.
 
 Which of the 6 CP tables a test result belongs to (for the dashboard's
 dataset_id) comes from dbt's own `attached_node` on the test's manifest
@@ -24,26 +27,19 @@ column/model-scoped).
 from __future__ import annotations
 import json
 import os
-import re
-import subprocess
-import sys
 
 import duckdb
 
-sys.path.insert(0, os.path.dirname(__file__))
-import cp_common
+from real_tools.common.dbt_common import ENGINE_TAG, parse_threshold, run_dbt, test_nodes
+from . import cp_common
 
-ROOT = os.path.join(os.path.dirname(__file__), "..")
+ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 DBT_PROJECT_DIR = os.path.join(ROOT, "dbt_project")
-PROFILES_DIR = os.path.join(os.path.dirname(__file__), "dbt_profiles")
+PROFILES_DIR = os.path.join(os.path.dirname(__file__), "..", "dbt_profiles")
 CP_DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
-
-ENGINE_TAG = "dbt-core 1.12 + dbt-duckdb (real)"
 
 CP_MODELS = [f"stg_{t}" for t in cp_common.TABLES]
 CP_SINGULAR_TESTS = list(cp_common.BUSINESS_RULE_HOME_TABLE.keys())
-
-_NUM_RE = re.compile(r"([\d.]+)")
 
 _DIMENSION_BY_TEST = {
     "unique": "uniqueness",
@@ -67,29 +63,6 @@ _LABEL_BY_TEST = {
     "not_null": "Null rate",
     "relationships": "Referential integrity",
 }
-
-
-def _parse_threshold(spec: str | None) -> float | None:
-    if spec is None or spec.strip() == "!= 0":
-        return None
-    m = _NUM_RE.search(spec)
-    return float(m.group(1)) if m else None
-
-
-def _run_dbt(db_path: str, command: str, select: list[str], target_path: str) -> None:
-    env = dict(os.environ)
-    env["DBT_DB_PATH"] = db_path
-    env["DBT_SEND_ANONYMOUS_USAGE_STATS"] = "False"
-    subprocess.run(
-        # --target-path gives each run its OWN target/ subdirectory rather
-        # than dbt's shared default - required for cross-run
-        # parallelization (plans/performance.md #4), same fix as
-        # run_dbt_real.py's own - see that file's comment for the full
-        # reasoning. Always applied, not just under parallel execution.
-        ["dbt", command, "--profiles-dir", PROFILES_DIR, "--project-dir", DBT_PROJECT_DIR,
-         "--quiet", "--target-path", target_path, "--select", *select],
-        env=env, cwd=ROOT, check=False, capture_output=True, text=True,
-    )
 
 
 def _table_for_test(node: dict) -> str | None:
@@ -116,14 +89,14 @@ def evaluate_dbt_real_cp(run_id: str, run_timestamp: str) -> list[dict]:
     # non-test nodes entirely (KeyError-safe since we only look them up
     # for uids present in `nodes`, which is test-only).
     target_path = os.path.join(DBT_PROJECT_DIR, "target", run_id)
-    _run_dbt(db_path, "build", CP_MODELS + CP_SINGULAR_TESTS, target_path)
+    run_dbt(db_path, "build", CP_MODELS + CP_SINGULAR_TESTS, target_path, PROFILES_DIR, DBT_PROJECT_DIR, ROOT)
 
     with open(os.path.join(target_path, "manifest.json")) as f:
         manifest = json.load(f)
     with open(os.path.join(target_path, "run_results.json")) as f:
         run_results = json.load(f)
 
-    nodes = {uid: n for uid, n in manifest["nodes"].items() if n.get("resource_type") == "test"}
+    nodes = test_nodes(manifest)
 
     conn = duckdb.connect(db_path, read_only=True)
     n_total_by_table = {t: conn.execute(f"SELECT COUNT(*) FROM stg_{t}").fetchone()[0] for t in cp_common.TABLES}
@@ -143,8 +116,8 @@ def evaluate_dbt_real_cp(run_id: str, run_timestamp: str) -> list[dict]:
         config = node.get("config", {})
         status = r["status"]
         failures = r.get("failures") or 0
-        warn_t = _parse_threshold(config.get("warn_if"))
-        fail_t = _parse_threshold(config.get("error_if"))
+        warn_t = parse_threshold(config.get("warn_if"))
+        fail_t = parse_threshold(config.get("error_if"))
 
         results.append({
             "agency_id": cp_common.AGENCY_ID,

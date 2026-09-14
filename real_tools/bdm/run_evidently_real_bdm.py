@@ -3,7 +3,11 @@ Runs REAL Evidently AI (evidently>=0.7, the current Report/DataDriftPreset
 API - a full rewrite since the 0.4.x API this project's dependencies originally
 assumed) against each run's `sex` column vs. the reference run (run_01),
 via the real evidently.Report + evidently.presets.DataDriftPreset classes -
-not a reimplementation of PSI.
+not a reimplementation of PSI. PSI computation itself is shared with
+run_evidently_real_cp.py via real_tools/common/evidently_common.py - the
+row-count-growth check below is birth-registrations-specific (Child
+Protection's periodic-snapshot extract doesn't have the same "should
+mostly grow" expectation an event feed does) - see plans/wider.md #20.
 
 Genuine finding from running the real tool, not assumed: Evidently's PSI
 computation treats every DISTINCT VALUE actually observed in the column as
@@ -23,44 +27,28 @@ import os
 
 import pandas as pd
 
-ROOT = os.path.join(os.path.dirname(__file__), "..")
+from real_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, status_for_psi, compute_psi
+
+ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 RAW_DIR = os.path.join(ROOT, "data", "raw")
 
 AGENCY_ID = "registry-services"
 COLLECTION_ID = "civil-registration"
 DATASET_ID = "birth-registrations"
-ENGINE_TAG = "Evidently 0.7 (real)"
 
 REFERENCE_RUN_ID = "run_01_2026-09-01"
-# same pass/warn/fail bands the equivalent engine that existed at the time
-# used, applied to the real PSI value Evidently computes - Evidently's own
-# DataDriftPreset only carries one drift/no-drift threshold (0.1) by
-# default, not a three-way band, so the warn/fail split here is this
-# project's convention, not Evidently's.
-WARN_THRESHOLD = 0.10
-FAIL_THRESHOLD = 0.25
 
 # Row-growth check: "some reduction in a daily refresh is fine" (Keith's
 # own words) - so only a genuinely large drop trips this, not any decrease
 # at all. Same two-tier-band-is-our-convention-not-the-tool's approach as
-# PSI above: Evidently's RowCount metric does support a built-in Reference-
-# based test (gte(Reference(relative=...))), tried first, but that only
-# gives one pass/fail band and buries the actual reference value inside a
+# PSI: Evidently's RowCount metric does support a built-in Reference-based
+# test (gte(Reference(relative=...))), tried first, but that only gives
+# one pass/fail band and buries the actual reference value inside a
 # free-text test description rather than a clean field - computing the
 # real row count via Evidently for both runs and applying our own two-tier
 # comparison, exactly like PSI, is both simpler and consistent.
 WARN_ROW_DROP = 0.10
 FAIL_ROW_DROP = 0.25
-
-
-def _status_for_psi(psi: float, is_reference: bool) -> str:
-    if is_reference:
-        return "pass"
-    if psi > FAIL_THRESHOLD:
-        return "fail"
-    if psi > WARN_THRESHOLD:
-        return "warn"
-    return "pass"
 
 
 def _status_for_row_drop(rate_drop: float) -> str:
@@ -91,27 +79,15 @@ def _previous_run_file(manifest: list[dict], run_id: str) -> str | None:
     return None
 
 
-def evaluate_evidently_real(run_id: str, csv_filename: str, run_timestamp: str,
-                             reference_run_id: str = REFERENCE_RUN_ID,
-                             reference_csv: str = f"{REFERENCE_RUN_ID}.csv") -> list[dict]:
-    from evidently import Report
-    from evidently.presets import DataDriftPreset
-
+def evaluate_evidently_real_bdm(run_id: str, csv_filename: str, run_timestamp: str,
+                                 reference_run_id: str = REFERENCE_RUN_ID,
+                                 reference_csv: str = f"{REFERENCE_RUN_ID}.csv") -> list[dict]:
     reference = pd.read_csv(os.path.join(RAW_DIR, reference_csv))[["sex"]]
     current = pd.read_csv(os.path.join(RAW_DIR, csv_filename))[["sex"]]
     n_total = len(current)
 
-    report = Report(metrics=[DataDriftPreset(columns=["sex"], cat_method="psi")])
-    snapshot = report.run(current, reference)
-    result = snapshot.dict()
-
-    psi = None
-    for m in result["metrics"]:
-        if m["metric_name"].startswith("ValueDrift(column=sex"):
-            psi = m["value"]
-            break
-
-    status = _status_for_psi(psi, run_id == reference_run_id)
+    psi = compute_psi(current, reference, "sex")
+    status = status_for_psi(psi, run_id == reference_run_id)
 
     results = [{
         "agency_id": AGENCY_ID,
@@ -179,7 +155,7 @@ if __name__ == "__main__":
     with open(os.path.join(RAW_DIR, "manifest.json")) as f:
         manifest = json.load(f)
     for entry in manifest:
-        res = evaluate_evidently_real(entry["run_id"], entry["file"], datetime.now(timezone.utc).isoformat())
+        res = evaluate_evidently_real_bdm(entry["run_id"], entry["file"], datetime.now(timezone.utc).isoformat())
         psi, growth = res[0], (res[1] if len(res) > 1 else None)
         growth_str = f"row_growth={growth['metric_value']:+.1f}%  status={growth['status']:5s}" if growth else "row_growth=n/a (first run)"
         print(f"{entry['run_id']:25s} PSI={psi['metric_value']}  status={psi['status']:5s}  |  {growth_str}")

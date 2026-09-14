@@ -1,6 +1,7 @@
 """
 Runs REAL datacontract-cli against contract/child-protection-contract.yaml,
-once per run - the Child Protection counterpart to run_datacontract_real.py.
+once per run - the Child Protection counterpart to
+real_tools/bdm/run_datacontract_real_bdm.py.
 
 Unlike Birth Registrations (one CSV per run), this contract has 6 schema
 objects, so the `local` server's `path` uses datacontract-cli's own
@@ -10,51 +11,29 @@ testing, and the same mechanism that lets this contract's cross-table
 type: sql rules (the 7 FK checks, the 3 business rules) actually run: every
 schema object becomes a real view/table on one shared duckdb connection,
 so a rule on one model can genuinely join to another by its literal name.
+The "local_test" server construction and DataContract.test() call are
+shared with run_datacontract_real_bdm.py via
+real_tools/common/datacontract_common.py - see plans/wider.md #20.
 
 Each check result's dataset_id comes straight from `c.model` -
 datacontract-cli's own check objects already know which schema object
 (i.e. which CP table) they belong to.
 """
 from __future__ import annotations
-import copy
 import os
 import re
-import sys
 
-import yaml
+from real_tools.common.datacontract_common import ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, run_against_local_server
+from . import cp_common
 
-sys.path.insert(0, os.path.dirname(__file__))
-import cp_common
-
-ROOT = os.path.join(os.path.dirname(__file__), "..")
+ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-contract.yaml")
 CP_RAW_DIR = os.path.join(ROOT, "data", "cp_raw")
-
-ENGINE_TAG = "datacontract-cli 1.2.0 (real)"
 
 _QUALITY_CHECK_TYPES = {
     "field_null_values", "field_invalid_values", "field_duplicate_values",
     "field_quality_sql", "model_quality_sql", "row_count",
 }
-
-_DIMENSION_BY_METRIC = {
-    "missing_count": "completeness",
-    "invalid_count": "validity",
-    "duplicate_count": "uniqueness",
-    "custom_sql": "consistency",
-    "row_count": "completeness",
-}
-
-# A short, human-readable phrase for what each metric actually measures -
-# written here, where each check result is constructed, not guessed later
-# from check_name by the dashboard-building code.
-_LABEL_BY_METRIC = {
-    "missing_count": "Null rate",
-    "invalid_count": "Invalid values",
-    "duplicate_count": "Duplicate rate",
-    "row_count": "Row count",
-}
-
 
 _FK_DESCRIPTION_RE = re.compile(r"^Every \w+'s (\w+) must reference an existing \w+ row\.")
 
@@ -94,22 +73,7 @@ def _custom_sql_label(description: str) -> str | None:
 
 
 def evaluate_datacontract_real_cp(run_id: str, run_timestamp: str) -> list[dict]:
-    from datacontract.data_contract import DataContract
-
-    with open(CONTRACT_PATH) as f:
-        contract_dict = yaml.safe_load(f)
-
-    d = copy.deepcopy(contract_dict)
-    d["servers"].append({
-        "server": "local_test",
-        "type": "local",
-        "path": os.path.join(CP_RAW_DIR, run_id, "{model}.csv"),
-        "format": "csv",
-        "delimiter": "comma",
-    })
-
-    dc = DataContract(data_contract_str=yaml.dump(d), server="local_test")
-    run = dc.test()
+    run = run_against_local_server(CONTRACT_PATH, os.path.join(CP_RAW_DIR, run_id, "{model}.csv"))
 
     results = []
     for c in run.checks:
@@ -141,7 +105,7 @@ def evaluate_datacontract_real_cp(run_id: str, run_timestamp: str) -> list[dict]
             fk_column = _fk_column_for(c.name)
         else:
             check_name = f"datacontract:{metric}"
-            label = _LABEL_BY_METRIC.get(metric)
+            label = LABEL_BY_METRIC.get(metric)
 
         results.append({
             "agency_id": cp_common.AGENCY_ID,
@@ -149,7 +113,7 @@ def evaluate_datacontract_real_cp(run_id: str, run_timestamp: str) -> list[dict]
             "dataset_id": cp_common.TABLE_DATASET_ID[table],
             "column_name": fk_column or c.field or "(table)",
             "check_name": check_name,
-            "dimension": c.dimension or _DIMENSION_BY_METRIC.get(metric, ""),
+            "dimension": c.dimension or DIMENSION_BY_METRIC.get(metric, ""),
             "label": label,
             "run_id": run_id,
             "run_timestamp": run_timestamp,

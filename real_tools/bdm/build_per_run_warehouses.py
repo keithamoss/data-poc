@@ -24,7 +24,7 @@ import os
 import duckdb
 import pandas as pd
 
-ROOT = os.path.join(os.path.dirname(__file__), "..")
+ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 RAW_DIR = os.path.join(ROOT, "data", "raw")
 OUT_DIR = os.path.join(ROOT, "data", "duckdb_runs")
 

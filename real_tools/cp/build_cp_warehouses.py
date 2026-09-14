@@ -2,10 +2,10 @@
 Builds one DuckDB file per Child Protection snapshot run under
 data/cp_duckdb_runs/<run_id>.duckdb, each containing that run's 6 tables
 under a `raw` schema - the Child Protection counterpart to
-build_per_run_warehouses.py, for the same reason: dbt's source config and
-the Soda checks file both refer to bare table names with no run_id-scoped
-`where`, so a real per-run `dbt test` / `soda scan` result needs its own
-physical warehouse, one per periodic extract.
+real_tools/bdm/build_per_run_warehouses.py, for the same reason: dbt's
+source config and the Soda checks file both refer to bare table names
+with no run_id-scoped `where`, so a real per-run `dbt test` / `soda scan`
+result needs its own physical warehouse, one per periodic extract.
 
 Unlike birth-registrations' single CSV per run, generator/generate_cp_runs.py
 writes one directory per run_id with 6 CSVs (cp_clients.csv,
@@ -18,7 +18,7 @@ import os
 import duckdb
 import pandas as pd
 
-ROOT = os.path.join(os.path.dirname(__file__), "..")
+ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CP_RAW_DIR = os.path.join(ROOT, "data", "cp_raw")
 OUT_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
 

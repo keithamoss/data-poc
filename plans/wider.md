@@ -49,7 +49,7 @@ not a schedule.
    birth-registrations pipeline's approach generalizes rather than being a
    one-off, and was the highest-value item on this list.
 
-3. **[todo, medium]** No CI. Nothing re-runs `real_tools/orchestrate_real.py`
+3. **[todo, medium]** No CI. Nothing re-runs `real_tools/bdm/orchestrate_real_bdm.py`
    against upstream tool releases, so a `dbt-core`/`soda-core-duckdb`/
    `datacontract-cli`/`evidently` update could silently break this and we
    wouldn't know. A scheduled job (even a simple cron/GitHub Action) that
@@ -699,15 +699,56 @@ not a schedule.
     Not a false-DRY situation, but not nothing either: ~150-260 lines/
     file with a real (if partial) shared layer inside it, and every new
     dataset currently means copy-pasting a whole file and manually
-    picking apart which parts to keep. Candidate approach, mirroring the
-    `parallel_orchestrate.py` precedent (action item above, `plans/
-    performance.md` #4) of extracting a *generic* module that dataset-
-    specific files call into rather than a base class datasets subclass:
-    a small `_dbt_common.py`/`_soda_common.py`/etc. per tool holding just
-    the confirmed-shared ~30-40 lines, imported by both existing files
-    and any new dataset's file. Not started - this is a "worth scoping
-    before the 3rd dataset lands" flag, not yet built or asked about in
-    enough detail to commit to a shape (e.g. whether it's worth doing per-
-    tool now vs. waiting to see what a 3rd dataset's files actually need,
-    which would be better evidence than extrapolating from 2 data
-    points).
+    picking apart which parts to keep.
+
+    **[done]** Built (2026-09-14), scoped via questions first (naming
+    suffix, folder structure, import style, and what to do with an
+    unrelated stray file the restructure surfaced):
+    - **Renamed the BDM/birth-registrations files to match the CP
+      convention** - `run_dbt_real.py` -> `run_dbt_real_bdm.py` etc.
+      (`_bdm`, not `_births` - matches the existing `contract/
+      bdm-birth-registrations-*` naming and "BDM" used as the dataset's
+      short name everywhere else in the repo). Previously birth
+      registrations had no suffix at all (it was the only dataset when
+      these files were written) while CP got `_cp` when it was added
+      later - fine with one dataset implied by "no suffix," not fine
+      with more coming.
+    - **Extracted the confirmed-shared ~30-40 lines/tool-pair** into
+      `real_tools/common/{dbt,soda,datacontract,evidently}_common.py` -
+      exactly the boilerplate identified above (subprocess/API
+      invocation, `--target-path` handling, threshold parsing,
+      `ENGINE_TAG`), plus two extra bits datacontract-cli's and
+      evidently's pairs turned out to also share byte-for-byte once
+      written side by side (the "local_test" server + `DataContract
+      .test()` construction; the PSI-via-DataDriftPreset computation) -
+      found while doing the extraction, not predicted in advance. Left
+      genuinely dataset-specific: test-name/metric mapping dicts, BDM's
+      `_VERIFY_COUNT_SQL` workaround, CP's `_table_for_test()`, BDM's
+      row-count-growth check (CP has no equivalent).
+    - **Split into per-dataset subfolders** - `real_tools/bdm/`,
+      `real_tools/cp/`, `real_tools/common/` - rather than a flat
+      directory of 16 files that only reads as organized by tool-name
+      prefix. `dbt_profiles/` stays directly under `real_tools/` (one
+      shared dbt project, can't be split by dataset).
+    - **`real_tools` became a proper Python package** (`__init__.py`
+      throughout, dotted imports - `from real_tools.common import
+      dbt_common`, `from . import cp_common`) rather than extending the
+      old per-script `sys.path.insert(0, dirname(__file__))` hack across
+      subfolders - Keith's own call between the two options asked about.
+      Scripts now run as `python3 -m real_tools.bdm.orchestrate_real_bdm`
+      (not a bare file path) - `run_pipeline.sh`, README, and CLAUDE.md
+      all updated. `pyproject.toml`'s pytest `pythonpath` swapped
+      `"real_tools"` for `"."` accordingly.
+    - **Deleted `real_tools/soda_configuration.yml`** (Keith's call, once
+      established it wasn't used by any code - a static reference doc
+      for running the `soda` CLI directly, hardcoded to one BDM run file,
+      superseded by the Python Scan API `run_soda_real_bdm.py` actually
+      uses). Git history holds it if ever needed.
+
+    Verified behaviour-preserving, not just refactored: both orchestration
+    scripts re-run end to end post-restructure and diffed byte-for-byte
+    identical (modulo `run_timestamp`) against pre-restructure
+    `results_real.json`/`results_real_cp.json` - 824 and 950 check
+    results respectively, zero differences. `uv run pytest` (19 tests,
+    `tests/test_parallel_orchestrate.py`'s import updated to the new
+    module path) and `uv run ruff check .` both clean.

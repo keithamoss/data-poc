@@ -1,15 +1,14 @@
 """
 Runs all four REAL tools (dbt-core, Soda Core, datacontract-cli, Evidently)
-against every generated run. Used to be the real-tool counterpart to a
-pipeline/orchestrate.py that also ran four hand-written Python equivalents
-in engines/ (since removed - see plans/wider.md's repo-tidy-up entries);
-this is now the only path. Aggregates into reports/results_real.json.
+against every generated Birth Registrations run. Aggregates into
+reports/results_real.json. The Child Protection counterpart is
+real_tools/cp/orchestrate_real_cp.py.
 
-Runs the manifest's runs IN PARALLEL by default (real_tools/
-parallel_orchestrate.py, one process per CPU core - measured ~2.2x on
-this project's own manifest, see plans/performance.md #4), with a
---sequential flag for easier debugging (parallel workers interleave
-their print output and stack traces; a single run under investigation is
+Runs the manifest's runs IN PARALLEL by default (real_tools/common/
+parallel_orchestrate.py, one process per CPU core - measured ~3.4x on
+this project's own 15-run manifest, see plans/performance.md #4), with a
+--sequential flag for easier debugging (parallel workers interleave their
+print output and stack traces; a single run under investigation is
 simpler to chase down sequentially). Either way, results come back in
 manifest order, so output stays byte-for-byte reproducible for a given
 manifest.
@@ -17,9 +16,11 @@ manifest.
 Assumes data/raw/ (generator output), data/warehouse.duckdb (the combined
 warehouse, still built by pipeline/load.py/orchestrate.py - see that
 file's docstring for why it's still needed) and data/duckdb_runs/*.duckdb
-(per-run real warehouses, real_tools/build_per_run_warehouses.py) already
-exist - run
-./run_pipeline.sh first if they don't.
+(per-run real warehouses, real_tools/bdm/build_per_run_warehouses.py)
+already exist - run ./run_pipeline.sh first if they don't.
+
+Run as `python3 -m real_tools.bdm.orchestrate_real_bdm` (this is a package
+now, not a flat script directory - see plans/wider.md #20).
 """
 from __future__ import annotations
 import json
@@ -27,16 +28,14 @@ import os
 import sys
 from datetime import datetime, timezone
 
-sys.path.insert(0, os.path.dirname(__file__))
+from real_tools.common import parallel_orchestrate
+from . import build_per_run_warehouses
+from . import run_dbt_real_bdm
+from . import run_soda_real_bdm
+from . import run_datacontract_real_bdm
+from . import run_evidently_real_bdm
 
-import build_per_run_warehouses
-import parallel_orchestrate
-import run_dbt_real
-import run_soda_real
-import run_datacontract_real
-import run_evidently_real
-
-ROOT = os.path.join(os.path.dirname(__file__), "..")
+ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 MANIFEST_PATH = os.path.join(ROOT, "data", "raw", "manifest.json")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_real.json")
 
@@ -47,10 +46,10 @@ def _run_one(entry: dict, run_timestamp: str) -> list[dict]:
     print(f"--- {run_id} ---")
 
     results: list[dict] = []
-    results.extend(run_dbt_real.evaluate_dbt_real(run_id, run_timestamp))
-    results.extend(run_soda_real.evaluate_soda_real(run_id, run_timestamp))
-    results.extend(run_datacontract_real.evaluate_datacontract_real(run_id, csv_filename, run_timestamp))
-    results.extend(run_evidently_real.evaluate_evidently_real(run_id, csv_filename, run_timestamp))
+    results.extend(run_dbt_real_bdm.evaluate_dbt_real_bdm(run_id, run_timestamp))
+    results.extend(run_soda_real_bdm.evaluate_soda_real_bdm(run_id, run_timestamp))
+    results.extend(run_datacontract_real_bdm.evaluate_datacontract_real_bdm(run_id, csv_filename, run_timestamp))
+    results.extend(run_evidently_real_bdm.evaluate_evidently_real_bdm(run_id, csv_filename, run_timestamp))
     return results
 
 

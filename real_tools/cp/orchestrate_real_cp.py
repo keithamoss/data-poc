@@ -1,19 +1,23 @@
 """
 Runs all four REAL tools (dbt-core, Soda Core, datacontract-cli, Evidently)
 against every generated Child Protection snapshot run - the CP counterpart
-to orchestrate_real.py. Aggregates into reports/results_real_cp.json, same
-check-result record shape (agency_id/collection_id/dataset_id/...) as
-reports/results_real.json, except dataset_id varies per result across the
-6 CP tables instead of being one constant.
+to real_tools/bdm/orchestrate_real_bdm.py. Aggregates into
+reports/results_real_cp.json, same check-result record shape
+(agency_id/collection_id/dataset_id/...) as reports/results_real.json,
+except dataset_id varies per result across the 6 CP tables instead of
+being one constant.
 
-Runs the manifest's runs IN PARALLEL by default (real_tools/
-parallel_orchestrate.py, shared with orchestrate_real.py - see that
+Runs the manifest's runs IN PARALLEL by default (real_tools/common/
+parallel_orchestrate.py, shared with orchestrate_real_bdm.py - see that
 file's docstring and plans/performance.md #4), with a --sequential flag
 for easier debugging.
 
 Assumes data/cp_raw/ (generator/generate_cp_runs.py's output) already
 exists - run that first if it doesn't. Builds data/cp_duckdb_runs/ itself
 via build_cp_warehouses.build_all().
+
+Run as `python3 -m real_tools.cp.orchestrate_real_cp` (this is a package
+now, not a flat script directory - see plans/wider.md #20).
 """
 from __future__ import annotations
 import json
@@ -21,17 +25,15 @@ import os
 import sys
 from datetime import datetime, timezone
 
-sys.path.insert(0, os.path.dirname(__file__))
+from real_tools.common import parallel_orchestrate
+from . import build_cp_warehouses
+from . import cp_common
+from . import run_dbt_real_cp
+from . import run_soda_real_cp
+from . import run_datacontract_real_cp
+from . import run_evidently_real_cp
 
-import build_cp_warehouses
-import cp_common
-import parallel_orchestrate
-import run_dbt_real_cp
-import run_soda_real_cp
-import run_datacontract_real_cp
-import run_evidently_real_cp
-
-ROOT = os.path.join(os.path.dirname(__file__), "..")
+ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 MANIFEST_PATH = os.path.join(ROOT, "data", "cp_raw", "manifest.json")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_real_cp.json")
 
