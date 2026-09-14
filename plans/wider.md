@@ -428,8 +428,66 @@ not a schedule.
     piecemeal from individual requests. Nothing to do yet - revisit when
     he raises it.
 
-17. **[parked]** Give this project a cute/proper name, rather than just
-    "data-poc." Not scoped - no constraints given yet on tone, whether it
-    should be an acronym/backronym tied to the actual subject matter
-    (birth registrations, multi-agency data, WA government), or purely
-    playful. Revisit when it comes up again.
+17. **[parked, in progress]** Give this project a cute/proper name, rather
+    than just "data-poc." Scoped a bit via a few rounds: single or two
+    words max, playful/punny or a backronym, tied to the wider
+    government-data-asset angle rather than narrowly to birth
+    registrations. No name chosen yet - options considered so far, for
+    when this comes back up:
+
+    - **Greek philosophy/mythology round**: **Plato**/**The Cave**
+      (strongest *conceptual* fit found - the Allegory of the Cave maps
+      almost exactly onto this repo's actual two-generation architecture:
+      `engines/` the hand-written stand-ins built with no real internet
+      access = the shadows on the wall; `real_tools/` the actual
+      dbt/Soda/datacontract-cli/Evidently = the real forms outside - this
+      is literally README's own "what's real vs equivalent" framing);
+      **Diogenes**/**Lantern** (searching for the one honest record among
+      the noise); **Themis** (scales of justice/law - the best fit
+      *for a government context specifically*, and confirmed via web
+      research to have zero presence as a name in the data-quality/
+      observability tooling market, unlike the alternatives below);
+      **Argus**/**Panoptes** (the all-seeing giant - "always watching");
+      **Sisyphus** (half-joke - eternally pushing the boulder back up,
+      given resupply chains sometimes take 5+ attempts to resolve).
+    - **Researched the real market first** (not just guessed): current
+      data-quality/observability tools (Monte Carlo, Bigeye, Metaplane,
+      Anomalo, Sifflet, Elementary, Validio, Qualytics, Lightup, Atlan,
+      Soda, dbt) lean on vigilance metaphors (Bigeye = literally "big
+      eye" watching data; Sifflet = French for "whistle"/alarm),
+      deduction (Elementary), or invented quality-word portmanteaus
+      (Anomalo, Validio, Qualytics) - mythological names are a genuinely
+      open lane in this specific market, not a crowded one. Sources:
+      Atlan's 2026 data-observability-tools roundup, daily.dev's 2026
+      roundup, Atlan's open-source-data-quality-tools roundup.
+    - **Broader myths-and-legends round** (West Virginia AND Western
+      Australia both explored, since the request named both and they
+      point at genuinely different folklore): **Mothman** (WV, Point
+      Pleasant 1966-67 - strongest thematic fit found across the whole
+      exercise: sightings stopped exactly when the Silver Bridge
+      collapsed, so it's remembered as a warning that came before a
+      disaster - an unusually apt metaphor for a QA/checks system whose
+      whole point is catching problems before they cause real downstream
+      damage); **Flatwoods Monster** (WV - genuinely weaker fit, included
+      as "another famous WV cryptid" rather than for a real thematic
+      reason, worth dropping); **Drop Bear** (WA/Australian - the
+      fictional carnivorous-koala tourist joke, zero cultural baggage,
+      purely playful larrikin humour); **Falling Stones of Mayanup**
+      (genuinely obscure real WA local legend, quirky hidden-gem
+      option). **Wagyl** (the rainbow-serpent figure from Noongar/WA
+      Aboriginal mythology) came up as a thematically strong candidate
+      (a serpent shaping the land ~ data flowing through the system) but
+      was deliberately NOT pitched as a casual codename option - it's a
+      significant living sacred figure, not folklore-as-entertainment
+      the way Mothman or Drop Bear are, and would need real consultation
+      first rather than a naming-brainstorm pick.
+    - **Backronym round** (earlier, WA-data-asset-literal): **SWAN**
+      (Shared WA Asset Network - WA's own emblem bird, and "asset" is
+      the exact word this project's own docs already use for the
+      multi-agency data asset concept); also considered and set aside:
+      GUARDIAN, TRUST, Black Swan Watch, QuokkaCheck, DataMuster.
+
+    Current leaning, not yet decided: **Mothman** (best thematic fit
+    overall) vs **Themis** (best fit specifically for the government/
+    regulatory context, cleanest market differentiation). Revisit when
+    Keith wants to actually pick one.
