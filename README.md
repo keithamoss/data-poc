@@ -149,11 +149,22 @@ uv run ruff check .        # lint - a lean rule set (real bugs: unused imports/v
                             # undefined names, syntax errors), not a style enforcer
 uv run pre-commit install  # one-time: wires ruff into `git commit` so lint issues
                             # get caught locally, not on the next person's pull
+uv run playwright install chromium  # one-time: for driving the dashboard in a
+                            # real browser (UI verification) - see below
 ```
 
 Ruff's rule set is deliberately narrow (`pyproject.toml`'s `[tool.ruff.lint]`)
 — this is still a fast-moving PoC with a narrative-comment-heavy style, not
 a codebase ready for a full opinionated linter pass.
+
+Everything here runs through `uv run` — nothing in this project depends on
+a system-installed Python or any package installed outside `.venv`
+(Playwright's browser binary included, via `uv run playwright install
+chromium` above). This matters more than usual for this repo specifically:
+it's meant to be checked out and run by other people evaluating the PoC,
+on their own machines, not just the one it was built on — `uv sync --dev`
+plus the one-time `playwright install` should be the entire setup, with no
+implicit "also have X on your PATH already" assumptions anywhere.
 
 ## Speed
 

@@ -21,6 +21,7 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.6",
     "pre-commit>=3.8",
+    "playwright>=1.62.0",  # real-browser UI verification (dashboard) - `uv run playwright install chromium` once after `uv sync --dev`, then drive it via `uv run python3 ...`; deliberately in the venv, not relied on as a system package, so this works the same on any contributor's machine
 ]
 
 # soda-core-duckdb declares duckdb<1.1.0, but datacontract-cli[duckdb] needs
