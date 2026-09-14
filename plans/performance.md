@@ -78,17 +78,32 @@ separate subprocess calls (`dbt run` then `dbt test`).
    setup? something reducible without changing what's tested?) — lower
    confidence this pays off, needs investigation before it needs code.
 
-4. **[open, medium]** Parallelize across the 10 independent runs
+4. **[open, medium]** Parallelize across the now-15 independent runs
    (multiprocessing — each run is its own isolated DuckDB file, no shared
-   mutable state between runs by design). Highest ceiling of any option
-   here — theoretically up to ~10x, realistically 3-5x depending on core
-   count — but not a small change: dbt writes to a shared
-   `dbt_project/target/` directory by default, so concurrent `dbt build`
-   invocations for *different* runs would clobber each other's
-   `manifest.json`/`run_results.json` mid-write unless each parallel
-   worker is given its own `--target-path`. Worth doing if this becomes a
-   frequently-run CI job (see `plans/wider.md` action 3); probably not
-   worth the added complexity for occasional local/manual runs.
+   mutable state between runs by design). Not a small change: dbt writes
+   to a shared `dbt_project/target/` directory by default, so concurrent
+   `dbt build` invocations for *different* runs would clobber each
+   other's `manifest.json`/`run_results.json` mid-write unless each
+   parallel worker is given its own `--target-path`.
+   **Empirically tested for Birth Registrations (2026-09-14), correcting
+   the "theoretically up to ~10x, realistically 3-5x" estimate above**,
+   which was never actually measured. Couldn't safely test dbt included
+   (the `target/` collision above would corrupt results, not just give a
+   noisy number), so tested Soda + datacontract-cli + Evidently only,
+   4 runs across 4 worker processes on this machine's 4 cores: sequential
+   27.57s -> parallel **12.46s wall-clock - a real 2.2x speedup**, but
+   with genuine contention visible (each run's own duration went from
+   5-10s to 10.5-12s under load - parallel workers compete for the same
+   cores/disk, they don't get a free ride). Extrapolating that measured
+   ratio to the full pipeline (dbt included, reasoned rather than
+   measured - it's a subprocess competing for the same resources, likely
+   similar behaviour once the `target/` fix exists): the current 2m36s
+   (155.8s) sequential run would land around **60-80s, roughly 2-2.5x**,
+   not the un-measured 3-5x guess. Still a real, worthwhile win if this
+   becomes a frequently-run CI job (`plans/wider.md` action 3); the
+   original "probably not worth it for occasional local/manual runs"
+   call still holds, maybe more so now that the realistic ceiling is
+   lower than first guessed.
 
 5. **[open, low]** Smaller-scope parallelism: within a single run, run
    the dbt subprocess concurrently with the three in-process Python calls
