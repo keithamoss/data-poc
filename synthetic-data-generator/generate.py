@@ -29,11 +29,10 @@ from __future__ import annotations
 import argparse
 import os
 import time
-import sys
 
 import pandas as pd
 
-from population import generate_population, _age_years
+from population import generate_population
 from child_protection import generate_child_protection_collection
 from agency_datasets import generate_birth_registrations, generate_school_enrollment
 import dirty as dirty_mod

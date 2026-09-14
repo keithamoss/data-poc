@@ -61,6 +61,13 @@ Rough layout:
 - Everything is seeded - regenerating reproduces the same output, so a
   diff against previous output is a real correctness check, not noise
   (used repeatedly to verify refactors are behaviour-preserving).
+- Dependencies are managed with `uv` (`pyproject.toml` + `uv.lock`) -
+  `uv sync --dev` installs everything including dev tooling. Run
+  `uv run pytest` (fast smoke tests - generator layer runs the real
+  seeded generator, dashboard-builder layer uses fixtures, no slow
+  real-tool run needed) and `uv run ruff check .` (a deliberately lean
+  rule set - real bugs only, not style) before considering a change
+  done. `pre-commit install` wires ruff into `git commit` automatically.
 - The repo is public (Keith's own call, synthetic data only) - GitHub
   Pages hosting depends on that; see `plans/wider.md` #5 for the
   parked note about what happens if/when it goes private again.

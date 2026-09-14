@@ -1,0 +1,56 @@
+[project]
+name = "mothman"
+version = "0.1.0"
+description = "QA/data-pipeline PoC for a multi-agency government data asset (BDM Birth Registrations + Child Protection), backed by real dbt-core/Soda Core/datacontract-cli/Evidently runs against synthetic data."
+requires-python = ">=3.11"
+dependencies = [
+    "dbt-core>=1.12",
+    "dbt-duckdb>=1.11",
+    "duckdb>=1.0",
+    "soda-core-duckdb>=3.5",
+    "datacontract-cli[duckdb]>=1.2",
+    "evidently>=0.7",
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "PyYAML>=6.0",
+    "Jinja2>=3.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "pre-commit>=3.8",
+]
+
+# soda-core-duckdb declares duckdb<1.1.0, but datacontract-cli[duckdb] needs
+# a newer duckdb via its ibis-framework dependency - a real pip
+# ResolutionImpossible error if both are installed in one transaction (see
+# requirements-real.txt's history for the two-step pip workaround this used
+# to need). Verified at runtime, repeatedly, across this whole project: all
+# four tools run together fine on duckdb 1.5.5, well past that declared
+# ceiling - the ceiling itself is stale, not the actual runtime requirement.
+# This override tells uv's resolver to trust that, so `uv sync` resolves
+# everything in one step instead of needing a manual two-step pip dance.
+[tool.uv]
+override-dependencies = ["duckdb>=1.5"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["generator", "pipeline", "real_tools"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+# Excludes real_tools/dbt_profiles (dbt-generated) and the synthetic-data-
+# generator subdirectory's own separate history - lint this repo's own
+# actively-developed code, not vendored/generated output.
+exclude = ["dbt_project/target", ".venv"]
+
+[tool.ruff.lint]
+# Lean on purpose (Keith's call, 2026-09-14): catch real bugs, not enforce
+# style on an already-large, deliberately narrative-comment-heavy codebase.
+select = [
+    "F",   # pyflakes - unused imports/variables, undefined names, real bugs
+    "E9",  # syntax errors
+]

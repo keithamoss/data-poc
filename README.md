@@ -16,10 +16,13 @@ to a real check evaluated against real generated CSVs.
 Run it yourself:
 
 ```bash
-pip install -r requirements-real.txt
-pip install 'datacontract-cli[duckdb]'    # see requirements-real.txt - a second step, not optional
+uv sync --dev
 ./run_pipeline.sh
 ```
+
+(No `uv`? `pip install .` reads the same `pyproject.toml` — though see the
+package-conflict note just below before you do; `uv`'s override handles it
+in one step, plain `pip` needs the two-step workaround that note describes.)
 
 This regenerates 10 scheduled daily deliveries (up to 15 manifest entries
 once red-triggered resupply attempts are included — see "The 10
@@ -40,12 +43,20 @@ nothing here is a hand-rolled stand-in:
 | **dbt-core** | `dbt_project/` is a real dbt project — `dbt_project.yml`, a staging model, `schema.yml` with real generic tests and severity config. | `run_dbt_real.py` shells out to the real `dbt` CLI (`dbt run` + `dbt test`, dbt-duckdb adapter) against a per-run DuckDB warehouse. |
 | **Evidently AI** | Population Stability Index (PSI) on the `sex` column vs. a reference run. | `run_evidently_real.py` runs the real `evidently.Report` + `DataDriftPreset` (the current 0.7.x API). |
 
-`requirements-real.txt` lists the exact package set verified to install and
-run together — including a `pip check`-flagged conflict between
-`soda-core-duckdb`'s declared `duckdb<1.1.0` ceiling and the actual duckdb
-version (1.5.5) that all four tools were run against with no observed
-breakage; see that file's comments before assuming the pip warning means
-you must downgrade.
+`pyproject.toml` lists the exact package set verified to install and run
+together. It includes a real, documented conflict: `soda-core-duckdb`
+declares `duckdb<1.1.0`, but `datacontract-cli[duckdb]` needs a newer
+duckdb via its `ibis-framework` dependency — a hard `pip`
+`ResolutionImpossible` error if both are installed in one transaction
+(the old two-step `pip install` workaround this project used to need).
+All four tools have been run together repeatedly on duckdb 1.5.5, well
+past that declared ceiling, with no observed breakage — the ceiling
+itself is stale, not the actual runtime requirement. `pyproject.toml`'s
+`[tool.uv] override-dependencies` tells `uv`'s resolver to trust that, so
+`uv sync` resolves everything correctly in one step; installing via plain
+`pip` still needs the old two-step dance (`pip install .` first, without
+the `[duckdb]` extra reachable, then `pip install 'datacontract-cli[duckdb]'`
+separately) since `pip` has no equivalent override mechanism.
 
 **This wasn't always the case.** This repo started in a claude.ai session
 with **no real internet access** (PyPI itself was unreachable there — every
@@ -113,8 +124,26 @@ reports/                       generated - results_real.json, results_real_cp.js
                                birth_registrations_dashboard.json, child_protection_dashboard.json
                                (not checked in)
 run_pipeline.sh                runs the whole real-tools pipeline end to end
-requirements-real.txt          the real tool packages - verified installing and running together
+pyproject.toml                 the real tool packages + dev tooling (pytest, ruff, pre-commit) -
+                               verified installing and running together; uv.lock pins exact versions
+tests/                         pytest smoke tests - generator and dashboard-builder layers
 ```
+
+## Development
+
+```bash
+uv sync --dev              # installs everything, including dev tooling
+uv run pytest              # smoke tests - generator layer (real, seeded runs) +
+                            # dashboard-builder layer (fixture-based, no slow real-tool run needed)
+uv run ruff check .        # lint - a lean rule set (real bugs: unused imports/vars,
+                            # undefined names, syntax errors), not a style enforcer
+uv run pre-commit install  # one-time: wires ruff into `git commit` so lint issues
+                            # get caught locally, not on the next person's pull
+```
+
+Ruff's rule set is deliberately narrow (`pyproject.toml`'s `[tool.ruff.lint]`)
+— this is still a fast-moving PoC with a narrative-comment-heavy style, not
+a codebase ready for a full opinionated linter pass.
 
 ## The 10 (scheduled) runs — and resupply attempts on top
 

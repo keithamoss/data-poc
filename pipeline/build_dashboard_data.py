@@ -27,7 +27,6 @@ by embed_dashboard_data.py as a JS const.
 from __future__ import annotations
 import json
 import os
-from datetime import datetime
 
 import duckdb
 
@@ -166,7 +165,6 @@ def build() -> dict:
             "previous": {"total": total_prev_manifest, "invalid": 0, "valid": total_prev_manifest, "valueCounts": None},
         }
         if checks_out:
-            primary_current = checks_out[0]["current"]
             primary_unit = checks_out[0]["unit"]
             for label, run_id, total_key in (("current", latest_run, "total_latest_manifest"), ("previous", prev_run, "total_prev_manifest")):
                 total = total_latest_manifest if label == "current" else total_prev_manifest

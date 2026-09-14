@@ -1,6 +1,6 @@
 """
 Runs REAL Evidently AI (evidently>=0.7, the current Report/DataDriftPreset
-API - a full rewrite since the 0.4.x API the original requirements-real.txt
+API - a full rewrite since the 0.4.x API this project's dependencies originally
 assumed) against each run's `sex` column vs. the reference run (run_01),
 via the real evidently.Report + evidently.presets.DataDriftPreset classes -
 not a reimplementation of PSI.

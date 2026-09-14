@@ -5,8 +5,8 @@
 #
 # Run this from the repo root. Every step is deterministic (seeded), so
 # re-running regenerates byte-for-byte the same runs/results. Requires the
-# real tool packages already installed - see requirements-real.txt's own
-# two-step install note before running this for the first time.
+# real tool packages already installed - run `uv sync --dev` first (see
+# pyproject.toml/README.md).
 set -euo pipefail
 cd "$(dirname "$0")"
 
