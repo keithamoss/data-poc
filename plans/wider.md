@@ -155,16 +155,72 @@ not a schedule.
    no CDN calls — see `plans/qa-pipeline.md`'s dashboard-readability
    entries). Decide replace vs. supplement before committing to either.
 
-10. **[todo, medium]** Repo review and tidy-up before continuing much
+10. **[done, medium]** Repo review and tidy-up before continuing much
     further — Keith flagged this given the pace of recent changes (Phase
     3/4, the QA-check battery, several real bugs found and fixed along the
-    way). Not yet scoped: likely candidates are a dead-code/stale-comment
-    pass, a consistency check across `real_tools/*.py` and `engines/*.py`
-    (naming, structure, how closely each pair actually mirrors the
-    other), a README accuracy pass against everything that's shipped
-    since it was last substantially updated, confirming `.gitignore`
-    coverage is still complete, and revisiting action 6 above (does
-    `synthetic-data-generator/` split into its own repo now).
+    way). Scoped live by actually investigating each candidate first
+    (dead-code pass, `real_tools/*.py`/`engines/*.py` consistency, README
+    accuracy, `.gitignore` coverage, action 6's repo-split question),
+    then checking findings against Keith before touching anything.
+
+    - **Dead-code/stale-comment pass**: genuinely clean. Grepped for
+      TODO/FIXME/deprecated/placeholder markers across all source - every
+      hit was a legitimate documentary one (contact-email placeholders
+      meant to be filled in later, an external API's own deprecation
+      history), nothing stale in this repo's own code. No backup/scratch
+      files either. Nothing to fix here.
+    - **`engines/*.py` vs `real_tools/*.py` naming**: found one real
+      inconsistency - `engines/contract_engine.py`/`soda_engine.py`/
+      `dbt_test_engine.py` all follow `<tool>_engine.py`, but
+      `drift_engine.py` was named by function (drift) instead of tool
+      (Evidently) - the odd one out among its own siblings. **Fixed**:
+      renamed to `evidently_engine.py`, and updated every reference,
+      including the module's own "engine" self-tag string that's baked
+      into `results.json`/the dashboard JSON, not just a docstring
+      (`pipeline/orchestrate.py`'s import, `build_dashboard_data.py`'s
+      `ENGINE_SHORT` lookup key, comments in `run_evidently_real.py`,
+      README/`qa-pipeline.md` mentions). Verified end to end by
+      re-running `./run_pipeline.sh`. The rest of `real_tools/*.py`'s own
+      naming (`run_<tool>_real.py`/`_cp.py`) was already consistent -
+      left alone.
+    - **`.gitignore` coverage**: found one real gap.
+      `reports/comparison.txt` (output of
+      `real_tools/compare_real_vs_equivalent.py`) was the one committed,
+      non-regenerating file among otherwise-gitignored reports - checked
+      its actual content and found it already stale (only covered the
+      original 10 runs, zero resupply-chain entries from the work done
+      earlier this session). Exactly the drift risk a committed generated
+      file creates that a gitignored one can't. **Fixed**: deleted and
+      added to `.gitignore` - regenerate on demand when actually wanted.
+    - **README accuracy pass**: found real drift. "The 10 runs" section
+      still said "one deliberately red," predating the resupply-chain
+      work entirely (now 2 red: run_06, run_09) and never mentioned
+      resupply attempts at all. **Fixed**: rewrote with fresh, verified
+      per-run numbers for all 4 dirty runs and an explanation of why
+      `data/raw/` actually has 15 entries, not 10. Also fixed the
+      quick-start blurb and the `generator/` layout listing (which didn't
+      mention `resupply.py` at all). Confirmed `generate_cp_runs.py`'s
+      "10 weekly snapshots" claim is still accurate - the resupply work
+      was Birth-Registrations-only, so CP wasn't affected.
+    - **Bigger finding, surfaced as a side effect of verifying the
+      rename**: re-embedding the dashboard to confirm `evidently_engine`
+      worked revealed the last commit to actually touch the dashboard's
+      embedded data predated the resupply-chain feature entirely (recent
+      dashboard commits were front-end-only - the tooltip fix, the
+      Mothman footer mention). The live published dashboard had been
+      silently serving data from before run_06 was ever made red. Fixed
+      as a side effect of this pass's regeneration - worth knowing this
+      class of staleness can happen silently (nothing errors, the
+      dashboard just quietly stops reflecting the generator's actual
+      logic) until someone re-runs the pipeline.
+    - **Action 6's repo-split question** (does `synthetic-data-generator/`
+      become its own repo): revisited given a real finding from this same
+      pass - `generator/generate_cp_runs.py` and `generator/daily_batch.py`
+      both actually reference `synthetic-data-generator/` now (not fully
+      decoupled, contrary to the general "deliberately separate" framing
+      elsewhere). Keith's call: leave it merged - the coupling makes a
+      clean split more work than it's worth right now, revisit only if it
+      becomes a real pain point.
 
 11. **[todo, low]** Document/explain how the synthetic data population is
     generated and how `dirty.py`'s failure injection reflects real
