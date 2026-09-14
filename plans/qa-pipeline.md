@@ -789,6 +789,32 @@ relative, not a schedule — this is weeks of work, not months.
     check) next time this comes up, rather than assuming full suppression
     is exactly right.
 
+18. **[investigate]** Explicit, non-magic null handling in every CSV
+    read/write this pipeline does - a spike Keith asked for after item
+    17's `"N/A"` bug. Right now every CSV read (`pd.read_csv(...)`,
+    DuckDB's `read_csv_auto(...)`) relies on each library's own default
+    list of "these specific strings mean null" - pandas' includes `""`,
+    `"N/A"`, `"NA"`, `"NULL"`, `"NaN"`, `"None"`, `"n/a"`, `"nan"`,
+    `"null"`, and several numeric-looking variants; DuckDB's own default
+    list is separate and not necessarily identical. Nobody in this
+    codebase chose that vocabulary - it's just whatever each library
+    ships with, and item 17's bug is exactly what "silent library magic"
+    costs when it collides with a real value. Goal: audit every
+    `pd.read_csv`/`read_csv_auto` call site in `generator/`, `pipeline/`,
+    `qa_tools/` and make null detection fully explicit - `pd.read_csv(...,
+    keep_default_na=False, na_values=[""])` and DuckDB's
+    `read_csv_auto(..., nullstr='')` - so an empty field is the ONLY
+    thing that ever becomes NULL, and any other text (including "N/A")
+    is always kept as the literal string it is. Needs checking against
+    every EXISTING null-rate check too, not just re-verifying item 17's
+    fix still holds - e.g. `place_of_birth_facility`'s null-rate check
+    presumably relies on a genuinely empty CSV field becoming NULL today;
+    confirm that still works identically once default sniffing is turned
+    off everywhere, not just that "N/A" stops being swallowed. Also
+    covers the write side (`to_csv()`'s own default for how a NaN gets
+    written back out) for the same write-then-read round trip item 17's
+    bug happened in.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
