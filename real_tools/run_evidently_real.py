@@ -2,7 +2,7 @@
 Runs REAL Evidently AI (evidently>=0.7, the current Report/DataDriftPreset
 API - a full rewrite since the 0.4.x API the original requirements-real.txt
 assumed) against each run's `sex` column vs. the reference run
-(run_01, same convention as engines/drift_engine.py), via the real
+(run_01, same convention as engines/evidently_engine.py), via the real
 evidently.Report + evidently.presets.DataDriftPreset classes - not a
 reimplementation of PSI.
 
@@ -10,7 +10,7 @@ Genuine finding from running the real tool, not assumed: Evidently's PSI
 computation treats every DISTINCT VALUE actually observed in the column as
 its own category (so a dirty run with three different invalid codes - e.g.
 run_09's "9"/"U"/"O" - gets three separate PSI categories), where
-engines/drift_engine.py's equivalent collapses everything outside {M,F,X}
+engines/evidently_engine.py's equivalent collapses everything outside {M,F,X}
 into one combined "_other" bucket. Both are real, defensible PSI
 implementations; they land in the same 0.1-0.25 "warn" band on run_09 but
 at genuinely different values (real Evidently: ~0.144; the equivalent's
@@ -33,7 +33,7 @@ DATASET_ID = "birth-registrations"
 ENGINE_TAG = "Evidently 0.7 (real)"
 
 REFERENCE_RUN_ID = "run_01_2026-09-01"
-# same pass/warn/fail bands engines/drift_engine.py uses, applied to the
+# same pass/warn/fail bands engines/evidently_engine.py uses, applied to the
 # real PSI value Evidently computes - Evidently's own DataDriftPreset only
 # carries one drift/no-drift threshold (0.1) by default, not a three-way
 # band, so the warn/fail split here is this project's convention, not

@@ -38,7 +38,7 @@ def run_pipeline(regenerate: bool = True) -> dict:
     import contract_engine
     import soda_engine
     import dbt_test_engine
-    import drift_engine
+    import evidently_engine
 
     with open(MANIFEST_PATH) as f:
         manifest = json.load(f)
@@ -51,7 +51,7 @@ def run_pipeline(regenerate: bool = True) -> dict:
         all_results.extend(contract_engine.evaluate_contract(CONTRACT_PATH, DB_PATH, run_id, run_timestamp))
         all_results.extend(soda_engine.evaluate_soda(SODA_PATH, DB_PATH, run_id, run_timestamp))
         all_results.extend(dbt_test_engine.evaluate_dbt_tests(DBT_PROJECT_DIR, DB_PATH, run_id, run_timestamp))
-        all_results.extend(drift_engine.evaluate_drift(DB_PATH, run_id, run_timestamp))
+        all_results.extend(evidently_engine.evaluate_drift(DB_PATH, run_id, run_timestamp))
 
     n_pass = sum(1 for r in all_results if r["status"] == "pass")
     n_warn = sum(1 for r in all_results if r["status"] == "warn")

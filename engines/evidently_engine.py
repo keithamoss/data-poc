@@ -95,7 +95,7 @@ def evaluate_drift(db_path: str, run_id: str, run_timestamp: str, reference_run_
         "on_fail_action": "flag",
         "row_count_total": n_total,
         "row_count_invalid": None,
-        "engine": "drift_engine (Evidently AI equivalent)",
+        "engine": "evidently_engine (Evidently AI equivalent)",
         "reference_run_id": reference_run_id,
         "reference_distribution": reference,
         "actual_distribution": actual,

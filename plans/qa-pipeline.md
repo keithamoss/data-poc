@@ -50,7 +50,7 @@ relative, not a schedule — this is weeks of work, not months.
 
 4. **[open, low]** Evidently's PSI and the equivalent engine's PSI
    genuinely differ (0.144 vs 0.179 on the red run) because Evidently bins
-   by every distinct observed value while `drift_engine.py` collapses
+   by every distinct observed value while `evidently_engine.py` collapses
    everything outside {M,F,X} into one `_other` bucket. Both valid;
    documented, not reconciled. **Follow-up:** decide whether to make the
    equivalent's PSI bin per-distinct-value too (closer fidelity to

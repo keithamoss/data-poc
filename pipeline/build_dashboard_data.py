@@ -32,7 +32,7 @@ ENGINE_SHORT = {
     "contract_engine (datacontract-cli equivalent)": "datacontract-cli equiv.",
     "soda_engine (Soda Core equivalent)": "Soda Core equiv.",
     "dbt_test_engine (dbt-core equivalent)": "dbt equiv.",
-    "drift_engine (Evidently AI equivalent)": "Evidently AI equiv.",
+    "evidently_engine (Evidently AI equivalent)": "Evidently AI equiv.",
     # The newer QA-check battery (source_system_record_id, extract_
     # timestamp, the multiple-birth sibling match, the 5 text-format
     # checks) was built real-tools-only, per Keith's explicit instruction

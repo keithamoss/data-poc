@@ -18,8 +18,10 @@ Run it yourself:
 ./run_pipeline.sh
 ```
 
-This regenerates 10 synthetic daily runs, loads them into DuckDB, runs all
-four *equivalent* check engines (see below), and re-embeds the results into
+This regenerates 10 scheduled daily deliveries (up to 15 manifest entries
+once red-triggered resupply attempts are included — see "The 10
+(scheduled) runs" below), loads them into DuckDB, runs all four
+*equivalent* check engines (see below), and re-embeds the results into
 `dashboard/qa-reporting-dashboard.html`. Every step is seeded, so re-running
 reproduces the same runs and the same numbers.
 
@@ -55,7 +57,7 @@ actually runs `dbt`, `soda`, `datacontract-cli`, and `evidently` today.
 | **datacontract-cli** | `contract/bdm-birth-registrations-contract.yaml` is a genuine ODCS v3.2.0 contract — `datacontract lint` passes on it. | `contract_engine.py`, a hand-written Python/DuckDB interpreter for the same real ODCS `metric`/`type: sql` rule vocabulary. | `run_datacontract_real.py` runs the actual `datacontract-cli` Python API (`DataContract.test()`) against each run's raw CSV via a `local` server. |
 | **Soda Core** | `contract/bdm-birth-registrations-soda-checks.yml` is genuine SodaCL. | `soda_engine.py`, a hand-written interpreter for the same SodaCL shapes. | `run_soda_real.py` runs the real `soda-core` `Scan` API against a per-run DuckDB warehouse. |
 | **dbt-core** | `dbt_project/` is a real dbt project — `dbt_project.yml`, a staging model, `schema.yml` with real generic tests and severity config. | `dbt_test_engine.py` renders the SQL model with actual Jinja2 into a DuckDB view, then evaluates the schema.yml tests as SQL. | `run_dbt_real.py` shells out to the real `dbt` CLI (`dbt run` + `dbt test`, dbt-duckdb adapter) against a per-run DuckDB warehouse. |
-| **Evidently AI** | Population Stability Index (PSI) on the `sex` column vs. a reference run. | `drift_engine.py` computes PSI from scratch with the standard formula and 0.1/0.25 warn/fail bands. | `run_evidently_real.py` runs the real `evidently.Report` + `DataDriftPreset` (the current 0.7.x API). |
+| **Evidently AI** | Population Stability Index (PSI) on the `sex` column vs. a reference run. | `evidently_engine.py` computes PSI from scratch with the standard formula and 0.1/0.25 warn/fail bands. | `run_evidently_real.py` runs the real `evidently.Report` + `DataDriftPreset` (the current 0.7.x API). |
 
 `requirements-real.txt` lists the exact package set verified to install and
 run together — including a `pip check`-flagged conflict between
@@ -103,7 +105,12 @@ generator/
   daily_batch.py              generates ONE day's birth-registration batch (an event-flow model,
                                deliberately different from the sibling synthetic-data-generator
                                repo's whole-population snapshot model — see the file's docstring)
-  generate_runs.py             orchestrates 10 daily runs, 3 deliberately dirty, into data/raw/
+  generate_runs.py             orchestrates 10 scheduled daily deliveries (2 amber, 2 red) into
+                               data/raw/ - red ones trigger resupply.py's resupply-chain
+                               simulation, so up to 15 manifest entries actually land, not 10
+  resupply.py                  generic resupply-chain orchestration (delay/retry/chaining),
+                               driven by a DatasetProvider protocol - knows nothing about how
+                               a dataset's rows are actually made, see the file's own docstring
   generate_cp_runs.py          orchestrates 10 weekly Child Protection snapshots into data/cp_raw/
   names_au.py, presentation.py, dirty.py   dirty.py has 2 new CP-specific presets;
                                kept in sync with synthetic-data-generator/dirty.py (see its docstring)
@@ -113,7 +120,7 @@ engines/                     the Python/DuckDB equivalents (kept as a fallback)
   contract_engine.py           datacontract-cli equivalent
   soda_engine.py                Soda Core equivalent
   dbt_test_engine.py            dbt-core equivalent (renders the real SQL model via Jinja2)
-  drift_engine.py                Evidently AI equivalent (real PSI)
+  evidently_engine.py           Evidently AI equivalent (real PSI)
 real_tools/                  runs the actual dbt/soda/datacontract-cli/evidently tools
   build_per_run_warehouses.py   one DuckDB file per run, for dbt/Soda to connect to
   dbt_profiles/profiles.yml     dbt-duckdb connection profile (no secrets - just a path)
@@ -147,11 +154,11 @@ run_pipeline.sh                runs the equivalent-engine pipeline end to end
 requirements-real.txt          the real tool packages - verified installing and running together
 ```
 
-## The 10 runs
+## The 10 (scheduled) runs — and resupply attempts on top
 
-`generator/generate_runs.py` generates ten daily runs (2026-09-01 through
-2026-09-10, ~1,800-2,000 rows each): seven clean, two deliberately
-"amber", one deliberately "red" (run 4 and run 7 amber, run 9 red), using
+`generator/generate_runs.py` schedules ten daily deliveries (2026-09-01
+through 2026-09-10, ~1,800-2,000 rows each): six clean, two deliberately
+"amber" (run 4, run 7), two deliberately "red" (run 6, run 9), using
 `dirty.py`'s `apply_birth_registrations_presets()` — calibrated to land
 exactly inside the Soda checks file's own warn/fail bands, not arbitrary
 noise. Verified after generation, not just intended:
@@ -159,8 +166,21 @@ noise. Verified after generation, not just intended:
 | Run | Severity | invalid `sex` rate | null `place_of_birth_facility` rate |
 |---|---|---|---|
 | run_01 (clean) | — | 0.0% | 2.1% |
-| run_04 | amber | 0.8% | 21.1% |
-| run_09 | red | 3.1% | 40.5% |
+| run_04 | amber | 0.8% | 30.6% |
+| run_06 | red | 3.0% | 56.9% |
+| run_07 | amber | 1.3% | 33.2% |
+| run_09 | red | 4.3% | 55.6% |
+
+**A RED delivery doesn't stop at one row in `manifest.json`.** It
+triggers `generator/resupply.py`'s resupply-chain simulation — modelling
+Keith's team's real practice of requesting a resupply when a file has a
+red failing check, with no single fixed turnaround time. Each subsequent
+attempt gets a business-day-aware delay, a chance of still being red, and
+small organic churn versus a fresh random draw (see that module's own
+docstring and `plans/wider.md` #12/#13 for the full design). Run 6 and
+run 9 going red is what pushes the actual row count in `data/raw/` and
+`manifest.json` from 10 to **15 entries** — each attempt gets its own
+CSV and its own `run_id` (e.g. `run_09_2026-09-09_resupply2`).
 
 ## The dashboard
 
@@ -329,7 +349,7 @@ held from the original equivalent-only build.
   are correct.** Evidently's `DataDriftPreset` treats every distinct value
   actually observed in a column as its own category, so run_09's three
   different injected invalid `sex` codes ("9"/"U"/"O") count as three
-  separate categories. `drift_engine.py`'s equivalent collapses everything
+  separate categories. `evidently_engine.py`'s equivalent collapses everything
   outside {M, F, X} into one combined `_other` bucket. Both land in the
   same 0.1–0.25 "warn" band on run_09, but at different values (real
   Evidently: 0.144; the equivalent: 0.179) — PSI is genuinely sensitive to
