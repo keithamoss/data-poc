@@ -68,6 +68,10 @@ Rough layout:
   real-tool run needed) and `uv run ruff check .` (a deliberately lean
   rule set - real bugs only, not style) before considering a change
   done. `pre-commit install` wires ruff into `git commit` automatically.
+  Not needed yet, but flagged: once the suite runs long enough that
+  wall-clock time actually matters (currently ~3s for 13 tests - `pytest-
+  xdist` would add more overhead than it saves), switch to `pytest-xdist`
+  for parallel test execution rather than just tolerating a slower suite.
 - **Whenever an actual bug is found** (not a design gap, not a missing
   feature - a case where the code produces a genuinely wrong result),
   add a test to `tests/` that reproduces it and fails against the

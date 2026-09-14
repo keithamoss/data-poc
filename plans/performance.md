@@ -94,8 +94,23 @@ separate subprocess calls (`dbt run` then `dbt test`).
    the dbt subprocess concurrently with the three in-process Python calls
    (Soda / datacontract-cli / Evidently) via a thread pool, since none of
    them touch each other's state. Avoids #4's `target/` collision problem
-   entirely (only one dbt process ever running at a time). Would cut
-   per-run time from ~21s toward roughly the slowest single tool (~9.5s,
-   or ~4.2s post-fix) rather than their sum — meaningful, but real
-   engineering (thread-safety of the Python API calls, correctly
-   collecting/ordering results) for a smaller win than #4.
+   entirely (only one dbt process ever running at a time).
+   **Re-measured for Birth Registrations specifically (2026-09-14),
+   correcting the estimate above** - the ~9.5s/~4.2s figures were Child
+   Protection's own baseline, and even that carried a real distortion:
+   isolated per-tool timing across 3 consecutive BDM runs in one process
+   showed Evidently and Soda both pay a one-time cost on their first call
+   (evidently: 2.88s -> 0.12s -> 0.10s; soda: 0.35s -> 0.08s -> 0.08s) -
+   almost certainly the `evidently`/`soda` package imports, not per-run
+   work - so a single-run timing snapshot overstates them heavily.
+   Steady-state BDM breakdown across real runs: dbt-core ~5s,
+   datacontract-cli ~6s, Soda/Evidently ~0.1s each (negligible). The real
+   bottleneck is dbt-core and datacontract-cli specifically, not "the
+   four tools' sum." Threading dbt concurrently with the other three
+   would overlap dbt's ~5s against datacontract-cli's ~6s instead of
+   summing them - **per-run time ~11s -> ~6s, roughly 5s/run saved, ~75s
+   across the current 15-run manifest (measured 2m36s full run -> an
+   estimated ~1m20-30s)** - a ~45-50% cut, larger than "smaller win than
+   #4" suggested. Still real engineering (thread-safety of the Python API
+   calls, correctly collecting/ordering results), but worth revisiting
+   the low-priority tag given the corrected number.
