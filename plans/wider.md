@@ -527,6 +527,9 @@ not a schedule.
     its literal column spec, rather than either side hand-authoring
     independently). Worth scoping properly rather than picking blind -
     revisit alongside actions 11/13's generator work, not in isolation.
+    See also action 22 - the same "contract should generate its
+    downstream files, not just describe them" question, applied to dbt's
+    and Soda's own check files instead of the generator.
 
 16. **[parked]** Keith wants to give a dedicated walkthrough of *why* this
     project exists and its actual goals, once the current loop of smaller
@@ -936,3 +939,62 @@ not a schedule.
     same reason: this repo is meant to be checked out and run by other
     people evaluating the PoC, on their own machines, not just the one it
     was built on.
+
+22. **[investigate]** A real, currently-unused way to make the ODCS
+    contract the actual single source of truth for dbt's and Soda's own
+    check files too - not just something the dashboard/datacontract-cli
+    read. Keith asked for this to be flagged as an architectural
+    consideration, not built. Same underlying pain as action 15 (the
+    generator hand-duplicating the contract's column definitions), just
+    hitting `dbt_project/models/staging/schema.yml` and
+    `contract/*-soda-checks.yml` instead of `generator/daily_batch.py`:
+    all three of these files independently hand-encode the same quality
+    rules the ODCS contract already states, with nothing connecting them
+    today - add or change a rule in the contract and the dbt/Soda check
+    files silently don't follow, the same drift risk action 15 already
+    named for the generator.
+
+    Both tools have real bridge tooling for this (verified with actual
+    research, not assumed - full detail and sources in
+    `plans/qa-pipeline.md` #19): `datacontract-cli`'s own `dbt sync`
+    command (already installed in this project) and the third-party
+    `dbt-contracts` package both read an ODCS file and **write real
+    `schema.yml`/model files to disk** - `dbt sync` specifically tags the
+    sections it manages so a re-run won't clobber hand-added tests.
+    Soda's `soda ai` (shipped inside `soda-core` itself, no extra
+    install) translates an ODCS contract into Soda's own Contract
+    Language, with a review-and-approve step before it saves a real file.
+    **Neither is a live runtime bridge** - dbt and Soda always execute
+    against whatever file is sitting on disk, with zero awareness of
+    where it came from or whether it's stale relative to the contract.
+
+    The pipeline shape this would actually enable, if adopted:
+    ```
+    contract/*.yaml (hand-edited, the only thing a human touches)
+            |
+            |  CI step, triggered on contract changes (or run manually)
+            v
+    `datacontract dbt sync ...`  /  `soda ai` (translate, review, approve)
+            |
+            v
+    dbt_project/.../schema.yml (generated + meta-tagged)
+    a generated Soda Contract Language file (replaces *-soda-checks.yml)
+            |
+            v
+    `dbt build` / `soda scan` - run completely normally, no ODCS involved
+    ```
+    Real, currently-unresolved tradeoffs, not yet scoped: `soda ai` is
+    explicitly experimental with no published GA date (see #19) - a real
+    dependency to take on for a PoC, not a stable foundation yet.
+    `dbt-contracts` is an unofficial third-party package, not from dbt
+    Labs. And this project's own check design leans on things that might
+    not survive a generated round-trip - the dbt-duckdb `fail_calc`
+    reliability workaround (`schema.yml`'s own header comment), the
+    count-based (not percentage) `warn_if`/`error_if` bands calibrated
+    per check, the custom `failed rows`/`fail query:` pattern used where
+    Soda's ordinary metric checks don't fit - would need verifying
+    whether `dbt sync`/`soda ai`'s generated output can even express
+    these, not just whether the happy path works. Not scoped further;
+    revisit alongside action 15, not in isolation - same root question
+    (should the contract generate its downstream check files, or stay
+    read-only reference material) applied to a different pair of files.
