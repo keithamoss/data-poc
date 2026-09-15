@@ -2064,6 +2064,59 @@ relative, not a schedule — this is weeks of work, not months.
     recurrence would let a future dig start from evidence instead of
     guessing at what to reproduce.
 
+39. **[done]** Added a unit-test battery for `generator/dirty.py`'s
+    failure-injection functions themselves (`tests/test_dirty.py`,
+    scoped via AskUserQuestion, 2026-09-15) - prompted by asking "do we
+    have good coverage of the actually dirty data injection itself?"
+    after building item 31's resupply.py battery. Before this, the only
+    test touching dirty.py was the narrow "N/A" null-sentinel CSV round-
+    trip regression - none of the 12 core injector functions (inject_
+    nulls, inject_invalid_values, inject_missing_expected_value, inject_
+    duplicate_rows, inject_nulls_in_subset, inject_duplicate_values,
+    inject_out_of_range_dates, inject_extract_timestamp_disorder,
+    truncate_rows, truncate_to_row_count, break_multiple_birth_siblings,
+    inject_drift_batch) had a direct test - all confidence came from real
+    pipeline runs and the calibration comments already scattered through
+    the module, same gap resupply.py had before its own fix above.
+    Deliberately scoped as a DIFFERENT thing from item 27 (still `[todo]`
+    below): this battery tests whether the injector code does what it
+    claims (rate accuracy, only the intended column/rows touched, exact
+    mechanics like truncate_to_row_count hitting its target and the ~60%
+    near-duplicate perturbation rate), not whether the injected dirt
+    reaches every check the two datasets define - that breadth gap is
+    unrelated and unaffected by this work.
+
+    Two explicit scoping choices, both Keith's (AskUserQuestion): cover
+    both the core injectors AND the dataset-specific presets (`apply_
+    birth_registrations_presets`, `apply_cp_notifications_presets`,
+    `apply_cp_placements_presets`, `apply_cp_clients_presets`, `apply_cp_
+    investigations_presets`) rather than just the former; and add a
+    shared property test asserting the module's own documented "returns
+    a new DataFrame, never mutates the input" contract across every core
+    injector - real load-bearing behaviour for item 31's resupply-chain
+    fix specifically, since `run_delivery_chain` now calls `dirty()`
+    repeatedly against a shared `clean_df` lineage and a mutating
+    injector would silently corrupt that lineage for every later attempt
+    in the chain.
+
+    One real test-design mistake caught and fixed along the way, not a
+    dirty.py bug: an initial "truncation lands on an exact band target"
+    test for `apply_birth_registrations_presets` assumed truncation was
+    the only row-count-changing step in the preset, and failed (3275 vs.
+    expected 3280) - `break_multiple_birth_siblings` also drops a row
+    per broken twin pair when real multi-birth pairs are present in the
+    input, so the two row-count-changing steps compound. Fixed by
+    isolating the truncation-only property against a fixture with no
+    multi-birth pairs; the pair-breaking step's own row-count effect is
+    separately covered by `test_break_multiple_birth_siblings_drops_the_
+    expected_number_of_pairs`.
+
+    33 tests in `tests/test_dirty.py` (3 pre-existing + 30 new), 67 in
+    the full suite, all passing; `uv run ruff check .` clean. No new
+    regression-test obligation under CLAUDE.md's bug-fix convention -
+    this batch added coverage for existing, working code rather than
+    fixing a found defect.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

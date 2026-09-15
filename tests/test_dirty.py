@@ -1,4 +1,9 @@
-"""Regression test for a real bug found while calibrating the new suburb/
+"""Tests for generator/dirty.py's failure-injection machinery.
+
+The first section (test_invalid_value_pools_contain_no_null_sentinel_strings
+/ test_injected_invalid_suburb_values_survive_a_csv_round_trip /
+test_injected_invalid_postcode_values_survive_a_csv_round_trip) is a
+regression test for a real bug found while calibrating the new suburb/
 postcode closed-value-set dirty presets (2026-09-14): both
 _INVALID_SUBURB_POOL and _INVALID_POSTCODE_POOL originally included the
 literal string "N/A" as an injected invalid value. pandas' and DuckDB's
@@ -14,13 +19,26 @@ calibrated rate (confirmed live: 4 of 18 injected postcode values on one
 run disappeared this way, enough to flip dbt's accepted_values result
 from fail to warn - datacontract-cli's own Python-level check didn't have
 this gap, so the three engines actively disagreed on the same run).
+Fixed by dropping "N/A" from both pools (see dirty.py's own comments).
 
-Fixed by dropping "N/A" from both pools (see dirty.py's own comments)."""
+The rest of the file (added 2026-09-15, scoped via AskUserQuestion) is a
+general test battery for the injector functions themselves - up to this
+point their correctness (rate produces the right fraction, only the
+intended column/rows are touched, the module's own documented "never
+mutates the input" contract) had no automated coverage at all, unlike
+that one specific CSV round-trip bug above; confidence came entirely from
+real pipeline runs and the calibration comments scattered through
+dirty.py, the same gap resupply.py had before its own 2026-09-15 fix (see
+plans/qa-pipeline.md #31). Deliberately does NOT try to prove dirty.py's
+presets actually exercise every check the two datasets define - that's
+the separate, much bigger breadth gap logged as plans/qa-pipeline.md #27
+(still [todo], not what this battery is for)."""
 from __future__ import annotations
 
 import io
 
 import pandas as pd
+import pytest
 
 from generator import dirty
 
@@ -58,3 +76,366 @@ def test_injected_invalid_postcode_values_survive_a_csv_round_trip():
     round_tripped = pd.read_csv(io.StringIO(csv_bytes), dtype={"postcode": str})
 
     assert round_tripped["postcode"].isna().sum() == 0
+
+
+# --- core injector battery -------------------------------------------------
+# Large-ish n so a seeded-random rate check has real statistical power
+# without being so large the suite gets slow. `_approx` gives a generous
+# tolerance deliberately - these tests exist to catch a real logic bug
+# (rate not applied, applied twice, wrong comparison operator, wrong
+# column), not to pin down dirty.py's exact calibration numbers, which
+# already have their own extensive commentary in the module itself.
+_N = 4000
+
+
+def _approx(actual: int, expected: float, rel: float = 0.25, floor: int = 5):
+    assert abs(actual - expected) <= max(floor, expected * rel), \
+        f"actual={actual} too far from expected={expected} (tolerance rel={rel}, floor={floor})"
+
+
+def _base_df(n: int = _N) -> pd.DataFrame:
+    return pd.DataFrame({
+        "sex": ["M"] * n,
+        "place_of_birth_facility": [f"Facility {i % 20}" for i in range(n)],
+        "source_system_record_id": [f"SRC-{i:09d}" for i in range(n)],
+        "child_given_names": ["Alex"] * n,
+        "date_registered": pd.to_datetime(["2026-09-01"] * n),
+        "extract_timestamp": pd.to_datetime(["2026-09-01 12:00:00"] * n),
+        "place_of_birth_suburb": ["Perth"] * n,
+        "date_of_birth": pd.to_datetime(["2026-08-25"] * n),
+    })
+
+
+CORE_INJECTOR_CALLS = [
+    ("inject_nulls", lambda df: dirty.inject_nulls(df, "place_of_birth_facility", 0.3, seed=1)),
+    ("inject_invalid_values", lambda df: dirty.inject_invalid_values(df, "sex", ["U", "O"], 0.3, seed=1)),
+    ("inject_missing_expected_value",
+     lambda df: dirty.inject_missing_expected_value(df, "sex", "M", ["F"], seed=1)),
+    ("inject_duplicate_rows", lambda df: dirty.inject_duplicate_rows(df, rate=0.1, seed=1)),
+    ("inject_nulls_in_subset",
+     lambda df: dirty.inject_nulls_in_subset(df, "place_of_birth_facility", df["sex"] == "M", 0.3, seed=1)),
+    ("inject_duplicate_values",
+     lambda df: dirty.inject_duplicate_values(df, "source_system_record_id", 0.3, seed=1)),
+    ("inject_out_of_range_dates",
+     lambda df: dirty.inject_out_of_range_dates(df, "date_of_birth", dirty._BAD_DATE_OF_BIRTH_POOL, 0.3, seed=1)),
+    ("inject_extract_timestamp_disorder",
+     lambda df: dirty.inject_extract_timestamp_disorder(df, 0.3, seed=1)),
+    ("truncate_rows", lambda df: dirty.truncate_rows(df, 0.3, seed=1)),
+    ("truncate_to_row_count", lambda df: dirty.truncate_to_row_count(df, len(df) // 2, seed=1)),
+]
+
+
+@pytest.mark.parametrize("name,call", CORE_INJECTOR_CALLS, ids=[c[0] for c in CORE_INJECTOR_CALLS])
+def test_core_injectors_never_mutate_their_input(name, call):
+    # dirty.py's own module docstring: "Each function returns a *new*
+    # DataFrame (never mutates the input)" - a real, load-bearing contract
+    # for the resupply-chain code (generator/resupply.py) that calls
+    # dirty() repeatedly against a shared clean lineage (see #31's fix) -
+    # a mutating injector would corrupt that lineage for every later
+    # attempt in the chain, not just the one that called it.
+    df = _base_df(200)
+    original = df.copy(deep=True)
+    call(df)
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_inject_nulls_rate_and_column():
+    df = _base_df()
+    out = dirty.inject_nulls(df, "place_of_birth_facility", rate=0.3, seed=1)
+    _approx(out["place_of_birth_facility"].isna().sum(), 0.3 * len(df))
+    # no other column touched
+    for col in df.columns.drop("place_of_birth_facility"):
+        pd.testing.assert_series_equal(out[col], df[col])
+
+
+def test_inject_invalid_values_rate_and_pool_membership():
+    df = _base_df()
+    pool = ["U", "O", "9"]
+    out = dirty.inject_invalid_values(df, "sex", pool, rate=0.3, seed=1)
+    changed = out["sex"] != df["sex"]
+    _approx(changed.sum(), 0.3 * len(df))
+    assert set(out.loc[changed, "sex"]).issubset(set(pool))
+    assert (out.loc[~changed, "sex"] == "M").all()
+
+
+def test_inject_missing_expected_value_removes_every_occurrence():
+    df = _base_df()
+    df.loc[df.index[:1000], "sex"] = "F"  # 1000 "F", rest "M"
+    out = dirty.inject_missing_expected_value(df, "sex", "F", ["X"], seed=1)
+    assert (out["sex"] == "F").sum() == 0
+    assert (out["sex"] == "X").sum() == 1000
+    assert (out["sex"] == "M").sum() == len(df) - 1000
+
+
+def test_inject_duplicate_rows_appends_exact_copies_without_near_duplicate_columns():
+    df = _base_df()
+    out = dirty.inject_duplicate_rows(df, rate=0.1, seed=1)
+    n_dupe = int(len(df) * 0.1)
+    assert len(out) == len(df) + n_dupe
+    appended = out.iloc[len(df):]
+    original_ids = set(df["source_system_record_id"])
+    assert appended["source_system_record_id"].isin(original_ids).all()
+
+
+def test_inject_duplicate_rows_perturbs_near_duplicate_columns():
+    df = _base_df()
+    out = dirty.inject_duplicate_rows(df, rate=1.0, seed=1, near_duplicate_columns=["source_system_record_id"])
+    n_dupe = len(df)  # rate=1.0
+    assert len(out) == len(df) + n_dupe
+    appended_ids = out.iloc[len(df):]["source_system_record_id"]
+    original_ids = set(df["source_system_record_id"])
+    # ~60% of appended rows should have one character dropped from the id,
+    # which (given 4000 distinct 13-char ids) essentially never collides
+    # back into the original id set by chance.
+    unperturbed_fraction = appended_ids.isin(original_ids).mean()
+    assert 0.25 < unperturbed_fraction < 0.55, \
+        f"expected ~40% of appended rows to be byte-identical copies (60% perturbed), got {unperturbed_fraction:.2f}"
+
+
+def test_inject_nulls_in_subset_only_touches_eligible_rows():
+    df = _base_df()
+    eligible = df.index < len(df) // 2
+    out = dirty.inject_nulls_in_subset(df, "place_of_birth_facility", eligible, rate=1.0, seed=1)
+    assert out.loc[eligible, "place_of_birth_facility"].isna().all()
+    assert (out.loc[~eligible, "place_of_birth_facility"] == df.loc[~eligible, "place_of_birth_facility"]).all()
+
+
+def test_inject_duplicate_values_creates_real_duplicates_from_existing_values():
+    df = _base_df()
+    out = dirty.inject_duplicate_values(df, "source_system_record_id", rate=1.0, seed=1)
+    # every resulting value must have existed in the original column...
+    assert out["source_system_record_id"].isin(df["source_system_record_id"]).all()
+    # ...and with rate=1.0 reassigning every row to a random donor, real
+    # duplicate values are all but certain to appear.
+    assert out["source_system_record_id"].duplicated().sum() > 0
+
+
+def test_inject_out_of_range_dates_rate_and_pool_membership():
+    df = _base_df()
+    pool = dirty._BAD_DATE_OF_BIRTH_POOL
+    out = dirty.inject_out_of_range_dates(df, "date_of_birth", pool, rate=0.3, seed=1)
+    changed = out["date_of_birth"] != df["date_of_birth"]
+    _approx(changed.sum(), 0.3 * len(df))
+    assert set(pd.to_datetime(out.loc[changed, "date_of_birth"]).dt.date).issubset(set(pool))
+
+
+def test_inject_extract_timestamp_disorder_only_shifts_affected_rows_before_registration():
+    df = _base_df()
+    out = dirty.inject_extract_timestamp_disorder(df, rate=0.3, seed=1)
+    changed = out["extract_timestamp"] != df["extract_timestamp"]
+    _approx(changed.sum(), 0.3 * len(df))
+    assert (out.loc[changed, "extract_timestamp"] < out.loc[changed, "date_registered"]).all()
+    assert (out.loc[~changed, "extract_timestamp"] == df.loc[~changed, "extract_timestamp"]).all()
+
+
+def test_truncate_rows_drops_approximately_the_requested_fraction():
+    df = _base_df()
+    out = dirty.truncate_rows(df, rate=0.3, seed=1)
+    _approx(len(df) - len(out), 0.3 * len(df))
+    # every surviving row is a genuine original row, not a new/altered one
+    assert out["source_system_record_id"].isin(df["source_system_record_id"]).all()
+
+
+def test_truncate_to_row_count_hits_the_exact_target():
+    df = _base_df()
+    target = len(df) // 2
+    out = dirty.truncate_to_row_count(df, target, seed=1)
+    assert len(out) == target
+    assert out["source_system_record_id"].isin(df["source_system_record_id"]).all()
+    assert out["source_system_record_id"].is_unique
+
+
+def test_truncate_to_row_count_is_a_noop_when_target_exceeds_length():
+    df = _base_df(100)
+    out = dirty.truncate_to_row_count(df, target_rows=500, seed=1)
+    pd.testing.assert_frame_equal(out, df)
+
+
+def test_break_multiple_birth_siblings_drops_the_expected_number_of_pairs():
+    # 40 real twin pairs (matching date_of_birth/facility/parent1, exactly
+    # 2 rows each) plus 20 non-twin singles the injector must leave alone.
+    n_pairs = 40
+    rows = []
+    for i in range(n_pairs):
+        for _twin in range(2):
+            rows.append({
+                "is_multiple_birth": True,
+                "date_of_birth": pd.Timestamp("2026-08-01") + pd.Timedelta(days=i),
+                "place_of_birth_facility": f"Facility {i}",
+                "registering_parent_1_name": f"Parent {i}",
+            })
+    for i in range(20):
+        rows.append({
+            "is_multiple_birth": False,
+            "date_of_birth": pd.Timestamp("2026-08-01") + pd.Timedelta(days=100 + i),
+            "place_of_birth_facility": f"Solo Facility {i}",
+            "registering_parent_1_name": f"Solo Parent {i}",
+        })
+    df = pd.DataFrame(rows)
+
+    out = dirty.break_multiple_birth_siblings(df, severity="red", seed=1)  # rate=0.5
+    expected_broken = int(n_pairs * 0.5)
+    assert len(df) - len(out) == expected_broken
+
+    remaining_twins = out[out["is_multiple_birth"]]
+    groups = remaining_twins.groupby(
+        ["date_of_birth", "place_of_birth_facility", "registering_parent_1_name"], dropna=False
+    ).size()
+    orphaned = (groups == 1).sum()
+    intact_pairs = (groups == 2).sum()
+    assert orphaned == expected_broken
+    assert intact_pairs == n_pairs - expected_broken
+    # non-twin rows are never touched
+    assert (~out["is_multiple_birth"]).sum() == 20
+
+
+def test_inject_drift_batch_never_affects_rows_before_onset():
+    n = 2000
+    df = pd.DataFrame({
+        "sex": ["M"] * n,
+        "batch_id": list(range(n)),
+    })
+    onset = n // 2
+    out = dirty.inject_drift_batch(df, "sex", ["U"], "batch_id", onset_value=onset,
+                                    rate_after_onset=0.4, seed=1)
+    before = out["batch_id"] < onset
+    after = ~before
+    assert (out.loc[before, "sex"] == "M").all()
+    changed_after = (out.loc[after, "sex"] != "M").sum()
+    _approx(changed_after, 0.4 * after.sum())
+
+
+# --- dataset-specific presets -----------------------------------------------
+# These compose the core injectors above at calibrated rates per severity -
+# tested here for the property that actually matters at this level (red is
+# measurably worse than amber, and previous_row_count truncation lands
+# exactly on its computed target), not by re-deriving every rate dirty.py's
+# own extensive inline comments already document.
+
+def _clean_bdm_df(n: int = 4000) -> pd.DataFrame:
+    df = _base_df(n)
+    # give break_multiple_birth_siblings real pairs to work with, same
+    # shape as test_break_multiple_birth_siblings_drops_the_expected_number_of_pairs
+    is_multi = [False] * n
+    for i in range(0, 200, 2):
+        is_multi[i] = is_multi[i + 1] = True
+        df.loc[i, "registering_parent_1_name"] = f"Parent {i}"
+        df.loc[i + 1, "registering_parent_1_name"] = f"Parent {i}"
+        df.loc[i + 1, "date_of_birth"] = df.loc[i, "date_of_birth"]
+        df.loc[i + 1, "place_of_birth_facility"] = df.loc[i, "place_of_birth_facility"]
+    df.loc[df.index[200:], "registering_parent_1_name"] = [f"Solo {i}" for i in range(n - 200)]
+    df["is_multiple_birth"] = is_multi
+    return df
+
+
+def test_birth_registrations_preset_red_is_worse_than_amber():
+    df = _clean_bdm_df()
+    amber = dirty.apply_birth_registrations_presets(df, severity="amber", seed=1)
+    red = dirty.apply_birth_registrations_presets(df, severity="red", seed=1)
+
+    amber_facility_null_rate = amber["place_of_birth_facility"].isna().mean()
+    red_facility_null_rate = red["place_of_birth_facility"].isna().mean()
+    assert red_facility_null_rate > amber_facility_null_rate
+
+    amber_invalid_sex = (~amber["sex"].isin(["M", "F"])).sum()
+    red_invalid_sex = (~red["sex"].isin(["M", "F"])).sum()
+    assert red_invalid_sex > amber_invalid_sex
+
+
+def test_birth_registrations_preset_truncates_to_exact_band_target():
+    # No multi-birth pairs here (unlike _clean_bdm_df) - isolates
+    # truncation as the ONLY row-count-changing step in the preset.
+    # break_multiple_birth_siblings also drops rows when real twin pairs
+    # exist (see test_birth_registrations_preset_red_is_worse_than_amber),
+    # so with pairs present the final count is the truncation target minus
+    # however many more pairs it breaks - not testable as an exact number
+    # without re-deriving that step's own randomness here too.
+    df = _base_df()
+    df["is_multiple_birth"] = False
+    df["registering_parent_1_name"] = [f"Parent {i}" for i in range(len(df))]
+
+    amber = dirty.apply_birth_registrations_presets(df, severity="amber", seed=1, previous_row_count=4000)
+    red = dirty.apply_birth_registrations_presets(df, severity="red", seed=1, previous_row_count=4000)
+    assert len(amber) == int(4000 * (1 - 0.18))
+    assert len(red) == int(4000 * (1 - 0.35))
+
+
+def test_cp_notifications_preset_red_is_worse_than_amber():
+    n = 2000
+    df = pd.DataFrame({
+        "notification_id": [f"NOTIF-{i:06d}" for i in range(n)],
+        "concern_type": ["Neglect"] * n,
+    })
+    amber = dirty.apply_cp_notifications_presets(df, severity="amber", seed=1)
+    red = dirty.apply_cp_notifications_presets(df, severity="red", seed=1)
+
+    amber_invalid = (~amber["concern_type"].isin(["Neglect"])).sum()
+    red_invalid = (~red["concern_type"].isin(["Neglect"])).sum()
+    assert red_invalid > amber_invalid
+    # duplicate_rows appends rows, so red (higher dup rate) ends up longer
+    assert len(red) > len(amber) >= n
+
+
+def test_cp_placements_preset_reassigns_only_to_non_approved_carers():
+    n = 2000
+    placements_df = pd.DataFrame({
+        "placement_id": [f"PLACE-{i:06d}" for i in range(n)],
+        "carer_id": ["CARER-APPROVED"] * n,
+    })
+    carers_df = pd.DataFrame({
+        "carer_id": ["CARER-APPROVED", "CARER-PENDING", "CARER-SUSPENDED"],
+        "approval_status": ["Approved", "Pending", "Suspended"],
+    })
+    amber = dirty.apply_cp_placements_presets(placements_df, carers_df, severity="amber", seed=1)
+    red = dirty.apply_cp_placements_presets(placements_df, carers_df, severity="red", seed=1)
+
+    non_approved = {"CARER-PENDING", "CARER-SUSPENDED"}
+    amber_reassigned = amber["carer_id"].isin(non_approved).sum()
+    red_reassigned = red["carer_id"].isin(non_approved).sum()
+    assert red_reassigned > amber_reassigned > 0
+    # the preset never invents a carer_id outside the real carers table
+    assert amber["carer_id"].isin(carers_df["carer_id"]).all()
+    assert red["carer_id"].isin(carers_df["carer_id"]).all()
+
+
+def test_cp_clients_preset_red_is_worse_than_amber():
+    n = 2000
+    df = pd.DataFrame({
+        "postcode": ["6000"] * n,
+        "date_of_birth": pd.to_datetime(["2020-01-01"] * n),
+    })
+    amber = dirty.apply_cp_clients_presets(df, severity="amber", seed=1)
+    red = dirty.apply_cp_clients_presets(df, severity="red", seed=1)
+
+    amber_bad_postcode = (amber["postcode"] != "6000").sum()
+    red_bad_postcode = (red["postcode"] != "6000").sum()
+    assert red_bad_postcode > amber_bad_postcode
+
+    amber_bad_dob = (amber["date_of_birth"] != df["date_of_birth"]).sum()
+    red_bad_dob = (red["date_of_birth"] != df["date_of_birth"]).sum()
+    assert red_bad_dob > amber_bad_dob
+
+
+def test_cp_investigations_preset_only_reopens_closed_case_investigations():
+    n = 1000
+    investigations_df = pd.DataFrame({
+        "investigation_id": [f"INV-{i:06d}" for i in range(n)],
+        "cp_client_id": [f"CLIENT-{i % 200:04d}" for i in range(n)],
+        "end_date": pd.to_datetime(["2026-01-01"] * n),
+    })
+    # half the clients are Closed, half Open
+    clients_df = pd.DataFrame({
+        "cp_client_id": [f"CLIENT-{i:04d}" for i in range(200)],
+        "case_status": ["Closed" if i < 100 else "Open" for i in range(200)],
+    })
+    closed_ids = set(clients_df.loc[clients_df["case_status"] == "Closed", "cp_client_id"])
+
+    out = dirty.apply_cp_investigations_presets(investigations_df, clients_df, severity="red", seed=1)  # rate=0.10
+    reopened = out["end_date"].isna()
+
+    assert reopened.sum() > 0
+    assert out.loc[reopened, "cp_client_id"].isin(closed_ids).all(), \
+        "a reopened (end_date nulled) investigation belongs to a client whose case isn't Closed"
+    # never touches investigations belonging to an Open-case client
+    open_ids = set(clients_df.loc[clients_df["case_status"] == "Open", "cp_client_id"])
+    assert not out.loc[out["cp_client_id"].isin(open_ids), "end_date"].isna().any()
