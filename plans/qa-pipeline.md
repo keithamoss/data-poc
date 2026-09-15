@@ -1901,6 +1901,25 @@ relative, not a schedule — this is weeks of work, not months.
     blocked by this session's own egress proxy - worth confirming this
     one separately, not assuming the same).
 
+37. **[todo]** Flag Elementary's own dashboard/reporting product itself
+    (distinct from item 36's own question about its *test suite*) as a
+    comparison point for this project's hand-rolled dashboard
+    (`dashboard/qa-reporting-dashboard.html`) - Keith's call, 2026-09-15.
+    Not researched yet - logged as a near-term item, not scoped. The
+    real question this item is for, whenever it gets picked up: does an
+    established, purpose-built solution like Elementary's dashboard
+    already do what this project's own single-file static HTML dashboard
+    was hand-built to do (traffic-light check status, drill-down to
+    failing rows/values, history over time, per-dataset/collection
+    rollups), and if so, what would this project actually gain or lose
+    by evaluating it as a real alternative rather than continuing to
+    extend the hand-rolled one - worth weighing once there's a genuine
+    side-by-side to look at, not before. Distinct from item 34's own
+    finding (that Elementary's dashboard reads the same, sometimes-buggy
+    `RunResult.failures` field dbt-core exposes) - that's a reliability
+    question already answered; this item is about the dashboard's actual
+    feature set and UX as a product, not its data-correctness properties.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
