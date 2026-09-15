@@ -835,6 +835,61 @@ relative, not a schedule — this is weeks of work, not months.
     written back out) for the same write-then-read round trip item 17's
     bug happened in.
 
+19. **[investigate]** What dbt-core/Soda Core natively offer for "inspect
+    the actual bad values/rows," and whether either can read an ODCS
+    contract - Keith asked for this to be verified with real research
+    (not just re-reading this project's own code), since it directly
+    revises claims made while building item 17's aggregate-values
+    feature. Findings, web-verified (2026-09-15):
+    - **Neither tool reads an ODCS contract at scan time** - both always
+      execute against their own native check format (dbt's `schema.yml`,
+      Soda's SodaCL/Contract Language), same as this project already
+      does. But both ecosystems have real, if not built-in, ODCS bridge
+      tooling this project doesn't use: `dbt-contracts` (a third-party
+      package - generates a whole dbt project, models/sources/staging
+      SQL/tests, from ODCS/ODPS YAML), and `soda ai` (shipped inside
+      soda-core itself, no extra install - an experimental CLI that
+      translates an ODCS contract into Soda's own Contract Language for
+      review before use). Soda's own docs frame the relationship as
+      "Soda sees ODCS as a documentation layer and Soda as the execution
+      layer" - translate-then-review, not live ODCS execution either way.
+    - **Both tools already give more than PKs natively - this project's
+      "PKs only" is a policy choice, not a tool limitation.** dbt's
+      `--store-failures` audit tables (already used here) carry the full
+      failing row (`not_null`) or `(value, n_records)` pairs
+      (`accepted_values`/`unique`) - confirmed independently, but also
+      directly visible in our own `dbt_common.py:
+      failing_sample_keys_via_values()`, which already selects the real
+      value column out of the audit table before discarding it in favor
+      of the PK. Soda's sample mechanism (our `CaptureSampler`) captures
+      every column of each sampled row, not just an identifier.
+    - **Correction to an earlier claim of mine**: I'd told Keith Soda
+      "computes samples then discards them" and has "no concept of
+      classification/sensitivity at all." Both need qualifying. Soda
+      Core's actual default is to collect up to **100** failed-row
+      samples per check (this project's own `CaptureSampler` caps it at
+      5, matching datacontract-cli's cap, by our own choice) - the
+      "discarded" behaviour is specifically about Soda *Cloud* routing,
+      not Soda Core losing the data. And Soda Core has its **own native
+      sensitivity-redaction mechanism**, independent of ODCS
+      `classification`: a `sampler: exclude_columns:` block in
+      `configuration.yml` (wildcard-capable), enforced by a gatekeeper
+      that strips excluded columns even from raw-SQL-based checks before
+      a sample is built. Not currently used in this project.
+    - **Real implication for `aggregate_values.py`**: for dbt
+      specifically, computing the categorical aggregate via a fresh SQL
+      query wasn't strictly necessary - the `accepted_values`/`unique`
+      audit table already *is* almost exactly the `(value, count)` shape
+      wanted, sitting right there. That was a genuine simplification
+      opportunity not taken, traded for one uniform code path across all
+      three tools instead of a different one per tool. For Soda and
+      datacontract-cli, their native caps (100 and 5 rows respectively)
+      mean neither gives a true, exhaustive aggregate - some additional
+      mechanism was genuinely needed for those two regardless.
+    Not yet acted on - a real finding to keep in mind if `aggregate_
+    values.py` (or a future dbt-specific optimization) gets revisited,
+    not an immediate to-do.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

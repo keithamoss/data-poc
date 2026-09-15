@@ -13,12 +13,19 @@ own warehouse table, independent of which real tool (dbt/Soda/
 datacontract-cli) actually flagged the check - all three point at the
 same staging data for a given column, so there's one true answer
 regardless of which engine's own internal sample/audit-table format
-happens to carry it (dbt's accepted_values audit table has a similar
-(value, n_records) shape, but relying on it would mean a different code
-path per tool for no real benefit here, and Soda's/datacontract-cli's
-own sample mechanisms are capped too small - 5 rows - to give a real
-aggregate). `total_invalid` is computed as its own COUNT(*), not derived
-from the (capped) values list, so it stays correct even past the cap.
+happens to carry it. Verified with real research, not assumed (see
+plans/qa-pipeline.md #19): dbt's own accepted_values/unique
+--store-failures audit table already has almost exactly this (value,
+n_records) shape - reusing it directly would have worked for dbt
+specifically, and wasn't a hard technical need there, just traded for
+one uniform code path across all three tools instead of a different one
+per tool. Soda's and datacontract-cli's own native sample caps (Soda
+Core's real default is up to 100 rows, not the 5 this project's own
+CaptureSampler self-imposes to match datacontract-cli's fixed cap) are
+genuinely too small to give a true, exhaustive aggregate either way -
+some additional mechanism actually was needed for those two.
+`total_invalid` is computed as its own COUNT(*), not derived from the
+(capped) values list, so it stays correct even past the cap.
 
 Sensitive columns (a real ODCS `classification` property - see the
 contract, matching datacontract-cli's own vocabulary) get their actual
