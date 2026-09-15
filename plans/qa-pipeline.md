@@ -890,6 +890,62 @@ relative, not a schedule — this is weeks of work, not months.
     values.py` (or a future dbt-specific optimization) gets revisited,
     not an immediate to-do.
 
+20. **[investigate]** datacontract-cli's failed-samples limitations, and
+    whether ODCS's numeric-only threshold operators are a recognized gap
+    or a deliberate design choice - three follow-up questions Keith asked
+    to be verified with real research, not assumed. Findings, web- and
+    source-verified (2026-09-15):
+    - **Custom SQL rules never get failed-samples, confirmed publicly**
+      (not just from reading the installed source): datacontract-cli's
+      own docs state `--include-failed-samples` "collects a small sample
+      of the rows that failed each missing/invalid/duplicate check," and
+      separately that custom SQL checks (`quality.type: sql`) "run the
+      query or file as-is and are not filtered" - i.e. never sampled.
+      Matches source exactly: `_SAMPLEABLE_METRICS = (MISSING_COUNT,
+      INVALID_COUNT, DUPLICATE_COUNT)`, with `CUSTOM_SQL` a separate,
+      excluded `MetricType` enum value. Real, documented limitation, not
+      a misreading - this project's BDM `date_of_birth` range check
+      (`type: sql`) gets no row-level detail from datacontract-cli at
+      all, not even a capped one.
+    - **The 5-row failed-samples cap is a hard ceiling, confirmed no
+      override exists**: datacontract-cli's own docs state the cap
+      flatly ("samples are capped at 5 rows per check") with no
+      documented config/flag/env var to change it, and independently:
+      "the 5-row limit does not appear to be configurable... this is a
+      hard-coded limit in the current implementation... would likely
+      require a feature request or a code contribution." Matches source:
+      `_FAILED_SAMPLE_LIMIT = 5` is a bare module constant, never read
+      from any argument/env/config anywhere in the call path. Unlike
+      Soda (raise `samples limit:` to a large number as a workaround -
+      see item 19), there's no lever to pull here at all.
+    - **No native date-range quality check in ODCS - confirmed not a
+      mistake, and probably not a recognized community gap either.**
+      ODCS's threshold operators (`mustBeGreaterThan`, `mustBeBetween`,
+      etc.) are documented as operating on numeric metrics only,
+      confirmed in source too (the Pydantic model types every one of
+      them `float | int`, would reject a date literal outright). Searched
+      specifically for public discussion of this as a known limitation
+      (GitHub issues on both `bitol-io/open-data-contract-standard` and
+      `datacontract/datacontract-cli`, general web) - found none. Two
+      things instead suggest it's deliberate, not overlooked: (1) ODCS
+      does have a native date-aware property - `freshness` (is the most
+      *recent* row recent enough, `now - MAX(timestamp) < threshold`) -
+      but that answers a different question than "does every row's date
+      fall in a valid range," so it was never a substitute for this
+      project's check; (2) YAML itself has a long-documented, unrelated-
+      to-data-contracts weakness around date/timestamp typing (unquoted
+      date-like strings parse ambiguously depending on the YAML
+      implementation, no dedicated datetime type the way TOML has one) -
+      a plausible real reason to keep native comparison operators
+      restricted to unambiguous numeric literals. Combined with ODCS's
+      own four-rule-type structure (SQL/Library/Text/Custom, with SQL
+      explicitly the documented escape hatch for whatever Library
+      doesn't cover) - this project's `type: sql` date-range check is
+      using the spec exactly as designed, not working around a gap.
+    Confirms items 17 and 19's design choices were correct, not just
+    convenient - nothing here changes what's built. Logged for the
+    record since it was asked to be verified, not because it's a to-do.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
