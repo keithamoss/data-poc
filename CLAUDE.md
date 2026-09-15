@@ -95,6 +95,27 @@ Rough layout:
   gets a new test alongside the fix, not just a fix. Don't retrofit this
   onto bugs already fixed earlier in this project's history; it's a
   going-forward convention.
+  **Exception, scoped 2026-09-15**: an environment/wiring bug - the
+  wrong file/module gets resolved or loaded (import ordering, `sys.path`,
+  a stale path/config constant, working-directory assumptions), as
+  opposed to a logic bug (given correct inputs, the code computes the
+  wrong value) - ask Keith before writing the regression test, right
+  when the bug's been diagnosed, rather than writing one automatically.
+  Reasoning: the real fix for this class of bug is often to remove the
+  fragile mechanism entirely (e.g. deleting a duplicate file, making a
+  directory a real package instead of a `sys.path` hack), which can make
+  a "regression test" moot the moment it's written - it ends up
+  documenting a hack that no longer exists rather than guarding an
+  ongoing behaviour. A worked example: `generator/generate_cp_runs.py`
+  importing the wrong `dirty.py` (2026-09-14) - the actual fix deleted
+  the duplicate file and made `generator/` a proper package, so there
+  was no longer a second `dirty.py` left to accidentally resolve to; the
+  test written for it says as much in its own docstring. Logic bugs
+  (the Evidently stale-reference-constant bug, the `"N/A"`-becomes-NULL
+  bug, both same session) keep the automatic rule - the fragile mechanism
+  in both cases still exists after the fix (a default-argument fallback;
+  pandas'/DuckDB's own null-sentinel behaviour), so a regression test
+  still has real, ongoing signal.
 - The repo is public (Keith's own call, synthetic data only) - GitHub
   Pages hosting depends on that; see `plans/wider.md` #5 for the
   parked note about what happens if/when it goes private again.
