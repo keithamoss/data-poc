@@ -628,7 +628,13 @@ function trendChart(check, compareIdx, onPointClick){
   const vals = history.map(r=>r.value);
   const maxV = Math.max(fail*1.15, ...vals, 0.0001);
   const n=vals.length;
-  const xs = i=> padL + i*(W-padL-padR)/(n-1);
+  // n===1 guard (2026-09-15, Keith's question about a brand new column/
+  // dataset's very first run): dividing by (n-1) is undefined at n=1 -
+  // every one of this project's own real checks has 10+ history points,
+  // so this NaN-coordinate bug was real but dormant until asked about.
+  // A single point just sits centered; there's no line/gap to place it
+  // relative to.
+  const xs = i=> n===1 ? padL + (W-padL-padR)/2 : padL + i*(W-padL-padR)/(n-1);
   const ys = v=> H-padB - (v/maxV)*(H-padT-padB);
   let path=""; history.forEach((r,i)=>{ path += (i===0?"M":"L")+xs(i).toFixed(1)+","+ys(r.value).toFixed(1)+" "; });
   // status color strip beneath
@@ -640,7 +646,7 @@ function trendChart(check, compareIdx, onPointClick){
   }).join("");
   const warnY=ys(warn).toFixed(1), failY=ys(fail).toFixed(1);
   // sparse x labels: first, mid, last
-  const tickIdx = [0, Math.floor((n-1)/2), n-1];
+  const tickIdx = [0, Math.floor((n-1)/2), n-1].filter((v,i,a)=>a.indexOf(v)===i);
   const xlabels = tickIdx.map(i=> `<text x="${xs(i).toFixed(1)}" y="${H-6}" font-size="9.5" text-anchor="middle" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${fmtDateShort(history[i].date)}</text>`).join("");
   const yTicks=[0,warn,fail].filter((v,i,a)=>a.indexOf(v)===i);
   const ylabels = yTicks.map(v=> `<text x="${padL-6}" y="${(ys(v)+3).toFixed(1)}" font-size="9.5" text-anchor="end" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${fmtMetric(v,unit)}</text>`).join("");
@@ -697,6 +703,7 @@ function wireChart(id, history, warn, fail, unit, xs, ys, W, padL, padR, onPoint
   const hoverline = svg.querySelector(".hoverline");
   const n = history.length;
   const idxFromEvent = (e)=>{
+    if(n===1) return 0; // same n===1 guard as xs() above - nothing to divide by
     const rect = svg.getBoundingClientRect();
     const relX = (e.clientX-rect.left) / rect.width * W;
     let idx = Math.round((relX-padL) / ((W-padL-padR)/(n-1)));
@@ -1149,21 +1156,47 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   // history length anyway - cheap insurance either way).
   const n = check.history.length;
   const currentPoint = check.history[n-1];
+  // #45 follow-up (2026-09-15, Keith's question): what does this look
+  // like for a check's very first run ever - a brand new column or
+  // dataset, n===1, genuinely no previous run to compare against at
+  // all? Handled explicitly rather than falling through: without this,
+  // defaultCompareIdx/compareIdx below would resolve to the SAME index
+  // as currentPoint (the only history point there is), silently
+  // comparing the current run against itself - a real bug caught before
+  // any real fixture ever hit it (every run in this project's own data
+  // has 10+ history points), but a brand new onboarded dataset would
+  // hit it on day one.
+  const hasCompareRun = n >= 2;
   const defaultCompareIdx = Math.max(0, n-2);
   const compareIdx = (STATE.compareIdx!=null && STATE.compareIdx>=0 && STATE.compareIdx<n-1) ? STATE.compareIdx : defaultCompareIdx;
-  const comparePoint = check.history[compareIdx];
+  const comparePoint = hasCompareRun ? check.history[compareIdx] : null;
   const isDefaultCompare = compareIdx === defaultCompareIdx;
 
-  const delta = currentPoint.value - comparePoint.value;
-  const flatBand = check.unit==="%" ? 0.02 : (check.unit==="hrs" ? 0.1 : 0.5);
-  const deltaClass = Math.abs(delta)<flatBand ? "flat" : (delta>0 ? "up":"down");
-  const compareWord = isDefaultCompare ? "previous run" : `${fmtDate(comparePoint.date)} run`;
-  const deltaWord = deltaClass==="flat" ? "No material change" : (deltaClass==="up" ? `Worse than the ${compareWord}` : `Better than the ${compareWord}`);
-  const deltaUnitTag = check.unit==="%" ? "pt" : (check.unit==="hrs" ? "h" : "");
-  const runOptions = check.history.slice(0, n-1).map((h,i)=>
-    `<option value="${i}" ${i===compareIdx?"selected":""}>${fmtDate(h.date)}${i===defaultCompareIdx?" (previous)":""}</option>`
-  ).join("");
-  const compareBlock = `
+  let compareBlock;
+  if(!hasCompareRun){
+    compareBlock = `
+    <div class="drawer-section">
+      <h4>This run vs. a chosen run</h4>
+      <div class="compare-grid">
+        <div class="compare-col">
+          <div class="k">Compared run</div>
+          <div class="v" style="font-size:14px; color:var(--ink-faint);">None yet</div>
+        </div>
+        <div class="compare-col"><div class="k">Current run</div><div class="v">${fmtMetric(currentPoint.value, check.unit)}</div></div>
+      </div>
+      <div style="font-size:12.5px; color:var(--ink-muted); margin-top:8px;">This is the first run for this check - there's no previous run yet to compare against.</div>
+    </div>`;
+  } else {
+    const delta = currentPoint.value - comparePoint.value;
+    const flatBand = check.unit==="%" ? 0.02 : (check.unit==="hrs" ? 0.1 : 0.5);
+    const deltaClass = Math.abs(delta)<flatBand ? "flat" : (delta>0 ? "up":"down");
+    const compareWord = isDefaultCompare ? "previous run" : `${fmtDate(comparePoint.date)} run`;
+    const deltaWord = deltaClass==="flat" ? "No material change" : (deltaClass==="up" ? `Worse than the ${compareWord}` : `Better than the ${compareWord}`);
+    const deltaUnitTag = check.unit==="%" ? "pt" : (check.unit==="hrs" ? "h" : "");
+    const runOptions = check.history.slice(0, n-1).map((h,i)=>
+      `<option value="${i}" ${i===compareIdx?"selected":""}>${fmtDate(h.date)}${i===defaultCompareIdx?" (previous)":""}</option>`
+    ).join("");
+    compareBlock = `
     <div class="drawer-section">
       <h4>This run vs. a chosen run</h4>
       <div class="compare-grid">
@@ -1177,6 +1210,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
       <div class="delta ${deltaClass}">${deltaClass==="up"?"↑":deltaClass==="down"?"↓":"–"} ${Math.abs(delta).toFixed(2)}${deltaUnitTag} — ${deltaWord}</div>
       ${n>2 ? `<div style="font-size:11px; color:var(--ink-faint); margin-top:8px;">Pick any past run above, or click a point on the trend chart below, to compare it against the current run.</div>` : ""}
     </div>`;
+  }
 
   // Row-level detail: the aggregate row_count_total/row_count_invalid
   // each real tool already reports for THIS check specifically (not the
@@ -1188,7 +1222,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   // remediation-workflow design draws (docs/remediation-workflow-design
   // .md) between reporting and case-management.
   const sampleKeys = currentPoint.failing_sample_keys || [];
-  const compareSampleKeys = comparePoint.failing_sample_keys || [];
+  const compareSampleKeys = hasCompareRun ? (comparePoint.failing_sample_keys || []) : [];
   const sampleBlock = sampleKeys.length ? `
       <div style="margin-top:10px;">
         <div style="font-size:11px; color:var(--ink-faint); margin-bottom:5px;">Example failing rows (primary key only)${currentPoint.row_count_invalid > sampleKeys.length ? ` — ${sampleKeys.length} of ${fmtInt(currentPoint.row_count_invalid)}` : ""}:</div>
@@ -1213,7 +1247,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
         <div style="font-size:11px; color:var(--ink-faint); margin-bottom:5px;">${label} (${keys.length}):</div>
         <div style="display:flex; flex-wrap:wrap; gap:5px;">${keys.map(k=>keyPill(k,bg)).join("")}</div>
       </div>` : "";
-  const diffBlock = (sampleKeys.length || compareSampleKeys.length) ? (()=>{
+  const diffBlock = (hasCompareRun && (sampleKeys.length || compareSampleKeys.length)) ? (()=>{
     const compareSet = new Set(compareSampleKeys), currentSet = new Set(sampleKeys);
     const stillFailing = sampleKeys.filter(k=>compareSet.has(k));
     const newSinceCompare = sampleKeys.filter(k=>!compareSet.has(k));
@@ -1234,7 +1268,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
       <div class="stat-row">
         <div class="stat"><div class="k">Rows checked, current run</div><div class="v">${fmtInt(currentPoint.row_count_total)}</div></div>
         <div class="stat"><div class="k">Rows flagged, current run</div><div class="v">${currentPoint.row_count_invalid!=null ? fmtInt(currentPoint.row_count_invalid) : "—"}</div></div>
-        ${comparePoint.row_count_invalid!=null ? `<div class="stat"><div class="k">Rows flagged, compared run</div><div class="v">${fmtInt(comparePoint.row_count_invalid)}</div></div>` : ""}
+        ${(hasCompareRun && comparePoint.row_count_invalid!=null) ? `<div class="stat"><div class="k">Rows flagged, compared run</div><div class="v">${fmtInt(comparePoint.row_count_invalid)}</div></div>` : ""}
       </div>
       ${sampleBlock}
       ${diffBlock}
@@ -1244,7 +1278,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   const trendBlock = `
     <div class="drawer-section">
       <h4>Over time — every QA run (${n} runs)</h4>
-      ${trendChart(check, compareIdx, n>2 ? (idx)=>setCompareIdx(ag, col, ds, column, check, idx) : null)}
+      ${trendChart(check, hasCompareRun ? compareIdx : null, n>2 ? (idx)=>setCompareIdx(ag, col, ds, column, check, idx) : null)}
     </div>`;
 
   const descBlock = `<div style="font-size:13px; color:var(--ink-muted); margin-bottom:18px;">

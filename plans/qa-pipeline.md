@@ -2389,6 +2389,44 @@ relative, not a schedule — this is weeks of work, not months.
     light and dark mode. `uv run pytest` (71) and `uv run ruff check .`
     both clean (JS/HTML-only change, no Python touched).
 
+    **Follow-up, same day - Keith's question: "what if there are no
+    previous runs, if it's the first run for a new column or new
+    dataset?"** Real gap, caught before it shipped to a real scenario:
+    with exactly one history point (`n===1`), `compareIdx`/`comparePoint`
+    resolved to the SAME index as the current run - the panel would have
+    silently compared the current run against itself (a "no material
+    change" delta, an empty-but-enabled-looking dropdown, a diff block
+    claiming rows were "still failing in both" that were really just
+    compared against themselves). Not exercised by this project's own
+    fixture (every real check has 10+ runs), but a brand new onboarded
+    dataset hits it on day one. Fixed: a `hasCompareRun = n>=2` flag
+    branches the whole compare/row-detail/diff rendering - with no
+    previous run, the compare block reads "Compared run: None yet - this
+    is the first run for this check", no dropdown renders, and the row-
+    detail/diff blocks skip their compared-run content entirely rather
+    than fabricating a comparison.
+
+    Digging into `n===1` also surfaced a second, genuinely pre-existing
+    bug, unrelated to this session's own change: `trendChart()`'s `xs()`
+    (and `wireChart()`'s matching hover-index math) divides by `(n-1)` -
+    undefined at `n=1`, so a first-ever run's trend chart would have
+    rendered `NaN` coordinates (a broken/invisible chart) and thrown a
+    JS error on hover, regardless of the compare-run feature above. This
+    predates item 45 entirely - `trendChart()` has always assumed at
+    least 2 history points - just never noticed because nothing in this
+    project's own fixture has ever had fewer. Fixed with the same
+    `n===1` guard in both places (a single point centers itself; there's
+    no line/gap to place it relative to).
+
+    Verified with Playwright: synthesized a check with exactly one
+    history point (a fresh `openCheckPanel()` call, bypassing this
+    project's own always-10+-runs fixture) and confirmed the "None yet"
+    wording, no dropdown, no diff block, real (non-`NaN`) chart
+    coordinates, a working hover tooltip, and zero console/page errors.
+    Re-ran the original multi-run Playwright checks above too, to
+    confirm the `n>=2` path is unaffected. `uv run pytest` (71) and
+    `uv run ruff check .` both clean.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
