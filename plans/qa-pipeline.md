@@ -812,7 +812,29 @@ relative, not a schedule — this is weeks of work, not months.
 18. **[done]** Explicit, non-magic null handling in every CSV read this
     pipeline does - started as a spike Keith asked for after item 17's
     `"N/A"` bug, built out for real on 2026-09-15 once the spike's
-    findings were in. Every CSV read (`pd.read_csv(...)`, DuckDB's
+    findings were in.
+
+    **The requirement, stated precisely** (confirmed with Keith
+    2026-09-15 - what's built below is deliberately this shape, not an
+    implementation detail to reverse-engineer from the narrative): null
+    detection in this pipeline is never implicit. For any column, the
+    only thing that counts as null by default is a literal empty field -
+    never a library's own guess (pandas'/DuckDB's default sniffing,
+    which independently treats strings like `"N/A"`/`"NULL"`/`"NaN"` as
+    null too). A contract MAY explicitly widen a specific column's null
+    vocabulary via `nullValues` (real source systems sometimes do write
+    a literal "NULL" or "N/A" string to mean missing, as a genuine
+    upstream convention, not a parsing accident) - but **a column with
+    no `nullValues` declared is a fully valid, silent, correct default,
+    not an error condition**. The pipeline never fails or warns because
+    a contract omits it. This is the opposite of "every column must
+    explicitly declare its null vocabulary or the pipeline errors" - that
+    stricter policy was raised and explicitly rejected in favour of this
+    one (silent, safe default; explicit opt-in only where genuinely
+    needed) - noted here because the two are easy to conflate and the
+    distinction was worth a real round of confirming, not assuming.
+
+    Every CSV read (`pd.read_csv(...)`, DuckDB's
     `read_csv_auto(...)`) used to rely on each library's own default list
     of "these specific strings mean null" - pandas' includes `""`,
     `"N/A"`, `"NA"`, `"NULL"`, `"NaN"`, `"None"`, `"n/a"`, `"nan"`,
