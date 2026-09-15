@@ -1695,8 +1695,25 @@ relative, not a schedule — this is weeks of work, not months.
     (32/32) and `uv run ruff check .` both clean; dashboard data and HTML
     re-embedded.
 
-    **Queued next, not started**: Keith wants to look at the Python
-    `pointblank` library after this - not yet researched.
+    **Queued next**: item 33.
+
+33. **[todo]** Look at the Python `pointblank` library as a fifth
+    candidate in this evaluation/shootout (see `plans/wider.md`'s purpose
+    note) - Keith's call, right after the dbt_utils switch. Not
+    researched yet - logged as a near-term item, not scoped. `pointblank`
+    is a Python-native data-validation library (not a dbt/SQL-layer
+    tool like the other three engines this project runs) - real open
+    questions for whenever this gets picked up: what it actually checks
+    (row-level rules, schema/type validation, something else), whether
+    it can run against this project's DuckDB warehouses directly or
+    needs its own ingestion step, what its own row-level PK/value
+    capability looks like against items 20/28/29's evaluation lens (same
+    "could this tool alone do the job" standard applied to Soda/dbt/
+    datacontract-cli/Evidently), and how a Python-native tool fits this
+    project's existing per-dataset orchestration shape (`qa_tools/bdm/
+    orchestrate_bdm.py`/`qa_tools/cp/orchestrate_cp.py`, each already
+    running 4 tools per run) rather than assuming it slots in identically
+    to the SQL-layer ones.
 
 ## Held over from the original (equivalent-only) build
 
