@@ -2285,6 +2285,29 @@ relative, not a schedule — this is weeks of work, not months.
     worded differently - see this project's own "full-triplication"
     passes) rather than assuming a single canonical source per check.
 
+44. **[todo]** Checks for expected values that must actually appear -
+    the inverse of an `accepted_values`/`invalid_percent` check (which
+    only ever asserts every value IS FROM a closed set), not covered by
+    anything in this project today. A closed-value-set column silently
+    losing an entire expected category (e.g. `risk_rating` never
+    producing a `Critical` row again, or `concern_type` never producing
+    `Sexual abuse`) would pass every existing check cleanly - nothing
+    here checks for value-set COVERAGE, only value-set VALIDITY.
+    `generator/dirty.py` already has the injector half of this
+    (`inject_missing_expected_value` - "the mirror image of inject_
+    invalid_values: makes a previously-common, expected value silently
+    STOP appearing"), but it's dormant: no preset on either dataset
+    actually calls it, so it's exercised only by its own core-injector
+    unit test in `tests/test_dirty.py`, never by a real generated run -
+    and there's no check anywhere (contract, Soda, or dbt) that would
+    even catch it firing if it were wired in. Not yet scoped: needs a
+    real check design (a `dbt_utils`-style "does every expected value
+    appear at least once/at some minimum rate" test doesn't obviously
+    exist off the shelf the way `accepted_values` does - may need a
+    hand-written singular test or Soda `failed rows` query, per column,
+    against the specific closed-value-set columns worth watching this
+    way) before the existing injector is worth wiring into a preset.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
