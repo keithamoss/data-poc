@@ -933,9 +933,12 @@ relative, not a schedule — this is weeks of work, not months.
       wanted, sitting right there. That was a genuine simplification
       opportunity not taken, traded for one uniform code path across all
       three tools instead of a different one per tool. For Soda and
-      datacontract-cli, their native caps (100 and 5 rows respectively)
-      mean neither gives a true, exhaustive aggregate - some additional
-      mechanism was genuinely needed for those two regardless.
+      datacontract-cli, their default/native caps (100 and 5 rows
+      respectively - though see item 29's correction: Soda's 100 is a
+      raisable default with no coded maximum, unlike datacontract-cli's
+      genuinely hard 5) mean neither gives a true, exhaustive aggregate
+      out of the box - some additional mechanism was genuinely needed
+      for those two regardless, at least as configured today.
     Not yet acted on - a real finding to keep in mind if `aggregate_
     values.py` (or a future dbt-specific optimization) gets revisited,
     not an immediate to-do.
@@ -1337,13 +1340,29 @@ relative, not a schedule — this is weeks of work, not months.
     **Soda Core - genuinely split, not one answer**:
     - For every metric-based check (`missing_count`/`missing_percent`,
       `invalid_percent`, `duplicate_count`, the FK reference check) -
-      **capped, standalone, no exception**. This project's own `samples
-      limit: 5` was chosen to match datacontract-cli's hard cap for
-      comparability (item 19), but Soda's real default is 100 - and even
-      100 is still a cap, not "all." Evaluated alone, Soda can never
-      guarantee every failing PK for these check types once a table is
-      large enough - a real, standalone mark, independent of what
-      dbt/datacontract-cli do alongside it in this fixture.
+      **correcting this entry's own first draft (2026-09-15, Keith asked
+      "is 100 actually the highest cap" - checked, it isn't)**. Verified
+      directly against this project's own installed `soda-core` 3.5.6
+      source (`.venv/lib/python3.11/site-packages/soda`, not just docs
+      or web search): `sampler/sampler.py`'s `DEFAULT_FAILED_ROWS_
+      SAMPLE_LIMIT = 100` is only ever the *default*.
+      `execution/metric/metric.py`'s three-tier resolution (default →
+      scan-level `samples_limit` → check-level `samples limit:`) applies
+      no minimum or maximum clamp anywhere, and the resolved number
+      flows straight into a plain SQL `LIMIT {n}` clause
+      (`execution/data_source.py`'s `sql_select_all`) with nothing
+      capping `n` in the whole path. So `samples limit: 100000` (or any
+      integer) is honored exactly as written - the only real ceiling is
+      the compute/memory cost of pulling and storing that many rows, per
+      Soda's own docs' caveat, not a code-enforced maximum. That makes
+      Soda's limit a fundamentally different *kind* of constraint than
+      datacontract-cli's genuinely hard-coded, non-overridable 5 (item
+      20) - soft/configurable vs. hard/fixed, not "100 vs. 5" as two
+      instances of the same thing. This also corrects item 19's "their
+      native caps (100 and 5 rows respectively)" phrasing, which
+      implied the same equivalence. Standalone, for these check types,
+      Soda can get every failing PK, if configured to - unlike
+      datacontract-cli, which never can regardless of configuration.
     - For "failed rows" checks (`fail condition:`/`fail query:` - this
       project's extract_timestamp ordering, sibling match, freshness,
       and all 3 CP business rules) - appears **uncapped** in practice,
