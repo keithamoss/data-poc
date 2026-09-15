@@ -998,3 +998,23 @@ not a schedule.
     revisit alongside action 15, not in isolation - same root question
     (should the contract generate its downstream check files, or stay
     read-only reference material) applied to a different pair of files.
+
+23. **[todo]** Secure/authenticated hosting for the dashboard - Cloudflare
+    Access or equivalent - near-term work Keith flagged, not scoped yet.
+    Directly relevant to action 5 above: the dashboard is currently
+    public with zero access control at all (`https://keithamoss.github.io
+    /data-poc/`, GitHub Pages free-tier, no login of any kind), because
+    the repo itself is public. This is a different, narrower question
+    than action 5's "move the repo back to private" - auth-gating the
+    *deployed site* is a real option regardless of whether the
+    underlying repo is public or private, and action 5's own "don't
+    pre-solve this" stance was specifically about not reaching for paid
+    Pages tiers/alternate hosts before the repo-privacy question was
+    live; this is Keith asking for exactly that now, on its own merits,
+    not contingent on the repo going private. Not scoped: which
+    mechanism (Cloudflare Access sitting in front of the existing GitHub
+    Pages URL vs. moving hosting to Cloudflare Pages directly vs. a
+    different provider entirely), who needs access (just Keith, a small
+    reviewer group, anyone with a shared password), and whether the
+    `.github/workflows/deploy-pages.yml` auto-publish-on-push flow needs
+    to change at all or just gets a login wall in front of it.

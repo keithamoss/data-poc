@@ -1105,6 +1105,35 @@ relative, not a schedule — this is weeks of work, not months.
     including resupplies) and Child Protection (10 straightforward
     weekly runs, no resupply concept) the same way.
 
+25. **[todo]** Layperson-friendly, human-readable English explanations of
+    what each check actually does - recorded on the check (or the
+    contract) and surfaced in the dashboard/reporting, not just in
+    code/config comments - near-term work Keith flagged, not scoped yet.
+    Real, confirmed gap, not assumed: `description:` fields already exist
+    today - 30 in each ODCS contract's own `quality:` blocks, 13 more in
+    `dbt_project/models/staging/schema.yml`, zero in either Soda checks
+    YAML - but they're written in this project's own technical/
+    contributor voice (workaround rationale, references to other files/
+    checks/dbt-duckdb reliability quirks), not for a non-technical
+    dashboard viewer. What the dashboard actually shows today is a
+    technical check *name* (`pipeline/dashboard_check_labels.py`'s
+    `display_name()` - e.g. "Invalid values — dbt:accepted_values
+    (dbt-core)") plus a provenance `note` ("Computed by dbt-core against
+    this run's real data — not a fabricated figure") - neither explains
+    *what the check verifies* or *why it matters* in plain English.
+    Scoping questions for when this gets picked up: a genuinely new
+    field (distinct from the existing technical `description:`, since
+    overwriting those would lose real information a contributor still
+    needs), or a policy for rewriting the existing ones to serve both
+    audiences at once; whether it lives on the ODCS contract only (one
+    property, reused by whichever check actually implements a rule - Soda/
+    dbt/datacontract-cli - since dashboard results already come with
+    `column_name`/`check_name` to key off) or needs a per-engine version
+    too, given the same underlying rule sometimes reads differently
+    across three separately-authored check files; and where in the
+    dashboard it surfaces - the check card, the check-detail panel, or
+    both.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
