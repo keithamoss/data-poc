@@ -37,25 +37,27 @@ tested - dbt-core still genuinely ran the real check (that's what
 what "engine" attributes this result to) - only the two known-unreliable
 numbers are cross-checked rather than passed through blindly.
 
-A third, newer instance of the same class of problem: the
-recent_births_present singular test (no config, no fail_calc arithmetic
-at all - the simplest possible test shape) reported "fail" for run_10 in
-a full 10-run orchestrate_bdm.py pass, while re-running that exact
-test in isolation seconds later, against the same warehouse file, correctly
-returned "pass" - and stayed correct on every subsequent re-run. No
-SQL-level or config-level explanation found (unlike the other two, this
-test has no arithmetic to remove), which points at dbt-duckdb itself
-rather than anything in this project's own SQL - feeds into the same open
-upstream-repro follow-up as the other two (plans/qa-pipeline.md #1).
-Treated the same way here: independently verified via direct query, not
-trusted blindly.
+A third, newer instance of the same class of problem, found on the
+project's own recent_births_present singular test (no config, no
+fail_calc arithmetic at all - the simplest possible test shape): it
+reported "fail" for run_10 in a full 10-run orchestrate_bdm.py pass,
+while re-running that exact test in isolation seconds later, against the
+same warehouse file, correctly returned "pass" - and stayed correct on
+every subsequent re-run. No SQL-level or config-level explanation found
+(unlike the other two, this test had no arithmetic to remove), which
+pointed at dbt-duckdb itself rather than anything in this project's own
+SQL - feeds into the same open upstream-repro follow-up as the other two
+(plans/qa-pipeline.md #1). That specific test was retired 2026-09-15 (the
+dbt_utils switch - see plans/qa-pipeline.md), replaced by dbt_utils.
+recency; _VERIFY_COUNT_SQL's own comment explains why the workaround
+wasn't carried forward onto its replacement automatically rather than
+re-verified.
 
 Also captures up to 5 example failing rows' registration_numbers per
 check (via dbt's --store-failures audit tables, see dbt_common.py) -
 identifiers only, never full row content, per plans/qa-pipeline.md #15.
-Not every test shape supports this (recent_births_present has no
-per-row concept at all - see its own .sql comment); see
-_failing_sample_keys()'s docstring for the exact coverage.
+Not every test shape supports this (recency has no per-row concept at
+all - see _failing_sample_keys()'s own docstring for the exact coverage).
 """
 from __future__ import annotations
 import json
@@ -83,16 +85,17 @@ DATASET_ID = "birth-registrations"
 _VERIFY_COUNT_SQL = {
     ("sex", "accepted_values"): "SELECT COUNT(*) FROM stg_birth_registrations WHERE sex NOT IN ('M','F','X')",
     ("place_of_birth_facility", "not_null"): "SELECT COUNT(*) FROM stg_birth_registrations WHERE place_of_birth_facility IS NULL",
-    # A third, newer instance of the same reliability problem, found live:
-    # a clean re-run of just this one test in isolation correctly returned
-    # 0 rows (pass) for run_10, but dbt's own run_results.json - from a
-    # full 10-run orchestrate_bdm.py pass minutes earlier, same
-    # warehouse file, same compiled SQL - reported it failed. Same
-    # treatment as the two above: recompute independently rather than
-    # trust dbt's reported status for this specific check.
-    ("date_of_birth", "recent_births_present"):
-        "SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END FROM stg_birth_registrations "
-        "WHERE date_of_birth >= CURRENT_DATE - INTERVAL 7 DAY",
+    # 2026-09-15: the previous third entry here (("date_of_birth",
+    # "recent_births_present")) is retired along with that singular test
+    # itself, replaced by dbt_utils.recency (see schema.yml, the
+    # dbt_utils switch - plans/qa-pipeline.md). Not carried forward
+    # automatically: the dbt-duckdb reliability bug this dict works
+    # around was only ever confirmed live for that specific test's exact
+    # compiled SQL, not assumed to apply to every "simple aggregate, no
+    # arithmetic" test shape in general. If the same live symptom
+    # reappears for recency (dbt reports a status direct re-verification
+    # contradicts), add it back here then, verified again rather than
+    # guessed.
 }
 
 # multiple_birth_sibling has no attached column of its own (a singular
@@ -102,15 +105,25 @@ _VERIFY_COUNT_SQL = {
 # check would land under column_name="(table)", which the dashboard
 # builder silently drops for birth-registrations (there's no
 # "(table-level checks)" pseudo-column here the way Child Protection has).
-_SINGULAR_TESTS = [
-    "multiple_birth_sibling", "recent_births_present",
-    "date_registered_after_birth", "bdm_date_of_birth_range",
-]
+# The only entry left after the 2026-09-15 dbt_utils switch retired the
+# other 3 (each was a genuinely bespoke singular test replaced by an
+# off-the-shelf dbt_utils generic test - see plans/qa-pipeline.md);
+# multiple_birth_sibling stays a singular test because it's a cross-table-
+# shaped self-join no generic test in dbt_utils/dbt-expectations covers.
+_SINGULAR_TESTS = ["multiple_birth_sibling"]
 _SINGULAR_TEST_COLUMN = {
     "multiple_birth_sibling": "is_multiple_birth",
-    "recent_births_present": "date_of_birth",
-    "date_registered_after_birth": "date_registered",
-    "bdm_date_of_birth_range": "date_of_birth",
+}
+
+# dbt_utils.expression_is_true/recency are declared at MODEL level in
+# schema.yml (they operate across the model, not one column - a
+# cross-field comparison, a max() aggregate) - same class of routing gap
+# as _SINGULAR_TEST_COLUMN above, just for generic tests whose manifest
+# node genuinely has no column_name (None, not missing) rather than for
+# singular tests (which have no test_metadata at all).
+_MODEL_LEVEL_TEST_COLUMN = {
+    "expression_is_true": "date_registered",
+    "recency": "date_of_birth",
 }
 
 _DIMENSION_BY_TEST = {
@@ -119,9 +132,9 @@ _DIMENSION_BY_TEST = {
     "accepted_values": "validity",
     "matches_regex": "validity",
     "multiple_birth_sibling": "consistency",
-    "recent_births_present": "timeliness",
-    "date_registered_after_birth": "consistency",
-    "bdm_date_of_birth_range": "conformity",
+    "accepted_range": "conformity",
+    "expression_is_true": "consistency",
+    "recency": "timeliness",
 }
 
 # A short, human-readable phrase for what each test actually checks -
@@ -132,15 +145,18 @@ _DIMENSION_BY_TEST = {
 # rule tests, whose own names already read plainly) because it's the same
 # rule as the contract's and Soda's own version of it, under different
 # names - the label is what makes that overlap visible on the dashboard.
+# accepted_range/expression_is_true/recency get the same treatment for
+# the same reason, now that they're dbt_utils' generic names rather than
+# this project's own descriptively-named singular test files.
 _LABEL_BY_TEST = {
     "unique": "Duplicate rate",
     "not_null": "Null rate",
     "accepted_values": "Invalid values",
     "matches_regex": "Invalid values",
     "multiple_birth_sibling": "Sibling record match",
-    "recent_births_present": "Freshness",
-    "date_registered_after_birth": "Registration/birth date ordering",
-    "bdm_date_of_birth_range": "Date-of-birth range",
+    "accepted_range": "Date-of-birth range",
+    "expression_is_true": "Registration/birth date ordering",
+    "recency": "Freshness",
 }
 
 
@@ -148,24 +164,26 @@ def _failing_sample_keys(conn, test_name: str, column: str, node: dict, status: 
     """Up to 5 example registration_numbers for the rows that actually
     failed this test, via dbt's own --store-failures audit table (see
     dbt_common.py) - never full row content, per plans/qa-pipeline.md
-    #15's "flag it, not full row content" line. Two test shapes are
-    deliberately skipped, not oversights: recent_births_present is a
-    boolean existence check (its audit table has no row/PK concept at
-    all - see its own dbt_project/tests/*.sql comment), and any test with
-    no relation_name (shouldn't happen once --store-failures is always
-    on, guarded anyway)."""
+    #15's "flag it, not full row content" line. One test shape is
+    deliberately skipped, not an oversight: recency is a max()-aggregate
+    existence check (its audit table has one row per group with
+    most_recent/threshold columns, no row/PK concept at all - see
+    dbt_utils' own recency.sql macro), and any test with no relation_name
+    (shouldn't happen once --store-failures is always on, guarded
+    anyway)."""
     if status not in ("warn", "fail"):
         return []
     relation_name = node.get("relation_name")
     if not relation_name:
         return []
     if test_name in ("not_null", "matches_regex", "multiple_birth_sibling",
-                      "date_registered_after_birth", "bdm_date_of_birth_range"):
+                      "accepted_range", "expression_is_true"):
         # the audit table already IS (a projection of) the failing rows
-        # themselves - not_null/matches_regex keep every column,
-        # multiple_birth_sibling/date_registered_after_birth/
-        # bdm_date_of_birth_range's own queries already select
-        # registration_number directly.
+        # themselves - not_null/matches_regex/accepted_range keep every
+        # column (confirmed against dbt_utils' own macro source:
+        # accepted_range's `select *`, expression_is_true's `select
+        # {{ '*' if should_store_failures() }}`), multiple_birth_sibling's
+        # own query already selects registration_number directly.
         return failing_sample_keys_direct(conn, relation_name, "registration_number")
     if test_name in ("accepted_values", "unique"):
         # these two dbt generic-test macros pre-aggregate their audit
@@ -218,7 +236,17 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
             continue
         meta = node.get("test_metadata")
         test_name = meta["name"] if meta else node["name"]
-        column = node["column_name"] if meta else _SINGULAR_TEST_COLUMN.get(node["name"], "(table)")
+        # Three cases: a real column-level generic test (column_name set);
+        # a model-level generic test (test_metadata present, but
+        # column_name is None - dbt_utils.expression_is_true/recency,
+        # declared under the model itself in schema.yml, not a column);
+        # a singular test (no test_metadata at all).
+        if meta and node["column_name"]:
+            column = node["column_name"]
+        elif meta:
+            column = _MODEL_LEVEL_TEST_COLUMN.get(test_name, "(table)")
+        else:
+            column = _SINGULAR_TEST_COLUMN.get(node["name"], "(table)")
         config = node.get("config", {})
         status = r["status"]
         failures = r.get("failures") or 0

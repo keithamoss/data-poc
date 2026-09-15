@@ -23,6 +23,22 @@ test is declared under, not necessarily the first of the tables it
 depends on), and from cp_common.BUSINESS_RULE_HOME_TABLE for the 3
 singular tests (which have no attached_node at all - they're not
 column/model-scoped).
+
+_VERIFY_COUNT_SQL (added 2026-09-15) cross-checks specific (table,
+column, test) combos against a direct query rather than trusting dbt's
+own reported "failures" blindly - the same real, confirmed dbt-duckdb
+reliability problem run_dbt_bdm.py's own module docstring documents at
+length (a compiled test's reported failure count is sometimes wrong,
+with no SQL-level explanation, and no fixed pattern for which runs it
+hits), first observed on the CP side here: dbt_utils.accepted_range on
+cp_clients.date_of_birth (right after adding a warn_if/error_if config -
+see schema.yml's own comment on it), and notification_id's pre-existing
+`unique` test (caught live reporting 0 on one orchestrate_cp.py pass,
+then correctly on the very next re-run of the identical warehouse files -
+genuine nondeterminism, not something this session's changes caused).
+Only these two combos are cross-checked, not every config'd test - the
+same policy run_dbt_bdm.py already established (verify what's actually
+been observed failing, not everything that plausibly could).
 """
 from __future__ import annotations
 import json
@@ -44,6 +60,35 @@ CP_DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
 CP_MODELS = [f"stg_{t}" for t in cp_common.TABLES]
 CP_SINGULAR_TESTS = list(cp_common.BUSINESS_RULE_HOME_TABLE.keys())
 
+# (table, column, test_name) combos where dbt's own "failures" value has
+# been directly observed to be unreliable - the same dbt-duckdb reliability
+# problem run_dbt_bdm.py's own _VERIFY_COUNT_SQL documents at length (see
+# that module's docstring), not previously seen on the CP side until
+# 2026-09-15's dbt_utils switch happened to surface two live instances:
+# - (cp_clients, date_of_birth, accepted_range): reported 0 failures for
+#   cp_run_04/cp_run_07 (true count 7/5, confirmed via direct query and
+#   against Soda's own matching check, which agreed with the direct
+#   count) the run immediately after adding a warn_if/error_if config to
+#   the new dbt_utils.accepted_range test - the same class of arithmetic-
+#   triggers-it pattern already documented for sex/place_of_birth_
+#   facility in run_dbt_bdm.py.
+# - (cp_notifications, notification_id, unique): a PRE-EXISTING test
+#   (unrelated to this session's changes, config'd since before this
+#   session), caught reporting 0 failures (true count 4/5/20 across cp_
+#   run_04/07/10) once, live, while investigating the accepted_range
+#   instance above - then reported CORRECTLY on the very next re-run of
+#   the exact same warehouse files, no code changed in between. Genuine
+#   nondeterminism, not a one-off: matches run_dbt_bdm.py's own
+#   recent_births_present finding (wrong on one full pass, correct on
+#   every re-run since) almost exactly. Verified here going forward
+#   rather than assumed fixed by the flip back to correct.
+_VERIFY_COUNT_SQL = {
+    ("cp_clients", "date_of_birth", "accepted_range"):
+        "SELECT COUNT(*) FROM stg_cp_clients WHERE date_of_birth < DATE '1900-01-01'",
+    ("cp_notifications", "notification_id", "unique"):
+        "SELECT COUNT(*) - COUNT(DISTINCT notification_id) FROM stg_cp_notifications",
+}
+
 _DIMENSION_BY_TEST = {
     "unique": "uniqueness",
     "not_null": "completeness",
@@ -52,7 +97,7 @@ _DIMENSION_BY_TEST = {
     "escalation_completeness": "completeness",
     "closed_case_investigation_hygiene": "consistency",
     "placement_carer_approval": "consistency",
-    "cp_client_date_of_birth_range": "conformity",
+    "accepted_range": "conformity",
 }
 
 # A short, human-readable phrase for what each test actually checks -
@@ -62,24 +107,28 @@ _DIMENSION_BY_TEST = {
 # etc.) are already plain enough on their own, and this same business rule
 # also shows up under Soda's and datacontract-cli's own already-plain
 # names - a reader scanning card titles already sees the shared word
-# without a further prefix. cp_client_date_of_birth_range DOES get one -
-# unlike those three, its own name reads as an internal test identifier,
-# not a plain description.
+# without a further prefix. accepted_range DOES get one - unlike those
+# three, its own name reads as a generic dbt_utils test identifier, not a
+# plain description of what it checks here specifically.
 _LABEL_BY_TEST = {
     "unique": "Duplicate rate",
     "not_null": "Null rate",
     "accepted_values": "Invalid values",
     "relationships": "Referential integrity",
-    "cp_client_date_of_birth_range": "Date range",
+    "accepted_range": "Date range",
 }
 
-# cp_client_date_of_birth_range genuinely is about one column (unlike the
-# 3 cross-table business rules, which stay at "(table)") - routed here the
-# same way run_dbt_bdm.py routes its own singular tests to a real column,
-# and matching how run_soda_cp.py routes its own version of this check.
-_SINGULAR_TEST_COLUMN = {
-    "cp_client_date_of_birth_range": "date_of_birth",
-}
+# Historical mechanism, currently unused: routes a SINGULAR test (no
+# test_metadata at all) to a real column instead of the "(table)"
+# fallback, the way run_dbt_bdm.py's own _SINGULAR_TEST_COLUMN still does
+# for multiple_birth_sibling. Empty since cp_client_date_of_birth_range
+# (this dict's only entry) was retired 2026-09-15, replaced by dbt_utils.
+# accepted_range - a real column-level GENERIC test now, routed the same
+# way accepted_values/not_null already are, via node["column_name"]
+# itself (no lookup needed). Left in place, not deleted, in case a future
+# CP singular test needs the same column-routing accepted_range no longer
+# does.
+_SINGULAR_TEST_COLUMN = {}
 
 
 def _table_for_test(node: dict) -> str | None:
@@ -110,10 +159,13 @@ def _failing_sample_keys(conn, test_name: str, column: str, table: str, node: di
         return []
     pk_column = cp_common.TABLE_PK[table]
     model = f"stg_{table}"
-    if test_name == "not_null" or test_name in cp_common.BUSINESS_RULE_HOME_TABLE:
-        # not_null's audit table keeps every column; each singular
-        # business-rule test's own query already selects its home
-        # table's PK directly (confirmed per-test, not assumed).
+    if (test_name in ("not_null", "accepted_range")
+            or test_name in cp_common.BUSINESS_RULE_HOME_TABLE):
+        # not_null/accepted_range's audit tables keep every column
+        # (confirmed against dbt_utils' own accepted_range.sql macro
+        # source: `select *`); each singular business-rule test's own
+        # query already selects its home table's PK directly (confirmed
+        # per-test, not assumed).
         return failing_sample_keys_direct(conn, relation_name, pk_column)
     if test_name == "unique":
         return failing_sample_keys_via_values(conn, relation_name, "unique_field", model, column, pk_column)
@@ -129,6 +181,14 @@ def _failing_sample_keys(conn, test_name: str, column: str, table: str, node: di
         # team_region).
         return failing_sample_keys_via_values(conn, relation_name, "value_field", model, column, pk_column)
     return []  # relationships - see docstring above
+
+
+def _status_for(count: int, warn_t: float | None, fail_t: float | None) -> str:
+    if fail_t is not None and count > fail_t:
+        return "fail"
+    if warn_t is not None and count > warn_t:
+        return "warn"
+    return "pass"
 
 
 def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
@@ -172,6 +232,13 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
         failures = r.get("failures") or 0
         warn_t = parse_threshold(config.get("warn_if"))
         fail_t = parse_threshold(config.get("error_if"))
+
+        verify_key = (table, column, test_name)
+        if verify_key in _VERIFY_COUNT_SQL and status != "error":
+            verified_count = conn.execute(_VERIFY_COUNT_SQL[verify_key]).fetchone()[0]
+            failures = verified_count
+            status = _status_for(verified_count, warn_t, fail_t)
+
         failing_sample_keys = _failing_sample_keys(conn, test_name, column, table, node, status)
 
         results.append({

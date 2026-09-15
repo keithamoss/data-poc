@@ -76,7 +76,14 @@ Rough layout:
   diff against previous output is a real correctness check, not noise
   (used repeatedly to verify refactors are behaviour-preserving).
 - Dependencies are managed with `uv` (`pyproject.toml` + `uv.lock`) -
-  `uv sync --dev` installs everything including dev tooling. Run
+  `uv sync --dev` installs everything including dev tooling. A real dbt
+  test dependency too, not covered by `uv`: `uv run dbt deps
+  --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles`
+  (one-time, only re-run if `dbt_project/packages.yml` changes) installs
+  `dbt_utils` - several real dbt checks (`dbt_utils.accepted_range`/
+  `expression_is_true`/`recency`, added in the 2026-09-15 dbt_utils
+  switch - see `plans/qa-pipeline.md`) use macros that package ships,
+  not dbt-core itself, so `dbt build` won't compile without it. Run
   `uv run pytest` (fast smoke tests - generator layer runs the real
   seeded generator, dashboard-builder layer uses fixtures, no slow
   real-tool run needed) and `uv run ruff check .` (a deliberately lean

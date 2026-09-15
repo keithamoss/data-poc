@@ -70,6 +70,35 @@ models:
     description: >
       One row per birth registration, across all loaded runs
       (run_id/run_date/dirty_severity identify which run a row came from).
+    # Model-level tests (2026-09-15, dbt_utils switch - see plans/qa-
+    # pipeline.md) - dbt_utils.expression_is_true/recency both operate
+    # across the model as a whole (a cross-field comparison; a max()
+    # aggregate), not one column, the same reason these previously lived
+    # as singular tests rather than under a `columns:` entry.
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "date_registered >= date_of_birth"
+          # Replaces tests/date_registered_after_birth.sql. Same rule as
+          # the ODCS contract's matching type: sql check on date_registered
+          # and the Soda checks file's matching `failed rows` check - a
+          # registration date earlier than the birth date indicates a
+          # corrupt or misjoined record.
+      - dbt_utils.recency:
+          field: date_of_birth
+          datepart: day
+          interval: 7
+          ignore_time_component: true
+          # Replaces tests/recent_births_present.sql. Genuinely the same
+          # check, not just similar: recency fails when max(date_of_birth)
+          # is older than 7 days ago - logically equivalent to "does any
+          # row have a date_of_birth within the last 7 days" (the max IS
+          # achieved by some row). Same honest limitation as the original
+          # (real wall-clock CURRENT_DATE vs. this fixture's fixed Sept
+          # 2026 dates - see the ODCS contract's matching type: sql rule
+          # and the Soda checks file's [recent] filter for the fuller
+          # account). ignore_time_component: true keeps both sides of the
+          # comparison as plain dates, matching date_of_birth's own type
+          # (no timestamp coercion needed or wanted here).
     columns:
       - name: registration_number
         description: BDM's unique registration identifier.
@@ -132,6 +161,13 @@ models:
       - name: date_of_birth
         tests:
           - not_null
+          - dbt_utils.accepted_range:
+              min_value: "DATE '1900-01-01'"
+              max_value: "CURRENT_DATE"
+              # Replaces tests/bdm_date_of_birth_range.sql (item 28's
+              # decision, plans/qa-pipeline.md). Same rule as the ODCS
+              # contract's matching type: sql check and the Soda checks
+              # file's matching `failed rows` check.
 
       - name: place_of_birth_suburb
         description: >
@@ -245,10 +281,32 @@ models:
 
       - name: date_of_birth
         description: >
-          Separate from tests/cp_client_date_of_birth_range.sql (the range
-          check) - this is the plain nullValues rule.
+          not_null is the plain nullValues rule; accepted_range replaces
+          tests/cp_client_date_of_birth_range.sql (2026-09-15, dbt_utils
+          switch - see plans/qa-pipeline.md). Lower bound only, no
+          max_value - matching what the CP contract's own reverse-gap
+          rule and Soda's matching check actually enforce, not silently
+          adding stricter coverage than either has (see the contract's
+          own comment on this - dirty.py never injects a future
+          date_of_birth for this table, only implausibly old ones).
         tests:
           - not_null
+          - dbt_utils.accepted_range:
+              min_value: "DATE '1900-01-01'"
+              config:
+                # Carries forward tests/cp_client_date_of_birth_range.
+                # sql's own two-tier config (warn_if = '>10', error_if =
+                # '>20') - a real bug caught during verification: without
+                # this, an unconfigured accepted_range hard-fails on any
+                # violation (same default-error_if=">0" quirk item 30
+                # already found for not_null), which disagreed with
+                # Soda's own matching check (still warn>10/fail>20) on 2
+                # of this fixture's 10 runs (7 and 5 violations, both
+                # amber-appropriate, both wrongly read as "fail" before
+                # this fix). Matches Keith's own framing when this check
+                # was first scoped: up to 10 bad dates is tolerable.
+                warn_if: ">10"
+                error_if: ">20"
 
       - name: sex
         tests:

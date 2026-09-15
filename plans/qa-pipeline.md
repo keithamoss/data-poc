@@ -1600,6 +1600,104 @@ relative, not a schedule — this is weeks of work, not months.
     side (delivery_id/supersedes_run_id consistency across a chain), not
     just `resupply.py`'s own dataframe logic.
 
+32. **[done]** Switched 4 of this project's 8 hand-authored dbt checks
+    (found while researching item 29's own "17% SQL escape hatch"
+    parallel finding) to `dbt_utils` - the flagship, dbt-Labs-maintained
+    package, not a third-party one (confirmed: `dbt-labs/dbt-utils` on
+    GitHub, the canonical Hub listing) - rather than keep hand-rolling
+    what it already provides off the shelf. Built the same day, 2026-09-
+    15, after Keith's "let's plan to switch" turned into "just do it"
+    given the change was concretely scoped and testable.
+
+    **What changed**: `tests/bdm_date_of_birth_range.sql` and `tests/
+    cp_client_date_of_birth_range.sql` (both singular tests) ->
+    `dbt_utils.accepted_range` on the respective `date_of_birth` columns.
+    `tests/date_registered_after_birth.sql` -> a model-level `dbt_utils.
+    expression_is_true` (`expression: "date_registered >= date_of_birth"`).
+    `tests/recent_births_present.sql` -> a model-level `dbt_utils.
+    recency` (`field: date_of_birth, datepart: day, interval: 7,
+    ignore_time_component: true`) - genuinely the same check, not just
+    similar: recency fails when `max(date_of_birth)` is older than the
+    interval, logically equivalent to "does any row have a recent
+    date_of_birth" (the max IS achieved by some row). The 4 genuinely
+    cross-table business-rule singular tests (`multiple_birth_sibling`,
+    `escalation_completeness`, `closed_case_investigation_hygiene`,
+    `placement_carer_approval`) stay hand-authored - no generic test in
+    `dbt_utils` or `dbt-expectations` abstracts away an arbitrary
+    multi-table join condition; even `expression_is_true` only removes
+    boilerplate, the business rule itself still has to be supplied.
+
+    **Real environment finding, not assumed**: the standard Hub-registry
+    install (`packages: - package: dbt-labs/dbt_utils`) fails in this
+    session's own sandbox - `dbt deps` needs `hub.getdbt.com`, which the
+    egress proxy blocks (403). A `git:` source (`packages: - git: "https:
+    //github.com/dbt-labs/dbt-utils.git"`) works, since it only needs
+    GitHub itself - a strictly weaker, more portable requirement anyway,
+    not just a workaround for this one sandbox. Documented as the actual
+    setup step in README.md/CLAUDE.md (`uv run dbt deps --project-dir
+    dbt_project --profiles-dir qa_tools/dbt_profiles`, one-time) - a real
+    new prerequisite `dbt build` will fail to compile without, unlike
+    everything `uv sync --dev` already covers.
+
+    **Two real bugs caught during verification, both fixed before
+    considering this done** - the same "measure twice" discipline item
+    30's parent-name bug came from, applied again:
+    - `dbt_utils.accepted_range` on `cp_clients.date_of_birth` silently
+      lost `tests/cp_client_date_of_birth_range.sql`'s own two-tier
+      `warn_if: '>10'`/`error_if: '>20'` config in the conversion - an
+      unconfigured `accepted_range` defaults to hard-fail-on-any-
+      violation (same `error_if` default-to-`">0"` quirk item 30 already
+      found for `not_null`). Caught by comparing dbt's reported status
+      against Soda's own matching check on the same runs (which still
+      had its two-tier config and correctly said "pass" at 7/5
+      violations) - 2 of CP's 10 runs read wrong before the fix. Fixed
+      by restoring the same config on the new test.
+    - Investigating that first bug surfaced a second, unrelated one live:
+      `cp_notifications.notification_id`'s pre-existing `unique` test
+      (untouched by this switch, config'd since before this session)
+      reported 0 failures on one `orchestrate_cp.py` pass where the true
+      count was 4/5/20 across 3 runs - then reported correctly on the
+      very next re-run of the identical warehouse files, no code changed
+      in between. This is the exact same dbt-duckdb reliability problem
+      `run_dbt_bdm.py`'s own module docstring already documents at
+      length for `sex`/`place_of_birth_facility`/`recent_births_present`
+      (a compiled test's reported failure count sometimes wrong, no
+      SQL-level explanation, no fixed pattern for which runs it hits) -
+      just newly *observed* on the CP side, on a check that had
+      apparently been fine every time anyone happened to look before
+      now. `run_dbt_cp.py` had no verification mechanism for this bug
+      class at all (unlike `run_dbt_bdm.py`) - added one (`_VERIFY_
+      COUNT_SQL` + `_status_for`, same pattern), covering both newly-
+      confirmed combos. Re-ran CP orchestration 3 times after the fix;
+      identical, correct results every time.
+
+    **Implication worth sitting with**: this bug is more pervasive and
+    less predictable than "2-3 known-bad checks to work around" - it
+    just struck a check that had never shown symptoms before, with zero
+    code change, discovered purely by chance while investigating a
+    different bug. Every dbt check in this project with a `config:`
+    override (not just the ones currently listed in either `_VERIFY_
+    COUNT_SQL` dict) is a candidate; this project's policy stays "verify
+    what's actually been observed failing, not everything that plausibly
+    could" (matching run_dbt_bdm.py's own stated approach), but that
+    policy only catches instances someone happens to notice - a real,
+    open-ended reliability tax on using real dbt-duckdb for anything with
+    threshold arithmetic, worth remembering next time a CP or BDM check
+    "looks fine" during a quick spot-check.
+
+    **Verification**: `schema.yml` re-parsed with `yaml.safe_load`; both
+    `run_dbt_bdm.py`/`run_dbt_cp.py` lint clean; full `./run_pipeline.sh`
+    plus 3x `qa_tools.cp.orchestrate_cp` re-run (988/20/206 BDM, 1710/10/
+    50 CP - identical to the pre-switch baseline every time); every
+    genuinely clean run still shows zero unexpected non-pass results;
+    `dbt_utils.recency`'s reported status directly cross-checked against
+    a raw query across all 15 BDM runs, zero mismatches; `uv run pytest`
+    (32/32) and `uv run ruff check .` both clean; dashboard data and HTML
+    re-embedded.
+
+    **Queued next, not started**: Keith wants to look at the Python
+    `pointblank` library after this - not yet researched.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
