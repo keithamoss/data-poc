@@ -2427,6 +2427,60 @@ relative, not a schedule — this is weeks of work, not months.
     confirm the `n>=2` path is unaffected. `uv run pytest` (71) and
     `uv run ruff check .` both clean.
 
+46. **[parked]** A real frontend test suite for `dashboard/qa-reporting-
+    dashboard.html` - Playwright end-to-end tests and/or frontend unit
+    tests - Keith's own framing: "if we stay with our hand-rolled
+    reporting solution, we'd definitely want" this. Explicitly
+    conditional on `plans/wider.md` action 9's still-open question
+    (hand-rolled dashboard vs. Streamlit/Power BI/etc.) resolving toward
+    "keep hand-rolling it" - not worth building against a UI that might
+    get replaced.
+
+    Motivating case, from today: every Playwright check this session ran
+    against item 45's build was a one-off script in a scratchpad
+    directory, thrown away after use, not a real suite - and it still
+    caught two real bugs before they shipped (`plans/qa-pipeline.md`
+    #45's own account): the check-panel silently comparing a run against
+    itself when a check has no previous run at all, and `trendChart()`'s
+    `xs()`/hover-index math dividing by zero (`NaN` coordinates, a
+    thrown JS error on hover) for that same case - both invisible in
+    this project's own fixture (every real check has 10+ runs) and only
+    found because Keith asked "what if it's the first run for a new
+    column or dataset?" A real, checked-in suite would catch this class
+    of edge case automatically, on every change, rather than relying on
+    someone asking the right question at the right time.
+
+    Not yet scoped: Playwright e2e (drives the real page - navigation,
+    the run-picker, back/forward/URL-state, both color schemes) vs.
+    frontend unit tests (pure functions like `statusForValue`/
+    `checkStatus`/`diffFailingKeys`-shaped logic in isolation) vs. both;
+    where tests would live (this repo has no JS test runner or `package.
+    json` today - Python's `uv run pytest` is the only test entry point
+    that exists); and whether `uv run pytest` should orchestrate the
+    Playwright run too (via the `playwright` Python package already used
+    ad hoc this session) so `CLAUDE.md`'s "run pytest before considering
+    a change done" convention naturally covers the dashboard too, or
+    whether frontend tests get their own separate invocation.
+
+47. **[parked]** Bring the column-level status-dot "pip" row
+    (`dashboard/qa-reporting-dashboard.html`'s `.status-dot-row`/
+    `.status-dot` - a compact row of small colored squares, one per run,
+    shown today only in the column drawer's "Worst status across all
+    checks" section via `statusHistoryForColumn()`) down to the check
+    level too - Keith's framing: "a useful counterpart to the graph."
+    Distinct from `trendChart()`'s own embedded color strip (already
+    per-run-colored, but thin, and only ever part of the bigger line-
+    chart visual, per item 45's compare-marker work) - this would be the
+    same bigger, simpler, standalone glanceable dot-row already proven
+    at the column level, reused one level down for a single check's own
+    run-by-run status, sitting alongside (not replacing) the trend
+    chart. Not yet scoped: exact placement in `openCheckPanel()` (above
+    the trend chart, inline with the "Over time" heading, or as its own
+    small section), and whether it reuses `statusHistoryForColumn()`'s
+    pattern directly (per-check rather than worst-of-all-checks - much
+    simpler, since a single check's own `history` already carries a
+    status per point via `statusForValue()`) or needs a new helper.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

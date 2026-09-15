@@ -1038,3 +1038,60 @@ not a schedule.
     reviewer group, anyone with a shared password), and whether the
     `.github/workflows/deploy-pages.yml` auto-publish-on-push flow needs
     to change at all or just gets a login wall in front of it.
+
+24. **[parked]** A real CLI for running this PoC, built on Python's
+    `click` library - Keith's own framing: "the goal is to give humans a
+    user-friendly tool to use to run this PoC on real and fake data."
+    Today's actual entry points, confirmed against `README.md`: BDM has
+    one (`./run_pipeline.sh`, a plain shell script wrapping 4 `uv run
+    python3 -m ...` calls), but Child Protection has no wrapper at all -
+    generating + running + building dashboard data for CP is 3 separate,
+    manually-typed `uv run python3 -m generator.generate_cp_runs` /
+    `qa_tools.cp.orchestrate_cp` / `pipeline.build_cp_dashboard_data`
+    commands, each needing the right module path remembered and run in
+    the right order. Real friction for anyone other than whoever's been
+    living in this repo daily. Not yet scoped: a single `click`-based
+    entry point covering both datasets (e.g. `run bdm`, `run cp`, `run
+    all`, maybe `generate --dataset cp --severity red` for the dirty-
+    data presets already in `generator/dirty.py`) vs. one subcommand
+    group per dataset; where it lives (a new top-level script, or
+    exposed via `pyproject.toml`'s `[project.scripts]` so `uv run
+    mothman ...` works without a path); and whether "real and fake data"
+    implies a mode this CLI would need to switch between, or just means
+    "the same synthetic-but-realistic data this PoC already only ever
+    uses" (no genuinely real BDM/CP data source exists anywhere in this
+    project today - see action 25 below for what that would actually
+    take).
+
+25. **[parked, medium-term]** What this repo would need to change to run
+    against real data in production, not just this PoC's synthetic
+    fixtures - Keith's own list of concerns, not yet scoped or
+    investigated against the actual codebase the way every `[todo]`/
+    `[investigate]` item above has been:
+    - **A checks library** - today's checks are hand-authored per column
+      across 4 separate places (ODCS contract, Soda YAML, dbt
+      `schema.yml`, the handful of contract-level `type: sql` rules) for
+      exactly 2 datasets; a real multi-agency deployment would need
+      this to scale past hand-authoring each one, per dataset, per
+      tool, from scratch.
+    - **Developer documentation** - `README.md`/`CLAUDE.md` explain this
+      PoC's own layout and conventions today; production would need
+      onboarding docs for engineers who didn't build it.
+    - **Running on Windows EC2s** - this PoC has only ever been run in
+      this project's own Linux sandbox/dev environment; `uv`, the real
+      tool packages (dbt-core, Soda Core, datacontract-cli, Evidently),
+      and every shell script (`run_pipeline.sh`) would all need a real
+      Windows-compatible path checked, not assumed.
+    - **How checks output/results get stored in a multi-user
+      environment** - today `reports/*.json`/`data/*.duckdb` are
+      gitignored, regenerated locally, single-user, no concurrency or
+      persistence story at all; a real deployment needs an actual answer
+      for where run results live, who can see them, and what happens
+      when two people or two scheduled runs overlap.
+    - "et cetera" (Keith's own words) - likely an incomplete list, not a
+      closed one; revisit and expand before this gets scoped for real.
+
+    Deliberately logged as a single parked item covering all of the
+    above rather than split into 4 - Keith raised them together as one
+    "what would production need" question, and splitting now would
+    guess at boundaries between them that scoping might not agree with.
