@@ -1920,6 +1920,22 @@ relative, not a schedule — this is weeks of work, not months.
     question already answered; this item is about the dashboard's actual
     feature set and UX as a product, not its data-correctness properties.
 
+    **Added to this item's scope 2026-09-15**: Elementary's product also
+    appears to include something like an incident/ticketing system -
+    worth investigating as part of this same piece of work, since it
+    speaks directly to `docs/remediation-workflow-design.md`'s own open
+    seam. That doc already designs the ticket model itself (creation,
+    lifecycle, assignment) and explicitly defers the *platform* choice as
+    "a deliberately separate, later conversation, not decided here" -
+    naming only Jira Service Management (already in use at the agency)
+    and Microsoft-stack tooling (Planner/Power Automate/SharePoint/Teams,
+    preferred to avoid extra licensing) as the options on the table.
+    Elementary's own incident-management component is a third possible
+    option worth being aware of for that later conversation, if it turns
+    out to be a real, usable piece of functionality rather than a thin
+    wrapper - not researched yet, logged here so it isn't lost track of
+    separately from the dashboard investigation it was found alongside.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
