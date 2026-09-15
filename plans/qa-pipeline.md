@@ -1134,6 +1134,42 @@ relative, not a schedule — this is weeks of work, not months.
     dashboard it surfaces - the check card, the check-detail panel, or
     both.
 
+26. **[open, not yet fixed - Keith's call to revisit]** A real bug found
+    while auditing every check for item 23's "duplicated-logic drift
+    risk" question (2026-09-15): `pipeline/build_dashboard_data.py`'s
+    `AGGREGATE_SPEC` entry for BDM's `date_of_birth` only encodes
+    `date_of_birth < DATE '1900-01-01'`. The actual rule it's supposed to
+    mirror - `contract/bdm-birth-registrations-contract.yaml`'s
+    `datacontract:custom_sql` check - is `< DATE '1900-01-01' OR {field}
+    > CURRENT_DATE`. The aggregate's condition is missing the upper
+    bound entirely.
+
+    Not yet observed producing a wrong number: `generator/dirty.py`'s
+    `_BAD_DATE_OF_BIRTH_POOL` only ever injects implausibly OLD dates
+    (1750-1899), never future ones, so `total_invalid`/the distinct-
+    values list have always happened to match the real check's count on
+    every run generated so far. But it's a live, latent bug, not a
+    theoretical one - if any future date_of_birth ever reaches this
+    table (a genuine data-entry error, a different injector, a schema
+    change upstream), datacontract-cli's real check would correctly flag
+    it and fail, while this aggregate would silently undercount it -
+    exactly the "hand-maintained copy of the check's own condition
+    silently drifts out of sync with the real thing" risk named as the
+    core problem with the independent-query architecture (item 23's
+    discussion). A concrete instance of the general risk, not a
+    hypothetical one made up to illustrate it.
+
+    Fix, when picked up: add `OR date_of_birth > CURRENT_DATE` to the
+    `AGGREGATE_SPEC["date_of_birth"]["invalid_condition"]` string. Per
+    CLAUDE.md's bug-fix convention this is a logic bug (wrong result
+    from a condition that doesn't match its own spec, not an
+    environment/wiring issue), so it gets a regression test alongside
+    the fix, not a check-first exception - straightforward to write:
+    inject a future date directly into a small fixture warehouse and
+    assert the aggregate's `total_invalid` matches a direct `COUNT(*)`
+    against the real datacontract-cli condition, not just the aggregate's
+    own (currently incomplete) one.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
