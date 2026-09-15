@@ -2251,7 +2251,7 @@ relative, not a schedule — this is weeks of work, not months.
     deliberately writes an unparseable value to demonstrate the failure
     mode for real rather than just avoiding it.
 
-42. **[scoped, not yet built]** Clearer red/amber/green status indicator
+42. **[done, 2026-09-15]** Clearer red/amber/green status indicator
     on a check's own detail page in the dashboard. Builds on item 14's
     click-a-check detail panel (`#check-panel` - current-vs-previous
     comparison, trend chart, row-level detail).
@@ -2277,9 +2277,20 @@ relative, not a schedule — this is weeks of work, not months.
     color + status label only, no inline threshold-math explanation (the
     compare-grid/thresholds line already shows the numbers); and the
     trend chart's existing per-run color-coding is sufficient as-is for
-    "history detail" - no separate plain-English summary needed. Small,
-    well-scoped change: add `${pill(checkStatus(check),"sm")}` next to
-    the title in `openCheckPanel()`. Not yet built.
+    "history detail" - no separate plain-English summary needed.
+
+    **Built**: `check-panel-title` now sits in a flex row alongside a
+    new `#check-panel-status` span (`dashboard/qa-reporting-dashboard.
+    html`'s static markup), and `openCheckPanel()` sets it to
+    `pill(checkStatus(check),"sm")` - the exact same component the
+    check-card itself already renders, no new CSS. Verified with
+    Playwright, both color schemes: clicked through to a real red check
+    (`place_of_birth_facility`'s `datacontract:missing_count`, 2.90% vs.
+    a 2% fail threshold) and screenshotted `#check-panel` - a clear "●
+    Red" pill sits directly beside the title, wraps cleanly even when
+    the check name itself spans two lines, legible in both light and
+    dark mode. `uv run pytest` (71) and `uv run ruff check .` both
+    clean (JS/HTML-only change, no Python touched).
 
 43. **[todo]** Visibility of what a check actually IS - its real SQL/
     YAML definition - from within the dashboard/reporting tool itself,

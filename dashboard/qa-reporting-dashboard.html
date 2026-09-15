@@ -328,7 +328,10 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
   <div class="drawer-head">
     <div>
       <div class="legend-key" style="margin:0 0 4px;" id="check-panel-eyebrow"></div>
-      <h3 id="check-panel-title">Check</h3>
+      <div style="display:flex; align-items:center; gap:9px;">
+        <h3 id="check-panel-title">Check</h3>
+        <span id="check-panel-status"></span>
+      </div>
     </div>
     <button class="drawer-close" id="check-panel-close" aria-label="Close">✕</button>
   </div>
@@ -1093,6 +1096,14 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   }
   document.getElementById("check-panel-eyebrow").innerHTML = `<span>${ag.name} / ${col.name} / ${ds.name} / ${column.name}</span>`;
   document.getElementById("check-panel-title").textContent = check.name;
+  // #42: the check-card this panel was opened from already shows a
+  // status pill (pill(st,"sm") in the checksBlock template below) - the
+  // panel itself used to drop that entirely, leaving a viewer to
+  // re-derive status from the compare-grid numbers a few lines down.
+  // Reuses the exact same pill() component, scoped via AskUserQuestion
+  // (2026-09-15): color + label only, no inline threshold math (the
+  // compare-grid/thresholds line already has the numbers).
+  document.getElementById("check-panel-status").innerHTML = pill(checkStatus(check), "sm");
   const body = document.getElementById("check-panel-body");
 
   const delta = check.current - check.previous;
