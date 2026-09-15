@@ -1046,6 +1046,14 @@ relative, not a schedule — this is weeks of work, not months.
       rules, plus BDM/CP's date-comparison rules) needs a Soda or dbt
       equivalent to exist for this reason alone, regardless of whether
       datacontract-cli's own version is otherwise doing useful work.
+      Read as an evaluation finding, not just a wiring detail (this
+      repo's purpose - see `plans/wider.md`'s purpose note): on its own,
+      without Soda/dbt alongside it, datacontract-cli cannot surface a
+      single failing row or value for any of its ~15 `type: sql` rules -
+      a fifth of every quality rule across both contracts. That's a real
+      standalone minus for datacontract-cli as a candidate, independent
+      of whether this project's specific fixture happens to paper over
+      it by also running Soda/dbt.
 
 21. **[decided]** The `classification` concept (a per-column sensitivity
     tag - `pii`, `confidential`, etc., see item 17) is a real requirement
@@ -1284,13 +1292,18 @@ relative, not a schedule — this is weeks of work, not months.
        doesn't cross the redline - there's no WHERE/join logic to drift
        out of sync, just "fetch the row this PK already names."
     3. datacontract-cli's `type: sql` rules give neither PKs nor values,
-       structurally (item 20). Since almost every check in this project
-       is triplicated across Soda/dbt/datacontract-cli, this is usually
-       harmless - some other tool has a PK-yielding version of the same
-       rule. Logged as a real mark against datacontract-cli regardless
-       (see item 20's new addendum), since it means datacontract-cli can
-       never be *the* PK source for any check, only ever a redundant
-       pass/fail signal alongside one that is.
+       structurally (item 20). **Correcting this entry's own original
+       wording here (2026-09-15, Keith's correction)**: the fact this
+       project runs Soda/dbt alongside it - so *this specific pipeline*
+       still gets a PK from somewhere - does NOT make the gap "usually
+       harmless." This repo's purpose is evaluating each tool on its own
+       merits (a shootout), not building a combined production pipeline
+       that leans on whichever tools happen to cover each other's gaps.
+       Read as a standalone capability question - "could datacontract-
+       cli alone do this job?" - the answer for every `type: sql` rule
+       is no, full stop, and that's a real minus against it as a
+       candidate regardless of what Soda/dbt happen to do in this
+       fixture. Logged in full as item 20's addendum.
     4. **The one place this project has no PK-yielding tool at all**:
        BDM's `date_of_birth` range check - `type: sql`-only today, no
        Soda check, no dbt test (confirmed by re-checking both files).

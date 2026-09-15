@@ -11,6 +11,26 @@ government agency, working this PoC over a period of **weeks**, then
 cleaning it up and handing it to the team for their input. Nothing here
 should assume a multi-month timeline.
 
+**Purpose, stated explicitly (2026-09-15, correcting a framing slip in
+`plans/qa-pipeline.md` #28)**: this repo is a tool evaluation/shootout -
+comparing dbt-core, Soda Core, datacontract-cli, and Evidently against
+each other on their own individual merits - not a PoC whose job is to
+get all of them combined into a working production pipeline. This
+matters for how every finding gets read: a gap in one tool that another
+tool happens to cover in this project's specific setup (all three run
+together, redundantly, on every check) is NOT "harmless" just because
+this pipeline still works end to end - it's a real minus against that
+tool standalone, since the evaluation's job is to tell the agency what
+each tool can and can't do on its own, not to justify keeping all of
+them forever. Concrete instance this was caught on: datacontract-cli's
+inability to yield PKs/failing values for any `type: sql` rule was
+initially logged as "usually harmless" because Soda/dbt cover the same
+rules in this fixture - wrong lens; fixed in `plans/qa-pipeline.md`
+#20/#28 to read as a standalone capability gap instead. Apply this
+lens going forward whenever a tool's shortcoming is tempting to wave
+away because something else in this specific pipeline happens to cover
+it.
+
 ## What exists, and where
 
 | Component | Where | Status |
