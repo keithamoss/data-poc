@@ -1715,6 +1715,129 @@ relative, not a schedule — this is weeks of work, not months.
     running 4 tools per run) rather than assuming it slots in identically
     to the SQL-layer ones.
 
+34. **[done]** Full account of the dbt-duckdb `failures=0` bug item 32
+    found - root cause, upstream status, whether dbt's own ecosystem has
+    a better story for exactly the kind of reporting this project builds,
+    and other possible fixes - all research-verified 2026-09-15, not
+    assumed.
+
+    **Root cause, found in our own installed source, not just inferred**:
+    `dbt/task/test.py`'s `build_test_run_result()` (dbt-core 1.12.4,
+    this project's actual installed version):
+    ```python
+    failures = 0
+    if severity == "ERROR" and result.should_error:
+        status = TestStatus.Fail
+        failures = result.failures
+    elif result.should_warn:
+        status = TestStatus.Warn
+        failures = result.failures
+    else:
+        status = TestStatus.Pass
+        # failures never reassigned - stays 0
+    ```
+    Any test whose real failure count is nonzero but under every
+    configured threshold (a genuine "Pass") always reports `failures=0`
+    in `RunResult`/`run_results.json`, discarding the real count.
+    Confirmed against a real dbt-core issue: [dbt-labs/dbt-core#11312]
+    (github.com/dbt-labs/dbt-core/issues/11312), tagged `type:bug` +
+    `engine:v1` by dbt Labs' own triage (not dismissed as a non-issue),
+    with an open, unmerged fix ([PR #11313]) - as of our installed
+    1.12.4, verified directly against the running code, the fix isn't in.
+    1.12.4 is confirmed the current latest stable dbt-core release
+    (2026-09-15) - there's a `2.0` Rust-rewrite release-candidate track
+    in progress (RC4 as of 2026-09-14) but nothing stable newer to
+    upgrade to that would sidestep this.
+
+    **Why so little public discussion despite being real**: checked the
+    issue directly - filed 2025-02-15 (~19 months old), zero comments,
+    filed by a single external contributor (`vglocus`) who offered to
+    write the fix themselves; their own PR has sat unmerged the whole
+    time with no maintainer response. Not evidence the bug is fake or
+    minor - it's genuinely low-visibility by nature: it only shows up
+    when something programmatically reads `RunResult.failures`/
+    `run_results.json` for a test that *passes or warns* with a nonzero
+    underlying count. `dbt test`'s own console output prints "PASS" with
+    no visible discrepancy either way, buggy or not - almost nobody
+    would ever notice unless their own tooling explicitly wants an exact
+    count regardless of status, which is unusual outside a project
+    shaped like this one.
+
+    **dbt's own "story" for this kind of dashboard - checked, and it
+    doesn't sidestep the bug either.** The documented, sanctioned pattern
+    (push `manifest.json`/`run_results.json`, or the equivalent on-run-end
+    Jinja objects, into warehouse tables, build dashboards on top) is
+    exactly what this project does. Checked `dbt-data-reliability`
+    (`elementary-data/dbt-data-reliability`, the package that powers
+    Elementary - the most widely-used, purpose-built "dbt-native data
+    observability dashboard" tool, built for exactly this use case) at
+    the source level, not just its marketing docs: its
+    `upload_run_results.sql` macro, which populates the warehouse table
+    its own dashboards read from, does `"failures":
+    run_result_dict.get("failures")` - reads the identical buggy
+    `RunResult.failures` field directly, no independent verification.
+    Elementary's own dashboards would show the same wrong number for a
+    test that passes/warns with a nonzero-but-under-threshold count. This
+    isn't a gap in this project's own approach specifically - it's
+    upstream of everyone building this class of dashboard on real dbt
+    output, including the most popular purpose-built tool for it.
+
+    **Other solutions researched, beyond what's already built**:
+    - **The community-recognized workaround, confirmed via multiple
+      independent sources discussing this exact dbt-core issue**: query
+      the `--store-failures` audit table directly (`SELECT * FROM
+      <profile_schema>_dbt_test__audit.<test_name>` or, for a count,
+      `SELECT COUNT(*) FROM <relation_name>`) rather than trust
+      `run_results.json`'s `failures` field. This works because
+      materialization into the audit table happens as part of the same
+      compiled query that also computes `should_warn`/`should_error`/
+      `failures` - upstream of `build_test_run_result()`'s separate,
+      buggy accounting logic - so the audit table's own row count is
+      never subject to this specific bug.
+    - **A related, genuinely relevant caveat checked and ruled out**:
+      [dbt-labs/dbt-core#11398] ("dbt drops audit table when test passes
+      and `--store-failures`", closed as not planned) - if this applied
+      to our exact scenario (nonzero failures, but "Pass" via threshold),
+      querying the audit table wouldn't work either, since it wouldn't
+      exist. Checked the actual reproduction steps: the drop is triggered
+      by a test transitioning to a *true* zero-failure pass (the query
+      itself returns no rows), a different code path from a test whose
+      query *does* return rows but whose final status is "Pass" only
+      because of a `warn_if`/`error_if` threshold - our exact scenario.
+      Consistent with what this project has already directly observed
+      all session: `failing_sample_keys_direct`/`_via_values`
+      (`dbt_common.py`) already query `relation_name` reliably for every
+      check this session touched, PK samples included, with no reported
+      missing-table failures.
+    - **No newer dbt-core version fixes it** (see above - PR unmerged,
+      1.12.4 is current). **No dbt-Labs-endorsed workaround exists**
+      beyond a BigQuery-specific job-lookup suggestion in the issue
+      thread itself, irrelevant to DuckDB.
+
+    **A real tension with Keith's own redline (item 28), found while
+    researching this**: this project's own current fix
+    (`_VERIFY_COUNT_SQL` in `run_dbt_bdm.py`/`run_dbt_cp.py`) doesn't use
+    the audit-table-count workaround above - it hand-maintains a direct
+    copy of each affected check's own SQL condition, run against the
+    source model instead (e.g. `"SELECT COUNT(*) FROM stg_cp_clients
+    WHERE date_of_birth < DATE '1900-01-01'"`). That's exactly the
+    "duplicate the check's own pass/fail SQL" pattern item 28's redline
+    rules out, and exactly the failure mode item 26's bug (a hand-
+    maintained condition silently drifting out of sync with the real
+    one) already demonstrated once. It's worked so far only because
+    these specific conditions are simple and haven't changed since - the
+    same risk profile as any other duplicated-logic case this project
+    has already flagged. **Not yet fixed** - the principled fix, matching
+    both the community's own workaround and the redline, is to make
+    `_VERIFY_COUNT_SQL` query each affected check's own `relation_name`
+    (already available on every test node) and aggregate it correctly
+    per test shape (`COUNT(*)` for row-shaped audit tables like
+    `not_null`/`accepted_range`; `COALESCE(SUM(n_records), 0)` for
+    value-aggregated ones like `accepted_values`/`unique` - this
+    project's own `schema.yml` comments already document that exact
+    distinction) instead of re-deriving the condition. A real near-term
+    follow-up, not scoped/built yet.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
