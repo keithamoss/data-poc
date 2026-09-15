@@ -2336,31 +2336,58 @@ relative, not a schedule — this is weeks of work, not months.
     against the specific closed-value-set columns worth watching this
     way) before the existing injector is worth wiring into a preset.
 
-45. **[todo, next up after item 42]** Choosing which run to compare
-    against, and clicking through to a real side-by-side view for that
-    chosen pair - not just the automatic "previous run" the check-panel
-    hardcodes today. Confirmed live: `openCheckPanel()`'s compare block
-    (`dashboard/qa-reporting-dashboard.html`) only ever shows `check.
-    previous` vs. `check.current` - there's no run-picker anywhere in
-    the dashboard today, on either the compare block or the trend chart.
-    The data to support this already exists per check (`check.history`,
-    the same array the trend chart iterates - each point already carries
-    `date`/`value`/`row_count_total`/`row_count_invalid`/`failing_
-    sample_keys`), so this is a UI/interaction gap, not a missing-data
-    one.
+45. **[done, 2026-09-15]** Choosing which run to compare against, and a
+    real side-by-side view for that chosen pair - not just the automatic
+    "previous run" the check-panel used to hardcode.
 
-    Two related asks, logged together since the second depends on the
-    first: (1) a way to pick a specific historical run to compare
-    against, rather than always the immediately-prior one - e.g. a
-    dropdown or clicking a point on the trend chart itself; (2) once
-    chosen, a real side-by-side comparison view for that pair (current
-    run vs. the chosen run), not just the two bare numbers the compare
-    block shows today - presumably the same shape of detail (row counts,
-    delta, maybe the failing-sample-keys diff) `openCheckPanel()`
-    already assembles for current-vs-previous, generalized to any two
-    points in `check.history`. Not yet scoped - queued to follow item
-    42's build (the check-panel status-indicator fix) since both touch
-    `openCheckPanel()`'s same compare-block area.
+    **Scoped via AskUserQuestion (Keith's answers):** both picker
+    mechanisms (a dropdown AND clicking a trend-chart point, not just
+    one); persist the choice in the URL the same way `checkKey` already
+    is; and a richer side-by-side view that also diffs the two runs'
+    failing-sample-keys, not just the bare row counts.
+
+    **Built**, all in `dashboard/qa-reporting-dashboard.html`:
+    - `openCheckPanel()`'s compare block now has a `<select id="check-
+      compare-select">` listing every run except the current one (by
+      date, the previous run marked "(previous)"), defaulting to the
+      previous run - the same default as before. Picking a different
+      run recomputes the whole panel (compare grid, delta wording, row-
+      level detail, the new diff block below) against that run instead.
+    - `trendChart()`/`wireChart()` gained an `onPointClick` callback -
+      clicking any point except the current run's own (last) point
+      fires the same `setCompareIdx()` the dropdown uses; hovering shows
+      a "Click to compare against this run" hint. A new hollow-ring
+      marker on the chart shows which point is currently selected,
+      distinct from the always-filled dot on the latest run.
+    - The choice is persisted via `STATE.compareIdx`, pushed/restored
+      exactly like `checkKey` already was (`setCompareIdx()` pushes its
+      own history entry) - explicitly reset to the default only when a
+      check is opened fresh (a genuine new navigation), not when re-
+      rendering after a compare-run change or restoring from popstate/
+      reload, so back/forward and a reloaded/shared URL all land on the
+      exact comparison someone was looking at.
+    - New "Failing rows vs. the compared run" block: diffs the current
+      run's sampled `failing_sample_keys` against the compared run's own
+      sample into "still failing in both", "new since the compared run",
+      and "no longer sampled as failing" (color-coded pills). Honestly
+      caveated inline - both sample arrays are already truncated at
+      generation time, so this is illustrative of the sampled rows, not
+      an exhaustive diff of every failing row in either run, same
+      limitation the pre-existing single-run sample block already
+      carried.
+
+    Verified with Playwright (both mechanisms, both color schemes, real
+    data): confirmed the dropdown defaults to "(previous)" and lists
+    every other run; picking a different run updates the compare value,
+    delta wording ("Worse than the Sep 6, 2026 run"), and the URL hash
+    (`compareIdx` appears/disappears correctly); clicking a trend-chart
+    point does the same; the compare-marker ring renders on the chart;
+    back navigation correctly restores the prior hash. Found a real
+    check with non-empty failing-sample-keys on both sides
+    (`missing_percent[all]` (Soda Core) on `place_of_birth_facility`)
+    and confirmed the diff block renders correctly, legibly, in both
+    light and dark mode. `uv run pytest` (71) and `uv run ruff check .`
+    both clean (JS/HTML-only change, no Python touched).
 
 ## Held over from the original (equivalent-only) build
 
