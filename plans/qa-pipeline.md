@@ -2251,18 +2251,35 @@ relative, not a schedule — this is weeks of work, not months.
     deliberately writes an unparseable value to demonstrate the failure
     mode for real rather than just avoiding it.
 
-42. **[todo]** Clearer red/amber/green status indicator on a check's own
-    detail page in the dashboard. Builds on item 14's click-a-check
-    detail panel (`#check-panel` - current-vs-previous comparison, trend
-    chart, row-level detail): today a viewer has to read the compare
-    grid's numbers against the warn/fail thresholds themselves to work
-    out the check's actual status, rather than seeing one clear, iconic
-    red/amber/green indicator on the panel itself the way the outer
-    dashboard's summary cards and check-cards already have. Not yet
-    scoped - needs a look at `dashboard/qa-reporting-dashboard.html`'s
-    existing `checkStatus()`/traffic-light rendering to see what can be
-    reused directly on `#check-panel` vs. what's specific to the card/
-    grid contexts it's built for today.
+42. **[scoped, not yet built]** Clearer red/amber/green status indicator
+    on a check's own detail page in the dashboard. Builds on item 14's
+    click-a-check detail panel (`#check-panel` - current-vs-previous
+    comparison, trend chart, row-level detail).
+
+    Scoping dig (2026-09-15) found the gap is narrower than it first
+    looked: `dashboard/qa-reporting-dashboard.html`'s check-CARDS (in the
+    column drawer, before you click through) already render a colored
+    `pill(st,"sm")` next to each check's name, and the trend chart
+    (`trendChart()`) already color-codes every historical run via a
+    status strip beneath the line plus a colored dot on the latest
+    point (`statusColorVar(statusForValue(...))`, per history point) -
+    so "history detail" is already covered. What's actually missing:
+    `openCheckPanel()`'s own header (`check-panel-eyebrow` +
+    `check-panel-title`) drops the pill entirely once you click through
+    - the panel shows only the check name and breadcrumb, no current-
+    status indicator at all, so a viewer has to remember the card's
+    color or re-derive status from the compare-grid numbers a few lines
+    down.
+
+    **Scoped via AskUserQuestion (Keith's answers, all the recommended
+    option):** reuse the existing `pill(st,"sm")` component, placed next
+    to `check-panel-title` in the header row (not a new bigger banner);
+    color + status label only, no inline threshold-math explanation (the
+    compare-grid/thresholds line already shows the numbers); and the
+    trend chart's existing per-run color-coding is sufficient as-is for
+    "history detail" - no separate plain-English summary needed. Small,
+    well-scoped change: add `${pill(checkStatus(check),"sm")}` next to
+    the title in `openCheckPanel()`. Not yet built.
 
 43. **[todo]** Visibility of what a check actually IS - its real SQL/
     YAML definition - from within the dashboard/reporting tool itself,
