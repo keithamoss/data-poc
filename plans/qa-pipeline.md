@@ -1170,6 +1170,75 @@ relative, not a schedule — this is weeks of work, not months.
     against the real datacontract-cli condition, not just the aggregate's
     own (currently incomplete) one.
 
+27. **[todo]** `generator/dirty.py` doesn't inject a failure scenario for a
+    large share of the checks both datasets actually define - found the
+    same day as item 26, by cross-referencing every `apply_*_presets`
+    function against `bdm-birth-registrations-soda-checks.yml`/`child-
+    protection-soda-checks.yml`, `dbt_project/models/staging/schema.yml`,
+    and both ODCS contracts' `quality:` blocks column by column. These
+    checks don't fail on *any* run generated so far - clean, amber, or
+    red - not because the pipeline is healthy, but because nothing ever
+    gives them a reason to. That's a materially weaker claim than "this
+    check passes" and the dashboard currently can't tell the two apart.
+
+    **Never-nulled required columns** (a `not_null`/`missing_count`/
+    `nullValues mustBe: 0` check that has never seen a null): BDM -
+    `date_of_birth`, `date_registered`, `is_multiple_birth`,
+    `extract_timestamp`, `source_system_record_id`, `registration_number`.
+    CP - `cp_clients.given_name`/`family_name`/`date_of_birth`/`suburb`/
+    `case_opened_date`; `cp_notifications.cp_client_id`/
+    `assigned_worker_id`; `cp_investigations.start_date`/
+    `lead_worker_id`; `cp_placements.cp_client_id`/`placement_start`/
+    `placement_suburb`. (`place_of_birth_facility` and `end_date` are the
+    only nullable-and-actually-nulled columns in either dataset.)
+
+    **Never-duplicated uniqueness/PK checks**: BDM's `registration_number`
+    (the PK itself - `source_system_record_id` is the only column dirty.py
+    ever duplicates). CP's `cp_client_id`, `investigation_id`,
+    `placement_id`, `carer_id`, `worker_id` (`notification_id` is the only
+    one dirty.py touches, via `inject_duplicate_rows`'s near-duplicate
+    mechanism - and even that only lands an exact duplicate ~40% of the
+    time, since the other 60% perturb one character on purpose).
+
+    **Never-invalid-value-injected closed-value-set/format columns**: BDM
+    - `child_family_name`, `registering_parent_1_name`,
+    `registering_parent_2_name` (junk-format injection only ever targets
+    `child_given_names`); `source_system_record_id`'s own `^SRC-[0-9]{9}$`
+    format regex (only ever gets exact-value duplication, never a
+    malformed value). CP - `cp_clients.sex`, `case_status`, `source_type`,
+    `risk_rating`, `outcome`, `substantiated`, `placement_type` (only
+    `concern_type` and `cp_clients.postcode` ever get an invalid-value
+    injector in CP). Item 26's date upper-bound bug is the same shape of
+    gap, one level down: not "never injected" but "the one existing
+    injector doesn't cover the full condition."
+
+    **Never-broken foreign keys**: all 7 CP relationship/reference checks
+    (`cp_notifications.cp_client_id`/`assigned_worker_id`,
+    `cp_investigations.notification_id`/`cp_client_id`/`lead_worker_id`,
+    `cp_placements.cp_client_id`/`carer_id`) - by design, per
+    `schema.yml`'s own comment: dirty.py's placement/investigation
+    presets reassign a FK to a still-real row (just one that fails a
+    *business* rule) or null a non-FK column, never point a FK at a row
+    that doesn't exist. So referential integrity itself has never
+    actually been exercised failing, on either tool that checks it (Soda's
+    `values in ... must exist in ...`, dbt's `relationships`) - a
+    deliberate design choice for the business-rule presets, but it means
+    the FK checks themselves are unproven the same way the columns above
+    are.
+
+    (Not in this list: the BDM freshness check, "recent birth dates
+    present" - that one's untestable-by-injection for a different reason,
+    a fixed-date fixture vs. real wall-clock `CURRENT_DATE`, not a dirty.py
+    coverage gap - already noted where that check is defined.)
+
+    Near-future work, not scoped yet: either calibrate presets for these
+    (mirroring how `apply_cp_clients_presets`/`apply_cp_placements_presets`
+    etc. were added for previously-uncovered checks per item 15/#9), or -
+    cheaper, and maybe more honest given how many columns this list
+    covers - have the dashboard distinguish "passed" from "has never been
+    observed failing on any generated run" so a viewer isn't reading
+    untested checks as verified ones.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
