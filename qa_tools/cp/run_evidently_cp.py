@@ -14,13 +14,14 @@ plans/wider.md #20.
 from __future__ import annotations
 import os
 
-import pandas as pd
-
 from qa_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, status_for_psi, compute_psi
+from qa_tools.common.csv_io import load_null_values_by_column, read_csv_explicit_nulls
 from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CP_RAW_DIR = os.path.join(ROOT, "data", "cp_raw")
+CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-contract.yaml")
+_NULL_VALUES = load_null_values_by_column(CONTRACT_PATH).get("cp_notifications", {})
 
 DATASET_ID = cp_common.TABLE_DATASET_ID["cp_notifications"]
 
@@ -37,8 +38,10 @@ REFERENCE_RUN_ID = "cp_run_01_2026-07-06"
 
 def evaluate_evidently_cp(run_id: str, run_timestamp: str,
                                 reference_run_id: str = REFERENCE_RUN_ID) -> list[dict]:
-    reference = pd.read_csv(os.path.join(CP_RAW_DIR, reference_run_id, "cp_notifications.csv"))[["concern_type"]]
-    current = pd.read_csv(os.path.join(CP_RAW_DIR, run_id, "cp_notifications.csv"))[["concern_type"]]
+    reference = read_csv_explicit_nulls(
+        os.path.join(CP_RAW_DIR, reference_run_id, "cp_notifications.csv"), _NULL_VALUES)[["concern_type"]]
+    current = read_csv_explicit_nulls(
+        os.path.join(CP_RAW_DIR, run_id, "cp_notifications.csv"), _NULL_VALUES)[["concern_type"]]
     n_total = len(current)
 
     psi = compute_psi(current, reference, "concern_type")

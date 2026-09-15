@@ -78,6 +78,9 @@ servers:
       casework collection, dropped into this bucket. No direct source
       connection yet.
 
+# `nullValues` (a project convention on top of ODCS, not a real ODCS
+# property) - see bdm-birth-registrations-contract.yaml's identical
+# comment for the full rationale. No property here sets one today.
 schema:
   - name: cp_clients
     physicalType: table

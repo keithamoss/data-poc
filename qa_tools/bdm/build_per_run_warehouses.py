@@ -22,17 +22,20 @@ import json
 import os
 
 import duckdb
-import pandas as pd
+
+from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 RAW_DIR = os.path.join(ROOT, "data", "raw")
 OUT_DIR = os.path.join(ROOT, "data", "duckdb_runs")
+CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
 
 
 def build_all(raw_dir: str = RAW_DIR, out_dir: str = OUT_DIR) -> list[str]:
     with open(os.path.join(raw_dir, "manifest.json")) as f:
         manifest = json.load(f)
 
+    null_values = load_null_values_by_column(CONTRACT_PATH).get("birth_registrations", {})
     os.makedirs(out_dir, exist_ok=True)
     paths = []
     for entry in manifest:
@@ -41,7 +44,7 @@ def build_all(raw_dir: str = RAW_DIR, out_dir: str = OUT_DIR) -> list[str]:
         if os.path.exists(db_path):
             os.remove(db_path)
 
-        df = pd.read_csv(os.path.join(raw_dir, entry["file"]))
+        df = read_csv_explicit_nulls(os.path.join(raw_dir, entry["file"]), null_values)
         df["run_id"] = run_id
         df["run_date"] = entry["run_date"]
         df["dirty_severity"] = entry["dirty_severity"]
@@ -57,8 +60,8 @@ def build_all(raw_dir: str = RAW_DIR, out_dir: str = OUT_DIR) -> list[str]:
         # to find it, not DuckDB's default "main" schema.
         conn.execute("CREATE SCHEMA IF NOT EXISTS raw")
         conn.execute(
-            "CREATE OR REPLACE TABLE raw.birth_registrations AS SELECT * FROM read_csv_auto(?, header=true)",
-            [combined_csv],
+            "CREATE OR REPLACE TABLE raw.birth_registrations AS SELECT * FROM read_csv_auto(?, header=true, nullstr=?)",
+            [combined_csv, DUCKDB_NULLSTR],
         )
         conn.close()
         os.remove(combined_csv)

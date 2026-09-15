@@ -25,12 +25,13 @@ from __future__ import annotations
 import json
 import os
 
-import pandas as pd
-
 from qa_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, status_for_psi, compute_psi
+from qa_tools.common.csv_io import load_null_values_by_column, read_csv_explicit_nulls
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 RAW_DIR = os.path.join(ROOT, "data", "raw")
+CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
+_NULL_VALUES = load_null_values_by_column(CONTRACT_PATH).get("birth_registrations", {})
 
 AGENCY_ID = "registry-services"
 COLLECTION_ID = "civil-registration"
@@ -65,7 +66,7 @@ def _row_count(csv_filename: str) -> int:
     from evidently import Report
     from evidently.metrics import RowCount
 
-    df = pd.read_csv(os.path.join(RAW_DIR, csv_filename))
+    df = read_csv_explicit_nulls(os.path.join(RAW_DIR, csv_filename), _NULL_VALUES)
     snapshot = Report(metrics=[RowCount()]).run(df, None)
     return int(snapshot.dict()["metrics"][0]["value"])
 
@@ -84,8 +85,8 @@ def _previous_run_file(manifest: list[dict], run_id: str) -> str | None:
 def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
                                  reference_run_id: str = REFERENCE_RUN_ID,
                                  reference_csv: str = f"{REFERENCE_RUN_ID}.csv") -> list[dict]:
-    reference = pd.read_csv(os.path.join(RAW_DIR, reference_csv))[["sex"]]
-    current = pd.read_csv(os.path.join(RAW_DIR, csv_filename))[["sex"]]
+    reference = read_csv_explicit_nulls(os.path.join(RAW_DIR, reference_csv), _NULL_VALUES)[["sex"]]
+    current = read_csv_explicit_nulls(os.path.join(RAW_DIR, csv_filename), _NULL_VALUES)[["sex"]]
     n_total = len(current)
 
     psi = compute_psi(current, reference, "sex")

@@ -22,8 +22,11 @@ import os
 import duckdb
 import pandas as pd
 
+from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
+
 RAW_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "warehouse.duckdb")
+CONTRACT_PATH = os.path.join(os.path.dirname(__file__), "..", "contract", "bdm-birth-registrations-contract.yaml")
 
 TABLE = "birth_registrations"
 
@@ -44,10 +47,11 @@ def load_all(db_path: str = DB_PATH, raw_dir: str = RAW_DIR) -> None:
         os.remove(db_path)
     conn = duckdb.connect(db_path)
 
+    null_values = load_null_values_by_column(CONTRACT_PATH).get(TABLE, {})
     frames = []
     for entry in manifest:
         path = os.path.join(raw_dir, entry["file"])
-        df = pd.read_csv(path)
+        df = read_csv_explicit_nulls(path, null_values)
         df["run_id"] = entry["run_id"]
         df["run_date"] = entry["run_date"]
         df["dirty_severity"] = entry["dirty_severity"]
@@ -68,8 +72,8 @@ def load_all(db_path: str = DB_PATH, raw_dir: str = RAW_DIR) -> None:
     combined_csv = os.path.join(raw_dir, "_combined.csv")
     full.to_csv(combined_csv, index=False)
     conn.execute(
-        f"CREATE OR REPLACE TABLE {TABLE} AS SELECT * FROM read_csv_auto(?, header=true)",
-        [combined_csv],
+        f"CREATE OR REPLACE TABLE {TABLE} AS SELECT * FROM read_csv_auto(?, header=true, nullstr=?)",
+        [combined_csv, DUCKDB_NULLSTR],
     )
     conn.execute(f"CREATE INDEX idx_{TABLE}_run ON {TABLE}(run_id)")
     os.remove(combined_csv)

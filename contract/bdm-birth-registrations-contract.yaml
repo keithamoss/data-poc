@@ -79,6 +79,19 @@ servers:
       Current delivery mechanism: a full or incremental CSV dump, dropped
       into this bucket on a daily schedule. No direct source connection yet.
 
+# `nullValues` (a project convention on top of ODCS, not a real ODCS
+# property - like `classification` elsewhere in this file, ODCS's own
+# Pydantic models accept arbitrary extra keys via extra="allow", so this
+# doesn't break `datacontract lint`) - an optional per-property list of
+# EXTRA literal strings this feed's source system uses to mean null,
+# beyond a genuinely empty field. Read by qa_tools/common/csv_io.py,
+# which every real CSV read in this pipeline goes through: no property
+# here sets one today, so every column's null vocabulary is "a literal
+# empty field, nothing else" - pandas'/DuckDB's own default null-
+# sniffing (which independently guesses at things like "N/A"/"NULL"/
+# "NaN") is turned off entirely, everywhere, on purpose. See
+# plans/qa-pipeline.md #17 for the real bug this fixes at the root
+# (an injected "N/A" silently became an actual NULL on CSV round-trip).
 schema:
   - name: birth_registrations
     physicalType: table

@@ -809,31 +809,59 @@ relative, not a schedule — this is weeks of work, not months.
     BDM data would need) or simplify it away for this PoC given the
     actual stakes are zero right now - not yet decided either way.
 
-18. **[investigate]** Explicit, non-magic null handling in every CSV
-    read/write this pipeline does - a spike Keith asked for after item
-    17's `"N/A"` bug. Right now every CSV read (`pd.read_csv(...)`,
-    DuckDB's `read_csv_auto(...)`) relies on each library's own default
-    list of "these specific strings mean null" - pandas' includes `""`,
+18. **[done]** Explicit, non-magic null handling in every CSV read this
+    pipeline does - started as a spike Keith asked for after item 17's
+    `"N/A"` bug, built out for real on 2026-09-15 once the spike's
+    findings were in. Every CSV read (`pd.read_csv(...)`, DuckDB's
+    `read_csv_auto(...)`) used to rely on each library's own default list
+    of "these specific strings mean null" - pandas' includes `""`,
     `"N/A"`, `"NA"`, `"NULL"`, `"NaN"`, `"None"`, `"n/a"`, `"nan"`,
     `"null"`, and several numeric-looking variants; DuckDB's own default
     list is separate and not necessarily identical. Nobody in this
-    codebase chose that vocabulary - it's just whatever each library
-    ships with, and item 17's bug is exactly what "silent library magic"
-    costs when it collides with a real value. Goal: audit every
-    `pd.read_csv`/`read_csv_auto` call site in `generator/`, `pipeline/`,
-    `qa_tools/` and make null detection fully explicit - `pd.read_csv(...,
-    keep_default_na=False, na_values=[""])` and DuckDB's
-    `read_csv_auto(..., nullstr='')` - so an empty field is the ONLY
-    thing that ever becomes NULL, and any other text (including "N/A")
-    is always kept as the literal string it is. Needs checking against
-    every EXISTING null-rate check too, not just re-verifying item 17's
-    fix still holds - e.g. `place_of_birth_facility`'s null-rate check
-    presumably relies on a genuinely empty CSV field becoming NULL today;
-    confirm that still works identically once default sniffing is turned
-    off everywhere, not just that "N/A" stops being swallowed. Also
-    covers the write side (`to_csv()`'s own default for how a NaN gets
-    written back out) for the same write-then-read round trip item 17's
-    bug happened in.
+    codebase had chosen that vocabulary - it was just whatever each
+    library shipped with, and item 17's bug was exactly what that "silent
+    library magic" costs when it collides with a real value.
+
+    Built: `qa_tools/common/csv_io.py` - `read_csv_explicit_nulls()`
+    peeks a CSV's header first, then calls `pd.read_csv(...,
+    keep_default_na=False, na_values={<every column>: [""] + <that
+    column's contract-declared extras>})` - confirmed empirically
+    (pandas requires EVERY column present in the `na_values` dict or
+    unlisted columns get no null treatment at all, not even blank
+    fields, so this always builds the complete map rather than trusting
+    a caller to enumerate columns). `load_null_values_by_column()` reads
+    an optional `nullValues` list per property from the ODCS contract
+    YAML - a project convention, not a real ODCS property, but doesn't
+    break contract validity (ODCS's Pydantic models accept arbitrary
+    extra keys via `extra="allow"`, confirmed in source - same mechanism
+    `classification` already relies on). No column in either contract
+    sets one today - every column's default null vocabulary is now "a
+    literal empty field, nothing else." Every DuckDB `read_csv_auto` call
+    site now passes an explicit `nullstr=''` too, for the same
+    no-implicit-magic reason, even though (confirmed) every one of them
+    only ever reads an already-pandas-written intermediate file in this
+    pipeline, never a raw generator CSV directly - so by the time DuckDB
+    reads it, pandas has already resolved every null correctly and
+    DuckDB's own default sniffing was never actually the risk.
+
+    Wired into all 5 real read call sites: `pipeline/load.py`,
+    `qa_tools/bdm/build_per_run_warehouses.py`,
+    `qa_tools/bdm/run_evidently_bdm.py`,
+    `qa_tools/cp/build_cp_warehouses.py`,
+    `qa_tools/cp/run_evidently_cp.py`. `tests/test_csv_io.py` (4 tests)
+    covers: every one of pandas' own default null-sniffing strings
+    survives as literal text; a genuinely blank field still becomes null;
+    a contract-declared extra null value applies only to its own column,
+    never bleeds into others; the contract-YAML parser itself. Verified
+    behaviour-preserving, not just passing new tests: full pipeline
+    regenerated for both datasets, identical check counts and identical
+    embedded-dashboard byte counts to before this change (839 BDM / 1000
+    CP results, same pass/warn/fail split both times) - confirms
+    `place_of_birth_facility`'s null-rate check and every other existing
+    null-dependent check still behave identically now that default
+    sniffing is off everywhere, not just that "N/A" stops being
+    swallowed. `uv run pytest` (32 tests, up from 28) and
+    `uv run ruff check .` both clean.
 
 19. **[investigate]** What dbt-core/Soda Core natively offer for "inspect
     the actual bad values/rows," and whether either can read an ODCS
@@ -984,6 +1012,76 @@ relative, not a schedule — this is weeks of work, not months.
       than adopting ODCS" is a real, unresolved architectural question,
       not something this entry decides. Revisit if this comes up again,
       informed by these actual numbers rather than a general impression.
+
+21. **[decided]** The `classification` concept (a per-column sensitivity
+    tag - `pii`, `confidential`, etc., see item 17) is a real requirement
+    for this PoC going forward, independent of whether ODCS/datacontract-
+    cli specifically is what this project ends up standardising on.
+    Keith's call, 2026-09-15: keep this as a first-class requirement of
+    the PoC itself - if ODCS gets dropped or replaced later (see item 22
+    of `plans/wider.md`, the ODCS-bridge-tooling question, and the
+    17%-SQL-escape-hatch concern in item 20 above), whatever replaces it
+    still needs a real per-column sensitivity tag and the same
+    "suppress values, keep counts" behaviour this project already built
+    around it (`pipeline/aggregate_values.py`, see item 17). Not a
+    decision about which tool to use - a decision about what any tool
+    or bespoke framework must support.
+
+22. **[todo]** Numeric value-field checks (amber/red thresholds on a
+    genuinely numeric - `integer`/`number` logicalType - column) - near-
+    future work, not scoped yet. Confirmed in item 17: neither contract
+    has a single numeric field today, every column is `string`/`date`/
+    `boolean`, so the "numeric" half of shape 2's aggregate design
+    (min/max/outlier-list/histogram) has only ever been exercised by
+    date fields. Would need real schema/generator work first, not just a
+    new check - a genuine numeric column doesn't exist in either dataset
+    to point a check at yet (candidates worth considering when this gets
+    scoped: something like a placement/investigation duration, a case
+    count, or an age-derived field - not decided).
+
+23. **[todo]** Capture each real tool's own bad-row/bad-value output as
+    fully as each one natively allows, not the current uniform 5-row-PK-
+    only cap, and show each tool's own version on its own check in the
+    dashboard rather than one shared sample across all of them - near-
+    future work, not scoped yet. Directly motivated by items 19/20's
+    findings: dbt's `--store-failures` audit tables are unbounded by
+    default (already true, no code change needed there) and for
+    `accepted_values`/`unique` already carry almost the full `(value,
+    count)` aggregate shape; Soda's real default cap is 100 rows (this
+    project self-imposes 5) and its "failed rows" checks appear
+    unbounded regardless (a Soda bug, not a guarantee - see item 19);
+    datacontract-cli tops out at a genuine hard 5-row ceiling with no
+    override (item 20) and has zero row-level output at all for custom
+    SQL rules. Today's dashboard shows one unified, heavily-capped
+    "example failing rows" list regardless of which tool actually ran -
+    this would mean surfacing each tool's own real capability instead,
+    including datacontract-cli's actual failed *values* (not just PKs)
+    where it has them. Real design questions not yet worked through: how
+    this interacts with `aggregate_values.py`'s existing full aggregate
+    (which already isn't capped, since it bypasses all three tools - see
+    item 19), and whether "each tool's own version, shown separately" is
+    clearer to a viewer than one merged view, or just more UI to parse.
+
+24. **[todo]** Browse back to a specific previous run (or a previous
+    resupply attempt) at the check level, and at the column/dataset
+    level too, not just the current run - near-future work, not scoped
+    yet. Real, currently-missing capability, confirmed by re-reading the
+    check-detail panel's own code: `openCheckPanel`'s row-level detail
+    (samples, and now shape 2's aggregate values) only ever reads `last`
+    (the latest run in `history`) - there's no way to click an earlier
+    point on the "over time" trend chart or status-dot history and see
+    *that* run's own row-level/aggregate detail, only the latest one's.
+    The column-drawer and dataset levels have the same shape: a status-
+    history dot row and a checks summary, both computed for "now," with
+    no drill-down into an arbitrary earlier run's own state at that
+    level either. Scoping questions for when this gets picked up: does
+    "browse back" mean picking any point on the existing history
+    displays (reusing UI that's already there) or a separate run-picker;
+    does resupply-attempt granularity (`run_06_..._resupply1` vs.
+    `_resupply2`) need its own affordance distinct from ordinary runs;
+    and whether this applies uniformly to BDM (15 manifest entries
+    including resupplies) and Child Protection (10 straightforward
+    weekly runs, no resupply concept) the same way.
 
 ## Held over from the original (equivalent-only) build
 

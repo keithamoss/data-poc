@@ -16,11 +16,13 @@ import json
 import os
 
 import duckdb
-import pandas as pd
+
+from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CP_RAW_DIR = os.path.join(ROOT, "data", "cp_raw")
 OUT_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
+CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-contract.yaml")
 
 TABLES = ["cp_clients", "cp_notifications", "cp_investigations", "cp_placements", "cp_carers", "cp_case_workers"]
 
@@ -29,6 +31,7 @@ def build_all(raw_dir: str = CP_RAW_DIR, out_dir: str = OUT_DIR) -> list[str]:
     with open(os.path.join(raw_dir, "manifest.json")) as f:
         manifest = json.load(f)
 
+    null_values_by_table = load_null_values_by_column(CONTRACT_PATH)
     os.makedirs(out_dir, exist_ok=True)
     paths = []
     for entry in manifest:
@@ -41,12 +44,12 @@ def build_all(raw_dir: str = CP_RAW_DIR, out_dir: str = OUT_DIR) -> list[str]:
         conn = duckdb.connect(db_path)
         conn.execute("CREATE SCHEMA IF NOT EXISTS raw")
         for table in TABLES:
-            df = pd.read_csv(os.path.join(run_dir, f"{table}.csv"))
+            df = read_csv_explicit_nulls(os.path.join(run_dir, f"{table}.csv"), null_values_by_table.get(table, {}))
             combined_csv = os.path.join(out_dir, f"_{run_id}_{table}.csv")
             df.to_csv(combined_csv, index=False)
             conn.execute(
-                f"CREATE OR REPLACE TABLE raw.{table} AS SELECT * FROM read_csv_auto(?, header=true)",
-                [combined_csv],
+                f"CREATE OR REPLACE TABLE raw.{table} AS SELECT * FROM read_csv_auto(?, header=true, nullstr=?)",
+                [combined_csv, DUCKDB_NULLSTR],
             )
             os.remove(combined_csv)
         conn.close()
