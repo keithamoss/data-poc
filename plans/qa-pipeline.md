@@ -1034,6 +1034,18 @@ relative, not a schedule — this is weeks of work, not months.
       than adopting ODCS" is a real, unresolved architectural question,
       not something this entry decides. Revisit if this comes up again,
       informed by these actual numbers rather than a general impression.
+    - **The `type: sql`/`CUSTOM_SQL` failed-samples exclusion is a mark
+      against datacontract-cli specifically** (2026-09-15, Keith's words:
+      "the lack of getting the PKs and values out of datacontract-cli is
+      a mark against it") - not just a documented quirk to route around.
+      Concrete cost, not a hypothetical one: item 28's architecture
+      decision means every check needs *some* tool to yield a PK for its
+      row-level dashboard detail, and datacontract-cli structurally can
+      never be that tool for any `type: sql` rule - every one of the ~15
+      SQL-escape-hatch rules counted above (all 10 CP cross-table/FK
+      rules, plus BDM/CP's date-comparison rules) needs a Soda or dbt
+      equivalent to exist for this reason alone, regardless of whether
+      datacontract-cli's own version is otherwise doing useful work.
 
 21. **[decided]** The `classification` concept (a per-column sensitivity
     tag - `pii`, `confidential`, etc., see item 17) is a real requirement
@@ -1238,6 +1250,68 @@ relative, not a schedule — this is weeks of work, not months.
     covers - have the dashboard distinguish "passed" from "has never been
     observed failing on any generated run" so a viewer isn't reading
     untested checks as verified ones.
+
+28. **[decided]** How the dashboard gets row-level detail (PKs and the
+    values/rows behind a failing check) - the question items 19-23 built
+    up to. Resolves the "wire into each tool's output vs. keep an
+    independent pipeline-level computation" fork raised in item 23,
+    following a full per-check-mechanism audit of what each tool can and
+    can't expose (dbt/Soda/datacontract-cli/Evidently, across null,
+    invalid-value, uniqueness, FK, and cross-table-business-rule checks -
+    the full breakdown isn't reproduced here, just the decision it led
+    to).
+
+    **Keith's redline**: the reporting pipeline must never duplicate a
+    check's own pass/fail SQL - the condition or join that decides
+    whether a row is failing. Item 26's bug (the hand-maintained
+    `AGGREGATE_SPEC` copy of a check's condition silently drifting out of
+    sync with the real thing) is exactly the failure mode this rules
+    out.
+
+    **The decided pattern**:
+    1. Row-level detail for a check comes from whichever real tool ran
+       it - its own PK sample (Soda's `samples limit`, dbt's
+       `--store-failures`, datacontract-cli's `failedSamples` where it
+       exists for that metric type). The reporting pipeline never
+       recomputes pass/fail itself.
+    2. Where a tool yields PKs but not the columns that explain *why*
+       (most of this project's Soda/dbt cross-table "failed rows"/
+       singular-test checks only `SELECT` the PK column, per item 23's
+       findings on escalation completeness/sibling match/etc.) - the
+       reporting pipeline enriches that with a plain `SELECT * WHERE <pk>
+       IN (...)` lookup against the warehouse. This is a row lookup by
+       identifier, not a duplicate of the check's own condition, so it
+       doesn't cross the redline - there's no WHERE/join logic to drift
+       out of sync, just "fetch the row this PK already names."
+    3. datacontract-cli's `type: sql` rules give neither PKs nor values,
+       structurally (item 20). Since almost every check in this project
+       is triplicated across Soda/dbt/datacontract-cli, this is usually
+       harmless - some other tool has a PK-yielding version of the same
+       rule. Logged as a real mark against datacontract-cli regardless
+       (see item 20's new addendum), since it means datacontract-cli can
+       never be *the* PK source for any check, only ever a redundant
+       pass/fail signal alongside one that is.
+    4. **The one place this project has no PK-yielding tool at all**:
+       BDM's `date_of_birth` range check - `type: sql`-only today, no
+       Soda check, no dbt test (confirmed by re-checking both files).
+       Also the exact check item 26's bug was found in - not a
+       coincidence; it's the one check that had already fallen back to
+       an independent, driftable recomputation for lack of any other
+       option. **Resolution, Keith's call**: add both a Soda `failed
+       rows` check and a dbt test mirroring the same condition (`<
+       DATE '1900-01-01' OR > CURRENT_DATE`), purely so a PK-yielding
+       source exists. Checked CP's own `cp_clients.date_of_birth` range
+       check while confirming this - it's Soda-only today too (no dbt
+       test in `schema.yml` either), so it has the same gap on the dbt
+       side specifically, just not the "zero tools at all" version BDM
+       has, since its Soda check already yields a PK. Worth picking up
+       both at once. datacontract-cli's rule stays too (the contract
+       remains the source of truth for the business rule itself) - this
+       adds redundant *checking*, not a pipeline-side reimplementation,
+       so it doesn't cross the redline either. Not yet built - near-
+       future work, alongside item 26's actual fix (add the missing
+       upper bound) and item 23's broader "surface each tool's own
+       output" build.
 
 ## Held over from the original (equivalent-only) build
 
