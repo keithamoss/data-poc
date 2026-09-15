@@ -1326,6 +1326,62 @@ relative, not a schedule — this is weeks of work, not months.
        upper bound) and item 23's broader "surface each tool's own
        output" build.
 
+29. **[done]** The same evaluation-lens correction (item 20/28's, and
+    `plans/wider.md`'s purpose note) applied to Soda's and Evidently's
+    own standalone row-level (PK/value) capability, at Keith's direct
+    request after the datacontract-cli correction. Same rule throughout:
+    read each tool's own gap as "could this tool alone do the job", not
+    "does something else in this project's specific triple-redundant
+    setup happen to cover it."
+
+    **Soda Core - genuinely split, not one answer**:
+    - For every metric-based check (`missing_count`/`missing_percent`,
+      `invalid_percent`, `duplicate_count`, the FK reference check) -
+      **capped, standalone, no exception**. This project's own `samples
+      limit: 5` was chosen to match datacontract-cli's hard cap for
+      comparability (item 19), but Soda's real default is 100 - and even
+      100 is still a cap, not "all." Evaluated alone, Soda can never
+      guarantee every failing PK for these check types once a table is
+      large enough - a real, standalone mark, independent of what
+      dbt/datacontract-cli do alongside it in this fixture.
+    - For "failed rows" checks (`fail condition:`/`fail query:` - this
+      project's extract_timestamp ordering, sibling match, freshness,
+      and all 3 CP business rules) - appears **uncapped** in practice,
+      but that's a documented Soda Core reliability gap (GitHub issue
+      #1985: `samples limit:` isn't enforced for this check shape), not
+      a guaranteed design feature. Evaluated standalone and honestly:
+      leaning on this for unbounded row-level detail means leaning on
+      undocumented behaviour a future Soda Core release could "fix"
+      (i.e. start enforcing the cap) without notice - a real risk worth
+      flagging in the evaluation, not a capability to bank on.
+    - Whether a "failed rows" check also returns the *causal* columns
+      (not just the PK) is **not a Soda limitation at all** -
+      `fail query:`/`fail condition:` can select arbitrary columns; this
+      project's own checks mostly just chose to select the PK only (item
+      23's per-check findings: sibling match/escalation completeness/
+      placement-carer-approval select the PK only; extract_timestamp
+      ordering, via `fail condition:`, returns the whole row). Unlike
+      datacontract-cli's `CUSTOM_SQL` exclusion, this is fixable by
+      rewriting this project's own check YAML, not something Soda is
+      structurally incapable of - a genuine point in Soda's favour
+      relative to datacontract-cli on this axis, not a wash.
+
+    **Evidently - the most severe standalone gap of the four tools**,
+    stated plainly rather than softened by "it's a different kind of
+    tool": **zero PKs, zero values, for every check, no exception, no
+    workaround.** It computes distributional statistics (PSI,
+    missing-value share, category-frequency deltas) over a whole
+    column/dataset and never evaluates or flags an individual row at
+    all - there is no row-level output to cap or ration in the first
+    place, not even a capped one. Where datacontract-cli's gap is scoped
+    to its ~15 `type: sql` rules and Soda's is scoped to the
+    metric-based check types, Evidently's is total: if row-level
+    bad-data inspection or PK capture is a requirement the agency cares
+    about, Evidently cannot meet it for any check, standalone or
+    otherwise. Recorded as an explicit minus for Evidently specifically
+    in the evaluation, not just a "different tool, different question"
+    aside.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
