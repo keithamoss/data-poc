@@ -946,6 +946,45 @@ relative, not a schedule — this is weeks of work, not months.
     convenient - nothing here changes what's built. Logged for the
     record since it was asked to be verified, not because it's a to-do.
 
+    **Keith's follow-up read on both findings, flagged as real concerns
+    (not resolved, not just logged as neutral fact)**:
+    - **The 5-row cap is a real issue**, not just a documented quirk -
+      no lever anywhere to raise it (unlike Soda's `samples limit:`),
+      which matters more as this PoC's fixtures grow or if it's ever
+      pointed at a real, larger dataset.
+    - **Leaning this heavily on the SQL escape hatch undermines ODCS's
+      own value proposition** - his words: "at that point, you might as
+      well just write your own framework rather than rely on ODCS."
+      Checked the actual numbers to see how heavy the lean really is:
+      across both contracts, **15 of 87 quality rules (~17%) are
+      `type: sql`**, not `metric:` Library rules - BDM 5/26, Child
+      Protection 10/61. Broken down by cause, since it's not one uniform
+      reason:
+      - **~10 (all in Child Protection)** are foreign-key/referential-
+        integrity checks ("every notification's `cp_client_id` must
+        reference an existing `cp_clients` row") and the 3 cross-table
+        business rules (escalation completeness, etc.) - genuinely
+        cross-table logic. ODCS's Library metrics are all single-
+        column/single-table; no comparable contract-standard's
+        declarative vocabulary covers joins either, so this specific
+        slice isn't really evidence against ODCS particularly - any
+        similar spec would need an escape hatch here.
+      - **~3-5** are the date-comparison rules item 20 already covers
+        (BDM's `date_of_birth` range check, `extract_timestamp` vs.
+        `date_registered` ordering/latency) - this slice genuinely *is*
+        the numeric-only-operator gap, not a structural limitation
+        shared by every contract format.
+      So the honest split: about two-thirds of this project's SQL-
+      escape-hatch usage is for something no declarative single-table
+      vocabulary would cover anyway (a weak argument against ODCS
+      specifically), and about a third is for the numeric-only-operator
+      gap (a real, ODCS-specific argument for Keith's point). Whether
+      17% overall - or the smaller date-comparison slice specifically -
+      is "enough that a bespoke framework would've been less friction
+      than adopting ODCS" is a real, unresolved architectural question,
+      not something this entry decides. Revisit if this comes up again,
+      informed by these actual numbers rather than a general impression.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
