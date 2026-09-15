@@ -2011,6 +2011,21 @@ relative, not a schedule — this is weeks of work, not months.
     *actual* remaining mystery is (a true, still-unexplained nonzero-vs-
     zero flip, not the "half the value" pattern this item resolves).
 
+    **Disposition, Keith's call**: not pursuing further active repro
+    attempts right now - watch for it recurring instead. If a future run
+    (real `orchestrate_bdm.py`/`orchestrate_cp.py` pass, not a synthetic
+    repro) shows a check that reports 0/an implausible value on one pass
+    and a plausible one on an immediate identical re-run, capture more
+    than this session's original sighting did before re-running past it:
+    which exact check and run_id, whether it was a parallel or
+    `--sequential` pass, the full `target/<run_id>/` directory from that
+    exact pass (manifest.json + run_results.json, before anything
+    overwrites it) rather than just the printed summary. That's the raw
+    material this session's repro attempt didn't have and couldn't
+    recreate from a description alone - real conditions from an actual
+    recurrence would let a future dig start from evidence instead of
+    guessing at what to reproduce.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
