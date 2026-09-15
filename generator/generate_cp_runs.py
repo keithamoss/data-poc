@@ -12,17 +12,39 @@ the Child Protection tables are built ONCE (fixed seed), then re-extracted
 which is what a real periodic extract of an active caseload would look
 like, unlike birth-registrations' fresh-cohort-per-day model.
 
-Dirty injection touches 4 of the 6 tables on amber/red runs:
-cp_notifications (dirty.py's apply_cp_notifications_presets - an unknown
-concern_type code, near-duplicate notifications), cp_placements
+Dirty injection touches all 6 tables on amber/red runs (plans/qa-
+pipeline.md #27, 2026-09-15 - previously only 4: cp_carers/cp_case_
+workers were deliberately clean in every run, a real gap closed once it
+was scoped rather than an oversight left in place). Each preset function
+in generator/dirty.py now covers not just its table's original "traffic
+light demo" check but every real check on that table that had never
+actually been exercised failing before: cp_notifications
+(apply_cp_notifications_presets - an unknown concern_type code,
+near-duplicate notifications, nulls on required columns, invalid values
+on source_type/risk_rating/outcome, and genuine dangling foreign keys on
+cp_client_id/assigned_worker_id), cp_placements
 (apply_cp_placements_presets - a placement reassigned to a non-Approved
-carer), cp_investigations (apply_cp_investigations_presets - a
-closed-case investigation reopened), and cp_clients
-(apply_cp_clients_presets - an unrecognised postcode, an out-of-range
-date_of_birth). The other two tables (cp_carers, cp_case_workers) are
-clean in every run - this mirrors how birth-registrations only
-demonstrates dirty behaviour on a subset of its columns, not an
-oversight.
+carer, nulls, an invalid placement_type, a duplicated placement_id, and
+dangling FKs on cp_client_id/carer_id), cp_investigations
+(apply_cp_investigations_presets - a closed-case investigation reopened,
+nulls, a duplicated investigation_id, and dangling FKs on all 3 of this
+table's real FKs), cp_clients (apply_cp_clients_presets - an
+unrecognised postcode, an out-of-range date_of_birth, nulls, an invalid
+sex, a duplicated cp_client_id), cp_carers and cp_case_workers
+(apply_cp_carers_presets/apply_cp_case_workers_presets - each just a
+duplicated PK, the only real check either table has that dirty.py had
+never touched).
+
+The dangling-FK injectors are a genuinely new failure mode, not a
+calibration tweak: every preset in this module used to deliberately
+avoid ever pointing a foreign key at a row that doesn't exist at all
+(dbt's `relationships` tests and Soda's `values in ... must exist in
+...` reference checks used to pass 0/0 on every run, dirty or clean -
+see dbt_project/models/staging/schema.yml's and contract/child-
+protection-soda-checks.yml's own comments, both updated alongside this).
+That was a deliberate scoping choice (2026-09-13), not an oversight -
+Keith's own call (2026-09-15) reversed it once item 27's audit made the
+gap concrete.
 
 child_protection.py's own generation logic makes all three of these
 tables' cross-table business rules (escalation completeness,
@@ -116,14 +138,31 @@ def main() -> None:
 
         tables = {name: base_tables[name].copy() for name in TABLES}
         if severity:
+            # Reference tables passed to the dangling-FK injectors
+            # (existing_ids exclusion sets, and cp_investigations' own
+            # closed-case eligibility filter) are base_tables - the real,
+            # never-dirtied source - not this run's own `tables` dict,
+            # so a preset applied earlier in this block (e.g. cp_clients'
+            # own PK-duplication further down) can never change what
+            # another preset considers a "real" ID (duplication only ever
+            # adds rows, never removes the original, so this is belt-and-
+            # braces rather than a live bug either way - but base_tables
+            # is the unambiguously correct thing to point at).
             tables["cp_notifications"] = dirty_mod.apply_cp_notifications_presets(
-                tables["cp_notifications"], severity, seed=BASE_SEED + 4100 + i)
+                tables["cp_notifications"], base_tables["cp_clients"], base_tables["cp_case_workers"],
+                severity, seed=BASE_SEED + 4100 + i)
             tables["cp_placements"] = dirty_mod.apply_cp_placements_presets(
-                tables["cp_placements"], tables["cp_carers"], severity, seed=BASE_SEED + 4200 + i)
+                tables["cp_placements"], tables["cp_carers"], base_tables["cp_clients"],
+                severity, seed=BASE_SEED + 4200 + i)
             tables["cp_investigations"] = dirty_mod.apply_cp_investigations_presets(
-                tables["cp_investigations"], tables["cp_clients"], severity, seed=BASE_SEED + 4300 + i)
+                tables["cp_investigations"], tables["cp_clients"], base_tables["cp_notifications"],
+                base_tables["cp_case_workers"], severity, seed=BASE_SEED + 4300 + i)
             tables["cp_clients"] = dirty_mod.apply_cp_clients_presets(
                 tables["cp_clients"], severity, seed=BASE_SEED + 4400 + i)
+            tables["cp_carers"] = dirty_mod.apply_cp_carers_presets(
+                tables["cp_carers"], severity, seed=BASE_SEED + 4500 + i)
+            tables["cp_case_workers"] = dirty_mod.apply_cp_case_workers_presets(
+                tables["cp_case_workers"], severity, seed=BASE_SEED + 4600 + i)
 
         row_counts = {}
         for name in TABLES:

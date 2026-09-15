@@ -41,15 +41,22 @@ version: 2
 # now exists below, on the 6 Child Protection staging models - real dbt
 # generic-test syntax (`relationships: {to: ref('...'), field: ...}`),
 # confirmed by actually running `dbt test` against a real per-run CP
-# warehouse (qa_tools/cp/build_cp_warehouses.py). All 7 pass on every run,
-# dirty or clean: generator/dirty.py's placement/investigation presets
-# reassign a placement's carer_id to a still-real (just non-Approved)
-# carer, and null an investigation's end_date - neither ever points a FK
-# column at a row that doesn't exist, so referential integrity itself
-# always holds even on a dirty run (see contract/child-protection-
-# contract.yaml's matching SQL-rule versions of these same 7 checks for
-# the fuller account of why they're still a genuine backstop against a
-# dropped join or truncated parent extract).
+# warehouse (qa_tools/cp/build_cp_warehouses.py). All 7 still pass 0/0 on
+# every CLEAN run - child_protection.py's own generation logic never
+# produces a dangling FK by construction - and generator/dirty.py's
+# placement/investigation presets still ALSO reassign a placement's
+# carer_id to a still-real (just non-Approved) carer, and null an
+# investigation's end_date, as their own separate business-rule failure
+# modes. But these 7 relationships tests are no longer untestable-by-
+# design on amber/red runs: plans/qa-pipeline.md #27's dangling-FK pass
+# (2026-09-15, Keith's call, reversing the 2026-09-13 scoping decision
+# this comment used to describe) added a genuine "points at a row that
+# doesn't exist at all" injector to every one of these 7 columns, so a
+# dirty run now exercises real referential-integrity failures here too,
+# not just the business rules layered on top of them (see contract/
+# child-protection-contract.yaml's matching SQL-rule versions of these
+# same 7 checks for the fuller account of why they're a genuine backstop
+# against a dropped join or truncated parent extract).
 #
 # The three cross-table business rules approved alongside these FKs
 # (escalation completeness, placement/carer approval compliance,

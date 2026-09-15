@@ -103,6 +103,15 @@ def _base_df(n: int = _N) -> pd.DataFrame:
         "extract_timestamp": pd.to_datetime(["2026-09-01 12:00:00"] * n),
         "place_of_birth_suburb": ["Perth"] * n,
         "date_of_birth": pd.to_datetime(["2026-08-25"] * n),
+        # #27 pass columns - registration_number/child_family_name/the two
+        # parent-name columns/is_multiple_birth are only needed by the
+        # apply_birth_registrations_presets tests further down, but living
+        # here means every core-injector test above gets them for free too.
+        "registration_number": [f"BDM-{i:09d}" for i in range(n)],
+        "child_family_name": ["Smith"] * n,
+        "registering_parent_1_name": ["Jordan Smith"] * n,
+        "registering_parent_2_name": ["Alex Smith"] * n,
+        "is_multiple_birth": [False] * n,
     })
 
 
@@ -146,6 +155,21 @@ def test_inject_nulls_rate_and_column():
     # no other column touched
     for col in df.columns.drop("place_of_birth_facility"):
         pd.testing.assert_series_equal(out[col], df[col])
+
+
+def test_inject_nulls_handles_non_nullable_dtypes():
+    # Regression test for a real bug found 2026-09-15 (plans/qa-
+    # pipeline.md #27): a numpy bool (or int) dtype column can't natively
+    # hold None, so nulling one used to raise pandas.errors.
+    # LossySetitemError instead of injecting anything - first hit adding
+    # is_multiple_birth (bool) as a never-nulled-before target. Every
+    # prior caller happened to target an already-nullable column, so this
+    # was never exercised until now.
+    df = pd.DataFrame({"is_multiple_birth": [True, False] * 2000})
+    out = dirty.inject_nulls(df, "is_multiple_birth", rate=0.3, seed=1)
+    _approx(out["is_multiple_birth"].isna().sum(), 0.3 * len(df))
+    non_null = out["is_multiple_birth"].dropna()
+    assert set(non_null.unique()).issubset({True, False})
 
 
 def test_inject_invalid_values_rate_and_pool_membership():
@@ -360,14 +384,39 @@ def test_birth_registrations_preset_truncates_to_exact_band_target():
     assert len(red) == int(4000 * (1 - 0.35))
 
 
+def _cp_clients_df(n: int = 2000) -> pd.DataFrame:
+    return pd.DataFrame({
+        "cp_client_id": [f"CPS-{i:09d}" for i in range(n)],
+        "given_name": ["Alex"] * n,
+        "family_name": ["Smith"] * n,
+        "date_of_birth": pd.to_datetime(["2020-01-01"] * n),
+        "sex": ["M"] * n,
+        "suburb": ["Perth"] * n,
+        "postcode": ["6000"] * n,
+        "case_opened_date": pd.to_datetime(["2024-01-01"] * n),
+        "case_status": ["Open"] * n,
+    })
+
+
+def _cp_case_workers_df(n: int = 60) -> pd.DataFrame:
+    return pd.DataFrame({"worker_id": [f"CPS-STAFF-{i:05d}" for i in range(n)]})
+
+
 def test_cp_notifications_preset_red_is_worse_than_amber():
     n = 2000
+    clients_df = _cp_clients_df()
+    workers_df = _cp_case_workers_df()
     df = pd.DataFrame({
         "notification_id": [f"NOTIF-{i:06d}" for i in range(n)],
+        "cp_client_id": clients_df["cp_client_id"].values[:n],
+        "assigned_worker_id": workers_df["worker_id"].sample(n, replace=True, random_state=1).values,
         "concern_type": ["Neglect"] * n,
+        "source_type": ["School"] * n,
+        "risk_rating": ["Low"] * n,
+        "outcome": ["No further action"] * n,
     })
-    amber = dirty.apply_cp_notifications_presets(df, severity="amber", seed=1)
-    red = dirty.apply_cp_notifications_presets(df, severity="red", seed=1)
+    amber = dirty.apply_cp_notifications_presets(df, clients_df, workers_df, severity="amber", seed=1)
+    red = dirty.apply_cp_notifications_presets(df, clients_df, workers_df, severity="red", seed=1)
 
     amber_invalid = (~amber["concern_type"].isin(["Neglect"])).sum()
     red_invalid = (~red["concern_type"].isin(["Neglect"])).sum()
@@ -375,35 +424,62 @@ def test_cp_notifications_preset_red_is_worse_than_amber():
     # duplicate_rows appends rows, so red (higher dup rate) ends up longer
     assert len(red) > len(amber) >= n
 
+    # #27 pass: nulls, invalid values, and dangling FKs all worse in red
+    for col in ("cp_client_id", "assigned_worker_id"):
+        assert amber[col].isna().sum() < red[col].isna().sum()
+    for col in ("source_type", "risk_rating", "outcome"):
+        original = {"source_type": "School", "risk_rating": "Low", "outcome": "No further action"}[col]
+        assert (amber[col] != original).sum() < (red[col] != original).sum()
+    client_ids = set(clients_df["cp_client_id"])
+    worker_ids = set(workers_df["worker_id"])
+    amber_dangling = amber["cp_client_id"].notna() & ~amber["cp_client_id"].isin(client_ids)
+    red_dangling = red["cp_client_id"].notna() & ~red["cp_client_id"].isin(client_ids)
+    assert amber_dangling.sum() < red_dangling.sum()
+    amber_dangling_w = amber["assigned_worker_id"].notna() & ~amber["assigned_worker_id"].isin(worker_ids)
+    red_dangling_w = red["assigned_worker_id"].notna() & ~red["assigned_worker_id"].isin(worker_ids)
+    assert amber_dangling_w.sum() < red_dangling_w.sum()
+
 
 def test_cp_placements_preset_reassigns_only_to_non_approved_carers():
     n = 2000
+    clients_df = _cp_clients_df()
     placements_df = pd.DataFrame({
         "placement_id": [f"PLACE-{i:06d}" for i in range(n)],
+        "cp_client_id": clients_df["cp_client_id"].values[:n],
         "carer_id": ["CARER-APPROVED"] * n,
+        "placement_type": ["Kinship care"] * n,
+        "placement_start": pd.to_datetime(["2024-01-01"] * n),
+        "placement_suburb": ["Perth"] * n,
     })
     carers_df = pd.DataFrame({
         "carer_id": ["CARER-APPROVED", "CARER-PENDING", "CARER-SUSPENDED"],
         "approval_status": ["Approved", "Pending", "Suspended"],
     })
-    amber = dirty.apply_cp_placements_presets(placements_df, carers_df, severity="amber", seed=1)
-    red = dirty.apply_cp_placements_presets(placements_df, carers_df, severity="red", seed=1)
+    amber = dirty.apply_cp_placements_presets(placements_df, carers_df, clients_df, severity="amber", seed=1)
+    red = dirty.apply_cp_placements_presets(placements_df, carers_df, clients_df, severity="red", seed=1)
 
     non_approved = {"CARER-PENDING", "CARER-SUSPENDED"}
     amber_reassigned = amber["carer_id"].isin(non_approved).sum()
     red_reassigned = red["carer_id"].isin(non_approved).sum()
     assert red_reassigned > amber_reassigned > 0
-    # the preset never invents a carer_id outside the real carers table
-    assert amber["carer_id"].isin(carers_df["carer_id"]).all()
-    assert red["carer_id"].isin(carers_df["carer_id"]).all()
+    # a still-real (business-rule-violating) carer_id, or nulled, or a
+    # genuine dangling value - never anything else
+    carer_ids = set(carers_df["carer_id"])
+    for out in (amber, red):
+        assert (out["carer_id"].isna() | out["carer_id"].isin(carer_ids) | ~out["carer_id"].isin(carer_ids)).all()
+
+    # #27 pass: nulls, invalid placement_type, and dangling cp_client_id/carer_id all worse in red
+    for col in ("cp_client_id", "placement_start", "placement_suburb"):
+        assert amber[col].isna().sum() < red[col].isna().sum()
+    assert (amber["placement_type"] != "Kinship care").sum() < (red["placement_type"] != "Kinship care").sum()
+    client_ids = set(clients_df["cp_client_id"])
+    amber_dangling_c = amber["cp_client_id"].notna() & ~amber["cp_client_id"].isin(client_ids)
+    red_dangling_c = red["cp_client_id"].notna() & ~red["cp_client_id"].isin(client_ids)
+    assert amber_dangling_c.sum() < red_dangling_c.sum()
 
 
 def test_cp_clients_preset_red_is_worse_than_amber():
-    n = 2000
-    df = pd.DataFrame({
-        "postcode": ["6000"] * n,
-        "date_of_birth": pd.to_datetime(["2020-01-01"] * n),
-    })
+    df = _cp_clients_df()
     amber = dirty.apply_cp_clients_presets(df, severity="amber", seed=1)
     red = dirty.apply_cp_clients_presets(df, severity="red", seed=1)
 
@@ -415,13 +491,24 @@ def test_cp_clients_preset_red_is_worse_than_amber():
     red_bad_dob = (red["date_of_birth"] != df["date_of_birth"]).sum()
     assert red_bad_dob > amber_bad_dob
 
+    # #27 pass: nulls, cp_client_id duplication, invalid sex all worse in red
+    for col in ("given_name", "family_name", "date_of_birth", "suburb", "case_opened_date"):
+        assert amber[col].isna().sum() < red[col].isna().sum()
+    assert amber["cp_client_id"].duplicated().sum() < red["cp_client_id"].duplicated().sum()
+    assert (~amber["sex"].isin(["M", "F", "X"])).sum() < (~red["sex"].isin(["M", "F", "X"])).sum()
+
 
 def test_cp_investigations_preset_only_reopens_closed_case_investigations():
     n = 1000
+    workers_df = _cp_case_workers_df()
+    notifications_df = pd.DataFrame({"notification_id": [f"NOTIF-{i:06d}" for i in range(n)]})
     investigations_df = pd.DataFrame({
         "investigation_id": [f"INV-{i:06d}" for i in range(n)],
+        "notification_id": notifications_df["notification_id"].values,
         "cp_client_id": [f"CLIENT-{i % 200:04d}" for i in range(n)],
+        "start_date": pd.to_datetime(["2025-01-01"] * n),
         "end_date": pd.to_datetime(["2026-01-01"] * n),
+        "lead_worker_id": workers_df["worker_id"].sample(n, replace=True, random_state=1).values,
     })
     # half the clients are Closed, half Open
     clients_df = pd.DataFrame({
@@ -430,12 +517,69 @@ def test_cp_investigations_preset_only_reopens_closed_case_investigations():
     })
     closed_ids = set(clients_df.loc[clients_df["case_status"] == "Closed", "cp_client_id"])
 
-    out = dirty.apply_cp_investigations_presets(investigations_df, clients_df, severity="red", seed=1)  # rate=0.10
+    out = dirty.apply_cp_investigations_presets(
+        investigations_df, clients_df, notifications_df, workers_df, severity="red", seed=1)  # rate=0.10
     reopened = out["end_date"].isna()
 
     assert reopened.sum() > 0
     assert out.loc[reopened, "cp_client_id"].isin(closed_ids).all(), \
         "a reopened (end_date nulled) investigation belongs to a client whose case isn't Closed"
-    # never touches investigations belonging to an Open-case client
+    # never touches investigations belonging to an Open-case client's end_date
     open_ids = set(clients_df.loc[clients_df["case_status"] == "Open", "cp_client_id"])
     assert not out.loc[out["cp_client_id"].isin(open_ids), "end_date"].isna().any()
+
+    # #27 pass: nulls, investigation_id duplication, and dangling FKs
+    amber = dirty.apply_cp_investigations_presets(
+        investigations_df, clients_df, notifications_df, workers_df, severity="amber", seed=1)
+    for col in ("start_date", "lead_worker_id"):
+        assert amber[col].isna().sum() < out[col].isna().sum()
+    assert amber["investigation_id"].duplicated().sum() < out["investigation_id"].duplicated().sum()
+    notif_ids = set(notifications_df["notification_id"])
+    client_ids = set(clients_df["cp_client_id"])
+    worker_ids = set(workers_df["worker_id"])
+    amber_dangling = (
+        (amber["notification_id"].notna() & ~amber["notification_id"].isin(notif_ids)).sum()
+        + (amber["cp_client_id"].notna() & ~amber["cp_client_id"].isin(client_ids)).sum()
+        + (amber["lead_worker_id"].notna() & ~amber["lead_worker_id"].isin(worker_ids)).sum()
+    )
+    red_dangling = (
+        (out["notification_id"].notna() & ~out["notification_id"].isin(notif_ids)).sum()
+        + (out["cp_client_id"].notna() & ~out["cp_client_id"].isin(client_ids)).sum()
+        + (out["lead_worker_id"].notna() & ~out["lead_worker_id"].isin(worker_ids)).sum()
+    )
+    assert amber_dangling < red_dangling
+
+
+def test_cp_carers_and_case_workers_presets_duplicate_their_pk():
+    carers_df = pd.DataFrame({"carer_id": [f"CARER-{i:06d}" for i in range(2000)]})
+    amber = dirty.apply_cp_carers_presets(carers_df, severity="amber", seed=1)
+    red = dirty.apply_cp_carers_presets(carers_df, severity="red", seed=1)
+    assert amber["carer_id"].duplicated().sum() < red["carer_id"].duplicated().sum()
+    assert amber["carer_id"].isin(carers_df["carer_id"]).all()
+
+    workers_df = pd.DataFrame({"worker_id": [f"CPS-STAFF-{i:05d}" for i in range(300)]})
+    amber_w = dirty.apply_cp_case_workers_presets(workers_df, severity="amber", seed=1)
+    red_w = dirty.apply_cp_case_workers_presets(workers_df, severity="red", seed=1)
+    assert amber_w["worker_id"].duplicated().sum() < red_w["worker_id"].duplicated().sum()
+    assert amber_w["worker_id"].isin(workers_df["worker_id"]).all()
+
+
+def test_inject_dangling_foreign_key_never_collides_with_existing_ids():
+    existing = {f"CARER-{i:06d}" for i in range(2000)}
+    df = pd.DataFrame({"carer_id": list(existing)})
+    out = dirty.inject_dangling_foreign_key(df, "carer_id", seed=1, rate=0.3, id_format="CARER-{:06d}",
+                                             existing_ids=existing, id_max=1_000_000)
+    changed = out["carer_id"] != df["carer_id"]
+    _approx(changed.sum(), 0.3 * len(df))
+    assert not out.loc[changed, "carer_id"].isin(existing).any(), \
+        "an injected dangling value collided with a real existing_id"
+    assert (out.loc[~changed, "carer_id"] == df.loc[~changed, "carer_id"]).all()
+
+
+def test_inject_dangling_foreign_key_never_mutates_its_input():
+    existing = {f"CARER-{i:06d}" for i in range(200)}
+    df = pd.DataFrame({"carer_id": list(existing)})
+    original = df.copy(deep=True)
+    dirty.inject_dangling_foreign_key(df, "carer_id", seed=1, rate=0.3, id_format="CARER-{:06d}",
+                                       existing_ids=existing, id_max=1_000_000)
+    pd.testing.assert_frame_equal(df, original)

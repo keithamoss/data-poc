@@ -1193,7 +1193,7 @@ relative, not a schedule — this is weeks of work, not months.
     against the real datacontract-cli condition, not just the aggregate's
     own (currently incomplete) one.
 
-27. **[todo]** `generator/dirty.py` doesn't inject a failure scenario for a
+27. **[done, 2026-09-15]** `generator/dirty.py` doesn't inject a failure scenario for a
     large share of the checks both datasets actually define - found the
     same day as item 26, by cross-referencing every `apply_*_presets`
     function against `bdm-birth-registrations-soda-checks.yml`/`child-
@@ -1254,13 +1254,114 @@ relative, not a schedule — this is weeks of work, not months.
     a fixed-date fixture vs. real wall-clock `CURRENT_DATE`, not a dirty.py
     coverage gap - already noted where that check is defined.)
 
-    Near-future work, not scoped yet: either calibrate presets for these
-    (mirroring how `apply_cp_clients_presets`/`apply_cp_placements_presets`
-    etc. were added for previously-uncovered checks per item 15/#9), or -
-    cheaper, and maybe more honest given how many columns this list
-    covers - have the dashboard distinguish "passed" from "has never been
-    observed failing on any generated run" so a viewer isn't reading
-    untested checks as verified ones.
+    **Closed (2026-09-15, Keith's call via AskUserQuestion)**: calibrated
+    presets for every gap above, rather than the cheaper "flag untested
+    checks in the dashboard" alternative - all 4 categories, including
+    reversing the FK-dangling design choice (see below). Item 31's test-
+    battery work earlier the same day had just made the same "coverage"
+    question concrete for `resupply.py`; asking it again immediately
+    surfaced this item as the still-open other half.
+
+    **Never-nulled required columns**: `inject_nulls` calls added for all
+    6 BDM columns and all 12 CP columns listed above, in `apply_
+    birth_registrations_presets` and every CP table's own preset
+    function. Real bug found and fixed along the way (not specific to
+    this item's scope, but first hit here): `inject_nulls` crashed with
+    `pandas.errors.LossySetitemError`/`TypeError: Invalid value 'nan' for
+    dtype 'bool'` on a non-nullable dtype column (`is_multiple_birth`,
+    the first bool column any caller had ever nulled) - pandas validates
+    the assigned scalar against the column's dtype even for an all-False
+    boolean mask, so the fix (upcast to `object` first when the dtype
+    can't hold `None`) had to be unconditional on whether the mask
+    actually selects any rows, not gated on `mask.any()` as first
+    written. Regression test added (`test_inject_nulls_handles_non_
+    nullable_dtypes`) and confirmed against the pre-fix code before the
+    real fix landed, per this project's own bug-fix-test convention.
+
+    **Never-duplicated PK checks**: `inject_duplicate_values` calls added
+    for `registration_number` (BDM) and `cp_client_id`/`investigation_id`/
+    `placement_id`/`carer_id`/`worker_id` (CP) - the last two required
+    brand new preset functions, `apply_cp_carers_presets`/`apply_cp_case_
+    workers_presets`, since those two tables had never been touched by
+    any preset at all before this (`generate_cp_runs.py`'s own docstring
+    used to describe that as deliberate - updated to describe the actual
+    current behaviour).
+
+    **Never-invalid-value-injected columns**: `inject_invalid_values`
+    calls added for BDM's `child_family_name`/`registering_parent_1_name`/
+    `registering_parent_2_name` (reusing `_JUNK_TEXT_POOL`) and a new
+    `_MALFORMED_SRC_ID_POOL` for `source_system_record_id`'s own format
+    check; CP's `cp_clients.sex`, `cp_notifications.source_type`/`risk_
+    rating`/`outcome`, `cp_placements.placement_type`. `case_status` was
+    explicitly and deliberately left out despite being named in this
+    item's own original audit above - it turns out to have no
+    `accepted_values`/`invalid_percent`/`accepted_values` check anywhere
+    (contract, Soda, or dbt), only a literal-value reference inside the
+    closed-case-investigation-hygiene business rule, so there was no
+    actual check to exercise. That's a different, narrower gap (a
+    genuinely missing check, not an unexercised one) - not scoped or
+    built here, flagged back to Keith rather than silently invented.
+
+    **Never-broken foreign keys - a real design reversal, not just a
+    calibration gap**: every preset in this module used to deliberately
+    avoid ever pointing a FK at a row that doesn't exist at all (a
+    2026-09-13 scoping decision - placement/investigation presets only
+    ever reassigned a FK to a still-real row that fails a *business*
+    rule). Keith's explicit call (AskUserQuestion, 2026-09-15) reversed
+    that: a new core injector, `inject_dangling_foreign_key` (draws a
+    well-formed-looking candidate ID against the referenced table's own
+    format/range and retries until it's guaranteed absent from a real
+    `existing_ids` set), is now wired into all 7 of Child Protection's
+    real FK columns (`cp_notifications.cp_client_id`/`assigned_worker_
+    id`, `cp_investigations.notification_id`/`cp_client_id`/`lead_
+    worker_id`, `cp_placements.cp_client_id`/`carer_id`). `existing_ids`
+    is built from `generate_cp_runs.py`'s `base_tables` (the real,
+    never-dirtied source) rather than each run's own possibly-already-
+    dirtied copy, so a dangling value is never accidentally still valid.
+    Confirmed for real: all 7 `dbt:relationships` tests and all 7 Soda
+    `values in ... must exist in ...` reference checks - previously 0/0
+    on every run, dirty or clean - now genuinely fail on the red run
+    across dbt, Soda, and datacontract-cli, while all 7 still pass 0/0 on
+    every clean run (`child_protection.py`'s own generation logic never
+    produces a dangling FK by construction, so this is a pure amber/red
+    phenomenon, same as every other preset in this module). Updated the
+    stale "these always pass" comments this reversal falsified, in both
+    `dbt_project/models/staging/schema.yml` and `contract/child-
+    protection-soda-checks.yml`.
+
+    A genuine, interesting side effect found while verifying real
+    output, not a bug: the *observed* dangling-FK failure count on
+    `cp_notifications.cp_client_id` (33) ran noticeably higher than the
+    directly-injected rate alone would suggest (~12) - `cp_clients`' own
+    new `cp_client_id` duplicate-value injector (`inject_duplicate_
+    values`) overwrites some rows' PK with a donor row's value, which can
+    incidentally make a real ID vanish entirely from that run's own
+    *materialized* `cp_clients` table (10 of 527 IDs, on the real red
+    run), so every notification still referencing that now-gone ID
+    becomes genuinely dangling too - a real, honest number reflecting
+    what the tools actually see when they query the real warehouse, not
+    a miscalibration. Doesn't affect pass/fail here (both relationships/
+    reference checks are single-tier - any violation fails regardless of
+    magnitude) - just documented in `apply_cp_notifications_presets`'
+    own `rate_dangling` comment so a future reader isn't confused by the
+    gap between the injection rate and the observed count.
+
+    **Verification**: full BDM pipeline (`./run_pipeline.sh`) and the
+    full CP pipeline (`generator.generate_cp_runs` +
+    `qa_tools.cp.orchestrate_cp` + `pipeline.build_cp_dashboard_data`)
+    regenerated end to end with no errors. Spot-checked every new check
+    category directly against `reports/results_bdm.json`/`results_cp.
+    json`: every previously-never-exercised check across all 4 tools
+    (dbt-core, Soda Core, datacontract-cli, Evidently where applicable)
+    now genuinely fires warn/fail on amber/red runs, while every clean
+    run (BDM and CP) remains 100% pass, 0 warn/fail - confirming the new
+    presets only ever fire when `severity` is set, same as every
+    pre-existing preset. `tests/test_dirty.py` extended with preset-level
+    "red is measurably worse than amber" assertions covering every new
+    column/check, plus dedicated `inject_dangling_foreign_key` tests
+    (guaranteed non-collision with `existing_ids`, the never-mutates-
+    input contract). 71 tests pass repo-wide; `uv run ruff check .`
+    clean.
 
 28. **[decided]** How the dashboard gets row-level detail (PKs and the
     values/rows behind a failing check) - the question items 19-23 built

@@ -180,13 +180,16 @@ checks for cp_notifications:
       samples limit: 5
 
   # --- 2 of the 7 real foreign-key relationships (the rest are on the ---
-  # other tables' blocks below). All pass on every run, dirty or clean, on
-  # this fixture - generator/dirty.py only ever touches cp_notifications'
-  # concern_type/notification_id columns, never the FK columns themselves.
-  # Kept as real checks anyway: the same genuine backstop against a
-  # dropped join or truncated parent-table extract that
-  # child-protection-contract.yaml's matching SQL rules explain in more
-  # depth.
+  # other tables' blocks below). Pass 0/0 on every CLEAN run always -
+  # child_protection.py's own generation logic never produces a dangling
+  # FK by construction. On amber/red runs, plans/qa-pipeline.md #27's
+  # dangling-FK pass (2026-09-15) means these can now genuinely fail too:
+  # generator/dirty.py's apply_cp_notifications_presets reassigns a
+  # fraction of cp_client_id/assigned_worker_id to an ID that doesn't
+  # exist in cp_clients/cp_case_workers at all - a real backstop against
+  # a dropped join or truncated parent-table extract, not just a check
+  # that child-protection-contract.yaml's matching SQL rules describe in
+  # theory but nothing ever exercises.
   - values in (cp_client_id) must exist in cp_clients (cp_client_id):
       samples limit: 5
   - values in (assigned_worker_id) must exist in cp_case_workers (worker_id):
