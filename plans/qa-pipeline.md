@@ -2218,6 +2218,73 @@ relative, not a schedule — this is weeks of work, not months.
     this batch added coverage for existing, working code rather than
     fixing a found defect.
 
+40. **[todo]** Schema-correctness checks: missing columns, unexpected
+    (extra) columns. Not yet investigated against what this project's
+    tools already do for free vs. what's a real gap - `datacontract
+    test`'s ODCS schema validation may already catch some of this (a
+    declared-but-absent column, at least), but that hasn't been confirmed
+    live the way this project confirms everything else, and dbt/Soda's
+    checks are all *named-column* checks (`not_null(date_of_birth)` etc.)
+    that simply wouldn't run at all if the column were missing, rather
+    than raising a "this column doesn't exist" error a viewer would
+    actually see - and an UNEXPECTED extra column (a source system
+    adding a field no contract/check knows about) has no check anywhere
+    in this project today, on either dataset. `dirty.py` also has no way
+    to simulate either scenario yet (drop a column / add a stray one) -
+    needed to demonstrate this failing for real, same as every other
+    check in this project.
+
+41. **[todo]** Data-type checks, particularly given this project's CSV
+    sources. Not yet investigated. The real, live-confirmed risk this
+    project already ran into once (`generator/dirty.py`'s own comment on
+    `inject_out_of_range_dates`, and `plans/qa-pipeline.md`'s note on it):
+    DuckDB's `read_csv_auto` infers a column's type PER FILE, not per
+    row, so a single unparseable value in a date/numeric column can
+    silently downgrade that WHOLE column's inferred type for that run
+    (to VARCHAR), which would corrupt every other check on that column
+    too, not just flag the one bad value - explicitly flagged as a real
+    follow-up when `_BAD_DATE_OF_BIRTH_POOL` was scoped to stay
+    genuinely out-of-range-but-still-parseable specifically to avoid
+    triggering it. Worth scoping: a dedicated type-inference check (does
+    this run's column actually come back as the expected DuckDB type,
+    not silently-downcast VARCHAR), and/or a `dirty.py` injector that
+    deliberately writes an unparseable value to demonstrate the failure
+    mode for real rather than just avoiding it.
+
+42. **[todo]** Clearer red/amber/green status indicator on a check's own
+    detail page in the dashboard. Builds on item 14's click-a-check
+    detail panel (`#check-panel` - current-vs-previous comparison, trend
+    chart, row-level detail): today a viewer has to read the compare
+    grid's numbers against the warn/fail thresholds themselves to work
+    out the check's actual status, rather than seeing one clear, iconic
+    red/amber/green indicator on the panel itself the way the outer
+    dashboard's summary cards and check-cards already have. Not yet
+    scoped - needs a look at `dashboard/qa-reporting-dashboard.html`'s
+    existing `checkStatus()`/traffic-light rendering to see what can be
+    reused directly on `#check-panel` vs. what's specific to the card/
+    grid contexts it's built for today.
+
+43. **[todo]** Visibility of what a check actually IS - its real SQL/
+    YAML definition - from within the dashboard/reporting tool itself,
+    not just a human-readable label. Today each `qa_tools/*/run_*.py`
+    script (e.g. `run_dbt_bdm.py`/`run_dbt_cp.py`'s own `_LABEL_BY_*`
+    dicts) writes a friendly `label` straight onto each check-result
+    record (`pipeline/dashboard_check_labels.py`'s `display_name()`
+    combines that with the engine/check name for the card title - see
+    its own module docstring), but there's no path from a check in the
+    dashboard back to the actual config that defines it: the dbt
+    `schema.yml` test block, the Soda `checks for` YAML, the ODCS
+    contract's `quality:` rule, or - for the `failed rows`/`type: sql`
+    checks specifically - the literal SQL condition being evaluated.
+    Not yet scoped: candidate approaches range from embedding each
+    check's source snippet into the results JSON at generation time
+    (`qa_tools/*/run_*.py` already knows which config produced each
+    result) to a simpler static mapping keyed by `check_name`/
+    `column_name`. Should account for one check often being defined
+    once per tool (dbt/Soda/contract each have their own copy, sometimes
+    worded differently - see this project's own "full-triplication"
+    passes) rather than assuming a single canonical source per check.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
