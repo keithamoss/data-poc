@@ -1879,6 +1879,28 @@ relative, not a schedule — this is weeks of work, not months.
     pytest` (32/32) and `uv run ruff check .` both clean; dashboard data
     and HTML re-embedded.
 
+36. **[todo]** Dig into Elementary's own data-tests documentation
+    (docs.elementary-data.com/data-tests/introduction) - Keith's call,
+    2026-09-15, after item 34 surfaced Elementary as the most popular
+    purpose-built dbt-native observability tool but only looked at its
+    *dashboard* layer (the `upload_run_results.sql` macro that reads
+    dbt's own, sometimes-buggy `RunResult.failures`). Not researched yet
+    - logged as a near-term item, not scoped. Real open question this
+    item is specifically about, distinct from item 34's own finding:
+    Elementary apparently also ships its *own* test suite (schema tests,
+    anomaly detection, freshness/volume checks - the "data tests" the
+    docs URL itself points at), separate from just visualizing dbt-
+    core's built-in ones. What role does that play relative to dbt-core's
+    4 native tests and the `dbt_utils`/`dbt-expectations` tests already
+    evaluated (items 32/34)? Is it a genuinely different capability
+    (anomaly detection dbt_utils doesn't have at all) or another
+    packaging of the same underlying idea? Does IT read the same
+    `RunResult.failures` field for its own tests' results, or something
+    more reliable? Whether `docs.elementary-data.com` is reachable from
+    this environment hasn't been checked either (`docs.getdbt.com` is
+    blocked by this session's own egress proxy - worth confirming this
+    one separately, not assuming the same).
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
