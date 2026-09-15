@@ -1543,8 +1543,7 @@ relative, not a schedule — this is weeks of work, not months.
     newly-added checks pass on every run today, correctly, for lack of a
     reason to fail rather than for lack of being real.
 
-31. **[open, not yet fixed - out of scope for item 30, flagged when
-    found]** A real, independent bug found while verifying item 30's
+31. **[fixed 2026-09-15]** A real, independent bug found while verifying item 30's
     regenerated pipeline output (2026-09-15): a resupply attempt that
     *resolves* (stops being red) is not actually regenerated clean.
     `generator/resupply.py`'s `run_delivery_chain` (lines ~118-126):
@@ -1571,34 +1570,73 @@ relative, not a schedule — this is weeks of work, not months.
     checks (place_of_birth_facility's null-rate check already existed
     before this session, so this bug's *effect* was already partly
     visible, just less systematically checked-for) that it became
-    obvious while verifying clean runs stayed clean. Logged only, fix
-    deferred - out of scope for item 30's own task, and the right fix
-    isn't obvious without a design call (regenerate a genuinely fresh
-    clean draw via `provider.generate()` again on resolution, vs. some
-    form of "reverse the dirty injection" pass on the existing
-    dataframe - `dirty.py` has no undo mechanism today, only additive
-    injectors).
+    obvious while verifying clean runs stayed clean.
 
-    **Parked (2026-09-15, Keith's call): a real test battery for
-    `generator/resupply.py`.** Not scoped or built - just recorded as a
-    near-future idea, the same status as items 22/23/25 above. The kind
-    of bug this item found (a "resolved" attempt silently keeping a
-    prior attempt's injected defects) is exactly what a test asserting
-    "a `severity: None` attempt's dataframe has none of the defect
-    signatures `dirty()` injects" would have caught immediately, rather
-    than needing a full pipeline regeneration plus manual CSV inspection
-    to surface. `run_delivery_chain`'s own logic (churn-forward-from-
-    the-previous-attempt, a red/still-red coin flip per attempt, real
-    business-day arrival-date arithmetic) has several more of these
-    "looks right, only verifiable by tracing actual output" properties
-    that unit tests would cover more cheaply than another full-pipeline
-    read-the-CSVs pass. Scoping questions for when this gets picked up:
-    whether it's several focused tests (one per property - defect-
-    freedom on resolution, chain termination at MAX_ATTEMPTS, business-
-    day-only arrival dates) or one longer property-style test; and
-    whether it should also cover `generate_runs.py`'s manifest-writing
-    side (delivery_id/supersedes_run_id consistency across a chain), not
-    just `resupply.py`'s own dataframe logic.
+    **Fix (2026-09-15, Keith's call via AskUserQuestion):** track a
+    separate `clean_df` lineage in `run_delivery_chain`, churned forward
+    every attempt via `provider.churn()` and never passed through
+    `provider.dirty()` directly. Each attempt's own yielded `df` is now
+    either a fresh `dirty(clean_df, ...)` call (when that attempt rolls
+    red) or `clean_df` itself (when it resolves) - never a previous
+    attempt's already-dirtied dataframe. This was the recommended option
+    over "regenerate a genuinely fresh clean draw via `provider.
+    generate()` again on resolution" specifically because it preserves
+    `plans/wider.md` action 12's own design intent ("largely the same
+    rows... not a fresh random draw") while still fixing the defect-
+    carryover bug - churn() still evolves the same underlying rows
+    attempt to attempt, it just never inherits another attempt's
+    injected defects. Confirmed directly against real regenerated data:
+    `run_06_2026-09-11_resupply2`'s `place_of_birth_facility` null rate
+    went from 0.781 to 0.028 and its `sex` values from `{'M': 585, 'F':
+    573, 'U': 28, '9': 25, 'X': 21, 'O': 20}` to `{'M': 915, 'F': 891,
+    'X': 31}` (only valid codes); `run_09_2026-09-14_resupply3` similarly
+    went from 0.889 to 0.029. Documented side effect, not a regression:
+    resolved-attempt row counts are now noticeably larger (e.g.
+    resupply2: 1252 -> 1837 rows) since `dirty()`'s row-count-truncation
+    logic no longer compounds across attempts - each attempt's
+    truncation is now computed fresh against the clean lineage instead
+    of against an already-truncated dataframe.
+
+    Alongside the fix, `generator/generate_runs.py`'s `main()` was
+    refactored to extract `_manifest_entries_for_delivery` - pure,
+    file-I/O-free manifest-entry construction (run_id derivation,
+    `supersedes_run_id` chaining across a delivery's attempts) - so that
+    logic is independently unit-testable without needing a real provider
+    or CSV writes. Verified behaviour-preserving via byte-for-byte diff
+    of `manifest.json` and md5 hashes of every CSV across two
+    regenerations before/after the refactor.
+
+    **Test battery built** (`tests/test_resupply.py`, scoped via
+    AskUserQuestion, several focused tests per Keith's choice over one
+    property-style test): a `MarkingStubProvider` whose `dirty()` sets a
+    persistent, churn()-surviving marker column (the existing
+    `StubProvider.dirty()` is a no-op and can't support this) backs
+    `test_resolved_attempt_carries_no_dirty_marker` - the direct
+    regression test for this bug, forcing `STILL_RED_PROB` to 0 via
+    monkeypatch for a deterministic 2-attempt `[red, resolved]` chain and
+    asserting the resolved attempt's dataframe carries no marker.
+    Confirmed this test actually catches the bug, not just documents the
+    fix: temporarily stashed just `generator/resupply.py` back to its
+    pre-fix committed version (`git stash push -- generator/resupply.py`),
+    re-ran the suite, and got the expected failure (`assert not True`,
+    the resolved attempt still carrying `dirtied=True` from the prior red
+    attempt) before restoring the fix and re-confirming all tests pass.
+    Also added: `test_always_red_chain_terminates_at_max_attempts`
+    (`STILL_RED_PROB` forced to 1 for a precise MAX_ATTEMPTS-length
+    assertion, tightening the existing loose `1 <= len <= 8` bound),
+    `test_same_seed_produces_identical_chain` (reproducibility, via
+    `pd.testing.assert_frame_equal`), and two tests for
+    `_manifest_entries_for_delivery` covering delivery_id/date constancy
+    across a chain and `supersedes_run_id`/`run_id`/`run_index` chaining
+    - covering both `resupply.py` and `generate_runs.py`'s manifest
+    assembly, per Keith's explicit choice over the "resupply.py only"
+    recommendation. 9 new/existing tests in the file, 37 total in the
+    suite, all passing; `uv run ruff check .` clean. Full pipeline
+    (`./run_pipeline.sh`) regenerated end to end with no errors after the
+    fix, and the same facility-null-rate/sex-value check re-run directly
+    against the fresh output to confirm the fix holds outside the
+    isolated `generator.generate_runs` regeneration used during
+    diagnosis.
 
 32. **[done]** Switched 4 of this project's 8 hand-authored dbt checks
     (found while researching item 29's own "17% SQL escape hatch"

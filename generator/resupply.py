@@ -95,10 +95,28 @@ def run_delivery_chain(provider: DatasetProvider, delivery_date: date, seed: int
     attempt in order. Stops as soon as an attempt isn't red, or after
     MAX_ATTEMPTS. The caller owns everything about *identity* (run_id,
     delivery_id, supersedes_run_id, manifest/file writing) - this only
-    knows attempt numbers and dates."""
-    df = provider.generate(delivery_date, seed, n_rows, id_offset)
-    if first_severity:
-        df = provider.dirty(df, first_severity, seed + 500, previous_row_count)
+    knows attempt numbers and dates.
+
+    Tracks two lineages, not one (real bug found and fixed 2026-09-15 -
+    see plans/qa-pipeline.md #31): `clean_df` is churned forward every
+    attempt and NEVER has dirty() applied to it directly; each attempt's
+    own yielded `df` is a fresh `dirty(clean_df, ...)` call when that
+    attempt rolls red, or `clean_df` itself when it resolves. Previously
+    `df` was reused and mutated in place across the whole loop, so a
+    resolved attempt silently inherited whatever dirty() had already
+    baked into a prior red attempt, and a still-red attempt accumulated
+    dirt on top of dirt rather than getting one fresh roll at that
+    severity - confirmed via real output (two "clean" resupply attempts
+    with ~78-89% facility nulls and invalid sex codes, matching RED-
+    severity injection, not a clean run). Keeping `clean_df` separate
+    fixes both: a resolved attempt is genuinely clean, and every red
+    attempt (first or Nth in a row) gets one fresh dirty() roll against
+    the current (churned-forward, never-dirtied) lineage - still not "a
+    fresh random draw" (churn() still evolves the same underlying rows
+    attempt to attempt, per plans/wider.md #12's own design intent), just
+    never carrying forward another attempt's injected defects."""
+    clean_df = provider.generate(delivery_date, seed, n_rows, id_offset)
+    df = provider.dirty(clean_df, first_severity, seed + 500, previous_row_count) if first_severity else clean_df
 
     attempt_number = 1
     arrived_date = delivery_date
@@ -117,10 +135,11 @@ def run_delivery_chain(provider: DatasetProvider, delivery_date: date, seed: int
         arrived_date = _add_business_days(arrived_date, delay_days)
         attempt_number += 1
 
-        df = provider.churn(df, seed + 800 + attempt_number, delivery_date,
-                             id_offset + 50_000 + attempt_number * 100)
+        clean_df = provider.churn(clean_df, seed + 800 + attempt_number, delivery_date,
+                                   id_offset + 50_000 + attempt_number * 100)
         if resupply_rng.random() < STILL_RED_PROB:
-            df = provider.dirty(df, "red", seed + 900 + attempt_number, previous_row_count)
+            df = provider.dirty(clean_df, "red", seed + 900 + attempt_number, previous_row_count)
             severity = "red"
         else:
+            df = clean_df
             severity = None

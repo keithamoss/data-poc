@@ -149,6 +149,42 @@ class BirthRegistrationsProvider:
         return out
 
 
+def _manifest_entries_for_delivery(attempts: list, i: int, delivery_id: str, delivery_date: date,
+                                    run_index_start: int, id_offset: int, seed: int) -> list[dict]:
+    """Pure manifest-entry construction for one delivery's full attempt
+    chain (run_id derivation, supersedes_run_id chaining across attempts)
+    - no file I/O, so this is independently testable
+    (tests/test_resupply.py) without needing main()'s own CSV writes or
+    a real provider. main() calls this directly and only adds the
+    file-writing side effect on top, so the two can't drift apart.
+    `run_index_start` is the manifest's own running length *before* this
+    delivery's entries (i.e. `len(manifest)`) - entries are 1-indexed
+    from there, matching the original inline `len(manifest) + 1`."""
+    entries = []
+    previous_run_id = None
+    for attempt in attempts:
+        suffix = "" if attempt.attempt_number == 1 else f"_resupply{attempt.attempt_number - 1}"
+        run_id = f"run_{i:02d}_{delivery_date.isoformat()}{suffix}"
+        entries.append({
+            "run_id": run_id,
+            "run_index": run_index_start + len(entries) + 1,
+            "delivery_id": delivery_id,
+            "delivery_date": delivery_date.isoformat(),
+            "attempt_number": attempt.attempt_number,
+            "arrived_date": attempt.arrived_date.isoformat(),
+            "run_date": attempt.arrived_date.isoformat(),  # the date this attempt's file was actually received
+            "is_resupply": attempt.is_resupply,
+            "supersedes_run_id": previous_run_id,
+            "n_rows_generated": int(len(attempt.df)),
+            "dirty_severity": attempt.severity,  # None | "amber" | "red" - this ATTEMPT's own outcome
+            "id_offset": id_offset,
+            "seed": seed,
+            "file": f"{run_id}.csv",
+        })
+        previous_run_id = run_id
+    return entries
+
+
 def main() -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
     provider: DatasetProvider = BirthRegistrationsProvider()
@@ -165,43 +201,24 @@ def main() -> None:
         seed = 1000 + i
         id_offset = i * ID_BLOCK
 
-        previous_run_id = None
-        final_row_count = n_rows
-        for attempt in run_delivery_chain(provider, delivery_date, seed, id_offset,
-                                           n_rows, severity, previous_row_count):
-            suffix = "" if attempt.attempt_number == 1 else f"_resupply{attempt.attempt_number - 1}"
-            run_id = f"run_{i:02d}_{delivery_date.isoformat()}{suffix}"
-            out_path = os.path.join(OUT_DIR, f"{run_id}.csv")
-            attempt.df.to_csv(out_path, index=False)
+        attempts = list(run_delivery_chain(provider, delivery_date, seed, id_offset,
+                                            n_rows, severity, previous_row_count))
+        entries = _manifest_entries_for_delivery(attempts, i, delivery_id, delivery_date,
+                                                  len(manifest), id_offset, seed)
 
-            manifest.append({
-                "run_id": run_id,
-                "run_index": len(manifest) + 1,
-                "delivery_id": delivery_id,
-                "delivery_date": delivery_date.isoformat(),
-                "attempt_number": attempt.attempt_number,
-                "arrived_date": attempt.arrived_date.isoformat(),
-                "run_date": attempt.arrived_date.isoformat(),  # the date this attempt's file was actually received
-                "is_resupply": attempt.is_resupply,
-                "supersedes_run_id": previous_run_id,
-                "n_rows_generated": int(len(attempt.df)),
-                "dirty_severity": attempt.severity,  # None | "amber" | "red" - this ATTEMPT's own outcome
-                "id_offset": id_offset,
-                "seed": seed,
-                "file": os.path.basename(out_path),
-            })
+        for attempt, entry in zip(attempts, entries):
+            out_path = os.path.join(OUT_DIR, entry["file"])
+            attempt.df.to_csv(out_path, index=False)
             tag = f"DIRTY({attempt.severity})" if attempt.severity else "clean"
             resupply_tag = (f"  [resupply attempt {attempt.attempt_number - 1}, "
                              f"arrived {attempt.arrived_date.isoformat()}]") if attempt.attempt_number > 1 else ""
-            print(f"{run_id}: {len(attempt.df):5d} rows  [{tag}]{resupply_tag}  -> {out_path}")
+            print(f"{entry['run_id']}: {len(attempt.df):5d} rows  [{tag}]{resupply_tag}  -> {out_path}")
             if attempt.severity == "red" and attempt.attempt_number >= MAX_ATTEMPTS:
                 print(f"  -> still red after {attempt.attempt_number} attempts - "
                       f"giving up (hit MAX_ATTEMPTS={MAX_ATTEMPTS})")
 
-            previous_run_id = run_id
-            final_row_count = len(attempt.df)
-
-        previous_row_count = final_row_count  # this delivery's final (resolved-or-abandoned) row count
+        manifest.extend(entries)
+        previous_row_count = len(attempts[-1].df)  # this delivery's final (resolved-or-abandoned) row count
 
     manifest_path = os.path.join(OUT_DIR, "manifest.json")
     with open(manifest_path, "w") as f:
