@@ -17,41 +17,41 @@ qa_tools/common/dbt_common.py; everything below is genuinely
 dataset-specific (which tests exist, what they mean, a real dbt-duckdb
 reliability workaround this dataset needed) - see plans/wider.md #20.
 
-A REAL, confirmed dbt-duckdb reliability problem, not assumed: for the two
-custom-configured tests (sex, place_of_birth_facility), dbt's own reported
-"failures" value was repeatedly and reproducibly wrong on certain runs -
-0 instead of the true row count - while the IDENTICAL compiled SQL,
-executed directly via DuckDB's own Python API against the same file,
-always gave the right answer. This was chased at length (see schema.yml's
-comments and README.md's known-disagreements section): it survived
-removing every layer of arithmetic from fail_calc (rounding, casting,
-percentage division, even plain count(*) with no override at all),
-`--no-partial-parse`, `--store-failures`, and switching COUNT for SUM -
-none of it was the cause, and it reproduces on some runs (the clean ones)
-but not others (amber/red) with no SQL-level explanation found. Rather
-than silently trust a demonstrably-unreliable number from a review tool,
-these two checks' metric_value/row_count_invalid/status are independently
-recomputed here via a direct query against the same warehouse dbt just
-tested - dbt-core still genuinely ran the real check (that's what
-`status`/`failures` get compared against, when they can be trusted, and
-what "engine" attributes this result to) - only the two known-unreliable
-numbers are cross-checked rather than passed through blindly.
+A REAL, confirmed dbt-core reliability problem, not assumed - and, as of
+2026-09-15, actually root-caused (see plans/qa-pipeline.md #34 for the
+full account, this is the short version): `dbt/task/test.py`'s
+`build_test_run_result()` in this project's installed dbt-core (1.12.4)
+hardcodes `failures = 0` as its default and only ever overwrites it when
+a test's final status lands on Fail or Warn - a test whose real failure
+count is nonzero but under every configured threshold (a genuine "Pass")
+always reports `failures=0`, discarding the true count. A real, filed
+dbt-core bug (dbt-labs/dbt-core#11312, tagged `type:bug`, fix unmerged as
+of our installed version), first found here on `sex`/
+`place_of_birth_facility` reporting 0 on certain runs while the identical
+compiled SQL, run directly via DuckDB's own Python API, always gave the
+right answer.
 
-A third, newer instance of the same class of problem, found on the
-project's own recent_births_present singular test (no config, no
-fail_calc arithmetic at all - the simplest possible test shape): it
-reported "fail" for run_10 in a full 10-run orchestrate_bdm.py pass,
-while re-running that exact test in isolation seconds later, against the
-same warehouse file, correctly returned "pass" - and stayed correct on
-every subsequent re-run. No SQL-level or config-level explanation found
-(unlike the other two, this test had no arithmetic to remove), which
-pointed at dbt-duckdb itself rather than anything in this project's own
-SQL - feeds into the same open upstream-repro follow-up as the other two
-(plans/qa-pipeline.md #1). That specific test was retired 2026-09-15 (the
-dbt_utils switch - see plans/qa-pipeline.md), replaced by dbt_utils.
-recency; _VERIFY_COUNT_SQL's own comment explains why the workaround
-wasn't carried forward onto its replacement automatically rather than
-re-verified.
+A second, separate, still-NOT-root-caused phenomenon was also found live
+in this project (originally on the retired recent_births_present
+singular test, since reproduced on the Child Protection side - see
+plans/qa-pipeline.md #34): a test's reported status/failures flipping
+between correct and wrong across separate `dbt build` invocations of the
+*identical* warehouse file, with no code change in between - genuine
+nondeterminism, not explained by the accounting bug above (that bug is
+deterministic given the same config/data; this one isn't). Points at
+something in dbt-duckdb's query execution path itself, not dbt-core's
+result-reporting logic - still an open question, feeds the same
+upstream-repro follow-up as before (plans/qa-pipeline.md #1).
+
+_AUDIT_AGGREGATE_SQL (see its own comment) protects against both at once
+for every test of a covered shape, not just the specific checks caught
+exhibiting either one: it re-derives the true count from each test's own
+`--store-failures` audit table (`relation_name`) rather than trusting
+`run_results.json`'s own `failures`/`status` fields - dbt-core still
+genuinely ran the real check (that's what "engine" attributes this result
+to, and what a *mismatch* would mean if this verification query itself
+had a bug); this only stops trusting the specific summary fields known to
+be unreliable.
 
 Also captures up to 5 example failing rows' registration_numbers per
 check (via dbt's --store-failures audit tables, see dbt_common.py) -
@@ -79,23 +79,45 @@ AGENCY_ID = "registry-services"
 COLLECTION_ID = "civil-registration"
 DATASET_ID = "birth-registrations"
 
-# column/test combos where dbt's own "failures" value was observed to be
-# unreliable (see module docstring) - mapped to the exact SQL used to
-# independently recompute the true failing-row count.
-_VERIFY_COUNT_SQL = {
-    ("sex", "accepted_values"): "SELECT COUNT(*) FROM stg_birth_registrations WHERE sex NOT IN ('M','F','X')",
-    ("place_of_birth_facility", "not_null"): "SELECT COUNT(*) FROM stg_birth_registrations WHERE place_of_birth_facility IS NULL",
-    # 2026-09-15: the previous third entry here (("date_of_birth",
-    # "recent_births_present")) is retired along with that singular test
-    # itself, replaced by dbt_utils.recency (see schema.yml, the
-    # dbt_utils switch - plans/qa-pipeline.md). Not carried forward
-    # automatically: the dbt-duckdb reliability bug this dict works
-    # around was only ever confirmed live for that specific test's exact
-    # compiled SQL, not assumed to apply to every "simple aggregate, no
-    # arithmetic" test shape in general. If the same live symptom
-    # reappears for recency (dbt reports a status direct re-verification
-    # contradicts), add it back here then, verified again rather than
-    # guessed.
+# Test shapes whose --store-failures audit table can replace
+# run_results.json's own (sometimes wrong) `failures` field - see
+# plans/qa-pipeline.md #34 for the full account: a confirmed dbt-core bug
+# (failures hardcoded to 0 whenever a test's final status lands on "Pass",
+# dbt-labs/dbt-core#11312, unmerged in this project's installed 1.12.4),
+# plus a separate, still-unexplained nondeterminism (a flaky CP unique
+# test, same item) this incidentally also protects against - both
+# manifest the same way: a reported count/status that doesn't match what
+# the audit table actually holds.
+#
+# 2026-09-15: replaces the previous _VERIFY_COUNT_SQL, which hand-
+# maintained a direct copy of each affected check's own SQL condition
+# against the source model (e.g. "...WHERE sex NOT IN ('M','F','X')") -
+# exactly the "duplicate the check's own pass/fail logic" pattern Keith's
+# redline (item 28) rules out, and the same drift risk item 26's bug
+# already demonstrated once for a hand-maintained copy of a check's
+# condition. Querying the audit table instead needs no knowledge of what
+# the check's condition actually is - it counts whatever dbt itself
+# already decided was a failing row, via the exact same relation_name
+# failing_sample_keys_direct/_via_values already read reliably all
+# session. Applied to every instance of these test types (not a curated
+# list of specific checks that happened to get caught) - the whole point
+# is this stops depending on someone having already noticed a given check
+# misbehave.
+#
+# Two test shapes are deliberately excluded: `recency` (dbt_utils' own
+# macro stores a one-row-per-group most_recent/threshold summary, not
+# failing rows - COUNT(*) on it is meaningless), and `accepted_values`/
+# `unique` need SUM(n_records) instead of COUNT(*), since their own
+# main_sql pre-aggregates to (value, count) pairs - see schema.yml's own
+# comment on this distinction.
+_AUDIT_AGGREGATE_SQL = {
+    "not_null": "SELECT COUNT(*) FROM {relation}",
+    "matches_regex": "SELECT COUNT(*) FROM {relation}",
+    "accepted_range": "SELECT COUNT(*) FROM {relation}",
+    "expression_is_true": "SELECT COUNT(*) FROM {relation}",
+    "multiple_birth_sibling": "SELECT COUNT(*) FROM {relation}",
+    "accepted_values": "SELECT COALESCE(SUM(n_records), 0) FROM {relation}",
+    "unique": "SELECT COALESCE(SUM(n_records), 0) FROM {relation}",
 }
 
 # multiple_birth_sibling has no attached column of its own (a singular
@@ -253,18 +275,19 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
         warn_t = parse_threshold(config.get("warn_if"))
         fail_t = parse_threshold(config.get("error_if"))
 
-        key = (column, test_name)
-        if key in _VERIFY_COUNT_SQL and status != "error":
-            verified_count = conn.execute(_VERIFY_COUNT_SQL[key]).fetchone()[0]
+        relation_name = node.get("relation_name")
+        if test_name in _AUDIT_AGGREGATE_SQL and relation_name and status != "error":
+            sql = _AUDIT_AGGREGATE_SQL[test_name].format(relation=relation_name)
+            verified_count = conn.execute(sql).fetchone()[0]
             failures = verified_count
             if warn_t is not None or fail_t is not None:
                 status = _status_for(verified_count, warn_t, fail_t)
             else:
-                # a hard pass/fail singular test (no warn_if/error_if
-                # config, so no threshold to compare against) - _status_for
-                # would silently read as "always pass" with both
-                # thresholds None; any nonzero verified count means the
-                # test genuinely failed instead.
+                # a hard pass/fail test (no warn_if/error_if config, so no
+                # threshold to compare against) - _status_for would
+                # silently read as "always pass" with both thresholds
+                # None; any nonzero verified count means the test
+                # genuinely failed instead.
                 status = "fail" if verified_count > 0 else "pass"
 
         failing_sample_keys = _failing_sample_keys(conn, test_name, column, node, status)

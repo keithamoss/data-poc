@@ -24,21 +24,27 @@ depends on), and from cp_common.BUSINESS_RULE_HOME_TABLE for the 3
 singular tests (which have no attached_node at all - they're not
 column/model-scoped).
 
-_VERIFY_COUNT_SQL (added 2026-09-15) cross-checks specific (table,
-column, test) combos against a direct query rather than trusting dbt's
-own reported "failures" blindly - the same real, confirmed dbt-duckdb
-reliability problem run_dbt_bdm.py's own module docstring documents at
-length (a compiled test's reported failure count is sometimes wrong,
-with no SQL-level explanation, and no fixed pattern for which runs it
-hits), first observed on the CP side here: dbt_utils.accepted_range on
-cp_clients.date_of_birth (right after adding a warn_if/error_if config -
-see schema.yml's own comment on it), and notification_id's pre-existing
-`unique` test (caught live reporting 0 on one orchestrate_cp.py pass,
-then correctly on the very next re-run of the identical warehouse files -
-genuine nondeterminism, not something this session's changes caused).
-Only these two combos are cross-checked, not every config'd test - the
-same policy run_dbt_bdm.py already established (verify what's actually
-been observed failing, not everything that plausibly could).
+_AUDIT_AGGREGATE_SQL (see its own comment, and run_dbt_bdm.py's matching
+one) cross-checks every test of a covered shape against its own
+--store-failures audit table rather than trusting dbt's own reported
+"failures"/status blindly. Two real problems motivate this, both found
+live on the CP side while adding dbt_utils.accepted_range on
+cp_clients.date_of_birth 2026-09-15: a confirmed, root-caused dbt-core
+bug (failures hardcoded to 0 whenever a test's status lands on "Pass" -
+dbt-labs/dbt-core#11312, unmerged in our installed 1.12.4 - see
+plans/qa-pipeline.md #34 for the full account) caught on accepted_range
+itself (0 reported for cp_run_04/07, true count 7/5), and a second,
+separate, still-unexplained nondeterminism caught investigating that -
+notification_id's pre-existing `unique` test (unrelated to this
+session's changes) reporting 0 once, live, then correctly on the very
+next re-run of the identical warehouse files, no code changed in
+between. 2026-09-15: replaced the original narrow, per-check
+_VERIFY_COUNT_SQL (which hand-duplicated each affected check's own SQL
+condition against the source model) with this - a check-agnostic
+mechanism applied to every instance of a covered test shape, not just
+the two specific checks that happened to get caught. See run_dbt_bdm.py's
+own comment on _AUDIT_AGGREGATE_SQL for why (Keith's redline against
+duplicating a check's own pass/fail logic, item 28).
 """
 from __future__ import annotations
 import json
@@ -60,33 +66,38 @@ CP_DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
 CP_MODELS = [f"stg_{t}" for t in cp_common.TABLES]
 CP_SINGULAR_TESTS = list(cp_common.BUSINESS_RULE_HOME_TABLE.keys())
 
-# (table, column, test_name) combos where dbt's own "failures" value has
-# been directly observed to be unreliable - the same dbt-duckdb reliability
-# problem run_dbt_bdm.py's own _VERIFY_COUNT_SQL documents at length (see
-# that module's docstring), not previously seen on the CP side until
-# 2026-09-15's dbt_utils switch happened to surface two live instances:
-# - (cp_clients, date_of_birth, accepted_range): reported 0 failures for
-#   cp_run_04/cp_run_07 (true count 7/5, confirmed via direct query and
-#   against Soda's own matching check, which agreed with the direct
-#   count) the run immediately after adding a warn_if/error_if config to
-#   the new dbt_utils.accepted_range test - the same class of arithmetic-
-#   triggers-it pattern already documented for sex/place_of_birth_
-#   facility in run_dbt_bdm.py.
-# - (cp_notifications, notification_id, unique): a PRE-EXISTING test
-#   (unrelated to this session's changes, config'd since before this
-#   session), caught reporting 0 failures (true count 4/5/20 across cp_
-#   run_04/07/10) once, live, while investigating the accepted_range
-#   instance above - then reported CORRECTLY on the very next re-run of
-#   the exact same warehouse files, no code changed in between. Genuine
-#   nondeterminism, not a one-off: matches run_dbt_bdm.py's own
-#   recent_births_present finding (wrong on one full pass, correct on
-#   every re-run since) almost exactly. Verified here going forward
-#   rather than assumed fixed by the flip back to correct.
-_VERIFY_COUNT_SQL = {
-    ("cp_clients", "date_of_birth", "accepted_range"):
-        "SELECT COUNT(*) FROM stg_cp_clients WHERE date_of_birth < DATE '1900-01-01'",
-    ("cp_notifications", "notification_id", "unique"):
-        "SELECT COUNT(*) - COUNT(DISTINCT notification_id) FROM stg_cp_notifications",
+# Test shapes whose --store-failures audit table row count can replace
+# run_results.json's own (sometimes wrong) `failures` field - see this
+# module's own docstring and plans/qa-pipeline.md #34 for the full
+# account, and run_dbt_bdm.py's matching dict for why this counts the
+# audit table instead of re-deriving each check's own condition (Keith's
+# redline, item 28). Applied to every instance of these test types,
+# CP's 3 cross-table business-rule singular tests included (escalation_
+# completeness/closed_case_investigation_hygiene/placement_carer_
+# approval) - none of these three have ever been directly caught
+# exhibiting either bug, but none are currently configured with a
+# warn_if/error_if either (so the confirmed accounting bug can't fire on
+# them structurally - it only fires when a test's status can land on
+# "Pass" despite a nonzero count), while the second, still-unexplained
+# nondeterminism has no known trigger condition to rule any test out by.
+# The fix is free (dbt already materializes these audit tables via
+# --store-failures) - no reason to wait for a specific instance to get
+# caught the way the CP-side discovery of this happened by chance.
+#
+# accepted_range/not_null (row-shaped, full row kept) get COUNT(*);
+# accepted_values/unique (value-aggregated, per schema.yml's own comment
+# on this) get SUM(n_records). relationships is deliberately excluded -
+# a separate, already-documented gap (_failing_sample_keys's own
+# docstring): its audit table only carries the offending FK value, not a
+# row count in the same shape as everything else here.
+_AUDIT_AGGREGATE_SQL = {
+    "not_null": "SELECT COUNT(*) FROM {relation}",
+    "accepted_range": "SELECT COUNT(*) FROM {relation}",
+    "escalation_completeness": "SELECT COUNT(*) FROM {relation}",
+    "closed_case_investigation_hygiene": "SELECT COUNT(*) FROM {relation}",
+    "placement_carer_approval": "SELECT COUNT(*) FROM {relation}",
+    "accepted_values": "SELECT COALESCE(SUM(n_records), 0) FROM {relation}",
+    "unique": "SELECT COALESCE(SUM(n_records), 0) FROM {relation}",
 }
 
 _DIMENSION_BY_TEST = {
@@ -233,11 +244,21 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
         warn_t = parse_threshold(config.get("warn_if"))
         fail_t = parse_threshold(config.get("error_if"))
 
-        verify_key = (table, column, test_name)
-        if verify_key in _VERIFY_COUNT_SQL and status != "error":
-            verified_count = conn.execute(_VERIFY_COUNT_SQL[verify_key]).fetchone()[0]
+        relation_name = node.get("relation_name")
+        if test_name in _AUDIT_AGGREGATE_SQL and relation_name and status != "error":
+            sql = _AUDIT_AGGREGATE_SQL[test_name].format(relation=relation_name)
+            verified_count = conn.execute(sql).fetchone()[0]
             failures = verified_count
-            status = _status_for(verified_count, warn_t, fail_t)
+            if warn_t is not None or fail_t is not None:
+                status = _status_for(verified_count, warn_t, fail_t)
+            else:
+                # the 3 business-rule singular tests have no warn_if/
+                # error_if config, so no threshold to compare against -
+                # _status_for would silently read as "always pass" with
+                # both thresholds None; any nonzero verified count means
+                # the test genuinely failed instead (same fix
+                # run_dbt_bdm.py's own mechanism already needed).
+                status = "fail" if verified_count > 0 else "pass"
 
         failing_sample_keys = _failing_sample_keys(conn, test_name, column, table, node, status)
 

@@ -1827,16 +1827,57 @@ relative, not a schedule — this is weeks of work, not months.
     one) already demonstrated once. It's worked so far only because
     these specific conditions are simple and haven't changed since - the
     same risk profile as any other duplicated-logic case this project
-    has already flagged. **Not yet fixed** - the principled fix, matching
-    both the community's own workaround and the redline, is to make
-    `_VERIFY_COUNT_SQL` query each affected check's own `relation_name`
-    (already available on every test node) and aggregate it correctly
-    per test shape (`COUNT(*)` for row-shaped audit tables like
-    `not_null`/`accepted_range`; `COALESCE(SUM(n_records), 0)` for
-    value-aggregated ones like `accepted_values`/`unique` - this
-    project's own `schema.yml` comments already document that exact
-    distinction) instead of re-deriving the condition. A real near-term
-    follow-up, not scoped/built yet.
+    has already flagged. **Fixed same day - see item 35.**
+
+35. **[done]** Fixed item 34's own redline tension: replaced both
+    `run_dbt_bdm.py`/`run_dbt_cp.py`'s narrow, per-check `_VERIFY_
+    COUNT_SQL` dicts with a single `_AUDIT_AGGREGATE_SQL` dict, keyed by
+    test *type* rather than specific (column, test) combos hand-picked
+    after being caught misbehaving. Queries each test's own `relation_
+    name` (the `--store-failures` audit table dbt already materializes,
+    the exact same one `failing_sample_keys_direct`/`_via_values` were
+    already reading reliably all session) instead of re-deriving the
+    check's own condition - `COUNT(*)` for row-shaped audit tables
+    (`not_null`, `matches_regex`, `accepted_range`, `expression_is_true`,
+    and every singular business-rule test - `multiple_birth_sibling` on
+    the BDM side, `escalation_completeness`/`closed_case_investigation_
+    hygiene`/`placement_carer_approval` on CP's), `COALESCE(SUM(
+    n_records), 0)` for value-aggregated ones (`accepted_values`,
+    `unique`). `recency` and `relationships` stay excluded - neither
+    has a row-count-shaped audit table (see items 29/34's own notes on
+    why).
+
+    **Deliberately applied to every instance of a covered test type, not
+    a curated list** - the whole motivation was that the CP-side bugs
+    only got caught by chance (notification_id's `unique` test had no
+    history of misbehaving before the one pass that caught it live); a
+    hand-picked list only ever protects checks someone already happened
+    to notice. The fix is free - dbt already builds these audit tables
+    via `--store-failures`, this only adds one lightweight query per
+    covered test result, reading data that already exists. This also
+    means the 3 CP business-rule singular tests (previously unprotected,
+    since the old narrow dict never covered them) and BDM's `multiple_
+    birth_sibling` are now covered too, despite none of them having ever
+    been directly caught exhibiting either bug - they're structurally
+    immune to the *confirmed* accounting bug (no `warn_if`/`error_if`
+    config, so status can never land on "Pass" with a nonzero count) but
+    not to the second, still-unexplained nondeterminism, which has no
+    known trigger condition to rule any test out by.
+
+    **Verification**: both files lint clean; `./run_pipeline.sh` +
+    `orchestrate_bdm.py`/`orchestrate_cp.py` each re-run 3x, identical
+    results every time (988/20/206 BDM, 1710/10/50 CP - same as every
+    prior baseline this session); a broader cross-check than item 34's
+    own 2-check spot-check - every dbt result compared against
+    datacontract-cli's matching count-unit metric across both datasets
+    (795 comparable pairs total) - found zero real mismatches; the only
+    apparent ones (`unique`'s duplicate-rate counts, consistently ~2x
+    datacontract-cli's) are a pre-existing, already-understood semantic
+    difference (dbt's `SUM(n_records)` counts every row in a duplicate
+    group; datacontract-cli's `duplicateValues` counts only the excess
+    rows) - not a bug, and not something this fix touched. `uv run
+    pytest` (32/32) and `uv run ruff check .` both clean; dashboard data
+    and HTML re-embedded.
 
 ## Held over from the original (equivalent-only) build
 
