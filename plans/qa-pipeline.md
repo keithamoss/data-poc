@@ -2325,6 +2325,32 @@ relative, not a schedule — this is weeks of work, not months.
     against the specific closed-value-set columns worth watching this
     way) before the existing injector is worth wiring into a preset.
 
+45. **[todo, next up after item 42]** Choosing which run to compare
+    against, and clicking through to a real side-by-side view for that
+    chosen pair - not just the automatic "previous run" the check-panel
+    hardcodes today. Confirmed live: `openCheckPanel()`'s compare block
+    (`dashboard/qa-reporting-dashboard.html`) only ever shows `check.
+    previous` vs. `check.current` - there's no run-picker anywhere in
+    the dashboard today, on either the compare block or the trend chart.
+    The data to support this already exists per check (`check.history`,
+    the same array the trend chart iterates - each point already carries
+    `date`/`value`/`row_count_total`/`row_count_invalid`/`failing_
+    sample_keys`), so this is a UI/interaction gap, not a missing-data
+    one.
+
+    Two related asks, logged together since the second depends on the
+    first: (1) a way to pick a specific historical run to compare
+    against, rather than always the immediately-prior one - e.g. a
+    dropdown or clicking a point on the trend chart itself; (2) once
+    chosen, a real side-by-side comparison view for that pair (current
+    run vs. the chosen run), not just the two bare numbers the compare
+    block shows today - presumably the same shape of detail (row counts,
+    delta, maybe the failing-sample-keys diff) `openCheckPanel()`
+    already assembles for current-vs-previous, generalized to any two
+    points in `check.history`. Not yet scoped - queued to follow item
+    42's build (the check-panel status-indicator fix) since both touch
+    `openCheckPanel()`'s same compare-block area.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
