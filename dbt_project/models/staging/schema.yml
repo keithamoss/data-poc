@@ -346,6 +346,7 @@ models:
         tests:
           - unique:
               config:
+                fail_calc: "coalesce(sum(n_records), 0)"
                 warn_if: ">0"
                 error_if: ">10"
               # mirrors the contract's duplicateValues rule on this column -
@@ -354,6 +355,24 @@ models:
               # row-count threshold, not a true percentage, for the same
               # dbt-duckdb fail_calc-reliability reason as sex/
               # place_of_birth_facility above.
+              #
+              # fail_calc was missing here until 2026-09-15, despite this
+              # comment already describing the intent - a real, found-by-
+              # digging-into-the-"flaky notification_id"-investigation gap
+              # (plans/qa-pipeline.md #38): unique's own main_sql groups by
+              # value (one row per distinct duplicated value), so an
+              # unconfigured fail_calc (dbt-core's own default, "count(*)")
+              # counts distinct BAD VALUES, not duplicate ROWS - see the
+              # accepted_values tests' own comments elsewhere in this file
+              # for the identical reasoning, which this test just never
+              # got despite describing it. Confirmed via dbt-core's own
+              # source (dbt/artifacts/resources/v1/config.py's
+              # `fail_calc: str = "count(*)"` default) and a real warehouse
+              # (cp_run_10_2026-09-14: 20 distinct duplicated values, 40
+              # total rows across those groups - this fixture's duplicate
+              # injection always creates simple pairs, so "distinct values"
+              # and "total rows" differed by exactly 2x, not a coincidence
+              # once you know the cause).
           - not_null
       - name: cp_client_id
         tests:

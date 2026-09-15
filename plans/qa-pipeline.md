@@ -1936,6 +1936,81 @@ relative, not a schedule — this is weeks of work, not months.
     wrapper - not researched yet, logged here so it isn't lost track of
     separately from the dashboard investigation it was found alongside.
 
+38. **[done - real root cause found, original mystery still open]**
+    Dug further into item 34's "second, still-unexplained nondeterminism"
+    (notification_id's `unique` test reporting 0 once, then correctly on
+    the very next identical re-run) - Keith's call, 2026-09-15. Real,
+    controlled experimentation, not more reading: reproduced `dbt build`
+    against `cp_run_10_2026-09-14.duckdb` standalone (20x, fully
+    isolated) and under genuine 4-way parallel load (4 concurrent
+    processes, each cycling through a different real CP run file,
+    matching `orchestrate_cp.py`'s actual `ProcessPoolExecutor` shape) -
+    40+ invocations total.
+
+    **What this found instead - a real, deterministic, fully root-caused
+    bug, distinct from the original flakiness**: every single invocation,
+    isolated or parallel, reported `notification_id`'s `unique` test
+    failures as exactly **20** for `cp_run_10` - never 0, never flaky,
+    always 20. But the true row count (independently verified with no
+    dbt involved at all: `SELECT notification_id, COUNT(*) FROM raw.
+    cp_notifications GROUP BY notification_id HAVING COUNT(*) > 1`) is
+    **40** - 20 distinct duplicated values, each appearing in exactly 2
+    rows. Traced to source: `notification_id`'s `unique` test config has
+    `warn_if`/`error_if` but was missing the `fail_calc` override every
+    sibling test in this file has (confirmed via `grep` across the whole
+    `schema.yml` - the only such gap) - its own comment already described
+    the intent ("the same dbt-duckdb fail_calc-reliability reason as sex/
+    place_of_birth_facility above") but the actual `fail_calc:` line was
+    never added. Confirmed the exact mechanism at the source, not
+    inferred: `dbt/artifacts/resources/v1/config.py`'s `TestConfig.
+    fail_calc` Python default is literally `"count(*)"` - and `unique`'s
+    own `main_sql` (`select {{ column }} as unique_field, count(*) as
+    n_records ... group by {{ column }} having count(*) > 1`) returns one
+    row per distinct duplicated value, so an unconfigured `fail_calc`
+    counts those rows (distinct bad values), not the real duplicate row
+    count. This fixture's duplicate injection always creates simple
+    pairs, so "distinct values" and "total rows" differ by exactly 2x -
+    not a coincidence once you know the cause, just what made the pattern
+    look so strikingly clean at first. **Fixed**: added the missing
+    `fail_calc: "coalesce(sum(n_records), 0)"` - confirmed the raw
+    `run_results.json` now reports 40, matching the independently-
+    verified truth. Purely a config-consistency fix, not a behaviour
+    change the dashboard would have shown - item 35's `_AUDIT_AGGREGATE_
+    SQL` was already bypassing this raw field entirely and computing the
+    correct 40 from the audit table regardless.
+
+    **Also tested and ruled out along the way**: DuckDB's own internal
+    query parallelism as a cause (forced `settings: {threads: 1}` in a
+    test profile, identical result every time - not it); a genuinely
+    separate, real discovery made while testing 4-way *same-file*
+    contention specifically (not how this project's orchestration
+    actually runs - each run always gets its own file): DuckDB's
+    documented single-writer file lock (`Could not set lock on file...
+    Conflicting lock is held in...`, duckdb.org/docs/stable/connect/
+    concurrency) causes a hard crash, 12 of 24 attempts, when two
+    processes genuinely target the *same* `.duckdb` file at once - not
+    a risk this project's real "one file per run" architecture exposes
+    itself to today, but worth remembering if that architecture ever
+    changes.
+
+    **Honest accounting - the original mystery is not resolved**: 40+
+    controlled attempts today, across isolation, real parallelism, and a
+    DuckDB-single-thread variant, never reproduced a spurious "0" on a
+    run that has genuine duplicates - only the fully deterministic
+    "count(*) instead of sum(n_records)" pattern above, which is a
+    different, already-explained number (20, not 0) with a different,
+    now-fixed cause. The original live observation (0 reported once,
+    correct on the very next identical re-run, no code change) remains
+    unreproduced and unexplained by this investigation - possibly a
+    genuinely rare, one-off transient event (a stale cache, a partially-
+    written file from conditions this session's repro couldn't recreate
+    exactly), or something specific to the full `orchestrate_cp.py` path
+    rather than a single `dbt build --select` invocation. Not claiming
+    it's fixed - only that today's digging found and fixed a real,
+    different, previously-unnoticed bug instead, and narrowed what the
+    *actual* remaining mystery is (a true, still-unexplained nonzero-vs-
+    zero flip, not the "half the value" pattern this item resolves).
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
