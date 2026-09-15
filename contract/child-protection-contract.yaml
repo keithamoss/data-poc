@@ -130,6 +130,27 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+          # Reverse gap, closed 2026-09-15 (plans/qa-pipeline.md's full-
+          # triplication pass): both Soda (a `failed rows` check) and dbt
+          # (tests/cp_client_date_of_birth_range.sql) already implement
+          # this range check - the contract was the one place it was
+          # missing. Same shape as bdm-birth-registrations-contract.yaml's
+          # matching date_of_birth rule, but no upper bound (> CURRENT_DATE)
+          # here - Soda's/dbt's own versions of this check only ever test
+          # the lower bound (generator/dirty.py's apply_cp_clients_presets
+          # only ever injects implausibly old dates, never future ones,
+          # same as BDM's own _BAD_DATE_OF_BIRTH_POOL) - mirroring their
+          # actual condition rather than silently adding stricter coverage
+          # than either real tool enforces.
+          - type: sql
+            dimension: conformity
+            query: "SELECT COUNT(*) FROM {model} WHERE date_of_birth < DATE '1900-01-01'"
+            mustBe: 0
+            severity: error
+            description: >
+              Guards against a type/format change upstream turning into
+              silently unparseable or nonsensical dates downstream - same
+              rationale as the Birth Registrations contract's matching rule.
       - name: sex
         logicalType: string
         physicalType: varchar(1)

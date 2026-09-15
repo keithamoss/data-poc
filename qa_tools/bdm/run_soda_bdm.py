@@ -60,6 +60,8 @@ _CUSTOM_CHECK_COLUMN = {
     "extract timestamp is logically ordered after date_registered": "extract_timestamp",
     "multiple birth records have a matching sibling": "is_multiple_birth",
     "recent birth dates present (freshness)": "date_of_birth",
+    "date_of_birth is within a plausible range": "date_of_birth",
+    "date_registered is not earlier than date_of_birth": "date_registered",
 }
 
 # A short, human-readable phrase shared with the same rule's dbt/
@@ -69,6 +71,8 @@ _CUSTOM_CHECK_LABEL = {
     "extract timestamp is logically ordered after date_registered": "Timestamp ordering",
     "multiple birth records have a matching sibling": "Sibling record match",
     "recent birth dates present (freshness)": "Freshness",
+    "date_of_birth is within a plausible range": "Date-of-birth range",
+    "date_registered is not earlier than date_of_birth": "Registration/birth date ordering",
 }
 
 # Explicit per-metric dimension, rather than a substring guess against
@@ -94,6 +98,8 @@ _CUSTOM_CHECK_DIMENSION = {
     "extract timestamp is logically ordered after date_registered": "consistency",
     "multiple birth records have a matching sibling": "consistency",
     "recent birth dates present (freshness)": "timeliness",
+    "date_of_birth is within a plausible range": "conformity",
+    "date_registered is not earlier than date_of_birth": "consistency",
 }
 
 

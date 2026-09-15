@@ -102,18 +102,26 @@ _VERIFY_COUNT_SQL = {
 # check would land under column_name="(table)", which the dashboard
 # builder silently drops for birth-registrations (there's no
 # "(table-level checks)" pseudo-column here the way Child Protection has).
-_SINGULAR_TESTS = ["multiple_birth_sibling", "recent_births_present"]
+_SINGULAR_TESTS = [
+    "multiple_birth_sibling", "recent_births_present",
+    "date_registered_after_birth", "bdm_date_of_birth_range",
+]
 _SINGULAR_TEST_COLUMN = {
     "multiple_birth_sibling": "is_multiple_birth",
     "recent_births_present": "date_of_birth",
+    "date_registered_after_birth": "date_registered",
+    "bdm_date_of_birth_range": "date_of_birth",
 }
 
 _DIMENSION_BY_TEST = {
     "unique": "uniqueness",
     "not_null": "completeness",
     "accepted_values": "validity",
+    "matches_regex": "validity",
     "multiple_birth_sibling": "consistency",
     "recent_births_present": "timeliness",
+    "date_registered_after_birth": "consistency",
+    "bdm_date_of_birth_range": "conformity",
 }
 
 # A short, human-readable phrase for what each test actually checks -
@@ -128,8 +136,11 @@ _LABEL_BY_TEST = {
     "unique": "Duplicate rate",
     "not_null": "Null rate",
     "accepted_values": "Invalid values",
+    "matches_regex": "Invalid values",
     "multiple_birth_sibling": "Sibling record match",
     "recent_births_present": "Freshness",
+    "date_registered_after_birth": "Registration/birth date ordering",
+    "bdm_date_of_birth_range": "Date-of-birth range",
 }
 
 
@@ -148,10 +159,13 @@ def _failing_sample_keys(conn, test_name: str, column: str, node: dict, status: 
     relation_name = node.get("relation_name")
     if not relation_name:
         return []
-    if test_name in ("not_null", "multiple_birth_sibling"):
+    if test_name in ("not_null", "matches_regex", "multiple_birth_sibling",
+                      "date_registered_after_birth", "bdm_date_of_birth_range"):
         # the audit table already IS (a projection of) the failing rows
-        # themselves - not_null keeps every column, multiple_birth_sibling's
-        # own fail query already selects just registration_number.
+        # themselves - not_null/matches_regex keep every column,
+        # multiple_birth_sibling/date_registered_after_birth/
+        # bdm_date_of_birth_range's own queries already select
+        # registration_number directly.
         return failing_sample_keys_direct(conn, relation_name, "registration_number")
     if test_name in ("accepted_values", "unique"):
         # these two dbt generic-test macros pre-aggregate their audit

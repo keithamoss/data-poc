@@ -35,6 +35,68 @@ checks for birth_registrations:
       fail: when > 5
       samples limit: 5
 
+  # --- Full-triplication pass (2026-09-15, plans/qa-pipeline.md) -----------
+  # Every check below already exists in the ODCS contract (nullValues/
+  # invalidValues/duplicateValues/type: sql), and most already exist in
+  # dbt's schema.yml too - added here so Soda implements the same rule set
+  # rather than only the handful of hand-picked "traffic light demo"
+  # checks. Same warn>0/fail>5 buffer as date_of_birth above for every
+  # contract column with a near-zero-tolerance nullValues rule (mustBe: 0,
+  # or mustBeLessThan a small integer), rather than a bespoke band per
+  # column - date_of_birth already established that pattern in this file.
+  - missing_count(registration_number):
+      warn: when > 0
+      fail: when > 5
+      samples limit: 5
+
+  - duplicate_count(registration_number):
+      warn: when > 0
+      fail: when > 3
+      samples limit: 5
+
+  - missing_count(child_given_names):
+      warn: when > 0
+      fail: when > 5
+      samples limit: 5
+
+  - missing_count(child_family_name):
+      warn: when > 0
+      fail: when > 5
+      samples limit: 5
+
+  # mustBeLessThan: 2 in the contract (up to 1 null tolerated, 2+ fails) -
+  # a tighter, explicit threshold rather than the generic 0/5 buffer above.
+  - missing_count(place_of_birth_suburb):
+      warn: when > 0
+      fail: when > 1
+      samples limit: 5
+
+  - missing_count(date_registered):
+      warn: when > 0
+      fail: when > 5
+      samples limit: 5
+
+  - missing_count(extract_timestamp):
+      warn: when > 0
+      fail: when > 5
+      samples limit: 5
+
+  # These two mirror the contract's own explicit, wider tolerances
+  # (mustBeLessThan: 5%/severity: warning, mustBeLessThan: 30%/severity:
+  # info) rather than the 0/5-count buffer above - both properties are
+  # optional (required: false) with a real, non-zero expected null rate
+  # (single-parent registrations), same rationale as place_of_birth_
+  # facility's missing_percent check below. SodaCL has no "info" severity,
+  # so the info-tier rule below only sets warn (there's nothing stricter
+  # than "worth a look" to escalate it to).
+  - missing_percent(registering_parent_1_name):
+      warn: when > 5%
+      samples limit: 5
+
+  - missing_percent(registering_parent_2_name):
+      warn: when > 30%
+      samples limit: 5
+
   # --- The traffic-light example you asked for: sex -----------------------
   # A closed value set that downstream systems depend on. Red/amber here
   # means genuinely different responses: a handful of invalid codes might be
@@ -111,6 +173,33 @@ checks for birth_registrations:
       warn: when > 0%
       fail: when > 3%
       samples limit: 5
+
+  # --- Date-of-birth range (item 28's decision) -----------------------------
+  # Same rule as the ODCS contract's matching type: sql check on
+  # date_of_birth - see plans/qa-pipeline.md #26 (the bug found in the
+  # independent aggregate's copy of this same condition) and #28 (the
+  # decision to add this here and to dbt specifically so a PK-yielding
+  # tool exists for it, since datacontract-cli's type: sql rules never
+  # expose one). Selects date_of_birth itself alongside the PK - not just
+  # registration_number - per #29's own lesson: a "failed rows" check
+  # costs nothing extra to also return the column that explains why a row
+  # failed, unlike most of this file's other business-rule checks below,
+  # which only ever return a bare PK.
+  - failed rows:
+      fail query: |
+        SELECT registration_number, date_of_birth
+        FROM birth_registrations
+        WHERE date_of_birth < DATE '1900-01-01' OR date_of_birth > CURRENT_DATE
+      name: date_of_birth is within a plausible range
+
+  # --- Registration/birth date ordering ---------------------------------
+  # Same rule as the ODCS contract's matching type: sql check on
+  # date_registered (a cross-field consistency rule, not a format check -
+  # ODCS's "consistency" dimension). A registration date earlier than the
+  # birth date indicates a corrupt or misjoined record.
+  - failed rows:
+      fail condition: date_registered < date_of_birth
+      name: date_registered is not earlier than date_of_birth
 
   # --- Extract timestamp ordering -------------------------------------------
   # A "failed rows" check with a custom fail condition - real SodaCL, not a

@@ -305,6 +305,27 @@ schema:
         physicalType: varchar(200)
         required: false
         description: Nullable - not every birth occurs in a registered facility (e.g. home births).
+        quality:
+          # Reverse gap, closed 2026-09-15 (plans/qa-pipeline.md's full-
+          # triplication pass): both Soda (missing_percent) and dbt
+          # (not_null with warn_if/error_if) already implement a null-rate
+          # threshold on this column - the contract was the one place it
+          # was missing, despite being the source of truth. 35% mirrors
+          # Soda's own fail band (warn>15%/fail>35%) - the single severity
+          # here is error rather than two-tier since ODCS quality rules
+          # don't have a native warn/error split within one metric the way
+          # SodaCL does; the warning-equivalent behaviour still lives in
+          # Soda/dbt's own two-tier checks.
+          - metric: nullValues
+            dimension: completeness
+            unit: percent
+            mustBeLessThan: 35
+            severity: error
+            description: >
+              Mirrors missing_percent(place_of_birth_facility)'s fail band
+              in the Soda checks file - some null rate is expected (home
+              births without a recorded facility), but a rate this high
+              signals a genuine upstream problem, not normal variation.
 
       - name: date_registered
         logicalType: date

@@ -47,6 +47,7 @@ CP_SINGULAR_TESTS = list(cp_common.BUSINESS_RULE_HOME_TABLE.keys())
 _DIMENSION_BY_TEST = {
     "unique": "uniqueness",
     "not_null": "completeness",
+    "accepted_values": "validity",
     "relationships": "consistency",
     "escalation_completeness": "completeness",
     "closed_case_investigation_hygiene": "consistency",
@@ -67,6 +68,7 @@ _DIMENSION_BY_TEST = {
 _LABEL_BY_TEST = {
     "unique": "Duplicate rate",
     "not_null": "Null rate",
+    "accepted_values": "Invalid values",
     "relationships": "Referential integrity",
     "cp_client_date_of_birth_range": "Date range",
 }
@@ -115,6 +117,17 @@ def _failing_sample_keys(conn, test_name: str, column: str, table: str, node: di
         return failing_sample_keys_direct(conn, relation_name, pk_column)
     if test_name == "unique":
         return failing_sample_keys_via_values(conn, relation_name, "unique_field", model, column, pk_column)
+    if test_name == "accepted_values":
+        # same pre-aggregated (value, n_records) shape as BDM's own
+        # accepted_values tests (see run_dbt_bdm.py's _failing_sample_
+        # keys) - previously fell through to the relationships case below
+        # and returned no sample keys at all for any of this project's
+        # accepted_values tests, postcode included; fixed alongside the
+        # 2026-09-15 full-triplication pass since it now covers far more
+        # checks (concern_type, sex, source_type, risk_rating, outcome,
+        # substantiated, placement_type, carer_type, approval_status,
+        # team_region).
+        return failing_sample_keys_via_values(conn, relation_name, "value_field", model, column, pk_column)
     return []  # relationships - see docstring above
 
 

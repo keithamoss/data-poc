@@ -1401,6 +1401,172 @@ relative, not a schedule — this is weeks of work, not months.
     in the evaluation, not just a "different tool, different question"
     aside.
 
+30. **[done]** Full-triplication pass: every check that has a Soda/dbt/
+    datacontract-cli-implementable shape now exists in all three, not
+    just the hand-picked subset each dataset had before. Keith's
+    instruction after item 29: "ensure we are implementing each check
+    across every tool that supports it, not just one or two." Built the
+    same day, 2026-09-15.
+
+    **Method**: cross-referenced every column in both ODCS contracts'
+    `quality:` blocks against `bdm-birth-registrations-soda-checks.yml`/
+    `child-protection-soda-checks.yml` and `dbt_project/models/staging/
+    schema.yml` (plus `dbt_project/tests/*.sql`, initially missed - see
+    the correction below). Two false positives caught before building
+    anything: BDM's sibling-match and freshness checks were already
+    fully triplicated (`tests/multiple_birth_sibling.sql`, `tests/
+    recent_births_present.sql`, both wired via `run_dbt_bdm.py`'s
+    `_SINGULAR_TESTS` - missed on the first pass because singular tests
+    live in a flat `tests/` directory dbt auto-discovers, not `schema.
+    yml`'s column-test list). Retracted before any code changed.
+
+    **BDM** (`bdm-birth-registrations-soda-checks.yml`,
+    `dbt_project/models/staging/schema.yml`, `dbt_project/tests/`,
+    `qa_tools/bdm/run_soda_bdm.py`, `qa_tools/bdm/run_dbt_bdm.py`):
+    - Soda gained ~9 checks: null checks on `registration_number`,
+      `child_given_names`, `child_family_name`, `place_of_birth_suburb`,
+      `date_registered`, `extract_timestamp` (plus `registering_parent_1_
+      name`/`_2_name` as `missing_percent` matching the contract's own
+      5%/30% tolerances), a `duplicate_count` on `registration_number`,
+      and a new `date_registered < date_of_birth` consistency check
+      (`failed rows`).
+    - dbt gained: `not_null` on the same columns above, plus a new
+      custom generic test (`dbt_project/macros/matches_regex.sql` - dbt-
+      core ships no native regex test, and this project has no dbt_utils
+      dependency to borrow one from) applied to `registration_number`,
+      `child_given_names`, `child_family_name`, `registering_parent_1_
+      name`, `registering_parent_2_name`, and `source_system_record_id`
+      (mirroring each column's existing Soda `valid regex` check
+      exactly, same DuckDB RE2 engine). A new singular test, `tests/
+      date_registered_after_birth.sql`, for the consistency check above.
+    - Item 28's already-decided `date_of_birth` range check: added to
+      both Soda (`failed rows`, selecting `date_of_birth` alongside the
+      PK per item 29's own lesson about returning causal values, not
+      just identifiers) and dbt (`tests/bdm_date_of_birth_range.sql`).
+    - Reverse gap closed: `place_of_birth_facility`'s null-rate rule
+      (already in Soda and dbt) is now also in the contract
+      (`nullValues`, `unit: percent`, `mustBeLessThan: 35`, matching
+      Soda's own fail band) - previously the contract had no rule for
+      this column at all.
+
+    **Child Protection** - the much bigger gap (`child-protection-soda-
+    checks.yml`, same `schema.yml`, `qa_tools/cp/run_soda_cp.py`,
+    `qa_tools/cp/run_dbt_cp.py`, `qa_tools/cp/cp_common.py` unchanged -
+    already had `cp_carers`/`cp_case_workers` registered):
+    - **`cp_carers` and `cp_case_workers` had zero Soda checks at all**
+      (no `checks for` block existed for either table) - both now have a
+      full block: `row_count`, PK `missing_count`/`duplicate_count`,
+      `given_name`/`family_name` null checks, and `invalid_percent` on
+      `carer_type`/`approval_status`/`team_region`.
+    - **`concern_type`** - this collection's own "traffic light demo
+      column," which dirty.py has injected bad values into since it was
+      built - had no Soda check and no dbt test until now. Confirmed
+      live on the red run: now fails correctly across dbt, Soda, and
+      datacontract-cli simultaneously, each with real PKs (except
+      datacontract-cli, per item 20/29's structural gap), plus Evidently
+      PSI drift.
+    - Every other closed-value-set column with a contract rule but no
+      implementation anywhere else now has one: `sex`/`postcode` (cp_
+      clients, postcode's invalid-value check already existed),
+      `source_type`/`risk_rating`/`outcome` (cp_notifications),
+      `substantiated` (cp_investigations), `placement_type` (cp_
+      placements) - `invalid_percent` in Soda, `accepted_values` in dbt.
+    - Every required column's `nullValues` rule with no prior
+      implementation now has a `missing_count`/`not_null` pair: ~13
+      columns across the 6 tables (given_name/family_name/date_of_birth/
+      suburb/case_opened_date on cp_clients; notification_date on cp_
+      notifications; start_date on cp_investigations; placement_start/
+      placement_suburb on cp_placements; given_name/family_name on both
+      cp_carers and cp_case_workers), plus PK null/duplicate pairs on
+      `notification_id`/`investigation_id`/`placement_id` that dbt
+      already had but Soda didn't.
+    - Reverse gap closed: `cp_clients.date_of_birth`'s range check
+      (already in Soda's `failed rows` and dbt's `tests/cp_client_date_
+      of_birth_range.sql`) is now also in the contract (`type: sql`,
+      lower bound only - matching what Soda/dbt actually enforce, not
+      silently adding stricter coverage than either real tool has).
+    - Two related pre-existing gaps fixed alongside this, since the new
+      `accepted_values` checks made them far more consequential:
+      `run_dbt_cp.py` had no dimension/label mapping for `accepted_
+      values` at all (silently fell back to `""`/`None` - already true
+      for `postcode`, just never conspicuous with only one such check),
+      and no failing-sample-key resolution for it either (fell through
+      to the `relationships` case and returned `[]` unconditionally).
+      Both fixed using the exact same pattern `run_dbt_bdm.py` already
+      established for its own `accepted_values` tests.
+
+    **A real bug caught during verification, fixed before considering
+    this done**: the two new `registering_parent_1_name`/`_2_name` not_
+    null tests, configured with only `warn_if` (matching the contract's
+    own single-severity tolerance, no error tier), hard-failed on every
+    clean run's ordinary ~2%/~26% natural null rate. Root cause: an
+    unconfigured `error_if` defaults to `">0"` in dbt-core, not "never
+    fails" - confirmed live (71 unexpected non-pass results on clean
+    runs before the fix, 0 after). Fixed by setting explicit, generous
+    `error_if` values on both. Environment/wiring vs. logic bug question
+    considered and set aside: this was caught and fixed within the same
+    session that introduced it, before any commit - not a case the
+    CLAUDE.md bug-fix-test convention (write a test for something
+    already shipped and now found broken) was built for either way.
+
+    **Verification**: both ODCS contracts still `datacontract lint`
+    clean; all touched YAML re-parsed with `yaml.safe_load`; full `./run_
+    pipeline.sh` plus `qa_tools.cp.orchestrate_cp` re-run end to end (no
+    crashes, no `status` values outside pass/warn/fail); every genuinely
+    clean run (excluding item 31's unrelated resupply-mislabeling bug
+    and the pre-existing freshness fixture-date limitation) shows zero
+    unexpected non-pass results; spot-checked the red runs to confirm
+    new checks actually fire with real PKs where a tool can give them;
+    `uv run pytest` (32/32) and `uv run ruff check .` both clean;
+    dashboard data and HTML re-embedded (BDM 220KB, CP grew 198KB ->
+    316KB, reflecting the coverage increase).
+
+    Total new check surface: BDM went from ~20 Soda checks / ~13 dbt
+    tests to ~30/~24; Child Protection went from ~13 Soda checks / ~22
+    dbt tests (mostly FK/business-rule/PK-only) to ~50/~50 (full column
+    coverage on all 6 tables). Item 27's "never actually exercised
+    failing" finding still applies to most of these - dirty.py has no
+    injector for the columns this pass added coverage to (concern_type
+    and the BDM date-range checks are the exceptions) - so most of the
+    newly-added checks pass on every run today, correctly, for lack of a
+    reason to fail rather than for lack of being real.
+
+31. **[open, not yet fixed - out of scope for item 30, flagged when
+    found]** A real, independent bug found while verifying item 30's
+    regenerated pipeline output (2026-09-15): a resupply attempt that
+    *resolves* (stops being red) is not actually regenerated clean.
+    `generator/resupply.py`'s `run_delivery_chain` (lines ~118-126):
+    when an attempt is no longer red, it takes the *previous, already-
+    red attempt's own dataframe*, applies `provider.churn()` (a small
+    ~1-2% organic-change pass - never a fix for the defects `provider.
+    dirty(df, "red", ...)` already baked in), and yields it labeled
+    `severity: None` - it never regenerates a fresh draw or reverses the
+    injected defects. Confirmed directly against real output, not just
+    reasoning about the code: `run_06_2026-09-11_resupply2` and `run_09_
+    2026-09-14_resupply3` both show `"dirty_severity": null` in `data/
+    raw/manifest.json`, yet their actual CSVs have ~78-89% `place_of_
+    birth_facility` nulls and invalid `sex` codes (`U`/`O`/`9`) - numbers
+    that match RED-severity injection, not a clean run. This directly
+    contradicts `plans/wider.md` action 12's own account of the
+    resupply-chain feature ("the corrected... resupply arrives"; "a real
+    per-attempt retry chance rather than 'one resupply always fixes
+    it'" - the design intent is clearly that a resolved attempt IS
+    corrected, not that it keeps carrying forward the prior attempt's
+    defects with a different label).
+
+    Not a regression from item 30's work - the underlying data bug
+    predates this session's changes; item 30 just added enough real
+    checks (place_of_birth_facility's null-rate check already existed
+    before this session, so this bug's *effect* was already partly
+    visible, just less systematically checked-for) that it became
+    obvious while verifying clean runs stayed clean. Logged only, fix
+    deferred - out of scope for item 30's own task, and the right fix
+    isn't obvious without a design call (regenerate a genuinely fresh
+    clean draw via `provider.generate()` again on resolution, vs. some
+    form of "reverse the dirty injection" pass on the existing
+    dataframe - `dirty.py` has no undo mechanism today, only additive
+    injectors).
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

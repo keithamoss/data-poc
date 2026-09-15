@@ -110,6 +110,8 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
         # the overlap without a further prefix).
         label = None if is_custom_name else {
             "row_count": "Row count", "reference": "Referential integrity",
+            "missing_count": "Null rate", "missing_percent": "Null rate",
+            "invalid_percent": "Invalid values", "duplicate_count": "Duplicate rate",
         }.get(base_check)
 
         results.append({
