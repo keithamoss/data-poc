@@ -191,6 +191,16 @@ checks for birth_registrations:
         FROM birth_registrations
         WHERE date_of_birth < DATE '1900-01-01' OR date_of_birth > CURRENT_DATE
       name: date_of_birth is within a plausible range
+      # Explicit high ceiling, not reliance on Soda's own (documented,
+      # unfixed) bug that "failed rows" checks ignore samples limit
+      # entirely (GitHub sodadata/soda-core#1985 - see plans/qa-
+      # pipeline.md #29). Today this check's own true failing-row count
+      # never comes close to it on this fixture; the point is that this
+      # project's *intent* - "get every failing row this check finds" -
+      # is now stated explicitly, so a future Soda release that starts
+      # enforcing samples limit properly doesn't silently reintroduce a
+      # 100-row cap here without anyone having decided that's acceptable.
+      samples limit: 100000
 
   # --- Registration/birth date ordering ---------------------------------
   # Same rule as the ODCS contract's matching type: sql check on
@@ -200,6 +210,7 @@ checks for birth_registrations:
   - failed rows:
       fail condition: date_registered < date_of_birth
       name: date_registered is not earlier than date_of_birth
+      samples limit: 100000
 
   # --- Extract timestamp ordering -------------------------------------------
   # A "failed rows" check with a custom fail condition - real SodaCL, not a
@@ -210,6 +221,7 @@ checks for birth_registrations:
   - failed rows:
       fail condition: extract_timestamp < date_registered OR extract_timestamp > date_registered + INTERVAL '1' DAY
       name: extract timestamp is logically ordered after date_registered
+      samples limit: 100000
 
   # --- Multiple-birth sibling match -----------------------------------------
   # A self-join "failed rows" check via a custom fail query - real SodaCL.
@@ -232,6 +244,7 @@ checks for birth_registrations:
               AND b.registering_parent_1_name IS NOT DISTINCT FROM a.registering_parent_1_name
           )
       name: multiple birth records have a matching sibling
+      samples limit: 100000
 
   # --- Freshness / relative-date check ---------------------------------------
   # Another "failed rows" check via a custom fail query, real SodaCL - but
@@ -244,6 +257,9 @@ checks for birth_registrations:
   # limitation this shares with the [recent] filter below (real wall-clock
   # CURRENT_DATE vs. this fixture's fixed Sept 2026 dates). Routed to the
   # date_of_birth column explicitly, same reason as the two checks above.
+  # No samples limit here (unlike the other failed rows checks above) -
+  # this query structurally returns 0 or 1 synthetic row regardless of
+  # any cap, so an explicit ceiling would be meaningless.
   - failed rows:
       fail query: |
         SELECT 1 WHERE NOT EXISTS (

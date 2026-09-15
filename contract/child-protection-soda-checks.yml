@@ -110,6 +110,12 @@ checks for cp_clients:
         SELECT cp_client_id FROM cp_clients WHERE date_of_birth < DATE '1900-01-01'
       warn: when > 10
       fail: when > 20
+      # Explicit high ceiling, not reliance on Soda's own (documented,
+      # unfixed) bug that "failed rows" checks ignore samples limit
+      # entirely (GitHub sodadata/soda-core#1985 - see plans/qa-
+      # pipeline.md #29's correction). Same rationale on all 4 "failed
+      # rows" checks in this file.
+      samples limit: 100000
 
 checks for cp_notifications:
   - row_count:
@@ -202,6 +208,11 @@ checks for cp_notifications:
       # cp_investigations never references. Confirmed for real: 0 clean,
       # 2-3 amber, 6 on the red run - same numbers
       # child-protection-contract.yaml's matching rule found.
+      # Explicit high ceiling, not reliance on Soda's own (documented,
+      # unfixed) bug that "failed rows" checks ignore samples limit
+      # entirely (GitHub sodadata/soda-core#1985 - see plans/qa-
+      # pipeline.md #29's correction).
+      samples limit: 100000
 
 checks for cp_investigations:
   # --- Full-triplication pass (2026-09-15, plans/qa-pipeline.md) ---------
@@ -263,6 +274,9 @@ checks for cp_investigations:
       # 0 clean, 1-3 amber, 6 on the red run. See child-protection-
       # contract.yaml's matching rule and plans/qa-pipeline.md #9 for the
       # fuller account (this rule used to always fail - fixed, not hidden).
+      # Explicit high ceiling - see escalation completeness's own comment
+      # above for why (GitHub sodadata/soda-core#1985).
+      samples limit: 100000
 
 checks for cp_placements:
   # --- Full-triplication pass (2026-09-15, plans/qa-pipeline.md) ---------
@@ -323,6 +337,9 @@ checks for cp_placements:
       # child-protection-contract.yaml's matching rule and
       # plans/qa-pipeline.md #9 for the fuller account (this rule used to
       # always fail - fixed, not hidden).
+      # Explicit high ceiling - see escalation completeness's own comment
+      # above for why (GitHub sodadata/soda-core#1985).
+      samples limit: 100000
 
 # --- Full-triplication pass (2026-09-15, plans/qa-pipeline.md) -------------
 # cp_carers and cp_case_workers previously had NO "checks for" block at

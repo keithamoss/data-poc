@@ -1373,6 +1373,18 @@ relative, not a schedule — this is weeks of work, not months.
       undocumented behaviour a future Soda Core release could "fix"
       (i.e. start enforcing the cap) without notice - a real risk worth
       flagging in the evaluation, not a capability to bank on.
+      **Mitigated 2026-09-15** (Keith's call, alongside item 30's build):
+      every `failed rows` check in both Soda files now sets an explicit
+      `samples limit: 100000` - stating this project's actual intent
+      ("get every failing row") outright rather than relying on the bug
+      to keep supplying it. If/when Soda Core actually fixes #1985 and
+      starts enforcing the limit properly, this project won't silently
+      drop back to a 100-row default nobody decided on; it'll keep
+      getting (up to) 100000, which is effectively "all of them" at this
+      fixture's scale. Doesn't change the evaluation finding above -
+      still worth recording as a real Soda Core reliability gap - just
+      means this project's own pipeline no longer depends on it staying
+      unfixed.
     - Whether a "failed rows" check also returns the *causal* columns
       (not just the PK) is **not a Soda limitation at all** -
       `fail query:`/`fail condition:` can select arbitrary columns; this
@@ -1566,6 +1578,27 @@ relative, not a schedule — this is weeks of work, not months.
     form of "reverse the dirty injection" pass on the existing
     dataframe - `dirty.py` has no undo mechanism today, only additive
     injectors).
+
+    **Parked (2026-09-15, Keith's call): a real test battery for
+    `generator/resupply.py`.** Not scoped or built - just recorded as a
+    near-future idea, the same status as items 22/23/25 above. The kind
+    of bug this item found (a "resolved" attempt silently keeping a
+    prior attempt's injected defects) is exactly what a test asserting
+    "a `severity: None` attempt's dataframe has none of the defect
+    signatures `dirty()` injects" would have caught immediately, rather
+    than needing a full pipeline regeneration plus manual CSV inspection
+    to surface. `run_delivery_chain`'s own logic (churn-forward-from-
+    the-previous-attempt, a red/still-red coin flip per attempt, real
+    business-day arrival-date arithmetic) has several more of these
+    "looks right, only verifiable by tracing actual output" properties
+    that unit tests would cover more cheaply than another full-pipeline
+    read-the-CSVs pass. Scoping questions for when this gets picked up:
+    whether it's several focused tests (one per property - defect-
+    freedom on resolution, chain termination at MAX_ATTEMPTS, business-
+    day-only arrival dates) or one longer property-style test; and
+    whether it should also cover `generate_runs.py`'s manifest-writing
+    side (delivery_id/supersedes_run_id consistency across a chain), not
+    just `resupply.py`'s own dataframe logic.
 
 ## Held over from the original (equivalent-only) build
 
