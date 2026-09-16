@@ -1237,3 +1237,81 @@ not a schedule.
     gunzip the one you want, open it" by hand. A real picker (reading
     `manifest.json`) is the natural next round once there's a real
     handful of snapshots to browse - which there now is.
+
+    **Important clarification, same day (2026-09-16) - Keith's own
+    correction, checked and confirmed before writing anything further:**
+    the "rolling window" referenced throughout rounds 1-2 above is
+    PURELY an artifact of how this PoC fabricates plausible-looking
+    recent demo data cheaply (`generate_runs.py`/`generate_cp_runs.py`
+    anchoring their date range to `date.today()` and regenerating a
+    fresh ~10-15-run window each time) - it is NOT a property of a real
+    production BDM/CP feed, and must never be treated as a real
+    architectural input to how time travel, or anything else, *should*
+    work. A real feed genuinely accumulates forever: a new file arrives,
+    joins the record, the record never resets - there is no "window" in
+    reality at all, just growing history.
+
+    Checked against what was actually built: `take_snapshot()` doesn't
+    know or depend on how the dashboard's underlying data was produced -
+    it archives whatever `dashboard/qa-reporting-dashboard.html`
+    currently contains, whether that's this PoC's narrow rolling window
+    or (in a real deployment) years of genuinely accumulated history. So
+    the snapshot MECHANISM needed no changes. What did need tightening
+    was this very writeup: "time travel just needs to work correctly for
+    whatever window exists at snapshot time" (Round 2 above) is accurate
+    but risks being misread later as endorsing the rolling window as a
+    legitimate design constraint, rather than naming it as the specific
+    reason THIS PoC's OWN demo snapshots only ever show a shallow ~15-run
+    slice - a limitation of the fake data generator, not of the feature.
+    Read every "rolling window" reference above with that in mind.
+
+    Separately parked, not acted on now (Keith's call): deepening the
+    PoC's own fake-data generation to accumulate more simulated history
+    over time, so a demo could show genuinely deep time travel rather
+    than a handful of nearby points - worth doing eventually, not a
+    priority while the feature's job is proving the mechanism works.
+
+27. **[parked]** Versioning the checks themselves, with that version
+    flowing through to the results/data each check run captures - Keith's
+    own framing, raised right after item 26's time-travel build: "a
+    useful thing to have as a baseline concept we could hook into
+    later," because checks will inevitably change ("there will be
+    breaks in checks and changes to checks"), and not every change means
+    the same thing for someone reading the history.
+
+    The core idea, as he framed it: some check changes are a genuine
+    **break in the series** (a threshold moved, the underlying logic
+    changed what's actually being measured - the run before and the run
+    after aren't really comparable anymore) and some aren't (a label
+    reworded, a cosmetic tweak, a bug fix that doesn't change what
+    passes/fails). Today, nothing in this project distinguishes the two
+    - a check is identified purely by its name/column, with no version
+    number or change history of its own, and every real check result
+    this project produces is tagged with which RUN it came from but
+    never with which VERSION of the check produced it. The trend chart
+    (`trendChart()`, `dashboard/qa-reporting-dashboard.html`) draws one
+    continuous line across a check's whole `history` regardless - a
+    silent threshold change today would show up as an unexplained kink
+    in the line, not a flagged discontinuity a reader would understand
+    as "the check itself changed here, don't read this as organic
+    drift."
+
+    Real connections to what already exists, worth keeping in view once
+    this gets scoped: item 26's time-travel snapshots already capture a
+    check's `warn`/`fail` thresholds as they stood at that moment (each
+    snapshot is self-consistent), so versioning would mostly be about
+    making that fact EXPLICIT and queryable rather than an accidental
+    side effect of how snapshots happen to work; `plans/qa-pipeline.md`
+    #43 (surfacing a check's real SQL/YAML definition in the dashboard,
+    not yet built) is the natural place a version identifier would also
+    want to show up. Not yet scoped: what actually constitutes a
+    "version" (a hash of the check's YAML config, a hand-maintained
+    semver-style number, a git commit reference), who/what decides
+    breaking vs. non-breaking (an author-asserted flag when the check
+    changes, vs. some automated diff heuristic), how a check result
+    would carry its version forward (a new field alongside `run_id` in
+    `reports/results_*.json`), and exactly how a "break in the series"
+    should read in the UI (a visual gap in the trend line, an
+    annotation/marker at the break point, splitting the line into two
+    separately-labeled segments, something else). Parked for a dedicated
+    scoping discussion, not this session.
