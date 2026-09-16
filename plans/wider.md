@@ -1576,3 +1576,33 @@ not a schedule.
     for a multi-agency register would need to cover more than one
     asset shape from the start) - worth revisiting together once either
     gets scoped for real.
+
+29. **[parked]** Root cause of the `astral-sh/setup-uv@v10` CI failure
+    (item 26's addendum above) - not the specific broken pin itself
+    (already fixed), but the pattern that produced it: an external fact
+    needed for a config file (a GitHub Action's valid tag format) got
+    asserted from a single WebFetch-summarized page rather than checked
+    against the primitive source, and the wrong answer went straight
+    into a committed workflow file. It then took an actual CI failure -
+    Keith checking the run rather than assuming green - to catch it.
+    Worth a real "how do we stop this happening again" discussion,
+    because the specific fix (look at the tags list, not a summarized
+    release page) doesn't generalize on its own to whatever the next
+    instance of this pattern looks like.
+
+    Not scoped yet - open questions to work through together: is this
+    narrowly about external version pins in CI/infra config (a smaller,
+    more tractable problem - e.g. always resolve a third-party GitHub
+    Action ref against its real tags/releases before writing it, never
+    from a single fetched page), or does it point at a wider category of
+    "asserted external fact, not independently verified, landed in
+    something committed" that could show up in other places too (a
+    library API's actual signature, a tool's actual CLI flag, a claimed
+    default behaviour)? And practically: does addressing it mean a
+    written convention (a CLAUDE.md rule, similar in spirit to the
+    existing bug-fix-gets-a-test convention), something checked
+    mechanically (e.g. a CI step that validates action refs actually
+    resolve, catching this class of mistake before merge rather than
+    after), both, or something else entirely. Deliberately not
+    conflating "log the specific mistake" (done, item 26's addendum)
+    with "fix the pattern" (this item).
