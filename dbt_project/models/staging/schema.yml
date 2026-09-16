@@ -72,6 +72,51 @@ version: 2
 # same real numbers already found and explained in the contract file,
 # rather than repeating them here.
 
+# Singular tests (tests/*.sql) get their own check-lifecycle metadata via
+# this top-level `tests:` block (dbt's "data test properties" - config
+# keyed by the test's own file/function name, not nested under a model)
+# rather than a {{ config(meta={...}) }} macro call inside the .sql file
+# itself - keeps every check's lifecycle metadata parseable as plain YAML
+# by qa_tools/common/check_lifecycle.py the same way every generic test
+# already is, rather than needing a second, Jinja-aware parser for one
+# category of check. A real, pre-existing gap found 2026-09-16 while
+# wiring check_id into the dashboard: check_lifecycle.py's dbt parser
+# only ever walked models[].tests/models[].columns[].tests, so every
+# singular test (this file's own multiple_birth_sibling, plus Child
+# Protection's 3 cross-table business-rule tests) had NO check_id
+# anywhere and was silently invisible to check_lifecycle.validate() -
+# not failing the gate, just never seen by it at all. See
+# plans/qa-pipeline.md's own entry for the full account.
+tests:
+  - name: multiple_birth_sibling
+    config:
+      meta:
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.multiple_birth_sibling_dbt
+        introduced_date: "2026-01-15"
+        description: "Every is_multiple_birth record must have a matching sibling row from the same birth event."
+        changelog: []
+  - name: escalation_completeness
+    config:
+      meta:
+        check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.escalation_completeness_dbt
+        introduced_date: "2026-01-15"
+        description: "Every escalated notification must have an investigation opened for it."
+        changelog: []
+  - name: closed_case_investigation_hygiene
+    config:
+      meta:
+        check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.closed_case_investigation_hygiene_dbt
+        introduced_date: "2026-01-15"
+        description: "A closed case's investigations must all have an end date - none should still be open."
+        changelog: []
+  - name: placement_carer_approval
+    config:
+      meta:
+        check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.placement_carer_approval_dbt
+        introduced_date: "2026-01-15"
+        description: "A placement's carer must be Approved-status at the time of assignment."
+        changelog: []
+
 models:
   - name: stg_birth_registrations
     description: >

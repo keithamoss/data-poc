@@ -2512,6 +2512,54 @@ relative, not a schedule — this is weeks of work, not months.
     tooltip, a second tap-while-shown to trigger compare, standard
     mobile chart UX) - logged for later, not investigated further now.
 
+49. **[fixed, 2026-09-16]** A real, pre-existing bug in `check_lifecycle.py`'s
+    dbt parser: it only ever walked `models[].tests`/`models[].
+    columns[].tests` in `schema.yml`, so dbt SINGULAR tests
+    (`dbt_project/tests/*.sql` - `multiple_birth_sibling` on the BDM
+    side, `escalation_completeness`/`closed_case_investigation_hygiene`/
+    `placement_carer_approval` on the CP side) had no `check_id`
+    anywhere and were silently invisible to it. Not a validation
+    FAILURE - `check_lifecycle.validate()` simply never saw these 4
+    checks at all, so they were never covered by the duplicate-check_id
+    or undocumented-config-change gates since Phase 1 shipped.
+
+    Found while tracing how to join a check RESULT to its lifecycle
+    metadata for the dashboard-wiring work (plans/publishing-and-
+    history.md Phase 4's as-of viewing, scoped 2026-09-16) - confirmed
+    empirically (not assumed) that neither dbt's compiled `manifest.
+    json` nor `run_results.json` reliably carries a test's own `meta`
+    block through, for either generic or singular tests, so a real fix
+    has to read `schema.yml` directly either way.
+
+    Fixed by adding a new top-level `tests:` block to `schema.yml`
+    (dbt's own "data test properties" shape - config keyed by a
+    singular test's file/function name, not nested under a model) with
+    `config.meta.check_id`/`introduced_date`/`description`/`changelog`
+    for all 4 singular tests, and extending `parse_dbt_check_metadata()`
+    to also walk it (`_parse_dbt_singular_test()`) - verified for real
+    against the installed dbt-core 1.12.4, not assumed: a real `dbt
+    build` for both `multiple_birth_sibling` (BDM) and all 3 CP business
+    rules still passes cleanly with the new block in place, and the
+    compiled manifest node's `test_metadata`/`column_name` fields stay
+    exactly as before (confirming `run_dbt_bdm.py`'s/`run_dbt_cp.py`'s
+    own manifest-based branching logic is unperturbed). `check_lifecycle.
+    validate()` now reports 258 checks (up from 254), the 4 new ones
+    landing as genuinely new check_ids, not undocumented changes.
+
+    Also added `dbt_check_id_lookup()` - a `{(column_or_None,
+    test_type_or_name): check_id}` reverse lookup built the same way,
+    for `run_dbt_bdm.py`/`run_dbt_cp.py` to tag each real result with
+    its own `check_id` at write time (the actual prerequisite this was
+    found while building - see plans/publishing-and-history.md Phase 4).
+
+    Regression tests: `tests/test_check_lifecycle.py`'s
+    `test_parse_dbt_check_metadata_covers_singular_tests`/
+    `test_parse_dbt_check_metadata_raises_for_singular_test_without_
+    check_id`/`test_dbt_check_id_lookup_keys_*` - confirmed to fail
+    against the pre-fix parser (which never reads `doc.get("tests")` at
+    all) before the fix landed, per this repo's own "verify a
+    regression test actually fails first" convention.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

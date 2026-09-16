@@ -71,6 +71,88 @@ def test_parse_dbt_check_metadata_raises_for_tests_without_check_id(tmp_path):
     assert "not_null" in message, "a dict test with no meta.check_id must also be reported"
 
 
+def test_parse_dbt_check_metadata_covers_singular_tests(tmp_path):
+    """Regression for a real, pre-existing gap found 2026-09-16: this
+    function only ever walked models[].tests/models[].columns[].tests -
+    a singular test (tests/*.sql, config'd via a top-level `tests:`
+    block, not nested under any model) had no check_id anywhere and was
+    silently invisible here, not caught by check_lifecycle.validate()
+    at all. Confirmed failing against the pre-fix code (git stash the
+    parser change, this assertion goes from 1 to 0) before fixing."""
+    path = _write(tmp_path, "schema.yml", """\
+        models:
+          - name: stg_birth_registrations
+        tests:
+          - name: multiple_birth_sibling
+            config:
+              meta:
+                check_id: data-asset-1.bdm.birth_registrations.stg_birth_registrations.is_multiple_birth.multiple_birth_sibling_dbt
+                introduced_date: "2026-01-15"
+                description: "Every multiple-birth record needs a matching sibling."
+                changelog: []
+        """)
+
+    checks = cl.parse_dbt_check_metadata(path)
+
+    assert len(checks) == 1
+    c = checks[0]
+    assert c.check_id == ("data-asset-1.bdm.birth_registrations.stg_birth_registrations."
+                           "is_multiple_birth.multiple_birth_sibling_dbt")
+    assert c.tool == "dbt"
+    assert c.introduced_date == "2026-01-15"
+
+
+def test_parse_dbt_check_metadata_raises_for_singular_test_without_check_id(tmp_path):
+    path = _write(tmp_path, "schema.yml", """\
+        models:
+          - name: stg_birth_registrations
+        tests:
+          - name: multiple_birth_sibling
+            config: {}
+        """)
+
+    with pytest.raises(cl.MissingCheckIdError) as exc_info:
+        cl.parse_dbt_check_metadata(path)
+
+    assert "multiple_birth_sibling" in str(exc_info.value)
+
+
+def test_dbt_check_id_lookup_keys_generic_tests_by_column_and_type(tmp_path):
+    path = _write(tmp_path, "schema.yml", """\
+        models:
+          - name: stg_birth_registrations
+            columns:
+              - name: registration_number
+                tests:
+                  - not_null:
+                      meta:
+                        check_id: data-asset-1.bdm.birth_registrations.stg_birth_registrations.registration_number.not_null_dbt
+        """)
+
+    lookup = cl.dbt_check_id_lookup(path)
+
+    assert lookup[("registration_number", "not_null")] == (
+        "data-asset-1.bdm.birth_registrations.stg_birth_registrations.registration_number.not_null_dbt")
+
+
+def test_dbt_check_id_lookup_keys_singular_tests_by_name_with_no_column(tmp_path):
+    path = _write(tmp_path, "schema.yml", """\
+        models:
+          - name: stg_birth_registrations
+        tests:
+          - name: multiple_birth_sibling
+            config:
+              meta:
+                check_id: data-asset-1.bdm.birth_registrations.stg_birth_registrations.is_multiple_birth.multiple_birth_sibling_dbt
+        """)
+
+    lookup = cl.dbt_check_id_lookup(path)
+
+    assert lookup[(None, "multiple_birth_sibling")] == (
+        "data-asset-1.bdm.birth_registrations.stg_birth_registrations."
+        "is_multiple_birth.multiple_birth_sibling_dbt")
+
+
 def test_parse_dbt_check_metadata_covers_model_level_tests(tmp_path):
     path = _write(tmp_path, "schema.yml", """\
         models:

@@ -105,6 +105,26 @@ def _parse_dbt_test(test: Any, source: str, location: str) -> list[CheckMetadata
     )]
 
 
+def _parse_dbt_singular_test(entry: dict, source: str) -> list[CheckMetadata]:
+    """A top-level `tests:` entry (dbt's "data test properties" - config
+    keyed by a singular test's own file/function name, not nested under
+    a model) - see schema.yml's own comment on that block for why
+    singular tests (tests/*.sql) need this separate shape from
+    _parse_dbt_test's model/column-nested one."""
+    name = entry.get("name")
+    if not name:
+        return []
+    config = dict(entry.get("config") or {})
+    meta = config.pop("meta", None) or {}
+    check_id = meta.get("check_id")
+    if not check_id:
+        raise MissingCheckIdError(f"{source}: singular test {name!r} has no config.meta.check_id")
+    return [CheckMetadata(
+        check_id=check_id, tool="dbt", config_hash=_config_hash(config),
+        source_file=source, **_lifecycle_fields(meta),
+    )]
+
+
 def parse_dbt_check_metadata(schema_yml_path: Path | str) -> list[CheckMetadata]:
     with open(schema_yml_path) as f:
         doc = yaml.safe_load(f) or {}
@@ -123,9 +143,64 @@ def parse_dbt_check_metadata(schema_yml_path: Path | str) -> list[CheckMetadata]
                     out.extend(_parse_dbt_test(test, source, f"model {model['name']!r} column {col['name']!r}"))
                 except MissingCheckIdError as e:
                     errors.append(str(e))
+    # Singular tests (tests/*.sql) - a real, pre-existing gap until
+    # 2026-09-16: this function only ever walked models[].tests/
+    # models[].columns[].tests, so every singular test (multiple_birth_
+    # sibling, Child Protection's 3 cross-table business-rule tests) had
+    # no check_id anywhere and was silently invisible here - not failing
+    # check_lifecycle.validate(), just never seen by it. See
+    # plans/qa-pipeline.md's own entry for the full account.
+    for entry in doc.get("tests", []) or []:
+        try:
+            out.extend(_parse_dbt_singular_test(entry, source))
+        except MissingCheckIdError as e:
+            errors.append(str(e))
     if errors:
         raise MissingCheckIdError("\n".join(errors))
     return out
+
+
+def dbt_check_id_lookup(schema_yml_path: Path | str) -> dict[tuple[str | None, str], str]:
+    """`{(column_or_None, dbt_test_type_or_singular_name): check_id}` for
+    every real dbt check in this file - built directly from schema.yml,
+    NOT dbt's compiled manifest (verified empirically, 2026-09-16: a
+    test's own `meta`/`config.meta` block does not reliably survive into
+    the compiled manifest node for either generic or singular tests, so
+    that's never a reliable source - see plans/qa-pipeline.md).
+    Model-level and singular tests key on `(None, test_type)`; column-
+    level tests key on `(column, test_type)`, both matching exactly what
+    run_dbt_bdm.py's/run_dbt_cp.py's own result-construction loop already
+    has on hand (`node.get("column_name")` and the resolved `test_name`)
+    - used to tag each real check result with its own check_id at write
+    time, not reconstructed from the check_id naming convention."""
+    with open(schema_yml_path) as f:
+        doc = yaml.safe_load(f) or {}
+    lookup: dict[tuple[str | None, str], str] = {}
+
+    def _record(test: Any, column: str | None) -> None:
+        if isinstance(test, str) or not isinstance(test, dict) or len(test) != 1:
+            return
+        (test_type, test_config), = test.items()
+        meta = (test_config or {}).get("meta") or {}
+        check_id = meta.get("check_id")
+        if check_id:
+            lookup[(column, test_type)] = check_id
+
+    for model in doc.get("models", []) or []:
+        for test in model.get("tests", []) or []:
+            _record(test, None)
+        for col in model.get("columns", []) or []:
+            for test in col.get("tests", []) or []:
+                _record(test, col["name"])
+
+    for entry in doc.get("tests", []) or []:
+        name = entry.get("name")
+        meta = (entry.get("config") or {}).get("meta") or {}
+        check_id = meta.get("check_id")
+        if name and check_id:
+            lookup[(None, name)] = check_id
+
+    return lookup
 
 
 # ---- Soda checks YAML ------------------------------------------------
