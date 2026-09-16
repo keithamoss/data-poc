@@ -18,21 +18,54 @@ it - `raw_output` stays pristine either way): the same fully-resolved,
 dashboard-ready check-result records `evaluate_*()` already builds in
 memory every run, captured here too. Added 2026-09-16
 (plans/publishing-and-history.md Phase 2, Keith's explicit call) once a
-real gap was found: dbt's `raw_output` alone isn't trustworthy (a
-documented dbt-core bug hardcodes `failures=0` on some passing-but-
-actually-nonzero results - dbt-labs/dbt-core#11312) and Soda's
-`row_count_total` isn't in `scan_results` at all - both only get
-resolved via a live query against that run's own per-run DuckDB
-warehouse, which only exists while the tool is actually running, not
-when this history is read back later. Rather than have Phase 2's
-dashboard-pipeline read step depend on that ephemeral warehouse too (or
-silently trust a known-sometimes-wrong number), each `run_*.py` caller
-now writes `verified` once, at the point that live connection already
-exists - so reading committed history back later needs nothing beyond
-this file. Every tool writes `verified` the same way, even the 2 (data-
-contract-cli, Evidently) whose `raw_output` never needed correcting -
-uniform shape, so the reader (`qa_results_reader.py`) never has to
-special-case which tools happen to need it.
+real gap was found: `raw_output` alone isn't trustworthy or sufficient
+for two dbt-side bugs plus one Soda-side gap, all already investigated
+in full in `plans/qa-pipeline.md` and `qa_tools/bdm/run_dbt_bdm.py`'s
+own docstring - not re-derived here, just cited:
+
+1. **dbt-core's `failures=0` accounting bug**, root-caused
+   (`plans/qa-pipeline.md` item 34): `dbt/task/test.py`'s
+   `build_test_run_result()` (confirmed in our installed dbt-core
+   1.12.4's own source) never reassigns `failures` off its `0` default
+   when a test's final status lands on "Pass" - so any test whose real
+   failure count is nonzero but under every configured threshold (a
+   genuine pass) silently reports `failures=0` in `run_results.json`.
+   Filed and triaged upstream as a real bug, fix unmerged as of our
+   installed version: [dbt-labs/dbt-core#11312](
+   https://github.com/dbt-labs/dbt-core/issues/11312).
+2. **A second, separate, still-NOT-root-caused nondeterminism**
+   (`plans/qa-pipeline.md` items 34 and 38): a test's reported status/
+   failures flipping between correct and wrong across separate
+   `dbt build` invocations of the identical warehouse file, no code
+   change in between. Item 38's own deep, controlled repro (40+
+   invocations, isolated and under real parallel load) found and fixed
+   a related-but-distinct, fully-explained bug along the way (a missing
+   `fail_calc:` override in this project's own `schema.yml`, nothing to
+   do with dbt-core itself) but never reproduced the original flip - it
+   remains open, unexplained, and has no upstream issue filed (points at
+   dbt-duckdb's query execution path, not dbt-core's result-reporting
+   logic, so there's nothing to link beyond this repo's own account).
+3. **Soda's `row_count_total` isn't in `scan_results` at all** - not a
+   Soda bug, just a genuine gap in what that structure exposes (no
+   issue to cite, upstream or otherwise).
+
+Both dbt problems are exactly what `run_dbt_bdm.py`'s/`run_dbt_cp.py`'s
+`_AUDIT_AGGREGATE_SQL` audit-table re-query protects against "at once"
+(their own docstrings' wording) - it doesn't care which of the two
+produced a wrong number, it re-derives the truth from dbt's own
+`--store-failures` audit table regardless. That query, and Soda's
+`row_count_total` query, both need a live connection to that run's own
+per-run DuckDB warehouse - which only exists while the tool is actually
+running, not when this history is read back later. Rather than have
+Phase 2's dashboard-pipeline read step depend on that ephemeral
+warehouse too (or silently trust numbers known to sometimes be wrong),
+each `run_*.py` caller now writes `verified` once, at the point that
+live connection already exists - so reading committed history back
+later needs nothing beyond this file. Every tool writes `verified` the
+same way, even the 2 (datacontract-cli, Evidently) whose `raw_output`
+never needed correcting - uniform shape, so the reader
+(`qa_results_reader.py`) never has to special-case which tools happen
+to need it.
 
 Path layout: `qa_results/<agency>/<dataset>/<run_id>/<tool>.json` - one
 directory per run, one file per tool, `run_id` (not `run_timestamp`)

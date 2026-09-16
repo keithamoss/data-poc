@@ -617,15 +617,41 @@ quality_rule_without_check_id`).
 scoping - resolved with Keith upfront rather than discovered mid-build:**
 tracing through the existing `evaluate_dbt_bdm()`/`evaluate_soda_bdm()`
 (and CP counterparts) showed Phase 1's committed `raw_output` alone
-isn't trustworthy or sufficient for this phase. Two real issues, both
-in code that predates this whole publishing-and-history effort:
-- dbt: a documented dbt-core bug (`failures` hardcoded to 0 on some
-  passing-but-actually-nonzero results, dbt-labs/dbt-core#11312,
-  already root-caused - see `plans/qa-pipeline.md`) only gets corrected
-  by a live query against that run's own per-run DuckDB warehouse,
-  computed *after* Phase 1 already wrote the raw file.
-- Soda: `row_count_total` isn't in `scan_results` at all - also a live
-  per-run-warehouse query, same timing problem.
+isn't trustworthy or sufficient for this phase. Three real issues, all
+in code that predates this whole publishing-and-history effort - not
+re-derived here, cited from where they were already fully investigated:
+- **dbt bug 1 - the `failures=0` accounting bug**, root-caused
+  (`plans/qa-pipeline.md` item 34, `qa_tools/bdm/run_dbt_bdm.py`'s own
+  docstring): `dbt/task/test.py`'s `build_test_run_result()` never
+  reassigns `failures` off its `0` default when a test's final status
+  lands on "Pass" - a test whose real failure count is nonzero but
+  under every configured threshold (a genuine pass) silently reports
+  `failures=0` in `run_results.json`. Filed and triaged upstream,
+  fix unmerged as of our installed version: [dbt-labs/dbt-core#11312](
+  https://github.com/dbt-labs/dbt-core/issues/11312).
+- **dbt bug 2 - a second, separate, still-NOT-root-caused
+  nondeterminism** (`plans/qa-pipeline.md` items 34 and 38): a test's
+  reported status/failures flipping between correct and wrong across
+  separate `dbt build` invocations of the identical warehouse file, no
+  code change in between. Item 38's own deep, controlled repro (40+
+  invocations, isolated and under real parallel load) found and fixed a
+  related-but-distinct, fully-explained bug along the way (a missing
+  `fail_calc:` override in this project's own `schema.yml`) but never
+  reproduced the original flip - still open, unexplained, no upstream
+  issue filed (points at dbt-duckdb's own query execution path, not
+  dbt-core's result-reporting logic, so there's nothing external to
+  link beyond this repo's own account).
+- **Soda gap - not a bug**: `row_count_total` isn't in `scan_results`
+  at all, just a genuine gap in what that structure exposes (no issue
+  to cite, upstream or otherwise).
+
+Both dbt bugs only get corrected by the same live query
+(`_AUDIT_AGGREGATE_SQL`) against that run's own per-run DuckDB
+warehouse, computed *after* Phase 1 already wrote the raw file -
+deliberately "at once" per that query's own docstring, since it
+re-derives the truth from dbt's own audit table regardless of which of
+the two produced a wrong number. Soda's `row_count_total` needs the
+same kind of live per-run-warehouse query, same timing problem.
 
 Both live queries need a DuckDB connection to `data/duckdb_runs/`/
 `data/cp_duckdb_runs/` - ephemeral, gitignored, regenerated - which
