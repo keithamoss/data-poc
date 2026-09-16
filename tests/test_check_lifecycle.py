@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import textwrap
 
+import pytest
+
 from qa_tools.common import check_lifecycle as cl
 
 
@@ -48,7 +50,7 @@ def test_parse_dbt_check_metadata_extracts_check_id_and_lifecycle_fields(tmp_pat
     assert c.changelog == []
 
 
-def test_parse_dbt_check_metadata_skips_tests_without_check_id(tmp_path):
+def test_parse_dbt_check_metadata_raises_for_tests_without_check_id(tmp_path):
     path = _write(tmp_path, "schema.yml", """\
         models:
           - name: stg_birth_registrations
@@ -61,9 +63,12 @@ def test_parse_dbt_check_metadata_skips_tests_without_check_id(tmp_path):
                         warn_if: ">90"
         """)
 
-    checks = cl.parse_dbt_check_metadata(path)
+    with pytest.raises(cl.MissingCheckIdError) as exc_info:
+        cl.parse_dbt_check_metadata(path)
 
-    assert checks == [], "a bare test name and a test with no meta block have no check_id - not migrated, not an error"
+    message = str(exc_info.value)
+    assert "unique" in message, "a bare test name has no check_id and must be reported"
+    assert "not_null" in message, "a dict test with no meta.check_id must also be reported"
 
 
 def test_parse_dbt_check_metadata_covers_model_level_tests(tmp_path):
@@ -138,11 +143,25 @@ def test_parse_soda_check_metadata_ignores_dataset_level_attributes_block(tmp_pa
               owner: some-team
           - row_count > 0:
               name: has rows
+              attributes:
+                check_id: data-asset-1.bdm.birth_registrations.stg_birth_registrations.row_count
         """)
 
     checks = cl.parse_soda_check_metadata(path)
 
-    assert checks == [], "a dataset-level 'attributes:' default block is not a check, and the row_count check has no check_id"
+    assert len(checks) == 1, "a dataset-level 'attributes:' default block is not a check and must be skipped"
+    assert checks[0].check_id == "data-asset-1.bdm.birth_registrations.stg_birth_registrations.row_count"
+
+
+def test_parse_soda_check_metadata_raises_for_checks_without_check_id(tmp_path):
+    path = _write(tmp_path, "checks.yml", """\
+        checks for birth_registrations:
+          - row_count > 0:
+              name: has rows
+        """)
+
+    with pytest.raises(cl.MissingCheckIdError, match="row_count"):
+        cl.parse_soda_check_metadata(path)
 
 
 def test_parse_soda_check_metadata_config_hash_ignores_name_and_attributes(tmp_path):
@@ -225,6 +244,21 @@ def test_parse_contract_check_metadata_covers_table_level_quality(tmp_path):
 
     assert len(checks) == 1
     assert checks[0].check_id == "x.y.birth_registrations.stg_birth_registrations.rowCount"
+
+
+def test_parse_contract_check_metadata_raises_for_quality_rule_without_check_id(tmp_path):
+    path = _write(tmp_path, "contract.yaml", """\
+        schema:
+          - name: birth_registrations
+            properties:
+              - name: registration_number
+                quality:
+                  - metric: nullValues
+                    mustBe: 0
+        """)
+
+    with pytest.raises(cl.MissingCheckIdError, match="nullValues"):
+        cl.parse_contract_check_metadata(path)
 
 
 # ---- Evidently parsing (plain dict, no file I/O) -----------------------

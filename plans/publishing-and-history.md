@@ -525,28 +525,67 @@ validation) - [DONE, 2026-09-16]:**
   renders with zero console errors afterward (real Playwright check).
 
 **A real design gap found during verification, not anticipated in the
-original scoping - worth Keith's sign-off before Phase 2:** the agreed
-`check_id` format (`<data-asset-name>.<agency>.<dataset>.<table>.
-<column>.<check_name>`) has no segment distinguishing which TOOL
-implements a check. This didn't matter for most checks (each tool's own
-metric vocabulary - `not_null` vs `missing_count` vs `nullValues` -
-already differs naturally), but several cross-table business rules and
-FK checks are implemented identically in more than one tool (Soda and
-the ODCS contract both implement the same 7 foreign keys and 3 business
-rules, in their own vocabularies, by this project's own long-standing
-design - see Thread B's own docstring). Where the check_name chosen for
-each was the same generic label (e.g. "date_of_birth range check"),
-this produced a real `check_id` collision - found on the BDM side first
-(5 collisions), fixed with a `_soda`/`_datacontract` suffix on the
-affected checks; applied proactively on the CP side afterward (7 FK +
-3 business-rule checks each got a tool-suffixed check_name from the
-start, avoiding a second collision-and-fix round). The underlying
-scheme itself wasn't changed - not every check_id needs a tool suffix,
-only ones where two tools happen to implement literally the same rule
-under the same name. Worth a real conversation before Phase 2 locks
-in on this pattern: keep the "suffix only when needed" convention as
-now applied, or make every check_id tool-qualified by default for
-robustness against future collisions that haven't happened yet.
+original scoping:** the agreed `check_id` format (`<data-asset-name>.
+<agency>.<dataset>.<table>.<column>.<check_name>`) has no segment
+distinguishing which TOOL implements a check. This didn't matter for
+most checks (each tool's own metric vocabulary - `not_null` vs
+`missing_count` vs `nullValues` - already differs naturally), but
+several cross-table business rules and FK checks are implemented
+identically in more than one tool (Soda and the ODCS contract both
+implement the same 7 foreign keys and 3 business rules, in their own
+vocabularies, by this project's own long-standing design - see Thread
+B's own docstring). Where the check_name chosen for each was the same
+generic label (e.g. "date_of_birth range check"), this produced a real
+`check_id` collision - found on the BDM side first (5 collisions),
+fixed with a `_soda`/`_datacontract` suffix on the affected checks;
+applied proactively on the CP side afterward (7 FK + 3 business-rule
+checks each got a tool-suffixed check_name from the start, avoiding a
+second collision-and-fix round).
+
+**Decided, 2026-09-16 (Keith): tool-qualify every `check_id` by
+default going forward**, not just the ones that happen to collide -
+robustness against future collisions that haven't happened yet, not
+just the ones found so far. Applied immediately to the retrofit's
+validation itself (see below). **Not yet applied retroactively to the
+~249 checks that don't currently carry a tool suffix** - flagged as a
+real, non-obvious consequence worth Keith's call before doing that
+mechanical rename: `check_id` is meant to be a check's *stable*
+identity across runs (that's the whole point - it's what Phase 2's
+trend lines and Phase 5's UI will match historical results by). Mass-
+renaming all 249 today would sever that continuity between the 25
+already-committed historical runs and every run from here on - every
+renamed check would look, to anything reading `qa_results/` history,
+like the old check_id was retired and a new one introduced on the same
+day, not like a rename. `check_lifecycle.py` doesn't currently model
+"this check_id replaced that one" as a distinct kind of change from
+retirement - only retirement and config-change are modeled. Low stakes
+right now (25 runs, PoC-stage), but worth Keith explicitly choosing
+between: (a) do the mass rename now anyway and accept the severed
+continuity given how little history exists yet, (b) apply the suffix
+only to check_names going forward (new checks, or existing ones next
+time they're genuinely touched) and leave the rest as-is, or (c) add a
+real "renamed from" concept to the metadata/validation so a rename
+doesn't read as retirement+reintroduction, before doing the mass
+rename.
+
+**Decided and built, 2026-09-16 (Keith): a check with no `check_id` is
+now a hard error, not a silent skip.** Before this, `check_lifecycle.py`
+treated a check with no `check_id` in its metadata as "not yet
+migrated" and silently excluded it from parsing - appropriate mid-
+retrofit, but a real gap once the retrofit gave every one of the 254
+real checks a `check_id`: from that point on, a check with none is a
+mistake, not a valid state. `parse_dbt_check_metadata`/
+`parse_soda_check_metadata`/`parse_contract_check_metadata` now raise
+`MissingCheckIdError` (collecting every offending check in a file into
+one error, not failing on the first) naming the file, the
+model/table/column, and the check/test/rule - Evidently's
+`CHECK_LIFECYCLE` dict is exempt by construction (it's keyed by
+`check_id`, so there's no way to add an entry without one). Verified
+against all 254 real checks (`parse_*` + `validate()` still clean) and
+covered by new tests (`test_parse_dbt_check_metadata_raises_for_tests_
+without_check_id`, `test_parse_soda_check_metadata_raises_for_checks_
+without_check_id`, `test_parse_contract_check_metadata_raises_for_
+quality_rule_without_check_id`).
 
 **Phase 2 (Thread B - dashboard pipeline's read side):**
 - The dashboard pipeline's "read all committed history, merge, reshape"
