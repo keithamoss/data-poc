@@ -22,7 +22,9 @@ scoped.
   results become a durable, committed, multi-person-publishable history
   (superseding today's gitignored `reports/*.json`), CI-gated publishing
   with no manual local-publish path, check retirement/definition-change
-  versioning, and cadence-aware "as of" viewing for non-daily datasets.
+  versioning, and cadence-aware "as of" viewing (one data-asset-level
+  offset, motivated by non-daily datasets but applied globally - see
+  that file's Thread C for the 2026-09-16 correction on this point).
   Read this before touching anything related to `reports/*.json`
   gitignore status, the dashboard's publish/deploy path, or check
   lifecycle - the design already accounts for changes in this area that
@@ -52,7 +54,7 @@ Rough layout:
 
 | Path | What |
 |---|---|
-| `contract/` | Real ODCS contract + SodaCL check YAML - the actual source of truth for schema/quality rules |
+| `contract/` | Real ODCS contract + SodaCL check YAML - the actual source of truth for schema/quality rules. Also holds `data-asset.yaml` - genuinely data-asset-level (not per-dataset) config, currently just `data_asset_id`/`as_of_offset_days` (Thread C's "as of" viewing offset - one global value, corrected 2026-09-16 from an earlier, wrong per-dataset attachment - see `plans/publishing-and-history.md`) |
 | `generator/` | Synthetic data generation (`daily_batch.py`, `generate_runs.py`, `resupply.py`, `dirty.py`, `names_au.py`, `presentation.py`) - Birth Registrations only; deliberately separate from `synthetic_data_generator/`'s population-scale generator, though the two share `dirty.py`/`names_au.py`/`presentation.py` (canonical here, imported from there - see `plans/wider.md`'s package-layout entry). A real package (`generator/__init__.py`) - run its scripts as `python3 -m generator.<module>`, not `python3 generator/<module>.py` (the latter can't resolve the absolute imports this needs - see that same entry for why). |
 | `synthetic_data_generator/` | A separate, population-scale (millions), cross-agency-identity-linked synthetic data generator - not currently wired into the pipeline (see `plans/wider.md`). Also a real package, run as `python3 -m synthetic_data_generator.<module>`. |
 | `pipeline/` | `orchestrate.py` generates + loads the combined DuckDB warehouse - used locally (`./run_pipeline.sh`) and by `qa_tools.bdm.orchestrate_bdm`, never by CI (see `qa_results/`'s own entry). `build_dashboard_data.py`/`build_cp_dashboard_data.py` reshape `reports/results_bdm.json`/`results_cp.json` (check results + `dataset_stats`, both from committed `qa_results/` history) into dashboard JSON - pure functions of that one file since Phase 3, no DuckDB import or live query of their own any more. Also a real package, run as `python3 -m pipeline.<module>`. |

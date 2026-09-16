@@ -1,0 +1,31 @@
+# Data-asset-level configuration - genuinely global (the whole system,
+# every agency/collection/dataset), not attached to any one dataset's
+# own contract. `data_asset_id` is the same "data-asset-1" placeholder
+# literal already baked into every check_id across all 4 tools' check
+# definitions (a real name can replace it later, everywhere it appears,
+# without changing the check_id scheme itself - see
+# plans/publishing-and-history.md Thread D). This file is the one place
+# that placeholder is declared, not repeated as a hardcoded string per
+# dataset's own config.
+#
+# Corrected 2026-09-16 (Keith's call): `as_of_offset_days` previously
+# lived as dataset-level `customProperties` on this repo's Child
+# Protection ODCS contract only (`contract/child-protection-
+# contract.yaml`), reasoned from that one collection's own quarterly
+# cadence. Wrong attachment point - Keith's explicit correction: this
+# is data-asset-level config, genuinely global. ONE offset applies to
+# every dataset's "as of" view, not a different value derived from each
+# dataset's own refresh cadence (so Birth Registrations - a daily feed -
+# also defaults to viewing state this many days behind latest, not the
+# absolute latest, once Thread C's actual as-of viewing logic/UI gets
+# built - still unbuilt as of this file's creation). Value carried over
+# unchanged from the superseded per-dataset config (60 - the number
+# itself wasn't in question, only where it's declared and its scope);
+# revisit if a genuinely global default warrants a different number.
+#
+# See plans/publishing-and-history.md's Thread C entries for the full
+# history, including the now-superseded per-dataset reasoning this
+# replaces.
+
+data_asset_id: data-asset-1
+as_of_offset_days: 60

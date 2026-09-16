@@ -77,23 +77,6 @@ support:
     tool: email
     description: Child Protection data supply team - replace with a real contact before use
 
-# Thread C's cadence-aware "as of" viewing (plans/publishing-and-
-# history.md, Phase 4) - Keith's call, 2026-09-16: 60 days, now that
-# this collection's real generated cadence is genuinely quarterly (see
-# generator/generate_cp_runs.py). The dashboard should default to
-# showing state as of 60 days behind the latest run, not "today" -
-# right after a quarterly refresh, defaulting to "today" would look
-# identical to a daily dataset's genuinely live current state, even
-# though this collection won't move again for ~3 months (Keith's own
-# words, same session). Lives here (dataset-level contract metadata)
-# rather than a separate config file - Keith's own call, same place
-# check-lifecycle metadata already lives. No equivalent property on
-# birth-registrations-contract.yaml - a daily asset shows the absolute
-# latest with no offset, by design.
-customProperties:
-  - property: asOfOffsetDays
-    value: "60"
-
 servers:
   - server: production
     type: s3

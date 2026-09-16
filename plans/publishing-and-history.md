@@ -474,12 +474,23 @@ a daily dataset's genuinely live current state, even though the
 quarterly one won't move again for ~3 months - a false signal, Keith's
 own words.
 
-**Decision:** a configurable relative-day offset per data asset that
-sets the dashboard's default "as of" date:
-- Daily asset (BDM): no filter, always show the absolute latest.
-- Quarterly asset (Child Protection, or whichever ends up quarterly):
-  offset of N days (e.g. 30-60, exact number not yet decided) - the
-  dashboard defaults to showing state as of N days ago, not today.
+**Decision:** a configurable relative-day offset that sets the
+dashboard's default "as of" date. **Corrected 2026-09-16 (Keith's
+call, superseding the two bullets originally here):** this offset is
+genuinely DATA-ASSET-level, not per-dataset - one number, configured
+once for the whole system, applied uniformly to every dataset's as-of
+view regardless of that dataset's own refresh cadence. The original
+design (documented below in the "Resolved while scoping Phase 4"
+entry, kept for the record rather than deleted) reasoned a *different*
+offset per dataset from its own cadence - 0/none for daily Birth
+Registrations, 60 for quarterly Child Protection - which Keith flagged
+as the wrong attachment point: it's config that belongs to the data
+asset as a whole (`data-asset-1`, the same placeholder already used
+throughout every check_id), not scattered per dataset. Concretely, once
+this is wired into real as-of viewing logic, Birth Registrations will
+ALSO default to a date some days behind latest rather than the
+absolute latest - a real, deliberate behavior change from the original
+design, not an oversight.
 - Below the as-of threshold, a check/dataset that hasn't been run yet
   shows "no data available" rather than a misleading blank/red state.
 
@@ -503,7 +514,8 @@ rolling-window/embedded-blob model. Build B (and D, since they're
 intertwined) first.
 
 **Resolved while scoping Phase 4 for real, 2026-09-16 (previously
-"not yet designed"):**
+"not yet designed") - SUPERSEDED the same day, see the correction
+below:**
 - **Offset value: 60 days for Child Protection**, Keith's call - set
   now that CP's own real generated cadence is genuinely quarterly (see
   plans/wider.md's history-depth entry), not picked to paper over the
@@ -522,15 +534,40 @@ intertwined) first.
   per-check `quality:`-scoped customProperties parsing), full pytest +
   ruff clean.
 - **Relationship to the "time travel" snapshot picker: two separate,
-  clearly-labeled entry points**, Keith's call - not merged/unified.
+  clearly-labeled entry points**, Keith's call - not merged/unified,
+  unaffected by the correction below.
 
-**Not yet built**: the offset value is now configured and verified
-parseable, but nothing reads it into the dashboard build yet, and none
-of Thread C's actual UI (as-of date picker, URL param persistence,
-"no data available" below-threshold state) or querying logic (how the
-dashboard computes/displays state "as of" an arbitrary past date
-against committed history) exists yet - a genuinely separate, larger
-piece of work from configuring the one number.
+**Corrected, same day (Keith): wrong attachment point - this is
+data-asset-level config, not dataset-level, and genuinely one global
+value, not a different one per dataset.** Keith's own words: "that
+shouldn't be attached to datasets or anything... that should be
+configuration attached to the data asset... that's like global, not
+per dataset." Confirmed explicitly (not assumed) that he meant this
+literally - one shared offset applied to every dataset's as-of view,
+including Birth Registrations, not a shared config location that still
+holds a different value per dataset underneath.
+
+Moved out of `contract/child-protection-contract.yaml`'s
+`customProperties` entirely into a new file, `contract/data-asset.yaml`
+- the one place the `data-asset-1` placeholder (already used throughout
+every check_id) is itself declared, alongside `as_of_offset_days: 60`.
+The number carries over unchanged from the superseded per-dataset
+value - only its attachment point and scope changed, not the number
+itself (revisit if a genuinely global default warrants something
+else). Re-verified for real after the move: `datacontract lint` still
+passes on the now-smaller CP contract, `check_lifecycle.validate()`
+still reports the same 258 checks/zero errors (the removed block was
+root-level, never inside `check_lifecycle.py`'s per-check `quality:`
+parsing), full pytest + ruff clean.
+
+**Not yet built**: the offset value is now configured (correctly
+scoped) and verified parseable, but nothing reads it into the
+dashboard build yet, and none of Thread C's actual UI (as-of date
+picker, URL param persistence, "no data available" below-threshold
+state) or querying logic (how the dashboard computes/displays state
+"as of" an arbitrary past date against committed history) exists yet -
+a genuinely separate, larger piece of work from configuring the one
+number.
 
 ## Build order
 
