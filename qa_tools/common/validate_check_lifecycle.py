@@ -38,14 +38,21 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 # retrofit was itself a manual, deliberate act per dataset.
 _YAML_SOURCES = [
     ("dbt_project/models/staging/schema.yml", cl.parse_dbt_check_metadata),
+    ("dbt_project/schema-retired.yml", cl.parse_dbt_check_metadata),
     ("contract/bdm-birth-registrations-soda-checks.yml", cl.parse_soda_check_metadata),
+    ("contract/bdm-birth-registrations-soda-checks-retired.yml", cl.parse_soda_check_metadata),
     ("contract/child-protection-soda-checks.yml", cl.parse_soda_check_metadata),
+    ("contract/child-protection-soda-checks-retired.yml", cl.parse_soda_check_metadata),
     ("contract/bdm-birth-registrations-contract.yaml", cl.parse_contract_check_metadata),
+    ("contract/bdm-birth-registrations-contract-retired.yaml", cl.parse_contract_check_metadata),
     ("contract/child-protection-contract.yaml", cl.parse_contract_check_metadata),
+    ("contract/child-protection-contract-retired.yaml", cl.parse_contract_check_metadata),
 ]
 _EVIDENTLY_SOURCES = [
     "qa_tools/bdm/evidently_check_lifecycle.py",
+    "qa_tools/bdm/evidently_check_lifecycle_retired.py",
     "qa_tools/cp/evidently_check_lifecycle.py",
+    "qa_tools/cp/evidently_check_lifecycle_retired.py",
 ]
 
 
@@ -72,10 +79,17 @@ def _evidently_dict_from_source(source: str, filename: str) -> dict:
 
 def collect_checks(ref: str | None) -> list[cl.CheckMetadata]:
     """`ref=None` means the current working tree; otherwise a git ref
-    (e.g. `"HEAD~1"`)."""
+    (e.g. `"HEAD~1"`). A source path missing at `ref=None` reads as "no
+    checks from it" too, same as a path that didn't exist yet at an old
+    ref - each tool's own `-retired` sibling file (schema-retired.yml
+    etc., see their own header comments) is a genuinely optional source
+    until a real project's first check ever gets retired, so this can't
+    assume every listed path already exists on disk."""
     checks: list[cl.CheckMetadata] = []
     for rel_path, parser in _YAML_SOURCES:
         if ref is None:
+            if not (ROOT / rel_path).exists():
+                continue
             checks.extend(parser(ROOT / rel_path))
             continue
         content = _old_file_content(rel_path, ref)
@@ -88,6 +102,8 @@ def collect_checks(ref: str | None) -> list[cl.CheckMetadata]:
 
     for rel_path in _EVIDENTLY_SOURCES:
         if ref is None:
+            if not (ROOT / rel_path).exists():
+                continue
             with open(ROOT / rel_path) as f:
                 source = f.read()
         else:

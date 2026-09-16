@@ -332,6 +332,25 @@ def find_duplicate_check_ids(checks: list[CheckMetadata]) -> list[str]:
     return sorted(check_id for check_id, count in seen.items() if count > 1)
 
 
+def find_disappeared_check_ids(old_checks: list[CheckMetadata], new_checks: list[CheckMetadata]) -> list[str]:
+    """Returns check_ids present in `old_checks` but entirely missing
+    from `new_checks` - a check_id, once introduced, must never be
+    changed or deleted, even once retired (Keith's call, 2026-09-16).
+    Retiring a check means MOVING its whole metadata block into that
+    tool's own `-retired` sibling file (schema-retired.yml, *-checks-
+    retired.yml, *-contract-retired.yaml, evidently_check_lifecycle_
+    retired.py - see each one's own header comment), never deleting it
+    outright - so a properly-retired check_id is still found by the
+    caller's own collection (both the active AND retired sources feed
+    into `old_checks`/`new_checks` here, see validate_check_lifecycle.py's
+    `_YAML_SOURCES`/`_EVIDENTLY_SOURCES`), just now sourced from the
+    retired file instead of the active one. Only a genuine deletion, or
+    an attempted rename (editing the check_id string itself, which reads
+    as the old id vanishing and a "new" one appearing), shows up here."""
+    new_ids = {c.check_id for c in new_checks}
+    return sorted(c.check_id for c in old_checks if c.check_id not in new_ids)
+
+
 def find_undocumented_changes(old_checks: list[CheckMetadata], new_checks: list[CheckMetadata]) -> list[str]:
     """Returns check_ids whose config_hash changed between `old_checks`
     and `new_checks` without a new changelog entry to explain it (the
@@ -358,4 +377,9 @@ def validate(old_checks: list[CheckMetadata], new_checks: list[CheckMetadata]) -
         errors.append(f"Duplicate check_id: {check_id!r}")
     for check_id in find_undocumented_changes(old_checks, new_checks):
         errors.append(f"Check config changed without a new changelog entry: {check_id!r}")
+    for check_id in find_disappeared_check_ids(old_checks, new_checks):
+        errors.append(
+            f"check_id disappeared entirely - a check_id must never be deleted or renamed, "
+            f"only retired (moved to its own tool's -retired sibling file): {check_id!r}"
+        )
     return errors

@@ -415,12 +415,68 @@ def test_find_undocumented_changes_ignores_brand_new_check_ids():
         "a check that didn't exist before has nothing to have 'changed' from"
 
 
+# ---- find_disappeared_check_ids() -----------------------------------------
+
+def test_find_disappeared_check_ids_flags_a_check_id_missing_from_new():
+    old = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="f")]
+    new = []
+
+    assert cl.find_disappeared_check_ids(old, new) == ["a"]
+
+
+def test_find_disappeared_check_ids_allows_a_properly_retired_check():
+    """A check_id, once introduced, must never be deleted or renamed -
+    but retiring it (moving its metadata to that tool's own -retired
+    sibling file) is legitimate: the caller's own collection already
+    reads both active and retired sources into one list (see
+    validate_check_lifecycle.py's _YAML_SOURCES), so a properly-retired
+    check_id is still present in `new_checks`, just now carrying
+    retired_as_of - this function only ever sees "is the check_id there
+    at all", not which file it came from."""
+    old = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="schema.yml")]
+    new = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="schema-retired.yml",
+                             retired_as_of="2026-09-16", retired_reason="superseded")]
+
+    assert cl.find_disappeared_check_ids(old, new) == []
+
+
+def test_find_disappeared_check_ids_empty_when_nothing_changed():
+    checks = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="f")]
+
+    assert cl.find_disappeared_check_ids(checks, checks) == []
+
+
+def test_find_disappeared_check_ids_ignores_brand_new_check_ids():
+    old = []
+    new = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="f")]
+
+    assert cl.find_disappeared_check_ids(old, new) == []
+
+
 # ---- Top-level validate() ------------------------------------------------
 
 def test_validate_returns_empty_list_when_everything_is_clean():
     checks = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="f")]
 
     assert cl.validate(checks, checks) == []
+
+
+def test_validate_reports_a_disappeared_check_id():
+    old = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="f")]
+    new = []
+
+    errors = cl.validate(old, new)
+
+    assert len(errors) == 1
+    assert "disappeared" in errors[0] and "'a'" in errors[0]
+
+
+def test_validate_allows_a_properly_retired_check_id():
+    old = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="schema.yml", changelog=[])]
+    new = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="schema-retired.yml",
+                             changelog=[], retired_as_of="2026-09-16", retired_reason="superseded")]
+
+    assert cl.validate(old, new) == []
 
 
 def test_validate_reports_both_kinds_of_error_together():

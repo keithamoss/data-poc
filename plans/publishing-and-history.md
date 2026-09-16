@@ -622,6 +622,104 @@ without_check_id`, `test_parse_soda_check_metadata_raises_for_checks_
 without_check_id`, `test_parse_contract_check_metadata_raises_for_
 quality_rule_without_check_id`).
 
+**Decided and built, 2026-09-16 (Keith, same day, prompted by the
+check_id-propagation work for Phase 4's dashboard-wiring): a `check_id`,
+once introduced, is PERMANENTLY unique - it must never be changed or
+deleted, even once retired.**
+
+Surfaced by Keith's own question while scoping the check_id-propagation
+prerequisite for Phase 4: "if that was real data, we wouldn't want to
+have to backfill it in... is there any protection against a user
+changing the check_id?" Checked `validate()` precisely - there wasn't
+any. It only ever checked two things (duplicates in the current set;
+config changed without a changelog entry under the SAME check_id) -
+nothing looked at whether a check_id present in the previous commit was
+still present now. A renamed or deleted check_id passed completely
+clean: the old id simply vanished unflagged, and the new one looked
+"brand new" - `find_undocumented_changes()`'s own "nothing to have
+changed FROM" exemption. Worse than needing a backfill - silent history
+orphaning, with nothing telling anyone it happened. (This session's
+earlier 227-check_id tool-qualify rename would itself have been blocked
+by this rule had it existed then - already explicitly accepted as a
+one-time, pre-production exception when only 25 runs of history
+existed; this rule only applies going forward.)
+
+**Mechanism, verified for real before building, not assumed:**
+retirement was already designed (this section, above) to mean "history
+stays fully visible, just flagged inactive" - so the natural fix is one
+new rule: *any check_id present in the previous commit must still be
+present now, full stop.* Retiring a check must never make it disappear
+from what the parser sees, only relocate it. Checked whether each
+tool's LIVE, actually-executed config file could keep a retired check's
+metadata declared while disabling its execution in place:
+- **dbt**: yes - `config: {enabled: false}`. Verified with a real `dbt
+  build`: the disabled test is cleanly absent from `run_results.json`
+  entirely (no error), while its `meta`/`check_id` block stays fully
+  parseable in `schema.yml`.
+- **Soda**: no native mechanism. Checked the installed `soda-core`
+  package directly, not just docs - its SodaCL parser
+  (`soda/sodacl/sodacl_parser.py`) has no `enabled`/`disable`/`active`
+  keyword, and its `Scan` class's public API (`soda/scan.py`) has no
+  exclude/skip-check method either.
+- **datacontract-cli/ODCS**: no native mechanism either. Fetched the
+  real ODCS v3 JSON schema from `bitol-io/open-data-contract-standard`
+  directly - a quality rule's full property list has no `enabled`/
+  `active`/`disabled` field. Confirmed the same against the installed
+  `datacontract_specification` package's own `Quality` Pydantic model.
+
+Given that split, Keith's own call: **use one uniform mechanism for all
+four tools anyway, not a dbt-specific exception** - a small sibling
+`-retired` file per tool (dbt's `enabled: false` route was available but
+deliberately not used, for consistency). Retiring a check means
+removing its whole metadata block from the tool's actually-executed
+file and moving it, unchanged except for adding `retired_as_of`/
+`retired_reason`, into that tool's own sibling file - never loaded by
+the real tool, only ever read by `check_lifecycle.py`:
+- `dbt_project/schema-retired.yml` - deliberately OUTSIDE
+  `dbt_project/models/` (dbt's own `model-paths`), verified for real
+  that dbt's parser completely ignores a yml file sitting outside its
+  configured paths (a real `dbt build` with a garbage-content file
+  there succeeded cleanly). Same nested shape as the real `schema.yml`,
+  so `parse_dbt_check_metadata()` reads it completely unchanged.
+- `contract/bdm-birth-registrations-soda-checks-retired.yml` /
+  `contract/child-protection-soda-checks-retired.yml` - real SodaCL
+  shape, reusing `parse_soda_check_metadata()` unchanged.
+- `contract/bdm-birth-registrations-contract-retired.yaml` /
+  `contract/child-protection-contract-retired.yaml` - real ODCS shape,
+  reusing `parse_contract_check_metadata()` unchanged.
+- `qa_tools/bdm/evidently_check_lifecycle_retired.py` /
+  `qa_tools/cp/evidently_check_lifecycle_retired.py` - same
+  `CHECK_LIFECYCLE` dict shape, reusing `parse_evidently_check_
+  metadata()` unchanged. (Evidently didn't strictly need this split -
+  it's plain Python, so retiring a check there was always just "stop
+  calling it" - but got the same sibling-file treatment anyway, for one
+  rule with no per-tool exceptions to remember.)
+
+**Built:** `check_lifecycle.find_disappeared_check_ids(old_checks,
+new_checks)` - any check_id in `old_checks` missing entirely from
+`new_checks` is an error; wired into `validate()` as a third error
+type, alongside the existing duplicate/undocumented-change checks. All
+7 new sibling files created now (empty but validly-shaped, header
+comments explaining the mechanism) rather than waiting for a first real
+retirement, so `collect_checks()` never hits a missing-file surprise.
+`validate_check_lifecycle.py`'s `_YAML_SOURCES`/`_EVIDENTLY_SOURCES`
+extended to read each tool's active AND retired file - both feed into
+one combined list, so a properly-retired check_id is still found
+(just now sourced from the retired file) while a genuine deletion or
+rename shows up as missing entirely. **A real robustness gap found
+while writing the integration test, not just a test-fixture
+inconvenience**: `collect_checks(ref=None)` (the current working tree)
+crashed with `FileNotFoundError` on any listed source that didn't exist
+on disk yet - it already tolerated a missing path at an old git ref,
+just not at the working tree. Fixed the same way, symmetrically.
+9 new tests (unit-level `find_disappeared_check_ids()` cases, plus two
+full `main()` integration tests against a real temp git repo - one
+genuine deletion correctly caught, one proper retirement correctly
+passing clean - and a `collect_checks()` missing-source test). Verified
+against the real repo: `validate_check_lifecycle.py` reports 258 checks,
+zero errors, with all 7 (currently-empty) retired files wired in. Full
+pytest (162 tests) + ruff clean.
+
 **Phase 2 (Thread B - dashboard pipeline's read side) - [DONE,
 2026-09-16]:**
 - The dashboard pipeline's "read all committed history, merge, reshape"

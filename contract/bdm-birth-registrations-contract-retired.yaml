@@ -1,0 +1,26 @@
+# Retired ODCS quality rules for the BDM birth-registrations feed
+# (plans/publishing-and-history.md Thread D, Keith's call 2026-09-16: a
+# check_id, once introduced, is permanently unique - it must never be
+# changed or deleted, even once retired).
+#
+# datacontract-cli/ODCS has no native "declared but disabled" quality
+# rule mechanism - verified for real, not assumed: fetched the actual
+# ODCS v3 JSON schema (bitol-io/open-data-contract-standard) and checked
+# every property a quality rule can carry - no enabled/active/disabled
+# field exists. Confirmed the same against the installed datacontract-
+# cli package's own Quality Pydantic model. So retiring a contract
+# quality rule means removing its whole `quality:` block (with its
+# `customProperties`) from bdm-birth-registrations-contract.yaml (the
+# file `datacontract test` actually runs against) and moving it here
+# instead - this file is never passed to `run_against_local_server()`,
+# only ever read by qa_tools/common/check_lifecycle.py (which reuses
+# parse_contract_check_metadata() unchanged, just pointed at this second
+# path).
+#
+# Add `retired_as_of`/`retired_reason` customProperties to the moved
+# rule when you do (both required together - see check_lifecycle.py's
+# CheckMetadata). Same real ODCS shape as the active file - a `schema:`
+# list of tables, each with table-level and/or property-level `quality:`
+# blocks - just never a complete/valid contract on its own (no need for
+# one; nothing ever tests against this file for real).
+schema: []

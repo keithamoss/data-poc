@@ -1,0 +1,23 @@
+# Retired dbt checks (plans/publishing-and-history.md Thread D, Keith's
+# call 2026-09-16: a check_id, once introduced, is permanently unique -
+# it must never be changed or deleted, even once retired). Deliberately
+# OUTSIDE dbt_project/models/ (dbt's own `model-paths`, default
+# ["models"]) - verified for real that dbt's parser completely ignores
+# any yml file sitting outside its configured paths, so this file is
+# never scanned/executed by a real `dbt build`, only ever read by
+# qa_tools/common/check_lifecycle.py (which reuses parse_dbt_check_
+# metadata() unchanged, just pointed at this second path) - the same
+# reason Soda's/the contract's/Evidently's own `-retired` sibling files
+# exist (see each one's own header comment).
+#
+# Retiring a check means MOVING its whole meta/attributes/customProperties
+# block from the live, tool-executed file into this one - never editing
+# its check_id, never deleting it outright. Add `retired_as_of`/
+# `retired_reason` to the meta block when you do (both required together -
+# see check_lifecycle.py's CheckMetadata). Same nested shape as the real
+# schema.yml: `models: [{name, tests: [...], columns: [{name, tests}]}]`
+# for generic tests, top-level `tests: [{name, config: {meta}}]` for
+# singular tests.
+version: 2
+models: []
+tests: []

@@ -1,0 +1,24 @@
+# Retired Soda checks for the BDM birth-registrations feed (plans/
+# publishing-and-history.md Thread D, Keith's call 2026-09-16: a
+# check_id, once introduced, is permanently unique - it must never be
+# changed or deleted, even once retired).
+#
+# Soda Core has no native "declared but disabled" check mechanism -
+# verified for real, not assumed: checked the installed soda-core
+# package's own SodaCL parser (soda/sodacl/sodacl_parser.py) for an
+# enabled/disable/active keyword (none exists), and its Scan class's
+# public API (soda/scan.py) for a programmatic exclude/skip-check method
+# (none exists either). So retiring a Soda check means removing its
+# whole `attributes:`-bearing block from bdm-birth-registrations-soda-
+# checks.yml (the file run_soda_bdm.py actually loads) and moving it
+# here instead - this file is never passed to `scan.add_sodacl_yaml_
+# file()`, only ever read by qa_tools/common/check_lifecycle.py (which
+# reuses parse_soda_check_metadata() unchanged, just pointed at this
+# second path).
+#
+# Add `retired_as_of`/`retired_reason` to the moved check's `attributes:`
+# block when you do (both required together - see check_lifecycle.py's
+# CheckMetadata). Same real SodaCL shape as the active file:
+# `checks for <dataset>: [{<check>: {attributes: {check_id, ...}}}]`.
+
+checks for birth_registrations: []
