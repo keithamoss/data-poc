@@ -1280,6 +1280,19 @@ not a schedule.
     placeholder raises a clear error rather than silently doing nothing.
     83 tests pass repo-wide; `uv run ruff check .` clean.
 
+    **Explicitly checked, Keith's own ask**: the "first time" case - a
+    brand new dashboard build with zero snapshots ever taken (`const
+    SNAPSHOT_MANIFEST = [];` still its untouched placeholder value) and
+    `dashboard/snapshots/` not existing on disk at all. Verified rather
+    than just assumed correct: simulated both with Playwright (a real
+    dashboard file with its manifest reset to `[]`) and by running the
+    deploy workflow's own shell logic against a directory tree with no
+    `dashboard/snapshots/` at all. Both already worked without changes -
+    the picker shows a clear "No snapshots yet - run SNAPSHOT_DASHBOARD=1
+    ./run_pipeline.sh..." message instead of an empty/broken panel, and
+    the workflow's `if [ -d dashboard/snapshots ]` guard means a missing
+    directory is a clean no-op, not an error.
+
     **Important clarification, same day (2026-09-16) - Keith's own
     correction, checked and confirmed before writing anything further:**
     the "rolling window" referenced throughout rounds 1-2 above is
@@ -1378,3 +1391,51 @@ not a schedule.
     annotation/marker at the break point, splitting the line into two
     separately-labeled segments, something else). Parked for a dedicated
     scoping discussion, not this session.
+
+28. **[parked, big think-piece]** Generalizing this whole architecture
+    (ODCS contract schema, Soda checks, dbt generic tests, and the
+    dashboard's own rendering model) to work on different SHAPES of data
+    asset, not just the one it's built around today. Keith's own
+    framing, raised right after the snapshot-picker build: "derived
+    products from data matching processes or data extractions" - his
+    explicit examples of shapes this project doesn't handle at all yet.
+    Near-to-medium term, not now - "a bigger think piece."
+
+    Everything this project has built so far - the ODCS contract's
+    `schema:`/`quality:` blocks, every Soda/dbt check, the dashboard's
+    entire Agency → Collection → Dataset → **Column** drill-down model -
+    assumes one specific shape: a table of typed columns, checked for
+    completeness/validity/uniqueness/freshness/relationships. That's a
+    real, deliberate scope (see this file's own framing throughout), but
+    it's not the only shape a real multi-agency data asset register
+    would need to cover. Keith's two named examples are both already
+    hinted at elsewhere in this project without being built:
+    - **Data-matching/record-linkage outputs** - `synthetic_data_
+      generator/population.py`'s cross-agency `person_uid` identity-
+      linkage machinery already exists (action 8 above: built, real,
+      but not wired into the QA pipeline at all). A real linkage
+      process's own natural QA concerns are a different SHAPE of
+      question entirely - match rate, false-positive/false-negative
+      link rate, cluster purity, confidence-score distribution - not
+      "is this column null", and don't obviously fit a column-drill-down
+      dashboard view at all.
+    - **Data extractions** - a derived/aggregated/transformed output (a
+      report, a summary table, a published extract drawn FROM other
+      data rather than captured directly) has yet another different QA
+      shape: reconciliation against source totals, extraction
+      completeness (did the job actually capture everything it should
+      have), aggregation correctness, lineage consistency back to the
+      source asset(s) it was derived from.
+
+    Not yet scoped, not even a first-pass design: whether the contract/
+    dashboard model needs a genuine "asset type" concept above "table"
+    (with each type bringing its own check vocabulary), whether dbt-
+    core/Soda Core/datacontract-cli have any native support for non-
+    tabular assets worth researching before assuming a from-scratch
+    build, and whether the dashboard's column-drilldown visual model can
+    stretch to cover a match-quality or reconciliation report or
+    genuinely needs a separate view type per asset shape. Connects to
+    action 25 above's "a checks library" concern (a real checks library
+    for a multi-agency register would need to cover more than one
+    asset shape from the start) - worth revisiting together once either
+    gets scoped for real.
