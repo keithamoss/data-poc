@@ -104,30 +104,109 @@ the start.
 **Confirmed: explicit declaration, not inferred from absence.** A check
 missing from a recent run's output is ambiguous - could mean retired,
 could mean the run crashed before reaching it, could mean a tool config
-error. Explicit is the only signal that's actually trustworthy. Concrete
-mechanism (not yet fully designed, but the shape): each check definition
-(Soda YAML / dbt schema.yml / the ODCS contract's quality: blocks) gets
-an optional lifecycle marker - something like `retired_as_of: <date>`
-for retirement, and a `version`/`changed_as_of: <date>` concept for
-definition changes - captured into the committed per-run file's own
-metadata (not just the check's live definition, since a run committed
-in the past needs to keep recording what was true when IT ran, not get
-silently reinterpreted by a later definition change).
+error. Explicit is the only signal that's actually trustworthy.
 
-**Not yet designed:**
-- Exact schema for the lifecycle marker(s) in the check-definition YAML/
-  contract files.
+**Round 2 (2026-09-16, same session) - metadata location, identity,
+version detection, enforcement, and authoring all settled:**
+
+- **Metadata location: per-tool, duplicated**, not one canonical
+  registry. Keith's own call - tool count is narrowing to ~2 eventually,
+  so the duplication cost is lower than a canonical-registry design
+  would be worth. Richer metadata than originally sketched: not just a
+  retired flag, but a version, a retirement **reason**, a **changelog**
+  of changes over time, and the date a check was **first introduced**.
+
+- **Check identity: needs an explicit, human-entered, globally unique
+  `check_id`** - NOT derived from any tool's own naming. Checked all
+  four tools' actual current naming (not assumed):
+  - dbt: `test_metadata["name"]` (`qa_tools/bdm/run_dbt_bdm.py`) - dbt's
+    stable BASE test name (e.g. `"accepted_values"`), deliberately
+    reused across every column/dataset that uses that generic test.
+  - Soda (`run_soda_bdm.py`): auto-named checks use a metric-type name
+    (`missing_percent[scope]`); custom-named "failed rows" checks use a
+    human-written `name:` field from the YAML (`contract/*-soda-
+    checks.yml`) - real, but genuinely collision-prone: BDM's date-range
+    check is named `"date_of_birth is within a plausible range"`, CP's
+    is `"date_of_birth out of range"` - different text today by luck,
+    not by any enforced uniqueness, for what's conceptually the same
+    kind of check on two different datasets.
+  - Evidently (`run_evidently_bdm.py`): hardcoded Python string
+    constants (`"drift:PSI"`, `"evidently:row_count_growth"`),
+    deliberately shared across whichever dataset's orchestration script
+    uses them.
+  - datacontract-cli: same pattern, `f"datacontract:{metric}"`.
+
+  None of these give a single flat string that's unique on its own
+  across 30 datasets - every one of them relies on being combined with
+  `dataset_id`/`column_name` to disambiguate, and even the most
+  deliberately-named case (Soda's custom `name:` field) has zero
+  uniqueness enforcement. Keith's call: introduce an explicit,
+  human-entered `check_id` rather than relying on tuple composition or
+  any tool's own naming quirks.
+
+- **Uniqueness enforcement: a GitHub Actions job**, not a local
+  pre-commit/pre-push hook (that distinction was worth drawing out
+  explicitly: a local git hook only fires if a contributor has it
+  installed and can be bypassed with `--no-verify`; a GitHub Actions
+  workflow can't stop a push from landing, but CAN block it from being
+  merged/published - which is exactly what Thread A's existing CI gate
+  already does). Confirmed: fold this into that SAME gate rather than
+  building a second, separate enforcement mechanism. The job scans every
+  committed check definition across all 30 datasets and fails if any
+  `check_id` is duplicated, or if a check's config changed without a
+  matching changelog entry present.
+
+- **Version detection: auto-detect via config hash, human marks
+  breaking/reason** - confirmed shape unchanged from the first round:
+  hash each check's config under its `check_id`; a hash that differs
+  from what's on file is an automatically-detected new version. A human
+  then writes the changelog entry for it (see fields below) - the CI gate
+  above is what actually enforces that this happens before a change can
+  be published, not an optional courtesy step.
+
+- **Authoring: no CLI - structured metadata lives directly in each
+  check's own definition**, hand-typed by a human. Keith's explicit
+  call, reversing my own earlier CLI proposal: the CI gate validates
+  correctness (uniqueness, required fields present), so a separate
+  authoring tool isn't needed - the check definition file itself is
+  where this metadata belongs. Verified per-tool mechanics rather than
+  assumed a single approach works everywhere:
+  - **dbt**: has a real, already-existing `meta:` dict on tests, built
+    for exactly this kind of custom metadata - doesn't touch
+    `config.warn_if`/`error_if`, no new dbt-core mechanism needed.
+  - **Soda**: checked the installed `soda-core` package's own SodaCL
+    parser (`soda/sodacl/sodacl_parser.py`) - `ATTRIBUTES` is a real
+    parser keyword, a genuine per-check `attributes:` block, not
+    something to invent from scratch. Exact per-check nesting mechanics
+    to confirm when this gets built.
+  - **Evidently**: a real asymmetry worth being upfront about - its
+    checks aren't YAML at all today, they're hardcoded Python constants
+    in `run_evidently_bdm.py`. "Alongside the check" means alongside
+    that Python code (e.g. a module-level dict), not a YAML field like
+    the other three.
+  - **ODCS contract**: not yet checked against the real spec for a
+    custom-properties equivalent - do this when building, same rigor as
+    the other three (verify, don't assume).
+
+**Confirmed field set for the metadata, each check gets:**
+- `check_id` - human-entered, must be globally unique (CI-enforced).
+- `introduced_date` - when the check was first added.
+- `retired_as_of` + `retired_reason` - both optional, both required
+  together if the check is retired (history stays fully visible, just
+  flagged inactive from this date).
+- `changelog` - a list of entries, each with: `date` (automatic, not
+  hand-entered), `description` (human-written), `author` (human-entered
+  - deliberately not auto-derived from git's own commit author, per
+  Keith's own call), `breaking` (human-set boolean).
+
+**Still not designed:**
+- Exact per-tool schema/field names (the concepts above are settled,
+  the literal YAML/Python shape isn't).
 - How the dashboard's existing check-history trend/panel (item 45's
   comparison UI, the trend chart) visually distinguishes "retired since
   X" from "definition changed at X, treat before/after as separate
   series" from a normal continuous history. Needs real UI design, not
-  just a data-model answer.
-- Whether a "breaking" vs "non-breaking" definition change (Keith's
-  original item 27 framing) is itself something someone declares
-  explicitly per change, or something inferred by comparing the stored
-  definitions across versions. Given the retirement decision above
-  (explicit, not inferred), the default lean is explicit here too, but
-  worth confirming when this gets designed in detail.
+  just a data-model answer - next thing to work through.
 
 ## Thread A - publishing (build after B/D's data format exists)
 
@@ -151,6 +230,10 @@ shared blob. A CI job then:
    that key UI elements actually render - the same kind of check this
    session's own Playwright verification has been doing by hand
    throughout; this becomes an automated, permanent version of that).
+   **Also covers Thread D's check-lifecycle validation** (settled
+   2026-09-16): fails if any `check_id` is duplicated across the 30
+   datasets, or if a check's config changed without a matching
+   changelog entry - one gate, not two separate enforcement mechanisms.
 3. Only publishes (deploys to GitHub Pages) if the gate passes - a
    broken run genuinely can't reach the published site.
 
