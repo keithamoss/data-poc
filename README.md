@@ -48,8 +48,8 @@ you'd hit the real package conflict described just below with no
 equivalent one-step override `uv` gives you — not worth the workaround
 when `uv` is one command to install.)
 
-This regenerates 10 scheduled daily deliveries (up to 15 manifest entries
-once red-triggered resupply attempts are included — see "The 10
+This regenerates 60 scheduled daily deliveries (up to 85 manifest entries
+once red-triggered resupply attempts are included — see "The 60
 (scheduled) runs" below), loads them into DuckDB, runs the four real tools
 against every run, and re-embeds the results into
 `dashboard/qa-reporting-dashboard.html`. Every step is seeded, so re-running
@@ -136,13 +136,14 @@ generator/                   a real package (generator/__init__.py) - `python3 -
   daily_batch.py               generates ONE day's birth-registration batch (an event-flow model,
                                deliberately different from the sibling synthetic_data_generator
                                package's whole-population snapshot model — see the file's docstring)
-  generate_runs.py             orchestrates 10 scheduled daily deliveries (2 amber, 2 red) into
+  generate_runs.py             orchestrates 60 scheduled daily deliveries (12 amber, 12 red) into
                                data/raw/ - red ones trigger resupply.py's resupply-chain
-                               simulation, so up to 15 manifest entries actually land, not 10
+                               simulation, so up to 85 manifest entries actually land, not 60
   resupply.py                  generic resupply-chain orchestration (delay/retry/chaining),
                                driven by a DatasetProvider protocol - knows nothing about how
                                a dataset's rows are actually made, see the file's own docstring
-  generate_cp_runs.py          orchestrates 10 weekly Child Protection snapshots into data/cp_raw/
+  generate_cp_runs.py          orchestrates 16 quarterly Child Protection snapshots (4 years) into
+                               data/cp_raw/
   names_au.py, presentation.py, dirty.py   the canonical copies - synthetic_data_generator/
                                imports these from here rather than keeping its own duplicates
                                (see "Relationship to the synthetic_data_generator package" below)
@@ -230,12 +231,16 @@ implicit "also have X on your PATH already" assumptions anywhere.
 `qa_tools/bdm/orchestrate_bdm.py`/`qa_tools/cp/orchestrate_cp.py`
 run their manifest's runs **in parallel by default** (`qa_tools/common/
 parallel_orchestrate.py`, one process per CPU core via `os.cpu_count()`)
-— measured, not estimated: Birth Registrations' 15-run manifest went from
-2m35s sequential to **45s** (3.4x); Child Protection's 10-run manifest
-went from 1m52s to **36s** (3.1x). Output is byte-for-byte identical to
-sequential (verified directly - same seeded property this project relies
-on everywhere else), since results always get reassembled in manifest
-order regardless of which run's worker process finishes first.
+— measured, not estimated, against the original manifest sizes (15/10
+runs, before the 2026-09-16 history deepening to 85/16 - not re-measured
+at the new depth, so read these as "the mechanism works and scales
+roughly linearly," not current absolute numbers): Birth Registrations'
+15-run manifest went from 2m35s sequential to **45s** (3.4x); Child
+Protection's 10-run manifest went from 1m52s to **36s** (3.1x). Output is
+byte-for-byte identical to sequential (verified directly - same seeded
+property this project relies on everywhere else), since results always
+get reassembled in manifest order regardless of which run's worker
+process finishes first.
 
 Pass `--sequential` to either script (or `./run_pipeline.sh` isn't
 affected either way, it just calls them) if you need to debug a specific
@@ -248,22 +253,27 @@ sequential behaviour.
 See `plans/performance.md` for the full timing investigation, including
 what was tried and measured before landing here.
 
-## The 10 (scheduled) runs — and resupply attempts on top
+## The 60 (scheduled) runs — and resupply attempts on top
 
-`generator/generate_runs.py` schedules ten daily deliveries (2026-09-01
-through 2026-09-10, ~1,800-2,000 rows each): six clean, two deliberately
-"amber" (run 4, run 7), two deliberately "red" (run 6, run 9), using
-`dirty.py`'s `apply_birth_registrations_presets()` — calibrated to land
-exactly inside the Soda checks file's own warn/fail bands, not arbitrary
-noise. Verified after generation, not just intended:
+`generator/generate_runs.py` schedules sixty daily deliveries (a ~2-month
+rolling window ending on the anchor date, ~1,700-2,050 rows each, deepened
+from an original 10-delivery/~10-day plan on 2026-09-16 - see
+`plans/wider.md`'s history-depth entry): thirty-six clean, twelve
+deliberately "amber", twelve deliberately "red", using `dirty.py`'s
+`apply_birth_registrations_presets()` — calibrated to land exactly inside
+the Soda checks file's own warn/fail bands, not arbitrary noise. The exact
+day-by-day severity assignment is seeded (`RUN_PLAN`'s own
+`_build_run_plan()`), not hand-listed, so it's reproducible but not worth
+enumerating here — verified after generation, not just intended, on a
+representative clean/amber/red sample:
 
 | Run | Severity | invalid `sex` rate | null `place_of_birth_facility` rate |
 |---|---|---|---|
 | run_01 (clean) | — | 0.0% | 2.1% |
-| run_04 | amber | 0.8% | 30.6% |
-| run_06 | red | 3.0% | 56.9% |
-| run_07 | amber | 1.3% | 33.2% |
-| run_09 | red | 4.3% | 55.6% |
+| run_02 | amber | 0.6% | 31.9% |
+| run_11 | amber | 0.8% | 30.4% |
+| run_06 | red | 3.0% | 57.0% |
+| run_07 | red | 4.5% | 57.5% |
 
 **A RED delivery doesn't stop at one row in `manifest.json`.** It
 triggers `generator/resupply.py`'s resupply-chain simulation — modelling
@@ -271,10 +281,11 @@ Keith's team's real practice of requesting a resupply when a file has a
 red failing check, with no single fixed turnaround time. Each subsequent
 attempt gets a business-day-aware delay, a chance of still being red, and
 small organic churn versus a fresh random draw (see that module's own
-docstring and `plans/wider.md` #12/#13 for the full design). Run 6 and
-run 9 going red is what pushes the actual row count in `data/raw/` and
-`manifest.json` from 10 to **15 entries** — each attempt gets its own
-CSV and its own `run_id` (e.g. `run_09_2026-09-09_resupply2`).
+docstring and `plans/wider.md` #12/#13 for the full design). The twelve
+red deliveries going red is what pushes the actual row count in
+`data/raw/` and `manifest.json` from 60 to **85 entries** — each attempt
+gets its own CSV and its own `run_id` (e.g.
+`run_58_2026-09-14_resupply3`).
 
 ## The dashboard
 
@@ -309,7 +320,7 @@ from the start rather than retrofitting them for something they were
 never built to do.
 
 ```bash
-uv run python3 -m generator.generate_cp_runs       # -> data/cp_raw/ (10 weekly snapshots)
+uv run python3 -m generator.generate_cp_runs       # -> data/cp_raw/ (16 quarterly snapshots, 4 years)
 uv run python3 -m qa_tools.cp.orchestrate_cp        # -> reports/results_cp.json
 uv run python3 -m pipeline.build_cp_dashboard_data  # -> reports/child_protection_dashboard.json
 uv run python3 dashboard/embed_dashboard_data.py    # re-embeds BOTH real datasets into the HTML

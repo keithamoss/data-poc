@@ -63,22 +63,37 @@ OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 ID_BLOCK = 100_000  # per-delivery id_offset spacing - well above any single delivery's row count
 
 # (day offset from delivery 1, base row count, first-attempt dirty severity or None)
-# 10 scheduled deliveries: most clean, 2 amber, 2 red - bumped from 1 red so
-# the resupply-chain simulation below has more than one independent example
-# to actually demonstrate variability (delay length, whether it resolves
-# in one resupply or several), not just a single data point.
-RUN_PLAN = [
-    (0, 1_820, None),
-    (1, 1_940, None),
-    (2, 1_760, None),
-    (3, 2_010, "amber"),
-    (4, 1_880, None),
-    (5, 1_790, "red"),
-    (6, 1_950, "amber"),
-    (7, 1_860, None),
-    (8, 1_900, "red"),
-    (9, 1_830, None),
-]
+# 60 scheduled deliveries (deepened 2026-09-16, Keith's own call - see
+# plans/wider.md's "deepening simulated history" follow-up, done together
+# with widening Child Protection's cadence to quarterly since the two were
+# explicitly parked as one piece of work) - same ~60/20/20 clean/amber/red
+# ratio as the original 10-delivery plan (which was itself bumped from a
+# single red to 2 so the resupply-chain simulation below had more than one
+# independent example to demonstrate variability), generated rather than
+# hand-listed at this length. First and last deliveries are always clean by
+# construction: the first is orchestrate_bdm.py's own Evidently reference
+# run (must be clean to be a meaningful baseline), the last being clean is
+# the same deliberate framing choice as the original 10-run plan (Keith's
+# own call, 2026-09-13) - Child Protection's own RUN_PLAN deliberately ends
+# red instead, see that module's own comment for why.
+_RUN_PLAN_SEED = 1900  # distinct range from per-delivery seeds (1000+i) and id_offset math
+N_DELIVERIES = 60
+
+
+def _build_run_plan(n: int, seed: int) -> list[tuple[int, int, str | None]]:
+    rng = np.random.default_rng(seed)
+    n_amber = round(n * 0.2)
+    n_red = round(n * 0.2)
+    n_clean_middle = n - n_amber - n_red - 2  # first/last carved out separately, always clean
+    middle = [None] * n_clean_middle + ["amber"] * n_amber + ["red"] * n_red
+    rng.shuffle(middle)
+    severities = [None] + list(middle) + [None]
+
+    row_counts = rng.integers(1_700, 2_050, size=n)
+    return [(i, int(row_counts[i]), severities[i]) for i in range(n)]
+
+
+RUN_PLAN = _build_run_plan(N_DELIVERIES, _RUN_PLAN_SEED)
 
 # Rolling window ending on the anchor date ("today" by default, pinnable
 # via GENERATOR_ANCHOR_DATE - see anchor_date.py) rather than a fixed
@@ -86,11 +101,12 @@ RUN_PLAN = [
 # from real "now" every day, which is exactly why the Soda [recent] filter
 # and the dbt/contract freshness checks on date_of_birth always resolved
 # to 0 rows / "no recent data" once enough real time had passed (see
-# plans/qa-pipeline.md #3). The last scheduled delivery (day_offset=9)
-# lands ON the anchor date so those checks have real, robust margin - most
-# of that delivery's rows have a date_of_birth within the freshness
-# checks' 7-day window, not just a coin-flip few right on the boundary.
-START_DATE = get_anchor_date() - timedelta(days=9)
+# plans/qa-pipeline.md #3). The last scheduled delivery (day_offset=
+# N_DELIVERIES-1) lands ON the anchor date so those checks have real,
+# robust margin - most of that delivery's rows have a date_of_birth
+# within the freshness checks' 7-day window, not just a coin-flip few
+# right on the boundary.
+START_DATE = get_anchor_date() - timedelta(days=N_DELIVERIES - 1)
 
 
 class BirthRegistrationsProvider:

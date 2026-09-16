@@ -1,0 +1,138 @@
+{
+  "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+  "run_by": "fpycnkgvmt@privaterelay.appleid.com",
+  "raw_output": {
+    "manifest_entry": {
+      "run_id": "run_38_2026-08-25_resupply1",
+      "run_index": 55,
+      "delivery_id": "delivery_38",
+      "delivery_date": "2026-08-25",
+      "attempt_number": 2,
+      "arrived_date": "2026-08-26",
+      "run_date": "2026-08-26",
+      "is_resupply": true,
+      "supersedes_run_id": "run_38_2026-08-25",
+      "n_rows_generated": 1172,
+      "dirty_severity": "red",
+      "id_offset": 3800000,
+      "seed": 1038,
+      "file": "run_38_2026-08-25_resupply1.csv"
+    },
+    "value_counts": {
+      "sex": [
+        [
+          "M",
+          567
+        ],
+        [
+          "F",
+          540
+        ],
+        [
+          "X",
+          20
+        ],
+        [
+          "(invalid code)",
+          45
+        ]
+      ]
+    },
+    "arrival": {
+      "max_lag_hours": 21.0,
+      "earliest_extract": "2026-08-24 20:00:00"
+    },
+    "check_aggregates": {
+      "sex": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 45,
+        "values": [
+          {
+            "value": "9",
+            "count": 18
+          },
+          {
+            "value": "U",
+            "count": 14
+          },
+          {
+            "value": "O",
+            "count": 13
+          }
+        ]
+      },
+      "place_of_birth_suburb": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 41,
+        "values": [
+          {
+            "value": "Not stated",
+            "count": 10
+          },
+          {
+            "value": "Freemantle",
+            "count": 10
+          },
+          {
+            "value": "Perth Metro",
+            "count": 8
+          },
+          {
+            "value": "TBC",
+            "count": 7
+          },
+          {
+            "value": "Unknown",
+            "count": 6
+          }
+        ]
+      },
+      "date_of_birth": {
+        "type": "numeric_date",
+        "suppressed": false,
+        "total_invalid": 15,
+        "min": "1750-01-01",
+        "max": "1899-01-01",
+        "values": [
+          {
+            "value": "1750-01-01",
+            "count": 6
+          },
+          {
+            "value": "1850-06-15",
+            "count": 5
+          },
+          {
+            "value": "1820-11-30",
+            "count": 3
+          },
+          {
+            "value": "1899-01-01",
+            "count": 1
+          }
+        ],
+        "histogram": [
+          {
+            "bucket": "1750-01-01 to 1774-11-01",
+            "count": 6
+          },
+          {
+            "bucket": "1799-09-01 to 1824-07-02",
+            "count": 3
+          },
+          {
+            "bucket": "1849-05-02 to 1874-03-02",
+            "count": 5
+          },
+          {
+            "bucket": "1874-03-02 to 1899-01-01",
+            "count": 1
+          }
+        ]
+      }
+    }
+  },
+  "verified": []
+}

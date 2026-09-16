@@ -168,3 +168,15 @@ separate subprocess calls (`dbt run` then `dbt test`).
    processes rather than threads sharing one interpreter). Not worth
    doing on top of #4 now - staying `[open, low]` only as a record of
    the analysis, no longer an active candidate.
+
+## Manifest size changed, 2026-09-16 - not yet re-benchmarked
+
+BDM's manifest grew from 15 to 85 entries (60 scheduled deliveries, up
+from 10) and CP's from 10 to 16 (quarterly instead of weekly - see
+plans/wider.md's history-depth entry). Both real orchestrators were run
+successfully end to end against the new scale (verified in
+plans/wider.md), but no fresh sequential-vs-parallel timing comparison
+was taken - the #4 parallelism numbers above (45s/36s) are from the
+original, smaller manifests and shouldn't be read as current. Worth a
+real re-measurement if runtime becomes a live concern again at this
+depth, not assumed to still hold linearly.

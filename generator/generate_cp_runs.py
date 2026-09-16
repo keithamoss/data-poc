@@ -62,7 +62,7 @@ the QA-pipeline scenario, not the core generator.
 from __future__ import annotations
 import json
 import os
-from datetime import date, timedelta
+from datetime import date
 
 import numpy as np
 import pandas as pd
@@ -82,30 +82,64 @@ BASE_SEED = 5000  # distinct range from generate_runs.py's 1000s and generate.py
 
 TABLES = ["cp_clients", "cp_notifications", "cp_investigations", "cp_placements", "cp_carers", "cp_case_workers"]
 
-# (week offset from run 1, dirty severity or None) - 10 weekly snapshots,
-# same 7 clean / 2 amber / 1 red ratio as generate_runs.py's RUN_PLAN.
-# Deliberately ends on the red run (unlike generate_runs.py, which ends
-# clean): Keith wanted the dashboard's default/latest view to show real
-# red on this collection specifically, not just buried a few runs back in
-# the trend history - see plans/wider.md and the AskUserQuestion decision
-# that shaped this ("make the latest run itself dirty" / "Child Protection
-# only").
-RUN_PLAN = [
-    (0, None), (1, None), (2, None), (3, "amber"), (4, None),
-    (5, None), (6, "amber"), (7, None), (8, None), (9, "red"),
-]
+# (quarter offset from run 1, dirty severity or None) - 16 quarterly
+# snapshots spanning 4 years (widened from 10 WEEKLY snapshots,
+# 2026-09-16, Keith's own call - see plans/wider.md's cadence-widening +
+# history-depth follow-up notes: CP's own framing as "a periodic full
+# extract" fits a quarterly re-extract more naturally than a weekly one
+# for a real casework/investigation collection, and getting real
+# quarterly-spaced history is also a meaningful stress test for the
+# as-of/time-travel features, which need genuinely deep, sparse history
+# to demonstrate against; 4 years rather than 3, Keith's own follow-up
+# call, for even deeper history). Ratio scaled from the original 10-run
+# plan's 7 clean / 2 amber / 1 red. Deliberately ends on the red run
+# (unchanged from the original plan): Keith wanted the dashboard's
+# default/latest view to show real red on this collection specifically,
+# not just buried a few runs back in the trend history - see
+# plans/wider.md and the AskUserQuestion decision that shaped this
+# ("make the latest run itself dirty" / "Child Protection only"). First
+# run stays clean - it's orchestrate_cp.py's own Evidently reference run.
+_RUN_PLAN_SEED = 5900  # distinct range from generation seeds (BASE_SEED+...)
+N_QUARTERS = 16
+
+
+def _build_run_plan(n: int, seed: int) -> list[tuple[int, str | None]]:
+    rng = np.random.default_rng(seed)
+    n_amber = max(1, round(n * 0.25))  # ~matches the original plan's 2/10 ratio
+    n_clean_middle = n - 2 - n_amber  # first (clean) & last (red) carved out separately
+    middle = [None] * n_clean_middle + ["amber"] * n_amber
+    rng.shuffle(middle)
+    return list(enumerate([None] + list(middle) + ["red"]))
+
+
+RUN_PLAN = _build_run_plan(N_QUARTERS, _RUN_PLAN_SEED)
+
+
+def _quarter_start(d: date) -> date:
+    """The first day of the calendar quarter containing `d` - a real
+    periodic full-collection extract lands on quarter boundaries
+    (Jan/Apr/Jul/Oct 1) more naturally than on an arbitrary day, same
+    "keep it realistic" rationale the old weekly version applied via its
+    own always-a-Monday alignment."""
+    quarter_start_month = ((d.month - 1) // 3) * 3 + 1
+    return date(d.year, quarter_start_month, 1)
+
+
+def _add_quarters(d: date, n: int) -> date:
+    total_months = (d.month - 1) + n * 3
+    year = d.year + total_months // 12
+    month = total_months % 12 + 1
+    return date(year, month, 1)
+
 
 # Rolling window ending on the anchor date ("today" by default, pinnable
 # via GENERATOR_ANCHOR_DATE - see anchor_date.py), same fix and rationale
 # as generate_runs.py's own START_DATE - un-stales the fixture generally
 # (plans/qa-pipeline.md #3's follow-up covers both). No wall-clock-
 # relative check depends on CP's dates today, unlike BDM's, but there's
-# no reason to leave CP's snapshots drifting stale either. Keeps the
-# "always a Monday" weekly-extract realism touch by anchoring to the most
-# recent Monday on/before the anchor date, not the anchor date itself.
+# no reason to leave CP's snapshots drifting stale either.
 _anchor = get_anchor_date()
-_last_monday = _anchor - timedelta(days=_anchor.weekday())
-START_DATE = _last_monday - timedelta(weeks=9)
+START_DATE = _add_quarters(_quarter_start(_anchor), -(N_QUARTERS - 1))
 
 
 def _add_extract_timestamp(df: pd.DataFrame, snapshot_date: date, date_col: str | None, seed: int) -> pd.DataFrame:
@@ -130,8 +164,8 @@ def main() -> None:
         print(f"  {name}: {len(base_tables[name]):,} rows")
 
     manifest = []
-    for i, (week_offset, severity) in enumerate(RUN_PLAN, start=1):
-        snapshot_date = START_DATE + timedelta(weeks=week_offset)
+    for i, (quarter_offset, severity) in enumerate(RUN_PLAN, start=1):
+        snapshot_date = _add_quarters(START_DATE, quarter_offset)
         run_id = f"cp_run_{i:02d}_{snapshot_date.isoformat()}"
         run_dir = os.path.join(OUT_DIR, run_id)
         os.makedirs(run_dir, exist_ok=True)

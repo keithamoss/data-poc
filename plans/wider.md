@@ -1326,32 +1326,47 @@ not a schedule.
     slice - a limitation of the fake data generator, not of the feature.
     Read every "rolling window" reference above with that in mind.
 
-    Separately parked, not acted on now (Keith's call): deepening the
-    PoC's own fake-data generation to accumulate more simulated history
-    over time, so a demo could show genuinely deep time travel rather
-    than a handful of nearby points - worth doing eventually, not a
-    priority while the feature's job is proving the mechanism works.
-
-    **Added 2026-09-16, same "when we come back to generating more
-    history" follow-up:** also tackle a genuinely different resupply
-    cadence between the two datasets at that point - one dataset daily,
-    the other quarterly. Today's actual cadences, for context:
-    `generate_runs.py` (BDM) already generates daily scheduled
-    deliveries; `generate_cp_runs.py` (Child Protection) generates
-    WEEKLY snapshots, not quarterly (its own docstring: "Child
-    Protection isn't a daily event feed, it's a periodic full extract of
-    the same underlying casework collection... re-extracted 10 times as
-    weekly snapshots"). Read this as widening that existing gap, not
-    introducing a third cadence - CP's own framing as "a periodic full
-    extract" already fits a quarterly re-extract at least as naturally
-    as a weekly one, arguably more so for a real casework/investigation
-    collection. A quarterly cadence would also make deepening simulated
-    history (the paragraph above) matter more directly: getting even 10
-    quarterly runs needs ~2.5 years of simulated calendar time, a much
-    more meaningful stress test of "does time travel actually work over
-    a long, sparse history" than 10 weekly runs (~10 weeks) does today.
-    Not yet scoped - revisit together with the history-depth work above,
-    not in isolation.
+    Previously parked, both pieces now **done, 2026-09-16** (Keith's own
+    call, revisited together as one piece of work while scoping Phase 4
+    of plans/publishing-and-history.md - "what's next in this phase"
+    naturally led here, since Thread C/Phase 4 needs real deep,
+    differently-cadenced history to demo "as of" viewing against, not
+    the previous ~10-15-run rolling windows):
+    - **Child Protection widened from weekly to quarterly**, and
+      deepened at the same time from 10 runs (~10 weeks) to **16
+      quarterly runs spanning 4 years** (Keith's own follow-up call,
+      after an initial "3 years" was corrected mid-build) -
+      `generator/generate_cp_runs.py`'s `RUN_PLAN` is now built by
+      `_build_run_plan()` (a seeded ratio-preserving severity
+      assignment: ~70% clean/~25% amber/1 fixed red, first run always
+      clean - the Evidently reference run - last always red, unchanged
+      from the original design intent) rather than hand-listed, and
+      `START_DATE`/each run's date now come from `_quarter_start()`/
+      `_add_quarters()` (real calendar-quarter boundaries - Jan/Apr/Jul/
+      Oct 1 - not week arithmetic).
+    - **Birth Registrations deepened from 10 scheduled deliveries (15
+      manifest entries incl. resupply attempts) to 60 (85 entries)**,
+      spanning ~2 months instead of ~10 days - `generator/
+      generate_runs.py`'s `RUN_PLAN` is now built the same way
+      (`_build_run_plan()`, seeded, ~60/20/20 clean/amber/red, first and
+      last always clean).
+    - Verified for real: both real orchestrators re-run end to end
+      against the deepened data (6884 BDM / 2832 CP check results,
+      across 85/16 runs respectively - up from 1214 BDM / 1770 CP
+      across 15/10 runs before this), qa_results/ history fully nuked
+      and regenerated (no way to backfill run_by-less old runs onto a
+      completely different date/severity plan anyway - same "happy to
+      throw it away" call as the run_by field's own rollout).
+      `build_results_from_history.py`'s history-only rebuild produced
+      byte-identical counts to the live orchestrator run for both
+      datasets. Both CI gates (check-lifecycle, dashboard render) pass
+      clean. Full pytest (149 tests) + ruff clean.
+    - Real timing, for future reference: BDM's 85-run real-tool
+      orchestration took several minutes (4-core parallelism, ~9.6s/run
+      baseline from plans/performance.md scaled up); CP's 16-run
+      orchestration stayed fast (a few minutes) since run count barely
+      grew from the original 10. See plans/performance.md if this
+      matters again at a future depth increase.
 
     **Local/offline viewing gap found and fixed, same day (2026-09-16),
     right after the picker build:** Keith's own catch - "a developer...
