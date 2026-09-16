@@ -1463,8 +1463,26 @@ not a schedule.
     (`uv run --no-project python3 -m dashboard.snapshot_dashboard
     --prepare-site <dir>`, ~0.15s, no dependency sync triggered) before
     changing the workflow. `.github/workflows/deploy-pages.yml` now adds
-    an `astral-sh/setup-uv@v10` step before "Prepare site" and runs the
+    an `astral-sh/setup-uv` step before "Prepare site" and runs the
     script through `uv run --no-project`.
+
+    **That deploy actually failed in CI, same day - real bug, caught
+    because Keith checked the run rather than assuming green:**
+    `astral-sh/setup-uv@v10` errored with "Unable to resolve action...
+    unable to find version `v10`" - a second wrong guess about that
+    action, not just the first one. Confirmed via its actual tags list
+    (`astral-sh/setup-uv` doesn't publish floating major-version tags at
+    all - only exact ones like `v10.1.0` - unlike `actions/checkout`/
+    `actions/deploy-pages` etc., which do) and its own README, which
+    recommends pinning to the full commit SHA rather than any tag, a
+    real supply-chain-security convention for third-party actions.
+    Re-pinned to `astral-sh/setup-uv@bec219d24cd3e171d82865faccec3312
+    0bb574f4 # v10.1.0`. Lesson worth naming plainly: the earlier "v10"
+    guess was asserted without checking the actual tags list first time
+    round either - looked up a release page, not the specific ref format
+    this workflow needed. Verified this time by listing the repo's real
+    tags before writing the pin, not by re-guessing a plausible-looking
+    one.
 
 27. **[parked]** Versioning the checks themselves, with that version
     flowing through to the results/data each check run captures - Keith's
