@@ -2687,6 +2687,22 @@ relative, not a schedule — this is weeks of work, not months.
     decided). Logged for later per Keith's own instruction, not
     investigated further now.
 
+53. **[todo, resolve at the end of the next phase]** The actual
+    published (live GitHub Pages) dashboard needs a handful of real
+    "🕐 Past snapshots" entries to browse through - Keith's own
+    instruction, 2026-09-16, right after the as-of picker landed:
+    important for demoing the dashboard, so an audience can actually
+    see the time-travel feature working, not just find it empty. The
+    mechanism already exists and works (`dashboard/snapshot_dashboard.py`,
+    opt-in via `SNAPSHOT_DASHBOARD=1 ./run_pipeline.sh`, committed
+    `.html.gz` originals under `dashboard/snapshots/` - see that path's
+    own `CLAUDE.md` entry) - a handful of demo snapshots were taken
+    early on (item 65) but nothing since; taking a few more (spread
+    across different as-of-relevant moments, now that Thread C exists)
+    and committing/pushing them is the actual remaining work here.
+    Explicitly deferred by Keith to the end of the next phase, not
+    investigated or built now.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

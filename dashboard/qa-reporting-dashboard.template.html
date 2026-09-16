@@ -770,29 +770,26 @@ function addDaysToDateStr(dateStr, days){
   d.setUTCDate(d.getUTCDate()+days);
   return toDateStr(d);
 }
-// The latest run_date actually present anywhere in committed history -
-// "one shared 'now' across the whole data asset" (Keith's own words,
-// scoping this feature) - computed from qa_results/-derived data rather
-// than live wall-clock time, so it's reproducible run to run like every
-// other date on this page (see TODAY above) instead of drifting with
-// whenever someone happens to load the dashboard.
-function maxRunDate(){
-  let max = null;
-  const consider = runs => (runs||[]).forEach(r=>{ if(!max || r.run_date>max) max = r.run_date; });
-  if(REAL_BIRTH_REG_DATA) consider(REAL_BIRTH_REG_DATA.runs);
-  if(REAL_CP_DATA) (REAL_CP_DATA.datasets||[]).forEach(d=> consider(d.runs));
-  return max;
-}
-// Default as-of date: the data asset's own latest known run date minus
-// AS_OF_OFFSET_DAYS (contract/data-asset.yaml, Thread D) - Keith's
-// confirmed answer for the default basis. Falls back to TODAY when
-// there's no real history to derive it from (the template opened
-// directly, before embed_dashboard_data.py has ever run) - irrelevant to
-// the illustrative-only datasets that path renders anyway.
+// Default as-of date: the genuine live wall-clock date minus
+// AS_OF_OFFSET_DAYS (contract/data-asset.yaml, Thread D) - corrected
+// 2026-09-16 (Keith, same day as the picker itself landed): NOT derived
+// from the latest run_date anywhere in committed history (an earlier,
+// self-reasoned version of this function did that, reaching for this
+// page's existing "reproducible, not wall-clock-relative" convention -
+// TODAY above - which doesn't actually apply here; that convention is
+// specifically for the ILLUSTRATIVE mock datasets' own seeded data, not
+// for a genuinely live "what's the real state of the data asset right
+// now" default). Real wall-clock "now" is exactly the right basis: it's
+// also what generator/anchor_date.py's own default already anchors
+// every real run's dates to, so this and "days since the most recent
+// real run" normally agree anyway - the difference only shows up (and
+// matters) once real time has moved on since the fixture was last
+// regenerated, which is exactly when a run-date-based default would
+// silently stop being "now minus offset" and nobody would notice.
+function liveNowDateStr(){ return toDateStr(new Date()); }
 function defaultAsOf(){
-  const max = maxRunDate();
-  if(!max || AS_OF_OFFSET_DAYS==null) return max || toDateStr(TODAY);
-  return addDaysToDateStr(max, -AS_OF_OFFSET_DAYS);
+  if(AS_OF_OFFSET_DAYS==null) return liveNowDateStr();
+  return addDaysToDateStr(liveNowDateStr(), -AS_OF_OFFSET_DAYS);
 }
 // URL query-string persistence, deliberately separate from the
 // hash-based STATE mechanism used for drill-down navigation (Thread C -
@@ -1173,7 +1170,7 @@ function renderAgency(view, agencyId){
       <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}</div>
       <div class="overflow-x">
       <table class="dataset-table">
-        <thead><tr><th>Dataset</th><th>Status</th><th>Arrival (today)</th><th>Rows, latest run</th><th>Last QA run</th></tr></thead>
+        <thead><tr><th>Dataset</th><th>Status</th><th>Latest arrival</th><th>Rows, latest run</th><th>Last QA run</th></tr></thead>
         <tbody>
         ${col.datasets.map(ds=>{
           if(ds.noDataAsOf){

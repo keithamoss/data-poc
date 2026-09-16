@@ -638,7 +638,54 @@ correctly, and resetting to the default restores the real dataset view
 and removes the URL param. Full `uv run pytest` (170 passed) and `uv
 run ruff check .` clean.
 
-## Build order
+**Corrected, same day (Keith): wrong default-date basis.** My own
+un-confirmed reasoning above (`defaultAsOf()` computing "one shared
+'now'" from the latest `run_date` anywhere in committed history) was
+wrong - Keith's own words: it should be the genuine current date minus
+`AS_OF_OFFSET_DAYS`, not the latest run date minus the offset. Fixed:
+`defaultAsOf()` now reads real wall-clock `new Date()` directly
+(`liveNowDateStr()`), same as `generator/anchor_date.py`'s own default
+already anchors every real run's OWN dates to - the two normally agree
+(BDM regenerates near real "now" every time), but only a genuine
+wall-clock basis stays correct once real time has moved on since the
+fixture was last regenerated, which a run-date-derived default would
+silently fail to track. `maxRunDate()` removed (no longer used).
+
+**Also same day: a real, related UI bug Keith caught by using the
+picker, not a design gap** - the agency-tier dataset table's "Arrival
+(today)" column header was written before Thread C's as-of clipping
+existed, back when the default view WAS unconditionally "today's"
+data. Once every dataset's default view can legitimately be clipped to
+an earlier as-of date, that header is actively misleading - it reads
+"(today)" over a date that may be days, weeks, or (for a quarterly
+dataset) months in the past, which is very plausibly what looked like
+"both BDM and CP arrived today" from the dashboard. Fixed: relabelled
+to "Latest arrival" (matching the dataset-detail view's own SLA-tile
+wording), dropping the now-inaccurate "(today)" implication rather than
+trying to make it as-of-aware in-line.
+
+**Investigated, not changed: whether Child Protection's own real
+cadence still looks genuinely quarterly.** Keith's fallback instruction
+("if [CP genuinely looks like it arrived today], pin its most recent
+supply to around the first of August") was conditional, so checked the
+premise directly against `reports/child_protection_dashboard.json`
+before acting: CP's real latest committed run is `2026-07-01`, not
+today (`2026-09-16` real wall-clock, per `generator/anchor_date.py`'s
+default) - genuinely a real quarterly-cadence extract, ~2.5 months
+behind BDM's own latest daily run, which is what the two-column-header
+bug above most likely actually was (an accurate, quarterly-lagged date
+sitting under a header that said "(today)" regardless). Since the
+premise didn't hold, CP's own generated data was left alone - no
+regeneration triggered speculatively. Genuinely shifting CP's rolling
+quarter-boundary anchor (`generator/generate_cp_runs.py`'s
+`_quarter_start()`/`_add_quarters()`, both phase-locked to calendar
+Jan/Apr/Jul/Oct 1 via the shared `generator/anchor_date.py` anchor) so
+its most recent supply lands nearer 2026-08-01 is a real, separate
+design fork (a one-time hardcoded date vs. a permanent phase shift of
+the quarter boundaries themselves, which would keep rolling forward
+with real time the same way the existing Jan/Apr/Jul/Oct boundaries
+already do) - not built, pending Keith confirming he still wants it now
+that the header-label explanation accounts for what he saw.
 
 Renumbered/reorganized 2026-09-16 (Keith's own call, for ease of
 reasoning/talking about this work) - each phase still names which
