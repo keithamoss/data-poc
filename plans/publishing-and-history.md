@@ -1464,6 +1464,33 @@ removing the commit-back step entirely:**
   committed (that would just reintroduce the same problem this decision
   was meant to avoid).
 
+**Enforced structurally, 2026-09-16 (same day, Keith's call): a local
+pre-commit hook, not just the convention above.** Surfaced doing the
+Phase 4 dashboard-data verification work (running `dashboard.embed_
+dashboard_data` + a real Playwright render check locally, then
+discarding the rebuild via `git checkout --` before committing) -
+Keith's instinct, matching this project's standing preference for a
+real mechanism over remembered discipline: "let's not have the
+dashboard template overwritten by a local build." `dashboard/
+check_no_local_embed_committed.py`, wired into `.pre-commit-config.yaml`
+as a local hook (`files: ^dashboard/qa-reporting-dashboard\.html$`),
+reads the file's staged diff (`git diff --cached -U0`) and refuses the
+commit only when EVERY changed line is one of the two `const REAL_*_DATA
+= ...;` lines - a genuine hand-edit to the dashboard's own HTML/CSS/JS
+(which IS meant to be committed directly) will always touch other
+lines too, so this can never block real work, only an accidentally-
+staged local rebuild. Verified for real, not just unit-tested: ran
+`embed_dashboard_data.py` against the real repo, staged the real
+rebuilt file, attempted a real `git commit` through the real installed
+hook (`pre-commit install`) - confirmed blocked with the expected
+message - then restored the file (`git restore --staged --worktree`)
+before committing this change itself. 4 new tests (`tests/test_check_
+no_local_embed_committed.py`, real temp git repos + real subprocess
+invocations, same rigor as `tests/test_validate_check_lifecycle.py`'s
+own git-history tests) - covering the block case, two "genuine edit"
+cases (touches other lines only; touches other lines AND the const
+lines), and the not-staged case. Full pytest (174 tests) + ruff clean.
+
 **Phase 4 (Thread C - cadence-aware "as of" viewing):**
 - Depends on Phase 1 and Phase 2 (real committed history, merged/
   reshaped) - NOT on Phase 3. Worth being explicit about this: the
