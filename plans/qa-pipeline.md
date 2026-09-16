@@ -2313,6 +2313,16 @@ relative, not a schedule — this is weeks of work, not months.
     worded differently - see this project's own "full-triplication"
     passes) rather than assuming a single canonical source per check.
 
+    **Partially absorbed, 2026-09-16** - see `plans/publishing-and-
+    history.md` Thread D. Keith pulled the related-but-distinct
+    "human-written description" idea out of this item into that
+    thread's check-lifecycle metadata design: a `description` field
+    (plain-English, hand-authored) now has a real home (dbt's `meta:`,
+    Soda's `attributes:`, etc.) and a real UI surface (the check-detail
+    panel). This item's ORIGINAL ask - showing the check's actual
+    technical SQL/YAML definition, not a human's explanation of it -
+    stays open, unresolved by that work.
+
 44. **[todo]** Checks for expected values that must actually appear -
     the inverse of an `accepted_values`/`invalid_percent` check (which
     only ever asserts every value IS FROM a closed set), not covered by

@@ -190,14 +190,85 @@ version detection, enforcement, and authoring all settled:**
 
 **Confirmed field set for the metadata, each check gets:**
 - `check_id` - human-entered, must be globally unique (CI-enforced).
+  Format confirmed 2026-09-16: `<data-asset-name>.<agency>.<dataset>.
+  <table>.<column>.<check_name>` - `column` omitted for a table-level
+  check (e.g. `dbt_utils.expression_is_true`/`recency`, declared under
+  the model itself, not a column). `data-asset-name` is a fixed literal
+  prefix used across every check_id in the whole system, not something
+  that varies per check - placeholder value for now: `data-asset-1`
+  (Keith's own call - a real name can replace it later, everywhere it
+  appears, without changing the scheme itself). `dataset` and `table`
+  are deliberately separate segments even though they're near-identical
+  strings for BDM today (single-table dataset) - they genuinely differ
+  for Child Protection (one collection/dataset, six distinct tables),
+  and Keith's explicit go-ahead: duplication for BDM is fine.
 - `introduced_date` - when the check was first added.
 - `retired_as_of` + `retired_reason` - both optional, both required
   together if the check is retired (history stays fully visible, just
   flagged inactive from this date).
+- `description` - human-written, plain-English explanation of what the
+  check actually does and why - pulled in from `plans/qa-pipeline.md`
+  #43 2026-09-16 (Keith's own instruction: "pull that out"), which had
+  parked a related but distinct idea: surfacing a check's REAL
+  SQL/YAML/technical definition in the dashboard, not just today's
+  terse `label`. That original ask stays open on its own (see below) -
+  this `description` field is the complementary, human-authored
+  explanation, not a replacement for showing the real technical rule.
+  Natural fit alongside the rest of this metadata, authored the same
+  way (dbt's `meta:`, Soda's `attributes:`, etc.) since it's the same
+  kind of hand-written, check-level information.
 - `changelog` - a list of entries, each with: `date` (automatic, not
   hand-entered), `description` (human-written), `author` (human-entered
   - deliberately not auto-derived from git's own commit author, per
   Keith's own call), `breaking` (human-set boolean).
+
+**Concrete per-tool schema, `data-asset-1` placeholder applied:**
+
+```yaml
+# dbt schema.yml
+tests:
+  - not_null:
+      meta:
+        check_id: data-asset-1.bdm.birth_registrations.stg_birth_registrations.registration_number.not_null
+        introduced_date: "2026-01-15"
+        description: "Every birth registration must carry a registration number - BDM's primary key for the feed."
+        changelog:
+          - date: "2026-06-01T10:00:00Z"
+            description: "Tightened null tolerance"
+            author: "Keith Moss"
+            breaking: false
+
+# Soda checks YAML
+checks for birth_registrations:
+  - missing_percent(place_of_birth_facility) > 5%:
+      name: place_of_birth_facility missing rate
+      attributes:
+        check_id: data-asset-1.bdm.birth_registrations.stg_birth_registrations.place_of_birth_facility.missing_percent
+        introduced_date: "2026-01-15"
+        description: "Facility should usually be captured - home births are the expected exception."
+        changelog: []
+
+# ODCS contract
+quality:
+  - metric: nullValues
+    mustBe: 0
+    customProperties:
+      - property: check_id
+        value: data-asset-1.bdm.birth_registrations.stg_birth_registrations.registration_number.nullValues
+      - property: description
+        value: "Every record must carry a registration number."
+      - property: introduced_date
+        value: "2026-01-15"
+
+# Evidently (Python, no YAML today)
+CHECK_LIFECYCLE = {
+    "data-asset-1.bdm.birth_registrations.stg_birth_registrations.row_count_growth": {  # table-level, column segment omitted
+        "introduced_date": "2026-02-01",
+        "description": "Row count should mostly grow run over run - a real drop signals a broken/partial extract.",
+        "changelog": [],
+    },
+}
+```
 
 **UI presentation - resolved, 2026-09-16, same session:**
 - **Breaking definition change: a real visual gap/split in the trend
@@ -210,30 +281,37 @@ version detection, enforcement, and authoring all settled:**
   look identical. Exact styling (color/pattern) to work out when built,
   but the constraint is now explicit, not something to discover as a
   bug later.
+- **Non-breaking definition change: a subtle marker on the still-
+  continuous line, deliberately the SAME COLOR as the breaking-change
+  styling** - Keith's own call: color is the consistent visual language
+  for "the check itself changed here" across both cases; the *shape*
+  (a gap vs. a marker on an unbroken line) is what actually carries the
+  breaking/non-breaking distinction, not a different color per case.
 - **Retired checks: drop out of the main current-status view by
   default** (column drawer, overall summary) - a retired check isn't
   part of "what's currently being checked," so the default view stays
   focused on active checks. A toggle brings retired checks back into
   view for history/audit purposes - full history stays intact and
   reachable, just not front-and-centre by default.
-- **Changelog metadata surfaces in the existing check-detail panel**
-  (item 42's status pill, item 45's comparison UI) rather than a new
-  tooltip pattern - a changelog entry becomes another section of the
-  panel that already shows a check's status/history/comparison,
+- **Changelog and description metadata both surface in the existing
+  check-detail panel** (item 42's status pill, item 45's comparison UI)
+  rather than a new tooltip pattern - each becomes another section of
+  the panel that already shows a check's status/history/comparison,
   consistent with how everything else about a check is already
   presented there.
 
 **Still not designed:**
-- Exact per-tool schema/field names (the concepts above are settled,
-  the literal YAML/Python shape isn't).
 - Exact visual styling for the breaking-change gap vs. Thread C's
-  no-data gap (the constraint that they must differ is settled; the
-  actual color/pattern isn't).
-- How a non-breaking definition change reads in the UI at all (the
-  breaking case now has a real design; the non-breaking case - still
-  one continuous line, but a change genuinely happened and has a
-  changelog entry - hasn't been designed yet. Presumably some lighter
-  marker on the continuous line, not yet confirmed with Keith).
+  no-data gap, and the shared marker/gap color itself (the constraints
+  - must differ from no-data, breaking and non-breaking share one color
+  - are settled; the actual color/pattern values aren't).
+- `plans/qa-pipeline.md` #43's ORIGINAL ask - surfacing a check's real
+  SQL/YAML/technical definition (not the new plain-English
+  `description` field, which is now resolved) - stays open, not
+  resolved by this round. Candidate approaches unchanged from that
+  item's own text: embed the source snippet at generation time, or a
+  simpler static mapping keyed by check_id now that one reliably
+  exists.
 
 ## Thread A - publishing (build after B/D's data format exists)
 
