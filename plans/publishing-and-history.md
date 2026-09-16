@@ -476,7 +476,7 @@ Thread B's format from the start, not bolted on after, so those two
 stay together).
 
 **Phase 1 (Thread B + D - results storage + check-lifecycle format and
-validation):**
+validation) - [DONE, 2026-09-16]:**
 - Committed per-run raw tool-output files, with check-lifecycle
   (retirement/definition-change) metadata designed into the format from
   the start.
@@ -490,6 +490,63 @@ validation):**
 - Doc updates: `CLAUDE.md`'s gitignore convention explicitly updated to
   reflect that `qa_results/` (or whatever this ends up named) is now
   committed, not ephemeral.
+
+**Built and verified for real, not just designed:**
+- `qa_tools/common/qa_results_writer.py` - writes each tool's native raw
+  output to `qa_results/<agency>/<dataset-or-collection>/<run_id>/
+  <tool>.json`. Wired into all 8 `run_*.py` tool-runner modules (BDM +
+  CP, all 4 tools each). Collection-level tools (dbt/Soda/datacontract-
+  cli for CP, which run once across all 6 tables in one invocation) use
+  the collection ID as the "dataset" path segment, not split artificially
+  per table - the path reflects what the tool actually ran, not a
+  finer grain than the real execution.
+- `qa_tools/common/check_lifecycle.py` - parses check-lifecycle metadata
+  from all 4 tools' own definition formats (dbt's `meta:`, Soda's
+  `attributes:`, the ODCS contract's `customProperties:`, a plain dict
+  for Evidently), computes a per-check config-hash fingerprint (scoped
+  to exclude cosmetic fields), and validates global `check_id`
+  uniqueness + changelog-completeness on config changes. 19 tests, all
+  against fixtures, not the real ~250 production checks.
+- All 4 tools' real check definitions, both datasets, fully retrofitted
+  with `check_id`/`introduced_date`/`description`/`changelog`: BDM (25
+  dbt + 26 Soda + 27 contract + 2 Evidently = 80) and Child Protection
+  (52 dbt + 59 Soda + 62 contract + 1 Evidently = 173) - **254 checks
+  total across the whole system**, `check_lifecycle.validate()` clean
+  (zero duplicate `check_id`s, zero undocumented config changes).
+  Verified against real tool runs throughout, not just YAML parsing -
+  a real `dbt build`, a real `soda scan`, a real `datacontract test`
+  were each run against both datasets after retrofitting, confirming
+  the added `meta:`/`attributes:`/`customProperties:` blocks don't
+  break any of the four tools.
+- Ran the full real pipeline end to end (`./run_pipeline.sh` for BDM,
+  `qa_tools.cp.orchestrate_cp` for Child Protection) to generate and
+  commit real `qa_results/` history for all 25 runs (15 BDM + 10 CP)
+  across every tool - 100 files, ~8.9MB. Confirmed the dashboard still
+  renders with zero console errors afterward (real Playwright check).
+
+**A real design gap found during verification, not anticipated in the
+original scoping - worth Keith's sign-off before Phase 2:** the agreed
+`check_id` format (`<data-asset-name>.<agency>.<dataset>.<table>.
+<column>.<check_name>`) has no segment distinguishing which TOOL
+implements a check. This didn't matter for most checks (each tool's own
+metric vocabulary - `not_null` vs `missing_count` vs `nullValues` -
+already differs naturally), but several cross-table business rules and
+FK checks are implemented identically in more than one tool (Soda and
+the ODCS contract both implement the same 7 foreign keys and 3 business
+rules, in their own vocabularies, by this project's own long-standing
+design - see Thread B's own docstring). Where the check_name chosen for
+each was the same generic label (e.g. "date_of_birth range check"),
+this produced a real `check_id` collision - found on the BDM side first
+(5 collisions), fixed with a `_soda`/`_datacontract` suffix on the
+affected checks; applied proactively on the CP side afterward (7 FK +
+3 business-rule checks each got a tool-suffixed check_name from the
+start, avoiding a second collision-and-fix round). The underlying
+scheme itself wasn't changed - not every check_id needs a tool suffix,
+only ones where two tools happen to implement literally the same rule
+under the same name. Worth a real conversation before Phase 2 locks
+in on this pattern: keep the "suffix only when needed" convention as
+now applied, or make every check_id tool-qualified by default for
+robustness against future collisions that haven't happened yet.
 
 **Phase 2 (Thread B - dashboard pipeline's read side):**
 - The dashboard pipeline's "read all committed history, merge, reshape"
