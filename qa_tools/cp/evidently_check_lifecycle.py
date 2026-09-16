@@ -9,7 +9,7 @@ metadata the way dbt/Soda/the contract do).
 from __future__ import annotations
 
 CHECK_LIFECYCLE = {
-    "data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.concern_type.drift_psi": {
+    "data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.concern_type.drift_psi_evidently": {
         "introduced_date": "2026-01-15",
         "description": "Population Stability Index on concern_type's value distribution vs. the reference run - this collection's own traffic-light demo column.",
         "changelog": [],

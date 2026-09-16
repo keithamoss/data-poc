@@ -12,12 +12,12 @@ the check" means for this one tool.
 from __future__ import annotations
 
 CHECK_LIFECYCLE = {
-    "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.drift_psi": {
+    "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.drift_psi_evidently": {
         "introduced_date": "2026-01-15",
         "description": "Population Stability Index on sex's value distribution vs. the reference run - flags a real distribution shift.",
         "changelog": [],
     },
-    "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.row_count_growth": {
+    "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.row_count_growth_evidently": {
         "introduced_date": "2026-01-15",
         "description": "Row count should mostly grow run over run - a real drop signals a broken/partial extract.",
         "changelog": [],

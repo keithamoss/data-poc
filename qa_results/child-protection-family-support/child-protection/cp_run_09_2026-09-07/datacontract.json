@@ -1,7 +1,7 @@
 {
-  "run_timestamp": "2026-09-16T09:51:07.495445+00:00",
+  "run_timestamp": "2026-09-16T10:30:21.814702+00:00",
   "raw_output": {
-    "runId": "7555d9dd-199f-4635-a932-234d8b522efc",
+    "runId": "d04e6031-9f31-4ade-aa56-1941c30276a3",
     "datacontractCliVersion": "1.2.0",
     "dataContractId": "child-protection-casework",
     "dataContractVersion": "1.0.0",
@@ -9,13 +9,13 @@
     "outputPortId": null,
     "server": "local_test",
     "filters": null,
-    "timestampStart": "2026-09-16 09:51:42.275863+00:00",
-    "timestampEnd": "2026-09-16 09:51:48.068599+00:00",
+    "timestampStart": "2026-09-16 10:30:56.410563+00:00",
+    "timestampEnd": "2026-09-16 10:31:02.222420+00:00",
     "result": "passed",
     "dryRun": false,
     "checks": [
       {
-        "id": "c9b63331-fe68-41a9-a271-341adb01b8e1",
+        "id": "1efb73be-908b-48d5-b8b3-d217905977d8",
         "key": "cp_clients__cp_client_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -39,7 +39,7 @@
         "failedSamples": null
       },
       {
-        "id": "137be38d-d842-4ce0-be40-f8004e30936a",
+        "id": "0035ea27-4911-4623-8816-eacef4269a0b",
         "key": "cp_clients__cp_client_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -66,7 +66,7 @@
         "failedSamples": null
       },
       {
-        "id": "42e572cb-c14b-4aee-83e3-797142863d41",
+        "id": "789c0d29-3f28-45b6-aad8-10a4b1f1ce3b",
         "key": "cp_clients__cp_client_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -93,7 +93,7 @@
         "failedSamples": null
       },
       {
-        "id": "33aae51c-414c-4564-bf36-cc8cf3943d89",
+        "id": "59ee5bf5-41d1-4a3a-b65a-0cbeff0bd9cd",
         "key": "cp_clients__cp_client_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -103,7 +103,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every client record must carry a client ID.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every client record must carry a client ID.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"cp_client_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_clients__cp_client_id__field_null_values\"\nFROM \"cp_clients\" AS \"t0\"",
@@ -121,7 +121,7 @@
         "failedSamples": null
       },
       {
-        "id": "d8138955-f3f5-483f-91b5-c7d96e5c78a1",
+        "id": "d94ab92e-7c0f-4313-9b01-670568e3dcf6",
         "key": "cp_clients__cp_client_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -131,7 +131,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "uniqueness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.duplicateValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Client IDs must not be duplicated.\n- property: changelog\n  value: '[]'\ndimension: uniqueness\nseverity: error\nmetric: duplicateValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.duplicateValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Client IDs must not be duplicated.\n- property: changelog\n  value: '[]'\ndimension: uniqueness\nseverity: error\nmetric: duplicateValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"cp_client_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_clients\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
@@ -149,7 +149,7 @@
         "failedSamples": null
       },
       {
-        "id": "d66bfaf5-36af-44ca-ba3d-e7d12f269843",
+        "id": "d5ac432f-d13f-4f7d-b1ec-f036622349eb",
         "key": "cp_clients__given_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -173,7 +173,7 @@
         "failedSamples": null
       },
       {
-        "id": "354d30d5-d6a9-4f79-ae37-406980a02e7e",
+        "id": "e915f363-d237-4ba3-897c-23e74721c1fe",
         "key": "cp_clients__given_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -200,7 +200,7 @@
         "failedSamples": null
       },
       {
-        "id": "96d3f56d-85ce-4d58-a90e-cf564d5a2e38",
+        "id": "fa627a35-6d60-448d-8d15-681fb2ad4d24",
         "key": "cp_clients__given_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -210,7 +210,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.given_name.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A client's given name must be recorded.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.given_name.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A client's given name must be recorded.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"given_name\" IS NULL THEN 1 ELSE 0 END) AS \"cp_clients__given_name__field_null_values\"\nFROM \"cp_clients\" AS \"t0\"",
@@ -228,7 +228,7 @@
         "failedSamples": null
       },
       {
-        "id": "92326d8c-2053-4a7f-b7a8-d51b102c688b",
+        "id": "30a854ea-1ae2-4cbd-87b4-f3d4fb1a647e",
         "key": "cp_clients__family_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -252,7 +252,7 @@
         "failedSamples": null
       },
       {
-        "id": "cf7b40ec-8410-4138-8b2c-94add1bf4c18",
+        "id": "5eb128de-d9c2-4c1a-a92d-1e52e11f2954",
         "key": "cp_clients__family_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -279,7 +279,7 @@
         "failedSamples": null
       },
       {
-        "id": "6d01576d-aa99-4550-80bf-26b51b742d72",
+        "id": "00cc0594-284c-4f37-9eeb-369059f12379",
         "key": "cp_clients__family_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -289,7 +289,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.family_name.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A client's family name must be recorded.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.family_name.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A client's family name must be recorded.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"family_name\" IS NULL THEN 1 ELSE 0 END) AS \"cp_clients__family_name__field_null_values\"\nFROM \"cp_clients\" AS \"t0\"",
@@ -307,7 +307,7 @@
         "failedSamples": null
       },
       {
-        "id": "cf297003-2780-42b2-879a-e29c6f0aae77",
+        "id": "f92bd79b-6ff5-4998-b67f-d6568947f319",
         "key": "cp_clients__date_of_birth__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -331,7 +331,7 @@
         "failedSamples": null
       },
       {
-        "id": "2f479269-ff0e-4d56-b5f4-d121a0558c83",
+        "id": "356b4699-cf07-4802-bf5d-a61ed158496f",
         "key": "cp_clients__date_of_birth__field_required",
         "category": "schema",
         "type": "field_required",
@@ -358,7 +358,7 @@
         "failedSamples": null
       },
       {
-        "id": "fb802973-77ed-4d18-a469-68c6db800d22",
+        "id": "ebe6b293-401f-438b-9a38-a48056e2b47f",
         "key": "cp_clients__date_of_birth__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -368,7 +368,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A client record must carry a date of birth.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A client record must carry a date of birth.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"date_of_birth\" IS NULL THEN 1 ELSE 0 END) AS \"cp_clients__date_of_birth__field_null_values\"\nFROM \"cp_clients\" AS \"t0\"",
@@ -386,7 +386,7 @@
         "failedSamples": null
       },
       {
-        "id": "28b47521-1d9b-4fcc-8201-b033f2aa9a62",
+        "id": "52a52a08-e2a6-4a05-9a36-16bd08b02d88",
         "key": "cp_clients__date_of_birth__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -412,7 +412,7 @@
         "failedSamples": null
       },
       {
-        "id": "1526bfb9-fab8-47da-b5ad-5ff805b23adc",
+        "id": "d8687822-cd4c-42d8-90f9-b4c92c8fb1d8",
         "key": "cp_clients__sex__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -436,7 +436,7 @@
         "failedSamples": null
       },
       {
-        "id": "3afdef85-c3b2-44ef-b52f-fc87f2c60fba",
+        "id": "5b9a74e5-3991-4d56-bbba-422ddb4683a0",
         "key": "cp_clients__sex__field_required",
         "category": "schema",
         "type": "field_required",
@@ -463,7 +463,7 @@
         "failedSamples": null
       },
       {
-        "id": "2e76e10b-2287-49f9-ba95-9a59bc0880fa",
+        "id": "28143af8-85b0-4828-8a94-d893178aef4b",
         "key": "cp_clients__sex__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -473,7 +473,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "conformity",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.sex.invalidValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Sex must be one of the closed value set M, F, or X.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - M\n  - F\n  - X\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.sex.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Sex must be one of the closed value set M, F, or X.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - M\n  - F\n  - X\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"sex\" IS NULL\n      ) AND NOT (\n        \"t0\".\"sex\" IN ('M', 'F', 'X')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_clients__sex__field_invalid_values\"\nFROM \"cp_clients\" AS \"t0\"",
@@ -498,7 +498,7 @@
         "failedSamples": null
       },
       {
-        "id": "09e22ab9-ae13-4447-ad16-aecff6149680",
+        "id": "e363d989-6bde-44b0-a200-e9c8b602faea",
         "key": "cp_clients__suburb__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -522,7 +522,7 @@
         "failedSamples": null
       },
       {
-        "id": "14cd6ddf-fa02-4389-9b65-75ece165460d",
+        "id": "e237f48d-812b-45b2-b22e-f8b7ed6d3915",
         "key": "cp_clients__suburb__field_required",
         "category": "schema",
         "type": "field_required",
@@ -549,7 +549,7 @@
         "failedSamples": null
       },
       {
-        "id": "b379dc1a-679a-45fd-b302-339c5d91188e",
+        "id": "137ea160-ba9e-4d1d-b5b5-344fc6acf466",
         "key": "cp_clients__suburb__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -559,7 +559,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.suburb.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A client's suburb must be recorded.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.suburb.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A client's suburb must be recorded.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"suburb\" IS NULL THEN 1 ELSE 0 END) AS \"cp_clients__suburb__field_null_values\"\nFROM \"cp_clients\" AS \"t0\"",
@@ -577,7 +577,7 @@
         "failedSamples": null
       },
       {
-        "id": "1c25b364-db16-4783-9ffe-e67dcaa5619c",
+        "id": "6a1f2b8a-5421-4642-b98b-f108dc694a5c",
         "key": "cp_clients__postcode__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -601,7 +601,7 @@
         "failedSamples": null
       },
       {
-        "id": "237129d5-dbea-4d34-98d7-484c6d5b747f",
+        "id": "4be5e439-3ac9-44ac-8f55-faf5b3d4baab",
         "key": "cp_clients__postcode__field_required",
         "category": "schema",
         "type": "field_required",
@@ -628,7 +628,7 @@
         "failedSamples": null
       },
       {
-        "id": "39c29d6e-17b1-4355-bc6f-80c591832b31",
+        "id": "5329cd24-8d31-47cf-a922-58bd4613cb89",
         "key": "cp_clients__postcode__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -638,7 +638,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A client's postcode must be recorded.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A client's postcode must be recorded.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"postcode\" IS NULL THEN 1 ELSE 0 END) AS \"cp_clients__postcode__field_null_values\"\nFROM \"cp_clients\" AS \"t0\"",
@@ -656,7 +656,7 @@
         "failedSamples": null
       },
       {
-        "id": "2802f4aa-fadb-424f-8ee5-2064d4c58878",
+        "id": "a97ae533-3d7a-4737-b9fb-65ea943c2adf",
         "key": "cp_clients__postcode__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -666,7 +666,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "conformity",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.invalidValues\n- property: introduced_date\n  value: '2026-09-15'\n- property: changelog\n  value: '[]'\ndescription: An unrecognised postcode means a data-entry typo or a source-system change.\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - '6007'\n  - '6008'\n  - '6014'\n  - '6018'\n  - '6019'\n  - '6027'\n  - '6028'\n  - '6030'\n  - '6035'\n  - '6036'\n  - '6050'\n  - '6056'\n  - '6061'\n  - '6062'\n  - '6064'\n  - '6069'\n  - '6100'\n  - '6102'\n  - '6107'\n  - '6109'\n  - '6110'\n  - '6112'\n  - '6122'\n  - '6148'\n  - '6151'\n  - '6155'\n  - '6160'\n  - '6162'\n  - '6163'\n  - '6164'\n  - '6167'\n  - '6168'\n  - '6171'\n  - '6210'\n  - '6215'\n  - '6225'\n  - '6230'\n  - '6258'\n  - '6280'\n  - '6285'\n  - '6312'\n  - '6330'\n  - '6401'\n  - '6430'\n  - '6450'\n  - '6530'\n  - '6714'\n  - '6721'\n  - '6725'\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-09-15'\n- property: changelog\n  value: '[]'\ndescription: An unrecognised postcode means a data-entry typo or a source-system change.\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - '6007'\n  - '6008'\n  - '6014'\n  - '6018'\n  - '6019'\n  - '6027'\n  - '6028'\n  - '6030'\n  - '6035'\n  - '6036'\n  - '6050'\n  - '6056'\n  - '6061'\n  - '6062'\n  - '6064'\n  - '6069'\n  - '6100'\n  - '6102'\n  - '6107'\n  - '6109'\n  - '6110'\n  - '6112'\n  - '6122'\n  - '6148'\n  - '6151'\n  - '6155'\n  - '6160'\n  - '6162'\n  - '6163'\n  - '6164'\n  - '6167'\n  - '6168'\n  - '6171'\n  - '6210'\n  - '6215'\n  - '6225'\n  - '6230'\n  - '6258'\n  - '6280'\n  - '6285'\n  - '6312'\n  - '6330'\n  - '6401'\n  - '6430'\n  - '6450'\n  - '6530'\n  - '6714'\n  - '6721'\n  - '6725'\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"postcode\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"postcode\" IN (\n          '6007',\n          '6008',\n          '6014',\n          '6018',\n          '6019',\n          '6027',\n          '6028',\n          '6030',\n          '6035',\n          '6036',\n          '6050',\n          '6056',\n          '6061',\n          '6062',\n          '6064',\n          '6069',\n          '6100',\n          '6102',\n          '6107',\n          '6109',\n          '6110',\n          '6112',\n          '6122',\n          '6148',\n          '6151',\n          '6155',\n          '6160',\n          '6162',\n          '6163',\n          '6164',\n          '6167',\n          '6168',\n          '6171',\n          '6210',\n          '6215',\n          '6225',\n          '6230',\n          '6258',\n          '6280',\n          '6285',\n          '6312',\n          '6330',\n          '6401',\n          '6430',\n          '6450',\n          '6530',\n          '6714',\n          '6721',\n          '6725'\n        )\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_clients__postcode__field_invalid_values\"\nFROM \"cp_clients\" AS \"t0\"",
@@ -737,7 +737,7 @@
         "failedSamples": null
       },
       {
-        "id": "9b9273f5-4cbb-461d-a44b-6cb9547ab2ca",
+        "id": "39111fab-f634-45b1-99f9-6b95335d344b",
         "key": "cp_clients__case_opened_date__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -761,7 +761,7 @@
         "failedSamples": null
       },
       {
-        "id": "36401874-7510-4a47-8600-bab57574b78a",
+        "id": "751c617d-fded-40ca-b9eb-abefeda8125d",
         "key": "cp_clients__case_opened_date__field_required",
         "category": "schema",
         "type": "field_required",
@@ -788,7 +788,7 @@
         "failedSamples": null
       },
       {
-        "id": "01a07086-e00e-4c2c-9778-c082f4b2c165",
+        "id": "a10f3ce4-bce0-4f03-b72b-885f24b66027",
         "key": "cp_clients__case_opened_date__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -798,7 +798,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.case_opened_date.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A client record must carry the date its case was opened.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.case_opened_date.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A client record must carry the date its case was opened.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"case_opened_date\" IS NULL THEN 1 ELSE 0 END) AS \"cp_clients__case_opened_date__field_null_values\"\nFROM \"cp_clients\" AS \"t0\"",
@@ -816,7 +816,7 @@
         "failedSamples": null
       },
       {
-        "id": "7f8e8e51-3110-4337-bbb9-cdc4454c5ab9",
+        "id": "7f5c4bc7-7f0e-42cc-b8e4-31e867511aa9",
         "key": "cp_clients__case_status__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -840,7 +840,7 @@
         "failedSamples": null
       },
       {
-        "id": "ed60a76f-5cf6-40a1-b3dd-f93a39487a5e",
+        "id": "cfdcbedf-042b-423b-befa-3b8a77eec28e",
         "key": "cp_clients__case_status__field_required",
         "category": "schema",
         "type": "field_required",
@@ -867,7 +867,7 @@
         "failedSamples": null
       },
       {
-        "id": "2024a827-5972-4091-8a10-227015810c4c",
+        "id": "e4b2e3ab-5bb1-4d30-b3bb-cbab96ef656a",
         "key": "cp_clients__case_status__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -877,7 +877,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "conformity",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.case_status.invalidValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Case status must be one of Open or Closed.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - Open\n  - Closed\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.case_status.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Case status must be one of Open or Closed.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - Open\n  - Closed\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"case_status\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"case_status\" IN ('Open', 'Closed')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_clients__case_status__field_invalid_values\"\nFROM \"cp_clients\" AS \"t0\"",
@@ -901,7 +901,7 @@
         "failedSamples": null
       },
       {
-        "id": "94989203-fcbb-4ec1-91d7-2542db132e72",
+        "id": "67309bfd-eb86-4d8f-a153-ed1bb7a9ca75",
         "key": "cp_clients__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -925,7 +925,7 @@
         "failedSamples": null
       },
       {
-        "id": "c3e7f4e3-c312-4414-94ad-25cb3c09cab4",
+        "id": "c7fae775-366f-45b3-9721-f3513372eb92",
         "key": "cp_clients__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -952,7 +952,7 @@
         "failedSamples": null
       },
       {
-        "id": "be3694fb-2997-4c3c-a173-7b81ba971e02",
+        "id": "3692e594-ac45-4462-87cb-9f7f56667e23",
         "key": "cp_clients__row_count",
         "category": "quality",
         "type": "row_count",
@@ -962,7 +962,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.rowCount\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\ndescription: |\n  A rough sanity band for the active client population per extract - catches a truncated or duplicated-file extract, same rationale as the Birth Registrations contract's rowCount rule.\ndimension: completeness\nseverity: warning\nmetric: rowCount\nmustBeBetween:\n- 300\n- 900\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.rowCount_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\ndescription: |\n  A rough sanity band for the active client population per extract - catches a truncated or duplicated-file extract, same rationale as the Birth Registrations contract's rowCount rule.\ndimension: completeness\nseverity: warning\nmetric: rowCount\nmustBeBetween:\n- 300\n- 900\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  COUNT(*) AS \"cp_clients__row_count\"\nFROM \"cp_clients\" AS \"t0\"",
@@ -978,7 +978,7 @@
         "failedSamples": null
       },
       {
-        "id": "c1fab418-e997-4c80-8812-d80ce38691f0",
+        "id": "5e3e9257-05de-4065-afd7-f41a9319c4d4",
         "key": "cp_notifications__notification_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1002,7 +1002,7 @@
         "failedSamples": null
       },
       {
-        "id": "7e92d3dc-a098-4473-86bb-bf23a6999e29",
+        "id": "cab0a50d-2296-4247-a336-e1c4ae8e6be7",
         "key": "cp_notifications__notification_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1029,7 +1029,7 @@
         "failedSamples": null
       },
       {
-        "id": "1d2252de-6824-40a8-b63d-944f138a9e4e",
+        "id": "c88db6c4-1c63-44ea-a394-dc7b21fc737a",
         "key": "cp_notifications__notification_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -1056,7 +1056,7 @@
         "failedSamples": null
       },
       {
-        "id": "66150147-1a21-4b3e-a67a-5f30946238ae",
+        "id": "01bc0e32-59aa-44a9-920d-5433c9483ed8",
         "key": "cp_notifications__notification_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1066,7 +1066,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every notification must carry a notification ID.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every notification must carry a notification ID.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"notification_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_notifications__notification_id__field_null_values\"\nFROM \"cp_notifications\" AS \"t0\"",
@@ -1084,7 +1084,7 @@
         "failedSamples": null
       },
       {
-        "id": "044408a8-7463-499c-9168-283e03bdbcdd",
+        "id": "90719f08-6b56-4bb6-93b8-bdafd13deced",
         "key": "cp_notifications__notification_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -1094,7 +1094,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "uniqueness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.duplicateValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\ndescription: |\n  The dirty(amber/red) presets on this table (see generator/dirty.py's apply_cp_notifications_presets) deliberately inject near-duplicate notifications - a real double-submission scenario - so this rule has something genuine to catch on those runs.\ndimension: uniqueness\nseverity: error\nmetric: duplicateValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.duplicateValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\ndescription: |\n  The dirty(amber/red) presets on this table (see generator/dirty.py's apply_cp_notifications_presets) deliberately inject near-duplicate notifications - a real double-submission scenario - so this rule has something genuine to catch on those runs.\ndimension: uniqueness\nseverity: error\nmetric: duplicateValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"notification_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_notifications\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
@@ -1112,7 +1112,7 @@
         "failedSamples": null
       },
       {
-        "id": "d2524122-95db-4205-9ef0-c5f2c3ebeca5",
+        "id": "6f2dbafb-9c31-4633-9aac-17bc72110b21",
         "key": "cp_notifications__cp_client_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1136,7 +1136,7 @@
         "failedSamples": null
       },
       {
-        "id": "27a00dc4-fcec-4925-90dd-fe8812435e34",
+        "id": "8d5a1278-4b85-40e5-be54-a6bc3527273c",
         "key": "cp_notifications__cp_client_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1163,7 +1163,7 @@
         "failedSamples": null
       },
       {
-        "id": "06bd818a-748a-482d-9507-37c4cdca3fdc",
+        "id": "a8006453-16ce-478a-8c79-658573162273",
         "key": "cp_notifications__cp_client_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1173,7 +1173,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every notification must reference a client.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every notification must reference a client.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"cp_client_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_notifications__cp_client_id__field_null_values\"\nFROM \"cp_notifications\" AS \"t0\"",
@@ -1191,7 +1191,7 @@
         "failedSamples": null
       },
       {
-        "id": "42104ea6-b32b-4a31-9448-1a14d8c69835",
+        "id": "07081854-fe75-440e-87c0-e32cb6df870f",
         "key": "cp_notifications__notification_date__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1215,7 +1215,7 @@
         "failedSamples": null
       },
       {
-        "id": "0d780a8a-5d90-4951-8dd7-7fe1c77657e8",
+        "id": "9a912aaf-ef96-4dd8-a86c-a041e7d2f4d1",
         "key": "cp_notifications__notification_date__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1242,7 +1242,7 @@
         "failedSamples": null
       },
       {
-        "id": "29edf409-7271-40f1-bfcd-820071f41643",
+        "id": "f67ed1b2-6054-4ba7-b7f9-307f627bd104",
         "key": "cp_notifications__notification_date__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1252,7 +1252,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_date.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every notification must carry the date it was made.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_date.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every notification must carry the date it was made.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"notification_date\" IS NULL THEN 1 ELSE 0 END) AS \"cp_notifications__notification_date__field_null_values\"\nFROM \"cp_notifications\" AS \"t0\"",
@@ -1270,7 +1270,7 @@
         "failedSamples": null
       },
       {
-        "id": "90837921-c359-4603-b53e-49f8ea2c7503",
+        "id": "e3dad476-1ba1-4743-af8f-8d4b0e0afaad",
         "key": "cp_notifications__source_type__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1294,7 +1294,7 @@
         "failedSamples": null
       },
       {
-        "id": "00517503-8cfb-414d-a399-e278c93f0977",
+        "id": "42e3ab35-44e2-452b-a20f-d0defe268b7f",
         "key": "cp_notifications__source_type__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1321,7 +1321,7 @@
         "failedSamples": null
       },
       {
-        "id": "ee4dfa51-9d1e-42c7-8007-368b34d3f9ae",
+        "id": "c25497b4-c6e1-4ba2-9371-793f40d291db",
         "key": "cp_notifications__source_type__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1331,7 +1331,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "conformity",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.source_type.invalidValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Notification source must be one of the closed value set.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - School\n  - Police\n  - Health service\n  - Family member\n  - Neighbour\n  - Anonymous\n  - Self-report\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.source_type.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Notification source must be one of the closed value set.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - School\n  - Police\n  - Health service\n  - Family member\n  - Neighbour\n  - Anonymous\n  - Self-report\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"source_type\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"source_type\" IN (\n          'School',\n          'Police',\n          'Health service',\n          'Family member',\n          'Neighbour',\n          'Anonymous',\n          'Self-report'\n        )\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_notifications__source_type__field_invalid_values\"\nFROM \"cp_notifications\" AS \"t0\"",
@@ -1360,7 +1360,7 @@
         "failedSamples": null
       },
       {
-        "id": "1709730a-05ab-442f-9dbf-bea29373d893",
+        "id": "f5755237-fa9b-48b8-a4d1-9c8e78e2cec1",
         "key": "cp_notifications__concern_type__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1384,7 +1384,7 @@
         "failedSamples": null
       },
       {
-        "id": "3c8a942a-5e42-4458-8b66-0696de0736c0",
+        "id": "852ea0fd-e1e5-46b0-973c-cff2822c83f6",
         "key": "cp_notifications__concern_type__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1411,7 +1411,7 @@
         "failedSamples": null
       },
       {
-        "id": "6943f2d0-2861-4d68-a2ff-b16cd4644237",
+        "id": "5a6e5105-f9e3-46ee-adbf-8e88da20744e",
         "key": "cp_notifications__concern_type__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1421,7 +1421,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "conformity",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.concern_type.invalidValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - Neglect\n  - Physical abuse\n  - Emotional abuse\n  - Sexual abuse\n  - Domestic violence exposure\n  - Parental substance use\n  - Parental mental health concern\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.concern_type.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - Neglect\n  - Physical abuse\n  - Emotional abuse\n  - Sexual abuse\n  - Domestic violence exposure\n  - Parental substance use\n  - Parental mental health concern\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"concern_type\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"concern_type\" IN (\n          'Neglect',\n          'Physical abuse',\n          'Emotional abuse',\n          'Sexual abuse',\n          'Domestic violence exposure',\n          'Parental substance use',\n          'Parental mental health concern'\n        )\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_notifications__concern_type__field_invalid_values\"\nFROM \"cp_notifications\" AS \"t0\"",
@@ -1450,7 +1450,7 @@
         "failedSamples": null
       },
       {
-        "id": "9ca1fa91-208a-4191-b8d4-5f3726c9adae",
+        "id": "3cd23791-1b69-4117-aee7-5c8684befc78",
         "key": "cp_notifications__risk_rating__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1474,7 +1474,7 @@
         "failedSamples": null
       },
       {
-        "id": "6e682042-faaa-4ad2-9253-5b4c5c61679d",
+        "id": "01f3c55f-7d15-437e-8ecf-51461f9506ec",
         "key": "cp_notifications__risk_rating__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1501,7 +1501,7 @@
         "failedSamples": null
       },
       {
-        "id": "a11b8a8a-bbf3-42c3-88cf-cbbc7159b08e",
+        "id": "8598587e-15d3-4856-9949-55f85fb1304a",
         "key": "cp_notifications__risk_rating__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1511,7 +1511,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "conformity",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.risk_rating.invalidValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Risk rating must be one of the closed value set.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - Low\n  - Medium\n  - High\n  - Critical\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.risk_rating.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Risk rating must be one of the closed value set.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - Low\n  - Medium\n  - High\n  - Critical\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"risk_rating\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"risk_rating\" IN ('Low', 'Medium', 'High', 'Critical')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_notifications__risk_rating__field_invalid_values\"\nFROM \"cp_notifications\" AS \"t0\"",
@@ -1537,7 +1537,7 @@
         "failedSamples": null
       },
       {
-        "id": "719a2891-78f2-4500-b676-38d7a81d4d27",
+        "id": "d0753481-0dfb-4f22-bd0e-2f83694868a0",
         "key": "cp_notifications__assigned_worker_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1561,7 +1561,7 @@
         "failedSamples": null
       },
       {
-        "id": "63a180b3-d288-4e7d-9198-8ed600192dfa",
+        "id": "24fe7127-b21e-48d0-a92c-876c9f972174",
         "key": "cp_notifications__assigned_worker_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1588,7 +1588,7 @@
         "failedSamples": null
       },
       {
-        "id": "1a30618e-8b3a-45e5-b39d-b9a41e7b75b5",
+        "id": "8d58f910-84e9-4266-b698-1c30db73cac6",
         "key": "cp_notifications__assigned_worker_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1598,7 +1598,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every notification must be assigned to a case worker.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every notification must be assigned to a case worker.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"assigned_worker_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_notifications__assigned_worker_id__field_null_values\"\nFROM \"cp_notifications\" AS \"t0\"",
@@ -1616,7 +1616,7 @@
         "failedSamples": null
       },
       {
-        "id": "7de4b524-05a9-440d-9d04-d77ff8780089",
+        "id": "aa5ae975-6c6e-461f-a196-27efecbdf9a5",
         "key": "cp_notifications__outcome__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1640,7 +1640,7 @@
         "failedSamples": null
       },
       {
-        "id": "a1d123e9-c9f3-48c6-96f1-3d645ef2539b",
+        "id": "7cea55ae-ae25-4373-b5eb-2ca06a7df721",
         "key": "cp_notifications__outcome__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1667,7 +1667,7 @@
         "failedSamples": null
       },
       {
-        "id": "7d3e2d16-273f-48e7-9770-91e35607c3c9",
+        "id": "39fe3ca8-b1d2-4c29-8270-3c44ae749f64",
         "key": "cp_notifications__outcome__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1677,7 +1677,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "conformity",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.outcome.invalidValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Notification outcome must be one of the closed value set.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - No further action\n  - Referred to family support\n  - Investigation opened\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.outcome.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Notification outcome must be one of the closed value set.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - No further action\n  - Referred to family support\n  - Investigation opened\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"outcome\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"outcome\" IN ('No further action', 'Referred to family support', 'Investigation opened')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_notifications__outcome__field_invalid_values\"\nFROM \"cp_notifications\" AS \"t0\"",
@@ -1702,7 +1702,7 @@
         "failedSamples": null
       },
       {
-        "id": "607c59db-fc4c-4cae-88e2-66b4f5acab34",
+        "id": "bffc6d5f-fb74-473c-9df3-4729fd85f94d",
         "key": "cp_notifications__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1726,7 +1726,7 @@
         "failedSamples": null
       },
       {
-        "id": "a85d9d6d-df1c-4f01-98a2-eb5978fe289f",
+        "id": "68f8ff6a-538e-418d-bdb2-0a3b6685216e",
         "key": "cp_notifications__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1753,7 +1753,7 @@
         "failedSamples": null
       },
       {
-        "id": "11211bd0-80ac-45e2-94de-5264e03aa9d7",
+        "id": "fcbf5da7-ccdc-4935-96be-178fb4d22f2e",
         "key": "cp_notifications__row_count",
         "category": "quality",
         "type": "row_count",
@@ -1763,7 +1763,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.rowCount\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: warning\nmetric: rowCount\nmustBeBetween:\n- 600\n- 1600\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.rowCount_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: warning\nmetric: rowCount\nmustBeBetween:\n- 600\n- 1600\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  COUNT(*) AS \"cp_notifications__row_count\"\nFROM \"cp_notifications\" AS \"t0\"",
@@ -1779,7 +1779,7 @@
         "failedSamples": null
       },
       {
-        "id": "cbf3d4f4-2c8a-4546-8125-e845d78fdc03",
+        "id": "95ff0edd-b581-4ba1-8b40-66ec34ccf4b5",
         "key": "cp_notifications__quality_sql_1",
         "category": "quality",
         "type": "model_quality_sql",
@@ -1804,7 +1804,7 @@
         "failedSamples": null
       },
       {
-        "id": "af5257a2-d5f4-4dd4-b8dc-5d5bb92b7c40",
+        "id": "8fbfd1c3-9437-4b9c-82b4-958b6bfc0889",
         "key": "cp_notifications__quality_sql_2",
         "category": "quality",
         "type": "model_quality_sql",
@@ -1829,7 +1829,7 @@
         "failedSamples": null
       },
       {
-        "id": "2d6f2425-7c6d-4a30-a17e-09b17bd0de25",
+        "id": "572f2824-5ce1-4292-9a4a-75277a1b5bda",
         "key": "cp_notifications__quality_sql_3",
         "category": "quality",
         "type": "model_quality_sql",
@@ -1854,7 +1854,7 @@
         "failedSamples": null
       },
       {
-        "id": "09a1164e-9f5f-47c0-b836-3655905f0399",
+        "id": "2f216b52-cce6-47dc-a98e-38a0017a531f",
         "key": "cp_investigations__investigation_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1878,7 +1878,7 @@
         "failedSamples": null
       },
       {
-        "id": "409470c1-70c4-4761-9051-5b1eac4c1c7e",
+        "id": "2d4e394a-5e72-45fe-be5a-3ca8e3453a75",
         "key": "cp_investigations__investigation_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1905,7 +1905,7 @@
         "failedSamples": null
       },
       {
-        "id": "d21e878f-52e3-4b9a-a5e6-ae88ba368d65",
+        "id": "f805c757-14fd-423d-87b8-26c65913eac4",
         "key": "cp_investigations__investigation_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -1932,7 +1932,7 @@
         "failedSamples": null
       },
       {
-        "id": "976ac22f-32cb-4272-87db-65656c85fa2e",
+        "id": "c6e09925-570f-4361-a01f-d7c5bebee7c3",
         "key": "cp_investigations__investigation_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1942,7 +1942,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every investigation record must carry an investigation ID.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every investigation record must carry an investigation ID.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"investigation_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_investigations__investigation_id__field_null_values\"\nFROM \"cp_investigations\" AS \"t0\"",
@@ -1960,7 +1960,7 @@
         "failedSamples": null
       },
       {
-        "id": "a23ff765-38e8-4529-b2cd-0cbf2308f17e",
+        "id": "93a70ef4-4fc1-41f7-89c4-fb6e71f31ae2",
         "key": "cp_investigations__investigation_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -1970,7 +1970,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "uniqueness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.duplicateValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Investigation IDs must not be duplicated.\n- property: changelog\n  value: '[]'\ndimension: uniqueness\nseverity: error\nmetric: duplicateValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.duplicateValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Investigation IDs must not be duplicated.\n- property: changelog\n  value: '[]'\ndimension: uniqueness\nseverity: error\nmetric: duplicateValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"investigation_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_investigations\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
@@ -1988,7 +1988,7 @@
         "failedSamples": null
       },
       {
-        "id": "43f8b25c-a3db-4be5-95c8-b75bc63e5057",
+        "id": "c1d2db2a-90ad-46d3-8ee9-c1f29b0a0497",
         "key": "cp_investigations__notification_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2012,7 +2012,7 @@
         "failedSamples": null
       },
       {
-        "id": "c755f702-3475-4184-8da4-4085c5151f54",
+        "id": "c1350b08-031e-4197-b679-8b40a82bc9d8",
         "key": "cp_investigations__notification_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2039,7 +2039,7 @@
         "failedSamples": null
       },
       {
-        "id": "c9a3aab2-cdaf-487e-a438-a000d46b2828",
+        "id": "aa707225-d74e-4e8a-82f6-fbd735d799da",
         "key": "cp_investigations__notification_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2049,7 +2049,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every investigation must reference the notification that escalated into it.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every investigation must reference the notification that escalated into it.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"notification_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_investigations__notification_id__field_null_values\"\nFROM \"cp_investigations\" AS \"t0\"",
@@ -2067,7 +2067,7 @@
         "failedSamples": null
       },
       {
-        "id": "05c200ea-a0f1-4106-9564-9a96a59b0016",
+        "id": "7a2dfb9c-ce77-44b7-8e56-a50b08ea60ff",
         "key": "cp_investigations__cp_client_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2091,7 +2091,7 @@
         "failedSamples": null
       },
       {
-        "id": "720cf5a2-3df1-409b-840f-5354042f9163",
+        "id": "ba499bbe-461f-47d4-8d8d-014edf2c1bc4",
         "key": "cp_investigations__cp_client_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2118,7 +2118,7 @@
         "failedSamples": null
       },
       {
-        "id": "6a6d4f98-6579-46a6-b8fc-a1bfee38223e",
+        "id": "ce34c50a-3679-44bc-94e9-3285d00e75a1",
         "key": "cp_investigations__cp_client_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2128,7 +2128,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every investigation must reference a client.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every investigation must reference a client.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"cp_client_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_investigations__cp_client_id__field_null_values\"\nFROM \"cp_investigations\" AS \"t0\"",
@@ -2146,7 +2146,7 @@
         "failedSamples": null
       },
       {
-        "id": "7dba8326-5d44-42f2-bcd6-652a3a08103a",
+        "id": "da851d86-7632-49f8-9680-760777147685",
         "key": "cp_investigations__start_date__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2170,7 +2170,7 @@
         "failedSamples": null
       },
       {
-        "id": "33c4b244-778c-4462-a296-6607c5d4b688",
+        "id": "c6f3efca-c7e7-4c88-8ee8-9675542470fa",
         "key": "cp_investigations__start_date__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2197,7 +2197,7 @@
         "failedSamples": null
       },
       {
-        "id": "94bad765-0555-42df-a145-ff1708c94bba",
+        "id": "89738a98-ecf2-4703-b162-0f4d28c4d196",
         "key": "cp_investigations__start_date__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2207,7 +2207,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.start_date.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every investigation must carry the date it started.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.start_date.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every investigation must carry the date it started.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"start_date\" IS NULL THEN 1 ELSE 0 END) AS \"cp_investigations__start_date__field_null_values\"\nFROM \"cp_investigations\" AS \"t0\"",
@@ -2225,7 +2225,7 @@
         "failedSamples": null
       },
       {
-        "id": "1e75717a-1087-48ae-8d1a-c85d4c5726a7",
+        "id": "b052b64b-9aea-4a67-abb8-a51187ed0361",
         "key": "cp_investigations__end_date__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2249,7 +2249,7 @@
         "failedSamples": null
       },
       {
-        "id": "a6cacd49-966d-41d8-92aa-830a1693d961",
+        "id": "ef217d49-c4c7-4d34-91e8-ee3e78cef390",
         "key": "cp_investigations__substantiated__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2273,7 +2273,7 @@
         "failedSamples": null
       },
       {
-        "id": "3cf6f081-3ce6-4dbe-914e-2def09886904",
+        "id": "f99fabaf-779e-45c6-8643-bd468cb732c3",
         "key": "cp_investigations__substantiated__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2300,7 +2300,7 @@
         "failedSamples": null
       },
       {
-        "id": "638913fb-bdaa-4e42-9812-513d2e2b4b07",
+        "id": "beee8a42-7a28-4d6c-b305-4924915ce4f3",
         "key": "cp_investigations__substantiated__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -2310,7 +2310,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "conformity",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.substantiated.invalidValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Investigation outcome must be one of the closed value set.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - Substantiated\n  - Not substantiated\n  - Inconclusive\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.substantiated.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Investigation outcome must be one of the closed value set.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - Substantiated\n  - Not substantiated\n  - Inconclusive\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"substantiated\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"substantiated\" IN ('Substantiated', 'Not substantiated', 'Inconclusive')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_investigations__substantiated__field_invalid_values\"\nFROM \"cp_investigations\" AS \"t0\"",
@@ -2335,7 +2335,7 @@
         "failedSamples": null
       },
       {
-        "id": "073df3a6-1de6-4af5-957d-c1f7f0c58190",
+        "id": "ab204b26-1fe3-4d37-bac4-c80533a4e53e",
         "key": "cp_investigations__lead_worker_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2359,7 +2359,7 @@
         "failedSamples": null
       },
       {
-        "id": "c32a3728-fe04-4554-a285-b4c93ffde1b6",
+        "id": "6f0a419d-56d6-440d-b1ed-05bb34425ba3",
         "key": "cp_investigations__lead_worker_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2386,7 +2386,7 @@
         "failedSamples": null
       },
       {
-        "id": "ce39e5ea-c017-43f0-af30-c0498ff040b5",
+        "id": "acd530ea-6aa1-400e-a97d-31b6b746acea",
         "key": "cp_investigations__lead_worker_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2396,7 +2396,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every investigation must have a lead case worker assigned.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every investigation must have a lead case worker assigned.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"lead_worker_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_investigations__lead_worker_id__field_null_values\"\nFROM \"cp_investigations\" AS \"t0\"",
@@ -2414,7 +2414,7 @@
         "failedSamples": null
       },
       {
-        "id": "fb614209-6c7c-46f2-b47f-296fbdc6701f",
+        "id": "aef1bb01-af2b-4b3c-b655-0eef74e203b0",
         "key": "cp_investigations__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2438,7 +2438,7 @@
         "failedSamples": null
       },
       {
-        "id": "3d3c36e7-4f8a-4edc-becb-7e8f0143c555",
+        "id": "95441db0-300b-426a-9398-66fba620f861",
         "key": "cp_investigations__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2465,7 +2465,7 @@
         "failedSamples": null
       },
       {
-        "id": "72a946d2-700e-4b71-9c2c-30e81647674b",
+        "id": "1c145f45-fed2-4630-b9cc-4ef3d1b37df1",
         "key": "cp_investigations__row_count",
         "category": "quality",
         "type": "row_count",
@@ -2475,7 +2475,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.rowCount\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: warning\nmetric: rowCount\nmustBeBetween:\n- 80\n- 350\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.rowCount_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: warning\nmetric: rowCount\nmustBeBetween:\n- 80\n- 350\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  COUNT(*) AS \"cp_investigations__row_count\"\nFROM \"cp_investigations\" AS \"t0\"",
@@ -2491,7 +2491,7 @@
         "failedSamples": null
       },
       {
-        "id": "cc8e7cc9-12f5-48b0-9c5a-7ca1f6ccebcb",
+        "id": "57719c20-290d-403d-b93b-1059de55ff44",
         "key": "cp_investigations__quality_sql_1",
         "category": "quality",
         "type": "model_quality_sql",
@@ -2516,7 +2516,7 @@
         "failedSamples": null
       },
       {
-        "id": "338db773-6829-442d-ab97-b4ec47a63e4c",
+        "id": "5fdb568c-61c7-47c8-8fec-c256352a18d7",
         "key": "cp_investigations__quality_sql_2",
         "category": "quality",
         "type": "model_quality_sql",
@@ -2541,7 +2541,7 @@
         "failedSamples": null
       },
       {
-        "id": "c0a6d0a0-0be2-4c42-8f7d-11699b3a120d",
+        "id": "1a4f1fed-56f5-4055-978d-b85461fe1214",
         "key": "cp_investigations__quality_sql_3",
         "category": "quality",
         "type": "model_quality_sql",
@@ -2566,7 +2566,7 @@
         "failedSamples": null
       },
       {
-        "id": "0d664764-72b1-4658-9a47-db897626fe34",
+        "id": "24db0f8b-aa24-4938-a4df-6bda374a236a",
         "key": "cp_investigations__quality_sql_4",
         "category": "quality",
         "type": "model_quality_sql",
@@ -2591,7 +2591,7 @@
         "failedSamples": null
       },
       {
-        "id": "c52638a5-c991-47a5-a1d1-c45940bd6d41",
+        "id": "fb75e2e8-99cc-490d-89de-3980c0751390",
         "key": "cp_placements__placement_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2615,7 +2615,7 @@
         "failedSamples": null
       },
       {
-        "id": "afc13ca4-70d1-4d1f-9920-7c12e8853f19",
+        "id": "92dbdd5d-74d9-4b50-aadb-2e13a0ecb79c",
         "key": "cp_placements__placement_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2642,7 +2642,7 @@
         "failedSamples": null
       },
       {
-        "id": "5f2da920-3419-4397-8b5e-652e24f0aa42",
+        "id": "1b27b141-bd16-497b-8a60-ad335d342448",
         "key": "cp_placements__placement_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -2669,7 +2669,7 @@
         "failedSamples": null
       },
       {
-        "id": "890b6a4a-2edd-44d3-b9d1-39326ddcd6d8",
+        "id": "a8cc9fdd-4799-4f8e-b892-c3b7d0a03e55",
         "key": "cp_placements__placement_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2679,7 +2679,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every placement record must carry a placement ID.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every placement record must carry a placement ID.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"placement_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_placements__placement_id__field_null_values\"\nFROM \"cp_placements\" AS \"t0\"",
@@ -2697,7 +2697,7 @@
         "failedSamples": null
       },
       {
-        "id": "94e0a62c-d00d-4f41-ba3a-6ec4c68b7779",
+        "id": "48c0ab20-5a07-4971-9f30-1af864c591ef",
         "key": "cp_placements__placement_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -2707,7 +2707,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "uniqueness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.duplicateValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Placement IDs must not be duplicated.\n- property: changelog\n  value: '[]'\ndimension: uniqueness\nseverity: error\nmetric: duplicateValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.duplicateValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Placement IDs must not be duplicated.\n- property: changelog\n  value: '[]'\ndimension: uniqueness\nseverity: error\nmetric: duplicateValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"placement_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_placements\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
@@ -2725,7 +2725,7 @@
         "failedSamples": null
       },
       {
-        "id": "409a3a66-409b-422e-96a9-1a07fb7041a3",
+        "id": "82aed2dd-29df-40ae-9eeb-f086639dba47",
         "key": "cp_placements__cp_client_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2749,7 +2749,7 @@
         "failedSamples": null
       },
       {
-        "id": "526638b4-b8bc-4749-ba45-e162f43671c6",
+        "id": "cad1358e-cf64-4164-8096-935ae7f6f7ab",
         "key": "cp_placements__cp_client_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2776,7 +2776,7 @@
         "failedSamples": null
       },
       {
-        "id": "f795dcf0-1ae3-4c3b-8e2e-0d7d520efaf2",
+        "id": "17781fb2-372b-4fb7-b372-d4c1d5c2ba45",
         "key": "cp_placements__cp_client_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2786,7 +2786,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every placement must reference a client.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every placement must reference a client.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"cp_client_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_placements__cp_client_id__field_null_values\"\nFROM \"cp_placements\" AS \"t0\"",
@@ -2804,7 +2804,7 @@
         "failedSamples": null
       },
       {
-        "id": "5efd6078-f9fd-4054-87b7-f0bdf3421264",
+        "id": "208ccb4f-0ecb-4fc0-96ce-32a596575d4e",
         "key": "cp_placements__placement_type__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2828,7 +2828,7 @@
         "failedSamples": null
       },
       {
-        "id": "8f01630c-2bfc-4d6f-beea-0b7b80e3544f",
+        "id": "5085b95c-3bb7-49e6-ab4f-7256df3186e8",
         "key": "cp_placements__placement_type__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2855,7 +2855,7 @@
         "failedSamples": null
       },
       {
-        "id": "e727effe-f415-417d-bfd4-dcddae64f572",
+        "id": "fba9a897-2274-4e92-bb3e-3d358c6daddf",
         "key": "cp_placements__placement_type__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -2865,7 +2865,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "conformity",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_type.invalidValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Placement type must be one of the closed value set.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - Kinship care\n  - Foster care\n  - Residential care\n  - Family group home\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_type.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Placement type must be one of the closed value set.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - Kinship care\n  - Foster care\n  - Residential care\n  - Family group home\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"placement_type\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"placement_type\" IN ('Kinship care', 'Foster care', 'Residential care', 'Family group home')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_placements__placement_type__field_invalid_values\"\nFROM \"cp_placements\" AS \"t0\"",
@@ -2891,7 +2891,7 @@
         "failedSamples": null
       },
       {
-        "id": "01a17833-589a-4510-90ab-0deae74e53f1",
+        "id": "c7eaedd0-5588-45d6-83dc-a4272ff00aca",
         "key": "cp_placements__carer_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2915,7 +2915,7 @@
         "failedSamples": null
       },
       {
-        "id": "e09cc1d3-206c-4e06-9be0-88f20a7ce03a",
+        "id": "96191f93-2cdd-47ce-876e-9cd74188883c",
         "key": "cp_placements__carer_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2942,7 +2942,7 @@
         "failedSamples": null
       },
       {
-        "id": "0f2c13f6-4308-4507-887a-432970b23db6",
+        "id": "c8abe493-2534-45c6-b425-d132bd90f8f0",
         "key": "cp_placements__carer_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2952,7 +2952,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every placement must have a carer assigned.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every placement must have a carer assigned.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"carer_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_placements__carer_id__field_null_values\"\nFROM \"cp_placements\" AS \"t0\"",
@@ -2970,7 +2970,7 @@
         "failedSamples": null
       },
       {
-        "id": "8f372b9a-a55b-4fab-ad6e-959104c37fe6",
+        "id": "ef00534b-b086-467c-abd5-331b4dcc9a7c",
         "key": "cp_placements__placement_start__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2994,7 +2994,7 @@
         "failedSamples": null
       },
       {
-        "id": "97ef07cb-731b-4071-bed2-f3e3b0cb3d97",
+        "id": "2f69f5d3-5339-40cc-bda4-0e3d86c0b706",
         "key": "cp_placements__placement_start__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3021,7 +3021,7 @@
         "failedSamples": null
       },
       {
-        "id": "86962a71-688d-4037-91a1-cc98f7b7b13a",
+        "id": "3b275239-a734-4094-ae31-7c7be3c807b7",
         "key": "cp_placements__placement_start__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3031,7 +3031,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_start.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every placement must carry the date it started.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_start.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every placement must carry the date it started.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"placement_start\" IS NULL THEN 1 ELSE 0 END) AS \"cp_placements__placement_start__field_null_values\"\nFROM \"cp_placements\" AS \"t0\"",
@@ -3049,7 +3049,7 @@
         "failedSamples": null
       },
       {
-        "id": "ec8d093c-ce60-43b1-b258-204f595340de",
+        "id": "04db931b-af96-4150-9aaf-b42644268e63",
         "key": "cp_placements__placement_end__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3073,7 +3073,7 @@
         "failedSamples": null
       },
       {
-        "id": "93eba29a-67ae-4cda-8837-2d7e437ee254",
+        "id": "aacbc4ff-573a-4aaf-ab3e-ef8ba2d5d65c",
         "key": "cp_placements__placement_suburb__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3097,7 +3097,7 @@
         "failedSamples": null
       },
       {
-        "id": "17c62eda-4ca2-4f63-95a7-bdc28a9f6121",
+        "id": "63bcfab2-7cad-4e3b-b3fc-df0ded25389a",
         "key": "cp_placements__placement_suburb__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3124,7 +3124,7 @@
         "failedSamples": null
       },
       {
-        "id": "abf55e2a-f0c5-406e-9adf-857e29c7e149",
+        "id": "2fb74454-77cb-4770-8897-d521e06f89cc",
         "key": "cp_placements__placement_suburb__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3134,7 +3134,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_suburb.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every placement must carry the suburb it's located in.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_suburb.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every placement must carry the suburb it's located in.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"placement_suburb\" IS NULL THEN 1 ELSE 0 END) AS \"cp_placements__placement_suburb__field_null_values\"\nFROM \"cp_placements\" AS \"t0\"",
@@ -3152,7 +3152,7 @@
         "failedSamples": null
       },
       {
-        "id": "40587efa-45a0-4ec0-ba93-7de5bb782f04",
+        "id": "727a7585-758b-4e6d-b045-7d56a3559282",
         "key": "cp_placements__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3176,7 +3176,7 @@
         "failedSamples": null
       },
       {
-        "id": "a891d075-83f5-4e83-8efb-308a9e8dc153",
+        "id": "dec39f69-bf72-4dfc-9da9-3ee47e49cd75",
         "key": "cp_placements__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3203,7 +3203,7 @@
         "failedSamples": null
       },
       {
-        "id": "77354e20-27b8-4d75-8739-e8d179db308a",
+        "id": "68e1f459-992e-4d20-a0b9-b16caae6a655",
         "key": "cp_placements__row_count",
         "category": "quality",
         "type": "row_count",
@@ -3213,7 +3213,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.rowCount\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: warning\nmetric: rowCount\nmustBeBetween:\n- 100\n- 450\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.rowCount_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: warning\nmetric: rowCount\nmustBeBetween:\n- 100\n- 450\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  COUNT(*) AS \"cp_placements__row_count\"\nFROM \"cp_placements\" AS \"t0\"",
@@ -3229,7 +3229,7 @@
         "failedSamples": null
       },
       {
-        "id": "97979ef1-dc25-486b-b378-bf92807b9358",
+        "id": "879a9054-610f-499c-a687-f735468d28cd",
         "key": "cp_placements__quality_sql_1",
         "category": "quality",
         "type": "model_quality_sql",
@@ -3254,7 +3254,7 @@
         "failedSamples": null
       },
       {
-        "id": "e669071d-9bc1-496f-ab49-62a370f767bc",
+        "id": "ad505a9a-5121-40bb-988d-277f2eceb4bf",
         "key": "cp_placements__quality_sql_2",
         "category": "quality",
         "type": "model_quality_sql",
@@ -3279,7 +3279,7 @@
         "failedSamples": null
       },
       {
-        "id": "6b594339-d455-4d18-bb8e-564655180ddd",
+        "id": "08c434c6-1b0b-48b8-8a5a-aab28e8a96cf",
         "key": "cp_placements__quality_sql_3",
         "category": "quality",
         "type": "model_quality_sql",
@@ -3304,7 +3304,7 @@
         "failedSamples": null
       },
       {
-        "id": "6c8074b0-d0ef-4c50-8679-a490f43d9fca",
+        "id": "6a08fb54-2bb7-4449-b6cf-90e9a4496bae",
         "key": "cp_carers__carer_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3328,7 +3328,7 @@
         "failedSamples": null
       },
       {
-        "id": "299b59f3-22f5-4fc1-9122-293a51f5df60",
+        "id": "ab841293-0cb2-4374-af8b-599ff617746f",
         "key": "cp_carers__carer_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3355,7 +3355,7 @@
         "failedSamples": null
       },
       {
-        "id": "112ab0c6-1161-4f49-a159-80559ccf327c",
+        "id": "33815119-f013-40bb-92db-db854e4345e8",
         "key": "cp_carers__carer_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -3382,7 +3382,7 @@
         "failedSamples": null
       },
       {
-        "id": "5a31753f-51e2-4cfe-a909-f4033bed8a47",
+        "id": "e698fb2f-50ad-4ed1-b1ae-c4131b470a61",
         "key": "cp_carers__carer_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3392,7 +3392,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every carer record must carry a carer ID.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every carer record must carry a carer ID.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"carer_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_carers__carer_id__field_null_values\"\nFROM \"cp_carers\" AS \"t0\"",
@@ -3410,7 +3410,7 @@
         "failedSamples": null
       },
       {
-        "id": "f02129ed-37f9-42cc-b6a4-bf78dd000017",
+        "id": "d58dc67f-2560-4bcf-a30f-3928f7867878",
         "key": "cp_carers__carer_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -3420,7 +3420,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "uniqueness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.duplicateValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Carer IDs must not be duplicated.\n- property: changelog\n  value: '[]'\ndimension: uniqueness\nseverity: error\nmetric: duplicateValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.duplicateValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Carer IDs must not be duplicated.\n- property: changelog\n  value: '[]'\ndimension: uniqueness\nseverity: error\nmetric: duplicateValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"carer_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_carers\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
@@ -3438,7 +3438,7 @@
         "failedSamples": null
       },
       {
-        "id": "bbad7bcb-a4b9-4a76-9c90-285ac4d03a2d",
+        "id": "c264411e-a6d5-4f2b-85f9-e4b5dd192303",
         "key": "cp_carers__given_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3462,7 +3462,7 @@
         "failedSamples": null
       },
       {
-        "id": "5e72fd49-518b-49a8-a7f2-4f239093e439",
+        "id": "f7d27338-163a-4b10-a8ac-23cb97dfb9cd",
         "key": "cp_carers__given_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3489,7 +3489,7 @@
         "failedSamples": null
       },
       {
-        "id": "f3c7d7d1-fcce-4300-b03c-f76fc3495f81",
+        "id": "7a0adee0-97a7-4c29-ac34-5955b9957cae",
         "key": "cp_carers__given_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3499,7 +3499,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.given_name.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A carer's given name must be recorded.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.given_name.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A carer's given name must be recorded.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"given_name\" IS NULL THEN 1 ELSE 0 END) AS \"cp_carers__given_name__field_null_values\"\nFROM \"cp_carers\" AS \"t0\"",
@@ -3517,7 +3517,7 @@
         "failedSamples": null
       },
       {
-        "id": "b3a591f6-9c4f-417f-99b8-74001bcb0dca",
+        "id": "1da800ab-551b-4345-9b1b-0601e3fb5833",
         "key": "cp_carers__family_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3541,7 +3541,7 @@
         "failedSamples": null
       },
       {
-        "id": "3f0d0bbe-30bf-47a7-9038-3032908e5cdd",
+        "id": "cdf698d2-a190-4252-8eba-6c6381eac7b5",
         "key": "cp_carers__family_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3568,7 +3568,7 @@
         "failedSamples": null
       },
       {
-        "id": "22633e7b-05ca-4599-b0e6-4387a5e5bd45",
+        "id": "9923fbbf-b621-4589-b6b1-1d5f85e06776",
         "key": "cp_carers__family_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3578,7 +3578,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.family_name.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A carer's family name must be recorded.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.family_name.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A carer's family name must be recorded.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"family_name\" IS NULL THEN 1 ELSE 0 END) AS \"cp_carers__family_name__field_null_values\"\nFROM \"cp_carers\" AS \"t0\"",
@@ -3596,7 +3596,7 @@
         "failedSamples": null
       },
       {
-        "id": "7418b0e4-9e41-4d5b-b3f1-04affaa09ec2",
+        "id": "d87bd176-d6d9-4607-9024-71c1960e4ecb",
         "key": "cp_carers__carer_type__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3620,7 +3620,7 @@
         "failedSamples": null
       },
       {
-        "id": "1799edef-8bb9-4bd3-9f53-28cec7a76601",
+        "id": "3de377d7-4fc3-4ed0-8c4b-40cb2e31e48c",
         "key": "cp_carers__carer_type__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3647,7 +3647,7 @@
         "failedSamples": null
       },
       {
-        "id": "5ea9a905-f2e9-4a58-80b3-5991e4daf16d",
+        "id": "2e3fa91f-91df-4afd-b333-cea6757c9f9d",
         "key": "cp_carers__carer_type__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -3657,7 +3657,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "conformity",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_type.invalidValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Carer type must be one of the closed value set.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - Kinship\n  - Foster\n  - Residential-staff\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_type.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Carer type must be one of the closed value set.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - Kinship\n  - Foster\n  - Residential-staff\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"carer_type\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"carer_type\" IN ('Kinship', 'Foster', 'Residential-staff')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_carers__carer_type__field_invalid_values\"\nFROM \"cp_carers\" AS \"t0\"",
@@ -3682,7 +3682,7 @@
         "failedSamples": null
       },
       {
-        "id": "4c14dd8e-8158-4b31-8083-cef7b62db2b1",
+        "id": "c724c28d-7515-4489-89c0-35fc17e1f261",
         "key": "cp_carers__approval_status__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3706,7 +3706,7 @@
         "failedSamples": null
       },
       {
-        "id": "6f833c80-dd10-4c85-aa21-4ed8c67edaf8",
+        "id": "c853d5ae-8569-4a0b-a89c-0eb141f1b943",
         "key": "cp_carers__approval_status__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3733,7 +3733,7 @@
         "failedSamples": null
       },
       {
-        "id": "7b8fdf3f-5ba3-45ed-a99c-f4af0fe6ab38",
+        "id": "3379bea0-6f83-4bf2-a83e-e3ad6280c798",
         "key": "cp_carers__approval_status__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -3743,7 +3743,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "conformity",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.approval_status.invalidValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Approval status must be one of the closed value set.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - Approved\n  - Provisional\n  - Under review\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.approval_status.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Approval status must be one of the closed value set.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - Approved\n  - Provisional\n  - Under review\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"approval_status\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"approval_status\" IN ('Approved', 'Provisional', 'Under review')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_carers__approval_status__field_invalid_values\"\nFROM \"cp_carers\" AS \"t0\"",
@@ -3768,7 +3768,7 @@
         "failedSamples": null
       },
       {
-        "id": "993535b3-9977-4730-b108-dabf6aff7775",
+        "id": "a1cf31d2-5a23-45fa-b239-8db034916cc0",
         "key": "cp_carers__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3792,7 +3792,7 @@
         "failedSamples": null
       },
       {
-        "id": "2b431a3e-bc1a-411e-84aa-4ac2cd48fa67",
+        "id": "8d2c2f43-dc44-4759-a8c9-998b561632c1",
         "key": "cp_carers__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3819,7 +3819,7 @@
         "failedSamples": null
       },
       {
-        "id": "5635812a-2d98-4acc-a5be-d584a0fd3b0b",
+        "id": "65d540fa-5bdb-4bc0-8605-c7edc17c1477",
         "key": "cp_carers__row_count",
         "category": "quality",
         "type": "row_count",
@@ -3829,7 +3829,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.rowCount\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: warning\nmetric: rowCount\nmustBeBetween:\n- 150\n- 500\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.rowCount_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: warning\nmetric: rowCount\nmustBeBetween:\n- 150\n- 500\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  COUNT(*) AS \"cp_carers__row_count\"\nFROM \"cp_carers\" AS \"t0\"",
@@ -3845,7 +3845,7 @@
         "failedSamples": null
       },
       {
-        "id": "edea4444-f28a-4177-af7d-2a99575447c5",
+        "id": "8bcd9e0c-aa08-410b-9cdb-528f810cc1ee",
         "key": "cp_case_workers__worker_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3869,7 +3869,7 @@
         "failedSamples": null
       },
       {
-        "id": "2bfb3f17-5666-4833-a17f-b4b39424c724",
+        "id": "3c3f672e-2790-4271-8542-fea125de5520",
         "key": "cp_case_workers__worker_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3896,7 +3896,7 @@
         "failedSamples": null
       },
       {
-        "id": "28c2d2c0-62f2-4936-9e07-206416beb207",
+        "id": "cd29f9a4-79b7-40b6-9259-80822974b8aa",
         "key": "cp_case_workers__worker_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -3923,7 +3923,7 @@
         "failedSamples": null
       },
       {
-        "id": "d2ea585e-60d3-4c33-be8d-acdd64bc8a31",
+        "id": "ae9774a2-b15b-4d30-a7c4-9dbf920bb8ba",
         "key": "cp_case_workers__worker_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3933,7 +3933,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every case worker record must carry a worker ID.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Every case worker record must carry a worker ID.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"worker_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_case_workers__worker_id__field_null_values\"\nFROM \"cp_case_workers\" AS \"t0\"",
@@ -3951,7 +3951,7 @@
         "failedSamples": null
       },
       {
-        "id": "640d3b4a-e0dd-4f7c-ad60-416a3a0f1485",
+        "id": "f82795c3-8f7c-4323-8f7c-e965d200caef",
         "key": "cp_case_workers__worker_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -3961,7 +3961,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "uniqueness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.duplicateValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Case worker IDs must not be duplicated.\n- property: changelog\n  value: '[]'\ndimension: uniqueness\nseverity: error\nmetric: duplicateValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.duplicateValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Case worker IDs must not be duplicated.\n- property: changelog\n  value: '[]'\ndimension: uniqueness\nseverity: error\nmetric: duplicateValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"worker_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_case_workers\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
@@ -3979,7 +3979,7 @@
         "failedSamples": null
       },
       {
-        "id": "a02a1db2-a420-4699-894b-770fc0f4f5ee",
+        "id": "7f4de098-45ae-4e0f-9631-2df754de9e12",
         "key": "cp_case_workers__given_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4003,7 +4003,7 @@
         "failedSamples": null
       },
       {
-        "id": "fd012220-1719-4851-819b-ac0038c8befb",
+        "id": "6fc7f0d6-230c-4c71-b53e-38d5780e5507",
         "key": "cp_case_workers__given_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4030,7 +4030,7 @@
         "failedSamples": null
       },
       {
-        "id": "723b3598-f57c-4a55-88c2-d644e972a72c",
+        "id": "52a3f9ff-994a-45e7-bc46-73a84b523e40",
         "key": "cp_case_workers__given_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -4040,7 +4040,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.given_name.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A case worker's given name must be recorded.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.given_name.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A case worker's given name must be recorded.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"given_name\" IS NULL THEN 1 ELSE 0 END) AS \"cp_case_workers__given_name__field_null_values\"\nFROM \"cp_case_workers\" AS \"t0\"",
@@ -4058,7 +4058,7 @@
         "failedSamples": null
       },
       {
-        "id": "93d11c8b-648e-4111-a642-091596635f12",
+        "id": "75de5e5f-0dde-4263-8721-2f8b1e6a691c",
         "key": "cp_case_workers__family_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4082,7 +4082,7 @@
         "failedSamples": null
       },
       {
-        "id": "74ff1838-b716-4652-a227-e4d10ee0c03b",
+        "id": "9d96376d-ab79-4919-8619-0fe2ddab6a9d",
         "key": "cp_case_workers__family_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4109,7 +4109,7 @@
         "failedSamples": null
       },
       {
-        "id": "32034c64-c524-4dcd-892a-e3543dc81660",
+        "id": "0705ad67-75d4-4a50-8d01-e9309c0c90d4",
         "key": "cp_case_workers__family_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -4119,7 +4119,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.family_name.nullValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A case worker's family name must be recorded.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.family_name.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: A case worker's family name must be recorded.\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"family_name\" IS NULL THEN 1 ELSE 0 END) AS \"cp_case_workers__family_name__field_null_values\"\nFROM \"cp_case_workers\" AS \"t0\"",
@@ -4137,7 +4137,7 @@
         "failedSamples": null
       },
       {
-        "id": "90c65b60-d800-4221-b811-757eb23c7027",
+        "id": "0964b6f6-aae5-4564-b706-6ad89dfc2cb4",
         "key": "cp_case_workers__team_region__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4161,7 +4161,7 @@
         "failedSamples": null
       },
       {
-        "id": "f0e0a738-05bd-4e2d-85ed-08042f0c0879",
+        "id": "917173a3-bbae-454d-a0c2-5aff48bd8004",
         "key": "cp_case_workers__team_region__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4188,7 +4188,7 @@
         "failedSamples": null
       },
       {
-        "id": "f9b17cd2-5cb4-45da-aa79-5548f164ccf6",
+        "id": "65d7b3ce-0e17-481a-ad16-f7a1295ea00c",
         "key": "cp_case_workers__team_region__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -4198,7 +4198,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "conformity",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.team_region.invalidValues\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Team region must be one of the closed value set of WA regions.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - Metro North\n  - Metro South\n  - Metro East\n  - South West\n  - Great Southern\n  - Goldfields\n  - Kimberley\n  - Pilbara\n  - Wheatbelt\n  - Midwest-Gascoyne\nmustBe: 0\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.team_region.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: Team region must be one of the closed value set of WA regions.\n- property: changelog\n  value: '[]'\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - Metro North\n  - Metro South\n  - Metro East\n  - South West\n  - Great Southern\n  - Goldfields\n  - Kimberley\n  - Pilbara\n  - Wheatbelt\n  - Midwest-Gascoyne\nmustBe: 0\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"team_region\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"team_region\" IN (\n          'Metro North',\n          'Metro South',\n          'Metro East',\n          'South West',\n          'Great Southern',\n          'Goldfields',\n          'Kimberley',\n          'Pilbara',\n          'Wheatbelt',\n          'Midwest-Gascoyne'\n        )\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_case_workers__team_region__field_invalid_values\"\nFROM \"cp_case_workers\" AS \"t0\"",
@@ -4230,7 +4230,7 @@
         "failedSamples": null
       },
       {
-        "id": "c0dce06f-da36-4165-b272-bf190f4d3f1d",
+        "id": "e85e0f5c-16c0-41e4-8014-e9fc8756ef5d",
         "key": "cp_case_workers__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4254,7 +4254,7 @@
         "failedSamples": null
       },
       {
-        "id": "eaa9d761-0054-494d-87cd-6dba02dc595e",
+        "id": "6ddccd47-62b4-4fe3-958d-e9eeb8d00d54",
         "key": "cp_case_workers__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4281,7 +4281,7 @@
         "failedSamples": null
       },
       {
-        "id": "9e4e2dab-cd23-4f9c-921f-4fcc3f6e440e",
+        "id": "85fd7efe-b65c-447a-aec8-6a2dbc6792f1",
         "key": "cp_case_workers__row_count",
         "category": "quality",
         "type": "row_count",
@@ -4291,7 +4291,7 @@
         "qualityId": null,
         "tags": null,
         "dimension": "completeness",
-        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.rowCount\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: warning\nmetric: rowCount\nmustBeBetween:\n- 40\n- 80\n",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.rowCount_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\ndimension: completeness\nseverity: warning\nmetric: rowCount\nmustBeBetween:\n- 40\n- 80\n",
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  COUNT(*) AS \"cp_case_workers__row_count\"\nFROM \"cp_case_workers\" AS \"t0\"",
@@ -4311,87 +4311,87 @@
       {
         "level": "INFO",
         "message": "Testing data contract",
-        "timestamp": "2026-09-16 09:51:42.275912+00:00"
+        "timestamp": "2026-09-16 10:30:56.410605+00:00"
       },
       {
         "level": "INFO",
         "message": "Data Contract CLI 1.2.0 running as CLI locally",
-        "timestamp": "2026-09-16 09:51:42.277088+00:00"
+        "timestamp": "2026-09-16 10:30:56.411689+00:00"
       },
       {
         "level": "INFO",
         "message": "Running tests for data contract child-protection-casework with server local_test",
-        "timestamp": "2026-09-16 09:51:42.599453+00:00"
+        "timestamp": "2026-09-16 10:30:56.726301+00:00"
       },
       {
         "level": "INFO",
         "message": "Running checks with ibis",
-        "timestamp": "2026-09-16 09:51:42.893666+00:00"
+        "timestamp": "2026-09-16 10:30:56.983473+00:00"
       },
       {
         "level": "INFO",
         "message": "Connecting to local csv via duckdb",
-        "timestamp": "2026-09-16 09:51:42.893697+00:00"
+        "timestamp": "2026-09-16 10:30:56.983503+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_clients for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_09_2026-09-07/cp_clients.csv",
-        "timestamp": "2026-09-16 09:51:42.909962+00:00"
+        "timestamp": "2026-09-16 10:30:56.999356+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'cp_client_id', 'VARCHAR', False, None, False), (1, 'given_name', 'VARCHAR', False, None, False), (2, 'family_name', 'VARCHAR', False, None, False), (3, 'date_of_birth', 'DATE', False, None, False), (4, 'sex', 'VARCHAR', False, None, False), (5, 'suburb', 'VARCHAR', False, None, False), (6, 'postcode', 'VARCHAR', False, None, False), (7, 'case_opened_date', 'DATE', False, None, False), (8, 'case_status', 'VARCHAR', False, None, False), (9, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-16 09:51:43.136316+00:00"
+        "timestamp": "2026-09-16 10:30:57.228531+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_notifications for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_09_2026-09-07/cp_notifications.csv",
-        "timestamp": "2026-09-16 09:51:43.136355+00:00"
+        "timestamp": "2026-09-16 10:30:57.228570+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'notification_id', 'VARCHAR', False, None, False), (1, 'cp_client_id', 'VARCHAR', False, None, False), (2, 'notification_date', 'DATE', False, None, False), (3, 'source_type', 'VARCHAR', False, None, False), (4, 'concern_type', 'VARCHAR', False, None, False), (5, 'risk_rating', 'VARCHAR', False, None, False), (6, 'assigned_worker_id', 'VARCHAR', False, None, False), (7, 'outcome', 'VARCHAR', False, None, False), (8, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-16 09:51:43.523859+00:00"
+        "timestamp": "2026-09-16 10:30:57.638261+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_investigations for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_09_2026-09-07/cp_investigations.csv",
-        "timestamp": "2026-09-16 09:51:43.523907+00:00"
+        "timestamp": "2026-09-16 10:30:57.638303+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'investigation_id', 'VARCHAR', False, None, False), (1, 'notification_id', 'VARCHAR', False, None, False), (2, 'cp_client_id', 'VARCHAR', False, None, False), (3, 'start_date', 'DATE', False, None, False), (4, 'end_date', 'DATE', False, None, False), (5, 'substantiated', 'VARCHAR', False, None, False), (6, 'lead_worker_id', 'VARCHAR', False, None, False), (7, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-16 09:51:43.606629+00:00"
+        "timestamp": "2026-09-16 10:30:57.721653+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_placements for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_09_2026-09-07/cp_placements.csv",
-        "timestamp": "2026-09-16 09:51:43.606671+00:00"
+        "timestamp": "2026-09-16 10:30:57.721690+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'placement_id', 'VARCHAR', False, None, False), (1, 'cp_client_id', 'VARCHAR', False, None, False), (2, 'placement_type', 'VARCHAR', False, None, False), (3, 'carer_id', 'VARCHAR', False, None, False), (4, 'placement_start', 'DATE', False, None, False), (5, 'placement_end', 'DATE', False, None, False), (6, 'placement_suburb', 'VARCHAR', False, None, False), (7, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-16 09:51:43.713237+00:00"
+        "timestamp": "2026-09-16 10:30:57.827916+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_carers for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_09_2026-09-07/cp_carers.csv",
-        "timestamp": "2026-09-16 09:51:43.713303+00:00"
+        "timestamp": "2026-09-16 10:30:57.827956+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'carer_id', 'VARCHAR', False, None, False), (1, 'given_name', 'VARCHAR', False, None, False), (2, 'family_name', 'VARCHAR', False, None, False), (3, 'carer_type', 'VARCHAR', False, None, False), (4, 'approval_status', 'VARCHAR', False, None, False), (5, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-16 09:51:43.797500+00:00"
+        "timestamp": "2026-09-16 10:30:57.915569+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_case_workers for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_09_2026-09-07/cp_case_workers.csv",
-        "timestamp": "2026-09-16 09:51:43.797538+00:00"
+        "timestamp": "2026-09-16 10:30:57.915607+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'worker_id', 'VARCHAR', False, None, False), (1, 'given_name', 'VARCHAR', False, None, False), (2, 'family_name', 'VARCHAR', False, None, False), (3, 'team_region', 'VARCHAR', False, None, False), (4, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-16 09:51:43.824693+00:00"
+        "timestamp": "2026-09-16 10:30:57.943491+00:00"
       }
     ]
   }

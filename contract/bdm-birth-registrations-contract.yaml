@@ -121,7 +121,7 @@ schema:
             description: Every record must carry a registration number.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.nullValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.nullValues_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
@@ -137,7 +137,7 @@ schema:
               migration) before they reach consumers as silent garbage.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.invalidValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.invalidValues_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
@@ -149,7 +149,7 @@ schema:
             description: No two rows may share a registration_number.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.duplicateValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.duplicateValues_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
@@ -180,7 +180,7 @@ schema:
               up" failure mode named as a real, recurring problem.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.nullValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.nullValues_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
@@ -203,7 +203,7 @@ schema:
               digit or symbol in it would NOT be caught by this rule alone.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.invalidValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.invalidValues_datacontract
               - property: introduced_date
                 value: "2026-09-15"
               - property: changelog
@@ -222,7 +222,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.nullValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.nullValues_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: description
@@ -238,7 +238,7 @@ schema:
             description: Same format rule as child_given_names - see that property's description.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.invalidValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.invalidValues_datacontract
               - property: introduced_date
                 value: "2026-09-15"
               - property: changelog
@@ -255,7 +255,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.nullValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.nullValues_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: description
@@ -276,7 +276,7 @@ schema:
               dates downstream.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.range_check
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.range_check_datacontract
               - property: introduced_date
                 value: "2026-09-13"
               - property: changelog
@@ -320,7 +320,7 @@ schema:
               would fix both at once.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.freshness
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.freshness_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
@@ -343,7 +343,7 @@ schema:
               unrecognised value in every downstream eligibility check.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.invalidValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.invalidValues_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
@@ -361,7 +361,7 @@ schema:
             severity: warning
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.nullValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.nullValues_datacontract
               - property: introduced_date
                 value: "2026-09-15"
               - property: description
@@ -391,7 +391,7 @@ schema:
               mid-fixture.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.invalidValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.invalidValues_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
@@ -425,7 +425,7 @@ schema:
               signals a genuine upstream problem, not normal variation.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_facility.nullValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_facility.nullValues_datacontract
               - property: introduced_date
                 value: "2026-09-15"
               - property: changelog
@@ -442,7 +442,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_registered.nullValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_registered.nullValues_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: description
@@ -464,7 +464,7 @@ schema:
             description: A registration date earlier than the birth date indicates a corrupt or misjoined record.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_registered.date_ordering
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_registered.date_ordering_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
@@ -483,7 +483,7 @@ schema:
             severity: warning
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.nullValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.nullValues_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: description
@@ -499,7 +499,7 @@ schema:
             description: Same format rule as child_given_names - see that property's description.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.invalidValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.invalidValues_datacontract
               - property: introduced_date
                 value: "2026-09-15"
               - property: changelog
@@ -519,7 +519,7 @@ schema:
             description: Higher tolerance - single-parent registrations are legitimately common.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.nullValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.nullValues_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
@@ -533,7 +533,7 @@ schema:
             description: Same format rule as child_given_names - see that property's description.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.invalidValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.invalidValues_datacontract
               - property: introduced_date
                 value: "2026-09-15"
               - property: changelog
@@ -556,7 +556,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.nullValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.nullValues_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: description
@@ -600,7 +600,7 @@ schema:
             description: "Multiple-birth sibling match: every is_multiple_birth record must have a matching sibling row from the same birth event."
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.sibling_match
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.sibling_match_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
@@ -619,7 +619,7 @@ schema:
             description: No two rows may share a source_system_record_id - a re-extract landing twice would double-count downstream.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.duplicateValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.duplicateValues_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
@@ -633,7 +633,7 @@ schema:
             description: Catches an upstream ID-format change, same rationale as registration_number's own pattern rule.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.invalidValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.invalidValues_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
@@ -651,7 +651,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.nullValues
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.nullValues_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: description
@@ -671,7 +671,7 @@ schema:
               extraction.
             customProperties:
               - property: check_id
-                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.timestamp_ordering
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.timestamp_ordering_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
@@ -695,7 +695,7 @@ schema:
           entirely, since a doubled file has a perfectly valid schema.
         customProperties:
           - property: check_id
-            value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.rowCount
+            value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.rowCount_datacontract
           - property: introduced_date
             value: "2026-01-15"
           - property: changelog

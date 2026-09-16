@@ -542,31 +542,49 @@ applied proactively on the CP side afterward (7 FK + 3 business-rule
 checks each got a tool-suffixed check_name from the start, avoiding a
 second collision-and-fix round).
 
-**Decided, 2026-09-16 (Keith): tool-qualify every `check_id` by
-default going forward**, not just the ones that happen to collide -
-robustness against future collisions that haven't happened yet, not
-just the ones found so far. Applied immediately to the retrofit's
-validation itself (see below). **Not yet applied retroactively to the
-~249 checks that don't currently carry a tool suffix** - flagged as a
-real, non-obvious consequence worth Keith's call before doing that
-mechanical rename: `check_id` is meant to be a check's *stable*
-identity across runs (that's the whole point - it's what Phase 2's
-trend lines and Phase 5's UI will match historical results by). Mass-
-renaming all 249 today would sever that continuity between the 25
-already-committed historical runs and every run from here on - every
-renamed check would look, to anything reading `qa_results/` history,
-like the old check_id was retired and a new one introduced on the same
-day, not like a rename. `check_lifecycle.py` doesn't currently model
-"this check_id replaced that one" as a distinct kind of change from
-retirement - only retirement and config-change are modeled. Low stakes
-right now (25 runs, PoC-stage), but worth Keith explicitly choosing
-between: (a) do the mass rename now anyway and accept the severed
-continuity given how little history exists yet, (b) apply the suffix
-only to check_names going forward (new checks, or existing ones next
-time they're genuinely touched) and leave the rest as-is, or (c) add a
-real "renamed from" concept to the metadata/validation so a rename
-doesn't read as retirement+reintroduction, before doing the mass
-rename.
+**Decided and applied, 2026-09-16 (Keith): tool-qualify every
+`check_id` by default.** Not just the ones that happened to collide -
+robustness against future collisions that haven't happened yet.
+Keith's explicit call on the continuity tradeoff this raised (renaming
+all 249 non-collision check_ids sixty seconds after Phase 1 landed
+would sever trend continuity with the 25 already-committed historical
+runs - see below): "we're only making fake data in development, so we
+can just blow it all away and start again." So the mass rename was
+done immediately rather than deferred - every real check_id across
+both datasets and all 4 tools now ends in `_dbt`/`_soda`/
+`_datacontract`/`_evidently` (227 renamed, the 27 that already carried
+a collision-driven suffix left as-is since they already qualified).
+Applied via a scripted, verified rename (exact-match on the check_id's
+full line, longest-string-first, to avoid the one real prefix collision
+found along the way - `sex.invalid_percent` vs.
+`sex.invalid_percent_recent` - matching as a substring instead of a
+whole line would have corrupted the shorter one). Re-verified against
+real tool runs, not just YAML parsing, same as the original retrofit:
+real `dbt build`/`soda scan`/`datacontract test` succeeded for both
+datasets, `check_lifecycle.validate()` clean across all 254 checks
+(zero duplicates, zero undocumented changes), a real Playwright check
+of the rebuilt dashboard showed zero console errors. Both real
+orchestrators (`qa_tools.bdm.orchestrate_bdm`, `qa_tools.cp.
+orchestrate_cp`) were re-run end to end, overwriting all 100
+already-committed `qa_results/` files in place with the new
+check_id-bearing raw output (same run_ids, so this is a normal
+overwrite via the pipeline's own generation path, not a manual
+delete-and-regenerate) - confirmed via diff that only check_id strings
+and inherently-nondeterministic wall-clock/invocation-id fields
+changed, not any actual pass/warn/fail result (1214 BDM results: 824
+pass/64 warn/326 fail; 1770 CP results: 1464 pass/61 warn/245 fail -
+same distribution as Phase 1's original verification). The
+"renamed-check reads as retired+reintroduced" consequence flagged
+below is accepted as-is for this rename, given only 25 runs of history
+existed at the time - not solved with a "renamed from" concept, per
+Keith's call above.
+
+`check_lifecycle.py` still doesn't model "this check_id replaced that
+one" as a distinct kind of change from retirement - only retirement
+and config-change are modeled. Worth remembering if a check_id rename
+is ever needed again once real history has accumulated (Phase 2+),
+since a rename at that point wouldn't get to lean on "it's all fake
+data anyway."
 
 **Decided and built, 2026-09-16 (Keith): a check with no `check_id` is
 now a hard error, not a silent skip.** Before this, `check_lifecycle.py`

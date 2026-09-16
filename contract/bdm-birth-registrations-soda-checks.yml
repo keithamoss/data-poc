@@ -33,7 +33,7 @@ checks for birth_registrations:
         when < 100
         when > 20000
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.row_count
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.row_count_soda
         introduced_date: "2026-01-15"
         description: "Row count should stay in a plausible band - catches a doubled or truncated extract file."
         changelog: []
@@ -47,7 +47,7 @@ checks for birth_registrations:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.missing_count
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.missing_count_soda
         introduced_date: "2026-01-15"
         description: "Date of birth must be present - a silent column rename would show up as this going to 100% missing."
         changelog: []
@@ -66,7 +66,7 @@ checks for birth_registrations:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.missing_count
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.missing_count_soda
         introduced_date: "2026-09-15"
         description: "Every birth registration must carry a registration number."
         changelog: []
@@ -76,7 +76,7 @@ checks for birth_registrations:
       fail: when > 3
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.duplicate_count
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.duplicate_count_soda
         introduced_date: "2026-09-15"
         description: "BDM's unique registration identifier must not be duplicated."
         changelog: []
@@ -86,7 +86,7 @@ checks for birth_registrations:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.missing_count
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.missing_count_soda
         introduced_date: "2026-09-15"
         description: "A child's given names must be recorded."
         changelog: []
@@ -96,7 +96,7 @@ checks for birth_registrations:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.missing_count
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.missing_count_soda
         introduced_date: "2026-09-15"
         description: "A child's family name must be recorded."
         changelog: []
@@ -108,7 +108,7 @@ checks for birth_registrations:
       fail: when > 1
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.missing_count
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.missing_count_soda
         introduced_date: "2026-09-15"
         description: "Suburb of birth must be recorded - tighter tolerance than most other required columns."
         changelog: []
@@ -118,7 +118,7 @@ checks for birth_registrations:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_registered.missing_count
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_registered.missing_count_soda
         introduced_date: "2026-09-15"
         description: "A birth registration must carry the date it was registered."
         changelog: []
@@ -128,7 +128,7 @@ checks for birth_registrations:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.missing_count
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.missing_count_soda
         introduced_date: "2026-09-15"
         description: "Every record must carry the timestamp it was extracted at."
         changelog: []
@@ -145,7 +145,7 @@ checks for birth_registrations:
       warn: when > 5%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.missing_percent
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.missing_percent_soda
         introduced_date: "2026-01-15"
         description: "Parent 1's name is expected on most registrations, tolerated null up to ~5%."
         changelog: []
@@ -154,7 +154,7 @@ checks for birth_registrations:
       warn: when > 30%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.missing_percent
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.missing_percent_soda
         introduced_date: "2026-01-15"
         description: "Parent 2's name is optional - single-parent registrations are common - tolerated null up to ~30%."
         changelog: []
@@ -171,7 +171,7 @@ checks for birth_registrations:
       fail: when > 2%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.invalid_percent
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.invalid_percent_soda
         introduced_date: "2026-01-15"
         description: "Sex must be one of the closed value set M, F, or X."
         changelog: []
@@ -185,7 +185,7 @@ checks for birth_registrations:
       fail: when > 35%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_facility.missing_percent
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_facility.missing_percent_soda
         introduced_date: "2026-01-15"
         description: "Facility should usually be captured - home births are the expected exception."
         changelog: []
@@ -199,7 +199,7 @@ checks for birth_registrations:
       fail: when > 3
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.duplicate_count
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.duplicate_count_soda
         introduced_date: "2026-01-15"
         description: "BDM's internal record ID must not be duplicated."
         changelog: []
@@ -210,7 +210,7 @@ checks for birth_registrations:
       fail: when > 1%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.invalid_percent
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.invalid_percent_soda
         introduced_date: "2026-01-15"
         description: "Catches upstream internal-ID-format changes before they reach consumers as silent garbage."
         changelog: []
@@ -229,7 +229,7 @@ checks for birth_registrations:
       fail: when > 3%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.invalid_percent
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.invalid_percent_soda
         introduced_date: "2026-09-15"
         description: "Given names should look like a name, not garbage/mis-parsed data."
         changelog: []
@@ -240,7 +240,7 @@ checks for birth_registrations:
       fail: when > 3%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.invalid_percent
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.invalid_percent_soda
         introduced_date: "2026-09-15"
         description: "Family names should look like a name, not garbage/mis-parsed data."
         changelog: []
@@ -254,7 +254,7 @@ checks for birth_registrations:
       fail: when > 3%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.invalid_percent
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.invalid_percent_soda
         introduced_date: "2026-01-15"
         description: "Suburb of birth must be one of the real WA suburbs in the closed value set."
         changelog: []
@@ -265,7 +265,7 @@ checks for birth_registrations:
       fail: when > 3%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.invalid_percent
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.invalid_percent_soda
         introduced_date: "2026-09-15"
         description: "Parent 1's name should look like a name, not garbage/mis-parsed data."
         changelog: []
@@ -276,7 +276,7 @@ checks for birth_registrations:
       fail: when > 3%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.invalid_percent
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.invalid_percent_soda
         introduced_date: "2026-09-15"
         description: "Parent 2's name should look like a name, not garbage/mis-parsed data."
         changelog: []
@@ -416,7 +416,7 @@ checks for birth_registrations [recent]:
       name: sex validity, last 24h only
       samples limit: 5
       attributes:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.invalid_percent_recent
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.invalid_percent_recent_soda
         introduced_date: "2026-01-15"
         description: "Sex validity, scoped to only the last 24 hours of extracts, so a fresh drift is caught fast."
         changelog: []
