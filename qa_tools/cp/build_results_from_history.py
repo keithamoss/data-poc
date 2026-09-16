@@ -5,15 +5,17 @@ qa_tools/bdm/build_results_from_history.py (see that file's own
 docstring for the full rationale). Runs no real tool, touches no local
 data of any kind.
 
-Reads two qa_results/ dataset segments per run, not one - dbt/Soda/
-datacontract-cli each run once across all 6 CP tables (written under
-the collection id, cp_common.COLLECTION_ID - dataset_stats.json lives
-here too, alongside them), while Evidently is scoped to cp_notifications
-alone and writes under its own table-scoped dataset id
-(cp_common.TABLE_DATASET_ID["cp_notifications"]) - see
-qa_results_writer.py callers' own AGENCY_ID/DATASET_ID/COLLECTION_ID
-constants. Interleaved per run_id (not two separate concatenated
-blocks) to match orchestrate_cp.py's own _run_one() order exactly.
+Reads every tool's output from the same qa_results/ dataset segment per
+run - cp_common.COLLECTION_ID. All 5 files (dbt/soda/datacontract/
+evidently/dataset_stats) live together under one run_id directory now;
+Evidently briefly wrote under its own table-scoped dataset id
+(cp_common.TABLE_DATASET_ID["cp_notifications"]) instead, a real bug
+fixed 2026-09-16 (run_evidently_cp.py's own comment on the write side)
+- Evidently's own per-result "dataset_id" field still correctly says
+"cp-notifications" for dashboard per-table grouping, only the file
+location was wrong. Interleaved per run_id (not two separate
+concatenated blocks) to match orchestrate_cp.py's own _run_one() order
+exactly.
 
 "runs" used to come from local data/cp_raw/manifest.json - changed
 2026-09-16, Keith's hard rule: CI must never touch data, only committed
@@ -31,8 +33,6 @@ from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
-
-_EVIDENTLY_DATASET_ID = cp_common.TABLE_DATASET_ID["cp_notifications"]
 
 
 def build_results_from_history() -> dict:
@@ -52,8 +52,7 @@ def build_results_from_history() -> dict:
     for entry in manifest:
         run_id = entry["run_id"]
         for tool in TOOL_ORDER:
-            dataset = _EVIDENTLY_DATASET_ID if tool == "evidently" else cp_common.COLLECTION_ID
-            all_results.extend(read_one(cp_common.AGENCY_ID, dataset, run_id, tool))
+            all_results.extend(read_one(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, tool))
 
     n_pass = sum(1 for r in all_results if r["status"] == "pass")
     n_warn = sum(1 for r in all_results if r["status"] == "warn")

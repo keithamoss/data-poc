@@ -69,8 +69,17 @@ def evaluate_evidently_cp(run_id: str, run_timestamp: str,
         "engine": ENGINE_TAG,
         "reference_run_id": reference_run_id,
     }]
-    write_qa_result(cp_common.AGENCY_ID, DATASET_ID, run_id, run_timestamp, "evidently", {"psi": psi_snapshot},
-                     verified=results)
+    # Written under the COLLECTION id, not this module's own table-scoped
+    # DATASET_ID - 2026-09-16 fix, Keith's call: qa_results/ output stays
+    # dataset(collection)-level for every tool, matching run_dbt_cp.py/
+    # run_soda_cp.py/run_datacontract_cp.py/dataset_stats.py, which all
+    # already write there. Evidently was the one real outlier (it only
+    # ever checks cp_notifications, so it used TABLE_DATASET_ID directly
+    # as its write path too) - each result record's own "dataset_id"
+    # field above still correctly says "cp-notifications" for dashboard
+    # per-table grouping; only the FILE location changes here.
+    write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, "evidently",
+                     {"psi": psi_snapshot}, verified=results)
     return results
 
 

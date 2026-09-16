@@ -2560,6 +2560,52 @@ relative, not a schedule — this is weeks of work, not months.
     all) before the fix landed, per this repo's own "verify a
     regression test actually fails first" convention.
 
+50. **[fixed, 2026-09-16]** A real bug in `qa_tools/cp/run_evidently_cp.py`:
+    it wrote its `qa_results/` output under its own table-scoped dataset
+    id (`cp_common.TABLE_DATASET_ID["cp_notifications"]`, i.e.
+    `"cp-notifications"`) instead of the collection id
+    (`cp_common.COLLECTION_ID`, `"child-protection"`) every other CP
+    tool - `run_dbt_cp.py`/`run_soda_cp.py`/`run_datacontract_cp.py`/
+    `orchestrate_cp.py`'s own `dataset_stats` write - already writes
+    under. Real, silent consequence: every run's `evidently.json` lived
+    in its own stray sibling directory
+    (`qa_results/child-protection-family-support/cp-notifications/
+    <run_id>/`) instead of alongside that same run's `dbt.json`/
+    `soda.json`/`datacontract.json`/`dataset_stats.json`
+    (`.../child-protection/<run_id>/`) - functionally fine only because
+    `build_results_from_history.py` special-cased the same wrong
+    constant (`_EVIDENTLY_DATASET_ID`) to go looking there, so nothing
+    outwardly broke, but the physical layout was inconsistent with every
+    other tool and dataset in the system.
+
+    Found while scoping a folder-nesting architecture question with
+    Keith (plans/publishing-and-history.md's Thread B entry, same day) -
+    tracing exactly how CP's qa_results/ directories were laid out
+    turned up this one real outlier. Keith's call once found: fix it
+    properly rather than leave the one inconsistency standing.
+
+    Fixed by writing under `cp_common.COLLECTION_ID` instead (each
+    result record's own `"dataset_id"` field is untouched - still
+    correctly `"cp-notifications"`, since the dashboard's per-table
+    grouping genuinely needs it; only the file's physical location
+    changed) and removing `build_results_from_history.py`'s matching
+    special case. Verified via a real, full `orchestrate_cp.py` run (not
+    just a manual file move) - diffed every regenerated file against the
+    previously-committed version and confirmed the only field that
+    changed anywhere was `run_timestamp` (dbt's own known run-to-run
+    wall-clock/invocation-id noise aside - see items 34/38 - no check's
+    actual status/metric_value moved), same 2832 results / 2332 pass /
+    123 warn / 377 fail distribution as before. The stale
+    `cp-notifications/` directory (16 runs' worth of `evidently.json`)
+    was removed once its replacement was confirmed correct.
+
+    Regression tests: `tests/test_run_evidently_cp.py`'s
+    `test_evaluate_evidently_cp_writes_under_the_collection_id_not_the_
+    table_id` (confirmed to fail against the pre-fix code, asserting the
+    old wrong constant) and `test_evaluate_evidently_cp_still_tags_its_
+    own_result_with_the_table_dataset_id` (confirms the per-result
+    `dataset_id` field is deliberately untouched by the fix).
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

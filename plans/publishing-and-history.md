@@ -82,6 +82,36 @@ against the real per-tool output formats when this gets built (dbt's
 `run_results.json`, Soda's scan result, Evidently's report format may
 each want slightly different handling).
 
+**Scoped and decided, 2026-09-16 (Keith): per-table nesting stays
+dataset-level everywhere, not table-level** - both for check DEFINITION
+files and for `qa_results/` output. Keith's own initial instinct was
+table-level (Child Protection has 6 tables, and he was explicitly fine
+with the real-tool run time cost of invoking each tool once per table
+instead of once per dataset), but once the ODCS/datacontract-cli
+constraint was laid out concretely - one contract document IS one data
+product, carrying document-level identity/version/team/support/as-of
+config plus 10 real cross-table FK/business-rule checks that don't have
+a single owning table to live under - Keith's final call was to keep
+every tool (dbt/Soda/ODCS/Evidently) uniformly at dataset level, not
+carve out ODCS as the one exception while the other three fragment.
+Nothing about `qa_results/`'s existing `<agency>/<dataset>/<run_id>/
+<tool>.json` layout needed to change to honor this - it was already
+dataset-level for 3 of 4 CP tools.
+
+**A real bug found while confirming that, not a design gap**: tracing
+CP's actual on-disk `qa_results/` layout to answer this turned up that
+`run_evidently_cp.py` was the one genuine outlier - it wrote under its
+own table-scoped dataset id (`cp_common.TABLE_DATASET_ID
+["cp_notifications"]`) instead of the collection id every other CP tool
+uses, landing each run's `evidently.json` in a stray sibling directory
+instead of alongside that run's other 4 files. Fixed (write path only -
+each result's own per-table `dataset_id` field is untouched, still
+needed for dashboard grouping), verified via a real full `orchestrate_
+cp.py` run diffed against the previously-committed history (only
+`run_timestamp` changed, same 2832-result pass/warn/fail distribution),
+stale directory removed. Full account, including the regression tests,
+in `plans/qa-pipeline.md` item 50 - not re-derived here.
+
 ## Thread D - check lifecycle: retirement + definition changes (build together with B)
 
 Originally item 27 (parked), pulled forward once Keith realised the
