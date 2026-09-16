@@ -112,6 +112,29 @@ Rough layout:
   wall-clock time actually matters (currently ~3s for 13 tests - `pytest-
   xdist` would add more overhead than it saves), switch to `pytest-xdist`
   for parallel test execution rather than just tolerating a slower suite.
+- **CI (and any "read committed history" code path - `qa_tools/*/
+  build_results_from_history.py`, `pipeline/build_*_dashboard_data.py`)
+  must never depend on live data access, real or synthetic.** Not "must
+  avoid touching real data" - the actual rule is narrower and stricter:
+  no regenerating, opening, or querying `data/`/`data/raw/`/`data/
+  cp_raw/`/any DuckDB warehouse, full stop, even though this PoC's data
+  is fake and harmless to regenerate. The reasoning (Keith's own words,
+  2026-09-16, after finding `deploy-pages.yml` was still regenerating
+  synthetic warehouses so the dashboard's chart queries had something
+  to query): a pipeline that's only safe because today's data happens
+  to be synthetic isn't a pipeline that's actually safe - it's one
+  accident away from being pointed at something real. See
+  `plans/publishing-and-history.md`'s Phase 3 write-up for the full
+  incident and fix (`qa_tools/*/dataset_stats.py` - any computation
+  that needs a live connection gets computed once, at real-run time,
+  by whichever `orchestrate_*.py` already has one legitimately open,
+  and committed to `qa_results/` alongside that run's check results -
+  never deferred to a later read). Before adding ANY new computation to
+  the dashboard-build path, ask first whether it needs a live
+  connection to anything under `data/` - if yes, it belongs in
+  `orchestrate_bdm.py`'s/`orchestrate_cp.py`'s own run step and a
+  committed `qa_results/` file, not in `pipeline/build_*_dashboard_
+  data.py`.
 - **Whenever an actual bug is found** (not a design gap, not a missing
   feature - a case where the code produces a genuinely wrong result),
   add a test to `tests/` that reproduces it and fails against the

@@ -948,6 +948,14 @@ pinned per Keith's own call:**
   Phase 2 is what makes the check-lifecycle data actually renderable)
   or Phase 4.
 
+**Phase 6 (test coverage) - added 2026-09-16, Keith's own call, once
+Phases 1-5 are otherwise done:** not scoped yet beyond the name - a
+deliberate placeholder so the ask isn't lost, not scoped in depth here
+since Keith hasn't asked for that yet. Depends on everything above
+existing to have something real to cover. Scope for real (what's
+covered vs. gap, unit vs. integration, real-tool-run coverage vs.
+fixture-only) when this phase is actually reached.
+
 ## Doc updates needed once this starts landing
 
 - `CLAUDE.md`: the `data/raw/`, `reports/*.json` gitignored-convention
