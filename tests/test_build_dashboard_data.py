@@ -101,3 +101,51 @@ def test_a_column_with_no_check_gets_an_honest_placeholder(tmp_path, monkeypatch
     # honest placeholder, not a crash or a silently-empty checks list.
     uncovered = next(c for c in data["columns"] if c["name"] == "date_registered")
     assert uncovered["checks"][0]["name"] == "No automated quality rule defined"
+
+
+def test_stats_by_run_carries_every_run_not_just_latest_and_previous(tmp_path, monkeypatch):
+    """Phase 4 prerequisite (plans/publishing-and-history.md Thread C):
+    stats["current"]/["previous"] stay exactly as before, but stats
+    ["byRun"] now carries every run, keyed by run_id - the actual data
+    Thread C's as-of picker will need."""
+    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))
+
+    data = bdd.build()
+    sex_col = next(c for c in data["columns"] if c["name"] == "sex")
+    by_run = sex_col["stats"]["byRun"]
+
+    assert set(by_run) == {"run_01_2026-09-01", "run_02_2026-09-02"}
+    # run_01 is clean (metric_value 0) - matches "previous" above
+    assert by_run["run_01_2026-09-01"] == {
+        "total": 3, "invalid": 0, "valid": 3, "valueCounts": [["M", 1], ["F", 2], ["X", 0]],
+    }
+    # run_02 matches "current" above (metric_value 1)
+    assert by_run["run_02_2026-09-02"] == {
+        "total": 4, "invalid": 1, "valid": 3, "valueCounts": [["M", 2], ["F", 1], ["X", 1]],
+    }
+    # a column with no real check (the honest-placeholder path) still
+    # gets a byRun entry per run, all zero - never crashes or gets skipped
+    uncovered = next(c for c in data["columns"] if c["name"] == "date_registered")
+    assert set(uncovered["stats"]["byRun"]) == {"run_01_2026-09-01", "run_02_2026-09-02"}
+
+
+def test_arrival_by_run_is_genuinely_computed_not_hardcoded_true(tmp_path, monkeypatch):
+    """A real bug fixed alongside the byRun work: arrivalHistory's onTime
+    used to be hardcoded True for every run but the latest, even though
+    every run's own max_lag_hours already existed to compute it for
+    real. A run with a real >24h lag must now show onTime=False."""
+    late_stats = json.loads(json.dumps(FIXTURE_DATASET_STATS))
+    late_stats["run_01_2026-09-01"]["arrival"]["max_lag_hours"] = 30.0
+    results_path = tmp_path / "results_bdm.json"
+    results_path.write_text(json.dumps({
+        "runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS, "dataset_stats": late_stats,
+    }))
+    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(results_path))
+
+    data = bdd.build()
+
+    assert data["arrivalByRun"]["run_01_2026-09-01"]["onTime"] is False
+    assert data["arrivalByRun"]["run_01_2026-09-01"]["maxLagHours"] == 30.0
+    assert data["arrivalByRun"]["run_02_2026-09-02"]["onTime"] is True
+    history_by_run = {h["run_id"]: h["onTime"] for h in data["arrivalHistory"]}
+    assert history_by_run == {"run_01_2026-09-01": False, "run_02_2026-09-02": True}

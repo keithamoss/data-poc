@@ -891,13 +891,71 @@ were never part of what it validates - only check definitions).
 
 **Still not built**: this only gets `check_id` onto every result
 record - nothing downstream (the dashboard-data builders, the
-dashboard's own JS) reads or uses it yet. That, plus the genuinely
-separate full-per-run-stats-fidelity gap in `pipeline/build_dashboard_
-data.py`/`build_cp_dashboard_data.py` (today's `stats.current`/
-`stats.previous` - valueCounts, arrival, row counts - are hardcoded to
-just the latest two runs, not every run the way `checks[].history`
-already is), is the remaining Phase 4 prerequisite work before Thread
-C's actual as-of picker UI can be built.
+dashboard's own JS) reads or uses it yet.
+
+**Built, 2026-09-16 (same day): full per-run stats fidelity in both
+dashboard-data builders - the other Phase 4 prerequisite.** Scoped with
+Keith first ("shape change scoped first"), not built straight off the
+back of the check_id work: `pipeline/build_dashboard_data.py`/
+`build_cp_dashboard_data.py`'s `stats.current`/`stats.previous`
+(valueCounts, invalid/valid counts), `lastArrival`, and `rowCount`/
+`prevRowCount` were all hardcoded to just the latest two runs, even
+though the source data (`qa_results/.../dataset_stats.json`) already
+carries `value_counts`/`arrival` for every committed run - purely a
+reshape gap, not a missing-data one, and no new `qa_results/`
+regeneration was needed.
+
+Two real forks resolved before building, both Keith's call:
+- **Shape: a dict keyed by `run_id`**, not an array aligned with the
+  existing `runs` list (unlike `checks[].history`, which is walked in
+  chart order) - the as-of picker needs direct "look up state as of
+  this specific run" access, not a scan.
+- **Also fix `arrivalHistory`'s `onTime`**, which was hardcoded `True`
+  for every run but the latest even though every run's own real
+  `max_lag_hours` already existed to compute it honestly - Keith's
+  call: leaving it hardcoded while claiming full per-run fidelity
+  elsewhere would be inconsistent with the project's own honesty
+  standard.
+
+**Additive, not a breaking change**: `stats.current`/`stats.previous`/
+`lastArrival`/`rowCount`/`prevRowCount` are computed exactly as before
+and stay in the output unchanged - today's dashboard rendering keeps
+working without any JS changes. `stats["byRun"]` and a new dataset-level
+`arrivalByRun` are new fields alongside them, built from `checks_out[0]`
+(the same "primary check" `current`/`previous` already use, post
+`rank_for_headline()`) so both stay governed by the same "which check is
+primary" choice. `history` entries (and the honest-placeholder path's
+own history) also gained a `run_id` field they didn't have before - a
+genuine correctness fix along the way, not cosmetic: `run_date` alone
+can't key a run uniquely once resupply runs exist (a resupply run
+shares its base run's `run_date`, e.g. `run_54_2026-09-10` and
+`run_54_2026-09-10_resupply1`), so `byRun` needed an unambiguous key to
+match against.
+
+Per-run row counts aren't duplicated into their own dict - `runs`
+(already in the output) carries `n_rows_generated`/`row_counts[table]`
+per manifest entry already, so nothing new was needed there.
+
+Verified: real rebuild of both `reports/*_dashboard.json` outputs
+against the current `qa_results/` history, real `dashboard.
+embed_dashboard_data` + a real headless-Chromium Playwright render
+check (`dashboard.check_dashboard_renders`) - zero console errors, same
+as before this change (confirms the additive fields don't break today's
+rendering) - then the local dashboard HTML rebuild was discarded
+(`git checkout --`), never committed, per this repo's standing Phase 3
+rule. 4 new fixture-based tests, 2 per dataset (the CP dataset-builder
+layer had no dedicated test file at all before this - added
+`tests/test_build_cp_dashboard_data.py`), including one proving
+`onTime` is genuinely computed (a >24h fixture lag correctly reads
+`False`), not just checking the happy path. Full pytest (170 tests) +
+ruff clean.
+
+**Not yet built**: Thread C's actual as-of picker UI (date picker/
+calendar widget, URL param persistence, "no data available"
+below-threshold state) and the querying logic that reads `stats.byRun`/
+`arrivalByRun` to render an arbitrary past date - both prerequisites
+(`check_id` propagation, full per-run stats fidelity) are done now, so
+this is the only piece of Phase 4 left.
 
 **Phase 2 (Thread B - dashboard pipeline's read side) - [DONE,
 2026-09-16]:**

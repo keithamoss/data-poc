@@ -159,6 +159,10 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
 
     run_ids_in_order = [m["run_id"] for m in manifest]
     latest_run, prev_run = run_ids_in_order[-1], run_ids_in_order[-2]
+    # run_date alone can't key a run uniquely (see build_dashboard_data.
+    # py's identical comment) - byRun below keys on run_id via each
+    # history entry's own "run_id" field.
+    row_count_by_run = {m["run_id"]: m["row_counts"][table] for m in manifest}
 
     columns_out = []
     for col in all_columns:
@@ -177,7 +181,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                     if attach_aggregate:
                         aggregate_values = dataset_stats[run_id]["check_aggregates"].get(f"{table}.{col}")
                     history.append({
-                        "run_date": run_date, "value": slot["by_run"][run_id],
+                        "run_id": run_id, "run_date": run_date, "value": slot["by_run"][run_id],
                         "row_count_total": slot["row_count_total"].get(run_id),
                         "row_count_invalid": slot["row_count_invalid"].get(run_id),
                         "failing_sample_keys": slot["failing_sample_keys"].get(run_id) or [],
@@ -203,7 +207,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                 "name": "No automated quality rule defined",
                 "dimension": "", "unit": "count", "warn": 1, "fail": 1,
                 "current": 0, "previous": 0,
-                "history": [{"run_date": m["run_date"], "value": 0} for m in manifest],
+                "history": [{"run_id": m["run_id"], "run_date": m["run_date"], "value": 0} for m in manifest],
                 "note": "Neither the ODCS contract nor the Soda/dbt check files define a rule for this "
                         "column today — this is a real gap, not a hidden failure.",
             }]
@@ -229,6 +233,23 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
             stats["current"]["valueCounts"] = dataset_stats[latest_run]["value_counts"]["concern_type"]
             stats["previous"]["valueCounts"] = dataset_stats[prev_run]["value_counts"]["concern_type"]
 
+        # Full per-run fidelity, keyed by run_id - see build_dashboard_
+        # data.py's identical comment on stats["byRun"] for the full
+        # rationale (additive, current/previous unchanged, for Thread
+        # C's as-of UI).
+        primary_unit = checks_out[0]["unit"]
+        stats_by_run = {}
+        for h in checks_out[0]["history"]:
+            run_id = h["run_id"]
+            total = row_count_by_run[run_id]
+            n_invalid = int(round(total * h["value"] / 100)) if primary_unit == "%" else int(round(h["value"]))
+            n_invalid = max(0, n_invalid)
+            stats_by_run[run_id] = {
+                "total": total, "invalid": n_invalid, "valid": max(0, total - n_invalid),
+                "valueCounts": dataset_stats[run_id]["value_counts"]["concern_type"] if col == "concern_type" else None,
+            }
+        stats["byRun"] = stats_by_run
+
         columns_out.append({
             "name": col, "logicalType": logical_type, "description": desc,
             "checks": checks_out, "stats": stats,
@@ -244,7 +265,19 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
     max_lag_hours = dataset_stats[latest_run]["arrival"][table]["max_lag_hours"]
     earliest_extract = dataset_stats[latest_run]["arrival"][table]["earliest_extract"]
 
-    arrival_history = [{"run_date": m["run_date"], "onTime": True} for m in manifest]  # every run's lag < 24h SLA, verified above for the latest
+    # Genuinely per-run now, not a hardcoded True for every run but the
+    # latest - see build_dashboard_data.py's identical comment.
+    arrival_by_run = {}
+    arrival_history = []
+    for m in manifest:
+        run_id = m["run_id"]
+        arrival = dataset_stats[run_id]["arrival"][table]
+        on_time = arrival["max_lag_hours"] < 24
+        arrival_by_run[run_id] = {
+            "arrivedAt": str(arrival["earliest_extract"]), "onTime": on_time,
+            "maxLagHours": round(arrival["max_lag_hours"], 1),
+        }
+        arrival_history.append({"run_id": run_id, "run_date": m["run_date"], "onTime": on_time})
 
     return {
         "id": dataset_id,
@@ -259,8 +292,12 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
             "maxLagHours": round(max_lag_hours, 1),
         },
         "arrivalHistory": arrival_history,
+        "arrivalByRun": arrival_by_run,
         "rowCount": latest_entry["row_counts"][table],
         "prevRowCount": prev_entry["row_counts"][table],
+        # Per-run row counts aren't duplicated into their own dict here -
+        # "runs" (below) already carries row_counts[table] per manifest
+        # entry, same as build_dashboard_data.py's identical comment.
         "runs": manifest,
         "columns": columns_out,
         "_provenance": f"Computed by qa_tools/cp/orchestrate_cp.py from real generated CSVs, the real "

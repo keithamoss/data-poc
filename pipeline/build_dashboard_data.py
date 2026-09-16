@@ -91,6 +91,11 @@ def build() -> dict:
 
     run_ids_in_order = [m["run_id"] for m in manifest]
     latest_run, prev_run = run_ids_in_order[-1], run_ids_in_order[-2]
+    # run_date alone can't key a run uniquely - a resupply run shares its
+    # base run's run_date (e.g. run_54_2026-09-10 and
+    # run_54_2026-09-10_resupply1) - so byRun below keys directly on
+    # run_id via each history entry's own "run_id" field, not run_date.
+    row_count_by_run = {m["run_id"]: m["n_rows_generated"] for m in manifest}
 
     columns_out = []
     for col in ALL_COLUMNS:
@@ -110,7 +115,7 @@ def build() -> dict:
                     if attach_aggregate:
                         aggregate_values = dataset_stats[run_id]["check_aggregates"].get(col)
                     history.append({
-                        "run_date": run_date, "value": slot["by_run"][run_id],
+                        "run_id": run_id, "run_date": run_date, "value": slot["by_run"][run_id],
                         "row_count_total": slot["row_count_total"].get(run_id),
                         "row_count_invalid": slot["row_count_invalid"].get(run_id),
                         "failing_sample_keys": slot["failing_sample_keys"].get(run_id) or [],
@@ -137,7 +142,7 @@ def build() -> dict:
                 "name": "No automated quality rule defined",
                 "dimension": "", "unit": "count", "warn": 1, "fail": 1,
                 "current": 0, "previous": 0,
-                "history": [{"run_date": m["run_date"], "value": 0} for m in manifest],
+                "history": [{"run_id": m["run_id"], "run_date": m["run_date"], "value": 0} for m in manifest],
                 "note": "Neither the ODCS contract nor the Soda/dbt check files define a rule for this "
                         "column today — this is a real gap, not a hidden failure.",
             }]
@@ -168,6 +173,29 @@ def build() -> dict:
             stats["current"]["valueCounts"] = dataset_stats[latest_run]["value_counts"]["sex"]
             stats["previous"]["valueCounts"] = dataset_stats[prev_run]["value_counts"]["sex"]
 
+        # Full per-run fidelity, keyed by run_id (not an index-aligned
+        # array like history - the as-of picker this serves needs direct
+        # lookup by an arbitrary run_id, not a scan). "current"/"previous"
+        # above stay exactly as they were - existing rendering keeps
+        # working unchanged; this is additive, for Thread C's as-of UI
+        # (plans/publishing-and-history.md) to consume once it's built.
+        # Computed from checks_out[0]'s own history (the same primary
+        # check "current"/"previous" already use, post rank_for_headline)
+        # rather than re-deriving from raw per-check data, so both stay
+        # governed by the exact same "which check is primary" choice.
+        primary_unit = checks_out[0]["unit"]
+        stats_by_run = {}
+        for h in checks_out[0]["history"]:
+            run_id = h["run_id"]
+            total = row_count_by_run[run_id]
+            n_invalid = int(round(total * h["value"] / 100)) if primary_unit == "%" else int(round(h["value"]))
+            n_invalid = max(0, n_invalid)
+            stats_by_run[run_id] = {
+                "total": total, "invalid": n_invalid, "valid": max(0, total - n_invalid),
+                "valueCounts": dataset_stats[run_id]["value_counts"]["sex"] if col == "sex" else None,
+            }
+        stats["byRun"] = stats_by_run
+
         status_rank = {"pass": 0, "warn": 1, "fail": 2}
         # column status = worst status among its real checks (mirrors the
         # dashboard's own worst-of rollup rule, computed here from real
@@ -192,9 +220,24 @@ def build() -> dict:
     max_lag_hours = dataset_stats[latest_run]["arrival"]["max_lag_hours"]
     earliest_extract = dataset_stats[latest_run]["arrival"]["earliest_extract"]
 
+    # Genuinely per-run now, not a hardcoded True for every run but the
+    # latest - every run's own max_lag_hours/earliest_extract already
+    # exists in its committed dataset_stats.json (Phase 3), just not
+    # previously surfaced here. arrival_by_run mirrors stats["byRun"]
+    # above (run_id-keyed, for Thread C's as-of UI); arrival_history
+    # keeps its existing array shape (one entry per run, in order) but
+    # its onTime is now real, not assumed.
+    arrival_by_run = {}
     arrival_history = []
     for m in manifest:
-        arrival_history.append({"run_date": m["run_date"], "onTime": True})  # every run's max lag < 24h SLA, verified above for the latest
+        run_id = m["run_id"]
+        arrival = dataset_stats[run_id]["arrival"]
+        on_time = arrival["max_lag_hours"] < 24
+        arrival_by_run[run_id] = {
+            "arrivedAt": arrival["earliest_extract"], "onTime": on_time,
+            "maxLagHours": round(arrival["max_lag_hours"], 1),
+        }
+        arrival_history.append({"run_id": run_id, "run_date": m["run_date"], "onTime": on_time})
 
     return {
         "id": "birth-registrations",
@@ -209,8 +252,12 @@ def build() -> dict:
             "maxLagHours": round(max_lag_hours, 1),
         },
         "arrivalHistory": arrival_history,
+        "arrivalByRun": arrival_by_run,
         "rowCount": latest_entry["n_rows_generated"],
         "prevRowCount": prev_entry["n_rows_generated"],
+        # Per-run row counts aren't duplicated into their own dict here -
+        # "runs" (below) already carries n_rows_generated per manifest
+        # entry, so Thread C's as-of UI can read it straight from there.
         "runs": manifest,
         "columns": columns_out,
         "_provenance": "Computed by qa_tools/bdm/orchestrate_bdm.py - actual dbt-core, Soda Core, datacontract-cli "
