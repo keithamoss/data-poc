@@ -188,6 +188,23 @@ friendly "Birth Registrations - published by Keith - 10 mins ago" feed
 in the UI. Per-dataset, per-publish granularity confirmed as the right
 level of detail.
 
+**Refined, 2026-09-16, same session:** each entry needs TWO distinct
+timestamps, not one - when the QA actually ran (the run's own execution
+time, already captured in the committed result file's own metadata -
+this project already has a `run_timestamp`/`run_id` concept), and when
+it was committed/published (git's own commit timestamp). These can
+genuinely differ - someone might run QA at 2pm and not commit until 5pm
+- and conflating them would misrepresent how fresh the underlying check
+actually is versus how fresh its publication is.
+
+**Explicitly out of scope for this changelog, Keith's own clarification:**
+check-lifecycle events (a check retired, a check's definition changed -
+Thread D) do NOT appear here. This feed is purely "which dataset got
+QA'd and published, by whom, when" - check versioning has its own
+record (the lifecycle metadata itself, plus git's own commit history on
+the check-definition files, which already provides an equivalent
+changelog for THAT concern without needing to be merged into this one).
+
 ## Thread C - cadence-aware "as of" viewing (build last - depends on B/D)
 
 Daily and quarterly datasets need different framing. Showing "today's"
