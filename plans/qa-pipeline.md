@@ -2491,6 +2491,27 @@ relative, not a schedule — this is weeks of work, not months.
     simpler, since a single check's own `history` already carries a
     status per point via `statusForValue()`) or needs a new helper.
 
+48. **[todo]** Mobile: tapping a trend chart briefly shows the tooltip,
+    then it disappears - Keith's report, 2026-09-16, with his own
+    correct hypothesis about the cause. Root cause, from reading
+    `wireChart()` (`dashboard/qa-reporting-dashboard.html`): the
+    tooltip only wires `mousemove`/`mouseleave` (lines ~742-757), never
+    a touch event. On a tap, mobile browsers fire a synthetic
+    `mousemove` (shows the tooltip) immediately followed by `click` -
+    and for any point except the current run, `click` calls
+    `onPointClick(idx)`, item 45's "click to compare against this run"
+    feature, which re-renders the chart/panel and tears the tooltip's
+    DOM down in the process. So the tooltip isn't buggy on its own -
+    it's real hover state getting destroyed by a full re-render
+    triggered by the same tap that showed it, a touch-vs-mouse-event
+    interaction neither the tooltip code nor item 45's click-to-compare
+    addition were built expecting. Not yet scoped: whether the fix is
+    touch-specific (suppress the click-triggered re-render immediately
+    after a touch-originated mousemove, e.g. via a short debounce or a
+    `pointerType` check) or interaction-model-specific (tap-to-show-
+    tooltip, a second tap-while-shown to trigger compare, standard
+    mobile chart UX) - logged for later, not investigated further now.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
