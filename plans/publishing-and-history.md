@@ -925,6 +925,83 @@ the feed's own UI is Phase 5 regardless). The gate-and-publish
 mechanism above is real and verified; this is a genuinely separate
 piece of work, flagged rather than silently skipped or rushed.
 
+**Follow-on, same day (2026-09-16) - the CI-vs-human push race, and
+removing the commit-back step entirely:**
+- After the first live CI runs above, hit two real non-fast-forward
+  push rejections doing normal local work on this same branch - CI's
+  own `[skip ci]` bot commit (the "commit the rebuilt dashboard data
+  back to the branch" step) landed while local work was in progress.
+  Both resolved cleanly via `git fetch` + `git rebase` + `git push`, but
+  Keith asked about it directly: was this caused by CI writing to the
+  same branch as human work? Confirmed yes.
+- Keith asked whether collapsing to "one CI/CD process, one branch"
+  (classic GitHub Pages branch-based hosting, Pages serving a branch's
+  tree directly) would work instead of a dedicated output branch -
+  talked through the real mechanism and tradeoffs (would mean giving up
+  the modern Actions-artifact deployment model).
+- Keith then asked to verify via real research whether the modern
+  `actions/deploy-pages` path truly has no way to avoid a shared-branch
+  commit-back step at all, rather than taking that as given - per this
+  project's own standing lesson against asserting unverified external
+  facts (see the `astral-sh/setup-uv@v10` pin incident, `plans/wider.md`
+  #29). Researched for real (WebSearch + WebFetch on
+  `github.com/actions/deploy-pages`, since `docs.github.com` is blocked
+  by this environment's network proxy): **the earlier framing was
+  wrong** - `deploy-pages` is already artifact-based and branch-
+  independent; the race was entirely the fault of this workflow's own
+  separate "commit the rebuilt dashboard data back to git" step, not of
+  `deploy-pages` itself, which never touches git at all. Corrected this
+  directly rather than letting the wrong framing stand.
+- That research surfaced two branch-independent fixes, both compatible
+  with the modern deployment path: (a) commit the rebuilt data to a
+  dedicated output branch instead of the shared dev branch, keeping
+  `deploy-pages` as-is; (b) stop committing the rebuilt dashboard data
+  to git at all, relying on each Pages deployment's own history (tied to
+  the exact commit SHA it was built from) for "what was published when"
+  traceability instead.
+- Before deciding, Keith asked exactly what's inside the committed
+  rebuild record that option (b) would stop capturing. Walked through
+  it precisely: the two embedded consts (`REAL_BIRTH_REG_DATA`/
+  `REAL_CP_DATA`) are `reports/birth_registrations_dashboard.json`/
+  `child_protection_dashboard.json` pasted in verbatim by
+  `dashboard/embed_dashboard_data.py` - the reshaped, presentation-ready
+  output (check results by dataset, `history` pass/warn/fail/error
+  trends, `columns_out`/per-check metadata, `stats` value-count/
+  aggregate-failing-value data, `lastArrival`/`arrivalHistory`,
+  `rowCount`/`prevRowCount`). Under option (b), what's lost is the
+  git-diffable, point-in-time record of exactly that reshaped data at
+  each commit (`git log -p`/`git diff` on the HTML file, and checking
+  out an old commit to see precisely what was live then with zero
+  rebuild). What's NOT at risk either way: `qa_results/` itself (raw
+  tool output + `dataset_stats.json` + manifest entries per run) stays
+  the permanent, committed source of truth regardless (Thread B,
+  untouched by this decision), and the reshaped dashboard JSON/HTML
+  stays 100% deterministically reproducible from it at any time via the
+  exact same `build_results_from_history.py` -> `build_*_dashboard_
+  data.py` -> `embed_dashboard_data.py` chain CI already runs.
+  `dashboard/snapshots/*.html.gz` (plans/wider.md #26) is unaffected
+  either way, a wholly separate point-in-time archive mechanism.
+- **Keith's call, after that walkthrough: option (b)** - stop
+  committing the rebuilt dashboard data to git at all. Comfortable
+  trading the git-native diffable history for removing the push race
+  entirely, given the underlying source of truth is untouched.
+- **Built and verified**: removed the "Commit the rebuilt dashboard data
+  back to the branch" step from `.github/workflows/deploy-pages.yml`
+  entirely (the job's `Prepare site` step already reads the just-
+  rebuilt `dashboard/qa-reporting-dashboard.html` straight off the
+  job's own working tree via `snapshot_dashboard.prepare_deploy_site()`,
+  not from git, so the deploy path needed no other change). Reverted
+  `permissions: contents: write` back to `read` (no longer writes to
+  git) and removed the now-pointless `if: ... [skip ci]` job guard (no
+  bot commit exists any more to guard against re-triggering on). Updated
+  the workflow's own header comment with the full incident/research/
+  decision writeup, and `CLAUDE.md`'s `dashboard/qa-reporting-
+  dashboard.html` entry to match - including the explicit consequence
+  that the git-committed copy of this file's two consts is now
+  permanently stale, and local rebuilds of it must still never be
+  committed (that would just reintroduce the same problem this decision
+  was meant to avoid).
+
 **Phase 4 (Thread C - cadence-aware "as of" viewing):**
 - Depends on Phase 1 and Phase 2 (real committed history, merged/
   reshaped) - NOT on Phase 3. Worth being explicit about this: the
