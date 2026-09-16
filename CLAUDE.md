@@ -1,14 +1,15 @@
 # Orientation for a new session
 
-Read this first, then `plans/wider.md` and `plans/qa-pipeline.md` in full
-before doing anything else. This project is worked across many separate
-chat sessions over a period of weeks - those two files are the actual
-persistent memory of the project, not this chat history. They're kept
-current as work happens: design decisions, the questions that were asked
-to scope them, what was verified and how, and what's still open. Don't
-re-derive a decision that's already recorded there, and don't re-propose
-something already logged as `[investigate]`/`[todo]` without checking if
-it's already scoped.
+Read this first, then `plans/wider.md`, `plans/qa-pipeline.md`, and
+`plans/publishing-and-history.md` in full before doing anything else.
+This project is worked across many separate chat sessions over a period
+of weeks - those files are the actual persistent memory of the project,
+not this chat history. They're kept current as work happens: design
+decisions, the questions that were asked to scope them, what was
+verified and how, and what's still open. Don't re-derive a decision
+that's already recorded there, and don't re-propose something already
+logged as `[investigate]`/`[todo]` without checking if it's already
+scoped.
 
 - `plans/wider.md` - the whole PoC: what exists and where, open
   architectural questions, parked thoughts for later.
@@ -17,6 +18,15 @@ it's already scoped.
   dashboard follow-ups.
 - `plans/performance.md` - narrowly the real-tool orchestration scripts'
   runtime.
+- `plans/publishing-and-history.md` - scoped but NOT YET BUILT: how QA
+  results become a durable, committed, multi-person-publishable history
+  (superseding today's gitignored `reports/*.json`), CI-gated publishing
+  with no manual local-publish path, check retirement/definition-change
+  versioning, and cadence-aware "as of" viewing for non-daily datasets.
+  Read this before touching anything related to `reports/*.json`
+  gitignore status, the dashboard's publish/deploy path, or check
+  lifecycle - the design already accounts for changes in this area that
+  haven't landed in code yet.
 
 ## Who this is for
 

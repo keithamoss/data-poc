@@ -1096,6 +1096,12 @@ not a schedule.
     "what would production need" question, and splitting now would
     guess at boundaries between them that scoping might not agree with.
 
+    **The "how checks output/results get stored" bullet is now properly
+    scoped, same day (2026-09-16)** - see `plans/publishing-and-history.md`
+    in full. Not built yet, but no longer an open question: committed
+    per-run tool-output files as the real source of truth, CI-gated
+    publishing with no manual local-publish path, and a build order.
+
 26. **[done, medium]** "Time travel" - the ability to go back and see the
     entire reporting solution exactly as it was for any previous run,
     not just a single check's own history (which item 45 already covers
@@ -1484,6 +1490,15 @@ not a schedule.
     tags before writing the pin, not by re-guessing a plausible-looking
     one.
 
+    **Relationship to the newer "as of" viewing idea, same day
+    (2026-09-16)** - see `plans/publishing-and-history.md` Thread C.
+    Different mechanism, both staying in the design: this item's
+    snapshots are whole-page freezes taken at explicit past moments;
+    "as of" viewing queries real accumulated per-run history (once
+    `plans/publishing-and-history.md` Thread B exists) for an arbitrary
+    date someone picks. How the two UI entry points should relate to
+    each other is flagged as not yet designed there.
+
 27. **[parked]** Versioning the checks themselves, with that version
     flowing through to the results/data each check run captures - Keith's
     own framing, raised right after item 26's time-travel build: "a
@@ -1528,6 +1543,15 @@ not a schedule.
     annotation/marker at the break point, splitting the line into two
     separately-labeled segments, something else). Parked for a dedicated
     scoping discussion, not this session.
+
+    **Picked back up and scoped for real, same day (2026-09-16)** - see
+    `plans/publishing-and-history.md` Thread D. Several of the "not yet
+    scoped" questions above now have real (if still partial) answers:
+    explicit declaration rather than inferred-from-absence (settles the
+    "who/what decides" question above), folded into Thread B's committed
+    per-run file design rather than built separately. The UI-presentation
+    question (how a break/retirement actually reads in the trend chart)
+    is still open - see that file's "Not yet designed" list.
 
 28. **[parked, big think-piece]** Generalizing this whole architecture
     (ODCS contract schema, Soda checks, dbt generic tests, and the
