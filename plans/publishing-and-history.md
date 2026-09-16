@@ -461,22 +461,65 @@ intertwined) first.
 
 ## Build order
 
-1. **Thread B + D together**: committed per-run raw tool-output files,
-   with check-lifecycle (retirement/definition-change) metadata designed
-   into the format from the start. The dashboard pipeline's "read all
-   committed history, merge, reshape" step. Doc updates: CLAUDE.md's
-   gitignore convention explicitly updated to reflect that `qa_results/`
-   (or whatever this ends up named) is now committed, not ephemeral.
-2. **Thread A**: CI-gated publishing (smoke tests + headless-browser
-   render check), removing any local-publish path, changelog derived
-   from git history.
-3. **Thread C**: cadence-aware "as of" viewing, once B/D's real history
-   exists to query.
+Renumbered/reorganized 2026-09-16 (Keith's own call, for ease of
+reasoning/talking about this work) - each phase still names which
+Thread(s) it corresponds to above, for reference back into the detailed
+design, but Thread A/B/C/D are no longer the primary labels here.
 
-Check-lifecycle UI presentation (retired/definition-changed badges in
-the check-history/trend views) can land alongside either 1 or 2,
-whichever turns out more natural once the data model is real - not a
-hard blocker either way.
+**Phase 1 (Thread B + D - results storage + check lifecycle):**
+- Committed per-run raw tool-output files, with check-lifecycle
+  (retirement/definition-change) metadata designed into the format from
+  the start.
+- **The check-lifecycle validation logic itself, as its own explicit
+  deliverable** - the duplicate-`check_id` scan across all committed
+  check definitions, and the changelog-completeness check (a config
+  hash changed without a matching changelog entry). Built as reusable
+  logic here, in this phase, so Phase 2's CI gate can directly invoke
+  it rather than needing to build equivalent logic itself under a
+  different phase's name - this was a real gap in the original
+  build-order writeup, caught when reviewing it: the validation logic
+  conceptually belongs with Thread D's work, but wasn't assigned to a
+  phase at all before now.
+- The dashboard pipeline's "read all committed history, merge, reshape"
+  step.
+- Doc updates: `CLAUDE.md`'s gitignore convention explicitly updated to
+  reflect that `qa_results/` (or whatever this ends up named) is now
+  committed, not ephemeral.
+
+**Phase 2 (Thread A - CI-gated publishing):**
+- Wires Phase 1's validation logic into the CI gate, alongside the
+  structural checks and the headless-browser render check.
+- Removes any local-publish path - CI is the only path, per Thread A's
+  own decision.
+- Changelog/activity-feed data logic (reshaping git commit history over
+  the committed result paths into feed entries) - the feed's own UI is
+  Phase 4, not here.
+- Depends on Phase 1.
+
+**Phase 3 (Thread C - cadence-aware "as of" viewing):**
+- Depends ONLY on Phase 1's real committed history existing to query -
+  NOT on Phase 2. Worth being explicit about this: the original
+  numbering implied a stricter chain (1 then 2 then 3) than the real
+  dependency graph requires (Phase 1 unlocks both 2 and 3, which don't
+  depend on each other). Kept as phase 3 in sequence anyway, per Keith's
+  own call to keep this simple to reason about - not because it's
+  actually blocked by Phase 2.
+- Includes Thread C's own UI (the as-of date picker/calendar widget,
+  URL param persistence) - that's part of this phase, not Phase 4 below.
+
+**Phase 4 (UI presentation - spans Thread D's check-lifecycle UI and
+Thread A's changelog/activity-feed UI) - now its own standalone phase,
+pinned per Keith's own call, rather than "can land alongside either 1
+or 2" as the original writeup vaguely left it (written before any of
+this UI was actually designed):**
+- Thread D: the breaking-change trend-line gap, the non-breaking marker
+  (same color, no gap), retired-checks dropping from the default view
+  with a toggle, and the changelog + description sections in the
+  existing check-detail panel.
+- Thread A: the "📋 Recent activity" header button + panel for the
+  publish changelog (same interaction pattern as "🕐 Past snapshots").
+- Depends on Phase 1 (check-lifecycle data to render) and Phase 2
+  (publish-activity data to render) - not on Phase 3.
 
 ## Doc updates needed once this starts landing
 
