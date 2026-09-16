@@ -446,18 +446,35 @@ date against - it can't be meaningfully retrofitted onto today's
 rolling-window/embedded-blob model. Build B (and D, since they're
 intertwined) first.
 
-**Not yet designed:**
-- Exact default offset values per asset (30 vs 60 days vs something
-  else) - Keith was thinking out loud, not deciding, on the specific
-  number.
-- Whether the offset config lives in the repo (e.g. alongside the ODCS
-  contract per dataset) or somewhere else.
-- How "as of" interacts with the existing "time travel" snapshot picker
-  (item 26) - they're different mechanisms (this queries live history
-  for an arbitrary date; snapshots are frozen whole-page archives taken
-  at explicit past moments), but a dashboard user might reasonably
-  expect some relationship between the two UI entry points. Worth a
-  short design pass when this gets built, not resolved here.
+**Resolved while scoping Phase 4 for real, 2026-09-16 (previously
+"not yet designed"):**
+- **Offset value: 60 days for Child Protection**, Keith's call - set
+  now that CP's own real generated cadence is genuinely quarterly (see
+  plans/wider.md's history-depth entry), not picked to paper over the
+  old weekly-labeled-as-quarterly mismatch. No offset for Birth
+  Registrations (daily asset, always shows the absolute latest, by
+  design - unchanged).
+- **Offset config location: alongside the ODCS contract**, Keith's
+  call - a root-level (dataset-level, not per-check) `customProperties`
+  block on `contract/child-protection-contract.yaml`
+  (`asOfOffsetDays: "60"`), same place check-lifecycle metadata already
+  lives, no new top-level config file. No equivalent property on
+  `contract/bdm-birth-registrations-contract.yaml`. Verified for real:
+  `datacontract lint` still passes, `check_lifecycle.
+  parse_contract_check_metadata()` still parses the same 62 checks
+  (the new root-level block doesn't interfere with the existing
+  per-check `quality:`-scoped customProperties parsing), full pytest +
+  ruff clean.
+- **Relationship to the "time travel" snapshot picker: two separate,
+  clearly-labeled entry points**, Keith's call - not merged/unified.
+
+**Not yet built**: the offset value is now configured and verified
+parseable, but nothing reads it into the dashboard build yet, and none
+of Thread C's actual UI (as-of date picker, URL param persistence,
+"no data available" below-threshold state) or querying logic (how the
+dashboard computes/displays state "as of" an arbitrary past date
+against committed history) exists yet - a genuinely separate, larger
+piece of work from configuring the one number.
 
 ## Build order
 
