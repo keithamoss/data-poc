@@ -687,6 +687,58 @@ with real time the same way the existing Jan/Apr/Jul/Oct boundaries
 already do) - not built, pending Keith confirming he still wants it now
 that the header-label explanation accounts for what he saw.
 
+**Resolved, same day: Keith confirmed CP's real latest supply
+(`2026-07-01`) is already what he wanted** ("make that the 1st of
+July, not August") - the design-fork question above is moot, no
+generator change needed.
+
+**Corrected, same day: a real, second gap in "no data available" - not
+covered by anything above.** Keith actually tested the live picker
+(not just read the header) and set as-of to `2026-09-16` on Child
+Protection, expecting "no data" - got CP's real (accurate,
+2.5-months-old) July data instead, i.e. "it's like it's still showing
+me the last run somehow." Root cause, confirmed via `AskUserQuestion`
+before touching code (a prior guess on this exact feature - the
+run-date-derived default basis, corrected above - had already gone
+wrong once, so this one wasn't assumed): `clipDatasetToAsOf()`'s "no
+data" state only ever fired when literally NO run existed at or before
+the picked date - correct as far as it went, but that only naturally
+happens before a dataset's very first-ever run, which for a quarterly
+dataset queried anywhere near "now" is nearly unreachable. That's
+backwards from Thread C's actual point: a quarterly dataset overdue
+for its next refresh should read as overdue, not silently show old
+data as if current.
+
+**Confirmed design (Keith, via AskUserQuestion): `AS_OF_OFFSET_DAYS`
+is a staleness TOLERANCE, not just an input to the default-date
+computation.** Once a dataset's most recent supply at-or-before the
+picked as-of date is itself more than `AS_OF_OFFSET_DAYS` days older
+than that picked date, the view now treats it the same as "never
+supplied" - `"no data"`, not stale-but-real numbers. `clipDatasetToAsOf()`
+gained one extra check (`daysBetween(effectiveRun.run_date,
+asOfDateStr) > AS_OF_OFFSET_DAYS`) right after finding the effective
+run, using the same `AS_OF_OFFSET_DAYS` const the default-date
+computation already reads - one number now does double duty by
+design, not two config values that happen to coincide. Both "no data"
+render paths (the dataset-detail empty state, the collapsed agency-
+table row) had their copy corrected too - the old wording ("no QA run
+exists ... at or before this date") stopped being accurate once "no
+data" could also mean "a run exists, but it's stale beyond tolerance",
+not just "never ran yet".
+
+Verified for real against Keith's own reported scenario: a headless-
+Chromium script setting as-of to `2026-09-16` confirms Child
+Protection now shows the corrected "no data" empty state (both at
+dataset-detail and agency-table-row level) while Birth Registrations
+(daily, always well within a 60-day tolerance) still shows its real
+data; the DEFAULT as-of date (today minus 60) still shows Child
+Protection's real July data too (17 days of gap, well inside
+tolerance) - confirming the fix is genuinely date-gap-driven, not a
+blanket "CP always shows no data" regression; and the pre-existing
+true-absence case (an as-of date before CP's very first-ever run)
+still correctly shows "no data" the original way. Full `uv run pytest`
+(170 passed) and `uv run ruff check .` clean.
+
 Renumbered/reorganized 2026-09-16 (Keith's own call, for ease of
 reasoning/talking about this work) - each phase still names which
 Thread(s) it corresponds to above, for reference back into the detailed

@@ -535,18 +535,32 @@ function buildRealDataset(d){
 // Thread C - cadence-aware "as of" viewing (plans/publishing-and-
 // history.md). Operates on the RAW JSON shape (same as what
 // REAL_BIRTH_REG_DATA/REAL_CP_DATA.datasets[i] already are), BEFORE
-// buildRealDataset() runs - returns either null ("no run exists at or
-// before this date" - the dataset genuinely has no data yet as of the
-// picked date) or a same-shaped-but-smaller raw object that
-// buildRealDataset() then processes completely unchanged. This is
-// deliberate: keeping the as-of logic entirely in this one function
-// means nothing downstream (buildRealDataset, every render function)
-// needs to know "as of" viewing exists at all - they just see a
-// dataset with less history than usual.
+// buildRealDataset() runs - returns either null (no data available as
+// of the picked date - see the two distinct reasons just below) or a
+// same-shaped-but-smaller raw object that buildRealDataset() then
+// processes completely unchanged. This is deliberate: keeping the as-of
+// logic entirely in this one function means nothing downstream
+// (buildRealDataset, every render function) needs to know "as of"
+// viewing exists at all - they just see a dataset with less history
+// than usual.
 function clipDatasetToAsOf(d, asOfDateStr){
   const eligibleRuns = d.runs.filter(r => r.run_date <= asOfDateStr);
-  if(!eligibleRuns.length) return null;
-  const effectiveRunId = eligibleRuns[eligibleRuns.length-1].run_id;
+  if(!eligibleRuns.length) return null; // never supplied yet as of this date
+  const effectiveRun = eligibleRuns[eligibleRuns.length-1];
+  // Staleness-TOLERANCE rule (Keith, 2026-09-16, confirmed via
+  // AskUserQuestion after picking as-of=2026-09-16 kept showing Child
+  // Protection's genuine-but-2.5-months-old July data instead of "no
+  // data"): AS_OF_OFFSET_DAYS isn't just an input to the default-date
+  // computation, it's also how stale a dataset's most recent supply is
+  // allowed to be before this view stops trusting it and shows "no
+  // data" instead. Without this, "no data" was reachable only before a
+  // dataset's very first-ever run - for a quarterly dataset queried
+  // anywhere near "now" that's nearly unreachable, exactly backwards
+  // from Thread C's whole point (a quarterly dataset overdue for its
+  // next refresh should read as overdue, not silently show old data as
+  // if it were current).
+  if(AS_OF_OFFSET_DAYS!=null && daysBetween(effectiveRun.run_date, asOfDateStr) > AS_OF_OFFSET_DAYS) return null;
+  const effectiveRunId = effectiveRun.run_id;
   const prevRunId = eligibleRuns.length>1 ? eligibleRuns[eligibleRuns.length-2].run_id : null;
   const eligibleRunIds = new Set(eligibleRuns.map(r=>r.run_id));
 
@@ -769,6 +783,10 @@ function addDaysToDateStr(dateStr, days){
   const d = new Date(dateStr+"T00:00:00Z");
   d.setUTCDate(d.getUTCDate()+days);
   return toDateStr(d);
+}
+function daysBetween(earlierDateStr, laterDateStr){
+  const a = new Date(earlierDateStr+"T00:00:00Z"), b = new Date(laterDateStr+"T00:00:00Z");
+  return Math.round((b-a)/DAY);
 }
 // Default as-of date: the genuine live wall-clock date minus
 // AS_OF_OFFSET_DAYS (contract/data-asset.yaml, Thread D) - corrected
@@ -1177,7 +1195,7 @@ function renderAgency(view, agencyId){
             return `<tr data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
               <td><div class="dataset-name">${ds.name}</div><div class="dataset-provider">${ds.provider}</div></td>
               <td>${pill(ds.status,"sm")}</td>
-              <td colspan="3" style="color:var(--ink-faint); font-size:12.5px;">No QA run as of the selected date</td>
+              <td colspan="3" style="color:var(--ink-faint); font-size:12.5px;">No QA run within tolerance as of the selected date</td>
             </tr>`;
           }
           const arrivalPill = ds.lastArrival.onTime ? `<span class="pill green sm"><span class="ico"></span>On time</span>` : `<span class="pill red sm"><span class="ico"></span>Late</span>`;
@@ -1215,9 +1233,11 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         </div>
       </div>
       <div style="padding:40px 0; color:var(--ink-muted); font-size:14px; max-width:56ch;">
-        No QA run exists for this dataset at or before <b>${fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"))}</b> —
-        the selected "as of" date is earlier than this dataset's first computed run.
-        Pick a later date, or reset to the default, using the 📅 As of control above.
+        No QA run within the accepted freshness window as of <b>${fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"))}</b> —
+        either this dataset hadn't been supplied yet by that date, or its most
+        recent supply by then is older than the data asset's staleness
+        tolerance (${AS_OF_OFFSET_DAYS} days). Pick a later date, or reset to
+        the default, using the 📅 As of control above.
       </div>
     `;
     return;
