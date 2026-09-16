@@ -17,14 +17,17 @@ from datetime import datetime, timezone
 from dashboard import snapshot_dashboard
 
 
-def _write_fake_dashboard(tmp_path, content: str = "<html>fake dashboard</html>"):
+def _write_fake_dashboard(tmp_path, content: str = "<html>fake dashboard</html>\nconst SNAPSHOT_MANIFEST = [];\n"):
     html_path = tmp_path / "qa-reporting-dashboard.html"
     html_path.write_text(content)
     return html_path
 
 
 def test_take_snapshot_round_trips_to_identical_bytes(tmp_path):
-    html_path = _write_fake_dashboard(tmp_path, "<html>hello world</html>")
+    html_path = _write_fake_dashboard(tmp_path, "<html>hello world</html>\nconst SNAPSHOT_MANIFEST = [];\n")
+    original_bytes = html_path.read_bytes()  # captured BEFORE take_snapshot - it re-embeds
+    # the manifest into html_path afterward (see test_take_snapshot_re_embeds_manifest_into_html_path
+    # below), so html_path itself is no longer a reliable source of "what got archived" post-call.
     snapshots_dir = tmp_path / "snapshots"
 
     out_path = snapshot_dashboard.take_snapshot(html_path=html_path, snapshots_dir=snapshots_dir)
@@ -32,8 +35,8 @@ def test_take_snapshot_round_trips_to_identical_bytes(tmp_path):
     assert out_path.exists()
     with gzip.open(out_path, "rb") as f:
         recovered = f.read()
-    assert recovered == html_path.read_bytes(), \
-        "gunzipping a snapshot must reproduce the original HTML byte-for-byte"
+    assert recovered == original_bytes, \
+        "gunzipping a snapshot must reproduce the ORIGINAL (pre-snapshot) HTML byte-for-byte"
 
 
 def test_take_snapshot_filename_has_no_windows_unsafe_characters(tmp_path):
@@ -63,7 +66,8 @@ def test_take_snapshot_uses_the_given_timestamp(tmp_path):
 
 
 def test_take_snapshot_appends_a_manifest_entry(tmp_path):
-    html_path = _write_fake_dashboard(tmp_path, "<html>abc</html>")
+    html_path = _write_fake_dashboard(tmp_path, "<html>abc</html>\nconst SNAPSHOT_MANIFEST = [];\n")
+    original_size = len(html_path.read_bytes())
     snapshots_dir = tmp_path / "snapshots"
 
     out_path = snapshot_dashboard.take_snapshot(html_path=html_path, snapshots_dir=snapshots_dir)
@@ -72,10 +76,57 @@ def test_take_snapshot_appends_a_manifest_entry(tmp_path):
     assert len(manifest) == 1
     entry = manifest[0]
     assert entry["file"] == out_path.name
-    assert entry["raw_size_bytes"] == len(html_path.read_bytes())
+    assert entry["raw_size_bytes"] == original_size
     assert entry["compressed_size_bytes"] == out_path.stat().st_size
     assert entry["commit_sha"]  # non-empty - either a real short sha or "nogit"
     assert entry["taken_at"]
+
+
+def test_take_snapshot_re_embeds_manifest_into_html_path(tmp_path):
+    html_path = _write_fake_dashboard(tmp_path)
+    snapshots_dir = tmp_path / "snapshots"
+    now = datetime(2026, 9, 16, 6, 0, 0, tzinfo=timezone.utc)
+
+    snapshot_dashboard.take_snapshot(html_path=html_path, snapshots_dir=snapshots_dir, now=now)
+
+    updated_html = html_path.read_text()
+    match = re.search(r"const SNAPSHOT_MANIFEST = (\[.*?\]);", updated_html)
+    assert match, "expected an updated SNAPSHOT_MANIFEST const in the live dashboard file"
+    embedded = json.loads(match.group(1))
+    on_disk_manifest = json.loads((snapshots_dir / "manifest.json").read_text())
+    assert embedded == on_disk_manifest, \
+        "the dashboard's embedded SNAPSHOT_MANIFEST must match manifest.json exactly"
+    assert len(embedded) == 1 and embedded[0]["taken_at"] == now.isoformat()
+
+
+def test_take_snapshot_embedded_manifest_does_not_include_itself_in_its_own_archive(tmp_path):
+    # A snapshot's own archived copy should reflect the manifest as it
+    # stood BEFORE that snapshot was taken - it never needs to know about
+    # itself (or, obviously, future snapshots).
+    html_path = _write_fake_dashboard(tmp_path)
+    snapshots_dir = tmp_path / "snapshots"
+    first = datetime(2026, 9, 1, 0, 0, 0, tzinfo=timezone.utc)
+    second = datetime(2026, 9, 8, 0, 0, 0, tzinfo=timezone.utc)
+
+    first_out = snapshot_dashboard.take_snapshot(html_path=html_path, snapshots_dir=snapshots_dir, now=first)
+    snapshot_dashboard.take_snapshot(html_path=html_path, snapshots_dir=snapshots_dir, now=second)
+
+    with gzip.open(first_out, "rt") as f:
+        first_archived_html = f.read()
+    match = re.search(r"const SNAPSHOT_MANIFEST = (\[.*?\]);", first_archived_html)
+    assert match, "the first snapshot's own archive should still carry its own (empty) manifest"
+    assert json.loads(match.group(1)) == [], \
+        "the first snapshot's archive must not know about the second snapshot taken after it"
+
+
+def test_take_snapshot_raises_if_manifest_placeholder_missing(tmp_path):
+    html_path = _write_fake_dashboard(tmp_path, "<html>no placeholder here</html>")
+    snapshots_dir = tmp_path / "snapshots"
+    try:
+        snapshot_dashboard.take_snapshot(html_path=html_path, snapshots_dir=snapshots_dir)
+        assert False, "expected a RuntimeError when the SNAPSHOT_MANIFEST placeholder is missing"
+    except RuntimeError as e:
+        assert "SNAPSHOT_MANIFEST" in str(e)
 
 
 def test_take_snapshot_manifest_accumulates_across_multiple_snapshots(tmp_path):

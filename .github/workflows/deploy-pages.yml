@@ -6,6 +6,16 @@ name: Deploy dashboard to GitHub Pages
 # rename: as more datasets get wired into the dashboard, this workflow
 # doesn't need to change - it just republishes whatever's in dashboard/ at
 # deploy time. See plans/wider.md action 5.
+#
+# Also decompresses every dashboard/snapshots/*.html.gz into
+# _site/snapshots/*.html at deploy time - plans/wider.md #26's "time
+# travel" picker (built into the live dashboard, dashboard/snapshot_
+# dashboard.py's own docstring has the fuller scoping rationale). Gzip
+# stays the only format actually committed to git; this decompression is
+# deploy-time only, so nothing uncompressed ever gets checked in - a
+# commit adding a snapshot.html.gz still triggers this workflow (it
+# matches dashboard/**), a harmless redeploy that republishes the same
+# index.html plus whichever new snapshot.html files are now decompressed.
 
 on:
   push:
@@ -36,8 +46,18 @@ jobs:
 
       - name: Prepare site
         run: |
-          mkdir -p _site
+          mkdir -p _site/snapshots
           cp dashboard/qa-reporting-dashboard.html _site/index.html
+          if [ -d dashboard/snapshots ]; then
+            for f in dashboard/snapshots/*.html.gz; do
+              [ -e "$f" ] || continue
+              name="$(basename "$f" .gz)"
+              gunzip -c "$f" > "_site/snapshots/$name"
+            done
+            if [ -e dashboard/snapshots/manifest.json ]; then
+              cp dashboard/snapshots/manifest.json _site/snapshots/manifest.json
+            fi
+          fi
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

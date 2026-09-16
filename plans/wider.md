@@ -1231,12 +1231,54 @@ not a schedule.
 
     `uv run pytest` (80) and `uv run ruff check .` both clean.
 
-    **Explicitly not built this round** (per round 3's build-order
-    answer): any UI for browsing/listing/opening past snapshots from the
-    live dashboard - today that's "look in `dashboard/snapshots/`,
-    gunzip the one you want, open it" by hand. A real picker (reading
-    `manifest.json`) is the natural next round once there's a real
-    handful of snapshots to browse - which there now is.
+    **Originally deferred** (per round 3's build-order answer): any UI
+    for browsing/listing/opening past snapshots from the live dashboard.
+
+    **Picker built, same day (2026-09-16), its own short round of
+    AskUserQuestion first:** confirmed it needed to work on the live
+    public GitHub Pages site now (not just from a local clone), which
+    forced a real design question - GitHub Pages can't be told to serve
+    a `.html.gz` with `Content-Encoding: gzip`, so a plain link to one
+    would just download it, not render it. Keith's own steer settled it:
+    keep gzip as the git storage format (already built, tested, no
+    reason to undo it for a marginal complexity saving), but decompress
+    at DEPLOY time so the published site serves plain `.html` files -
+    normal links, no client-side decompression JS needed at all.
+
+    Built: `.github/workflows/deploy-pages.yml`'s "Prepare site" step now
+    also gunzips every `dashboard/snapshots/*.html.gz` into `_site/
+    snapshots/*.html` (plus publishing `manifest.json` alongside, for
+    direct inspection) - nothing decompressed is ever committed to git,
+    only produced at deploy time. The picker itself lives INSIDE the
+    live dashboard (Keith's call, not a separate page) - a "🕐 Past
+    snapshots" button in the header opens a panel listing every
+    snapshot (date/time, commit SHA, compressed size), each linking to
+    its decompressed page. Deliberately reads an embedded
+    `SNAPSHOT_MANIFEST` const (re-embedded by `dashboard/snapshot_
+    dashboard.py` every time a snapshot is taken, same mechanism as
+    `embed_dashboard_data.py`'s `REAL_BIRTH_REG_DATA`/`REAL_CP_DATA`
+    replacement) rather than `fetch()`-ing `manifest.json` at runtime -
+    a fetch would silently fail under `file://` (CORS), breaking the
+    picker for exactly the offline/local-open workflow this dashboard's
+    own dev loop (and every Playwright check this session has run) has
+    depended on all along. A snapshot's own archived copy still only
+    ever reflects the manifest as it stood before that snapshot was
+    taken - it re-embeds AFTER archiving, not before, so a snapshot
+    never "knows about" itself or later snapshots.
+
+    Verified end to end with Playwright, not just unit-tested: served a
+    real simulation of the Pages deploy output (`gunzip` step run
+    locally, exactly as the workflow does it) over a local HTTP server,
+    opened the live dashboard, clicked "Past snapshots" (4 rows shown,
+    correctly formatted), clicked "Open" on one, and confirmed the
+    resulting new tab actually rendered the archived page - real title,
+    real card count, zero console errors, correct decompressed URL.
+    Checked both color schemes render legibly. 6 new/updated tests in
+    `tests/test_snapshot_dashboard.py` (12 total) cover the manifest
+    re-embedding: it matches `manifest.json` exactly, a snapshot's own
+    archive excludes itself, and a missing `SNAPSHOT_MANIFEST`
+    placeholder raises a clear error rather than silently doing nothing.
+    83 tests pass repo-wide; `uv run ruff check .` clean.
 
     **Important clarification, same day (2026-09-16) - Keith's own
     correction, checked and confirmed before writing anything further:**

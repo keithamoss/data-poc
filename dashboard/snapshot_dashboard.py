@@ -39,15 +39,32 @@ alone:
   and "a developer iterating on code" (every regeneration uses the same
   script) - Keith's own call was a manual toggle rather than guessing at
   an automatic signal that doesn't actually exist here yet.
-- Picker/browse UI for opening past snapshots is explicitly NOT part of
-  this build - scoped as a separate, later follow-up once snapshots
-  actually exist to browse.
+- Picker/browse UI (added 2026-09-16, a separate later round once real
+  snapshots existed to browse): built INTO the live dashboard itself
+  (`#snapshots-panel` in qa-reporting-dashboard.html), not a standalone
+  page - Keith's own call. It reads a `SNAPSHOT_MANIFEST` const embedded
+  directly into the dashboard HTML (this module re-embeds it every time
+  a snapshot is taken - see `_embed_snapshot_manifest` below), not
+  fetched at runtime: `fetch('manifest.json')` would silently fail under
+  file:// (CORS), breaking the picker for exactly the offline/local-open
+  workflow this project's own dev loop already depends on. Each entry
+  links to a plain `snapshots/<name>.html` - resolves on the published
+  GitHub Pages site (`.github/workflows/deploy-pages.yml` decompresses
+  every `.html.gz` into `_site/snapshots/` at deploy time specifically
+  for this - gzip stays the only format actually committed to git;
+  nothing decompressed is ever checked in), but 404s if the dashboard is
+  opened locally via file:// straight from a clone, since `dashboard/
+  snapshots/` only ever holds the gzipped originals there - known,
+  accepted: this picker was explicitly scoped "needs to work on the live
+  public site now", not local convenience (`gunzip` still works locally,
+  same as before this existed).
 """
 from __future__ import annotations
 
 import gzip
 import json
 import os
+import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -89,7 +106,15 @@ def take_snapshot(html_path: Path = DASHBOARD_HTML, snapshots_dir: Path = SNAPSH
     without touching the real dashboard file or writing into the real
     repo's snapshots directory - see tests/test_snapshot_dashboard.py.
     Returns the path written; raises FileNotFoundError if `html_path`
-    doesn't exist yet (embed_dashboard_data.py hasn't run)."""
+    doesn't exist yet (embed_dashboard_data.py hasn't run).
+
+    Side effect on `html_path` itself, not just `snapshots_dir`: after
+    archiving, this also re-embeds the updated snapshot manifest back
+    into `html_path` (its `SNAPSHOT_MANIFEST` const) so the live
+    dashboard's own "past snapshots" picker panel immediately knows
+    about the one just taken - see `_embed_snapshot_manifest`. Requires
+    `html_path` to already contain a `const SNAPSHOT_MANIFEST = ...;`
+    placeholder line; raises if it doesn't."""
     if not html_path.exists():
         raise FileNotFoundError(
             f"{html_path} doesn't exist - run dashboard/embed_dashboard_data.py first "
@@ -106,27 +131,60 @@ def take_snapshot(html_path: Path = DASHBOARD_HTML, snapshots_dir: Path = SNAPSH
     with gzip.open(out_path, "wb") as f:
         f.write(html_bytes)
 
-    _append_manifest_entry(snapshots_dir, {
+    manifest = _append_manifest_entry(snapshots_dir, {
         "file": name,
         "taken_at": now.isoformat(),
         "commit_sha": sha,
         "raw_size_bytes": len(html_bytes),
         "compressed_size_bytes": out_path.stat().st_size,
     })
+    # Re-embed AFTER archiving, not before: html_bytes above is exactly
+    # what existed before this snapshot (including whatever
+    # SNAPSHOT_MANIFEST it already had) - this snapshot's own archive
+    # correctly reflects only the snapshots that existed BEFORE it, and
+    # the live file on disk gets the freshly updated list, including
+    # itself, so the picker can link to it going forward.
+    _embed_snapshot_manifest(html_path, manifest)
     return out_path
 
 
-def _append_manifest_entry(snapshots_dir: Path, entry: dict) -> None:
+def _append_manifest_entry(snapshots_dir: Path, entry: dict) -> list:
     """A plain, minimal record of what's been snapshotted - bookkeeping
     for this script itself (and something tests/test_snapshot_dashboard.py
     can assert against), NOT the cross-snapshot query/comparison feature
-    the module docstring explains was scoped OUT of this build. A future
-    picker UI (deliberately not built here) would likely read this rather
-    than re-deriving it by listing the directory."""
+    the module docstring explains was scoped OUT of this build. The
+    picker UI reads this list too (via the embedded copy - see
+    `_embed_snapshot_manifest`), rather than re-deriving it by listing
+    the directory. Returns the full, updated manifest."""
     manifest_path = snapshots_dir / "manifest.json"
     manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else []
     manifest.append(entry)
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+    return manifest
+
+
+def _embed_snapshot_manifest(html_path: Path, manifest: list) -> None:
+    """Regenerates the `const SNAPSHOT_MANIFEST = [...];` line inside
+    `html_path` - same mechanism as dashboard/embed_dashboard_data.py's
+    REAL_BIRTH_REG_DATA/REAL_CP_DATA replacement (a single-line const,
+    regex-replaced with a lambda substitution so any special characters
+    already in the JSON are never reinterpreted as regex backreferences).
+    Kept here rather than in embed_dashboard_data.py since this is
+    specifically about snapshot bookkeeping, not the real-tool results
+    that module embeds - see the module docstring for why this is
+    embedded rather than fetched at runtime."""
+    html = html_path.read_text()
+    manifest_json = json.dumps(manifest, separators=(",", ":"))
+    new_line = f"const SNAPSHOT_MANIFEST = {manifest_json};\n"
+
+    pattern = re.compile(r"const SNAPSHOT_MANIFEST = .*?;\n")
+    html, n = pattern.subn(lambda _m: new_line, html, count=1)
+    if n != 1:
+        raise RuntimeError(
+            f"Could not find exactly one 'const SNAPSHOT_MANIFEST = ...;' line in {html_path} "
+            f"to replace (found {n}) - has the dashboard's structure changed?"
+        )
+    html_path.write_text(html)
 
 
 def main() -> None:
