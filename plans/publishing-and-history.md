@@ -312,6 +312,32 @@ CHECK_LIFECYCLE = {
   item's own text: embed the source snippet at generation time, or a
   simpler static mapping keyed by check_id now that one reliably
   exists.
+- **Un-retiring a check leaves a misleading gap in its trend chart,
+  not a visible break** (Keith's question, 2026-09-16: "would it just
+  work, or would it blow things up?"). Mechanically nothing blows up -
+  moving a check_id back from its tool's `-retired` sibling file into
+  the active one is clean against `validate()` (config_hash excludes
+  `retired_as_of`/`retired_reason`, so un-retiring alone needs no new
+  changelog entry unless the underlying threshold also changed), and
+  the real tool just resumes evaluating it from the next run. The gap
+  is in what's rendered: while retired, the check has literally no
+  result in any run's `qa_results/` output (not a placeholder - the
+  entry doesn't exist), so its `history` array jumps straight from the
+  last pre-retirement point to the first post-un-retirement one. Traced
+  the actual chart code (`dashboard/qa-reporting-dashboard.html`'s
+  `trendChart()`, the `xs()` position function) to check, not assumed:
+  points are positioned by ARRAY INDEX, not real elapsed time, so
+  today's chart would draw that gap as an ordinary unbroken line
+  between two "adjacent" points - visually implying continuous
+  reporting straight through the retired period, the opposite of a
+  visible break. Same root cause as the breaking-change gap styling
+  above (an index-based x-axis with no concept of real time between
+  points) - Keith's call: fold "retirement gap" into that same
+  not-yet-designed piece of work rather than treating it separately,
+  since a fix for one likely fixes both (a date-based x-axis, or at
+  minimum a real-time-aware gap/break marker between two history
+  points whose dates are further apart than the dataset's own normal
+  run cadence).
 
 ## Thread A - publishing (build after B/D's data format exists)
 
