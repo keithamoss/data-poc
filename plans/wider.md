@@ -1271,6 +1271,27 @@ not a schedule.
     than a handful of nearby points - worth doing eventually, not a
     priority while the feature's job is proving the mechanism works.
 
+    **Added 2026-09-16, same "when we come back to generating more
+    history" follow-up:** also tackle a genuinely different resupply
+    cadence between the two datasets at that point - one dataset daily,
+    the other quarterly. Today's actual cadences, for context:
+    `generate_runs.py` (BDM) already generates daily scheduled
+    deliveries; `generate_cp_runs.py` (Child Protection) generates
+    WEEKLY snapshots, not quarterly (its own docstring: "Child
+    Protection isn't a daily event feed, it's a periodic full extract of
+    the same underlying casework collection... re-extracted 10 times as
+    weekly snapshots"). Read this as widening that existing gap, not
+    introducing a third cadence - CP's own framing as "a periodic full
+    extract" already fits a quarterly re-extract at least as naturally
+    as a weekly one, arguably more so for a real casework/investigation
+    collection. A quarterly cadence would also make deepening simulated
+    history (the paragraph above) matter more directly: getting even 10
+    quarterly runs needs ~2.5 years of simulated calendar time, a much
+    more meaningful stress test of "does time travel actually work over
+    a long, sparse history" than 10 weekly runs (~10 weeks) does today.
+    Not yet scoped - revisit together with the history-depth work above,
+    not in isolation.
+
 27. **[parked]** Versioning the checks themselves, with that version
     flowing through to the results/data each check run captures - Keith's
     own framing, raised right after item 26's time-travel build: "a
