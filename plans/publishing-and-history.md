@@ -813,6 +813,92 @@ against the real repo: `validate_check_lifecycle.py` reports 258 checks,
 zero errors, with all 7 (currently-empty) retired files wired in. Full
 pytest (162 tests) + ruff clean.
 
+**Built, 2026-09-16 (same day): `check_id` propagated into every real
+check RESULT record, all 8 `run_*.py` modules, all 4 tools - the actual
+Phase 4 prerequisite the check_id-permanence and singular-test-gap work
+above both grew out of.** Before this, `check_id` existed only in check
+DEFINITIONS (schema.yml's `meta:`, the Soda/contract YAML's
+`attributes:`/`customProperties:`, Evidently's `CHECK_LIFECYCLE` dict) -
+never on the RESULT dicts `evaluate_*()` builds and `write_qa_result()`
+commits, so nothing downstream could join a specific result back to its
+own check's lifecycle metadata. Verified each tool's join mechanism for
+real before wiring it in, not assumed:
+- **dbt**: no reliable manifest-based join exists - confirmed
+  empirically (again, see the singular-test-gap entry above) that a
+  test's `meta`/`config.meta` doesn't survive into the compiled
+  manifest. `check_lifecycle.dbt_check_id_lookup(schema_yml_path)`
+  reads `schema.yml` directly instead, building a lookup keyed on
+  `(model, column_or_None, test_type_or_singular_name)` - `run_dbt_bdm.
+  py`/`run_dbt_cp.py` look their own result up in it at write time.
+  **A real bug found wiring this in, not a design gap**: the lookup's
+  original key (from the singular-test-gap build, `(column, test_type)`
+  with no model) collided across datasets - both `stg_birth_
+  registrations` and `stg_cp_clients` have a `date_of_birth` column with
+  an `accepted_range` test, and schema.yml holds every model in one
+  file, so the second one parsed silently overwrote the first's
+  check_id. A real BDM result came back tagged with CP's check_id
+  before this was caught (checked directly, not assumed - see
+  `plans/qa-pipeline.md` item 50's neighbour entry for the full
+  account). Fixed by adding `model` to the key. A second, smaller bug in
+  the same function: schema.yml's own key for a cross-package macro is
+  qualified (`dbt_utils.accepted_range`), but dbt's compiled manifest
+  reports that test's name UNqualified (`test_metadata["name"] ==
+  "accepted_range"`) - the lookup now strips the package prefix to
+  match.
+- **Soda**: real scan results carry `resourceAttributes` (a list of
+  `{name, value}` pairs, confirmed against a real scan output) directly
+  on each check - no cross-check lookup needed, no collision risk (each
+  result already knows its own attributes).
+  `soda_common.check_id_from_resource_attributes()`.
+- **datacontract-cli**: real `Run.checks[]` entries carry
+  `qualityDefinition` - a YAML string dump of the original rule,
+  `customProperties` included (confirmed against a real
+  `DataContract.test()` run) - parsed the same way check_lifecycle.py's
+  own `_custom_properties_to_dict()` reads the contract file directly,
+  just from a string instead of an already-loaded dict.
+  `datacontract_common.check_id_from_quality_definition()`.
+- **Evidently**: trivial, as expected - each dataset's own
+  `evidently_check_lifecycle.py` now exports its check_id(s) as named
+  constants (`PSI_CHECK_ID`, BDM also gets `ROW_COUNT_GROWTH_CHECK_ID`),
+  imported directly into `run_evidently_*.py` rather than duplicating
+  the literal string in two places.
+
+Every one of the 4 result-construction functions now fails loudly
+(`ValueError`, not a silent `None`) if a real check somehow produces no
+check_id - matches this codebase's established fail-loud convention
+(`MissingCheckIdError`, `MissingGitIdentityError`) rather than letting
+a lookup miss surface later as a confusing downstream gap.
+
+**Verified via a real, full 3rd regeneration of `qa_results/` (both
+datasets), not just unit tests**: `orchestrate_bdm.py` (6884 results,
+4655 pass/373 warn/1856 fail) and `orchestrate_cp.py` (2832 results,
+2332 pass/123 warn/377 fail) - identical distributions to the
+pre-check_id regeneration. Diffed every regenerated file against the
+previously-committed version across all 505 files: every one of the
+9,716 real check results now carries a non-null `check_id`, and the
+only fields that changed anywhere were `run_timestamp` (expected,
+every real run) and, in 13 of BDM's `datacontract.json` files, the
+*order* (not content) of `failing_sample_keys` - a genuine, pre-
+existing nondeterminism in datacontract-cli's own sample ordering
+(same 5 values, different position - same class of already-documented,
+accepted nondeterminism as dbt's own `plans/qa-pipeline.md` items
+34/38, just not previously visible since no earlier regeneration had
+diffed this finely against itself). Full pytest (166 tests, +4 new:
+2 for the model-collision bug, 1 for the package-prefix-stripping bug,
+1 for the CP Evidently write-path bug already logged separately) +
+ruff clean, `check_lifecycle.validate()` unaffected (result records
+were never part of what it validates - only check definitions).
+
+**Still not built**: this only gets `check_id` onto every result
+record - nothing downstream (the dashboard-data builders, the
+dashboard's own JS) reads or uses it yet. That, plus the genuinely
+separate full-per-run-stats-fidelity gap in `pipeline/build_dashboard_
+data.py`/`build_cp_dashboard_data.py` (today's `stats.current`/
+`stats.previous` - valueCounts, arrival, row counts - are hardcoded to
+just the latest two runs, not every run the way `checks[].history`
+already is), is the remaining Phase 4 prerequisite work before Thread
+C's actual as-of picker UI can be built.
+
 **Phase 2 (Thread B - dashboard pipeline's read side) - [DONE,
 2026-09-16]:**
 - The dashboard pipeline's "read all committed history, merge, reshape"

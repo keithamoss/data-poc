@@ -1,8 +1,8 @@
 {
-  "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+  "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
   "run_by": null,
   "raw_output": {
-    "runId": "8781936f-552f-436d-9b8c-e74d70acb72a",
+    "runId": "1e91548d-6ece-4173-a3f4-df79d69326b8",
     "datacontractCliVersion": "1.2.0",
     "dataContractId": "bdm-birth-registrations",
     "dataContractVersion": "1.0.0",
@@ -10,13 +10,13 @@
     "outputPortId": null,
     "server": "local_test",
     "filters": null,
-    "timestampStart": "2026-09-16 14:00:50.865563+00:00",
-    "timestampEnd": "2026-09-16 14:01:00.530419+00:00",
+    "timestampStart": "2026-09-16 22:23:46.057771+00:00",
+    "timestampEnd": "2026-09-16 22:23:52.409115+00:00",
     "result": "failed",
     "dryRun": false,
     "checks": [
       {
-        "id": "38d38c8c-fe33-49e8-8d0c-b78eca8c7cc5",
+        "id": "8d6a955e-2708-4301-b727-ed3b2dcbbebd",
         "key": "birth_registrations__registration_number__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -40,7 +40,7 @@
         "failedSamples": null
       },
       {
-        "id": "4f52808a-6b19-4eac-8e71-9e31441278ba",
+        "id": "16ca0421-40aa-44b1-b1dc-6aa8e68826cd",
         "key": "birth_registrations__registration_number__field_required",
         "category": "schema",
         "type": "field_required",
@@ -94,7 +94,7 @@
         ]
       },
       {
-        "id": "760e4ba7-86be-42fe-8c05-487f0c5d6107",
+        "id": "35d280cd-f000-4781-b366-c8f21739166b",
         "key": "birth_registrations__registration_number__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -120,51 +120,51 @@
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-880184880",
+            "registration_number": null,
+            "duplicate_count": 4
+          },
+          {
+            "registration_number": "BDM-846722705",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-572299469",
+            "registration_number": "BDM-341772147",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-584713514",
+            "registration_number": "BDM-795217914",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-460161542",
-            "duplicate_count": 2
-          },
-          {
-            "registration_number": "BDM-388617001",
+            "registration_number": "BDM-222796870",
             "duplicate_count": 2
           }
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-880184880",
+            "registration_number": null,
+            "duplicate_count": 4
+          },
+          {
+            "registration_number": "BDM-846722705",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-572299469",
+            "registration_number": "BDM-341772147",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-584713514",
+            "registration_number": "BDM-795217914",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-460161542",
-            "duplicate_count": 2
-          },
-          {
-            "registration_number": "BDM-388617001",
+            "registration_number": "BDM-222796870",
             "duplicate_count": 2
           }
         ]
       },
       {
-        "id": "8bf01169-e919-4c01-9ead-00013ce71b4a",
+        "id": "7e86af08-ee2f-4b9b-8b6a-3372815c416f",
         "key": "birth_registrations__registration_number__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -219,7 +219,7 @@
         ]
       },
       {
-        "id": "25747cb1-7109-4d8b-9113-e0303eded461",
+        "id": "3b5a51cf-351c-4644-bcc2-b620e5007e07",
         "key": "birth_registrations__registration_number__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -250,7 +250,7 @@
         "failedSamples": null
       },
       {
-        "id": "cfeced82-ff4e-4319-9bf4-1e7a5802f3ae",
+        "id": "29e14a19-f9dd-424c-9518-23e4fb754213",
         "key": "birth_registrations__registration_number__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -321,7 +321,7 @@
         ]
       },
       {
-        "id": "166d9570-9a48-40ce-b66a-3a41df7d894a",
+        "id": "52001d93-053c-4318-b708-97b67f7ee9cb",
         "key": "birth_registrations__child_given_names__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -345,7 +345,7 @@
         "failedSamples": null
       },
       {
-        "id": "27002b7d-d1d8-4103-be40-ab60a77f1207",
+        "id": "29631d82-c2d0-4657-afe9-23df26e24b53",
         "key": "birth_registrations__child_given_names__field_required",
         "category": "schema",
         "type": "field_required",
@@ -372,7 +372,7 @@
         "failedSamples": null
       },
       {
-        "id": "b987c467-b3e0-40f3-9f4f-1ffa3f659ad9",
+        "id": "20906915-f052-4181-a25a-fc52c7fbc354",
         "key": "birth_registrations__child_given_names__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -402,7 +402,7 @@
         "failedSamples": null
       },
       {
-        "id": "0f9423bc-f9da-429d-a4ae-afaf3d14c191",
+        "id": "5c7ad72c-f967-4ca2-911c-f68babdfd5aa",
         "key": "birth_registrations__child_given_names__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -466,7 +466,7 @@
         ]
       },
       {
-        "id": "1fdce2e3-c23d-4754-b3ac-38cc4f7c65b4",
+        "id": "46aa6329-1228-410f-ad48-8190bcc12d86",
         "key": "birth_registrations__child_family_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -490,7 +490,7 @@
         "failedSamples": null
       },
       {
-        "id": "f64aaf11-ac98-436a-9ebe-468d266ca04a",
+        "id": "73d188f6-730f-43ba-a8f7-f4eaeab85e9b",
         "key": "birth_registrations__child_family_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -517,7 +517,7 @@
         "failedSamples": null
       },
       {
-        "id": "902c9de7-d7cb-40b0-8db5-dd233c52e76e",
+        "id": "e6b6edb9-a089-4b0c-9c89-220188b84d75",
         "key": "birth_registrations__child_family_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -547,7 +547,7 @@
         "failedSamples": null
       },
       {
-        "id": "b3aab0a9-24a5-47c7-9f72-10ccf1f768d4",
+        "id": "cdde13f7-1ea3-423f-bd89-a6ff4b5a4fb7",
         "key": "birth_registrations__child_family_name__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -611,7 +611,7 @@
         ]
       },
       {
-        "id": "da77508b-d242-44bd-b7ae-728454df5e54",
+        "id": "78fcb2a9-8ffc-470f-a788-64affd73c0e7",
         "key": "birth_registrations__date_of_birth__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -635,7 +635,7 @@
         "failedSamples": null
       },
       {
-        "id": "7468f257-567b-44e8-93a6-3a1bd4a0a247",
+        "id": "f72d901b-270c-4a42-a9a9-0f8ec399067c",
         "key": "birth_registrations__date_of_birth__field_required",
         "category": "schema",
         "type": "field_required",
@@ -705,7 +705,7 @@
         ]
       },
       {
-        "id": "46680cec-9b31-406b-8239-8c2dbcca8087",
+        "id": "7371631a-cf53-4d37-a216-d21e0b0f149d",
         "key": "birth_registrations__date_of_birth__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -776,7 +776,7 @@
         ]
       },
       {
-        "id": "806fdf48-8045-4f3c-a96c-9302369a2d4c",
+        "id": "46de53c2-4416-4f45-9d43-c56a11b7f08a",
         "key": "birth_registrations__date_of_birth__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -802,7 +802,7 @@
         "failedSamples": null
       },
       {
-        "id": "0ef4a293-215c-4eaf-a1c4-e66cfac204a4",
+        "id": "2322e6a5-528f-4066-a494-d3818c75600c",
         "key": "birth_registrations__date_of_birth__quality_sql_2",
         "category": "quality",
         "type": "field_quality_sql",
@@ -828,7 +828,7 @@
         "failedSamples": null
       },
       {
-        "id": "eb5596d4-5fcc-4bc6-9e13-52c795fb336d",
+        "id": "d84741cd-3432-4444-98bd-892b335eeaf8",
         "key": "birth_registrations__sex__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -852,7 +852,7 @@
         "failedSamples": null
       },
       {
-        "id": "b0cab8d3-02ef-4c27-9576-08bb4d0b4238",
+        "id": "aa739ac8-6f34-499a-bafa-8363128c0db7",
         "key": "birth_registrations__sex__field_required",
         "category": "schema",
         "type": "field_required",
@@ -879,7 +879,7 @@
         "failedSamples": null
       },
       {
-        "id": "5e4826b7-79e6-4bf3-90e2-dad4f237b24a",
+        "id": "e15d3343-17cd-4eac-9769-87c94630c132",
         "key": "birth_registrations__sex__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -957,7 +957,7 @@
         ]
       },
       {
-        "id": "bf817518-7624-4da5-9a54-7d8a6a9dbbc0",
+        "id": "fb22f3b8-90e7-411f-9731-0db3103aa452",
         "key": "birth_registrations__place_of_birth_suburb__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -981,7 +981,7 @@
         "failedSamples": null
       },
       {
-        "id": "38640ecf-0f7c-4cd4-b32e-77212196ab28",
+        "id": "e4a6b7ae-d20f-4e9e-b8c2-f02c28acfa9c",
         "key": "birth_registrations__place_of_birth_suburb__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1008,7 +1008,7 @@
         "failedSamples": null
       },
       {
-        "id": "fa0d144d-94b8-4db4-9757-3891bcc194b3",
+        "id": "043ff13b-e7ce-41f0-b26e-71da117fa3ba",
         "key": "birth_registrations__place_of_birth_suburb__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1038,7 +1038,7 @@
         "failedSamples": null
       },
       {
-        "id": "5b3a6b75-3933-40f3-b5cb-e854424a31b2",
+        "id": "e8ba8838-ddae-4abb-a710-768df36a754b",
         "key": "birth_registrations__place_of_birth_suburb__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1164,7 +1164,7 @@
         ]
       },
       {
-        "id": "53a574bd-1301-425c-98e6-8a36a732d4e1",
+        "id": "ef3c2bc5-4d2d-4244-b319-d1670a2d5ef9",
         "key": "birth_registrations__place_of_birth_facility__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1188,7 +1188,7 @@
         "failedSamples": null
       },
       {
-        "id": "651dfa23-b2d1-497f-8b84-0842643dd56e",
+        "id": "4d52b940-e163-4127-ae32-0dfebefb82fa",
         "key": "birth_registrations__place_of_birth_facility__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1261,7 +1261,7 @@
         ]
       },
       {
-        "id": "f839be5c-4332-40b7-94e6-f46e1dc4b11b",
+        "id": "b9c47636-2716-4c77-afff-5661afc749ea",
         "key": "birth_registrations__date_registered__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1285,7 +1285,7 @@
         "failedSamples": null
       },
       {
-        "id": "c4f51308-9907-4fbb-86bc-1081c1e48f08",
+        "id": "90d163c0-9699-4f5d-88c9-2cc0d62b13f8",
         "key": "birth_registrations__date_registered__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1355,7 +1355,7 @@
         ]
       },
       {
-        "id": "b1b018d2-0f97-481f-97cc-39e1e1cf1108",
+        "id": "da52c18a-ba07-4f90-8c70-6c62da751483",
         "key": "birth_registrations__date_registered__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1426,7 +1426,7 @@
         ]
       },
       {
-        "id": "a4cb6b31-d1a9-465d-bd46-8f706f39e7ba",
+        "id": "d8b3085b-a43d-43be-82da-1d4a3cefb7ad",
         "key": "birth_registrations__date_registered__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -1452,7 +1452,7 @@
         "failedSamples": null
       },
       {
-        "id": "f9050edb-b5a7-4a90-a18b-1505f49cb0f7",
+        "id": "3a99b294-be65-4c36-aa4b-82c202654759",
         "key": "birth_registrations__registering_parent_1_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1476,7 +1476,7 @@
         "failedSamples": null
       },
       {
-        "id": "f82b8398-89cb-4fc1-b712-f01d93f6d9ca",
+        "id": "d09ed610-0244-44ab-b20c-8231186b6f41",
         "key": "birth_registrations__registering_parent_1_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1506,7 +1506,7 @@
         "failedSamples": null
       },
       {
-        "id": "37c3798d-15b0-4170-830a-963f25849706",
+        "id": "0eb64299-6898-44ac-b4d1-3f3d20747324",
         "key": "birth_registrations__registering_parent_1_name__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1570,7 +1570,7 @@
         ]
       },
       {
-        "id": "7333fe6d-f602-4438-a6f3-90a062a4b9c0",
+        "id": "9cceb7dd-08d3-40b3-bdee-2b9a3086c1bf",
         "key": "birth_registrations__registering_parent_2_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1594,7 +1594,7 @@
         "failedSamples": null
       },
       {
-        "id": "41ead588-45de-491f-a462-e8bc46cb1922",
+        "id": "2a10c469-cdf5-4c31-a78b-f441c8c85217",
         "key": "birth_registrations__registering_parent_2_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1624,7 +1624,7 @@
         "failedSamples": null
       },
       {
-        "id": "b7d1b8a0-2d80-4c2c-8c0a-ead56edf1a4f",
+        "id": "b04c7bd4-6c92-40bd-979f-a55f289fed92",
         "key": "birth_registrations__registering_parent_2_name__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1688,7 +1688,7 @@
         ]
       },
       {
-        "id": "0248c898-602c-44b1-8625-fe73e670034b",
+        "id": "4d601943-3802-495b-8fd9-0b6ba01a90fb",
         "key": "birth_registrations__is_multiple_birth__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1712,7 +1712,7 @@
         "failedSamples": null
       },
       {
-        "id": "65c56d27-eee8-48d3-9102-be59b3fd75eb",
+        "id": "1e45360d-a866-4078-824e-2d3c61e442b3",
         "key": "birth_registrations__is_multiple_birth__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1782,7 +1782,7 @@
         ]
       },
       {
-        "id": "7bdf5108-0b86-496c-bac1-556b1626dbb8",
+        "id": "fff9fc89-b39c-46a5-8472-c44b2859dfd2",
         "key": "birth_registrations__is_multiple_birth__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1853,7 +1853,7 @@
         ]
       },
       {
-        "id": "366cb99a-95df-41e6-9ae9-9f81a5a2a58b",
+        "id": "fe9d7d38-c1f6-4bdb-86bb-94a7b8c072e7",
         "key": "birth_registrations__is_multiple_birth__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -1879,7 +1879,7 @@
         "failedSamples": null
       },
       {
-        "id": "d9aa51e8-b96a-4731-a932-12251eeaa607",
+        "id": "c94788f0-007d-4800-99b5-2091baf2e93a",
         "key": "birth_registrations__source_system_record_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1903,7 +1903,7 @@
         "failedSamples": null
       },
       {
-        "id": "9f36fb2f-0a48-48d4-b93f-defa9d7c3022",
+        "id": "932b832a-41a5-460f-b0f4-8be9024cabc3",
         "key": "birth_registrations__source_system_record_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1965,7 +1965,7 @@
         ]
       },
       {
-        "id": "a724638e-9c6d-4a59-a718-20766459d466",
+        "id": "04e55d0b-aded-4836-a1be-a8a63ae5d1de",
         "key": "birth_registrations__source_system_record_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -2036,7 +2036,7 @@
         ]
       },
       {
-        "id": "994a2c7a-6602-47dc-b270-01d2b4d246ff",
+        "id": "1546ed80-e881-466f-a5eb-01882b37cc69",
         "key": "birth_registrations__source_system_record_id__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -2110,7 +2110,7 @@
         ]
       },
       {
-        "id": "3be14241-5103-4db3-bd86-02d242efefa4",
+        "id": "79c61525-16c2-471b-bc2d-de3eb689ad66",
         "key": "birth_registrations__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2134,7 +2134,7 @@
         "failedSamples": null
       },
       {
-        "id": "b8b105e6-8ccf-4d30-aa81-50f6370d06d9",
+        "id": "1870c21b-62ea-4e9e-a194-ae3c1136bd0b",
         "key": "birth_registrations__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2204,7 +2204,7 @@
         ]
       },
       {
-        "id": "e04ec931-b38a-454f-8d31-ebcda330da5b",
+        "id": "e2bbe290-4ab3-4381-b916-f477a1fcddb9",
         "key": "birth_registrations__extract_timestamp__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2275,7 +2275,7 @@
         ]
       },
       {
-        "id": "fa34ae87-ee14-4c67-bc05-3ae44a5acc2f",
+        "id": "93270d34-d773-4141-b45c-d73a717731e1",
         "key": "birth_registrations__extract_timestamp__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -2301,7 +2301,7 @@
         "failedSamples": null
       },
       {
-        "id": "dd0653e3-70d3-40a0-86aa-3f3c6b167d5e",
+        "id": "87d3679e-2bdf-47b3-9576-8521a7319005",
         "key": "birth_registrations__row_count",
         "category": "quality",
         "type": "row_count",
@@ -2331,37 +2331,37 @@
       {
         "level": "INFO",
         "message": "Testing data contract",
-        "timestamp": "2026-09-16 14:00:50.865615+00:00"
+        "timestamp": "2026-09-16 22:23:46.057817+00:00"
       },
       {
         "level": "INFO",
         "message": "Data Contract CLI 1.2.0 running as CLI locally",
-        "timestamp": "2026-09-16 14:00:50.871666+00:00"
+        "timestamp": "2026-09-16 22:23:46.059088+00:00"
       },
       {
         "level": "INFO",
         "message": "Running tests for data contract bdm-birth-registrations with server local_test",
-        "timestamp": "2026-09-16 14:00:51.543161+00:00"
+        "timestamp": "2026-09-16 22:23:46.384358+00:00"
       },
       {
         "level": "INFO",
         "message": "Running checks with ibis",
-        "timestamp": "2026-09-16 14:00:51.565105+00:00"
+        "timestamp": "2026-09-16 22:23:46.410056+00:00"
       },
       {
         "level": "INFO",
         "message": "Connecting to local csv via duckdb",
-        "timestamp": "2026-09-16 14:00:51.565129+00:00"
+        "timestamp": "2026-09-16 22:23:46.410076+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table birth_registrations for /home/user/data-poc/qa_tools/bdm/../../data/raw/run_09_2026-07-27_resupply2.csv",
-        "timestamp": "2026-09-16 14:00:51.582314+00:00"
+        "timestamp": "2026-09-16 22:23:46.427496+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'registration_number', 'VARCHAR', False, None, False), (1, 'child_given_names', 'VARCHAR', False, None, False), (2, 'child_family_name', 'VARCHAR', False, None, False), (3, 'date_of_birth', 'DATE', False, None, False), (4, 'sex', 'VARCHAR', False, None, False), (5, 'place_of_birth_suburb', 'VARCHAR', False, None, False), (6, 'place_of_birth_facility', 'VARCHAR', False, None, False), (7, 'date_registered', 'DATE', False, None, False), (8, 'registering_parent_1_name', 'VARCHAR', False, None, False), (9, 'registering_parent_2_name', 'VARCHAR', False, None, False), (10, 'is_multiple_birth', 'BOOLEAN', False, None, False), (11, 'source_system_record_id', 'VARCHAR', False, None, False), (12, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-16 14:00:52.573550+00:00"
+        "timestamp": "2026-09-16 22:23:47.242886+00:00"
       }
     ]
   },
@@ -2370,12 +2370,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.nullValues_datacontract",
       "column_name": "registration_number",
       "check_name": "datacontract:missing_count",
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 4,
       "unit": "count",
       "warn_threshold": null,
@@ -2396,12 +2397,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.invalidValues_datacontract",
       "column_name": "registration_number",
       "check_name": "datacontract:invalid_count",
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -2417,12 +2419,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.duplicateValues_datacontract",
       "column_name": "registration_number",
       "check_name": "datacontract:duplicate_count",
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 22,
       "unit": "count",
       "warn_threshold": null,
@@ -2444,12 +2447,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.nullValues_datacontract",
       "column_name": "child_given_names",
       "check_name": "datacontract:missing_count",
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": null,
@@ -2465,12 +2469,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.invalidValues_datacontract",
       "column_name": "child_given_names",
       "check_name": "datacontract:invalid_count",
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 32,
       "unit": "count",
       "warn_threshold": null,
@@ -2492,12 +2497,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.nullValues_datacontract",
       "column_name": "child_family_name",
       "check_name": "datacontract:missing_count",
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": null,
@@ -2513,12 +2519,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.invalidValues_datacontract",
       "column_name": "child_family_name",
       "check_name": "datacontract:invalid_count",
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 42,
       "unit": "count",
       "warn_threshold": null,
@@ -2540,12 +2547,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.nullValues_datacontract",
       "column_name": "date_of_birth",
       "check_name": "datacontract:missing_count",
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 8,
       "unit": "count",
       "warn_threshold": null,
@@ -2567,12 +2575,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.range_check_datacontract",
       "column_name": "date_of_birth",
       "check_name": "datacontract:custom_sql",
       "dimension": "conformity",
       "label": null,
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 22,
       "unit": "count",
       "warn_threshold": null,
@@ -2588,12 +2597,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.freshness_datacontract",
       "column_name": "date_of_birth",
       "check_name": "datacontract:custom_sql",
       "dimension": "timeliness",
       "label": "Freshness",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 1,
       "unit": "count",
       "warn_threshold": null,
@@ -2609,12 +2619,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.invalidValues_datacontract",
       "column_name": "sex",
       "check_name": "datacontract:invalid_count",
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 38,
       "unit": "count",
       "warn_threshold": null,
@@ -2636,12 +2647,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.nullValues_datacontract",
       "column_name": "place_of_birth_suburb",
       "check_name": "datacontract:missing_count",
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": null,
@@ -2657,12 +2669,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.invalidValues_datacontract",
       "column_name": "place_of_birth_suburb",
       "check_name": "datacontract:invalid_count",
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 30,
       "unit": "count",
       "warn_threshold": null,
@@ -2684,12 +2697,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_facility.nullValues_datacontract",
       "column_name": "place_of_birth_facility",
       "check_name": "datacontract:missing_count",
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 55.788712,
       "unit": "%",
       "warn_threshold": null,
@@ -2711,12 +2725,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_registered.nullValues_datacontract",
       "column_name": "date_registered",
       "check_name": "datacontract:missing_count",
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 7,
       "unit": "count",
       "warn_threshold": null,
@@ -2738,12 +2753,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_registered.date_ordering_datacontract",
       "column_name": "date_registered",
       "check_name": "datacontract:custom_sql",
       "dimension": "consistency",
       "label": null,
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -2759,12 +2775,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.nullValues_datacontract",
       "column_name": "registering_parent_1_name",
       "check_name": "datacontract:missing_count",
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 1.736614,
       "unit": "%",
       "warn_threshold": null,
@@ -2780,12 +2797,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.invalidValues_datacontract",
       "column_name": "registering_parent_1_name",
       "check_name": "datacontract:invalid_count",
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 26,
       "unit": "count",
       "warn_threshold": null,
@@ -2807,12 +2825,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.nullValues_datacontract",
       "column_name": "registering_parent_2_name",
       "check_name": "datacontract:missing_count",
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 25.976845,
       "unit": "%",
       "warn_threshold": null,
@@ -2828,12 +2847,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.invalidValues_datacontract",
       "column_name": "registering_parent_2_name",
       "check_name": "datacontract:invalid_count",
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 34,
       "unit": "count",
       "warn_threshold": null,
@@ -2855,12 +2875,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.nullValues_datacontract",
       "column_name": "is_multiple_birth",
       "check_name": "datacontract:missing_count",
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 6,
       "unit": "count",
       "warn_threshold": null,
@@ -2882,12 +2903,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.sibling_match_datacontract",
       "column_name": "is_multiple_birth",
       "check_name": "datacontract:custom_sql",
       "dimension": "consistency",
       "label": "Sibling record match",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 49,
       "unit": "count",
       "warn_threshold": null,
@@ -2903,12 +2925,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.duplicateValues_datacontract",
       "column_name": "source_system_record_id",
       "check_name": "datacontract:duplicate_count",
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 39,
       "unit": "count",
       "warn_threshold": null,
@@ -2924,12 +2947,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.invalidValues_datacontract",
       "column_name": "source_system_record_id",
       "check_name": "datacontract:invalid_count",
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 39,
       "unit": "count",
       "warn_threshold": null,
@@ -2951,12 +2975,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.nullValues_datacontract",
       "column_name": "extract_timestamp",
       "check_name": "datacontract:missing_count",
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 8,
       "unit": "count",
       "warn_threshold": null,
@@ -2978,12 +3003,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.timestamp_ordering_datacontract",
       "column_name": "extract_timestamp",
       "check_name": "datacontract:custom_sql",
       "dimension": "consistency",
       "label": "Timestamp ordering",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 61,
       "unit": "count",
       "warn_threshold": null,
@@ -2999,12 +3025,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.rowCount_datacontract",
       "column_name": "(table)",
       "check_name": "datacontract:row_count",
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "run_09_2026-07-27_resupply2",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 1382,
       "unit": "count",
       "warn_threshold": null,

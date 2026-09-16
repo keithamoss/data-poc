@@ -18,6 +18,7 @@ from qa_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_TH
 from qa_tools.common.csv_io import load_null_values_by_column, read_csv_explicit_nulls
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
+from .evidently_check_lifecycle import PSI_CHECK_ID
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CP_RAW_DIR = os.path.join(ROOT, "data", "cp_raw")
@@ -52,6 +53,7 @@ def evaluate_evidently_cp(run_id: str, run_timestamp: str,
         "agency_id": cp_common.AGENCY_ID,
         "collection_id": cp_common.COLLECTION_ID,
         "dataset_id": DATASET_ID,
+        "check_id": PSI_CHECK_ID,
         "column_name": "concern_type",
         "check_name": "drift:PSI",
         "dimension": "consistency",

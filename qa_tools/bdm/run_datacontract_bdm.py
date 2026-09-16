@@ -32,7 +32,7 @@ import os
 
 from qa_tools.common.datacontract_common import (
     ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
-    run_against_local_server, failing_sample_keys,
+    run_against_local_server, failing_sample_keys, check_id_from_quality_definition,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
 
@@ -90,10 +90,16 @@ def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str
 
         label = _custom_sql_label(c.name) if metric == "custom_sql" else LABEL_BY_METRIC.get(metric)
 
+        check_id = check_id_from_quality_definition(c.qualityDefinition)
+        if check_id is None:
+            raise ValueError(f"no check_id found in qualityDefinition for datacontract check {c.name!r} "
+                              f"(type={c.type!r}) - the contract is missing customProperties.check_id for this rule")
+
         results.append({
             "agency_id": AGENCY_ID,
             "collection_id": COLLECTION_ID,
             "dataset_id": DATASET_ID,
+            "check_id": check_id,
             "column_name": c.field or "(table)",
             "check_name": f"datacontract:{metric}",
             "dimension": c.dimension or DIMENSION_BY_METRIC.get(metric, ""),

@@ -36,7 +36,9 @@ import os
 
 import duckdb
 
-from qa_tools.common.soda_common import ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys
+from qa_tools.common.soda_common import (
+    ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys, check_id_from_resource_attributes,
+)
 from qa_tools.common.qa_results_writer import write_qa_result
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -150,6 +152,11 @@ def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
 
         column = c["column"] or (_CUSTOM_CHECK_COLUMN.get(c["name"]) if is_custom_name else None) or "(table)"
 
+        check_id = check_id_from_resource_attributes(c)
+        if check_id is None:
+            raise ValueError(f"no check_id found in resourceAttributes for soda check {c['name']!r} - "
+                              f"the checks YAML is missing attributes.check_id for this check")
+
         row_count_invalid = None
         if diagnostics.get("blocks"):
             row_count_invalid = diagnostics["blocks"][0].get("totalFailingRows")
@@ -178,6 +185,7 @@ def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
             "agency_id": AGENCY_ID,
             "collection_id": COLLECTION_ID,
             "dataset_id": DATASET_ID,
+            "check_id": check_id,
             "column_name": column,
             "check_name": check_name,
             "dimension": _CUSTOM_CHECK_DIMENSION.get(c["name"]) if is_custom_name

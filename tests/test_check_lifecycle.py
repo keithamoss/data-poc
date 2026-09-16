@@ -131,7 +131,7 @@ def test_dbt_check_id_lookup_keys_generic_tests_by_column_and_type(tmp_path):
 
     lookup = cl.dbt_check_id_lookup(path)
 
-    assert lookup[("registration_number", "not_null")] == (
+    assert lookup[("stg_birth_registrations", "registration_number", "not_null")] == (
         "data-asset-1.bdm.birth_registrations.stg_birth_registrations.registration_number.not_null_dbt")
 
 
@@ -148,9 +148,71 @@ def test_dbt_check_id_lookup_keys_singular_tests_by_name_with_no_column(tmp_path
 
     lookup = cl.dbt_check_id_lookup(path)
 
-    assert lookup[(None, "multiple_birth_sibling")] == (
+    assert lookup[(None, None, "multiple_birth_sibling")] == (
         "data-asset-1.bdm.birth_registrations.stg_birth_registrations."
         "is_multiple_birth.multiple_birth_sibling_dbt")
+
+
+def test_dbt_check_id_lookup_strips_the_package_prefix_from_cross_package_macros(tmp_path):
+    """A real bug, found 2026-09-16 wiring this lookup into run_dbt_bdm.py
+    for real: schema.yml's own key for a dbt_utils macro is package-
+    qualified ("dbt_utils.accepted_range"), but dbt's compiled manifest
+    reports that same test's name UNqualified (test_metadata["name"] ==
+    "accepted_range") - confirmed against a real manifest, not assumed.
+    Without stripping the prefix here, every dbt_utils-sourced check_id
+    silently never matched the caller's own resolved test_name."""
+    path = _write(tmp_path, "schema.yml", """\
+        models:
+          - name: stg_birth_registrations
+            columns:
+              - name: date_of_birth
+                tests:
+                  - dbt_utils.accepted_range:
+                      meta:
+                        check_id: data-asset-1.bdm.birth_registrations.stg_birth_registrations.date_of_birth.accepted_range_dbt
+        """)
+
+    lookup = cl.dbt_check_id_lookup(path)
+
+    assert lookup[("stg_birth_registrations", "date_of_birth", "accepted_range")] == (
+        "data-asset-1.bdm.birth_registrations.stg_birth_registrations."
+        "date_of_birth.accepted_range_dbt")
+    assert ("stg_birth_registrations", "date_of_birth", "dbt_utils.accepted_range") not in lookup
+
+
+def test_dbt_check_id_lookup_does_not_collide_across_models_with_the_same_column_and_test_type(tmp_path):
+    """A real bug, found 2026-09-16 wiring this into run_dbt_bdm.py/
+    run_dbt_cp.py for real: schema.yml holds every dataset's models
+    together in one file, and both BDM's stg_birth_registrations and
+    CP's stg_cp_clients have a date_of_birth column with an
+    accepted_range test. Without the model in the lookup key, the second
+    one parsed silently overwrote the first's check_id - real BDM
+    results were coming back tagged with CP's check_id."""
+    path = _write(tmp_path, "schema.yml", """\
+        models:
+          - name: stg_birth_registrations
+            columns:
+              - name: date_of_birth
+                tests:
+                  - dbt_utils.accepted_range:
+                      meta:
+                        check_id: data-asset-1.bdm.birth_registrations.stg_birth_registrations.date_of_birth.accepted_range_dbt
+          - name: stg_cp_clients
+            columns:
+              - name: date_of_birth
+                tests:
+                  - dbt_utils.accepted_range:
+                      meta:
+                        check_id: data-asset-1.cp.child_protection.stg_cp_clients.date_of_birth.accepted_range_dbt
+        """)
+
+    lookup = cl.dbt_check_id_lookup(path)
+
+    assert lookup[("stg_birth_registrations", "date_of_birth", "accepted_range")] == (
+        "data-asset-1.bdm.birth_registrations.stg_birth_registrations."
+        "date_of_birth.accepted_range_dbt")
+    assert lookup[("stg_cp_clients", "date_of_birth", "accepted_range")] == (
+        "data-asset-1.cp.child_protection.stg_cp_clients.date_of_birth.accepted_range_dbt")
 
 
 def test_parse_dbt_check_metadata_covers_model_level_tests(tmp_path):

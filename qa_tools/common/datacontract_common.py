@@ -79,6 +79,31 @@ def run_against_local_server(contract_path: str, local_path: str):
 SAMPLEABLE_METRICS = {"missing_count", "invalid_count", "duplicate_count"}
 
 
+def check_id_from_quality_definition(quality_definition: str | None) -> str | None:
+    """Pulls `check_id` out of a real datacontract-cli check's own
+    `qualityDefinition` - a YAML string dump of the original ODCS
+    quality rule, customProperties included, confirmed for real
+    (2026-09-16) against a real `DataContract.test()` run, not assumed.
+    Same `customProperties: [{property, value}, ...]` shape
+    check_lifecycle.py's own `_custom_properties_to_dict()` already
+    parses from the contract file directly - not reused here since that
+    function takes an already-parsed dict, not a raw YAML string, and
+    pulling in check_lifecycle.py from this tool-plumbing module would
+    be a backwards dependency (check_lifecycle validates check
+    definitions; this module runs the real tool). None for a
+    schema-derived check (field_is_present/field_required/field_unique)
+    - those aren't declared under `quality:` at all, so they have no
+    qualityDefinition and are already filtered out by each caller's own
+    `_QUALITY_CHECK_TYPES` guard before this ever gets called on one."""
+    if not quality_definition:
+        return None
+    doc = yaml.safe_load(quality_definition) or {}
+    for prop in doc.get("customProperties") or []:
+        if prop.get("property") == "check_id":
+            return prop.get("value")
+    return None
+
+
 def failing_sample_keys(check, pk_column: str) -> list[str]:
     """Pulls just pk_column's value out of check.failedSamples -
     datacontract-cli's own _samples_for() already restricts each sample

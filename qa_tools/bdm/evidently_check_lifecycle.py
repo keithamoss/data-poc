@@ -11,13 +11,22 @@ the check" means for this one tool.
 """
 from __future__ import annotations
 
+# Named constants, not just dict keys - imported directly by
+# run_evidently_bdm.py to tag each real check result with its own
+# check_id (2026-09-16, Phase 4 prerequisite), so there's exactly one
+# place either string is spelled out, not a literal duplicated between
+# this file and the result-construction code.
+PSI_CHECK_ID = "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.drift_psi_evidently"
+ROW_COUNT_GROWTH_CHECK_ID = (
+    "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.row_count_growth_evidently")
+
 CHECK_LIFECYCLE = {
-    "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.drift_psi_evidently": {
+    PSI_CHECK_ID: {
         "introduced_date": "2026-01-15",
         "description": "Population Stability Index on sex's value distribution vs. the reference run - flags a real distribution shift.",
         "changelog": [],
     },
-    "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.row_count_growth_evidently": {
+    ROW_COUNT_GROWTH_CHECK_ID: {
         "introduced_date": "2026-01-15",
         "description": "Row count should mostly grow run over run - a real drop signals a broken/partial extract.",
         "changelog": [],

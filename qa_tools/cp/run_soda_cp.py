@@ -17,7 +17,9 @@ import os
 
 import duckdb
 
-from qa_tools.common.soda_common import ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys
+from qa_tools.common.soda_common import (
+    ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys, check_id_from_resource_attributes,
+)
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
 
@@ -76,6 +78,12 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
             continue  # not a CP table (shouldn't happen - guard anyway)
 
         column = c["column"] or _CUSTOM_CHECK_COLUMN.get(c["name"]) or "(table)"
+
+        check_id = check_id_from_resource_attributes(c)
+        if check_id is None:
+            raise ValueError(f"no check_id found in resourceAttributes for soda check {c['name']!r} - "
+                              f"the checks YAML is missing attributes.check_id for this check")
+
         diagnostics = c["diagnostics"]
         value = diagnostics.get("value")
         outcome = c["outcome"]
@@ -119,6 +127,7 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
             "agency_id": cp_common.AGENCY_ID,
             "collection_id": cp_common.COLLECTION_ID,
             "dataset_id": cp_common.TABLE_DATASET_ID[table],
+            "check_id": check_id,
             "column_name": column,
             "check_name": check_name,
             "dimension": dimension,

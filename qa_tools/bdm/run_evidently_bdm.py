@@ -28,6 +28,7 @@ import os
 from qa_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, status_for_psi, compute_psi
 from qa_tools.common.csv_io import load_null_values_by_column, read_csv_explicit_nulls
 from qa_tools.common.qa_results_writer import write_qa_result
+from .evidently_check_lifecycle import PSI_CHECK_ID, ROW_COUNT_GROWTH_CHECK_ID
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 RAW_DIR = os.path.join(ROOT, "data", "raw")
@@ -99,6 +100,7 @@ def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
         "agency_id": AGENCY_ID,
         "collection_id": COLLECTION_ID,
         "dataset_id": DATASET_ID,
+        "check_id": PSI_CHECK_ID,
         "column_name": "sex",
         "check_name": "drift:PSI",
         "dimension": "consistency",
@@ -129,6 +131,7 @@ def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
             "agency_id": AGENCY_ID,
             "collection_id": COLLECTION_ID,
             "dataset_id": DATASET_ID,
+            "check_id": ROW_COUNT_GROWTH_CHECK_ID,
             # No single column "owns" a whole-dataset row count; attributed
             # to registration_number (the row-identifying primary key) as
             # the least-arbitrary home, rather than "(table)" - which

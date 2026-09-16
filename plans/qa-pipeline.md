@@ -2606,6 +2606,56 @@ relative, not a schedule — this is weeks of work, not months.
     own_result_with_the_table_dataset_id` (confirms the per-result
     `dataset_id` field is deliberately untouched by the fix).
 
+51. **[fixed, 2026-09-16]** Two real bugs in `check_lifecycle.
+    dbt_check_id_lookup()` (built for item 49, but never actually wired
+    into a real result-construction loop until this session's check_id-
+    propagation work - both were latent until then), found running the
+    real dbt build against real data, not in a unit test:
+
+    **Bug 1 - cross-dataset key collision.** The lookup's original key
+    was `(column, test_type)`, with no model in it. `schema.yml` holds
+    every dataset's models together in one file, and both BDM's
+    `stg_birth_registrations` and CP's `stg_cp_clients` have a
+    `date_of_birth` column with a `dbt_utils.accepted_range` test - the
+    second one parsed silently overwrote the first's check_id in the
+    lookup dict. Caught immediately on the very first real `evaluate_
+    dbt_bdm()` call after wiring the lookup in: a genuine BDM result
+    came back tagged with `data-asset-1.child-protection-family-support.
+    cp-clients...` instead of its own `registry-services.birth-
+    registrations...` check_id. Fixed by adding `model` to the key
+    (`(model, column_or_None, test_type)`) - `run_dbt_bdm.py` always
+    passes its one constant model name; `run_dbt_cp.py` passes
+    `f"stg_{table}"`, using the same `table` it already resolves via
+    `_table_for_test()` for other purposes.
+
+    **Bug 2 - package-qualified test type never matched.** `schema.
+    yml`'s own key for a cross-package macro is qualified
+    (`dbt_utils.accepted_range`), but dbt's compiled manifest reports
+    that test's name UNqualified (`test_metadata["name"] ==
+    "accepted_range"`, the package living separately in `test_metadata
+    ["namespace"]`) - confirmed against a real compiled manifest node,
+    not assumed. Every dbt_utils-sourced check (`accepted_range`,
+    `expression_is_true`, `recency` - a meaningful fraction of both
+    datasets' real dbt checks) raised "no check_id found" the moment
+    this was wired in for real, since the lookup's key never matched
+    what the caller's own resolved `test_name` actually was. Fixed by
+    stripping the package prefix (`test_type.rsplit(".", 1)[-1]`) when
+    building the lookup key.
+
+    Both found and fixed in the same short verification pass (real dbt
+    build against real per-run warehouses, not a fixture) - a genuine
+    case for this repo's real-tool-first approach: neither bug was
+    visible from reading the code or from `dbt_check_id_lookup()`'s own
+    unit tests (which only ever exercised a single-model fixture), only
+    from actually running it against real, multi-dataset schema.yml
+    content. Regression tests added: `test_dbt_check_id_lookup_does_
+    not_collide_across_models_with_the_same_column_and_test_type`,
+    `test_dbt_check_id_lookup_strips_the_package_prefix_from_cross_
+    package_macros`, both confirmed to fail against the pre-fix
+    function first. Full account of the propagation work this was found
+    during is in `plans/publishing-and-history.md`'s Thread D section
+    (search "check_id propagated into every real check RESULT record").
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

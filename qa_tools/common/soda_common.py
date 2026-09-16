@@ -61,6 +61,21 @@ def failing_sample_keys(captured: dict[str, list[dict]], check_name: str, pk_col
     return [str(row[pk_column]) for row in rows if row.get(pk_column) is not None]
 
 
+def check_id_from_resource_attributes(check: dict) -> str | None:
+    """Pulls `check_id` out of a real Soda scan result's own
+    `resourceAttributes` - a list of `{name, value}` pairs Soda copies
+    straight from the check's `attributes:` block in the checks YAML
+    (confirmed against a real scan, 2026-09-16, not assumed) - one check
+    result only ever carries its own attributes, so unlike dbt's schema.
+    yml-wide lookup (see check_lifecycle.dbt_check_id_lookup()'s own
+    docstring on the collision bug that needed guarding against), there's
+    no cross-check ambiguity to resolve here."""
+    for attr in check.get("resourceAttributes") or []:
+        if attr.get("name") == "check_id":
+            return attr.get("value")
+    return None
+
+
 def threshold(spec: dict | None) -> float | None:
     if not spec:
         return None

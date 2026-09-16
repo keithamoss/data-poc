@@ -52,6 +52,7 @@ import os
 
 import duckdb
 
+from qa_tools.common.check_lifecycle import dbt_check_id_lookup
 from qa_tools.common.dbt_common import (
     ENGINE_TAG, parse_threshold, run_dbt, test_nodes,
     failing_sample_keys_direct, failing_sample_keys_via_values,
@@ -63,6 +64,12 @@ ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 DBT_PROJECT_DIR = os.path.join(ROOT, "dbt_project")
 PROFILES_DIR = os.path.join(os.path.dirname(__file__), "..", "dbt_profiles")
 CP_DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
+SCHEMA_YML_PATH = os.path.join(DBT_PROJECT_DIR, "models", "staging", "schema.yml")
+
+# Built once from schema.yml itself, not the compiled manifest - see
+# dbt_check_id_lookup()'s own docstring and run_dbt_bdm.py's identical
+# constant for why.
+_CHECK_ID_LOOKUP = dbt_check_id_lookup(SCHEMA_YML_PATH)
 
 CP_MODELS = [f"stg_{t}" for t in cp_common.TABLES]
 CP_SINGULAR_TESTS = list(cp_common.BUSINESS_RULE_HOME_TABLE.keys())
@@ -267,10 +274,30 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
 
         failing_sample_keys = _failing_sample_keys(conn, test_name, column, table, node, status)
 
+        # Model+column are None for a singular test (no test_metadata,
+        # and schema.yml's own tests: block has no model association -
+        # fine, singular test names are globally unique - see
+        # dbt_check_id_lookup()'s own docstring) even though `column`
+        # above may hold a display-only fallback. `table` (already
+        # resolved above via _table_for_test()) gives the real model
+        # name for a generic test - CP's schema.yml holds 6 models
+        # together, so this must match dbt_check_id_lookup()'s own
+        # per-model keying or a same-named column+test-type collision
+        # across tables (or against BDM's own models, same file) would
+        # silently tag a result with the wrong check_id.
+        check_id_model = f"stg_{table}" if meta else None
+        check_id_column = node["column_name"] if meta else None
+        check_id = _CHECK_ID_LOOKUP.get((check_id_model, check_id_column, test_name))
+        if check_id is None:
+            raise ValueError(f"no check_id found for dbt test {test_name!r} "
+                              f"(model={check_id_model!r}, column={check_id_column!r}) - schema.yml "
+                              f"is missing meta.check_id or this test isn't declared there")
+
         results.append({
             "agency_id": cp_common.AGENCY_ID,
             "collection_id": cp_common.COLLECTION_ID,
             "dataset_id": cp_common.TABLE_DATASET_ID[table],
+            "check_id": check_id,
             "column_name": column,
             "check_name": f"dbt:{test_name}",
             "dimension": _DIMENSION_BY_TEST.get(test_name, ""),

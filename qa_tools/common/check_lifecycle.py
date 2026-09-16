@@ -160,45 +160,70 @@ def parse_dbt_check_metadata(schema_yml_path: Path | str) -> list[CheckMetadata]
     return out
 
 
-def dbt_check_id_lookup(schema_yml_path: Path | str) -> dict[tuple[str | None, str], str]:
-    """`{(column_or_None, dbt_test_type_or_singular_name): check_id}` for
-    every real dbt check in this file - built directly from schema.yml,
-    NOT dbt's compiled manifest (verified empirically, 2026-09-16: a
-    test's own `meta`/`config.meta` block does not reliably survive into
-    the compiled manifest node for either generic or singular tests, so
-    that's never a reliable source - see plans/qa-pipeline.md).
-    Model-level and singular tests key on `(None, test_type)`; column-
-    level tests key on `(column, test_type)`, both matching exactly what
-    run_dbt_bdm.py's/run_dbt_cp.py's own result-construction loop already
-    has on hand (`node.get("column_name")` and the resolved `test_name`)
+def dbt_check_id_lookup(schema_yml_path: Path | str) -> dict[tuple[str | None, str | None, str], str]:
+    """`{(model_or_None, column_or_None, dbt_test_type_or_singular_name):
+    check_id}` for every real dbt check in this file - built directly
+    from schema.yml, NOT dbt's compiled manifest (verified empirically,
+    2026-09-16: a test's own `meta`/`config.meta` block does not
+    reliably survive into the compiled manifest node for either generic
+    or singular tests, so that's never a reliable source - see
+    plans/qa-pipeline.md). Column-level generic tests key on `(model,
+    column, test_type)`; model-level generic tests key on `(model, None,
+    test_type)`; singular tests key on `(None, None, name)` - a singular
+    test's own name has no model in schema.yml's top-level `tests:`
+    block to begin with, but that's fine, not a gap: singular test names
+    are already globally unique by construction (BDM's `multiple_birth_
+    sibling`, CP's 3 business-rule names), unlike a bare `(column,
+    test_type)` pair, which genuinely isn't - a real bug, found
+    2026-09-16 wiring this into run_dbt_bdm.py/run_dbt_cp.py for real:
+    both BDM's `stg_birth_registrations` and CP's `stg_cp_clients` have a
+    `date_of_birth` column with an `accepted_range` test, and schema.yml
+    holds every dataset's models together in one file - without `model`
+    in the key, the second one parsed silently overwrote the first's
+    check_id, so BDM's real results were coming back tagged with CP's
+    check_id (or vice versa) whenever a column name + test type repeated
+    across datasets. Model matches exactly what run_dbt_bdm.py's/
+    run_dbt_cp.py's own result-construction loop already has on hand
+    (its own dataset's one constant model name, or
+    cp_common.TABLE_DATASET_ID's `f"stg_{table}"` via `_table_for_test()`)
     - used to tag each real check result with its own check_id at write
     time, not reconstructed from the check_id naming convention."""
     with open(schema_yml_path) as f:
         doc = yaml.safe_load(f) or {}
-    lookup: dict[tuple[str | None, str], str] = {}
+    lookup: dict[tuple[str | None, str | None, str], str] = {}
 
-    def _record(test: Any, column: str | None) -> None:
+    def _record(test: Any, model: str, column: str | None) -> None:
         if isinstance(test, str) or not isinstance(test, dict) or len(test) != 1:
             return
         (test_type, test_config), = test.items()
         meta = (test_config or {}).get("meta") or {}
         check_id = meta.get("check_id")
         if check_id:
-            lookup[(column, test_type)] = check_id
+            # schema.yml's own key is package-qualified for a cross-package
+            # macro (e.g. "dbt_utils.accepted_range"), but dbt's compiled
+            # manifest reports that same test's name UNqualified
+            # (test_metadata["name"] == "accepted_range", the package
+            # living separately in test_metadata["namespace"]) - confirmed
+            # empirically, 2026-09-16, against a real compiled manifest
+            # node, not assumed. Strip to match what run_dbt_bdm.py's/
+            # run_dbt_cp.py's own `test_name` is actually resolved to, or
+            # every dbt_utils-sourced check_id would silently never match.
+            lookup[(model, column, test_type.rsplit(".", 1)[-1])] = check_id
 
     for model in doc.get("models", []) or []:
+        model_name = model["name"]
         for test in model.get("tests", []) or []:
-            _record(test, None)
+            _record(test, model_name, None)
         for col in model.get("columns", []) or []:
             for test in col.get("tests", []) or []:
-                _record(test, col["name"])
+                _record(test, model_name, col["name"])
 
     for entry in doc.get("tests", []) or []:
         name = entry.get("name")
         meta = (entry.get("config") or {}).get("meta") or {}
         check_id = meta.get("check_id")
         if name and check_id:
-            lookup[(None, name)] = check_id
+            lookup[(None, None, name)] = check_id
 
     return lookup
 

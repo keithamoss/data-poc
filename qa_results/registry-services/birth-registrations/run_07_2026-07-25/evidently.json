@@ -1,5 +1,5 @@
 {
-  "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+  "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
   "run_by": null,
   "raw_output": {
     "psi": {
@@ -29,7 +29,7 @@
             "method": "psi",
             "threshold": 0.1
           },
-          "value": 0.23027595162574135
+          "value": 0.23027595162574138
         }
       ],
       "tests": []
@@ -53,12 +53,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.drift_psi_evidently",
       "column_name": "sex",
       "check_name": "drift:PSI",
       "dimension": "consistency",
       "label": "Distribution drift",
       "run_id": "run_07_2026-07-25",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 0.2303,
       "unit": "PSI",
       "warn_threshold": 0.1,
@@ -74,12 +75,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.row_count_growth_evidently",
       "column_name": "registration_number",
       "check_name": "evidently:row_count_growth",
       "dimension": "timeliness",
       "label": "Row count vs. previous run",
       "run_id": "run_07_2026-07-25",
-      "run_timestamp": "2026-09-16T13:59:40.055667+00:00",
+      "run_timestamp": "2026-09-16T22:22:46.340513+00:00",
       "metric_value": 35.25,
       "unit": "%",
       "warn_threshold": 10.0,

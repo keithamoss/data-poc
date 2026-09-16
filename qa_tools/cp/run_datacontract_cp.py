@@ -31,7 +31,7 @@ import re
 
 from qa_tools.common.datacontract_common import (
     ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
-    run_against_local_server, failing_sample_keys,
+    run_against_local_server, failing_sample_keys, check_id_from_quality_definition,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
@@ -117,10 +117,16 @@ def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
             check_name = f"datacontract:{metric}"
             label = LABEL_BY_METRIC.get(metric)
 
+        check_id = check_id_from_quality_definition(c.qualityDefinition)
+        if check_id is None:
+            raise ValueError(f"no check_id found in qualityDefinition for datacontract check {c.name!r} "
+                              f"(type={c.type!r}) - the contract is missing customProperties.check_id for this rule")
+
         results.append({
             "agency_id": cp_common.AGENCY_ID,
             "collection_id": cp_common.COLLECTION_ID,
             "dataset_id": cp_common.TABLE_DATASET_ID[table],
+            "check_id": check_id,
             "column_name": fk_column or c.field or "(table)",
             "check_name": check_name,
             "dimension": c.dimension or DIMENSION_BY_METRIC.get(metric, ""),
