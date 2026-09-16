@@ -1630,3 +1630,43 @@ not a schedule.
     after), both, or something else entirely. Deliberately not
     conflating "log the specific mistake" (done, item 26's addendum)
     with "fix the pattern" (this item).
+
+30. **[parked]** Revisit the per-dataset file architecture across
+    `qa_tools/`/`pipeline/` - flagged by Keith right after Phase 2
+    landed, near-future not now: "I don't really want a separate file
+    for each individual dataset/agency, but I am open to it if needs
+    be." Explicitly a discussion/brainstorm to have later, not a
+    decision made here - this entry just records the concern and its
+    context, no proposed solution.
+
+    Related to, but a reopening of, action 20 above rather than the
+    same question: action 20 confirmed the same "one file pair per
+    tool per dataset" pattern back when there were only 2 datasets
+    (BDM, Child Protection), found it wasn't false-DRY (the per-dataset
+    half is genuinely different check-to-dashboard-field logic, not
+    copy-paste boilerplate), extracted the confirmed-shared ~30-40
+    lines/pair into `qa_tools/common/`, and left the per-dataset split
+    itself in place - explicitly flagging even then that "every new
+    dataset currently means copy-pasting a whole file." That trade-off
+    made sense at 2 datasets. The project's own stated target is ~30,
+    and Phase 1/2 of `plans/publishing-and-history.md` have since added
+    MORE per-dataset file pairs on top of the original 4 tool-runners
+    (`build_results_from_history.py`, `evidently_check_lifecycle.py`,
+    the per-dataset warehouse builders, the two `build_*dashboard_data.py`
+    scripts) - the pattern this action already named as a real (if
+    partial) cost is now multiplying, not just persisting.
+
+    Nothing about action 20's actual finding is being second-guessed -
+    the per-dataset LOGIC (which tests exist, what they mean, dataset-
+    specific reliability workarounds) is still genuinely different per
+    dataset and shouldn't be forced into one shared abstraction just to
+    reduce file count. What's worth a real conversation is the
+    file-per-dataset-per-concern SHAPE itself at ~30x today's scale -
+    e.g. whether tool-runner logic could be data-driven off each
+    dataset's own config/check definitions inside fewer files, whether
+    a plugin/registry pattern per tool (not per dataset) reads better,
+    or whether the current shape is still fine and it's specifically
+    the Phase 1/2 additions (which are more mechanical/generic than the
+    original 4 tool-runners) that should collapse first. Not scoped -
+    the point of this entry is to not lose the concern before that
+    conversation happens.
