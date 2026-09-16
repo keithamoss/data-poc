@@ -479,8 +479,29 @@ function buildRealDataset(d){
     realRunCount: d.runs.length,
   };
 }
-function buildBirthRegistrations(){ return buildRealDataset(REAL_BIRTH_REG_DATA); }
-function buildChildProtectionDatasets(){ return REAL_CP_DATA.datasets.map(buildRealDataset); }
+// Both fall back to the same illustrative-mock generator the other 14
+// datasets already use (genDataset(), defined below - forward-referenced
+// here since these two functions are only ever actually CALLED after it
+// exists, at DATA-construction time) whenever the real consts are still
+// the template's own null/empty placeholders - opening dashboard/qa-
+// reporting-dashboard.template.html directly (before embed_dashboard_
+// data.py has ever run) must render cleanly, not crash. genDataset()
+// never sets isReal, so the fallback correctly shows as "Illustrative
+// mock data" (see the ds.isReal ternaries below), the same honest signal
+// every other non-real tile already gives - not a special case to
+// maintain, just the existing mechanism doing exactly what it's for.
+function buildBirthRegistrations(){
+  if(!REAL_BIRTH_REG_DATA) return genDataset(
+    "registry-services.civil-registration.birth-registrations", "Birth Registrations",
+    "Registry of Births, Deaths & Marriages (BDM)", "CSV (S3 drop)", POOLS.death);
+  return buildRealDataset(REAL_BIRTH_REG_DATA);
+}
+function buildChildProtectionDatasets(){
+  if(!REAL_CP_DATA) return [genDataset(
+    "child-protection-family-support.child-protection.cp-clients", "Client Register",
+    "Department for Child Protection and Family Support", "CSV (S3 drop)", POOLS.enrollment)];
+  return REAL_CP_DATA.datasets.map(buildRealDataset);
+}
 
 
 /* =========================================================================

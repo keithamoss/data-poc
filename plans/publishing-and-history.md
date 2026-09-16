@@ -1567,6 +1567,39 @@ committed - not a genuine data-refresh run). Full pytest (170 tests,
 down from 174 - the 4 removed hook tests, no replacements needed) +
 ruff clean.
 
+**Follow-up, same day: the template must render cleanly on its own,
+not just the built output.** Keith's explicit requirement once the
+split above landed - opening the raw `.template.html` directly
+(before `embed_dashboard_data.py` has ever run) is a real path a
+contributor can hit, not just a hypothetical the "build first"
+convention alone should have to prevent from crashing. Checked, not
+assumed: `buildBirthRegistrations()`/`buildChildProtectionDatasets()`
+called `buildRealDataset(null)`/`null.datasets.map(...)` on the
+template's own placeholder consts - a real, confirmed crash (verified
+with a real headless-Chromium load against the template before fixing
+anything). Fixed by falling back to `genDataset()` - the exact same
+illustrative-mock generator the other 14 non-real datasets already
+use - whenever `REAL_BIRTH_REG_DATA`/`REAL_CP_DATA` are still `null`;
+`genDataset()` never sets `isReal`, so the fallback tiles correctly
+show as "Illustrative mock data" (the same honest signal every other
+non-real tile already gives), not a new UI state to build or maintain.
+`dashboard/check_dashboard_renders.py` extended to check BOTH the
+built output and the template now (a real headless-browser load of
+each, zero console errors, `#view` populated) - the template's render
+check doesn't validate embedded-JSON structure the way the built
+output's does (its placeholders aren't real pipeline output to
+validate), just that it loads and renders without error. Verified for
+real: a genuine `file://` load of the template in real Chromium, zero
+console errors, confirmed both before (crash reproduced) and after
+(clean) the fix - not assumed from reading the code alone.
+
+**Also flagged, same conversation, logged rather than fixed**: a real
+UI bug in the check-detail panel's (X) close button (needs several
+clicks to actually close after picking multiple "Compared run" dates)
+- root-caused and logged as `plans/qa-pipeline.md` item 52, Keith's
+own explicit instruction to resolve it at the end of the next phase
+rather than now.
+
 **Phase 4 (Thread C - cadence-aware "as of" viewing):**
 - Depends on Phase 1 and Phase 2 (real committed history, merged/
   reshaped) - NOT on Phase 3. Worth being explicit about this: the

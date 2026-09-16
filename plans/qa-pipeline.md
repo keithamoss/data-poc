@@ -2656,6 +2656,37 @@ relative, not a schedule — this is weeks of work, not months.
     during is in `plans/publishing-and-history.md`'s Thread D section
     (search "check_id propagated into every real check RESULT record").
 
+52. **[todo, resolve at the end of the next phase]** The check-detail
+    panel's (X) close button sometimes needs several clicks before it
+    actually closes - Keith's report, 2026-09-16. Root cause, from
+    reading the dashboard's own JS (`dashboard/qa-reporting-
+    dashboard.template.html`): `closeCheckPanel()` (~line 1388) does
+    `if(STATE && STATE.checkKey) history.back();` - a single step back
+    through browser history. But `setCompareIdx()` (~line 1378, item
+    45's "Compared run" selector) pushes a BRAND NEW history entry
+    every time a different comparison run is picked, via `STATE = {...
+    STATE, compareIdx: idx}; history.pushState(...)` - and `checkKey`
+    stays set on every one of those pushed states, since changing the
+    comparison run doesn't close the panel. So picking N different
+    "Compared run" dates before closing means N extra history entries
+    all satisfying `STATE.checkKey`, and one (X) click only pops the
+    MOST RECENT compare-selection, not all the way back to "panel
+    wasn't open" - the panel visually stays open (just with an earlier
+    compare selection) until enough clicks work through every pushed
+    compare-selection entry. Same root shape as `closeDrawer()`
+    (~line 1104) for the outer column drawer, though not confirmed
+    whether that one is reachable the same way (the column drawer has
+    no per-selection push of its own today, only `checkKey`/`columnName`
+    changes on open). Not yet scoped: whether the fix is "X always
+    replaces state back to pre-panel, not history.back()" (loses the
+    real forward/back-button symmetry this history-based design was
+    built for - see closeDrawer()'s own comment on why pushState was
+    chosen over a plain hide) or "setCompareIdx() should replaceState,
+    not pushState" (compare-selection stops being independently
+    back/forward-navigable, which may or may not be a real loss - not
+    decided). Logged for later per Keith's own instruction, not
+    investigated further now.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
