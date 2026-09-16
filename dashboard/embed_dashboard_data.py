@@ -11,7 +11,13 @@ by CI on every push and locally by ./run_pipeline.sh. Run this last,
 after orchestrate.py/orchestrate_cp.py and the two build_*_dashboard_
 data.py scripts, whenever the pipeline is regenerated.
 
-This only replaces those two lines - the rest of the dashboard (its
+Also re-embeds `const AS_OF_OFFSET_DAYS` from `contract/data-asset.yaml`
+(Thread C, plans/publishing-and-history.md) - the one genuinely
+data-asset-level (not per-dataset) config value the as-of viewing
+feature needs, read the same way check_id's `data-asset-1` placeholder
+already is.
+
+This only replaces those three lines - the rest of the dashboard (its
 CSS, the rendering code, the other 14 illustrative datasets, and the
 separate SNAPSHOT_MANIFEST const dashboard/snapshot_dashboard.py owns)
 is copied through unchanged from the template.
@@ -21,14 +27,32 @@ import json
 import os
 import re
 
+import yaml
+
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 TEMPLATE_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.template.html")
 DASHBOARD_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.html")
+DATA_ASSET_YAML = os.path.join(ROOT, "contract", "data-asset.yaml")
 
 TARGETS = [
     ("REAL_BIRTH_REG_DATA", os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")),
     ("REAL_CP_DATA", os.path.join(ROOT, "reports", "child_protection_dashboard.json")),
 ]
+
+
+def _replace_const(html: str, const_name: str, value_json: str) -> str:
+    new_line = f"const {const_name} = {value_json};\n"
+    pattern = re.compile(rf"const {const_name} = .*?;\n")
+    # a lambda replacement (not a plain string) so backslash sequences
+    # already inside the JSON (e.g. "—") are never reinterpreted as
+    # regex backreferences by re.sub
+    html, n = pattern.subn(lambda _m: new_line, html, count=1)
+    if n != 1:
+        raise RuntimeError(
+            f"Could not find exactly one 'const {const_name} = ...;' line to replace "
+            f"(found {n}) - has the dashboard's structure changed?"
+        )
+    return html
 
 
 def embed() -> None:
@@ -39,19 +63,14 @@ def embed() -> None:
         with open(data_json_path) as f:
             data = json.load(f)
         real_json = json.dumps(data, separators=(",", ":"))
-        new_line = f"const {const_name} = {real_json};\n"
-
-        pattern = re.compile(rf"const {const_name} = .*?;\n")
-        # a lambda replacement (not a plain string) so backslash sequences
-        # already inside the JSON (e.g. "—") are never reinterpreted as
-        # regex backreferences by re.sub
-        html, n = pattern.subn(lambda _m: new_line, html, count=1)
-        if n != 1:
-            raise RuntimeError(
-                f"Could not find exactly one 'const {const_name} = ...;' line to replace "
-                f"(found {n}) - has the dashboard's structure changed?"
-            )
+        html = _replace_const(html, const_name, real_json)
         print(f"Re-embedded {len(real_json)} bytes of real data into {const_name}")
+
+    with open(DATA_ASSET_YAML) as f:
+        data_asset = yaml.safe_load(f)
+    offset_days = data_asset["as_of_offset_days"]
+    html = _replace_const(html, "AS_OF_OFFSET_DAYS", json.dumps(offset_days))
+    print(f"Re-embedded AS_OF_OFFSET_DAYS = {offset_days}")
 
     with open(DASHBOARD_HTML, "w") as f:
         f.write(html)

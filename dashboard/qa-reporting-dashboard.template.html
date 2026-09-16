@@ -119,6 +119,8 @@ button{font:inherit; color:inherit;}
 .pill.tag .ico{background:var(--accent); border-radius:2px;}
 .pill.illustrative{background:var(--surface-alt); color:var(--ink-muted); border:1px solid var(--line-strong);}
 .pill.illustrative .ico{background:var(--ink-faint); border-radius:2px;}
+.pill.nodata{background:var(--surface-alt); color:var(--ink-faint); border:1px dashed var(--line-strong);}
+.pill.nodata .ico{background:var(--ink-faint); border-radius:2px;}
 
 /* ============ Section headers ============ */
 .view-head{display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:6px;}
@@ -315,6 +317,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
       </div>
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
+      <button class="snapshots-btn" id="asof-btn" type="button">📅 As of: <span id="asof-btn-label">…</span></button>
       <button class="snapshots-btn" id="snapshots-btn" type="button">🕐 Past snapshots</button>
       <div class="live"><span class="dot"></span><span id="clock-text">Live · updated moments ago</span></div>
     </div>
@@ -370,6 +373,41 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
   <div class="drawer-body" id="snapshots-panel-body"></div>
 </aside>
 
+<!-- Thread C (plans/publishing-and-history.md) - cadence-aware "as of"
+     viewing. Deliberately a SEPARATE entry point from the snapshots
+     picker above, per Keith's own confirmed design: a snapshot is a
+     frozen, literal past render of the whole dashboard as it looked at
+     a moment in time (a different HTML file entirely); "as of" instead
+     re-derives the CURRENT dashboard's view from committed history as
+     it would have read on some earlier date - live app, filtered data,
+     not an archive. One global control for the whole dashboard, not
+     per-dataset (Keith: "that's like global, not per dataset"). -->
+<div class="backdrop" id="asof-backdrop"></div>
+<aside class="drawer" id="asof-panel" aria-hidden="true">
+  <div class="drawer-head">
+    <div>
+      <div class="legend-key" style="margin:0 0 4px;">Cadence-aware viewing</div>
+      <h3>View data asset as of a date</h3>
+    </div>
+    <button class="drawer-close" id="asof-panel-close" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body" id="asof-panel-body">
+    <div style="font-size:12.5px; color:var(--ink-muted); margin-bottom:16px;">
+      Rolls every real dataset back to whichever of its own QA runs was the
+      most recent at or before the date you pick — showing exactly what was
+      actually known as of that date, not just filtering what's on screen
+      now. A dataset with no run yet as of that date shows as
+      <b>No data</b>, never a misleading blank, green, or red. Applies to
+      the whole data asset at once.
+    </div>
+    <label for="asof-input" style="display:block; font-size:12.5px; font-weight:600; margin-bottom:6px;">As of date</label>
+    <input type="date" id="asof-input" style="font:600 14px 'IBM Plex Mono',monospace; padding:8px 10px; border:1px solid var(--line-strong); border-radius:var(--radius-sm); background:var(--surface); color:var(--ink); width:100%; max-width:220px;">
+    <div style="margin-top:14px;">
+      <button class="link-btn" id="asof-reset-btn" type="button">Reset to default (<span id="asof-default-label"></span>)</button>
+    </div>
+  </div>
+</aside>
+
 <script>
 "use strict";
 /* =========================================================================
@@ -393,8 +431,15 @@ function fmtMetric(x, unit){
   return Math.round(x).toLocaleString("en-US");
 }
 
-const STATUS_ORDER = {green:0, amber:1, red:2};
-const STATUS_LABEL = {green:"Green", amber:"Amber", red:"Red"};
+// "nodata" (Thread C's as-of viewing, plans/publishing-and-history.md)
+// deliberately sits BELOW green in STATUS_ORDER - it must never win a
+// worstOf() reduce against a real green/amber/red (that would either
+// hide a real problem behind "no data" or, worse, make "no data" look
+// like the WORST outcome when it's really just "nothing to show yet") -
+// callers that need to render it explicitly (a dataset's own status pill)
+// set it directly, not via worstOf().
+const STATUS_ORDER = {nodata:-1, green:0, amber:1, red:2};
+const STATUS_LABEL = {nodata:"No data", green:"Green", amber:"Amber", red:"Red"};
 function worstOf(list){ return list.reduce((w,s)=> STATUS_ORDER[s]>STATUS_ORDER[w]?s:w, "green"); }
 function checkStatus(check){ if(check.current>check.fail) return "red"; if(check.current>check.warn) return "amber"; return "green"; }
 
@@ -432,6 +477,13 @@ function checkStatus(check){ if(check.current>check.fail) return "red"; if(check
    "placeholder here, real data only in the built output" treatment as
    the two consts above.
 
+   AS_OF_OFFSET_DAYS — Thread C's cadence-aware "as of" viewing (plans/
+   publishing-and-history.md): the one genuinely data-asset-level (not
+   per-dataset) config number, re-embedded from the real, committed
+   contract/data-asset.yaml on every build - same treatment as the
+   three consts above. Real value: 60 (as of this file's own last
+   edit - the template's own placeholder is never the real number).
+
    A prior generation of this pipeline also ran four hand-written
    equivalent check engines (engines/*.py, built when the original
    session had no PyPI access) and merged their output with the real
@@ -443,6 +495,7 @@ function checkStatus(check){ if(check.current>check.fail) return "red"; if(check
 const REAL_BIRTH_REG_DATA = null;
 const REAL_CP_DATA = null;
 const SNAPSHOT_MANIFEST = [];
+const AS_OF_OFFSET_DAYS = null;
 
 // Shared by Birth Registrations (a single dataset) and Child Protection
 // (6 datasets, one per table) - both are reshaped server-side into this
@@ -479,6 +532,96 @@ function buildRealDataset(d){
     realRunCount: d.runs.length,
   };
 }
+// Thread C - cadence-aware "as of" viewing (plans/publishing-and-
+// history.md). Operates on the RAW JSON shape (same as what
+// REAL_BIRTH_REG_DATA/REAL_CP_DATA.datasets[i] already are), BEFORE
+// buildRealDataset() runs - returns either null ("no run exists at or
+// before this date" - the dataset genuinely has no data yet as of the
+// picked date) or a same-shaped-but-smaller raw object that
+// buildRealDataset() then processes completely unchanged. This is
+// deliberate: keeping the as-of logic entirely in this one function
+// means nothing downstream (buildRealDataset, every render function)
+// needs to know "as of" viewing exists at all - they just see a
+// dataset with less history than usual.
+function clipDatasetToAsOf(d, asOfDateStr){
+  const eligibleRuns = d.runs.filter(r => r.run_date <= asOfDateStr);
+  if(!eligibleRuns.length) return null;
+  const effectiveRunId = eligibleRuns[eligibleRuns.length-1].run_id;
+  const prevRunId = eligibleRuns.length>1 ? eligibleRuns[eligibleRuns.length-2].run_id : null;
+  const eligibleRunIds = new Set(eligibleRuns.map(r=>r.run_id));
+
+  const columns = d.columns.map(col => {
+    // A check with zero history entries at or before the as-of date
+    // hasn't been introduced yet as of that date (or, same shape,
+    // simply has no result for any eligible run) - dropped, not shown
+    // with a misleading zero/blank value.
+    const checks = col.checks
+      .map(ck => {
+        const history = ck.history.filter(h => eligibleRunIds.has(h.run_id));
+        if(!history.length) return null;
+        const last = history[history.length-1], prev = history.length>1 ? history[history.length-2] : last;
+        return {...ck, history, current: last.value, previous: prev.value};
+      })
+      .filter(Boolean);
+    const byRun = (col.stats && col.stats.byRun) || {};
+    return {...col, checks, stats: {
+      current: byRun[effectiveRunId] || col.stats.current,
+      previous: (prevRunId && byRun[prevRunId]) || byRun[effectiveRunId] || col.stats.previous,
+    }};
+  });
+
+  // stats.byRun's own "total" is already the dataset-wide row count at
+  // that run (qa_tools' dataset_stats.py/pipeline's build_*_dashboard_
+  // data.py - every column shares the same value) - reused here rather
+  // than re-deriving row counts from the raw manifest, which for Child
+  // Protection would need a table-name lookup this layer shouldn't have
+  // to know about. Checked more than one column in case the first one's
+  // own byRun doesn't happen to cover every run (a column/check
+  // introduced partway through history) - falls back to the dataset's
+  // own unclipped rowCount only if truly none of them do.
+  const rowCountAt = runId => {
+    for(const col of d.columns){
+      const byRun = col.stats && col.stats.byRun;
+      if(byRun && byRun[runId]) return byRun[runId].total;
+    }
+    return null;
+  };
+  const rowCount = rowCountAt(effectiveRunId) ?? d.rowCount;
+  const prevRowCount = (prevRunId && rowCountAt(prevRunId)) ?? rowCount;
+
+  const arrivalByRun = d.arrivalByRun || {};
+  const arrival = arrivalByRun[effectiveRunId];
+  const lastArrival = arrival
+    ? {run_date: eligibleRuns[eligibleRuns.length-1].run_date, arrivedAt: arrival.arrivedAt, onTime: arrival.onTime}
+    : d.lastArrival;
+
+  return {
+    ...d,
+    runs: eligibleRuns,
+    columns,
+    arrivalHistory: (d.arrivalHistory || []).filter(a => eligibleRunIds.has(a.run_id)),
+    lastArrival,
+    rowCount, prevRowCount,
+  };
+}
+
+// A dataset with no run at or before the as-of date - a real, distinct
+// state ("no data available yet"), never rendered as a misleading
+// blank/red/green tile (Keith's own words, plans/publishing-and-
+// history.md Thread C). Only the fields the noDataAsOf-aware render
+// paths actually read are populated; everything else stays a safe,
+// inert placeholder rather than mirroring buildRealDataset()'s full
+// shape, so a render path that FORGETS to check noDataAsOf fails
+// loudly (undefined property access) instead of silently showing
+// wrong numbers.
+function noDataDataset(id, name, provider, deliveryFormat, sla){
+  return {
+    id, name, provider, deliveryFormat, sla,
+    status: "nodata", noDataAsOf: true, isReal: true, realRunCount: 0,
+    columns: [], lastArrival: null, arrivalHistory: [], rowCount: 0, prevRowCount: 0,
+  };
+}
+
 // Both fall back to the same illustrative-mock generator the other 14
 // datasets already use (genDataset(), defined below - forward-referenced
 // here since these two functions are only ever actually CALLED after it
@@ -490,17 +633,26 @@ function buildRealDataset(d){
 // mock data" (see the ds.isReal ternaries below), the same honest signal
 // every other non-real tile already gives - not a special case to
 // maintain, just the existing mechanism doing exactly what it's for.
-function buildBirthRegistrations(){
+// Illustrative datasets are never clipped to the as-of date - only real,
+// pipeline-tracked history has genuine per-run data worth "as of"-ing.
+function buildBirthRegistrations(asOfDateStr){
   if(!REAL_BIRTH_REG_DATA) return genDataset(
     "registry-services.civil-registration.birth-registrations", "Birth Registrations",
     "Registry of Births, Deaths & Marriages (BDM)", "CSV (S3 drop)", POOLS.death);
-  return buildRealDataset(REAL_BIRTH_REG_DATA);
+  const clipped = clipDatasetToAsOf(REAL_BIRTH_REG_DATA, asOfDateStr);
+  return clipped ? buildRealDataset(clipped)
+    : noDataDataset(REAL_BIRTH_REG_DATA.id, REAL_BIRTH_REG_DATA.name, REAL_BIRTH_REG_DATA.provider,
+                     REAL_BIRTH_REG_DATA.deliveryFormat, REAL_BIRTH_REG_DATA.sla);
 }
-function buildChildProtectionDatasets(){
+function buildChildProtectionDatasets(asOfDateStr){
   if(!REAL_CP_DATA) return [genDataset(
     "child-protection-family-support.child-protection.cp-clients", "Client Register",
     "Department for Child Protection and Family Support", "CSV (S3 drop)", POOLS.enrollment)];
-  return REAL_CP_DATA.datasets.map(buildRealDataset);
+  return REAL_CP_DATA.datasets.map(d => {
+    const clipped = clipDatasetToAsOf(d, asOfDateStr);
+    return clipped ? buildRealDataset(clipped)
+      : noDataDataset(d.id, d.name, d.provider, d.deliveryFormat, d.sla);
+  });
 }
 
 
@@ -587,16 +739,96 @@ const POOLS = {
   tax:["filer_id","filing_period","filing_date","lodgement_channel","assessed_flag","amendment_count","agent_id","jurisdiction_code"],
 };
 
-function rollup(datasets){ return worstOf(datasets.map(d=> worstOf(d.columns.map(c=>c.status)))); }
+// Datasets with no data as of the currently-selected as-of date
+// (ds.noDataAsOf, Thread C) are excluded from the worst-of - "no data"
+// is a different KIND of signal from a real green/amber/red and must
+// never silently vote "green" (an empty ds.columns list would default
+// worstOf() to green) into its parent collection/agency's own status.
+// If literally every dataset in the group has no data, the group's own
+// status becomes "nodata" too, rather than falling back to a
+// meaningless "green" over an empty list.
+function rollup(datasets){
+  const withData = datasets.filter(d=>!d.noDataAsOf);
+  if(!withData.length) return datasets.length ? "nodata" : "green";
+  return worstOf(withData.map(d=> worstOf(d.columns.map(c=>c.status))));
+}
+// Same "don't let nodata silently win OR silently vanish" logic as
+// rollup() above, one level up (collections -> agency) - a collection's
+// OWN status can itself already be "nodata" (every dataset inside it had
+// none as of the selected date), and a plain worstOf() would never let
+// that surface (STATUS_ORDER.nodata is below green, so it can only ever
+// lose a reduce that starts from "green").
+function rollupStatuses(statuses){
+  const withData = statuses.filter(s=>s!=="nodata");
+  if(!withData.length) return statuses.length ? "nodata" : "green";
+  return worstOf(withData);
+}
 
-const DATA = {
+function toDateStr(d){ return d.toISOString().slice(0,10); }
+function addDaysToDateStr(dateStr, days){
+  const d = new Date(dateStr+"T00:00:00Z");
+  d.setUTCDate(d.getUTCDate()+days);
+  return toDateStr(d);
+}
+// The latest run_date actually present anywhere in committed history -
+// "one shared 'now' across the whole data asset" (Keith's own words,
+// scoping this feature) - computed from qa_results/-derived data rather
+// than live wall-clock time, so it's reproducible run to run like every
+// other date on this page (see TODAY above) instead of drifting with
+// whenever someone happens to load the dashboard.
+function maxRunDate(){
+  let max = null;
+  const consider = runs => (runs||[]).forEach(r=>{ if(!max || r.run_date>max) max = r.run_date; });
+  if(REAL_BIRTH_REG_DATA) consider(REAL_BIRTH_REG_DATA.runs);
+  if(REAL_CP_DATA) (REAL_CP_DATA.datasets||[]).forEach(d=> consider(d.runs));
+  return max;
+}
+// Default as-of date: the data asset's own latest known run date minus
+// AS_OF_OFFSET_DAYS (contract/data-asset.yaml, Thread D) - Keith's
+// confirmed answer for the default basis. Falls back to TODAY when
+// there's no real history to derive it from (the template opened
+// directly, before embed_dashboard_data.py has ever run) - irrelevant to
+// the illustrative-only datasets that path renders anyway.
+function defaultAsOf(){
+  const max = maxRunDate();
+  if(!max || AS_OF_OFFSET_DAYS==null) return max || toDateStr(TODAY);
+  return addDaysToDateStr(max, -AS_OF_OFFSET_DAYS);
+}
+// URL query-string persistence, deliberately separate from the
+// hash-based STATE mechanism used for drill-down navigation (Thread C -
+// "as of" is a global filter over the whole page, not a navigable state
+// someone would want "back" to step through one change at a time). Kept
+// out of the URL entirely when it's just the default, so a plain shared
+// link never implies "someone deliberately chose a date".
+function asOfFromUrl(){
+  const v = new URLSearchParams(location.search).get("asof");
+  return /^\d{4}-\d{2}-\d{2}$/.test(v||"") ? v : null;
+}
+function setAsOfInUrl(dateStr, defaultDateStr){
+  const url = new URL(location.href);
+  if(dateStr === defaultDateStr) url.searchParams.delete("asof");
+  else url.searchParams.set("asof", dateStr);
+  history.replaceState(STATE, "", url.pathname + url.search + location.hash);
+}
+
+const DEFAULT_AS_OF = defaultAsOf();
+let CURRENT_AS_OF = asOfFromUrl() || DEFAULT_AS_OF;
+
+// The whole agencies/collections/datasets literal, and its bottom-up
+// rollup wiring, wrapped in a rebuildable function (was a one-shot const
+// before Thread C) - selecting a new as-of date rebuilds DATA from
+// scratch against that date rather than mutating anything in place, same
+// "no leftover state from the old view" principle as navigate() already
+// uses for drill-down transitions.
+function buildData(asOfDateStr){
+  const data = {
   agencies:[
     {
       id:"registry-services", name:"Registry Services", blurb:"Civil registration of life events for the whole state.",
       collections:[
         { id:"civil-registration", name:"Civil Registration",
           datasets:[
-            buildBirthRegistrations(),
+            buildBirthRegistrations(asOfDateStr),
             genDataset("registry-services.civil-registration.death-registrations","Death Registrations","Registry of Births, Deaths & Marriages (BDM)","CSV (S3 drop)",POOLS.death),
             genDataset("registry-services.civil-registration.marriage-registrations","Marriage Registrations","Registry of Births, Deaths & Marriages (BDM)","CSV (S3 drop)",POOLS.marriage),
           ]},
@@ -605,7 +837,7 @@ const DATA = {
       id:"child-protection-family-support", name:"Department for Child Protection and Family Support",
       blurb:"Casework for children and families needing protection or support services.",
       collections:[
-        { id:"child-protection", name:"Child Protection", datasets: buildChildProtectionDatasets() },
+        { id:"child-protection", name:"Child Protection", datasets: buildChildProtectionDatasets(asOfDateStr) },
       ]},
     {
       id:"health-human-services", name:"Health & Human Services", blurb:"Public health programs and hospital system oversight.",
@@ -656,15 +888,21 @@ const DATA = {
         ]},
       ]},
   ],
-};
-// wire up rollup statuses bottom-up
-DATA.agencies.forEach(ag=>{
-  ag.collections.forEach(col=>{
-    col.datasets.forEach(ds=>{ ds.status = worstOf(ds.columns.map(c=>c.status)); });
-    col.status = rollup(col.datasets);
+  };
+  // wire up rollup statuses bottom-up. A noDataAsOf dataset already
+  // carries its own "nodata" status from noDataDataset() above - its
+  // (empty) columns list must never be re-derived over the top of that,
+  // since worstOf([]) would silently default it back to "green".
+  data.agencies.forEach(ag=>{
+    ag.collections.forEach(col=>{
+      col.datasets.forEach(ds=>{ if(!ds.noDataAsOf) ds.status = worstOf(ds.columns.map(c=>c.status)); });
+      col.status = rollup(col.datasets);
+    });
+    ag.status = rollupStatuses(ag.collections.map(c=>c.status));
   });
-  ag.status = worstOf(ag.collections.map(c=>c.status));
-});
+  return data;
+}
+let DATA = buildData(CURRENT_AS_OF);
 
 /* =========================================================================
    4. SVG CHART HELPERS
@@ -938,6 +1176,13 @@ function renderAgency(view, agencyId){
         <thead><tr><th>Dataset</th><th>Status</th><th>Arrival (today)</th><th>Rows, latest run</th><th>Last QA run</th></tr></thead>
         <tbody>
         ${col.datasets.map(ds=>{
+          if(ds.noDataAsOf){
+            return `<tr data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
+              <td><div class="dataset-name">${ds.name}</div><div class="dataset-provider">${ds.provider}</div></td>
+              <td>${pill(ds.status,"sm")}</td>
+              <td colspan="3" style="color:var(--ink-faint); font-size:12.5px;">No QA run as of the selected date</td>
+            </tr>`;
+          }
           const arrivalPill = ds.lastArrival.onTime ? `<span class="pill green sm"><span class="ico"></span>On time</span>` : `<span class="pill red sm"><span class="ico"></span>Late</span>`;
           return `<tr data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td><div class="dataset-name">${ds.name}${ds.isReal?` <span class="pill tag sm"><span class="ico"></span>Real pipeline data</span>`:""}</div><div class="dataset-provider">${ds.provider}</div></td>
@@ -964,6 +1209,22 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     {tier:"Tier 2",label:ag.name, nav:{tier:"agency",agencyId}},
     {tier:"Tier 3",label:ds.name, nav:{tier:"dataset",agencyId,collectionId,datasetId}},
   ]);
+  if(ds.noDataAsOf){
+    view.innerHTML = `
+      <div class="view-head">
+        <div>
+          <h2>${ds.name} ${pill("nodata")}</h2>
+          <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}</div>
+        </div>
+      </div>
+      <div style="padding:40px 0; color:var(--ink-muted); font-size:14px; max-width:56ch;">
+        No QA run exists for this dataset at or before <b>${fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"))}</b> —
+        the selected "as of" date is earlier than this dataset's first computed run.
+        Pick a later date, or reset to the default, using the 📅 As of control above.
+      </div>
+    `;
+    return;
+  }
   const rowDelta = ds.rowCount - ds.prevRowCount;
   view.innerHTML = `
     <div class="view-head">
@@ -1456,11 +1717,52 @@ document.getElementById("snapshots-btn").addEventListener("click", openSnapshots
 document.getElementById("snapshots-backdrop").addEventListener("click", closeSnapshotsPanel);
 document.getElementById("snapshots-panel-close").addEventListener("click", closeSnapshotsPanel);
 
+// Thread C - as-of date picker. rebuildData() throws the current DATA
+// away and rebuilds it from scratch against the new date (see buildData()
+// above), the same "no leftover state" approach navigate() already uses -
+// then re-renders whatever view/drawer/panel is currently open via
+// renderFromState() so picking a date doesn't also silently close
+// whatever the person was looking at.
+function updateAsOfButtonLabel(){
+  const label = document.getElementById("asof-btn-label");
+  if(label) label.textContent = fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"));
+}
+function applyAsOf(dateStr){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+  CURRENT_AS_OF = dateStr;
+  DATA = buildData(CURRENT_AS_OF);
+  setAsOfInUrl(CURRENT_AS_OF, DEFAULT_AS_OF);
+  updateAsOfButtonLabel();
+  renderFromState();
+}
+function openAsOfPanel(){
+  document.getElementById("asof-input").value = CURRENT_AS_OF;
+  document.getElementById("asof-default-label").textContent = fmtDate(new Date(DEFAULT_AS_OF+"T00:00:00Z"));
+  document.getElementById("asof-backdrop").classList.add("open");
+  document.getElementById("asof-panel").classList.add("open");
+  document.getElementById("asof-panel").setAttribute("aria-hidden","false");
+}
+function closeAsOfPanel(){
+  document.getElementById("asof-backdrop").classList.remove("open");
+  document.getElementById("asof-panel").classList.remove("open");
+  document.getElementById("asof-panel").setAttribute("aria-hidden","true");
+}
+document.getElementById("asof-btn").addEventListener("click", openAsOfPanel);
+document.getElementById("asof-backdrop").addEventListener("click", closeAsOfPanel);
+document.getElementById("asof-panel-close").addEventListener("click", closeAsOfPanel);
+document.getElementById("asof-input").addEventListener("change", (e)=> applyAsOf(e.target.value));
+document.getElementById("asof-reset-btn").addEventListener("click", ()=>{
+  document.getElementById("asof-input").value = DEFAULT_AS_OF;
+  applyAsOf(DEFAULT_AS_OF);
+});
+updateAsOfButtonLabel();
+
 document.getElementById("backdrop").addEventListener("click", closeDrawer);
 document.getElementById("drawer-close").addEventListener("click", closeDrawer);
 document.addEventListener("keydown", (e)=>{
   if(e.key!=="Escape") return;
   if(document.getElementById("snapshots-panel").classList.contains("open")) closeSnapshotsPanel();
+  else if(document.getElementById("asof-panel").classList.contains("open")) closeAsOfPanel();
   else if(STATE && STATE.checkKey) closeCheckPanel();
   else closeDrawer();
 });

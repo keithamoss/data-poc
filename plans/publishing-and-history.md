@@ -560,14 +560,83 @@ still reports the same 258 checks/zero errors (the removed block was
 root-level, never inside `check_lifecycle.py`'s per-check `quality:`
 parsing), full pytest + ruff clean.
 
-**Not yet built**: the offset value is now configured (correctly
-scoped) and verified parseable, but nothing reads it into the
-dashboard build yet, and none of Thread C's actual UI (as-of date
-picker, URL param persistence, "no data available" below-threshold
-state) or querying logic (how the dashboard computes/displays state
-"as of" an arbitrary past date against committed history) exists yet -
-a genuinely separate, larger piece of work from configuring the one
-number.
+**Built, 2026-09-16 (same day, Phase 4): the actual as-of date picker
+UI, querying logic, and "no data available" state.** Two forks scoped
+with Keith via AskUserQuestion before building, both answered against
+the recommended default:
+- **One global as-of date control for the whole dashboard, not
+  per-dataset** - a single header button (📅, next to "🕐 Past
+  snapshots" - a deliberately separate entry point, per the
+  already-confirmed design above) opens a small picker panel; picking a
+  date rebuilds every real dataset's view against it at once.
+- **Default date basis: "one shared 'now' across the whole data
+  asset"** (Keith's own words), not each dataset's own latest run. I
+  reasoned - not yet separately re-confirmed by Keith beyond the
+  AskUserQuestion answer itself - that this "shared now" should be a
+  deterministic quantity computed from committed history (the max
+  `run_date` across every real dataset's `runs`, BDM and every CP table
+  alike) rather than live wall-clock time, matching this project's
+  existing reproducibility ethos (`TODAY` at the top of the dashboard
+  script is already the same kind of fixed, seeded quantity for the
+  illustrative datasets) - `maxRunDate()`/`defaultAsOf()` in the
+  template. `AS_OF_OFFSET_DAYS` (Thread D's `contract/data-asset.yaml`
+  value, re-embedded by `embed_dashboard_data.py` alongside the two
+  real data consts) is then subtracted from that date to get the actual
+  default.
+
+Mechanics, all in `dashboard/qa-reporting-dashboard.template.html`:
+- `clipDatasetToAsOf(d, asOfDateStr)` (written earlier alongside the
+  scoping work above) filters a raw real dataset to only its runs at or
+  before the picked date, recomputing history/current/previous/row
+  counts/arrival from that clipped set; returns `null` when no run
+  qualifies yet.
+- `noDataDataset(...)` is the placeholder shown when `clipDatasetToAsOf`
+  returns `null` - status `"nodata"`, deliberately NOT shaped like a
+  real dataset (empty `columns`, `null` `lastArrival`) so a render path
+  that forgets to check `ds.noDataAsOf` fails loudly instead of
+  rendering wrong numbers.
+- `"nodata"` sits below `green` in `STATUS_ORDER` (order `-1`) so it can
+  never silently win a `worstOf()` reduce (would either mask a real
+  problem or look like the worst possible outcome) - `worstOf()` alone
+  also can't let it win an ALL-nodata rollup (an empty-after-filtering
+  reduce just falls back to its `"green"` seed), so `rollup()`
+  (datasets → collection) and the new `rollupStatuses()` (collections →
+  agency) both special-case that "every child is nodata" case
+  explicitly rather than relying on the reduce.
+- `buildData(asOfDateStr)` - the whole `agencies:[...]` literal plus its
+  bottom-up rollup wiring, which used to be a one-shot `const DATA =
+  {...}`, is now a function; `DATA` itself is `let`, rebuilt from
+  scratch (`DATA = buildData(CURRENT_AS_OF)`) on every date change -
+  same "no leftover state from the old view" principle `navigate()`
+  already uses for drill-down transitions, not a mutate-in-place update.
+- URL persistence via a plain `?asof=YYYY-MM-DD` query-string param -
+  deliberately NOT folded into the existing hash-based `STATE`
+  mechanism (`stateToHash`/`hashToState`/`popstate`), since as-of is a
+  global filter over the whole page, not a per-navigation state someone
+  would want the browser's own back/forward to step through one change
+  at a time. Omitted from the URL entirely when it equals the computed
+  default, so a plain shared link never implies "someone deliberately
+  picked a date" when nobody did.
+- `renderAgency()`'s dataset table and `renderDataset()`'s dataset view
+  both gained an explicit `ds.noDataAsOf` branch (a collapsed table row;
+  a "no QA run as of this date" empty state) rather than reaching into
+  `ds.lastArrival`/`ds.columns` unconditionally, which would otherwise
+  crash on `noDataDataset()`'s intentionally-sparse shape.
+- New `.pill.nodata` CSS treatment (dashed border, muted, matching the
+  existing `.pill.illustrative` tone - "no data" is a different kind of
+  signal from green/amber/red, not a fourth severity level).
+
+Verified for real: `uv run python3 -m dashboard.check_dashboard_renders`
+(built output AND template both render clean, zero console errors) plus
+a separate real headless-Chromium functional script (not just the
+render-cleanliness check) driving the actual picker - confirmed the
+default date computes sanely, picking a date before Birth
+Registrations'/Child Protection's earliest run shows the "no data"
+empty state at both the dataset-detail and agency-table-row levels (and
+doesn't crash the executive tier either), the URL gains/loses `?asof=`
+correctly, and resetting to the default restores the real dataset view
+and removes the URL param. Full `uv run pytest` (170 passed) and `uv
+run ruff check .` clean.
 
 ## Build order
 
@@ -1600,7 +1669,7 @@ clicks to actually close after picking multiple "Compared run" dates)
 own explicit instruction to resolve it at the end of the next phase
 rather than now.
 
-**Phase 4 (Thread C - cadence-aware "as of" viewing):**
+**Phase 4 (Thread C - cadence-aware "as of" viewing) - [DONE, 2026-09-16]:**
 - Depends on Phase 1 and Phase 2 (real committed history, merged/
   reshaped) - NOT on Phase 3. Worth being explicit about this: the
   numbering reads sequential, but Phase 4 isn't actually blocked by

@@ -18,17 +18,22 @@ scoped.
   dashboard follow-ups.
 - `plans/performance.md` - narrowly the real-tool orchestration scripts'
   runtime.
-- `plans/publishing-and-history.md` - scoped but NOT YET BUILT: how QA
-  results become a durable, committed, multi-person-publishable history
-  (superseding today's gitignored `reports/*.json`), CI-gated publishing
-  with no manual local-publish path, check retirement/definition-change
-  versioning, and cadence-aware "as of" viewing (one data-asset-level
-  offset, motivated by non-daily datasets but applied globally - see
-  that file's Thread C for the 2026-09-16 correction on this point).
-  Read this before touching anything related to `reports/*.json`
-  gitignore status, the dashboard's publish/deploy path, or check
-  lifecycle - the design already accounts for changes in this area that
-  haven't landed in code yet.
+- `plans/publishing-and-history.md` - how QA results become a durable,
+  committed, multi-person-publishable history (superseding today's
+  gitignored `reports/*.json`), CI-gated publishing with no manual
+  local-publish path, check retirement/definition-change versioning, and
+  cadence-aware "as of" viewing (one data-asset-level offset, motivated
+  by non-daily datasets but applied globally - see that file's Thread C
+  for the 2026-09-16 correction on this point). Phases 1-4 are BUILT
+  (results storage/check-lifecycle format, history-only dashboard
+  rebuild, CI-gated publish with no local commit-back, and the as-of
+  date picker itself); Phase 5 (check-lifecycle/changelog UI) and Phase
+  6 (test coverage pass) are still open - see that file's own "Build
+  order" section for the phase-by-phase detail. Read this before
+  touching anything related to `reports/*.json` gitignore status, the
+  dashboard's publish/deploy path, check lifecycle, or the as-of
+  viewing/picker - the design already accounts for changes in this area
+  that haven't all landed in code yet.
 
 ## Who this is for
 
