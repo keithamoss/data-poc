@@ -72,6 +72,30 @@ def read_dataset_stats(agency: str, dataset: str, run_id: str,
     return committed.get("raw_output")
 
 
+def read_run_provenance(agency: str, dataset: str, run_id: str,
+                         qa_results_dir: Path | str = QA_RESULTS_DIR) -> dict | None:
+    """The `run_timestamp`/`run_by` envelope fields for one run - unlike
+    read_dataset_stats() above (which returns only the `raw_output`
+    payload, the shape every existing caller already expects), this
+    reads the two provenance fields write_qa_result() stamps ALONGSIDE
+    raw_output, not inside it. Added for qa_tools/common/changelog.py
+    (plans/publishing-and-history.md Phase 3's changelog feature,
+    2026-09-16) - a separate function rather than reshaping
+    read_dataset_stats() itself, since that would break every existing
+    caller's assumption that its return value IS the raw_output dict.
+    Reads dataset_stats.json specifically since it's the one file
+    guaranteed to exist for every run (orchestrate_bdm.py's/
+    orchestrate_cp.py's own dataset_stats write is where run_by gets
+    stamped - see write_qa_result()'s own docstring). Returns None if
+    this run has no committed dataset_stats.json."""
+    path = Path(qa_results_dir) / agency / dataset / run_id / "dataset_stats.json"
+    if not path.exists():
+        return None
+    with open(path) as f:
+        committed = json.load(f)
+    return {"run_timestamp": committed.get("run_timestamp"), "run_by": committed.get("run_by")}
+
+
 def read_qa_results(agency: str, dataset: str, qa_results_dir: Path | str = QA_RESULTS_DIR) -> list[dict]:
     """Every committed run's every tool's `verified` records for one
     `agency`/`dataset` pair, concatenated in run-id then tool order.

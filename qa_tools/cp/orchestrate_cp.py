@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 import duckdb
 
 from qa_tools.common import parallel_orchestrate
+from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import build_cp_warehouses
@@ -44,7 +45,7 @@ RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
 CP_DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
 
 
-def _run_one(entry: dict, run_timestamp: str, reference_run_id: str) -> list[dict]:
+def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str) -> list[dict]:
     run_id = entry["run_id"]
     print(f"--- {run_id} ---")
 
@@ -59,7 +60,10 @@ def _run_one(entry: dict, run_timestamp: str, reference_run_id: str) -> list[dic
     conn = duckdb.connect(os.path.join(CP_DUCKDB_RUNS_DIR, f"{run_id}.duckdb"), read_only=True)
     stats = dataset_stats.compute_dataset_stats(conn, entry)
     conn.close()
-    write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, "dataset_stats", stats)
+    # run_by stamped only on this write - see orchestrate_bdm.py's
+    # identical comment.
+    write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, "dataset_stats", stats,
+                     run_by=run_by)
 
     return results
 
@@ -77,8 +81,11 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     # and plans/qa-pipeline.md for the bug this was found as.
     reference_run_id = manifest[0]["run_id"]
     run_timestamp = datetime.now(timezone.utc).isoformat()
+    # Fails loudly here, before any real tool runs - see orchestrate_bdm.py's
+    # identical comment and git_identity.py's own docstring.
+    run_by = get_run_by()
     all_results = parallel_orchestrate.run_manifest(
-        manifest, _run_one, run_timestamp, reference_run_id, sequential=sequential)
+        manifest, _run_one, run_timestamp, run_by, reference_run_id, sequential=sequential)
 
     # Same rationale as orchestrate_bdm.py's identical block.
     dataset_stats_by_run = {}

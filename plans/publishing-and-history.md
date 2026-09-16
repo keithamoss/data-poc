@@ -918,12 +918,122 @@ own ask:**
   repo's own "verify a regression test actually fails first, then fix"
   convention.
 
-**Not yet built - the remaining piece of Phase 3**: the changelog/
-activity-feed DATA logic (reshaping git commit history over the
-committed result paths into "who published what, when" feed entries -
-the feed's own UI is Phase 5 regardless). The gate-and-publish
-mechanism above is real and verified; this is a genuinely separate
-piece of work, flagged rather than silently skipped or rushed.
+**Changelog/activity-feed DATA logic - built and verified, 2026-09-16**
+(the feed's own UI is still Phase 5 - this is only the data side):
+
+Scoped with Keith across several rounds before building, each one a
+real fork, not a rubber-stamp:
+- **What a feed line looks like**: one line per dataset, "\<dataset\>
+  QA'd by \<person\> on \<the real time it was QA'd\>", with the actual
+  commit time available too so the two can be compared - Keith's own
+  framing, motivated by wanting a real signal for "QA'd today but not
+  published for days."
+- **Grouping key**: Keith's own objection to naive git-commit-history
+  reconstruction - "someone could easily QA multiple datasets and do a
+  single commit," so a commit can't be the feed's unit of grouping.
+  Resolved once traced through: `orchestrate_bdm.py`'s/
+  `orchestrate_cp.py`'s own `run_timestamp` is already stamped
+  identically across every file from one invocation, so grouping by
+  `(agency, dataset, run_timestamp)` reconstructs one real QA event per
+  dataset for free, regardless of how many datasets later land in the
+  same commit.
+- **Attribution field**: `run_by` = `git config user.email`, not name -
+  email is required to make any commit at all, so it's exactly as
+  reliably available as name, and disambiguates two people sharing a
+  display name. **Fail loudly and early** if unset (Keith's call,
+  matching `check_lifecycle.py`'s `MissingCheckIdError` posture) -
+  raised before any real tool runs, not partway through.
+- **Where "committed at" comes from - the real design turn**: the
+  first design (self-record `commit_sha`/`committed_at` locally, right
+  after `git commit`, into a small companion file/ledger) looked
+  simpler and was seriously considered, including a pre-commit-hook
+  variant that would bake it into the same commit. Both broken by the
+  same real problem, surfaced by Keith asking directly how this would
+  hold up with multiple people's working copies: a commit made
+  locally, pre-push, can still be rebased before it reaches the shared
+  branch - rebasing rewrites the commit's SHA and (git's own default
+  behaviour) bumps its committer date to rebase time. Self-recording
+  "committed at 9:05am" locally, then pushing at 2pm after a rebase,
+  leaves a ledger entry that's not just imprecise but silently wrong -
+  in exactly the "QA'd today, published days later" scenario this
+  feature exists to catch. No local hook (pre-commit, post-commit,
+  pre-push) can fix this: none of them fire after the push is actually
+  accepted by the remote, so none of them can know if or when a
+  rebase will happen. The only thing that knows "did this actually
+  land, and when" is the real, already-pushed branch - so `committed_
+  at`/`commit_sha` are resolved by reading that, not by recording a
+  local guess. Content-based lookup (walking history and reading what
+  each commit's diff actually introduced) is also naturally rebase-safe
+  in a way SHA-based self-recording can never be: it finds the commit
+  wherever the content ends up living, no matter how many times that
+  content got replayed onto a new base getting there.
+- **Performance at scale, also raised directly by Keith** ("what about
+  a thousand commits after a year?"): the first version of the
+  content-based lookup did one `git log -S"<value>"` pickaxe search per
+  distinct `run_timestamp`, each independently re-walking the same
+  commit history - O(events) searches x O(commits) each = effectively
+  O(events^2). Fixed before building: walk each dataset's own commit
+  history ONCE, read every commit's own diff for whatever
+  `run_timestamp` value(s) it introduced, in a single pass - O(commits)
+  total. Not a problem this PoC has yet at 25 runs, but the fix was
+  real, not deferred, since the whole design exercise was about not
+  papering over exactly this kind of thing.
+- **Historical data**: the 25 already-committed runs predated `run_by`
+  and can't be backfilled honestly (no way to know who ran a run
+  that's already over) - Keith's call: nuke and regenerate rather than
+  leave them unattributed or fake an answer. (This does collapse
+  several genuinely distinct historical `run_timestamp` values - one
+  per real regeneration this session - into a single fresh one; a
+  known, accepted, explicitly-flagged trade, not an oversight.)
+
+**Built**:
+- `qa_tools/common/git_identity.py` (new) - `get_run_by()` +
+  `MissingGitIdentityError`.
+- `qa_tools/common/qa_results_writer.py` - `write_qa_result()` gained
+  an optional `run_by` param, stamped alongside `run_timestamp` (always
+  present as a key, `None` when a caller doesn't pass it - same shape
+  `verified` already uses). Only `orchestrate_bdm.py`'s/
+  `orchestrate_cp.py`'s own `dataset_stats` write passes it - one value
+  per run is all the changelog needs, and `dataset_stats.json` is the
+  one file guaranteed to exist for every run; the other 8 `run_*.py`
+  writes are unchanged.
+- `orchestrate_bdm.py`/`orchestrate_cp.py` - `run_pipeline()`/
+  `run_pipeline_cp()` call `get_run_by()` once, before any real tool
+  runs (fails loudly and early), and thread it through `_run_one()`.
+- `qa_tools/common/qa_results_reader.py` - new `read_run_provenance()`,
+  reading the `run_timestamp`/`run_by` envelope fields (not
+  `raw_output`, which `read_dataset_stats()` already owns and every
+  existing caller already assumes is the whole return value - a
+  separate function rather than reshaping that one, to avoid breaking
+  every existing caller).
+- `qa_tools/common/changelog.py` (new) - `build_changelog(agency,
+  dataset)`: groups by `(agency, dataset, run_timestamp)` from
+  committed file content, resolves `commit_sha`/`committed_at` via the
+  single-pass git-history walk described above. Not yet wired into the
+  published dashboard JSON or CI (no UI exists to consume it yet - see
+  Phase 5) - a standalone, tested, `python3 -m qa_tools.common.
+  changelog <agency> <dataset>`-invokable module for now.
+- 3 tests (`tests/test_changelog.py`, real temp git repo, same pattern
+  as `test_validate_check_lifecycle.py`) - including one that
+  specifically exercises Keith's original objection: two datasets QA'd
+  and committed together in ONE commit still produce two separate feed
+  events, each with its own `run_timestamp`/`run_by`, sharing only the
+  commit metadata. 3 more for `git_identity.py` (real subprocess
+  against a real temp repo, including the "email configured but empty"
+  and "not configured at all" failure modes). 2 more in
+  `test_qa_results_writer.py` for the new `run_by` param.
+- All 25 historical runs (15 BDM + 10 CP) regenerated fresh (nuked
+  first, per Keith's call above) - verified same 1214 BDM / 1770 CP
+  check-result counts as before (no regression), `run_by` confirmed
+  present and identical across every file from the same invocation
+  (one `git config user.email` read per orchestrator run, as designed).
+  Rebuilt `reports/*.json` from the fresh history and re-embedded the
+  dashboard - both CI gates (`validate_check_lifecycle`,
+  `check_dashboard_renders`, the latter via `PLAYWRIGHT_CHROMIUM_PATH`
+  for this environment's pre-installed Chromium) pass clean; the local
+  dashboard re-embed itself was reverted before committing, per this
+  project's own "only CI commits that file's data" convention. Full
+  pytest (149 tests, 8 new) + ruff clean.
 
 **Follow-on, same day (2026-09-16) - the CI-vs-human push race, and
 removing the commit-back step entirely:**

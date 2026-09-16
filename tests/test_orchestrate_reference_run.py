@@ -61,7 +61,8 @@ def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypat
     # A reference deliberately different from run_evidently_bdm's own
     # hardcoded REFERENCE_RUN_ID default - the whole point being that
     # _run_one must forward exactly what it's given, not fall back.
-    orchestrate_bdm._run_one(entry, "2099-01-05T00:00:00Z", "run_01_2099-01-01", "run_01_2099-01-01.csv")
+    orchestrate_bdm._run_one(entry, "2099-01-05T00:00:00Z", "test@example.com",
+                              "run_01_2099-01-01", "run_01_2099-01-01.csv")
 
     assert captured["reference_run_id"] == "run_01_2099-01-01"
     assert captured["reference_run_id"] != orchestrate_bdm.run_evidently_bdm.REFERENCE_RUN_ID
@@ -84,7 +85,7 @@ def test_cp_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatc
     monkeypatch.setattr(orchestrate_cp.duckdb, "connect", lambda *a, **k: _FakeConn())
 
     entry = {"run_id": "cp_run_05_2099-02-02"}
-    orchestrate_cp._run_one(entry, "2099-02-02T00:00:00Z", "cp_run_01_2099-01-01")
+    orchestrate_cp._run_one(entry, "2099-02-02T00:00:00Z", "test@example.com", "cp_run_01_2099-01-01")
 
     assert captured["reference_run_id"] == "cp_run_01_2099-01-01"
     assert captured["reference_run_id"] != orchestrate_cp.run_evidently_cp.REFERENCE_RUN_ID

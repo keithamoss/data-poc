@@ -65,6 +65,22 @@ def test_write_qa_result_defaults_verified_to_empty_list(tmp_path):
     assert written["verified"] == []
 
 
+def test_write_qa_result_stamps_run_by_alongside_run_timestamp(tmp_path):
+    out_path = write_qa_result("agency", "dataset", "run_01", "2026-01-01T00:00:00Z", "dataset_stats", {},
+                                run_by="keith@example.com", results_dir=tmp_path)
+
+    written = json.loads(out_path.read_text())
+    assert written["run_by"] == "keith@example.com"
+
+
+def test_write_qa_result_defaults_run_by_to_none(tmp_path):
+    out_path = write_qa_result("agency", "dataset", "run_01", "2026-01-01T00:00:00Z", "dbt", {},
+                                results_dir=tmp_path)
+
+    written = json.loads(out_path.read_text())
+    assert written["run_by"] is None
+
+
 def test_write_qa_result_overwrites_a_rerun_of_the_same_tool_and_run(tmp_path):
     write_qa_result("agency", "dataset", "run_01", "2026-01-01T00:00:00Z", "dbt", {"version": 1}, results_dir=tmp_path)
     out_path = write_qa_result("agency", "dataset", "run_01", "2026-01-02T00:00:00Z", "dbt", {"version": 2}, results_dir=tmp_path)

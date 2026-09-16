@@ -31,6 +31,7 @@ from datetime import datetime, timezone
 import duckdb
 
 from qa_tools.common import parallel_orchestrate
+from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import build_per_run_warehouses
@@ -49,7 +50,7 @@ AGENCY_ID = "registry-services"
 DATASET_ID = "birth-registrations"
 
 
-def _run_one(entry: dict, run_timestamp: str, reference_run_id: str, reference_csv: str) -> list[dict]:
+def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str, reference_csv: str) -> list[dict]:
     run_id = entry["run_id"]
     csv_filename = entry["file"]
     print(f"--- {run_id} ---")
@@ -70,7 +71,11 @@ def _run_one(entry: dict, run_timestamp: str, reference_run_id: str, reference_c
     conn = duckdb.connect(WAREHOUSE_DB_PATH, read_only=True)
     stats = dataset_stats.compute_dataset_stats(conn, run_id, entry)
     conn.close()
-    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "dataset_stats", stats)
+    # run_by stamped only on this write, not the 4 real-tool writes above -
+    # one value per run is all qa_tools/common/changelog.py needs, and
+    # dataset_stats.json is the one file guaranteed to exist for every
+    # run (see write_qa_result()'s own docstring).
+    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "dataset_stats", stats, run_by=run_by)
 
     return results
 
@@ -92,8 +97,12 @@ def run_pipeline(sequential: bool = False) -> dict:
     # plans/qa-pipeline.md for the regression test this got.
     reference_entry = manifest[0]
     run_timestamp = datetime.now(timezone.utc).isoformat()
+    # Fails loudly here, before any real tool runs, if git identity isn't
+    # configured (Keith's call, 2026-09-16) - see git_identity.py's own
+    # docstring for why this can't fall back to "unknown".
+    run_by = get_run_by()
     all_results = parallel_orchestrate.run_manifest(
-        manifest, _run_one, run_timestamp, reference_entry["run_id"], reference_entry["file"],
+        manifest, _run_one, run_timestamp, run_by, reference_entry["run_id"], reference_entry["file"],
         sequential=sequential)
 
     # Read back rather than threaded through _run_one's own return value -

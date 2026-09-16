@@ -86,6 +86,7 @@ QA_RESULTS_DIR = ROOT / "qa_results"
 
 def write_qa_result(agency: str, dataset: str, run_id: str, run_timestamp: str,
                      tool: str, raw_output: Any, verified: list[dict] | None = None,
+                     run_by: str | None = None,
                      results_dir: Path = QA_RESULTS_DIR) -> Path:
     """Writes one tool's native raw output for one run to a committed
     JSON file. `raw_output` must already be JSON-serializable (a plain
@@ -101,14 +102,24 @@ def write_qa_result(agency: str, dataset: str, run_id: str, run_timestamp: str,
     it) - optional only so tests/ad-hoc calls that don't care about it
     can omit it; every real `run_*.py` caller passes it.
 
-    Wraps the raw output with `run_timestamp` alongside it (not inside
-    it - never mutates what the tool actually produced) so the file
-    carries real provenance without touching the tool's own payload.
-    Returns the path written."""
+    `run_by` (qa_tools/common/git_identity.py's get_run_by(), the local
+    git user.email) is the changelog feature's attribution field
+    (plans/publishing-and-history.md Phase 3, 2026-09-16) - only
+    orchestrate_bdm.py's/orchestrate_cp.py's own `dataset_stats` write
+    passes it, since one value per run is all the changelog needs
+    (qa_tools/common/changelog.py reads it from there); the other 8
+    run_*.py callers leave it None, same "always present as a key,
+    defaulted" shape `verified` already uses.
+
+    Wraps the raw output with `run_timestamp` (and `run_by`) alongside
+    it (not inside it - never mutates what the tool actually produced)
+    so the file carries real provenance without touching the tool's own
+    payload. Returns the path written."""
     run_dir = results_dir / agency / dataset / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     out_path = run_dir / f"{tool}.json"
-    payload = {"run_timestamp": run_timestamp, "raw_output": raw_output, "verified": verified or []}
+    payload = {"run_timestamp": run_timestamp, "run_by": run_by,
+               "raw_output": raw_output, "verified": verified or []}
     with open(out_path, "w") as f:
         json.dump(payload, f, indent=2, default=str)
     return out_path
