@@ -315,6 +315,23 @@ record (the lifecycle metadata itself, plus git's own commit history on
 the check-definition files, which already provides an equivalent
 changelog for THAT concern without needing to be merged into this one).
 
+**UI, resolved - a real gap until Keith flagged it, the data model above
+had been specified but not where/how it's actually shown:**
+- **Placement: same pattern as the existing "🕐 Past snapshots" header
+  button + side panel** - a new header button (e.g. "📋 Recent
+  activity") opening a panel that lists entries, deliberately consistent
+  with an interaction pattern that's already built rather than a new one.
+- **Scope: one global feed across all 30 datasets**, not per-dataset -
+  matches the original framing ("who's committed/pushed what dataset's
+  QA recently") as a single cross-cutting view, useful for someone
+  wanting an overview of what's happening across the whole register
+  without checking dataset by dataset.
+- **Depth: bounded to recent activity** (something like the last 20-50
+  entries, or a time window - exact number not yet pinned down), not a
+  full scrollable history - matches the "recent" framing of the original
+  ask. Git's own history is already the permanent record for anyone who
+  needs to go further back than this feed shows.
+
 ## Thread C - cadence-aware "as of" viewing (build last - depends on B/D)
 
 Daily and quarterly datasets need different framing. Showing "today's"
