@@ -707,7 +707,7 @@ additive field, never by mutating what the tool itself reported.
   plus 2 more in `test_qa_results_writer.py` for `verified`), ruff
   clean.
 
-**Phase 3 (Thread A - CI-gated publishing) - [in progress, 2026-09-16]:**
+**Phase 3 (Thread A - CI-gated publishing) - [complete, 2026-09-16]:**
 - Wires Phase 1's validation logic into the CI gate, alongside the
   structural checks and the headless-browser render check.
 - Removes any local-publish path - CI is the only path, per Thread A's
