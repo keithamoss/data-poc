@@ -1427,22 +1427,44 @@ not a schedule.
     via a `--prepare-site <dir>` flag on `snapshot_dashboard.py`'s own
     `main()` rather than a separate script, so there's no risk of the
     workflow importing a stale copy. `deploy-pages.yml`'s "Prepare site"
-    step is now a single line: `python3 -m dashboard.snapshot_dashboard
-    --prepare-site _site` - no `uv sync` needed there, everything used
-    is stdlib.
+    step is now: `uv run --no-project python3 -m dashboard.
+    snapshot_dashboard --prepare-site _site`.
 
-    Verified for real, not just unit-tested: ran that exact command
-    (`python3 -m dashboard.snapshot_dashboard --prepare-site <dir>`)
-    with a bare `python3` from the repo root, matching the CI
-    environment - correctly produced `index.html` plus all 4 real
-    committed snapshots decompressed under `snapshots/`, confirming
-    namespace-package `-m` resolution works without `dashboard/`
-    needing an `__init__.py`. 6 new tests (24 total in
-    `tests/test_snapshot_dashboard.py`, 95 repo-wide): `prepare_deploy_
-    site()`'s copy/decompress/manifest/no-snapshots-dir behaviour, an
-    explicit byte-for-byte-identical check between the local and deploy
-    decompression paths, and the `--prepare-site` CLI flag itself
-    (including its usage-error case). `uv run ruff check .` clean.
+    Verified for real, not just unit-tested: ran `python3 -m dashboard.
+    snapshot_dashboard --prepare-site <dir>` from the repo root -
+    correctly produced `index.html` plus all 4 real committed snapshots
+    decompressed under `snapshots/`, confirming namespace-package `-m`
+    resolution works without `dashboard/` needing an `__init__.py`. 6
+    new tests (24 total in `tests/test_snapshot_dashboard.py`, 95
+    repo-wide): `prepare_deploy_site()`'s copy/decompress/manifest/no-
+    snapshots-dir behaviour, an explicit byte-for-byte-identical check
+    between the local and deploy decompression paths, and the
+    `--prepare-site` CLI flag itself (including its usage-error case).
+    `uv run ruff check .` clean.
+
+    **Correction, same day (2026-09-16) - Keith's own catch:** this
+    entry originally said the deploy step should invoke a bare `python3`
+    since the script only needs stdlib, "so no uv/dependency install
+    needed" - wrong. Keith asked directly: are we sure GitHub Pages
+    deployment can't use uv? It can - nothing stops it, and this repo's
+    own convention (CLAUDE.md: "Always through `uv run`, not a bare
+    `python3`... nothing should depend on... a system Python that
+    happens to have the right packages") applies in CI too, not just to
+    local dev machines. "Needs no third-party packages" and "so skip uv"
+    had been quietly conflated. The actual constraint was narrower: a
+    plain `uv run` in this repo's directory would sync the FULL project
+    dependency set from `pyproject.toml` (dbt-core, Soda Core,
+    datacontract-cli, Evidently, pandas...) before running anything -
+    genuinely unwanted for a step that only needs stdlib and would slow
+    every deploy. `uv run --no-project` resolves that: it skips the
+    project-context dependency sync entirely while still running through
+    uv's own pinned Python rather than trusting whatever `python3`
+    happens to be preinstalled on the runner. Verified locally
+    (`uv run --no-project python3 -m dashboard.snapshot_dashboard
+    --prepare-site <dir>`, ~0.15s, no dependency sync triggered) before
+    changing the workflow. `.github/workflows/deploy-pages.yml` now adds
+    an `astral-sh/setup-uv@v10` step before "Prepare site" and runs the
+    script through `uv run --no-project`.
 
 27. **[parked]** Versioning the checks themselves, with that version
     flowing through to the results/data each check run captures - Keith's

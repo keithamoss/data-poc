@@ -23,7 +23,13 @@ name: Deploy dashboard to GitHub Pages
 # pipeline.sh via that module's main()), not a separate shell gunzip
 # loop reimplementing the same logic - scoped 2026-09-16, Keith's own
 # ask, so a local run is a genuine dry run of what this step will do.
-# Stdlib only, so no uv/dependency install needed here.
+# Run via `uv run --no-project`, matching this repo's own convention of
+# never trusting a bare `python3` (CLAUDE.md) - `--no-project` skips
+# syncing the full dbt-core/Soda Core/datacontract-cli/Evidently
+# dependency set from pyproject.toml (this script only needs stdlib, and
+# that install would be slow and pointless for a deploy step), while
+# still running through uv's own pinned Python rather than whatever
+# happens to be preinstalled on the runner.
 
 on:
   push:
@@ -52,8 +58,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10
+
       - name: Prepare site
-        run: python3 -m dashboard.snapshot_dashboard --prepare-site _site
+        run: uv run --no-project python3 -m dashboard.snapshot_dashboard --prepare-site _site
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

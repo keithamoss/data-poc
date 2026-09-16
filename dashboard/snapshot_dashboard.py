@@ -224,10 +224,17 @@ def prepare_deploy_site(site_dir: Path, html_path: Path = DASHBOARD_HTML,
     this deploy step in CI - running the local command really is a dry
     run of what deploy will do, not just something that resembles it.
 
-    No dependency on this project's `uv`-managed environment: everything
-    used here is Python stdlib, so CI can invoke this with a bare
-    `python3`, no `uv sync` needed for what is otherwise just a file-copy
-    step."""
+    Doesn't need this project's full `uv`-managed dependency set (dbt-
+    core, Soda Core, datacontract-cli, Evidently, ...) - everything used
+    here is Python stdlib. CI still runs this through `uv run
+    --no-project` rather than a bare `python3`, per this repo's own
+    convention of never trusting whatever interpreter happens to be
+    preinstalled on a machine (CLAUDE.md) - `--no-project` gets uv's
+    pinned Python without triggering a full dependency sync for what's
+    otherwise just a file-copy step. (An earlier version of this
+    docstring said CI should use a bare `python3` here since nothing but
+    stdlib is needed - wrong: "doesn't need extra packages" and "so skip
+    uv" aren't the same thing. Corrected 2026-09-16, Keith's own catch.)"""
     site_dir.mkdir(parents=True, exist_ok=True)
     (site_dir / "index.html").write_bytes(html_path.read_bytes())
 
