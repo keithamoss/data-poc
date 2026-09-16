@@ -1,0 +1,1817 @@
+{
+  "run_timestamp": "2026-09-16T09:51:07.495445+00:00",
+  "raw_output": {
+    "metadata": {
+      "dbt_schema_version": "https://schemas.getdbt.com/dbt/run-results/v6.json",
+      "dbt_version": "1.12.4",
+      "generated_at": "2026-09-16T09:51:12.959333Z",
+      "invocation_id": "946f052e-0683-4c83-878b-4c180cf16670",
+      "invocation_started_at": "2026-09-16T09:51:08.920659Z",
+      "env": {}
+    },
+    "results": [
+      {
+        "status": "success",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:10.930911Z",
+            "completed_at": "2026-09-16T09:51:10.938449Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:10.939000Z",
+            "completed_at": "2026-09-16T09:51:10.995966Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.06678628921508789,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "OK",
+        "failures": null,
+        "unique_id": "model.birth_registrations.stg_cp_carers",
+        "compiled": true,
+        "compiled_code": "with source as (\n    select * from \"cp_run_04_2026-08-03\".\"raw\".\"cp_carers\"\n)\n\nselect * from source",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main\".\"stg_cp_carers\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "success",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.001280Z",
+            "completed_at": "2026-09-16T09:51:11.003324Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.003818Z",
+            "completed_at": "2026-09-16T09:51:11.024691Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.025059938430786133,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "OK",
+        "failures": null,
+        "unique_id": "model.birth_registrations.stg_cp_case_workers",
+        "compiled": true,
+        "compiled_code": "with source as (\n    select * from \"cp_run_04_2026-08-03\".\"raw\".\"cp_case_workers\"\n)\n\nselect * from source",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main\".\"stg_cp_case_workers\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "success",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.029006Z",
+            "completed_at": "2026-09-16T09:51:11.031457Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.031959Z",
+            "completed_at": "2026-09-16T09:51:11.052458Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.025227069854736328,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "OK",
+        "failures": null,
+        "unique_id": "model.birth_registrations.stg_cp_clients",
+        "compiled": true,
+        "compiled_code": "-- Real dbt staging model - passthrough from the raw source, same\n-- conventional layer stg_birth_registrations.sql gives that dataset. No\n-- type coercion needed here (no booleans in this table, unlike\n-- birth_registrations' is_multiple_birth).\n\nwith source as (\n    select * from \"cp_run_04_2026-08-03\".\"raw\".\"cp_clients\"\n)\n\nselect * from source",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main\".\"stg_cp_clients\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "success",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.056853Z",
+            "completed_at": "2026-09-16T09:51:11.058848Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.059314Z",
+            "completed_at": "2026-09-16T09:51:11.085717Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.030668973922729492,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "OK",
+        "failures": null,
+        "unique_id": "model.birth_registrations.stg_cp_investigations",
+        "compiled": true,
+        "compiled_code": "with source as (\n    select * from \"cp_run_04_2026-08-03\".\"raw\".\"cp_investigations\"\n)\n\nselect * from source",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main\".\"stg_cp_investigations\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "success",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.089933Z",
+            "completed_at": "2026-09-16T09:51:11.091937Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.092437Z",
+            "completed_at": "2026-09-16T09:51:11.110925Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.022481441497802734,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "OK",
+        "failures": null,
+        "unique_id": "model.birth_registrations.stg_cp_notifications",
+        "compiled": true,
+        "compiled_code": "with source as (\n    select * from \"cp_run_04_2026-08-03\".\"raw\".\"cp_notifications\"\n)\n\nselect * from source",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main\".\"stg_cp_notifications\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "success",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.115077Z",
+            "completed_at": "2026-09-16T09:51:11.117197Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.117681Z",
+            "completed_at": "2026-09-16T09:51:11.143647Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.030094146728515625,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "OK",
+        "failures": null,
+        "unique_id": "model.birth_registrations.stg_cp_placements",
+        "compiled": true,
+        "compiled_code": "with source as (\n    select * from \"cp_run_04_2026-08-03\".\"raw\".\"cp_placements\"\n)\n\nselect * from source",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main\".\"stg_cp_placements\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.148136Z",
+            "completed_at": "2026-09-16T09:51:11.155038Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.155564Z",
+            "completed_at": "2026-09-16T09:51:11.204709Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.05903196334838867,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.accepted_values_stg_cp_carers_approval_status__Approved__Provisional__Under_review.eead04b4f6",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        approval_status as value_field,\n        count(*) as n_records\n\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_carers\"\n    group by approval_status\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    'Approved','Provisional','Under review'\n)\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"accepted_values_stg_cp_carers_4d8417602d2660aa7035a64e7162c6a0\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.209910Z",
+            "completed_at": "2026-09-16T09:51:11.217750Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.218254Z",
+            "completed_at": "2026-09-16T09:51:11.236061Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.029613733291625977,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.accepted_values_stg_cp_carers_carer_type__Kinship__Foster__Residential_staff.28c2989876",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        carer_type as value_field,\n        count(*) as n_records\n\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_carers\"\n    group by carer_type\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    'Kinship','Foster','Residential-staff'\n)\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"accepted_values_stg_cp_carers_c08a54f039df87b27297847475f82aa8\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.241453Z",
+            "completed_at": "2026-09-16T09:51:11.250914Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.251415Z",
+            "completed_at": "2026-09-16T09:51:11.267624Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.028552770614624023,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_carers_carer_id.6b9723489f",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_carers\"\nwhere carer_id is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_carers_carer_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.272157Z",
+            "completed_at": "2026-09-16T09:51:11.282606Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.283113Z",
+            "completed_at": "2026-09-16T09:51:11.311096Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.04151582717895508,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_carers_family_name.48b12cede5",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_carers\"\nwhere family_name is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_carers_family_name\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.316043Z",
+            "completed_at": "2026-09-16T09:51:11.324057Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.324693Z",
+            "completed_at": "2026-09-16T09:51:11.340736Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.02708721160888672,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_carers_given_name.7cb2df9695",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_carers\"\nwhere given_name is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_carers_given_name\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.345408Z",
+            "completed_at": "2026-09-16T09:51:11.354518Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.355098Z",
+            "completed_at": "2026-09-16T09:51:11.375715Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.036721229553222656,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 4 results, configured to fail if != 0",
+        "failures": 4,
+        "unique_id": "test.birth_registrations.unique_stg_cp_carers_carer_id.f6bb2c4a2d",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nselect\n    carer_id as unique_field,\n    count(*) as n_records\n\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_carers\"\nwhere carer_id is not null\ngroup by carer_id\nhaving count(*) > 1\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"unique_stg_cp_carers_carer_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.385239Z",
+            "completed_at": "2026-09-16T09:51:11.393128Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.393708Z",
+            "completed_at": "2026-09-16T09:51:11.410508Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.02799820899963379,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.accepted_values_stg_cp_case_workers_team_region__Metro_North__Metro_South__Metro_East__South_West__Great_Southern__Goldfields__Kimberley__Pilbara__Wheatbelt__Midwest_Gascoyne.553694348e",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        team_region as value_field,\n        count(*) as n_records\n\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_case_workers\"\n    group by team_region\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    'Metro North','Metro South','Metro East','South West','Great Southern','Goldfields','Kimberley','Pilbara','Wheatbelt','Midwest-Gascoyne'\n)\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"accepted_values_stg_cp_case_wo_a10c601bb4f6c57a41eef07233b78591\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.415514Z",
+            "completed_at": "2026-09-16T09:51:11.423845Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.424819Z",
+            "completed_at": "2026-09-16T09:51:11.440486Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.027523040771484375,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_case_workers_family_name.f31dcb3a9a",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_case_workers\"\nwhere family_name is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_case_workers_family_name\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.445401Z",
+            "completed_at": "2026-09-16T09:51:11.452760Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.453458Z",
+            "completed_at": "2026-09-16T09:51:11.469426Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.026433467864990234,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_case_workers_given_name.dd0013bdd3",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_case_workers\"\nwhere given_name is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_case_workers_given_name\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.474391Z",
+            "completed_at": "2026-09-16T09:51:11.481897Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.482445Z",
+            "completed_at": "2026-09-16T09:51:11.498320Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.0268862247467041,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_case_workers_worker_id.5ae0f86993",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_case_workers\"\nwhere worker_id is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_case_workers_worker_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.503261Z",
+            "completed_at": "2026-09-16T09:51:11.510497Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.511045Z",
+            "completed_at": "2026-09-16T09:51:11.531429Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.03060007095336914,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 3 results, configured to fail if != 0",
+        "failures": 3,
+        "unique_id": "test.birth_registrations.unique_stg_cp_case_workers_worker_id.28cac7b6c7",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nselect\n    worker_id as unique_field,\n    count(*) as n_records\n\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_case_workers\"\nwhere worker_id is not null\ngroup by worker_id\nhaving count(*) > 1\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"unique_stg_cp_case_workers_worker_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "warn",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.537129Z",
+            "completed_at": "2026-09-16T09:51:11.544308Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.544918Z",
+            "completed_at": "2026-09-16T09:51:11.567980Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.03367209434509277,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 4 results, configured to warn if >0",
+        "failures": 4,
+        "unique_id": "test.birth_registrations.accepted_values_stg_cp_clients_postcode__6007__6008__6014__6018__6019__6027__6028__6030__6035__6036__6050__6056__6061__6062__6064__6069__6100__6102__6107__6109__6110__6112__6122__6148__6151__6155__6160__6162__6163__6164__6167__6168__6171__6210__6215__6225__6230__6258__6280__6285__6312__6330__6401__6430__6450__6530__6714__6721__6725.396db8fb02",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        postcode as value_field,\n        count(*) as n_records\n\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_clients\"\n    group by postcode\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    '6007','6008','6014','6018','6019','6027','6028','6030','6035','6036','6050','6056','6061','6062','6064','6069','6100','6102','6107','6109','6110','6112','6122','6148','6151','6155','6160','6162','6163','6164','6167','6168','6171','6210','6215','6225','6230','6258','6280','6285','6312','6330','6401','6430','6450','6530','6714','6721','6725'\n)\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"accepted_values_stg_cp_clients_c7222ff0c1a0e55e4c8dfa59d7b556da\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "warn",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.573011Z",
+            "completed_at": "2026-09-16T09:51:11.580113Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.580710Z",
+            "completed_at": "2026-09-16T09:51:11.609348Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.03896927833557129,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 4 results, configured to warn if >0",
+        "failures": 4,
+        "unique_id": "test.birth_registrations.accepted_values_stg_cp_clients_sex__M__F__X.734fdf27c8",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        sex as value_field,\n        count(*) as n_records\n\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_clients\"\n    group by sex\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    'M','F','X'\n)\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"accepted_values_stg_cp_clients_sex__M__F__X\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.614255Z",
+            "completed_at": "2026-09-16T09:51:11.621452Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.622009Z",
+            "completed_at": "2026-09-16T09:51:11.643231Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.031441688537597656,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.dbt_utils_accepted_range_stg_cp_clients_date_of_birth__DATE_1900_01_01_.f980a40438",
+        "compiled": true,
+        "compiled_code": "\n\nwith meet_condition as(\n  select *\n  from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_clients\"\n),\n\nvalidation_errors as (\n  select *\n  from meet_condition\n  where\n    -- never true, defaults to an empty result set. Exists to ensure any combo of the `or` clauses below succeeds\n    1 = 2\n    -- records with a value >= min_value are permitted. The `not` flips this to find records that don't meet the rule.\n    or not date_of_birth >= DATE '1900-01-01'\n)\n\nselect *\nfrom validation_errors\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"dbt_utils_accepted_range_stg_c_279037787cb8019a2f5bfac3ca4136cc\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.647962Z",
+            "completed_at": "2026-09-16T09:51:11.656030Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.656658Z",
+            "completed_at": "2026-09-16T09:51:11.679867Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.034703969955444336,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 4 results, configured to fail if != 0",
+        "failures": 4,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_clients_case_opened_date.c3a5cc0a3b",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_clients\"\nwhere case_opened_date is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_clients_case_opened_date\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.685499Z",
+            "completed_at": "2026-09-16T09:51:11.692388Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.692938Z",
+            "completed_at": "2026-09-16T09:51:11.709070Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.02622079849243164,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_clients_cp_client_id.aff3d56a39",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_clients\"\nwhere cp_client_id is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_clients_cp_client_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.714219Z",
+            "completed_at": "2026-09-16T09:51:11.721414Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.721957Z",
+            "completed_at": "2026-09-16T09:51:11.738551Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.02675795555114746,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 1 result, configured to fail if != 0",
+        "failures": 1,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_clients_date_of_birth.7d689f2de8",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_clients\"\nwhere date_of_birth is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_clients_date_of_birth\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.744170Z",
+            "completed_at": "2026-09-16T09:51:11.750960Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.751502Z",
+            "completed_at": "2026-09-16T09:51:11.772503Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.030869245529174805,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 3 results, configured to fail if != 0",
+        "failures": 3,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_clients_family_name.112f10ab4e",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_clients\"\nwhere family_name is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_clients_family_name\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.777719Z",
+            "completed_at": "2026-09-16T09:51:11.784811Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.785324Z",
+            "completed_at": "2026-09-16T09:51:11.801431Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.026102781295776367,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 5 results, configured to fail if != 0",
+        "failures": 5,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_clients_given_name.80530981a9",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_clients\"\nwhere given_name is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_clients_given_name\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.806663Z",
+            "completed_at": "2026-09-16T09:51:11.813643Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.814152Z",
+            "completed_at": "2026-09-16T09:51:11.829796Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.02545619010925293,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_clients_postcode.6ab03db5dc",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_clients\"\nwhere postcode is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_clients_postcode\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.834405Z",
+            "completed_at": "2026-09-16T09:51:11.841082Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.841633Z",
+            "completed_at": "2026-09-16T09:51:11.862253Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.030244112014770508,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 3 results, configured to fail if != 0",
+        "failures": 3,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_clients_suburb.7a1f5728cd",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_clients\"\nwhere suburb is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_clients_suburb\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.867950Z",
+            "completed_at": "2026-09-16T09:51:11.874614Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.875117Z",
+            "completed_at": "2026-09-16T09:51:11.891130Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.02591228485107422,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 1 result, configured to fail if != 0",
+        "failures": 1,
+        "unique_id": "test.birth_registrations.unique_stg_cp_clients_cp_client_id.7a22d059e5",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nselect\n    cp_client_id as unique_field,\n    count(*) as n_records\n\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_clients\"\nwhere cp_client_id is not null\ngroup by cp_client_id\nhaving count(*) > 1\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"unique_stg_cp_clients_cp_client_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.896919Z",
+            "completed_at": "2026-09-16T09:51:11.903979Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.904572Z",
+            "completed_at": "2026-09-16T09:51:11.920218Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.025933504104614258,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.accepted_values_stg_cp_investigations_substantiated__Substantiated__Not_substantiated__Inconclusive.db18a1058c",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        substantiated as value_field,\n        count(*) as n_records\n\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_investigations\"\n    group by substantiated\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    'Substantiated','Not substantiated','Inconclusive'\n)\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"accepted_values_stg_cp_investi_39b323b09cc9f9ccd50b07e8e90265d5\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.925216Z",
+            "completed_at": "2026-09-16T09:51:11.928004Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.928573Z",
+            "completed_at": "2026-09-16T09:51:11.950645Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.02784132957458496,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 1 result, configured to fail if != 0",
+        "failures": 1,
+        "unique_id": "test.birth_registrations.closed_case_investigation_hygiene",
+        "compiled": true,
+        "compiled_code": "-- Real dbt singular test - see escalation_completeness.sql's header for\n-- the pattern, and contract/child-protection-contract.yaml's matching\n-- type: sql version of this check for the full rationale.\n--\n-- An investigation should not still be open (end_date NULL) once its\n-- client's case_status is Closed. Passes (0 rows) on every clean run -\n-- child_protection.py only ever marks a case Closed once none of that\n-- client's own investigations are still open, so this holds by\n-- construction. dirty.py's apply_cp_investigations_presets (amber/red\n-- only) reopens a controlled number of Closed-case investigations to\n-- demonstrate a real violation: 0 clean, 1-3 amber, 6 on the red run.\n-- Previously (see plans/qa-pipeline.md #9) this test failed on every run\n-- at a stable ~9% rate because the generator didn't tie case_status to\n-- investigation state at all - fixed, not hidden.\n\nselect i.investigation_id, c.case_status\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_investigations\" i\njoin \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_clients\" c\n    on i.cp_client_id = c.cp_client_id\nwhere c.case_status = 'Closed'\n  and i.end_date is null",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"closed_case_investigation_hygiene\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.956029Z",
+            "completed_at": "2026-09-16T09:51:11.963400Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.963960Z",
+            "completed_at": "2026-09-16T09:51:11.979479Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.02591419219970703,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_investigations_cp_client_id.d40f4d1fac",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_investigations\"\nwhere cp_client_id is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_investigations_cp_client_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:11.984009Z",
+            "completed_at": "2026-09-16T09:51:11.990830Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:11.991333Z",
+            "completed_at": "2026-09-16T09:51:12.007751Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.026325464248657227,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_investigations_investigation_id.facead7474",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_investigations\"\nwhere investigation_id is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_investigations_investigation_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.012665Z",
+            "completed_at": "2026-09-16T09:51:12.019571Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.020280Z",
+            "completed_at": "2026-09-16T09:51:12.036694Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.026530027389526367,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 1 result, configured to fail if != 0",
+        "failures": 1,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_investigations_lead_worker_id.f02388f130",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_investigations\"\nwhere lead_worker_id is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_investigations_lead_worker_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.042224Z",
+            "completed_at": "2026-09-16T09:51:12.049476Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.050008Z",
+            "completed_at": "2026-09-16T09:51:12.066670Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.027011394500732422,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_investigations_notification_id.b56e7b755f",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_investigations\"\nwhere notification_id is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_investigations_notification_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.071459Z",
+            "completed_at": "2026-09-16T09:51:12.078957Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.079498Z",
+            "completed_at": "2026-09-16T09:51:12.095944Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.026829242706298828,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 3 results, configured to fail if != 0",
+        "failures": 3,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_investigations_start_date.40235903b5",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_investigations\"\nwhere start_date is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_investigations_start_date\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.101448Z",
+            "completed_at": "2026-09-16T09:51:12.111974Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.112572Z",
+            "completed_at": "2026-09-16T09:51:12.135193Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.0361788272857666,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 2 results, configured to fail if != 0",
+        "failures": 2,
+        "unique_id": "test.birth_registrations.relationships_stg_cp_investigations_cp_client_id__cp_client_id__ref_stg_cp_clients_.4e13c1dcdb",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith child as (\n    select cp_client_id as from_field\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_investigations\"\n    where cp_client_id is not null\n),\n\nparent as (\n    select cp_client_id as to_field\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_clients\"\n)\n\nselect\n    from_field\n\nfrom child\nleft join parent\n    on child.from_field = parent.to_field\n\nwhere parent.to_field is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"relationships_stg_cp_investiga_a7973f806cb5d7cce4c67900136fae9f\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.140756Z",
+            "completed_at": "2026-09-16T09:51:12.151406Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.151966Z",
+            "completed_at": "2026-09-16T09:51:12.169100Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.030900955200195312,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 10 results, configured to fail if != 0",
+        "failures": 10,
+        "unique_id": "test.birth_registrations.relationships_stg_cp_investigations_lead_worker_id__worker_id__ref_stg_cp_case_workers_.c1a9c355a7",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith child as (\n    select lead_worker_id as from_field\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_investigations\"\n    where lead_worker_id is not null\n),\n\nparent as (\n    select worker_id as to_field\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_case_workers\"\n)\n\nselect\n    from_field\n\nfrom child\nleft join parent\n    on child.from_field = parent.to_field\n\nwhere parent.to_field is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"relationships_stg_cp_investiga_4b84c9ddde2c9966d7cb508dd132c914\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.174339Z",
+            "completed_at": "2026-09-16T09:51:12.181496Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.182046Z",
+            "completed_at": "2026-09-16T09:51:12.198206Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.026244640350341797,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.unique_stg_cp_investigations_investigation_id.761d480cac",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nselect\n    investigation_id as unique_field,\n    count(*) as n_records\n\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_investigations\"\nwhere investigation_id is not null\ngroup by investigation_id\nhaving count(*) > 1\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"unique_stg_cp_investigations_investigation_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "warn",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.202899Z",
+            "completed_at": "2026-09-16T09:51:12.210158Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.210744Z",
+            "completed_at": "2026-09-16T09:51:12.228681Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.02822732925415039,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 7 results, configured to warn if >0",
+        "failures": 7,
+        "unique_id": "test.birth_registrations.accepted_values_stg_cp_notifications_concern_type__Neglect__Physical_abuse__Emotional_abuse__Sexual_abuse__Domestic_violence_exposure__Parental_substance_use__Parental_mental_health_concern.99e0129698",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        concern_type as value_field,\n        count(*) as n_records\n\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_notifications\"\n    group by concern_type\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    'Neglect','Physical abuse','Emotional abuse','Sexual abuse','Domestic violence exposure','Parental substance use','Parental mental health concern'\n)\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"accepted_values_stg_cp_notific_36afe6643844d1c59df1543a1b485164\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "warn",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.233588Z",
+            "completed_at": "2026-09-16T09:51:12.241055Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.241636Z",
+            "completed_at": "2026-09-16T09:51:12.263471Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.0323488712310791,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 9 results, configured to warn if >0",
+        "failures": 9,
+        "unique_id": "test.birth_registrations.accepted_values_stg_cp_notifications_outcome__No_further_action__Referred_to_family_support__Investigation_opened.9440ae5e48",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        outcome as value_field,\n        count(*) as n_records\n\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_notifications\"\n    group by outcome\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    'No further action','Referred to family support','Investigation opened'\n)\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"accepted_values_stg_cp_notific_8f4169503b40623d2f5df400b641be53\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "warn",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.268320Z",
+            "completed_at": "2026-09-16T09:51:12.275509Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.276036Z",
+            "completed_at": "2026-09-16T09:51:12.293259Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.027615785598754883,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 11 results, configured to warn if >0",
+        "failures": 11,
+        "unique_id": "test.birth_registrations.accepted_values_stg_cp_notifications_risk_rating__Low__Medium__High__Critical.46dc4621b7",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        risk_rating as value_field,\n        count(*) as n_records\n\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_notifications\"\n    group by risk_rating\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    'Low','Medium','High','Critical'\n)\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"accepted_values_stg_cp_notific_34153a00dabb1088228ca8fa580e36c6\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "warn",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.298355Z",
+            "completed_at": "2026-09-16T09:51:12.305770Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.306303Z",
+            "completed_at": "2026-09-16T09:51:12.323566Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.027791976928710938,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 10 results, configured to warn if >0",
+        "failures": 10,
+        "unique_id": "test.birth_registrations.accepted_values_stg_cp_notifications_source_type__School__Police__Health_service__Family_member__Neighbour__Anonymous__Self_report.af19e44110",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        source_type as value_field,\n        count(*) as n_records\n\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_notifications\"\n    group by source_type\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    'School','Police','Health service','Family member','Neighbour','Anonymous','Self-report'\n)\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"accepted_values_stg_cp_notific_c9083d5fb839740cc1f723e84287af84\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.328459Z",
+            "completed_at": "2026-09-16T09:51:12.331011Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.331550Z",
+            "completed_at": "2026-09-16T09:51:12.348501Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.022481203079223633,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 5 results, configured to fail if != 0",
+        "failures": 5,
+        "unique_id": "test.birth_registrations.escalation_completeness",
+        "compiled": true,
+        "compiled_code": "-- Real dbt singular test: returns the rows that FAIL the rule (dbt fails\n-- the test if this query returns anything). Cross-table business rule\n-- approved alongside the 7 relationships tests in schema.yml - see\n-- contract/child-protection-contract.yaml's matching type: sql version of\n-- this same check for the full rationale and confirmed real numbers\n-- (0 on clean runs, 2-3 on amber, 6 on the red run).\n--\n-- A notification recorded with outcome 'Investigation opened' must have a\n-- matching cp_investigations row.\n\nselect n.notification_id\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_notifications\" n\nleft join \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_investigations\" i\n    on n.notification_id = i.notification_id\nwhere n.outcome = 'Investigation opened'\n  and i.investigation_id is null",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"escalation_completeness\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.355584Z",
+            "completed_at": "2026-09-16T09:51:12.362471Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.362993Z",
+            "completed_at": "2026-09-16T09:51:12.380081Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.027016162872314453,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 3 results, configured to fail if != 0",
+        "failures": 3,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_notifications_assigned_worker_id.ef3439cf34",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_notifications\"\nwhere assigned_worker_id is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_notifications_assigned_worker_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.385798Z",
+            "completed_at": "2026-09-16T09:51:12.392905Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.393382Z",
+            "completed_at": "2026-09-16T09:51:12.412429Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.029288530349731445,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 4 results, configured to fail if != 0",
+        "failures": 4,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_notifications_cp_client_id.84d902198e",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_notifications\"\nwhere cp_client_id is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_notifications_cp_client_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.417361Z",
+            "completed_at": "2026-09-16T09:51:12.425030Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.425553Z",
+            "completed_at": "2026-09-16T09:51:12.445836Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.03687453269958496,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_notifications_notification_date.aecf2d35d1",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_notifications\"\nwhere notification_date is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_notifications_notification_date\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.456212Z",
+            "completed_at": "2026-09-16T09:51:12.463732Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.464221Z",
+            "completed_at": "2026-09-16T09:51:12.486141Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.03237128257751465,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_notifications_notification_id.bcbaa43a53",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_notifications\"\nwhere notification_id is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_notifications_notification_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.490821Z",
+            "completed_at": "2026-09-16T09:51:12.501507Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.502047Z",
+            "completed_at": "2026-09-16T09:51:12.527278Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.03888583183288574,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 3 results, configured to fail if != 0",
+        "failures": 3,
+        "unique_id": "test.birth_registrations.relationships_stg_cp_investigations_notification_id__notification_id__ref_stg_cp_notifications_.22536c51f4",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith child as (\n    select notification_id as from_field\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_investigations\"\n    where notification_id is not null\n),\n\nparent as (\n    select notification_id as to_field\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_notifications\"\n)\n\nselect\n    from_field\n\nfrom child\nleft join parent\n    on child.from_field = parent.to_field\n\nwhere parent.to_field is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"relationships_stg_cp_investiga_171795d0fdab670414aadef1c08f9f03\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.532782Z",
+            "completed_at": "2026-09-16T09:51:12.543844Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.544454Z",
+            "completed_at": "2026-09-16T09:51:12.562119Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.03185701370239258,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 56 results, configured to fail if != 0",
+        "failures": 56,
+        "unique_id": "test.birth_registrations.relationships_stg_cp_notifications_assigned_worker_id__worker_id__ref_stg_cp_case_workers_.4dca16f89e",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith child as (\n    select assigned_worker_id as from_field\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_notifications\"\n    where assigned_worker_id is not null\n),\n\nparent as (\n    select worker_id as to_field\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_case_workers\"\n)\n\nselect\n    from_field\n\nfrom child\nleft join parent\n    on child.from_field = parent.to_field\n\nwhere parent.to_field is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"relationships_stg_cp_notificat_569114fe833e9677de254ee4cf00e290\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.567203Z",
+            "completed_at": "2026-09-16T09:51:12.578859Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.579369Z",
+            "completed_at": "2026-09-16T09:51:12.603104Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.03854703903198242,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 3 results, configured to fail if != 0",
+        "failures": 3,
+        "unique_id": "test.birth_registrations.relationships_stg_cp_notifications_cp_client_id__cp_client_id__ref_stg_cp_clients_.9d7f3eb751",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith child as (\n    select cp_client_id as from_field\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_notifications\"\n    where cp_client_id is not null\n),\n\nparent as (\n    select cp_client_id as to_field\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_clients\"\n)\n\nselect\n    from_field\n\nfrom child\nleft join parent\n    on child.from_field = parent.to_field\n\nwhere parent.to_field is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"relationships_stg_cp_notificat_364336dde843fe6fd3aeafa0c0d02383\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "warn",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.609032Z",
+            "completed_at": "2026-09-16T09:51:12.616405Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.616947Z",
+            "completed_at": "2026-09-16T09:51:12.634058Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.02748870849609375,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 8 results, configured to warn if >0",
+        "failures": 8,
+        "unique_id": "test.birth_registrations.unique_stg_cp_notifications_notification_id.f315484cf4",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nselect\n    notification_id as unique_field,\n    count(*) as n_records\n\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_notifications\"\nwhere notification_id is not null\ngroup by notification_id\nhaving count(*) > 1\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"unique_stg_cp_notifications_notification_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "warn",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.638903Z",
+            "completed_at": "2026-09-16T09:51:12.646256Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.646828Z",
+            "completed_at": "2026-09-16T09:51:12.664942Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.028439998626708984,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 1 result, configured to warn if >0",
+        "failures": 1,
+        "unique_id": "test.birth_registrations.accepted_values_stg_cp_placements_placement_type__Kinship_care__Foster_care__Residential_care__Family_group_home.839f08abaf",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        placement_type as value_field,\n        count(*) as n_records\n\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_placements\"\n    group by placement_type\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    'Kinship care','Foster care','Residential care','Family group home'\n)\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"accepted_values_stg_cp_placeme_fc1114bc1ac6394565896d7ec8b1ca0e\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.669740Z",
+            "completed_at": "2026-09-16T09:51:12.676767Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.677272Z",
+            "completed_at": "2026-09-16T09:51:12.698904Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.03161168098449707,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_placements_carer_id.5896149149",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_placements\"\nwhere carer_id is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_placements_carer_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.703741Z",
+            "completed_at": "2026-09-16T09:51:12.710843Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.711349Z",
+            "completed_at": "2026-09-16T09:51:12.728158Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.027112722396850586,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 2 results, configured to fail if != 0",
+        "failures": 2,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_placements_cp_client_id.6d03c6919d",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_placements\"\nwhere cp_client_id is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_placements_cp_client_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.734398Z",
+            "completed_at": "2026-09-16T09:51:12.741668Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.742175Z",
+            "completed_at": "2026-09-16T09:51:12.758061Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.026559114456176758,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_placements_placement_id.6ff14cd5e9",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_placements\"\nwhere placement_id is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_placements_placement_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.762860Z",
+            "completed_at": "2026-09-16T09:51:12.769901Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.770407Z",
+            "completed_at": "2026-09-16T09:51:12.786951Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.03135085105895996,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 2 results, configured to fail if != 0",
+        "failures": 2,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_placements_placement_start.88de1000e2",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_placements\"\nwhere placement_start is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_placements_placement_start\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.796870Z",
+            "completed_at": "2026-09-16T09:51:12.805277Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.805809Z",
+            "completed_at": "2026-09-16T09:51:12.821712Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.02731776237487793,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_cp_placements_placement_suburb.56980c9a40",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_placements\"\nwhere placement_suburb is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"not_null_stg_cp_placements_placement_suburb\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.826277Z",
+            "completed_at": "2026-09-16T09:51:12.829101Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.829619Z",
+            "completed_at": "2026-09-16T09:51:12.846095Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.022114038467407227,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 7 results, configured to fail if != 0",
+        "failures": 7,
+        "unique_id": "test.birth_registrations.placement_carer_approval",
+        "compiled": true,
+        "compiled_code": "-- Real dbt singular test - see escalation_completeness.sql's header for\n-- the pattern, and contract/child-protection-contract.yaml's matching\n-- type: sql version of this check for the full rationale.\n--\n-- A placement's carer must be Approved, not Provisional or Under review.\n-- Passes (0 rows) on every clean run - child_protection.py only ever\n-- assigns an Approved carer to a placement, so this holds by\n-- construction. dirty.py's apply_cp_placements_presets (amber/red only)\n-- reassigns a controlled number of placements to a non-Approved carer to\n-- demonstrate a real violation: 0 clean, 3 amber, 17 on the red run.\n-- Previously (see plans/qa-pipeline.md #9) this test failed on every run\n-- at a stable ~15% rate because the generator didn't enforce this\n-- invariant at all - fixed, not hidden.\n\nselect p.placement_id, c.approval_status\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_placements\" p\njoin \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_carers\" c\n    on p.carer_id = c.carer_id\nwhere c.approval_status != 'Approved'",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"placement_carer_approval\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.851738Z",
+            "completed_at": "2026-09-16T09:51:12.862266Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.862811Z",
+            "completed_at": "2026-09-16T09:51:12.879683Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.03066420555114746,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 1 result, configured to fail if != 0",
+        "failures": 1,
+        "unique_id": "test.birth_registrations.relationships_stg_cp_placements_carer_id__carer_id__ref_stg_cp_carers_.4908178e65",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith child as (\n    select carer_id as from_field\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_placements\"\n    where carer_id is not null\n),\n\nparent as (\n    select carer_id as to_field\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_carers\"\n)\n\nselect\n    from_field\n\nfrom child\nleft join parent\n    on child.from_field = parent.to_field\n\nwhere parent.to_field is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"relationships_stg_cp_placement_1aa83a4bf3e6cb1c48edf6d618353c29\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.885315Z",
+            "completed_at": "2026-09-16T09:51:12.895859Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.896421Z",
+            "completed_at": "2026-09-16T09:51:12.919271Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.03676176071166992,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 3 results, configured to fail if != 0",
+        "failures": 3,
+        "unique_id": "test.birth_registrations.relationships_stg_cp_placements_cp_client_id__cp_client_id__ref_stg_cp_clients_.6561b4c876",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith child as (\n    select cp_client_id as from_field\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_placements\"\n    where cp_client_id is not null\n),\n\nparent as (\n    select cp_client_id as to_field\n    from \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_clients\"\n)\n\nselect\n    from_field\n\nfrom child\nleft join parent\n    on child.from_field = parent.to_field\n\nwhere parent.to_field is null\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"relationships_stg_cp_placement_c3d4d5b3f579a340c3d0b262c0ceacc4\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-16T09:51:12.923917Z",
+            "completed_at": "2026-09-16T09:51:12.931656Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-16T09:51:12.932140Z",
+            "completed_at": "2026-09-16T09:51:12.948411Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.026888370513916016,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 3 results, configured to fail if != 0",
+        "failures": 3,
+        "unique_id": "test.birth_registrations.unique_stg_cp_placements_placement_id.a42ef7186f",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nselect\n    placement_id as unique_field,\n    count(*) as n_records\n\nfrom \"cp_run_04_2026-08-03\".\"main\".\"stg_cp_placements\"\nwhere placement_id is not null\ngroup by placement_id\nhaving count(*) > 1\n\n\n",
+        "relation_name": "\"cp_run_04_2026-08-03\".\"main_dbt_test__audit\".\"unique_stg_cp_placements_placement_id\"",
+        "batch_results": null,
+        "overload_results": null
+      }
+    ],
+    "elapsed_time": 2.1527132987976074,
+    "args": {
+      "empty": false,
+      "quiet": true,
+      "export_saved_queries": false,
+      "use_v2_parser": false,
+      "require_unique_project_resource_names": false,
+      "use_fast_test_edges": false,
+      "support_custom_ref_kwargs": false,
+      "log_level": "info",
+      "log_level_file": "debug",
+      "v2_parser": "dbt-core-experimental-parser parse",
+      "introspect": true,
+      "write_json": true,
+      "partial_parse": true,
+      "source_freshness_run_project_hooks": true,
+      "version_check": true,
+      "state_modified_compare_more_unrendered_values": true,
+      "populate_cache": true,
+      "resource_types": [],
+      "require_batched_execution_for_custom_microbatch_strategy": true,
+      "require_ref_searches_node_package_before_root": false,
+      "state_modified_compare_vars": false,
+      "enable_grouped_warn_error_parser_logs": false,
+      "defer": false,
+      "favor_state": false,
+      "log_file_max_bytes": 10485760,
+      "strict_mode": false,
+      "require_generic_test_arguments_property": true,
+      "project_dir": "/home/user/data-poc/qa_tools/cp/../../dbt_project",
+      "show_all_deprecations": false,
+      "skip_nodes_if_on_run_start_fails": true,
+      "macro_debugging": false,
+      "which": "build",
+      "require_corrected_analysis_fqns": false,
+      "use_colors_file": true,
+      "log_format_file": "debug",
+      "select": [
+        "stg_cp_clients",
+        "stg_cp_notifications",
+        "stg_cp_investigations",
+        "stg_cp_placements",
+        "stg_cp_carers",
+        "stg_cp_case_workers",
+        "escalation_completeness",
+        "closed_case_investigation_hygiene",
+        "placement_carer_approval"
+      ],
+      "allow_jinja_file_extensions": false,
+      "warn_error_options": {
+        "error": [],
+        "warn": [],
+        "silence": []
+      },
+      "use_colors": true,
+      "show": false,
+      "require_resource_names_without_spaces": true,
+      "require_all_warnings_handled_by_warn_error": true,
+      "indirect_selection": "eager",
+      "cache_selected_only": false,
+      "require_valid_schema_from_generate_schema_name": false,
+      "include_saved_query": false,
+      "require_nested_cumulative_type_params": true,
+      "require_source_and_semantic_model_names_without_spaces": false,
+      "validate_macro_args": true,
+      "partial_parse_file_diff": true,
+      "profiles_dir": "/home/user/data-poc/qa_tools/cp/../dbt_profiles",
+      "send_anonymous_usage_stats": false,
+      "exclude_resource_types": [],
+      "hints_enabled": true,
+      "use_catalogs_v2": false,
+      "store_failures": true,
+      "log_path": "/home/user/data-poc/qa_tools/cp/../../dbt_project/logs",
+      "latest_version_pointer_enabled_by_default": false,
+      "snowflake_projects_otel": false,
+      "invocation_command": "dbt build --profiles-dir /home/user/data-poc/qa_tools/cp/../dbt_profiles --project-dir /home/user/data-poc/qa_tools/cp/../../dbt_project --quiet --target-path /home/user/data-poc/qa_tools/cp/../../dbt_project/target/cp_run_04_2026-08-03 --select stg_cp_clients stg_cp_notifications stg_cp_investigations stg_cp_placements stg_cp_carers stg_cp_case_workers escalation_completeness closed_case_investigation_hygiene placement_carer_approval --store-failures",
+      "static_parser": true,
+      "print": true,
+      "upload_to_artifacts_ingest_api": false,
+      "require_explicit_package_overrides_for_builtin_materializations": true,
+      "target_path": "/home/user/data-poc/qa_tools/cp/../../dbt_project/target/cp_run_04_2026-08-03",
+      "vars": {},
+      "maximum_seed_size_mib": 1,
+      "require_sql_header_in_test_configs": false,
+      "show_resource_report": false,
+      "sqlparse": {
+        "MAX_GROUPING_DEPTH": null,
+        "MAX_GROUPING_TOKENS": null
+      },
+      "log_format": "default",
+      "require_yaml_configuration_for_mf_time_spines": true,
+      "printer_width": 80,
+      "exclude": []
+    }
+  }
+}

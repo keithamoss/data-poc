@@ -1,0 +1,37 @@
+{
+  "run_timestamp": "2026-09-16T09:51:07.495445+00:00",
+  "raw_output": {
+    "psi": {
+      "metrics": [
+        {
+          "id": "0de519a1a212d60c4daa3636b206c963",
+          "metric_name": "DriftedColumnsCount(columns=concern_type,drift_share=0.5,cat_method=psi)",
+          "config": {
+            "type": "evidently:metric_v2:DriftedColumnsCount",
+            "columns": [
+              "concern_type"
+            ],
+            "drift_share": 0.5,
+            "cat_method": "psi"
+          },
+          "value": {
+            "count": 0.0,
+            "share": 0.0
+          }
+        },
+        {
+          "id": "5ef05d33c423017693e92f5da2e77a01",
+          "metric_name": "ValueDrift(column=concern_type,method=psi,threshold=0.1)",
+          "config": {
+            "type": "evidently:metric_v2:ValueDrift",
+            "column": "concern_type",
+            "method": "psi",
+            "threshold": 0.1
+          },
+          "value": 0.03494040661640166
+        }
+      ],
+      "tests": []
+    }
+  }
+}

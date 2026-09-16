@@ -32,6 +32,16 @@
 # README.md's known-disagreements section for why, found the hard way by
 # actually running datacontract-cli against the birth-registrations
 # contract first.
+#
+# Every quality rule below carries a `customProperties:` block with
+# check-lifecycle metadata (check_id/introduced_date/changelog) - plans/
+# publishing-and-history.md Thread D, Phase 1. FK and cross-table
+# business-rule checks are deliberately given a `_datacontract`-suffixed
+# check_name - the Soda checks file implements the same 7 FKs and 3
+# business rules in its own vocabulary, and a real collision was found
+# (and fixed) between Soda's and the contract's identically-named checks
+# on the BDM side before this suffix convention was adopted - applied
+# proactively here, mirroring Soda's own `_soda` suffix.
 
 apiVersion: v3.2.0
 kind: DataContract
@@ -97,10 +107,28 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every client record must carry a client ID."
+              - property: changelog
+                value: "[]"
           - metric: duplicateValues
             dimension: uniqueness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.duplicateValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Client IDs must not be duplicated."
+              - property: changelog
+                value: "[]"
       - name: given_name
         logicalType: string
         physicalType: varchar(200)
@@ -111,6 +139,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.given_name.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "A client's given name must be recorded."
+              - property: changelog
+                value: "[]"
       - name: family_name
         logicalType: string
         physicalType: varchar(200)
@@ -121,6 +158,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.family_name.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "A client's family name must be recorded."
+              - property: changelog
+                value: "[]"
       - name: date_of_birth
         logicalType: date
         physicalType: date
@@ -130,6 +176,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "A client record must carry a date of birth."
+              - property: changelog
+                value: "[]"
           # Reverse gap, closed 2026-09-15 (plans/qa-pipeline.md's full-
           # triplication pass): both Soda (a `failed rows` check) and dbt
           # (tests/cp_client_date_of_birth_range.sql) already implement
@@ -151,6 +206,13 @@ schema:
               Guards against a type/format change upstream turning into
               silently unparseable or nonsensical dates downstream - same
               rationale as the Birth Registrations contract's matching rule.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.range_check_datacontract
+              - property: introduced_date
+                value: "2026-09-15"
+              - property: changelog
+                value: "[]"
       - name: sex
         logicalType: string
         physicalType: varchar(1)
@@ -162,6 +224,15 @@ schema:
               validValues: ["M", "F", "X"]
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.sex.invalidValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Sex must be one of the closed value set M, F, or X."
+              - property: changelog
+                value: "[]"
       - name: suburb
         logicalType: string
         physicalType: varchar(100)
@@ -171,6 +242,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.suburb.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "A client's suburb must be recorded."
+              - property: changelog
+                value: "[]"
       - name: postcode
         logicalType: string
         physicalType: varchar(4)
@@ -180,6 +260,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "A client's postcode must be recorded."
+              - property: changelog
+                value: "[]"
           # Closed value set - generator/names_au.py's SUBURBS pool's own
           # postcodes (49 distinct values paired with the 51 suburb names),
           # same real-and-bounded rationale as BDM's place_of_birth_suburb
@@ -192,6 +281,13 @@ schema:
             mustBe: 0
             severity: error
             description: An unrecognised postcode means a data-entry typo or a source-system change.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.invalidValues
+              - property: introduced_date
+                value: "2026-09-15"
+              - property: changelog
+                value: "[]"
       - name: case_opened_date
         logicalType: date
         physicalType: date
@@ -201,6 +297,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.case_opened_date.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "A client record must carry the date its case was opened."
+              - property: changelog
+                value: "[]"
       - name: case_status
         logicalType: string
         physicalType: varchar(10)
@@ -213,6 +318,15 @@ schema:
               validValues: ["Open", "Closed"]
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.case_status.invalidValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Case status must be one of Open or Closed."
+              - property: changelog
+                value: "[]"
       - name: extract_timestamp
         logicalType: date
         physicalType: timestamp
@@ -227,6 +341,13 @@ schema:
           A rough sanity band for the active client population per
           extract - catches a truncated or duplicated-file extract, same
           rationale as the Birth Registrations contract's rowCount rule.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.rowCount
+          - property: introduced_date
+            value: "2026-01-15"
+          - property: changelog
+            value: "[]"
 
   - name: cp_notifications
     physicalType: table
@@ -244,6 +365,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every notification must carry a notification ID."
+              - property: changelog
+                value: "[]"
           - metric: duplicateValues
             dimension: uniqueness
             mustBe: 0
@@ -254,6 +384,13 @@ schema:
               deliberately inject near-duplicate notifications - a real
               double-submission scenario - so this rule has something
               genuine to catch on those runs.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.duplicateValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
       - name: cp_client_id
         logicalType: string
         physicalType: varchar(20)
@@ -263,6 +400,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every notification must reference a client."
+              - property: changelog
+                value: "[]"
       - name: notification_date
         logicalType: date
         physicalType: date
@@ -272,6 +418,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_date.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every notification must carry the date it was made."
+              - property: changelog
+                value: "[]"
       - name: source_type
         logicalType: string
         physicalType: varchar(30)
@@ -283,6 +438,15 @@ schema:
               validValues: ["School", "Police", "Health service", "Family member", "Neighbour", "Anonymous", "Self-report"]
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.source_type.invalidValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Notification source must be one of the closed value set."
+              - property: changelog
+                value: "[]"
       - name: concern_type
         logicalType: string
         physicalType: varchar(50)
@@ -299,6 +463,13 @@ schema:
                             "Domestic violence exposure", "Parental substance use", "Parental mental health concern"]
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.concern_type.invalidValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
       - name: risk_rating
         logicalType: string
         physicalType: varchar(10)
@@ -310,6 +481,15 @@ schema:
               validValues: ["Low", "Medium", "High", "Critical"]
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.risk_rating.invalidValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Risk rating must be one of the closed value set."
+              - property: changelog
+                value: "[]"
       - name: assigned_worker_id
         logicalType: string
         physicalType: varchar(20)
@@ -319,6 +499,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every notification must be assigned to a case worker."
+              - property: changelog
+                value: "[]"
       - name: outcome
         logicalType: string
         physicalType: varchar(30)
@@ -330,6 +519,15 @@ schema:
               validValues: ["No further action", "Referred to family support", "Investigation opened"]
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.outcome.invalidValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Notification outcome must be one of the closed value set."
+              - property: changelog
+                value: "[]"
       - name: extract_timestamp
         logicalType: date
         physicalType: timestamp
@@ -339,18 +537,39 @@ schema:
         dimension: completeness
         mustBeBetween: [600, 1600]
         severity: warning
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.rowCount
+          - property: introduced_date
+            value: "2026-01-15"
+          - property: changelog
+            value: "[]"
       - type: sql
         dimension: consistency
         query: "SELECT COUNT(*) FROM {model} n LEFT JOIN cp_clients c ON n.cp_client_id = c.cp_client_id WHERE c.cp_client_id IS NULL"
         mustBe: 0
         severity: error
         description: Every notification's cp_client_id must reference an existing cp_clients row.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.relationships_datacontract
+          - property: introduced_date
+            value: "2026-09-15"
+          - property: changelog
+            value: "[]"
       - type: sql
         dimension: consistency
         query: "SELECT COUNT(*) FROM {model} n LEFT JOIN cp_case_workers w ON n.assigned_worker_id = w.worker_id WHERE w.worker_id IS NULL"
         mustBe: 0
         severity: error
         description: Every notification's assigned_worker_id must reference an existing cp_case_workers row.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.relationships_datacontract
+          - property: introduced_date
+            value: "2026-09-15"
+          - property: changelog
+            value: "[]"
       - type: sql
         dimension: completeness
         query: >-
@@ -371,6 +590,13 @@ schema:
           notification_id that cp_investigations was built before and
           never references. Confirmed for real: 0 on clean runs, 2-3 on
           amber runs, 6 on the red run.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.escalation_completeness_datacontract
+          - property: introduced_date
+            value: "2026-01-15"
+          - property: changelog
+            value: "[]"
 
   - name: cp_investigations
     physicalType: table
@@ -386,10 +612,28 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every investigation record must carry an investigation ID."
+              - property: changelog
+                value: "[]"
           - metric: duplicateValues
             dimension: uniqueness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.duplicateValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Investigation IDs must not be duplicated."
+              - property: changelog
+                value: "[]"
       - name: notification_id
         logicalType: string
         physicalType: varchar(20)
@@ -399,6 +643,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every investigation must reference the notification that escalated into it."
+              - property: changelog
+                value: "[]"
       - name: cp_client_id
         logicalType: string
         physicalType: varchar(20)
@@ -408,6 +661,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every investigation must reference a client."
+              - property: changelog
+                value: "[]"
       - name: start_date
         logicalType: date
         physicalType: date
@@ -417,6 +679,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.start_date.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every investigation must carry the date it started."
+              - property: changelog
+                value: "[]"
       - name: end_date
         logicalType: date
         physicalType: date
@@ -433,6 +704,15 @@ schema:
               validValues: ["Substantiated", "Not substantiated", "Inconclusive"]
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.substantiated.invalidValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Investigation outcome must be one of the closed value set."
+              - property: changelog
+                value: "[]"
       - name: lead_worker_id
         logicalType: string
         physicalType: varchar(20)
@@ -442,6 +722,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every investigation must have a lead case worker assigned."
+              - property: changelog
+                value: "[]"
       - name: extract_timestamp
         logicalType: date
         physicalType: timestamp
@@ -451,24 +740,52 @@ schema:
         dimension: completeness
         mustBeBetween: [80, 350]
         severity: warning
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.rowCount
+          - property: introduced_date
+            value: "2026-01-15"
+          - property: changelog
+            value: "[]"
       - type: sql
         dimension: consistency
         query: "SELECT COUNT(*) FROM {model} i LEFT JOIN cp_notifications n ON i.notification_id = n.notification_id WHERE n.notification_id IS NULL"
         mustBe: 0
         severity: error
         description: Every investigation's notification_id must reference an existing cp_notifications row.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.relationships_datacontract
+          - property: introduced_date
+            value: "2026-09-15"
+          - property: changelog
+            value: "[]"
       - type: sql
         dimension: consistency
         query: "SELECT COUNT(*) FROM {model} i LEFT JOIN cp_clients c ON i.cp_client_id = c.cp_client_id WHERE c.cp_client_id IS NULL"
         mustBe: 0
         severity: error
         description: Every investigation's cp_client_id must reference an existing cp_clients row.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.relationships_datacontract
+          - property: introduced_date
+            value: "2026-09-15"
+          - property: changelog
+            value: "[]"
       - type: sql
         dimension: consistency
         query: "SELECT COUNT(*) FROM {model} i LEFT JOIN cp_case_workers w ON i.lead_worker_id = w.worker_id WHERE w.worker_id IS NULL"
         mustBe: 0
         severity: error
         description: Every investigation's lead_worker_id must reference an existing cp_case_workers row.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.relationships_datacontract
+          - property: introduced_date
+            value: "2026-09-15"
+          - property: changelog
+            value: "[]"
       - type: sql
         dimension: consistency
         query: >-
@@ -490,6 +807,13 @@ schema:
           Previously (see plans/qa-pipeline.md #9) this rule failed on
           every run at a stable ~9% rate because the generator didn't tie
           case_status to investigation state at all - fixed, not hidden.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.closed_case_hygiene_datacontract
+          - property: introduced_date
+            value: "2026-01-15"
+          - property: changelog
+            value: "[]"
 
   - name: cp_placements
     physicalType: table
@@ -505,10 +829,28 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every placement record must carry a placement ID."
+              - property: changelog
+                value: "[]"
           - metric: duplicateValues
             dimension: uniqueness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.duplicateValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Placement IDs must not be duplicated."
+              - property: changelog
+                value: "[]"
       - name: cp_client_id
         logicalType: string
         physicalType: varchar(20)
@@ -518,6 +860,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every placement must reference a client."
+              - property: changelog
+                value: "[]"
       - name: placement_type
         logicalType: string
         physicalType: varchar(30)
@@ -529,6 +880,15 @@ schema:
               validValues: ["Kinship care", "Foster care", "Residential care", "Family group home"]
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_type.invalidValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Placement type must be one of the closed value set."
+              - property: changelog
+                value: "[]"
       - name: carer_id
         logicalType: string
         physicalType: varchar(20)
@@ -538,6 +898,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every placement must have a carer assigned."
+              - property: changelog
+                value: "[]"
       - name: placement_start
         logicalType: date
         physicalType: date
@@ -547,6 +916,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_start.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every placement must carry the date it started."
+              - property: changelog
+                value: "[]"
       - name: placement_end
         logicalType: date
         physicalType: date
@@ -561,6 +939,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_suburb.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every placement must carry the suburb it's located in."
+              - property: changelog
+                value: "[]"
       - name: extract_timestamp
         logicalType: date
         physicalType: timestamp
@@ -570,18 +957,39 @@ schema:
         dimension: completeness
         mustBeBetween: [100, 450]
         severity: warning
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.rowCount
+          - property: introduced_date
+            value: "2026-01-15"
+          - property: changelog
+            value: "[]"
       - type: sql
         dimension: consistency
         query: "SELECT COUNT(*) FROM {model} p LEFT JOIN cp_clients c ON p.cp_client_id = c.cp_client_id WHERE c.cp_client_id IS NULL"
         mustBe: 0
         severity: error
         description: Every placement's cp_client_id must reference an existing cp_clients row.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.relationships_datacontract
+          - property: introduced_date
+            value: "2026-09-15"
+          - property: changelog
+            value: "[]"
       - type: sql
         dimension: consistency
         query: "SELECT COUNT(*) FROM {model} p LEFT JOIN cp_carers c ON p.carer_id = c.carer_id WHERE c.carer_id IS NULL"
         mustBe: 0
         severity: error
         description: Every placement's carer_id must reference an existing cp_carers row.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.relationships_datacontract
+          - property: introduced_date
+            value: "2026-09-15"
+          - property: changelog
+            value: "[]"
       - type: sql
         dimension: consistency
         query: >-
@@ -602,6 +1010,13 @@ schema:
           plans/qa-pipeline.md #9) this rule failed on every run at a
           stable ~15% rate because the generator drew from the full carer
           pool regardless of approval_status - fixed, not hidden.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.approval_compliance_datacontract
+          - property: introduced_date
+            value: "2026-01-15"
+          - property: changelog
+            value: "[]"
 
   - name: cp_carers
     physicalType: table
@@ -617,10 +1032,28 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every carer record must carry a carer ID."
+              - property: changelog
+                value: "[]"
           - metric: duplicateValues
             dimension: uniqueness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.duplicateValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Carer IDs must not be duplicated."
+              - property: changelog
+                value: "[]"
       - name: given_name
         logicalType: string
         physicalType: varchar(200)
@@ -631,6 +1064,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.given_name.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "A carer's given name must be recorded."
+              - property: changelog
+                value: "[]"
       - name: family_name
         logicalType: string
         physicalType: varchar(200)
@@ -641,6 +1083,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.family_name.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "A carer's family name must be recorded."
+              - property: changelog
+                value: "[]"
       - name: carer_type
         logicalType: string
         physicalType: varchar(20)
@@ -652,6 +1103,15 @@ schema:
               validValues: ["Kinship", "Foster", "Residential-staff"]
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_type.invalidValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Carer type must be one of the closed value set."
+              - property: changelog
+                value: "[]"
       - name: approval_status
         logicalType: string
         physicalType: varchar(20)
@@ -663,6 +1123,15 @@ schema:
               validValues: ["Approved", "Provisional", "Under review"]
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.approval_status.invalidValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Approval status must be one of the closed value set."
+              - property: changelog
+                value: "[]"
       - name: extract_timestamp
         logicalType: date
         physicalType: timestamp
@@ -672,6 +1141,13 @@ schema:
         dimension: completeness
         mustBeBetween: [150, 500]
         severity: warning
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.rowCount
+          - property: introduced_date
+            value: "2026-01-15"
+          - property: changelog
+            value: "[]"
 
   - name: cp_case_workers
     physicalType: table
@@ -687,10 +1163,28 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every case worker record must carry a worker ID."
+              - property: changelog
+                value: "[]"
           - metric: duplicateValues
             dimension: uniqueness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.duplicateValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Case worker IDs must not be duplicated."
+              - property: changelog
+                value: "[]"
       - name: given_name
         logicalType: string
         physicalType: varchar(200)
@@ -701,6 +1195,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.given_name.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "A case worker's given name must be recorded."
+              - property: changelog
+                value: "[]"
       - name: family_name
         logicalType: string
         physicalType: varchar(200)
@@ -711,6 +1214,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.family_name.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "A case worker's family name must be recorded."
+              - property: changelog
+                value: "[]"
       - name: team_region
         logicalType: string
         physicalType: varchar(30)
@@ -723,6 +1235,15 @@ schema:
                             "Goldfields", "Kimberley", "Pilbara", "Wheatbelt", "Midwest-Gascoyne"]
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.team_region.invalidValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Team region must be one of the closed value set of WA regions."
+              - property: changelog
+                value: "[]"
       - name: extract_timestamp
         logicalType: date
         physicalType: timestamp
@@ -732,6 +1253,13 @@ schema:
         dimension: completeness
         mustBeBetween: [40, 80]
         severity: warning
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.rowCount
+          - property: introduced_date
+            value: "2026-01-15"
+          - property: changelog
+            value: "[]"
 
 slaProperties:
   - property: frequency
