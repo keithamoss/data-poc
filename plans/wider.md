@@ -1095,3 +1095,145 @@ not a schedule.
     above rather than split into 4 - Keith raised them together as one
     "what would production need" question, and splitting now would
     guess at boundaries between them that scoping might not agree with.
+
+26. **[done, medium]** "Time travel" - the ability to go back and see the
+    entire reporting solution exactly as it was for any previous run,
+    not just a single check's own history (which item 45 already covers
+    within the live dashboard's own rolling window). Keith's own framing
+    up front: "think big, think architecturally, and consider this
+    solution will run for years" - built through several explicit rounds
+    of AskUserQuestion (intent, then scope, then solution architecture)
+    before any code was written, per his own request.
+
+    **Round 1 - intent.** Confirmed against the actual codebase first,
+    not assumed: this project has NO persistent, accumulating run
+    history today - `data/`, `reports/*.json`, and `dbt_project/target/`
+    are all gitignored and fully regenerated, and both generators
+    (`generate_runs.py`/`generate_cp_runs.py`) recompute a ROLLING
+    window of runs anchored to `date.today()` on every regeneration, not
+    an ever-growing log - so "time travel" had no historical spine to
+    stand on yet, a genuinely architectural gap, not a UI feature to
+    bolt on. Keith's answers: covers data AND the check definitions in
+    effect at the time AND the dashboard UI itself, not just today's UI
+    rendering old data; driven by audit/compliance and incident-
+    debugging (a third option, general trend exploration/convenience,
+    was explicitly parked for a later discussion); per-dataset vs.
+    whole-system-at-a-point-in-time granularity left open pending scope.
+
+    **Round 2 - scope.** The PoC's own rolling-window architecture was
+    deliberately left as-is (not changed to accumulate real infinite
+    history) - time travel just needs to work correctly for whatever
+    window exists at snapshot time. Snapshot trigger: gated behind a
+    manual on/off flag rather than an automatic "is this a real refresh"
+    heuristic, since this PoC has no clean signal to distinguish a
+    genuine scheduled run from a developer iterating on code (both use
+    the same script) - Keith's own call, plus wanting the mechanism
+    covered by real tests and a handful of demo snapshots committed to
+    the repo so there's something to actually show. Retention: keep
+    everything for now, no thinning - explicitly deferred to whichever
+    future storage backend (S3/SharePoint/Cloudflare/etc, per action 25
+    above) eventually replaces "just commit it to the repo".
+
+    **Round 3 - solution architecture.** Three real approaches were
+    compared before picking one, not just the first idea Keith floated:
+    - **A - full self-contained snapshot**: archive the exact same fully-
+      built static HTML the pipeline already produces (shell + CSS + JS
+      + embedded data, zero external dependencies), one complete file
+      per snapshot.
+    - **B - data-only + shared shell ("hybrid")**: archive just the data
+      payload, tagged to a commit SHA pinning which version of the
+      rendering code understands that shape; viewing means loading an
+      old commit's shell against archived data.
+    - **C - archive inputs, rebuild on demand**: archive the raw tool
+      outputs (`results_bdm.json`/`results_cp.json`) plus a commit SHA,
+      and regenerate the dashboard from them at view time.
+
+    B and C both trade real integrity for storage savings: replaying old
+    data through a DIFFERENT commit's rendering code (B) is exactly the
+    kind of thing that can silently misrender history if the JS
+    interpretation logic ever changes - the opposite of what an audit
+    feature needs; C additionally depends on the entire toolchain
+    (dbt-core, Soda Core, `uv`, Python itself) still installing and
+    behaving identically years from now just to produce a view at all.
+    Given the audit/incident-debugging driver from round 1, Keith
+    confirmed the hard requirement this settled it: a snapshot must be
+    openable with nothing but a browser, forever - which only A
+    satisfies. Storage growth (A's real cost) settled as gzip-compression-
+    only, no harder cap, matching round 2's "keep everything for now".
+    One more scope question resolved here too: whether snapshots need to
+    support cross-snapshot querying/comparison ("show me every snapshot
+    where this check was red") - Keith's own correction sharpened this:
+    that's the LIVE dashboard's trend-chart job (operating on its
+    current rolling window), a genuinely different concern from an
+    archived, opened-one-at-a-time forensic record - so no separate JSON
+    payload alongside each snapshot, just the plain self-contained HTML.
+    Build order: the snapshot mechanism + tests + demo snapshots this
+    round; a browse/picker UI for opening past snapshots explicitly
+    deferred to a later, separate round once snapshots exist to browse.
+
+    **Built**, per the above:
+    - `dashboard/snapshot_dashboard.py` - `take_snapshot()` (a pure,
+      testable function - injectable `html_path`/`snapshots_dir`/`now`)
+      gzips the current fully-embedded `dashboard/qa-reporting-
+      dashboard.html` into `dashboard/snapshots/<UTC timestamp>_<git
+      short sha>.html.gz` and appends an entry to a plain `manifest.json`
+      alongside it (bookkeeping for this script and its own tests - NOT
+      the cross-snapshot query feature ruled out above). The timestamp
+      format (`%Y%m%dT%H%M%SZ`, no colons) is deliberately Windows-
+      filesystem-safe, given action 25 above's own flag that this needs
+      to run on Windows EC2s eventually. `main()` is gated on
+      `SNAPSHOT_DASHBOARD=1` (unset by default) so a normal `./run_
+      pipeline.sh` run stays a no-op for this step unless explicitly
+      asked for.
+    - The check-defining thresholds that determine each check's pass/
+      fail status (`check.warn`/`check.fail`) are already embedded in
+      the data payload itself, so a single frozen HTML snapshot
+      genuinely captures "data AND the check definitions in effect
+      then" for status-determination purposes without needing to
+      separately embed raw contract/Soda/dbt YAML - nothing in the
+      dashboard renders that content today anyway (see plans/qa-
+      pipeline.md #43). The snapshot's git commit SHA is enough
+      provenance to look up the exact check-definition files in git
+      history if that's ever needed later.
+    - `run_pipeline.sh` gained a 5th step calling the snapshot script
+      unconditionally (the script itself no-ops without the env flag) -
+      `SNAPSHOT_DASHBOARD=1 ./run_pipeline.sh` to actually archive one.
+      Documented in `README.md` and `CLAUDE.md` (including flagging that
+      `dashboard/snapshots/*.html.gz`, unlike every other generated
+      artifact this project produces, is deliberately committed to git,
+      not gitignored - the whole point is that it accumulates).
+    - `tests/test_snapshot_dashboard.py` (9 tests): gzip round-trip
+      byte-for-byte integrity, filename has no Windows-unsafe characters
+      (regex-checked), manifest entries are correct and accumulate
+      correctly across multiple snapshots, a missing dashboard HTML
+      raises rather than silently producing an empty snapshot, and
+      `main()` is a genuine no-op without `SNAPSHOT_DASHBOARD=1` set to
+      exactly `"1"` (not `"true"`/`"yes"`/empty).
+    - 3 real demo snapshots generated and committed (`dashboard/
+      snapshots/`), confirmed genuinely distinct (different `md5sum`s
+      after gunzip) by regenerating the whole pipeline twice more under
+      `GENERATOR_ANCHOR_DATE` overrides a week and three weeks back
+      before restoring the live dashboard to today's real, un-overridden
+      state as the final step - so the committed `dashboard/qa-
+      reporting-dashboard.html` isn't left backdated. One of the three
+      verified with Playwright: gunzipped to a plain file, opened cold
+      in a real browser (no dev server, no repo context) - renders with
+      zero console/page errors, `card count: 6`, confirming genuine
+      standalone integrity, not just "the gzip round-trips".
+
+    Known, accepted side effect: `dashboard/snapshots/` sits inside
+    `dashboard/`, so a commit adding new snapshots also matches `.github/
+    workflows/deploy-pages.yml`'s `dashboard/**` trigger path - a
+    harmless, no-op-content GitHub Pages redeploy alongside the real
+    publish whenever a snapshot-only commit happens. Not worth narrowing
+    the workflow's trigger path for - the redeploy costs nothing and
+    always republishes the correct, current dashboard either way.
+
+    `uv run pytest` (80) and `uv run ruff check .` both clean.
+
+    **Explicitly not built this round** (per round 3's build-order
+    answer): any UI for browsing/listing/opening past snapshots from the
+    live dashboard - today that's "look in `dashboard/snapshots/`,
+    gunzip the one you want, open it" by hand. A real picker (reading
+    `manifest.json`) is the natural next round once there's a real
+    handful of snapshots to browse - which there now is.

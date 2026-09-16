@@ -55,6 +55,17 @@ against every run, and re-embeds the results into
 `dashboard/qa-reporting-dashboard.html`. Every step is seeded, so re-running
 reproduces the same runs and the same numbers.
 
+Pass `SNAPSHOT_DASHBOARD=1` to also archive the freshly re-embedded
+dashboard as a self-contained "time travel" snapshot
+(`dashboard/snapshots/<UTC timestamp>_<git short sha>.html.gz`) — a real,
+independently-openable-with-just-a-browser copy of the whole dashboard as
+it looked at that moment, for later audit/incident-debugging purposes
+(`plans/wider.md`). Off by default: `./run_pipeline.sh` doubles as both a
+genuine data-refresh run and a developer iterating on the dashboard's own
+code, and only the former should get archived — see
+`dashboard/snapshot_dashboard.py`'s own docstring for the full scoping
+rationale.
+
 ## What's actually running
 
 Every check is a real tool, reading this project's real config files —
