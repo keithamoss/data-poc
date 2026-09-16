@@ -1,0 +1,105 @@
+"""
+Phase 3's CI gate step (plans/publishing-and-history.md Thread A):
+verifies the just-built dashboard/qa-reporting-dashboard.html is
+structurally sound (both embedded JSON blobs actually parse) and
+renders cleanly in a real headless browser (zero console errors, and
+the main drill-down view actually populated with content) - an
+automated, permanent version of the same Playwright check this
+project's own sessions have run by hand throughout.
+
+Doesn't build anything itself - run this after the full rebuild
+(qa_tools.bdm/cp.build_results_from_history, pipeline.
+build_dashboard_data/build_cp_dashboard_data, dashboard.
+embed_dashboard_data) has already produced the file. Needs Playwright's
+Chromium already available (see pyproject.toml's dev dependency group).
+
+Run as `python3 -m dashboard.check_dashboard_renders`.
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+import re
+import sys
+from pathlib import Path
+
+from playwright.async_api import async_playwright
+
+from dashboard.embed_dashboard_data import TARGETS
+
+ROOT = Path(__file__).resolve().parent.parent
+DASHBOARD_PATH = ROOT / "dashboard" / "qa-reporting-dashboard.html"
+
+# Normal Playwright resolution (needs `uv run playwright install chromium`
+# once - see pyproject.toml's dev dependency group) works on a real
+# contributor machine or a real CI runner. Some sandboxed dev
+# environments pre-install a Chromium build at a fixed path instead (a
+# version-pinned one that Playwright's own default channel lookup won't
+# find) - PLAYWRIGHT_CHROMIUM_PATH is the escape hatch for those, left
+# unset everywhere else.
+_CHROMIUM_PATH = os.environ.get("PLAYWRIGHT_CHROMIUM_PATH")
+
+
+def _check_embedded_json() -> list[str]:
+    """Each `const <NAME> = {...};` block actually parses as JSON - the
+    exact same single-line regex embed_dashboard_data.py itself uses to
+    find and replace these lines, reused here rather than re-derived, so
+    the two never drift apart on what "the embedded data line" means."""
+    html = DASHBOARD_PATH.read_text()
+    errors = []
+    for const_name, _data_path in TARGETS:
+        pattern = re.compile(rf"const {const_name} = (.*?);\n")
+        match = pattern.search(html)
+        if not match:
+            errors.append(f"{const_name}: no embedded const found in the built HTML")
+            continue
+        try:
+            json.loads(match.group(1))
+        except json.JSONDecodeError as e:
+            errors.append(f"{const_name}: embedded data isn't valid JSON - {e}")
+    return errors
+
+
+async def _check_render() -> list[str]:
+    console_errors: list[str] = []
+    async with async_playwright() as p:
+        launch_kwargs = {"executable_path": _CHROMIUM_PATH} if _CHROMIUM_PATH else {}
+        browser = await p.chromium.launch(**launch_kwargs)
+        page = await browser.new_page()
+        page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
+        page.on("pageerror", lambda exc: console_errors.append(str(exc)))
+        await page.goto(f"file://{DASHBOARD_PATH.resolve()}")
+        await page.wait_for_timeout(2000)
+
+        # "key UI elements actually render", not just "no console errors" -
+        # #view is where the whole drill-down UI mounts; empty means the
+        # page loaded but the app itself never actually rendered anything.
+        view_html = await page.locator("#view").inner_html()
+        if not view_html.strip():
+            console_errors.append("#view is empty after load - the dashboard app never rendered")
+
+        await browser.close()
+    return [f"render check: {e}" for e in console_errors]
+
+
+def main() -> int:
+    if not DASHBOARD_PATH.exists():
+        print(f"FAILED: {DASHBOARD_PATH} doesn't exist - run the build pipeline first.", file=sys.stderr)
+        return 1
+
+    errors = _check_embedded_json()
+    errors += asyncio.run(_check_render())
+
+    if errors:
+        print(f"dashboard render check FAILED ({len(errors)} error(s)):", file=sys.stderr)
+        for e in errors:
+            print(f"  - {e}", file=sys.stderr)
+        return 1
+
+    print("dashboard render check OK - embedded data valid, zero console errors, #view populated.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

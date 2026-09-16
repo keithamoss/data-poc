@@ -1,46 +1,78 @@
-name: Deploy dashboard to GitHub Pages
+name: Build, validate, and publish the dashboard
 
-# Publishes dashboard/qa-reporting-dashboard.html (already self-contained -
-# its data is baked in at commit time by dashboard/embed_dashboard_data.py,
-# not fetched live) as index.html on GitHub Pages. No build step beyond the
-# rename: as more datasets get wired into the dashboard, this workflow
-# doesn't need to change - it just republishes whatever's in dashboard/ at
-# deploy time. See plans/wider.md action 5.
+# Phase 3 of plans/publishing-and-history.md's Thread A ("CI-gated
+# publishing") - this workflow IS the only path from a committed QA run
+# to the published site now, per Keith's own explicit call ("gone
+# entirely - CI is the only path", no manual local-publish path in any
+# form). It used to just republish an already-built dashboard/
+# qa-reporting-dashboard.html that a human built and committed locally
+# (see git history for that version) - it now does the real build
+# itself, from committed history alone, and gates the result before
+# anything reaches Pages.
 #
-# Also decompresses every dashboard/snapshots/*.html.gz into
+# What "the real build" means: dashboard/qa-reporting-dashboard.html
+# holds BOTH hand-authored UI source (committed, edited directly - the
+# HTML/CSS/JS itself) AND two embedded data consts (REAL_BIRTH_REG_DATA/
+# REAL_CP_DATA) that used to get regenerated and committed by whoever
+# last ran the pipeline locally. Keith's explicit call, 2026-09-16: keep
+# that as ONE file (not a template/build-output split) - this workflow
+# is now the only thing that ever regenerates those two consts, and it
+# commits that data-only change back to the branch itself (see the
+# "Commit the rebuilt dashboard" step below) before deploying, so a
+# human genuinely cannot cause the published data to change without
+# going through a qa_results/ (or check-definition) commit first.
+#
+# The rebuild needs more than qa_results/ alone: pipeline/
+# build_dashboard_data.py's/build_cp_dashboard_data.py's own direct
+# DuckDB queries (e.g. the sex/concern_type value-count charts) run
+# against the regenerated synthetic-data warehouses, not just the
+# committed check-result history - Thread B's own scope boundary
+# ("tool RESULTS only, not the underlying raw synthetic data records")
+# already treats that data as gitignored/regenerated, so this workflow
+# regenerates it fresh every run, same as any local ./run_pipeline.sh
+# does - fully deterministic (every generator call is seeded), so this
+# reproduces byte-identical warehouses without needing them committed.
+# No real dbt-core/Soda Core/datacontract-cli/Evidently run happens
+# here at all - qa_tools.*.build_results_from_history reads back each
+# tool's already-resolved `verified` records straight from committed
+# qa_results/ (plans/publishing-and-history.md Phase 2), so this is
+# fast and needs none of those four tools actually installed... except
+# `uv sync --dev` installs them anyway (pyproject.toml has no lighter
+# dependency group to sync instead) - a known, accepted inefficiency,
+# not a correctness problem.
+#
+# The gate (structural + check-lifecycle + real-browser render) runs
+# BEFORE the commit-back step - broken output never lands in git and
+# never deploys. "Old" for the check-lifecycle diff is the immediately-
+# previous commit on this branch (Keith's call, 2026-09-16 - see
+# qa_tools/common/validate_check_lifecycle.py's own docstring for why),
+# which is why this checks out 2 commits of history, not 1.
+#
+# Also still decompresses every dashboard/snapshots/*.html.gz into
 # _site/snapshots/*.html at deploy time - plans/wider.md #26's "time
-# travel" picker (built into the live dashboard, dashboard/snapshot_
-# dashboard.py's own docstring has the fuller scoping rationale). Gzip
-# stays the only format actually committed to git; this decompression is
-# deploy-time only, so nothing uncompressed ever gets checked in - a
-# commit adding a snapshot.html.gz still triggers this workflow (it
-# matches dashboard/**), a harmless redeploy that republishes the same
-# index.html plus whichever new snapshot.html files are now decompressed.
-#
-# The actual "prepare site" step below just calls dashboard/snapshot_
-# dashboard.py --prepare-site - the SAME decompression code local
-# developers run (sync_local_snapshots(), wired into every ./run_
-# pipeline.sh via that module's main()), not a separate shell gunzip
-# loop reimplementing the same logic - scoped 2026-09-16, Keith's own
-# ask, so a local run is a genuine dry run of what this step will do.
-# Run via `uv run --no-project`, matching this repo's own convention of
-# never trusting a bare `python3` (CLAUDE.md) - `--no-project` skips
-# syncing the full dbt-core/Soda Core/datacontract-cli/Evidently
-# dependency set from pyproject.toml (this script only needs stdlib, and
-# that install would be slow and pointless for a deploy step), while
-# still running through uv's own pinned Python rather than whatever
-# happens to be preinstalled on the runner.
+# travel" picker - via dashboard/snapshot_dashboard.py --prepare-site,
+# the same code local developers run (sync_local_snapshots(), wired
+# into every ./run_pipeline.sh). Unlike before, this now runs through
+# the full `uv sync` environment (already synced for the real rebuild
+# above), not a separate `--no-project` stdlib-only install - no longer
+# worth keeping that split now this job installs everything anyway.
 
 on:
   push:
     branches: [claude/new-session-en9qen]
     paths:
+      - "qa_results/**"
+      - "contract/**"
+      - "dbt_project/models/staging/schema.yml"
+      - "qa_tools/**"
+      - "pipeline/**"
+      - "generator/**"
       - "dashboard/**"
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write # was `read` - this job now commits the rebuilt dashboard data back (see above)
   pages: write
   id-token: write
 
@@ -49,7 +81,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build-validate-publish:
+    # Skips the workflow run this job's OWN commit-back step produces -
+    # without this, that commit would retrigger this same workflow
+    # (dashboard/** is a trigger path), which would rebuild identical
+    # data, find nothing new to commit, and redeploy pointlessly. Only
+    # meaningful for `push` events - `github.event.head_commit` doesn't
+    # exist for a manual `workflow_dispatch` run.
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -57,12 +96,69 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # need HEAD~1 for the check-lifecycle old-vs-new diff
 
       - name: Install uv
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
 
+      - name: Sync dependencies
+        run: uv sync --dev
+
+      - name: Install Playwright's Chromium
+        run: uv run playwright install --with-deps chromium
+
+      - name: Regenerate synthetic data + combined warehouse (BDM)
+        run: uv run python3 -m pipeline.orchestrate
+
+      - name: Regenerate synthetic data + per-run warehouses (Child Protection)
+        run: |
+          uv run python3 -m generator.generate_cp_runs
+          uv run python3 -m qa_tools.cp.build_cp_warehouses
+
+      - name: Rebuild check results from committed qa_results/ history
+        run: |
+          uv run python3 -m qa_tools.bdm.build_results_from_history
+          uv run python3 -m qa_tools.cp.build_results_from_history
+
+      - name: Reshape into dashboard JSON
+        run: |
+          uv run python3 -m pipeline.build_dashboard_data
+          uv run python3 -m pipeline.build_cp_dashboard_data
+
+      - name: Embed real data into the dashboard
+        run: uv run python3 dashboard/embed_dashboard_data.py
+
+      - name: Gate - check-lifecycle validation (Thread D)
+        run: uv run python3 -m qa_tools.common.validate_check_lifecycle
+
+      - name: Gate - dashboard structural + real-browser render check
+        run: uv run python3 -m dashboard.check_dashboard_renders
+
+      - name: Commit the rebuilt dashboard data back to the branch
+        run: |
+          if git diff --quiet -- dashboard/qa-reporting-dashboard.html; then
+            echo "No data change - nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dashboard/qa-reporting-dashboard.html
+          git commit -m "Rebuild dashboard from committed QA history [skip ci]"
+          for attempt in 1 2 3 4; do
+            if git push; then
+              exit 0
+            fi
+            echo "Push rejected (branch moved) - retrying ($attempt/4)..."
+            git fetch origin "${{ github.ref_name }}"
+            git rebase "origin/${{ github.ref_name }}"
+            sleep $((attempt * 2))
+          done
+          echo "::error::Failed to push the rebuilt dashboard after 4 attempts"
+          exit 1
+
       - name: Prepare site
-        run: uv run --no-project python3 -m dashboard.snapshot_dashboard --prepare-site _site
+        run: uv run python3 -m dashboard.snapshot_dashboard --prepare-site _site
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

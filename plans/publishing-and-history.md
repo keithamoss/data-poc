@@ -707,7 +707,7 @@ additive field, never by mutating what the tool itself reported.
   plus 2 more in `test_qa_results_writer.py` for `verified`), ruff
   clean.
 
-**Phase 3 (Thread A - CI-gated publishing):**
+**Phase 3 (Thread A - CI-gated publishing) - [in progress, 2026-09-16]:**
 - Wires Phase 1's validation logic into the CI gate, alongside the
   structural checks and the headless-browser render check.
 - Removes any local-publish path - CI is the only path, per Thread A's
@@ -716,6 +716,116 @@ additive field, never by mutating what the tool itself reported.
   the committed result paths into feed entries) - the feed's own UI is
   Phase 5, not here.
 - Depends on Phase 1 and Phase 2 (needs a working dashboard to publish).
+
+**Two real forks resolved with Keith before building, not assumed:**
+
+1. **Should CI actually rebuild the dashboard, or just gate a human's
+   local build?** The old `deploy-pages.yml` only ever republished
+   whatever `dashboard/qa-reporting-dashboard.html` a human had already
+   built and committed locally - which doesn't actually deliver "CI is
+   the only path" (the real build still happens locally) and doesn't
+   solve the concurrency problem this whole file's "Why this changes
+   things" section names (two people's local builds only ever reflect
+   their own machine's `qa_results/` state, not the full merged
+   history). **Keith's call: yes, CI-only build** - confirmed via
+   AskUserQuestion, matches Thread A's own text.
+2. **`dashboard/qa-reporting-dashboard.html` holds BOTH hand-authored
+   UI source (committed, edited directly all project) AND two embedded
+   data consts - found only once actually tracing through what "stop
+   committing it" would really mean, not anticipated when framing
+   question 1.** Two ways to actually stop committing the DATA while
+   still tracking the UI SOURCE: split into a template + gitignored
+   build output (cleaner, actually fixes the mergeability problem, but
+   a real rename/restructure), or keep the one file and have CI itself
+   commit the data-only diff back (no restructuring, but the exact
+   same file that used to be human-committed is now bot-committed -
+   doesn't fix mergeability, just moves who commits). **Keith's call:
+   keep one file, CI commits the data-only diff back** - explicitly
+   choosing not to restructure, even knowing it doesn't resolve the
+   mergeability concern the same way the alternative would have.
+
+**Built and verified for real:**
+- `qa_tools/common/validate_check_lifecycle.py` (new) - the Thread D
+  gate: parses every real check definition (all 4 tools x both
+  datasets) at both the current working tree and `HEAD~1` (Keith's
+  call on "old" - the immediately-previous commit on the pushed
+  branch, not whatever's currently live on Pages - simplest, no state
+  to track, and catches "changed without a changelog entry in the same
+  commit" which is the more useful thing anyway), and runs
+  `check_lifecycle.validate()` between them. A file that didn't exist
+  at `HEAD~1` reads as "no old checks from it," not an error.
+  Evidently's plain-dict metadata has no YAML parser to reuse, so old
+  content gets `exec`'d as trusted source (our own repo content at a
+  real git ref) rather than needing a bespoke parser. 6 tests
+  (`tests/test_validate_check_lifecycle.py`), including a real temp
+  git repo exercising the actual `git show HEAD~1:<path>` mechanism,
+  not a mocked subprocess.
+- `dashboard/check_dashboard_renders.py` (new) - the structural +
+  render gate: both embedded data consts (`REAL_BIRTH_REG_DATA`/
+  `REAL_CP_DATA`) parse as JSON (reusing `embed_dashboard_data.py`'s
+  own regex, not a re-derived one, so the two can't drift on what "the
+  embedded data line" means), then a real headless-browser load with
+  zero console errors AND `#view` (where the whole drill-down app
+  mounts) actually populated - not just "the page didn't crash." 4
+  tests for the structural half; the render half needs a real
+  Chromium, exercised by hand and will be exercised for real by CI
+  itself, not worth mocking a browser for in a unit test.
+- `.github/workflows/deploy-pages.yml` rewritten (same filename - the
+  file's ultimate purpose, publish to Pages, is unchanged, just hugely
+  expanded in scope; not worth the churn of a rename nobody asked for)
+  into the real build-validate-publish pipeline: regenerates BDM+CP's
+  synthetic data and warehouses fresh (fully deterministic - see
+  below), rebuilds check results from committed `qa_results/` alone
+  (Phase 2, no real dbt/Soda/datacontract-cli/Evidently re-run), reshapes
+  into dashboard JSON, embeds it, runs both gate scripts above, and
+  only if both pass, commits the data-only change back to the branch
+  (`[skip ci]`-tagged, with a bounded retry-on-push-conflict loop) and
+  deploys. `permissions: contents: write` - a real, deliberate
+  escalation from the old `read`-only workflow, the direct and
+  necessary consequence of Keith's decision 2 above.
+- **A real finding while proving this out, not assumed to be fine**:
+  `pipeline/build_dashboard_data.py`'s/`build_cp_dashboard_data.py`'s
+  own DIRECT DuckDB queries (the sex/concern_type value-count charts)
+  run against the regenerated synthetic-data warehouses, not just
+  `qa_results/` - so the CI rebuild needs the FULL synthetic-data-
+  generation step too (`generator.generate_runs`/`generate_cp_runs` +
+  warehouse loading), not just Phase 2's committed-history read. Still
+  entirely consistent with Thread B's own scope boundary ("tool
+  RESULTS only, not the underlying raw synthetic data records, which
+  stays gitignored/regenerated") - this data was never meant to be
+  committed, CI just needs to regenerate it fresh like any local run
+  does, which is fine precisely because it's genuinely deterministic.
+- **That determinism was verified for real, not assumed**: rehearsed
+  the entire rebuild sequence in an isolated clean git clone (no local
+  state, matching a real CI checkout) end to end - both gate scripts
+  passed. Ran the synthetic-data-generation step twice from a
+  completely empty `data/`, diffed the two runs' `manifest.json` and
+  `results_bdm.json` (`generated_at` aside) - byte-identical. (A
+  three-way diff against THIS session's own accumulated local
+  `data/raw/` - built up over many manual re-runs across a long
+  session, never cleared between them - genuinely did differ, which is
+  expected and not a bug: `generator/anchor_date.py`'s own docstring
+  already documents that regenerating without a pinned
+  `GENERATOR_ANCHOR_DATE` lands near real "today," and this project's
+  own generator doesn't clear stale leftover files between local
+  re-runs either - see `plans/qa-pipeline.md`'s "old dated files aren't
+  cleaned up between regenerations" finding. Not a property CI actually
+  depends on: every CI run starts from a genuinely clean checkout, the
+  same starting point every time, which is the only determinism that
+  actually matters here.)
+- Documented the new convention (CLAUDE.md, README.md): a local
+  `./run_pipeline.sh` run still regenerates `dashboard/qa-reporting-
+  dashboard.html` in place for personal viewing, same as always - but
+  committing that regeneration yourself is now explicitly against
+  convention, since only CI's own gated rebuild should ever land in
+  git.
+
+**Not yet built - the remaining piece of Phase 3**: the changelog/
+activity-feed DATA logic (reshaping git commit history over the
+committed result paths into "who published what, when" feed entries -
+the feed's own UI is Phase 5 regardless). The gate-and-publish
+mechanism above is real and verified; this is a genuinely separate
+piece of work, flagged rather than silently skipped or rushed.
 
 **Phase 4 (Thread C - cadence-aware "as of" viewing):**
 - Depends on Phase 1 and Phase 2 (real committed history, merged/

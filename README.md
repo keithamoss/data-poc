@@ -55,6 +55,16 @@ against every run, and re-embeds the results into
 `dashboard/qa-reporting-dashboard.html`. Every step is seeded, so re-running
 reproduces the same runs and the same numbers.
 
+**Don't commit your own local re-embed of `dashboard/qa-reporting-dashboard.html`.**
+Since `plans/publishing-and-history.md` Phase 3, CI
+(`.github/workflows/deploy-pages.yml`) is the only thing that commits a
+change to that file's two embedded data consts — it rebuilds the whole
+dashboard from committed `qa_results/` history itself on every relevant
+push, gates the result, and only then commits + deploys. Running the
+pipeline locally still regenerates the file for your own viewing (that
+part's unchanged); just don't `git add`/commit that regeneration
+yourself.
+
 Pass `SNAPSHOT_DASHBOARD=1` to also archive the freshly re-embedded
 dashboard as a self-contained "time travel" snapshot
 (`dashboard/snapshots/<UTC timestamp>_<git short sha>.html.gz`) — a real,
