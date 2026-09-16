@@ -199,14 +199,41 @@ version detection, enforcement, and authoring all settled:**
   - deliberately not auto-derived from git's own commit author, per
   Keith's own call), `breaking` (human-set boolean).
 
+**UI presentation - resolved, 2026-09-16, same session:**
+- **Breaking definition change: a real visual gap/split in the trend
+  line**, not just a marker on a continuous line - the strongest signal
+  that before/after genuinely aren't comparable. Deliberately styled
+  DISTINCTLY from Thread C's "no data available" state (quarterly-
+  cadence datasets, below the as-of threshold) - both are "a gap in the
+  line," but they mean different things (one is missing data, one is a
+  deliberate declaration that the check itself changed) and must not
+  look identical. Exact styling (color/pattern) to work out when built,
+  but the constraint is now explicit, not something to discover as a
+  bug later.
+- **Retired checks: drop out of the main current-status view by
+  default** (column drawer, overall summary) - a retired check isn't
+  part of "what's currently being checked," so the default view stays
+  focused on active checks. A toggle brings retired checks back into
+  view for history/audit purposes - full history stays intact and
+  reachable, just not front-and-centre by default.
+- **Changelog metadata surfaces in the existing check-detail panel**
+  (item 42's status pill, item 45's comparison UI) rather than a new
+  tooltip pattern - a changelog entry becomes another section of the
+  panel that already shows a check's status/history/comparison,
+  consistent with how everything else about a check is already
+  presented there.
+
 **Still not designed:**
 - Exact per-tool schema/field names (the concepts above are settled,
   the literal YAML/Python shape isn't).
-- How the dashboard's existing check-history trend/panel (item 45's
-  comparison UI, the trend chart) visually distinguishes "retired since
-  X" from "definition changed at X, treat before/after as separate
-  series" from a normal continuous history. Needs real UI design, not
-  just a data-model answer - next thing to work through.
+- Exact visual styling for the breaking-change gap vs. Thread C's
+  no-data gap (the constraint that they must differ is settled; the
+  actual color/pattern isn't).
+- How a non-breaking definition change reads in the UI at all (the
+  breaking case now has a real design; the non-breaking case - still
+  one continuous line, but a change genuinely happened and has a
+  changelog entry - hasn't been designed yet. Presumably some lighter
+  marker on the continuous line, not yet confirmed with Keith).
 
 ## Thread A - publishing (build after B/D's data format exists)
 
