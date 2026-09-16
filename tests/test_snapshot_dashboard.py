@@ -12,6 +12,7 @@ from __future__ import annotations
 import gzip
 import json
 import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -267,3 +268,90 @@ def test_take_snapshot_also_writes_a_local_decompressed_copy(tmp_path):
         "take_snapshot() must leave a locally-openable .html copy, not just the .gz archive"
     with gzip.open(out_path, "rb") as f:
         assert local_copy.read_bytes() == f.read()
+
+
+def test_prepare_deploy_site_copies_dashboard_as_index(tmp_path):
+    html_path = _write_fake_dashboard(tmp_path, "<html>the live dashboard</html>\nconst SNAPSHOT_MANIFEST = [];\n")
+    site_dir = tmp_path / "_site"
+
+    snapshot_dashboard.prepare_deploy_site(site_dir, html_path=html_path, snapshots_dir=tmp_path / "snapshots")
+
+    assert (site_dir / "index.html").read_text() == html_path.read_text()
+
+
+def test_prepare_deploy_site_decompresses_every_committed_snapshot(tmp_path):
+    html_path = _write_fake_dashboard(tmp_path)
+    snapshots_dir = tmp_path / "snapshots"
+    snapshots_dir.mkdir()
+    with gzip.open(snapshots_dir / "20260916T000000Z_abc1234.html.gz", "wb") as f:
+        f.write(b"<html>archived snapshot one</html>")
+    with gzip.open(snapshots_dir / "20260916T010000Z_def5678.html.gz", "wb") as f:
+        f.write(b"<html>archived snapshot two</html>")
+    (snapshots_dir / "manifest.json").write_text('[{"file": "irrelevant"}]')
+    site_dir = tmp_path / "_site"
+
+    snapshot_dashboard.prepare_deploy_site(site_dir, html_path=html_path, snapshots_dir=snapshots_dir)
+
+    site_snapshots_dir = site_dir / "snapshots"
+    assert (site_snapshots_dir / "20260916T000000Z_abc1234.html").read_bytes() == b"<html>archived snapshot one</html>"
+    assert (site_snapshots_dir / "20260916T010000Z_def5678.html").read_bytes() == b"<html>archived snapshot two</html>"
+    assert (site_snapshots_dir / "manifest.json").read_text() == '[{"file": "irrelevant"}]'
+
+
+def test_prepare_deploy_site_is_a_clean_noop_for_snapshots_when_none_exist(tmp_path):
+    html_path = _write_fake_dashboard(tmp_path)
+    site_dir = tmp_path / "_site"
+
+    snapshot_dashboard.prepare_deploy_site(site_dir, html_path=html_path, snapshots_dir=tmp_path / "no-such-dir")
+
+    assert (site_dir / "index.html").exists()
+    assert not (site_dir / "snapshots").exists()
+
+
+def test_prepare_deploy_site_and_sync_local_snapshots_use_the_same_decompression(tmp_path):
+    # The whole point of unifying these (Keith's own ask): a snapshot
+    # decompressed locally and one decompressed for deploy must be
+    # byte-for-byte identical, because they're produced by the exact
+    # same code path, not two implementations that happen to agree today.
+    html_path = _write_fake_dashboard(tmp_path)
+    snapshots_dir = tmp_path / "snapshots"
+    snapshots_dir.mkdir()
+    with gzip.open(snapshots_dir / "20260916T000000Z_abc1234.html.gz", "wb") as f:
+        f.write(b"<html>identical decompression check</html>")
+
+    snapshot_dashboard.sync_local_snapshots(snapshots_dir)
+    site_dir = tmp_path / "_site"
+    snapshot_dashboard.prepare_deploy_site(site_dir, html_path=html_path, snapshots_dir=snapshots_dir)
+
+    local_html = (snapshots_dir / "20260916T000000Z_abc1234.html").read_bytes()
+    deployed_html = (site_dir / "snapshots" / "20260916T000000Z_abc1234.html").read_bytes()
+    assert local_html == deployed_html == b"<html>identical decompression check</html>"
+
+
+def test_main_prepare_site_flag_calls_prepare_deploy_site(monkeypatch, tmp_path, capsys):
+    # This is exactly how .github/workflows/deploy-pages.yml invokes this
+    # module: `python3 -m dashboard.snapshot_dashboard --prepare-site _site`.
+    site_dir = tmp_path / "_site"
+    monkeypatch.setattr(sys, "argv", ["snapshot_dashboard.py", "--prepare-site", str(site_dir)])
+    calls = []
+    monkeypatch.setattr(snapshot_dashboard, "prepare_deploy_site",
+                         lambda *a, **k: calls.append((a, k)))
+
+    snapshot_dashboard.main()
+
+    assert len(calls) == 1
+    args, kwargs = calls[0]
+    assert kwargs.get("site_dir") == site_dir or (args and args[0] == site_dir)
+    assert str(site_dir) in capsys.readouterr().out
+
+
+def test_main_prepare_site_flag_requires_a_directory_argument(monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", ["snapshot_dashboard.py", "--prepare-site"])
+    monkeypatch.setattr(snapshot_dashboard, "prepare_deploy_site", lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError("prepare_deploy_site should not be called without a directory argument")))
+
+    try:
+        snapshot_dashboard.main()
+        assert False, "expected SystemExit for a missing --prepare-site argument"
+    except SystemExit as e:
+        assert e.code == 2

@@ -1402,6 +1402,48 @@ not a schedule.
     `dashboard/snapshots/` directory as a side effect of running the test
     suite). 89 tests pass repo-wide; `uv run ruff check .` clean.
 
+    **Unified with the deploy pipeline's decompression, same day
+    (2026-09-16), right after the fix above:** Keith flagged the local
+    sync and the GitHub Pages deploy step (`.github/workflows/deploy-
+    pages.yml`'s "Prepare site") were two separate implementations of
+    the same "unzip a snapshot" logic - the deploy step was a bash
+    `gunzip` loop, `sync_local_snapshots()` was Python's `gzip` module -
+    that could quietly drift apart. His ask: make local sync literally
+    exercise the same code path deploy uses, so running it locally is a
+    real dry run of what CI will do, not just something that resembles
+    it. First separately confirmed the local-sync feature itself was
+    fine to keep as-is (his worry it might undercut "push to the shared
+    site" incentives didn't hold up: `sync_local_snapshots()` only ever
+    decompresses `.gz` files already on disk - either pulled from git,
+    already shared, or just taken by that same local run - so it can't
+    let anyone see history they didn't already have access to).
+
+    Extracted `_decompress_snapshot(gz_path, dest_path)` as the one
+    place a `.gz` becomes a plain `.html`, called by both
+    `sync_local_snapshots()` (unchanged behaviour) and a new
+    `prepare_deploy_site(site_dir, ...)`, which now builds the entire
+    `_site/` tree deploy uploads (index.html + decompressed snapshots +
+    manifest.json copy) - replacing the old bash loop entirely. Wired up
+    via a `--prepare-site <dir>` flag on `snapshot_dashboard.py`'s own
+    `main()` rather than a separate script, so there's no risk of the
+    workflow importing a stale copy. `deploy-pages.yml`'s "Prepare site"
+    step is now a single line: `python3 -m dashboard.snapshot_dashboard
+    --prepare-site _site` - no `uv sync` needed there, everything used
+    is stdlib.
+
+    Verified for real, not just unit-tested: ran that exact command
+    (`python3 -m dashboard.snapshot_dashboard --prepare-site <dir>`)
+    with a bare `python3` from the repo root, matching the CI
+    environment - correctly produced `index.html` plus all 4 real
+    committed snapshots decompressed under `snapshots/`, confirming
+    namespace-package `-m` resolution works without `dashboard/`
+    needing an `__init__.py`. 6 new tests (24 total in
+    `tests/test_snapshot_dashboard.py`, 95 repo-wide): `prepare_deploy_
+    site()`'s copy/decompress/manifest/no-snapshots-dir behaviour, an
+    explicit byte-for-byte-identical check between the local and deploy
+    decompression paths, and the `--prepare-site` CLI flag itself
+    (including its usage-error case). `uv run ruff check .` clean.
+
 27. **[parked]** Versioning the checks themselves, with that version
     flowing through to the results/data each check run captures - Keith's
     own framing, raised right after item 26's time-travel build: "a

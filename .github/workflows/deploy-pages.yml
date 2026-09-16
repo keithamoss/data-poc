@@ -16,6 +16,14 @@ name: Deploy dashboard to GitHub Pages
 # commit adding a snapshot.html.gz still triggers this workflow (it
 # matches dashboard/**), a harmless redeploy that republishes the same
 # index.html plus whichever new snapshot.html files are now decompressed.
+#
+# The actual "prepare site" step below just calls dashboard/snapshot_
+# dashboard.py --prepare-site - the SAME decompression code local
+# developers run (sync_local_snapshots(), wired into every ./run_
+# pipeline.sh via that module's main()), not a separate shell gunzip
+# loop reimplementing the same logic - scoped 2026-09-16, Keith's own
+# ask, so a local run is a genuine dry run of what this step will do.
+# Stdlib only, so no uv/dependency install needed here.
 
 on:
   push:
@@ -45,19 +53,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Prepare site
-        run: |
-          mkdir -p _site/snapshots
-          cp dashboard/qa-reporting-dashboard.html _site/index.html
-          if [ -d dashboard/snapshots ]; then
-            for f in dashboard/snapshots/*.html.gz; do
-              [ -e "$f" ] || continue
-              name="$(basename "$f" .gz)"
-              gunzip -c "$f" > "_site/snapshots/$name"
-            done
-            if [ -e dashboard/snapshots/manifest.json ]; then
-              cp dashboard/snapshots/manifest.json _site/snapshots/manifest.json
-            fi
-          fi
+        run: python3 -m dashboard.snapshot_dashboard --prepare-site _site
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

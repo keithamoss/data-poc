@@ -83,6 +83,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -166,12 +167,27 @@ def take_snapshot(html_path: Path = DASHBOARD_HTML, snapshots_dir: Path = SNAPSH
     return out_path
 
 
+def _decompress_snapshot(gz_path: Path, dest_path: Path) -> None:
+    """The one place a snapshot `.gz` becomes a plain `.html` file - used
+    identically by `sync_local_snapshots()` (local dev) and
+    `prepare_deploy_site()` (the GitHub Pages deploy workflow) below, so a
+    local sync is a genuine dry run of exactly what deploy will do, not a
+    second, parallel reimplementation (e.g. a shell `gunzip` loop) that
+    could quietly drift from this one. Scoped 2026-09-16, Keith's own ask
+    once the local-sync gap above was fixed: "I would want it to be using
+    the same code paths as the deployment pipeline... then we can treat
+    the sync as a way to locally test how the CI/CD pipeline will unzip.\""""
+    with gzip.open(gz_path, "rb") as f:
+        dest_path.write_bytes(f.read())
+
+
 def sync_local_snapshots(snapshots_dir: Path = SNAPSHOTS_DIR) -> list[Path]:
     """Decompresses every `*.html.gz` in `snapshots_dir` that doesn't
     already have a local `.html` sibling, so the live dashboard's "past
     snapshots" picker (each row links to `snapshots/<name>.html`) resolves
     locally too, not just on the published GitHub Pages site (which
-    already does this at deploy time - see `.github/workflows/deploy-
+    already does this at deploy time, via the same `_decompress_snapshot`
+    this calls - see `prepare_deploy_site` and `.github/workflows/deploy-
     pages.yml`). See the module docstring's "Local/offline viewing"
     section for the fuller rationale.
 
@@ -187,10 +203,45 @@ def sync_local_snapshots(snapshots_dir: Path = SNAPSHOTS_DIR) -> list[Path]:
         html_path = gz_path.with_suffix("")  # strips only the trailing .gz
         if html_path.exists():
             continue
-        with gzip.open(gz_path, "rb") as f:
-            html_path.write_bytes(f.read())
+        _decompress_snapshot(gz_path, html_path)
         written.append(html_path)
     return written
+
+
+def prepare_deploy_site(site_dir: Path, html_path: Path = DASHBOARD_HTML,
+                         snapshots_dir: Path = SNAPSHOTS_DIR) -> None:
+    """Builds the `_site/` tree `.github/workflows/deploy-pages.yml`
+    uploads to GitHub Pages: `index.html` (the live dashboard) plus every
+    committed snapshot decompressed into `_site/snapshots/`, alongside a
+    copy of `manifest.json` for direct inspection. Deliberately the SAME
+    `_decompress_snapshot()` call `sync_local_snapshots()` uses above -
+    this function replaced an earlier version of this step written as a
+    standalone `gunzip` loop directly in the workflow YAML, which worked
+    but was a second implementation of the exact same logic that could
+    have quietly drifted from the local path. Now there is exactly one
+    "how does a snapshot get decompressed" implementation, exercised by
+    both `uv run python3 -m dashboard.snapshot_dashboard` locally and
+    this deploy step in CI - running the local command really is a dry
+    run of what deploy will do, not just something that resembles it.
+
+    No dependency on this project's `uv`-managed environment: everything
+    used here is Python stdlib, so CI can invoke this with a bare
+    `python3`, no `uv sync` needed for what is otherwise just a file-copy
+    step."""
+    site_dir.mkdir(parents=True, exist_ok=True)
+    (site_dir / "index.html").write_bytes(html_path.read_bytes())
+
+    if not snapshots_dir.exists():
+        return
+    site_snapshots_dir = site_dir / "snapshots"
+    site_snapshots_dir.mkdir(parents=True, exist_ok=True)
+    for gz_path in sorted(snapshots_dir.glob("*.html.gz")):
+        dest_name = gz_path.with_suffix("").name  # strips only the trailing .gz
+        _decompress_snapshot(gz_path, site_snapshots_dir / dest_name)
+
+    manifest_path = snapshots_dir / "manifest.json"
+    if manifest_path.exists():
+        (site_snapshots_dir / "manifest.json").write_bytes(manifest_path.read_bytes())
 
 
 def _append_manifest_entry(snapshots_dir: Path, entry: dict) -> list:
@@ -233,10 +284,27 @@ def _embed_snapshot_manifest(html_path: Path, manifest: list) -> None:
 
 
 def main() -> None:
+    # `--prepare-site DIR`: the GitHub Pages deploy workflow's entry
+    # point (.github/workflows/deploy-pages.yml), kept as a flag on this
+    # same script rather than a separate one so there's no risk of it
+    # importing a stale copy of _decompress_snapshot() - one module, one
+    # decompression implementation, used by both this and the plain
+    # local-dev path below.
+    if len(sys.argv) >= 2 and sys.argv[1] == "--prepare-site":
+        if len(sys.argv) != 3:
+            print("usage: snapshot_dashboard.py --prepare-site <site_dir>", file=sys.stderr)
+            raise SystemExit(2)
+        prepare_deploy_site(site_dir=Path(sys.argv[2]))
+        print(f"Site prepared -> {sys.argv[2]}")
+        return
+
     # Unconditional, regardless of the SNAPSHOT_DASHBOARD flag below - a
     # plain local run (no flag set) still needs to backfill decompressed
     # copies of whatever snapshots already exist in the repo (e.g. right
-    # after a fresh clone), so the live dashboard's picker works offline.
+    # after a fresh clone), so the live dashboard's picker works offline -
+    # and, per Keith's own framing, doubles as a local dry run of exactly
+    # what --prepare-site above will do in CI, since both call the same
+    # _decompress_snapshot().
     synced = sync_local_snapshots()
     if synced:
         print(f"Synced {len(synced)} local snapshot copy/copies for offline viewing.")
