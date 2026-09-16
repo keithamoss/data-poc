@@ -52,12 +52,29 @@ alone:
   GitHub Pages site (`.github/workflows/deploy-pages.yml` decompresses
   every `.html.gz` into `_site/snapshots/` at deploy time specifically
   for this - gzip stays the only format actually committed to git;
-  nothing decompressed is ever checked in), but 404s if the dashboard is
-  opened locally via file:// straight from a clone, since `dashboard/
-  snapshots/` only ever holds the gzipped originals there - known,
-  accepted: this picker was explicitly scoped "needs to work on the live
-  public site now", not local convenience (`gunzip` still works locally,
-  same as before this existed).
+  nothing decompressed is ever checked in).
+- Local/offline viewing (added 2026-09-16, later the same day - a real
+  gap Keith spotted: a developer running the pipeline locally, then
+  opening the dashboard straight from `dashboard/qa-reporting-
+  dashboard.html` via `file://`, would 404 on every "Open" link, since
+  `dashboard/snapshots/` on disk only ever held the gzipped originals -
+  nothing decompressed the picker's links until GitHub Pages did, at
+  deploy time, for the published site only). `sync_local_snapshots()`
+  below closes this: it decompresses any `*.html.gz` in `dashboard/
+  snapshots/` that doesn't already have a local `.html` sibling, writing
+  to the exact same relative path (`dashboard/snapshots/<name>.html`)
+  the picker's existing links already point at - so the dashboard's JS/
+  markup needed zero changes, locally or on Pages, the same relative
+  link now resolves either way. Called unconditionally from `main()`
+  (so a plain `./run_pipeline.sh`, with no `SNAPSHOT_DASHBOARD` flag,
+  still backfills local copies for whatever snapshots already exist in
+  the repo - e.g. right after a fresh clone) and again at the end of
+  `take_snapshot()` (so a snapshot just taken is immediately locally
+  openable too, even if `take_snapshot()` is called directly rather than
+  through `main()`). The decompressed `.html` copies are gitignored
+  (`dashboard/snapshots/*.html`) and regenerated from the committed
+  `.gz` originals, never committed themselves - one source of truth per
+  snapshot, same as `data/`/`reports/` elsewhere in this repo.
 """
 from __future__ import annotations
 
@@ -145,7 +162,35 @@ def take_snapshot(html_path: Path = DASHBOARD_HTML, snapshots_dir: Path = SNAPSH
     # the live file on disk gets the freshly updated list, including
     # itself, so the picker can link to it going forward.
     _embed_snapshot_manifest(html_path, manifest)
+    sync_local_snapshots(snapshots_dir)
     return out_path
+
+
+def sync_local_snapshots(snapshots_dir: Path = SNAPSHOTS_DIR) -> list[Path]:
+    """Decompresses every `*.html.gz` in `snapshots_dir` that doesn't
+    already have a local `.html` sibling, so the live dashboard's "past
+    snapshots" picker (each row links to `snapshots/<name>.html`) resolves
+    locally too, not just on the published GitHub Pages site (which
+    already does this at deploy time - see `.github/workflows/deploy-
+    pages.yml`). See the module docstring's "Local/offline viewing"
+    section for the fuller rationale.
+
+    Idempotent and safe to call repeatedly/unconditionally: a `.gz` that
+    already has a decompressed sibling is left untouched. Returns the
+    `.html` paths newly written (empty list if nothing needed it, or if
+    `snapshots_dir` doesn't exist at all - e.g. no snapshot has ever been
+    taken)."""
+    if not snapshots_dir.exists():
+        return []
+    written = []
+    for gz_path in sorted(snapshots_dir.glob("*.html.gz")):
+        html_path = gz_path.with_suffix("")  # strips only the trailing .gz
+        if html_path.exists():
+            continue
+        with gzip.open(gz_path, "rb") as f:
+            html_path.write_bytes(f.read())
+        written.append(html_path)
+    return written
 
 
 def _append_manifest_entry(snapshots_dir: Path, entry: dict) -> list:
@@ -188,6 +233,14 @@ def _embed_snapshot_manifest(html_path: Path, manifest: list) -> None:
 
 
 def main() -> None:
+    # Unconditional, regardless of the SNAPSHOT_DASHBOARD flag below - a
+    # plain local run (no flag set) still needs to backfill decompressed
+    # copies of whatever snapshots already exist in the repo (e.g. right
+    # after a fresh clone), so the live dashboard's picker works offline.
+    synced = sync_local_snapshots()
+    if synced:
+        print(f"Synced {len(synced)} local snapshot copy/copies for offline viewing.")
+
     if os.environ.get("SNAPSHOT_DASHBOARD") != "1":
         print("SNAPSHOT_DASHBOARD not set to 1 - skipping the dashboard snapshot "
               "(pass SNAPSHOT_DASHBOARD=1 to take one for this run).")

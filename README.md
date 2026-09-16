@@ -66,6 +66,16 @@ code, and only the former should get archived — see
 `dashboard/snapshot_dashboard.py`'s own docstring for the full scoping
 rationale.
 
+The dashboard's own "🕐 Past snapshots" picker links to a decompressed
+copy of each snapshot alongside the `.gz` originals
+(`dashboard/snapshots/<name>.html`). Locally these are gitignored and
+regenerated automatically — every `./run_pipeline.sh` run backfills them
+regardless of the `SNAPSHOT_DASHBOARD` flag above, so the picker works
+even when opening the dashboard straight off disk via `file://`. On the
+published GitHub Pages site the same decompression happens at deploy time
+instead (`.github/workflows/deploy-pages.yml`) — either way, only the
+`.gz` files are ever actually committed to git.
+
 ## What's actually running
 
 Every check is a real tool, reading this project's real config files —

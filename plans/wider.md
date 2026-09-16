@@ -1347,6 +1347,61 @@ not a schedule.
     Not yet scoped - revisit together with the history-depth work above,
     not in isolation.
 
+    **Local/offline viewing gap found and fixed, same day (2026-09-16),
+    right after the picker build:** Keith's own catch - "a developer...
+    does a QA run... opens the latest file that was generated... they
+    can't actually go back and select any of the previous runs, can't
+    they? Because they're all just gzipped up in the repository." Correct:
+    the picker's links (`snapshots/<name>.html`) only ever resolved on
+    the published GitHub Pages site, where `deploy-pages.yml` decompresses
+    every `.html.gz` at deploy time - nothing decompressed anything
+    locally, so `dashboard/snapshots/` on a real clone only ever held the
+    gzipped originals, and opening the dashboard via `file://` would 404
+    on every "Open" link. (Briefly thought this was already handled -
+    it wasn't; confirmed by reading `take_snapshot()`, which only ever
+    called `gzip.open()`, never wrote a plain `.html` copy anywhere.)
+
+    Fixed with `sync_local_snapshots()` in `dashboard/snapshot_
+    dashboard.py`: decompresses any `*.html.gz` in `dashboard/snapshots/`
+    lacking a local `.html` sibling, writing to the exact same relative
+    path the picker's existing links already use - so neither the
+    dashboard's JS nor its link markup needed any change, locally or on
+    Pages. Called from two places: unconditionally at the top of `main()`
+    (so a plain `./run_pipeline.sh`, no `SNAPSHOT_DASHBOARD` flag needed,
+    backfills local copies of whatever snapshots already exist - the
+    literal fresh-clone scenario Keith described), and again at the end
+    of `take_snapshot()` itself (so a snapshot just taken is immediately
+    locally openable too). Idempotent - a `.gz` with an existing `.html`
+    sibling is left untouched.
+
+    Scoped via two quick questions rather than assumed: whether
+    decompression should be automatic vs. a separate explicit step
+    (Keith's read - correctly - was that automatic is how it already
+    should work, confirming the fix's direction), and whether the local
+    `.html` copies should be committed or gitignored-and-regenerated -
+    "Gitignored, regenerated from .gz," so `dashboard/snapshots/*.html`
+    was added to `.gitignore`; the `.gz` files stay the only thing
+    actually committed, same single-source-of-truth pattern as `data/`/
+    `reports/` elsewhere in this repo.
+
+    Verified two ways: `uv run python3 -c "from dashboard import
+    snapshot_dashboard; snapshot_dashboard.sync_local_snapshots()"`
+    against the real repo's 4 existing committed `.gz` snapshots -
+    correctly backfilled 4 local `.html` copies, confirmed gitignored
+    (`git status` shows nothing new). Then real Playwright against the
+    live dashboard opened via `file://`: clicked "🕐 Past snapshots",
+    clicked "Open" on a row, confirmed the resulting popup actually
+    rendered the archived page from its local `file://.../snapshots/
+    <name>.html` path - real title, real content, zero console errors.
+    6 new tests in `tests/test_snapshot_dashboard.py` (18 total, up from
+    12): `sync_local_snapshots()`'s decompress/skip-existing/missing-dir/
+    idempotent behaviour, `take_snapshot()` leaving a local copy behind
+    too, and `main()` syncing even with no `SNAPSHOT_DASHBOARD` flag set
+    (the existing `main()` tests were also updated to mock out
+    `sync_local_snapshots()`, since it otherwise touches the real repo's
+    `dashboard/snapshots/` directory as a side effect of running the test
+    suite). 89 tests pass repo-wide; `uv run ruff check .` clean.
+
 27. **[parked]** Versioning the checks themselves, with that version
     flowing through to the results/data each check run captures - Keith's
     own framing, raised right after item 26's time-travel build: "a

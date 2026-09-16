@@ -13,6 +13,7 @@ import gzip
 import json
 import re
 from datetime import datetime, timezone
+from pathlib import Path
 
 from dashboard import snapshot_dashboard
 
@@ -156,6 +157,7 @@ def test_take_snapshot_raises_if_dashboard_html_missing(tmp_path):
 
 def test_main_is_a_noop_without_the_env_flag(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("SNAPSHOT_DASHBOARD", raising=False)
+    monkeypatch.setattr(snapshot_dashboard, "sync_local_snapshots", lambda *a, **k: [])
     calls = []
     monkeypatch.setattr(snapshot_dashboard, "take_snapshot", lambda *a, **k: calls.append(1))
 
@@ -168,6 +170,7 @@ def test_main_is_a_noop_without_the_env_flag(tmp_path, monkeypatch, capsys):
 def test_main_is_a_noop_when_flag_is_not_exactly_one(monkeypatch):
     for value in ("0", "true", "yes", ""):
         monkeypatch.setenv("SNAPSHOT_DASHBOARD", value)
+        monkeypatch.setattr(snapshot_dashboard, "sync_local_snapshots", lambda *a, **k: [])
         calls = []
         monkeypatch.setattr(snapshot_dashboard, "take_snapshot", lambda *a, **k: calls.append(1))
         snapshot_dashboard.main()
@@ -176,6 +179,7 @@ def test_main_is_a_noop_when_flag_is_not_exactly_one(monkeypatch):
 
 def test_main_takes_a_snapshot_when_flag_is_set(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("SNAPSHOT_DASHBOARD", "1")
+    monkeypatch.setattr(snapshot_dashboard, "sync_local_snapshots", lambda *a, **k: [])
     fake_out = tmp_path / "fake-snapshot.html.gz"
     calls = []
     monkeypatch.setattr(snapshot_dashboard, "take_snapshot", lambda *a, **k: calls.append(1) or fake_out)
@@ -184,3 +188,82 @@ def test_main_takes_a_snapshot_when_flag_is_set(monkeypatch, tmp_path, capsys):
 
     assert calls == [1]
     assert str(fake_out) in capsys.readouterr().out
+
+
+def test_main_syncs_local_snapshots_even_without_the_env_flag(monkeypatch, capsys):
+    # The whole point of the fix: a plain `./run_pipeline.sh` with no
+    # SNAPSHOT_DASHBOARD flag set must still backfill local decompressed
+    # copies of whatever snapshots already exist (e.g. right after a
+    # fresh clone) - not just when actively taking a new one.
+    monkeypatch.delenv("SNAPSHOT_DASHBOARD", raising=False)
+    monkeypatch.setattr(snapshot_dashboard, "take_snapshot", lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError("take_snapshot should not be called without the flag set")))
+    sync_calls = []
+    monkeypatch.setattr(snapshot_dashboard, "sync_local_snapshots",
+                         lambda *a, **k: sync_calls.append(1) or [Path("fake.html")])
+
+    snapshot_dashboard.main()
+
+    assert sync_calls == [1]
+    assert "synced 1 local snapshot" in capsys.readouterr().out.lower()
+
+
+def test_sync_local_snapshots_decompresses_gz_files_missing_a_local_copy(tmp_path):
+    snapshots_dir = tmp_path / "snapshots"
+    snapshots_dir.mkdir()
+    gz_path = snapshots_dir / "20260916T000000Z_abc1234.html.gz"
+    with gzip.open(gz_path, "wb") as f:
+        f.write(b"<html>archived content</html>")
+
+    written = snapshot_dashboard.sync_local_snapshots(snapshots_dir)
+
+    expected_html = snapshots_dir / "20260916T000000Z_abc1234.html"
+    assert written == [expected_html]
+    assert expected_html.read_bytes() == b"<html>archived content</html>"
+
+
+def test_sync_local_snapshots_skips_gz_files_that_already_have_a_local_copy(tmp_path):
+    snapshots_dir = tmp_path / "snapshots"
+    snapshots_dir.mkdir()
+    gz_path = snapshots_dir / "20260916T000000Z_abc1234.html.gz"
+    with gzip.open(gz_path, "wb") as f:
+        f.write(b"<html>archived content</html>")
+    html_path = snapshots_dir / "20260916T000000Z_abc1234.html"
+    html_path.write_bytes(b"<html>a stale or hand-edited local copy</html>")
+
+    written = snapshot_dashboard.sync_local_snapshots(snapshots_dir)
+
+    assert written == []
+    assert html_path.read_bytes() == b"<html>a stale or hand-edited local copy</html>", \
+        "an existing local .html must never be overwritten by sync"
+
+
+def test_sync_local_snapshots_returns_empty_list_when_snapshots_dir_missing(tmp_path):
+    missing_dir = tmp_path / "does-not-exist"
+    assert snapshot_dashboard.sync_local_snapshots(missing_dir) == []
+
+
+def test_sync_local_snapshots_is_idempotent(tmp_path):
+    snapshots_dir = tmp_path / "snapshots"
+    snapshots_dir.mkdir()
+    with gzip.open(snapshots_dir / "20260916T000000Z_abc1234.html.gz", "wb") as f:
+        f.write(b"<html>archived content</html>")
+
+    first = snapshot_dashboard.sync_local_snapshots(snapshots_dir)
+    second = snapshot_dashboard.sync_local_snapshots(snapshots_dir)
+
+    assert len(first) == 1
+    assert second == [], "a second call must find nothing left to decompress"
+
+
+def test_take_snapshot_also_writes_a_local_decompressed_copy(tmp_path):
+    html_path = _write_fake_dashboard(tmp_path, "<html>local copy check</html>\nconst SNAPSHOT_MANIFEST = [];\n")
+    snapshots_dir = tmp_path / "snapshots"
+
+    out_path = snapshot_dashboard.take_snapshot(html_path=html_path, snapshots_dir=snapshots_dir)
+
+    local_copy = out_path.with_suffix("")
+    assert local_copy.exists(), \
+        "take_snapshot() must leave a locally-openable .html copy, not just the .gz archive"
+    with gzip.open(out_path, "rb") as f:
+        assert local_copy.read_bytes() == f.read()
