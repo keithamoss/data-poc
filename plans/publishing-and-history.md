@@ -1095,6 +1095,10 @@ additive field, never by mutating what the tool itself reported.
    keep one file, CI commits the data-only diff back** - explicitly
    choosing not to restructure, even knowing it doesn't resolve the
    mergeability concern the same way the alternative would have.
+   **Superseded, 2026-09-16 (same day, Keith reconsidered): the
+   template + gitignored build output split, after all** - see the
+   dated entry below ("Reconsidered and built") for the full account
+   of why this changed and what got built.
 
 **Built and verified for real:**
 - `qa_tools/common/validate_check_lifecycle.py` (new) - the Thread D
@@ -1490,6 +1494,78 @@ invocations, same rigor as `tests/test_validate_check_lifecycle.py`'s
 own git-history tests) - covering the block case, two "genuine edit"
 cases (touches other lines only; touches other lines AND the const
 lines), and the not-staged case. Full pytest (174 tests) + ruff clean.
+
+**Reconsidered and built, 2026-09-16 (same day): the template + gitignored
+build output split, after all - the pre-commit hook above removed as
+redundant.** Keith's own follow-up after the hook landed: "what if we
+instead had the file as a `.template.html` file? And then let the
+builder write to the current file name?" - the exact option framed and
+set aside in decision 2 above, back when CI was still going to commit
+the data-only diff back (making "not worth the restructuring churn" a
+real tradeoff at the time). That justification no longer held once CI
+stopped committing anything at all (the decision right above this one)
+- at that point the pre-commit hook was already compensating for a
+structural gap a clean split would remove entirely, so reconsidering it
+was the right call, not scope creep.
+
+Three real forks resolved before building:
+- **Template placeholder content: `null`/`[]`, not today's frozen real
+  data** - keeps the file people actually hand-edit small and diffable,
+  with no risk of stale megabyte-scale JSON sitting in reviewable
+  source (a real, additional benefit beyond just closing the commit
+  risk - every real pipeline regeneration used to touch a multi-hundred-
+  KB diff in the SAME file as hand-authored UI code before this).
+- **Remove the now-redundant pre-commit hook** - once the build output
+  is gitignored, git can never see a diff on it to stage in the first
+  place, so a hook checking for that diff shape can only ever fire on a
+  deliberate `git add -f` bypass. Kept as dead-weight complexity would
+  have cost more (a hook whose docstring no longer matches reality) than
+  it protects against.
+- **A fresh clone no longer has an immediately-openable, pre-built
+  dashboard - confirmed acceptable.** Only the empty-placeholder
+  template exists until `./run_pipeline.sh`/`embed_dashboard_data.py`
+  runs. GitHub Pages (the actual public-facing, always-fresh copy) is
+  completely unaffected; only a local clone's immediate-open convenience
+  changes, and that copy was already frozen/stale under the previous
+  design anyway.
+
+**Built:**
+- `git mv dashboard/qa-reporting-dashboard.html dashboard/qa-reporting-
+  dashboard.template.html` (preserves file history) - the three consts
+  (`REAL_BIRTH_REG_DATA`/`REAL_CP_DATA`/`SNAPSHOT_MANIFEST`) nulled/
+  emptied out. A real, pre-existing staleness caught fixing this file's
+  own header comment while touching it anyway (not otherwise related to
+  this change): "10 scheduled deliveries, up to 15 manifest entries"
+  corrected to the real current numbers (60/85, since the history-
+  deepening work).
+- `dashboard/embed_dashboard_data.py` - reads `TEMPLATE_HTML` (new
+  constant), writes `DASHBOARD_HTML` (same path/name as before) - the
+  only functional code change needed. `dashboard/snapshot_dashboard.py`/
+  `dashboard/check_dashboard_renders.py` needed NO changes at all -
+  both already referenced the build-output path, never the source,
+  confirmed by grepping every reference to the filename across the repo
+  before assuming so.
+- `.gitignore` - added `dashboard/qa-reporting-dashboard.html`.
+- Removed: `dashboard/check_no_local_embed_committed.py`, its
+  `.pre-commit-config.yaml` entry, and `tests/test_check_
+  no_local_embed_committed.py` (4 tests).
+- `README.md`/`CLAUDE.md` updated to describe the new split (edit the
+  template, never the build output) in place of the old "don't commit a
+  local rebuild" convention-based wording.
+
+**Verified for real, not just that the build succeeds:** a real
+`embed_dashboard_data.py` run confirmed the build output lands
+correctly ignored (`git check-ignore -v`, `git status` shows the staged
+rename cleanly with no interference from the freshly-built ignored
+file sitting at that path); a real Playwright render check
+(`check_dashboard_renders.py`) against that freshly-built file - zero
+console errors, same as before; a real `snapshot_dashboard.py` run
+confirmed `SNAPSHOT_MANIFEST` still re-embeds correctly from the real
+`dashboard/snapshots/manifest.json` (the verification run's own stray
+snapshot file and `manifest.json` diff were discarded afterward, not
+committed - not a genuine data-refresh run). Full pytest (170 tests,
+down from 174 - the 4 removed hook tests, no replacements needed) +
+ruff clean.
 
 **Phase 4 (Thread C - cadence-aware "as of" viewing):**
 - Depends on Phase 1 and Phase 2 (real committed history, merged/

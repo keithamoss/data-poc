@@ -1,15 +1,20 @@
 """
-Regenerates the `const REAL_BIRTH_REG_DATA = {...};` and
-`const REAL_CP_DATA = {...};` lines inside qa-reporting-dashboard.html from
-reports/birth_registrations_dashboard.json and
-reports/child_protection_dashboard.json - the step that turns
-pipeline/build_dashboard_data.py's and pipeline/build_cp_dashboard_data.py's
-output into what the dashboard actually renders. Run this last, after
-orchestrate.py/orchestrate_cp.py and the two build_*_dashboard_data.py
-scripts, whenever the pipeline is regenerated.
+Builds dashboard/qa-reporting-dashboard.html from dashboard/qa-reporting-
+dashboard.template.html (2026-09-16, Keith's call - plans/publishing-
+and-history.md): reads the committed, hand-edited template, regenerates
+the `const REAL_BIRTH_REG_DATA = {...};` and `const REAL_CP_DATA =
+{...};` lines from reports/birth_registrations_dashboard.json and
+reports/child_protection_dashboard.json (pipeline/build_dashboard_
+data.py's/build_cp_dashboard_data.py's output), and writes the result
+to the real, viewable HTML - gitignored, never committed, rebuilt fresh
+by CI on every push and locally by ./run_pipeline.sh. Run this last,
+after orchestrate.py/orchestrate_cp.py and the two build_*_dashboard_
+data.py scripts, whenever the pipeline is regenerated.
 
-This only replaces those two lines - the rest of the dashboard (its CSS,
-the rendering code, and the other 14 illustrative datasets) is untouched.
+This only replaces those two lines - the rest of the dashboard (its
+CSS, the rendering code, the other 14 illustrative datasets, and the
+separate SNAPSHOT_MANIFEST const dashboard/snapshot_dashboard.py owns)
+is copied through unchanged from the template.
 """
 from __future__ import annotations
 import json
@@ -17,6 +22,7 @@ import os
 import re
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
+TEMPLATE_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.template.html")
 DASHBOARD_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.html")
 
 TARGETS = [
@@ -26,7 +32,7 @@ TARGETS = [
 
 
 def embed() -> None:
-    with open(DASHBOARD_HTML) as f:
+    with open(TEMPLATE_HTML) as f:
         html = f.read()
 
     for const_name, data_json_path in TARGETS:

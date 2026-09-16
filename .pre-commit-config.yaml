@@ -4,16 +4,3 @@ repos:
     hooks:
       - id: ruff
         args: [--fix]
-  - repo: local
-    hooks:
-      - id: no-local-embed-committed
-        name: block committing a local dashboard data-embed rebuild
-        description: >-
-          Refuses a commit if dashboard/qa-reporting-dashboard.html's staged
-          diff touches only the two embedded-data consts (a local
-          embed_dashboard_data.py/./run_pipeline.sh rebuild) - see
-          dashboard/check_no_local_embed_committed.py's own docstring.
-        entry: uv run python3 dashboard/check_no_local_embed_committed.py
-        language: system
-        files: ^dashboard/qa-reporting-dashboard\.html$
-        pass_filenames: false

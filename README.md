@@ -51,19 +51,23 @@ when `uv` is one command to install.)
 This regenerates 60 scheduled daily deliveries (up to 85 manifest entries
 once red-triggered resupply attempts are included — see "The 60
 (scheduled) runs" below), loads them into DuckDB, runs the four real tools
-against every run, and re-embeds the results into
-`dashboard/qa-reporting-dashboard.html`. Every step is seeded, so re-running
-reproduces the same runs and the same numbers.
+against every run, and builds `dashboard/qa-reporting-dashboard.html` from
+`dashboard/qa-reporting-dashboard.template.html` plus the results. Every
+step is seeded, so re-running reproduces the same runs and the same
+numbers.
 
-**Don't commit your own local re-embed of `dashboard/qa-reporting-dashboard.html`.**
-Since `plans/publishing-and-history.md` Phase 3, CI
-(`.github/workflows/deploy-pages.yml`) is the only thing that commits a
-change to that file's two embedded data consts — it rebuilds the whole
-dashboard from committed `qa_results/` history itself on every relevant
-push, gates the result, and only then commits + deploys. Running the
-pipeline locally still regenerates the file for your own viewing (that
-part's unchanged); just don't `git add`/commit that regeneration
-yourself.
+**`dashboard/qa-reporting-dashboard.html` is a *build output*, not a
+committed file — edit `dashboard/qa-reporting-dashboard.template.html`
+instead.** The template is the real, hand-authored UI source (HTML/CSS/
+JS), committed and edited directly; `dashboard/embed_dashboard_data.py`
+reads it and writes the real, viewable `.html` file, which is gitignored
+and never committed (2026-09-16, `plans/publishing-and-history.md` Phase
+3). CI (`.github/workflows/deploy-pages.yml`) rebuilds it fresh from
+committed `qa_results/` history on every relevant push, gates the
+result, and deploys — it doesn't commit anything back to git either.
+Running the pipeline locally still builds the file for your own
+viewing; there's just nothing to accidentally commit any more, since
+git never tracks that path.
 
 Pass `SNAPSHOT_DASHBOARD=1` to also archive the freshly re-embedded
 dashboard as a self-contained "time travel" snapshot
@@ -182,9 +186,13 @@ pipeline/                    a real package (pipeline/__init__.py) - `python3 -m
   build_dashboard_data.py       reshapes results_bdm.json into the dashboard's data shape
   build_cp_dashboard_data.py    reshapes results_cp.json into 6 datasets' worth of dashboard data
 dashboard/
-  qa-reporting-dashboard.html   the 3-tier QA dashboard, with Birth Registrations and the whole Child
-                               Protection collection wired to real data
-  embed_dashboard_data.py       re-embeds both real datasets (REAL_BIRTH_REG_DATA, REAL_CP_DATA) into the HTML
+  qa-reporting-dashboard.template.html   the 3-tier QA dashboard's hand-authored UI source (HTML/CSS/JS) -
+                               edit this file, not the built .html below
+  qa-reporting-dashboard.html   BUILD OUTPUT (gitignored, never committed) - the template above with
+                               real data embedded, Birth Registrations and the whole Child Protection
+                               collection wired to real data
+  embed_dashboard_data.py       builds qa-reporting-dashboard.html from the template above, embedding
+                               both real datasets (REAL_BIRTH_REG_DATA, REAL_CP_DATA)
 data/                          generated - raw run CSVs, manifest.json, warehouse.duckdb, duckdb_runs/,
                                cp_raw/, cp_duckdb_runs/ (not checked in)
 reports/                       generated - results_bdm.json, results_cp.json,

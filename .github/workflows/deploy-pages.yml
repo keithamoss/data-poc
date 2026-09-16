@@ -10,19 +10,30 @@ name: Build, validate, and publish the dashboard
 # itself, from committed history alone, and gates the result before
 # anything reaches Pages.
 #
-# What "the real build" means: dashboard/qa-reporting-dashboard.html
-# holds BOTH hand-authored UI source (committed, edited directly - the
-# HTML/CSS/JS itself) AND two embedded data consts (REAL_BIRTH_REG_DATA/
-# REAL_CP_DATA), rebuilt fresh by this job on every run. Keith's explicit
-# call, 2026-09-16: keep that as ONE file (not a template/build-output
-# split) - but as of the same day, this job does NOT commit the rebuilt
-# consts back to git at all (a second decision, later the same day - see
-# "Why this job no longer commits anything" below). The rebuild happens
-# in the job's own working tree, feeds straight into the Pages artifact
-# a few steps down, and is discarded when the job ends - the committed
-# copy of this file in git keeps whatever data consts were last (and
-# will ever be) checked in, which is now permanently stale relative to
-# what's actually live. That's a deliberate trade, not an oversight -
+# What "the real build" means: dashboard/embed_dashboard_data.py reads
+# dashboard/qa-reporting-dashboard.template.html (the real, committed
+# UI source - hand-authored HTML/CSS/JS, with three placeholder consts:
+# REAL_BIRTH_REG_DATA/REAL_CP_DATA/SNAPSHOT_MANIFEST) and writes
+# dashboard/qa-reporting-dashboard.html (no `.template` - gitignored,
+# never committed) with real data embedded, fresh on every run. This
+# WAS one file (Keith's explicit call, 2026-09-16: keep hand-authored
+# UI and embedded data together rather than split into a template/
+# build-output pair) - but as of the same day, this job stopped
+# committing the rebuilt consts back to git at all (a second decision,
+# later the same day - see "Why this job no longer commits anything"
+# below), which made the one-file design's own justification (avoiding
+# restructuring churn, since CI was going to commit the data-only diff
+# back either way) moot. Keith reconsidered once that changed, same
+# day: the template + gitignored build output split, after all - see
+# plans/publishing-and-history.md's Phase 3 section ("Reconsidered and
+# built") for the full account, including why this also let a
+# pre-commit hook that had briefly existed to guard the one-file design
+# get removed as redundant. The rebuild happens in the job's own
+# working tree, feeds straight into the Pages artifact a few steps
+# down, and is discarded when the job ends - the committed template has
+# no real data in it at all, by design, not "stale" the way the old
+# one-file design's committed copy was. That's a deliberate trade, not
+# an oversight -
 # see below.
 #
 # Why this job no longer commits anything (2026-09-16, same day as the
