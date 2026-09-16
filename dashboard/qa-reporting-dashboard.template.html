@@ -424,6 +424,15 @@ function runDate(idxFromToday){ return new Date(TODAY.getTime() - idxFromToday*D
 function fmtDate(d){ return d.toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}); }
 function fmtDateShort(d){ return d.toLocaleDateString("en-US",{month:"short",day:"numeric"}); }
 function fmtInt(x){ return x.toLocaleString("en-US"); }
+// lastArrival.arrivedAt on its own is only ever a time ("05:07 local",
+// "14:32 UTC (earliest extract, latest run)") - Keith's own report,
+// 2026-09-16: on its own that reads as "arrived at this time" with no
+// day attached, ambiguous once the dashboard can be viewed as of an
+// arbitrary past date (Thread C) rather than always meaning "today".
+// Pairs it with lastArrival.date (fmtDate's existing "Jul 1, 2026"
+// format, reused rather than inventing a new date style) using the
+// same " · " separator this UI already uses elsewhere.
+function fmtArrival(lastArrival){ return `${lastArrival.arrivedAt} · ${fmtDate(lastArrival.date)}`; }
 function fmtMetric(x, unit){
   if(unit==="%") return x.toFixed(2)+"%";
   if(unit==="hrs") return x.toFixed(1)+"h";
@@ -1202,7 +1211,7 @@ function renderAgency(view, agencyId){
           return `<tr data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td><div class="dataset-name">${ds.name}${ds.isReal?` <span class="pill tag sm"><span class="ico"></span>Real pipeline data</span>`:""}</div><div class="dataset-provider">${ds.provider}</div></td>
             <td>${pill(ds.status,"sm")}</td>
-            <td>${arrivalPill} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${ds.lastArrival.arrivedAt}</span></td>
+            <td>${arrivalPill} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${fmtArrival(ds.lastArrival)}</span></td>
             <td class="mono">${fmtInt(ds.rowCount)}</td>
             <td class="mono" style="color:var(--ink-muted);">${fmtDate(ds.lastArrival.date)}</td>
           </tr>`;
@@ -1253,7 +1262,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     </div>
     <div class="sla-strip">
       <div class="sla-tile"><div class="k">SLA</div><div class="v" style="font-size:14px;">${ds.sla.frequency}, by ${ds.sla.expectedBy}</div></div>
-      <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono">${ds.lastArrival.arrivedAt} ${ds.lastArrival.onTime? "":"(late)"}</div></div>
+      <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono">${fmtArrival(ds.lastArrival)} ${ds.lastArrival.onTime? "":"(late)"}</div></div>
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>
       <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">${fmtInt(ds.rowCount)} <span style="font-size:11.5px; color:${rowDelta>=0?'var(--good)':'var(--bad)'};">(${rowDelta>=0?'+':''}${fmtInt(rowDelta)})</span></div></div>
     </div>

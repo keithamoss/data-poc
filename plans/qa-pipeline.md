@@ -2703,6 +2703,38 @@ relative, not a schedule — this is weeks of work, not months.
     Explicitly deferred by Keith to the end of the next phase, not
     investigated or built now.
 
+54. **[todo, resolve at the end of the next phase]** A real pluralization
+    bug - Keith's report, 2026-09-16: on the Executive tier's agency
+    cards, "collections"/"datasets" stay plural even when the count is
+    1 (`dashboard/qa-reporting-dashboard.template.html`, the
+    `card-meta` block, `${ag.collections.length}</b> collections` /
+    `${nDatasets}</b> datasets`). Keith's own instruction: fix this
+    specific spot AND find every other place with the same
+    count-plus-noun pattern, applying one generalized fix rather than
+    patching each site by hand. Audited (not fixed) while logging this:
+    the same shape shows up in at least 4 other places, all a plain
+    `${count} noun` template-literal with no singular/plural branching -
+    - the dataset-detail "Real pipeline data" badge: `${ds.realRunCount}
+      computed runs` (would read "1 computed runs" for a brand-new
+      dataset's very first run)
+    - the "no data as of" empty state's tolerance text: `(${AS_OF_OFFSET_DAYS}
+      days)` (would read "1 days" if the offset were ever configured to 1)
+    - the column drawer's checks-history heading: `every QA run
+      (${statusHistory.length} runs)`
+    - the check-detail panel's trend heading: `every QA run (${n} runs)`
+
+    None of today's real data happens to hit count=1 for any of these
+    (BDM/CP have 80+/16+ runs, the offset is 60, collections/datasets
+    per agency are mostly >1), which is presumably why this has sat
+    unnoticed - but it's a real, reachable bug (a brand-new dataset's
+    first-ever run, or a future single-collection agency, would show
+    it immediately) not just a hypothetical. Not yet scoped: what the
+    generalized fix actually looks like (a small `pluralize(n, noun,
+    pluralNoun?)` helper reused at all 5 sites is the obvious shape,
+    but not decided) or whether there are more sites this audit missed
+    once looked at properly. Logged for later per Keith's own
+    instruction, not investigated further or fixed now.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
