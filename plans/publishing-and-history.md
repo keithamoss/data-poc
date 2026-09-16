@@ -154,16 +154,27 @@ shared blob. A CI job then:
 3. Only publishes (deploys to GitHub Pages) if the gate passes - a
    broken run genuinely can't reach the published site.
 
-**Proposed default, not yet explicitly confirmed with Keith (easy to
-revise later - flagging rather than blocking on it):** CI triggers on
-push to the committed raw-result paths, not a fixed schedule. Keeps
-faith with the "every run should arguably be shared" principle from the
+**Confirmed with Keith (2026-09-16):** CI triggers on push to the
+committed raw-result paths - explicitly NOT on a schedule. Keeps faith
+with the "every run should arguably be shared" principle from the
 original local-publish brainstorm - the moment someone's results land in
 the repo, the team's view updates (once smoke tests pass), no separate
 deliberate "now publish" step and no waiting for a scheduled window
-either. A schedule can be layered in later (e.g. a periodic rebuild even
-absent new commits, to catch drift) if gaps turn out to matter in
-practice.
+either.
+
+Broadened per Keith's own addition: the trigger path set isn't just the
+raw per-run result files - it's anything in this space whose change
+could affect the published output. In practice that means the workflow's
+`paths:` filter needs to cover, at minimum: the committed `qa_results/`-
+style raw tool outputs (Thread B), the check-lifecycle/versioning
+metadata (Thread D - a retirement or definition-change declaration
+changes what gets rendered even without a new run), and the dashboard
+pipeline's own code (the merge/reshape/render logic itself - a bug fix
+or feature to that code changes the published output just as much as
+new data does, same principle `deploy-pages.yml`'s existing `dashboard/**`
+path filter already applies to today). Exact path list to be finalized
+when Thread A actually gets built, once Thread B/D's real directory
+layout exists to filter on.
 
 **Changelog/activity feed** (Keith's own addition mid-thread - "who's
 committed/pushed what dataset's QA recently"): falls out of this design
