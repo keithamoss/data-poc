@@ -1,5 +1,5 @@
 {
-  "run_timestamp": "2026-09-16T10:29:11.569729+00:00",
+  "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
   "raw_output": {
     "psi": {
       "metrics": [
@@ -33,5 +33,28 @@
       ],
       "tests": []
     }
-  }
+  },
+  "verified": [
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "column_name": "sex",
+      "check_name": "drift:PSI",
+      "dimension": "consistency",
+      "label": "Distribution drift",
+      "run_id": "run_01_2026-09-07",
+      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "metric_value": 0.0,
+      "unit": "PSI",
+      "warn_threshold": 0.1,
+      "fail_threshold": 0.25,
+      "status": "pass",
+      "on_fail_action": "flag",
+      "row_count_total": 1851,
+      "row_count_invalid": null,
+      "engine": "Evidently 0.7",
+      "reference_run_id": "run_01_2026-09-07"
+    }
+  ]
 }

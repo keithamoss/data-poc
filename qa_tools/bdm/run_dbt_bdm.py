@@ -248,8 +248,6 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     with open(os.path.join(target_path, "run_results.json")) as f:
         run_results = json.load(f)
 
-    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "dbt", run_results)
-
     nodes = test_nodes(manifest)
     conn = duckdb.connect(db_path, read_only=True)
     n_total = conn.execute("SELECT COUNT(*) FROM stg_birth_registrations").fetchone()[0]
@@ -318,6 +316,13 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
         })
 
     conn.close()
+    # Committed only now, after the audit-table correction above (not
+    # right after run_results.json is read) - raw_output stays dbt's own
+    # unmodified output (bug included), but `verified` (=`results`, the
+    # already-corrected records) is what a later, no-live-DB read of
+    # this file actually needs - see qa_results_writer.py's own
+    # docstring for why.
+    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "dbt", run_results, verified=results)
     return results
 
 

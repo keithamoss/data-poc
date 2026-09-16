@@ -45,6 +45,26 @@ def test_write_qa_result_creates_parent_directories(tmp_path):
     assert out_path.parent.is_dir()
 
 
+def test_write_qa_result_writes_verified_alongside_raw_output(tmp_path):
+    raw = {"results": [{"status": "fail", "failures": 0}]}  # e.g. dbt's own (buggy) count
+    verified = [{"status": "fail", "metric_value": 7, "column_name": "sex"}]  # the corrected record
+
+    out_path = write_qa_result("agency", "dataset", "run_01", "2026-01-01T00:00:00Z", "dbt", raw,
+                                verified=verified, results_dir=tmp_path)
+
+    written = json.loads(out_path.read_text())
+    assert written["raw_output"] == raw, "raw_output must stay exactly what the tool produced, uncorrected"
+    assert written["verified"] == verified
+
+
+def test_write_qa_result_defaults_verified_to_empty_list(tmp_path):
+    out_path = write_qa_result("agency", "dataset", "run_01", "2026-01-01T00:00:00Z", "dbt", {},
+                                results_dir=tmp_path)
+
+    written = json.loads(out_path.read_text())
+    assert written["verified"] == []
+
+
 def test_write_qa_result_overwrites_a_rerun_of_the_same_tool_and_run(tmp_path):
     write_qa_result("agency", "dataset", "run_01", "2026-01-01T00:00:00Z", "dbt", {"version": 1}, results_dir=tmp_path)
     out_path = write_qa_result("agency", "dataset", "run_01", "2026-01-02T00:00:00Z", "dbt", {"version": 2}, results_dir=tmp_path)

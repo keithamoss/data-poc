@@ -124,7 +124,6 @@ def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     scan.disable_telemetry()
     scan.execute()
     scan_results = scan.get_scan_results()
-    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "soda", scan_results)
     metric_name_by_id = {m["identity"]: m["metricName"] for m in scan_results["metrics"]}
 
     results = []
@@ -199,6 +198,10 @@ def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
         })
 
     conn.close()
+    # Committed only now, after row_count_total's own live query above -
+    # scan_results alone never carries it (see qa_results_writer.py's
+    # own docstring for why `verified` exists).
+    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "soda", scan_results, verified=results)
     return results
 
 

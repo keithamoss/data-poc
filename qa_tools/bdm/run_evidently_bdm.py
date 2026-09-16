@@ -153,7 +153,7 @@ def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
             "reference_run_id": None,
         })
 
-    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "evidently", raw_output)
+    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "evidently", raw_output, verified=results)
     return results
 
 

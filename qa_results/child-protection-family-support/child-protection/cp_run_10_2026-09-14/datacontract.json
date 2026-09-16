@@ -1,7 +1,7 @@
 {
-  "run_timestamp": "2026-09-16T10:30:21.814702+00:00",
+  "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
   "raw_output": {
-    "runId": "dda22573-e8f6-4032-a136-833068d19b73",
+    "runId": "56bae56b-cb92-4d80-ae16-d7d32dab5ed5",
     "datacontractCliVersion": "1.2.0",
     "dataContractId": "child-protection-casework",
     "dataContractVersion": "1.0.0",
@@ -9,13 +9,13 @@
     "outputPortId": null,
     "server": "local_test",
     "filters": null,
-    "timestampStart": "2026-09-16 10:30:56.738376+00:00",
-    "timestampEnd": "2026-09-16 10:31:02.914854+00:00",
+    "timestampStart": "2026-09-16 10:49:28.283635+00:00",
+    "timestampEnd": "2026-09-16 10:49:34.531465+00:00",
     "result": "failed",
     "dryRun": false,
     "checks": [
       {
-        "id": "d91c7d1d-dc68-4b42-9e5e-6badbbeabd9a",
+        "id": "21ba9685-1c67-40a7-ac13-45cee463f4f8",
         "key": "cp_clients__cp_client_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -39,7 +39,7 @@
         "failedSamples": null
       },
       {
-        "id": "ca4d376b-1be7-4480-82fe-8f6ec48b016e",
+        "id": "2dec9a13-3798-4bf5-9774-1eb765853e5d",
         "key": "cp_clients__cp_client_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -66,7 +66,7 @@
         "failedSamples": null
       },
       {
-        "id": "0749a72c-2d41-497d-baa0-3b9ce96bf8cb",
+        "id": "371a7331-f7c0-4fa8-bf7b-7881d002b521",
         "key": "cp_clients__cp_client_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -92,11 +92,15 @@
         },
         "failedSamples": [
           {
-            "cp_client_id": "CPS-738107226",
+            "cp_client_id": "CPS-452257459",
             "duplicate_count": 2
           },
           {
-            "cp_client_id": "CPS-410038024",
+            "cp_client_id": "CPS-755892958",
+            "duplicate_count": 2
+          },
+          {
+            "cp_client_id": "CPS-788233531",
             "duplicate_count": 2
           },
           {
@@ -105,20 +109,20 @@
           },
           {
             "cp_client_id": "CPS-909156374",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-185627400",
             "duplicate_count": 2
           }
         ],
         "failed_samples": [
           {
-            "cp_client_id": "CPS-738107226",
+            "cp_client_id": "CPS-452257459",
             "duplicate_count": 2
           },
           {
-            "cp_client_id": "CPS-410038024",
+            "cp_client_id": "CPS-755892958",
+            "duplicate_count": 2
+          },
+          {
+            "cp_client_id": "CPS-788233531",
             "duplicate_count": 2
           },
           {
@@ -128,15 +132,11 @@
           {
             "cp_client_id": "CPS-909156374",
             "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-185627400",
-            "duplicate_count": 2
           }
         ]
       },
       {
-        "id": "86c419c7-c2f4-4182-a68a-c2bb85fd1d19",
+        "id": "67c645d9-3e10-41cd-8bb4-ece54fc19237",
         "key": "cp_clients__cp_client_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -164,7 +164,7 @@
         "failedSamples": null
       },
       {
-        "id": "f9cc8504-9de0-4645-b17d-1ea49dbcfdf7",
+        "id": "14853900-11ee-493c-8019-ea2f82882c67",
         "key": "cp_clients__cp_client_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -191,6 +191,14 @@
         },
         "failedSamples": [
           {
+            "cp_client_id": "CPS-738107226",
+            "duplicate_count": 2
+          },
+          {
+            "cp_client_id": "CPS-410038024",
+            "duplicate_count": 2
+          },
+          {
             "cp_client_id": "CPS-452257459",
             "duplicate_count": 2
           },
@@ -200,19 +208,19 @@
           },
           {
             "cp_client_id": "CPS-788233531",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-410038024",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-738107226",
             "duplicate_count": 2
           }
         ],
         "failed_samples": [
           {
+            "cp_client_id": "CPS-738107226",
+            "duplicate_count": 2
+          },
+          {
+            "cp_client_id": "CPS-410038024",
+            "duplicate_count": 2
+          },
+          {
             "cp_client_id": "CPS-452257459",
             "duplicate_count": 2
           },
@@ -223,19 +231,11 @@
           {
             "cp_client_id": "CPS-788233531",
             "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-410038024",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-738107226",
-            "duplicate_count": 2
           }
         ]
       },
       {
-        "id": "8e99fcd8-1631-422c-b97b-ac179db48e3f",
+        "id": "a54bd895-9165-423a-81e2-a7f5f0cb1f5d",
         "key": "cp_clients__given_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -259,7 +259,7 @@
         "failedSamples": null
       },
       {
-        "id": "ad1f04eb-95ff-40d8-9844-baebe116e462",
+        "id": "bc6269ea-4373-4104-96a1-84398a9b04db",
         "key": "cp_clients__given_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -319,7 +319,7 @@
         ]
       },
       {
-        "id": "4bfd3796-445d-44af-ab2e-0e8cba50ca2e",
+        "id": "b0f98b0b-e145-4f8c-830d-227395470f6e",
         "key": "cp_clients__given_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -380,7 +380,7 @@
         ]
       },
       {
-        "id": "6e459990-0f1f-4f03-a762-18a5d593fc24",
+        "id": "4643a207-8a59-4a65-b1ca-fa699f04f034",
         "key": "cp_clients__family_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -404,7 +404,7 @@
         "failedSamples": null
       },
       {
-        "id": "cc4e8144-6013-4201-8ae0-97d0dbc72c64",
+        "id": "f48cba92-0da4-407f-a9f6-e4675db1fcc0",
         "key": "cp_clients__family_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -464,7 +464,7 @@
         ]
       },
       {
-        "id": "d93e7f4b-8ed9-49ce-a743-ad3f65e8ded0",
+        "id": "d5dc5eff-543c-43e3-9bad-d279c79e759a",
         "key": "cp_clients__family_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -525,7 +525,7 @@
         ]
       },
       {
-        "id": "4eb3309e-df64-4829-a95c-d3d795cdccef",
+        "id": "f9ae6637-33fd-469d-b8ff-32e0448cd8ad",
         "key": "cp_clients__date_of_birth__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -549,7 +549,7 @@
         "failedSamples": null
       },
       {
-        "id": "31d2251f-9c47-4414-97d5-cf922a851a01",
+        "id": "99190c47-8873-4d47-ae85-635f6bb2f95f",
         "key": "cp_clients__date_of_birth__field_required",
         "category": "schema",
         "type": "field_required",
@@ -619,7 +619,7 @@
         ]
       },
       {
-        "id": "05de672e-b38b-4e5c-844a-f09f412a415e",
+        "id": "288c37b1-b37e-4463-b33c-76c3b1cd453d",
         "key": "cp_clients__date_of_birth__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -690,7 +690,7 @@
         ]
       },
       {
-        "id": "33f3e028-8150-4abe-9a9c-6c6020377116",
+        "id": "dc8f1c33-adb4-4d7f-b66d-9a96290eb1b7",
         "key": "cp_clients__date_of_birth__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -716,7 +716,7 @@
         "failedSamples": null
       },
       {
-        "id": "84fe73d7-742c-4a81-85ff-63b445081744",
+        "id": "f1b11058-25e1-4264-a533-84264cd65240",
         "key": "cp_clients__sex__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -740,7 +740,7 @@
         "failedSamples": null
       },
       {
-        "id": "77d52d5c-d013-4d5f-9392-e435d6d72c35",
+        "id": "a976412f-67d2-417b-885e-39a052cac398",
         "key": "cp_clients__sex__field_required",
         "category": "schema",
         "type": "field_required",
@@ -767,7 +767,7 @@
         "failedSamples": null
       },
       {
-        "id": "c6ef4a37-0663-4bad-8671-2a4a6f2483f6",
+        "id": "9d88e019-5652-4c22-9224-fe20741df79d",
         "key": "cp_clients__sex__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -845,7 +845,7 @@
         ]
       },
       {
-        "id": "047cabe4-d246-43b2-a7ae-56e364653996",
+        "id": "f5778ffb-9ea4-4e2b-88f8-bbb8d57ee221",
         "key": "cp_clients__suburb__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -869,7 +869,7 @@
         "failedSamples": null
       },
       {
-        "id": "62ffae70-7c3e-41ab-85ad-9b4f5e1a04b9",
+        "id": "e56ecb44-56f9-4014-a568-3e2d1bf48bf4",
         "key": "cp_clients__suburb__field_required",
         "category": "schema",
         "type": "field_required",
@@ -939,7 +939,7 @@
         ]
       },
       {
-        "id": "1452a77b-e50f-4497-97fb-8ab27f6922ac",
+        "id": "71f61d8a-262e-4582-9a5e-f0efe24b67b8",
         "key": "cp_clients__suburb__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1010,7 +1010,7 @@
         ]
       },
       {
-        "id": "feaa192e-72b9-40c9-9357-a4e1f794153c",
+        "id": "e79175b3-b275-429f-8577-f841d7a536ff",
         "key": "cp_clients__postcode__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1034,7 +1034,7 @@
         "failedSamples": null
       },
       {
-        "id": "58ea7290-6f17-491e-a007-87bbae391ec0",
+        "id": "681028c6-ed77-40ae-87cd-daabb54ca9e2",
         "key": "cp_clients__postcode__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1061,7 +1061,7 @@
         "failedSamples": null
       },
       {
-        "id": "9507b176-f5c5-40bf-b30b-fccae8805692",
+        "id": "67af0cff-6dfb-4acc-9131-39742282375e",
         "key": "cp_clients__postcode__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1089,7 +1089,7 @@
         "failedSamples": null
       },
       {
-        "id": "92325a37-2366-4a57-8fb7-bfadc42485be",
+        "id": "8d295914-bb8b-484d-8979-4277b5e3edd3",
         "key": "cp_clients__postcode__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1213,7 +1213,7 @@
         ]
       },
       {
-        "id": "26a5c7cd-7cab-42eb-98f4-3fc3e180d4fa",
+        "id": "de4490e5-a8bd-4058-a38d-161f8744e5e4",
         "key": "cp_clients__case_opened_date__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1237,7 +1237,7 @@
         "failedSamples": null
       },
       {
-        "id": "a847a9a8-a88e-475e-afc4-2f1fad7b4dd7",
+        "id": "24b593cd-3387-4caf-bb21-126a12cd9d63",
         "key": "cp_clients__case_opened_date__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1307,7 +1307,7 @@
         ]
       },
       {
-        "id": "d2429a9c-01db-4d57-835a-f8f04d9328b7",
+        "id": "06d55e98-7417-4124-bd07-4f8890fea1b7",
         "key": "cp_clients__case_opened_date__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1378,7 +1378,7 @@
         ]
       },
       {
-        "id": "f1bd5999-4f9c-44dc-8b16-f772fdb27fa9",
+        "id": "f7e44ebd-b21e-4bd8-b829-b3440f438fcb",
         "key": "cp_clients__case_status__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1402,7 +1402,7 @@
         "failedSamples": null
       },
       {
-        "id": "5a5cccb3-6ae9-4194-99d2-69257a2f957b",
+        "id": "2e52d7b0-3ff8-4d32-a5a6-835d0d2076ee",
         "key": "cp_clients__case_status__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1429,7 +1429,7 @@
         "failedSamples": null
       },
       {
-        "id": "21bea931-9d93-4931-a091-a36e90f8198b",
+        "id": "898abbf8-cb6b-4904-99f3-20008d5ed044",
         "key": "cp_clients__case_status__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1463,7 +1463,7 @@
         "failedSamples": null
       },
       {
-        "id": "f4097f8a-2aeb-43a0-8b39-5519bf2b6b9f",
+        "id": "d83c05bd-f066-40de-90b1-f0953136bcc0",
         "key": "cp_clients__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1487,7 +1487,7 @@
         "failedSamples": null
       },
       {
-        "id": "31340f0f-5b20-4586-a4b2-ef294c150851",
+        "id": "ceb40d10-3e0e-41d3-8b71-13a17fc96b99",
         "key": "cp_clients__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1514,7 +1514,7 @@
         "failedSamples": null
       },
       {
-        "id": "95d00fb9-d36f-4bc6-b387-95003281de67",
+        "id": "29aa5466-1123-40d3-9546-ca0059dd210c",
         "key": "cp_clients__row_count",
         "category": "quality",
         "type": "row_count",
@@ -1540,7 +1540,7 @@
         "failedSamples": null
       },
       {
-        "id": "0378e4d9-8f0d-4de7-8ada-14b61e349ee4",
+        "id": "d8fb2a6f-8f72-4996-a0a6-9e348bfb2bcb",
         "key": "cp_notifications__notification_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1564,7 +1564,7 @@
         "failedSamples": null
       },
       {
-        "id": "657e1e7d-5cbc-439a-968b-897f34721573",
+        "id": "a8f891d1-9cf3-4b43-b13c-cddf4ecead27",
         "key": "cp_notifications__notification_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1591,7 +1591,7 @@
         "failedSamples": null
       },
       {
-        "id": "6f45f933-7a32-4197-8672-d59bb0bd9dc4",
+        "id": "a006d2a5-d099-4c12-81e8-0dce62db6709",
         "key": "cp_notifications__notification_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -1629,11 +1629,11 @@
             "duplicate_count": 2
           },
           {
-            "notification_id": "NOTIF-00000168",
+            "notification_id": "NOTIF-00000338",
             "duplicate_count": 2
           },
           {
-            "notification_id": "NOTIF-00000191",
+            "notification_id": "NOTIF-00000445",
             "duplicate_count": 2
           }
         ],
@@ -1651,17 +1651,17 @@
             "duplicate_count": 2
           },
           {
-            "notification_id": "NOTIF-00000168",
+            "notification_id": "NOTIF-00000338",
             "duplicate_count": 2
           },
           {
-            "notification_id": "NOTIF-00000191",
+            "notification_id": "NOTIF-00000445",
             "duplicate_count": 2
           }
         ]
       },
       {
-        "id": "dea13325-4a54-4009-87d9-6f6a08d92b7b",
+        "id": "defc2567-c212-45d4-aeac-e2db8b9ff024",
         "key": "cp_notifications__notification_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1689,7 +1689,7 @@
         "failedSamples": null
       },
       {
-        "id": "b0c273a4-71ba-4942-966d-3af8564f21a6",
+        "id": "8c79d942-755d-45c8-aa3f-eb913b4895a3",
         "key": "cp_notifications__notification_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -1716,51 +1716,51 @@
         },
         "failedSamples": [
           {
-            "notification_id": "NOTIF-00000168",
+            "notification_id": "NOTIF-00000349",
             "duplicate_count": 2
           },
           {
-            "notification_id": "NOTIF-00000191",
+            "notification_id": "NOTIF-00000830",
             "duplicate_count": 2
           },
           {
-            "notification_id": "NOTIF-00000201",
+            "notification_id": "NOTIF-0000081",
             "duplicate_count": 2
           },
           {
-            "notification_id": "NOTIF-00000820",
+            "notification_id": "NOTIF-00000347",
             "duplicate_count": 2
           },
           {
-            "notification_id": "NOTIF-00000826",
+            "notification_id": "NOTIF-00000370",
             "duplicate_count": 2
           }
         ],
         "failed_samples": [
           {
-            "notification_id": "NOTIF-00000168",
+            "notification_id": "NOTIF-00000349",
             "duplicate_count": 2
           },
           {
-            "notification_id": "NOTIF-00000191",
+            "notification_id": "NOTIF-00000830",
             "duplicate_count": 2
           },
           {
-            "notification_id": "NOTIF-00000201",
+            "notification_id": "NOTIF-0000081",
             "duplicate_count": 2
           },
           {
-            "notification_id": "NOTIF-00000820",
+            "notification_id": "NOTIF-00000347",
             "duplicate_count": 2
           },
           {
-            "notification_id": "NOTIF-00000826",
+            "notification_id": "NOTIF-00000370",
             "duplicate_count": 2
           }
         ]
       },
       {
-        "id": "32dae46f-3a90-4c5e-941d-db282c879c9b",
+        "id": "08a376c5-34a7-4af9-b616-92a76f3d647e",
         "key": "cp_notifications__cp_client_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1784,7 +1784,7 @@
         "failedSamples": null
       },
       {
-        "id": "363bc3d3-baa7-4c92-9681-7c4763f36a16",
+        "id": "243e5d59-3bdb-4240-9230-5c4da1eda7d4",
         "key": "cp_notifications__cp_client_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1854,7 +1854,7 @@
         ]
       },
       {
-        "id": "bf1f63e3-d5cd-4db5-b4f2-b7adc8ba1e0b",
+        "id": "3ccb9a05-8c68-4b6c-bff5-2e3cc542df0b",
         "key": "cp_notifications__cp_client_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1925,7 +1925,7 @@
         ]
       },
       {
-        "id": "b506bddf-d866-4e96-a74f-e1f895798913",
+        "id": "38213cdf-dd96-42bb-b828-f19fea4f7808",
         "key": "cp_notifications__notification_date__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1949,7 +1949,7 @@
         "failedSamples": null
       },
       {
-        "id": "65b2b32e-ea8e-4012-add0-a84fec938739",
+        "id": "acf6b2c9-2561-4232-96fb-1d3a9d53a8bd",
         "key": "cp_notifications__notification_date__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1976,7 +1976,7 @@
         "failedSamples": null
       },
       {
-        "id": "0b31421d-6212-4d64-b9c3-a3f4c8b37349",
+        "id": "012aeb5c-579c-4c99-a489-5f8867be591e",
         "key": "cp_notifications__notification_date__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2004,7 +2004,7 @@
         "failedSamples": null
       },
       {
-        "id": "f1abdf6a-0ef1-44f4-8521-2fa9df7969bb",
+        "id": "36c6acff-69c0-409f-929e-c559a852fc69",
         "key": "cp_notifications__source_type__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2028,7 +2028,7 @@
         "failedSamples": null
       },
       {
-        "id": "241b174f-03ab-4806-9043-57a8a43682d9",
+        "id": "919ed928-8ede-45d4-a625-65999929d3d1",
         "key": "cp_notifications__source_type__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2055,7 +2055,7 @@
         "failedSamples": null
       },
       {
-        "id": "40e5719f-4feb-4795-b7ed-e056e7f9e68d",
+        "id": "ecdf780a-59a8-4ca6-b1c1-4ed997ff7d4f",
         "key": "cp_notifications__source_type__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -2137,7 +2137,7 @@
         ]
       },
       {
-        "id": "d521e70c-dfea-446c-910a-fc5ce8e5ca90",
+        "id": "47a5ce22-1b30-48bd-a8d6-fb9adc8d9c78",
         "key": "cp_notifications__concern_type__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2161,7 +2161,7 @@
         "failedSamples": null
       },
       {
-        "id": "3479c88b-df20-4f6f-9c72-3c011378d1e5",
+        "id": "1517ff48-37ab-4c95-90e9-1f437cb05e6d",
         "key": "cp_notifications__concern_type__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2188,7 +2188,7 @@
         "failedSamples": null
       },
       {
-        "id": "17955a4a-d9eb-42b2-853b-da1279800908",
+        "id": "c53bc584-3e22-4fe9-8881-9d2ac8641da8",
         "key": "cp_notifications__concern_type__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -2270,7 +2270,7 @@
         ]
       },
       {
-        "id": "a6a0ea75-d453-4803-b990-d8531d09a958",
+        "id": "e060f316-4643-4eff-8e54-b0d4cffd5df3",
         "key": "cp_notifications__risk_rating__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2294,7 +2294,7 @@
         "failedSamples": null
       },
       {
-        "id": "844da1e7-76f5-4a6c-af43-d5dfea80a09a",
+        "id": "ab8587c3-b46f-4f74-9730-f2b72ccd348b",
         "key": "cp_notifications__risk_rating__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2321,7 +2321,7 @@
         "failedSamples": null
       },
       {
-        "id": "28e5fcb4-a738-4e52-b202-5a7ea1b2dc6d",
+        "id": "f7e0b434-a71f-41ba-8991-3b749afbc044",
         "key": "cp_notifications__risk_rating__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -2400,7 +2400,7 @@
         ]
       },
       {
-        "id": "42434d15-4e1e-4949-af35-c5c043ef96a0",
+        "id": "d77b4aac-46fa-493d-926c-ff3173a3f49d",
         "key": "cp_notifications__assigned_worker_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2424,7 +2424,7 @@
         "failedSamples": null
       },
       {
-        "id": "fde1dc1e-880e-41a9-96cf-4fd7af333472",
+        "id": "93de518e-a35b-4cf0-a521-9094e27db0a8",
         "key": "cp_notifications__assigned_worker_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2494,7 +2494,7 @@
         ]
       },
       {
-        "id": "c753e2ca-2555-495a-a296-c6c2a7342701",
+        "id": "c9f96929-ff8e-4107-8264-ca868d6872c3",
         "key": "cp_notifications__assigned_worker_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2565,7 +2565,7 @@
         ]
       },
       {
-        "id": "53aeaa26-ad16-4e49-961e-be8a16490ea3",
+        "id": "e812f11d-3af1-4c11-98e9-b48084b10d86",
         "key": "cp_notifications__outcome__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2589,7 +2589,7 @@
         "failedSamples": null
       },
       {
-        "id": "5cba0677-0135-4136-92f0-5354a801d113",
+        "id": "6dee84e9-32bb-45ac-9c3e-13b619200d3e",
         "key": "cp_notifications__outcome__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2616,7 +2616,7 @@
         "failedSamples": null
       },
       {
-        "id": "7154d86e-8286-4aa7-ab1d-a666906bbf73",
+        "id": "ccefc7cd-a7ef-4507-a0fa-28afeb5a15bb",
         "key": "cp_notifications__outcome__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -2694,7 +2694,7 @@
         ]
       },
       {
-        "id": "57a6b331-b30c-44b5-b3a0-d520236176cc",
+        "id": "9dde9504-ca24-4023-bffe-a1c8f5742974",
         "key": "cp_notifications__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2718,7 +2718,7 @@
         "failedSamples": null
       },
       {
-        "id": "cbe39644-038c-470c-ae39-47728df1301e",
+        "id": "35001131-0fdd-4afc-9cf5-40d300b89752",
         "key": "cp_notifications__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2745,7 +2745,7 @@
         "failedSamples": null
       },
       {
-        "id": "33cce730-1d81-4661-b466-2c7dc256121d",
+        "id": "c4c83286-e4f2-4a62-93b9-cf3ed7f36bc2",
         "key": "cp_notifications__row_count",
         "category": "quality",
         "type": "row_count",
@@ -2771,7 +2771,7 @@
         "failedSamples": null
       },
       {
-        "id": "aad84673-84b6-4aad-8af0-fecc5cd48937",
+        "id": "b347965c-47c3-4a75-8e0a-9d0bf31c6a5b",
         "key": "cp_notifications__quality_sql_1",
         "category": "quality",
         "type": "model_quality_sql",
@@ -2796,7 +2796,7 @@
         "failedSamples": null
       },
       {
-        "id": "c05d0e2b-1277-456f-a5c7-997e87dd53d2",
+        "id": "74177845-8c61-4643-873a-9effaa257701",
         "key": "cp_notifications__quality_sql_2",
         "category": "quality",
         "type": "model_quality_sql",
@@ -2821,7 +2821,7 @@
         "failedSamples": null
       },
       {
-        "id": "0af36984-22b9-420f-bf55-11914a471719",
+        "id": "3bf332e2-de0e-4bec-be5d-72dd4329dd65",
         "key": "cp_notifications__quality_sql_3",
         "category": "quality",
         "type": "model_quality_sql",
@@ -2846,7 +2846,7 @@
         "failedSamples": null
       },
       {
-        "id": "b02e4d88-b2e3-4256-aaa8-15cd94300443",
+        "id": "879acc67-4304-4d2f-b963-6f872c0ade9d",
         "key": "cp_investigations__investigation_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2870,7 +2870,7 @@
         "failedSamples": null
       },
       {
-        "id": "7985096d-05bf-4cfe-8c1d-611e3900dd15",
+        "id": "5e6c7919-4008-4550-b9df-786cec896c79",
         "key": "cp_investigations__investigation_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2897,7 +2897,7 @@
         "failedSamples": null
       },
       {
-        "id": "edbe62e3-9eaa-4814-bdf3-7ba90dad73f3",
+        "id": "d37edddc-664b-49e2-9acb-35f7cc98e2a5",
         "key": "cp_investigations__investigation_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -2939,7 +2939,7 @@
             "duplicate_count": 2
           },
           {
-            "investigation_id": "INV-00000158",
+            "investigation_id": "INV-00000151",
             "duplicate_count": 2
           }
         ],
@@ -2961,13 +2961,13 @@
             "duplicate_count": 2
           },
           {
-            "investigation_id": "INV-00000158",
+            "investigation_id": "INV-00000151",
             "duplicate_count": 2
           }
         ]
       },
       {
-        "id": "e1e812ca-fa62-4851-8538-cca485f5ef40",
+        "id": "ffc8498b-fa70-4ea5-999f-139ca951e748",
         "key": "cp_investigations__investigation_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2995,7 +2995,7 @@
         "failedSamples": null
       },
       {
-        "id": "df3cb5e7-b15b-4c9d-8d21-aeb5f547bc17",
+        "id": "c5821e75-069a-4f54-8023-f9132dbad585",
         "key": "cp_investigations__investigation_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -3066,7 +3066,7 @@
         ]
       },
       {
-        "id": "03a52e75-fb46-4061-8cb8-97b5d7f60d32",
+        "id": "c0f14139-afd9-4fa5-b051-c5ad3a42150e",
         "key": "cp_investigations__notification_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3090,7 +3090,7 @@
         "failedSamples": null
       },
       {
-        "id": "b2d74843-b0e3-42ad-8bf5-e2d31c6bad53",
+        "id": "ab589634-df4a-461a-b572-82bb529d0b0e",
         "key": "cp_investigations__notification_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3117,7 +3117,7 @@
         "failedSamples": null
       },
       {
-        "id": "f02bcbe1-1c13-40fd-84b7-7827b20b59e7",
+        "id": "c9cc1c68-41e0-4f37-a31b-ae800f3cb729",
         "key": "cp_investigations__notification_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3145,7 +3145,7 @@
         "failedSamples": null
       },
       {
-        "id": "3fab24b8-0d51-4b12-b343-04d73e8ec513",
+        "id": "aa4e3853-1635-4312-bd72-9973d4195e32",
         "key": "cp_investigations__cp_client_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3169,7 +3169,7 @@
         "failedSamples": null
       },
       {
-        "id": "b6ae3fc7-0e4b-4214-92d6-a41d18176872",
+        "id": "94e43370-58f4-491a-9ad3-a98ba6017b80",
         "key": "cp_investigations__cp_client_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3196,7 +3196,7 @@
         "failedSamples": null
       },
       {
-        "id": "30c0693f-64f4-4d1c-b168-6f78f551b28a",
+        "id": "de275985-ee6f-4287-a38a-ade92c0ad4dd",
         "key": "cp_investigations__cp_client_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3224,7 +3224,7 @@
         "failedSamples": null
       },
       {
-        "id": "810b275a-c9fb-47d0-b35c-32e6d9bc2fa6",
+        "id": "5c043cdd-340a-462a-8828-dd30466dabeb",
         "key": "cp_investigations__start_date__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3248,7 +3248,7 @@
         "failedSamples": null
       },
       {
-        "id": "54c1c290-eb83-4e5a-95fc-54e2736506df",
+        "id": "aa5aa277-6190-47ae-94e0-2fbd38cb570b",
         "key": "cp_investigations__start_date__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3310,7 +3310,7 @@
         ]
       },
       {
-        "id": "f32dd0ce-067f-41bb-99cd-60cbdcc22ede",
+        "id": "52183bea-1c38-4803-a9ef-a8dfd7dda132",
         "key": "cp_investigations__start_date__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3373,7 +3373,7 @@
         ]
       },
       {
-        "id": "048ba86c-e227-40c3-803c-de9adbc347b2",
+        "id": "82b38662-f8a9-498b-8aab-4ca52bdb1488",
         "key": "cp_investigations__end_date__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3397,7 +3397,7 @@
         "failedSamples": null
       },
       {
-        "id": "4d6b1189-8e1f-483c-923d-1425c26c7d61",
+        "id": "73a1ef73-08ba-4c3f-99ba-b83ea020823c",
         "key": "cp_investigations__substantiated__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3421,7 +3421,7 @@
         "failedSamples": null
       },
       {
-        "id": "019be961-1b1a-4197-a965-189540f74f19",
+        "id": "9bd97a0a-78e3-44f0-b835-f3913be88dbf",
         "key": "cp_investigations__substantiated__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3448,7 +3448,7 @@
         "failedSamples": null
       },
       {
-        "id": "b586d15e-98bb-4b3e-aaf7-12fd6204a98f",
+        "id": "f6561602-76d6-4d25-ba02-6bd783076428",
         "key": "cp_investigations__substantiated__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -3483,7 +3483,7 @@
         "failedSamples": null
       },
       {
-        "id": "04889f5b-5cc6-45e6-8765-31e3c2870e01",
+        "id": "609d43e3-e548-4e26-927d-cc399dffbe45",
         "key": "cp_investigations__lead_worker_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3507,7 +3507,7 @@
         "failedSamples": null
       },
       {
-        "id": "3fcfdd41-1afb-4e79-8d78-2ddceb6dc6a0",
+        "id": "aa51ad20-3dae-4514-beea-b1eb30fb610e",
         "key": "cp_investigations__lead_worker_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3577,7 +3577,7 @@
         ]
       },
       {
-        "id": "ef1ded89-d2e4-4de7-bb71-cb70c2766891",
+        "id": "69253afd-fc4e-4ae7-b3c1-ff49a5fbd8e2",
         "key": "cp_investigations__lead_worker_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3648,7 +3648,7 @@
         ]
       },
       {
-        "id": "c1eb9c64-a9fc-44f3-b00e-6ef94ec98ec8",
+        "id": "46a89465-1f9b-4e63-a02b-555a228f8f96",
         "key": "cp_investigations__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3672,7 +3672,7 @@
         "failedSamples": null
       },
       {
-        "id": "8189d90c-f926-40f4-a1a7-40f5657394e7",
+        "id": "64cf771a-8d5b-4c95-878d-a22cfc408c5d",
         "key": "cp_investigations__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3699,7 +3699,7 @@
         "failedSamples": null
       },
       {
-        "id": "aff0d162-f4ba-4656-b01e-66c3e3d3f6a5",
+        "id": "3e8a3bb1-820c-4c11-86a6-0cedebb2b52a",
         "key": "cp_investigations__row_count",
         "category": "quality",
         "type": "row_count",
@@ -3725,7 +3725,7 @@
         "failedSamples": null
       },
       {
-        "id": "6c03dccd-1815-45e3-aa22-7208f014dbc7",
+        "id": "26a9351d-b38a-4d4f-a220-3e6e7130dea9",
         "key": "cp_investigations__quality_sql_1",
         "category": "quality",
         "type": "model_quality_sql",
@@ -3750,7 +3750,7 @@
         "failedSamples": null
       },
       {
-        "id": "a21b2ac6-fa08-4429-be19-246a799a4bd0",
+        "id": "f9b04da7-6a25-4fb0-8aad-be85f1caae2e",
         "key": "cp_investigations__quality_sql_2",
         "category": "quality",
         "type": "model_quality_sql",
@@ -3775,7 +3775,7 @@
         "failedSamples": null
       },
       {
-        "id": "44715caa-b9c1-46ee-98b8-9beb3d08c897",
+        "id": "d5917ce1-2321-45a2-b55b-4089b34c682a",
         "key": "cp_investigations__quality_sql_3",
         "category": "quality",
         "type": "model_quality_sql",
@@ -3800,7 +3800,7 @@
         "failedSamples": null
       },
       {
-        "id": "c2e6a323-2317-4768-a6b1-05b356ccda04",
+        "id": "1c018c8d-4b23-4357-a754-057692890976",
         "key": "cp_investigations__quality_sql_4",
         "category": "quality",
         "type": "model_quality_sql",
@@ -3825,7 +3825,7 @@
         "failedSamples": null
       },
       {
-        "id": "5c6121a1-fe54-4479-81cc-25aac745c38f",
+        "id": "be1dbffd-8252-4a49-ab5d-d18e10b02ca2",
         "key": "cp_placements__placement_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3849,7 +3849,7 @@
         "failedSamples": null
       },
       {
-        "id": "c15fea76-fda2-4e73-8c97-2483e7daa76f",
+        "id": "a59e40d9-6ca1-42df-8f0f-57ae011fdf27",
         "key": "cp_placements__placement_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3876,7 +3876,7 @@
         "failedSamples": null
       },
       {
-        "id": "9cda34af-424a-4695-a43a-a6e74b1d949e",
+        "id": "6a411f78-f9c1-40c2-b7e3-547d2e06c866",
         "key": "cp_placements__placement_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -3914,11 +3914,11 @@
             "duplicate_count": 2
           },
           {
-            "placement_id": "PLACE-0000025",
+            "placement_id": "PLACE-0000189",
             "duplicate_count": 2
           },
           {
-            "placement_id": "PLACE-0000189",
+            "placement_id": "PLACE-0000154",
             "duplicate_count": 2
           }
         ],
@@ -3936,17 +3936,17 @@
             "duplicate_count": 2
           },
           {
-            "placement_id": "PLACE-0000025",
+            "placement_id": "PLACE-0000189",
             "duplicate_count": 2
           },
           {
-            "placement_id": "PLACE-0000189",
+            "placement_id": "PLACE-0000154",
             "duplicate_count": 2
           }
         ]
       },
       {
-        "id": "bda223d7-a0d9-4560-b34a-f3435217579b",
+        "id": "dbdadfc6-7ce0-4c5a-bbf3-ca7228beeb78",
         "key": "cp_placements__placement_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3974,7 +3974,7 @@
         "failedSamples": null
       },
       {
-        "id": "bb086b1b-0402-4ecb-be54-d54e6105e2cb",
+        "id": "b41ffcb1-f347-4be4-ad31-311b4c8bcd83",
         "key": "cp_placements__placement_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -4001,14 +4001,6 @@
         },
         "failedSamples": [
           {
-            "placement_id": "PLACE-0000189",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000154",
-            "duplicate_count": 2
-          },
-          {
             "placement_id": "PLACE-0000018",
             "duplicate_count": 2
           },
@@ -4018,19 +4010,19 @@
           },
           {
             "placement_id": "PLACE-0000221",
+            "duplicate_count": 2
+          },
+          {
+            "placement_id": "PLACE-0000189",
+            "duplicate_count": 2
+          },
+          {
+            "placement_id": "PLACE-0000154",
             "duplicate_count": 2
           }
         ],
         "failed_samples": [
           {
-            "placement_id": "PLACE-0000189",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000154",
-            "duplicate_count": 2
-          },
-          {
             "placement_id": "PLACE-0000018",
             "duplicate_count": 2
           },
@@ -4041,11 +4033,19 @@
           {
             "placement_id": "PLACE-0000221",
             "duplicate_count": 2
+          },
+          {
+            "placement_id": "PLACE-0000189",
+            "duplicate_count": 2
+          },
+          {
+            "placement_id": "PLACE-0000154",
+            "duplicate_count": 2
           }
         ]
       },
       {
-        "id": "a2ec74f8-94f1-4835-8492-695143307224",
+        "id": "9a78fad1-e5e7-48ea-8a05-5b47c118e8d5",
         "key": "cp_placements__cp_client_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4069,7 +4069,7 @@
         "failedSamples": null
       },
       {
-        "id": "cc5fae1d-f200-4553-996c-1cd10c9dc95c",
+        "id": "ab8b6844-3085-4238-9817-61b561691292",
         "key": "cp_placements__cp_client_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4139,7 +4139,7 @@
         ]
       },
       {
-        "id": "6f9e8672-67db-4328-9949-c8e0cd74eecf",
+        "id": "f7b968ba-ba51-4a37-8b5a-5902a01669b8",
         "key": "cp_placements__cp_client_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -4210,7 +4210,7 @@
         ]
       },
       {
-        "id": "62a8695d-a255-4520-b3bf-196335f10f6b",
+        "id": "db5f4496-77d9-48c1-b63d-fd73c8c37a34",
         "key": "cp_placements__placement_type__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4234,7 +4234,7 @@
         "failedSamples": null
       },
       {
-        "id": "76650ad9-7661-44fb-a62a-9a6a3813112e",
+        "id": "ade53ccb-d7ac-4f22-8e6c-800ac9f20eaf",
         "key": "cp_placements__placement_type__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4261,7 +4261,7 @@
         "failedSamples": null
       },
       {
-        "id": "03887add-87b2-422f-bcc6-ae804e84beb7",
+        "id": "e74a1a9c-5268-4734-9276-d6027b283457",
         "key": "cp_placements__placement_type__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -4340,7 +4340,7 @@
         ]
       },
       {
-        "id": "e58c43b1-7274-4d30-808b-1d124b093678",
+        "id": "52b1156b-d4a3-4cb8-a976-c821d46742c1",
         "key": "cp_placements__carer_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4364,7 +4364,7 @@
         "failedSamples": null
       },
       {
-        "id": "265a2b97-d932-46bd-9660-8461048ef435",
+        "id": "3cdd8b29-634b-45da-82c1-0d05d98229f9",
         "key": "cp_placements__carer_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4391,7 +4391,7 @@
         "failedSamples": null
       },
       {
-        "id": "ace75810-ff7f-4586-9dd6-e8924a5499f1",
+        "id": "41c3319a-2216-407a-b40f-9ccf6886a9f9",
         "key": "cp_placements__carer_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -4419,7 +4419,7 @@
         "failedSamples": null
       },
       {
-        "id": "af33ac47-a01b-455b-bdb0-e5a03f683ce7",
+        "id": "24795a11-3aa3-4522-9c88-db5a110b8620",
         "key": "cp_placements__placement_start__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4443,7 +4443,7 @@
         "failedSamples": null
       },
       {
-        "id": "3fd5fbcb-7793-4155-9bba-1e8e01d0e09c",
+        "id": "a93399bd-905d-4c50-8e54-ca264f45b404",
         "key": "cp_placements__placement_start__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4513,7 +4513,7 @@
         ]
       },
       {
-        "id": "875201b7-4575-4f10-9a2b-0d63ba3b588c",
+        "id": "6720c0d3-4538-4afb-93a4-d5b14de66edd",
         "key": "cp_placements__placement_start__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -4584,7 +4584,7 @@
         ]
       },
       {
-        "id": "d1b11371-be14-4f57-a87d-a12960059cff",
+        "id": "3e218ff9-a070-4907-8dfa-915b08d29f10",
         "key": "cp_placements__placement_end__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4608,7 +4608,7 @@
         "failedSamples": null
       },
       {
-        "id": "16e2ca70-e63c-4ad0-b663-7886935e4c2d",
+        "id": "44765ad0-b606-4cb8-8d10-cf01080c1748",
         "key": "cp_placements__placement_suburb__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4632,7 +4632,7 @@
         "failedSamples": null
       },
       {
-        "id": "8dbbf09d-a83a-4773-93a1-fb36d00e4363",
+        "id": "490ed9be-1d51-4f8c-9722-025a0c2c5834",
         "key": "cp_placements__placement_suburb__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4702,7 +4702,7 @@
         ]
       },
       {
-        "id": "3d6847d5-3ea4-41b1-885f-3fb3dbe215ee",
+        "id": "93b8cf89-316b-474f-971f-b67c5c4adef2",
         "key": "cp_placements__placement_suburb__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -4773,7 +4773,7 @@
         ]
       },
       {
-        "id": "8e52fb29-6033-4291-a031-e8510097b379",
+        "id": "0129614e-92ec-4d12-b3a1-ab30273d874d",
         "key": "cp_placements__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4797,7 +4797,7 @@
         "failedSamples": null
       },
       {
-        "id": "27b8048d-99b1-41a9-878c-bd5e197c4e53",
+        "id": "a76e0f13-391a-4662-bccb-73c1ab866704",
         "key": "cp_placements__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4824,7 +4824,7 @@
         "failedSamples": null
       },
       {
-        "id": "fba69d30-b612-427a-b998-0dcd149d16c9",
+        "id": "7ed3f36e-030e-4a51-92ac-d8a80ed11b74",
         "key": "cp_placements__row_count",
         "category": "quality",
         "type": "row_count",
@@ -4850,7 +4850,7 @@
         "failedSamples": null
       },
       {
-        "id": "c462f39a-6343-45bc-8fb2-1c5d67c43979",
+        "id": "6e97cdf7-b2d6-4953-bd84-f68c29056ab8",
         "key": "cp_placements__quality_sql_1",
         "category": "quality",
         "type": "model_quality_sql",
@@ -4875,7 +4875,7 @@
         "failedSamples": null
       },
       {
-        "id": "fddb94a4-2c83-471e-b672-8075dc56035e",
+        "id": "35c818c2-369c-439b-8190-c527306cfab1",
         "key": "cp_placements__quality_sql_2",
         "category": "quality",
         "type": "model_quality_sql",
@@ -4900,7 +4900,7 @@
         "failedSamples": null
       },
       {
-        "id": "81fe25cc-c91d-47de-9aa3-eecebf826a88",
+        "id": "df1780df-8b7d-4e4c-ab1c-0c7fa357303f",
         "key": "cp_placements__quality_sql_3",
         "category": "quality",
         "type": "model_quality_sql",
@@ -4925,7 +4925,7 @@
         "failedSamples": null
       },
       {
-        "id": "f2b17335-b39f-4841-9fdf-ed66372579bd",
+        "id": "9878f252-2aff-41d9-9ca4-1a62d062bb66",
         "key": "cp_carers__carer_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4949,7 +4949,7 @@
         "failedSamples": null
       },
       {
-        "id": "f132ca36-6cd0-4099-9120-6a44cf04a618",
+        "id": "bfa2aac2-6be2-4e1b-a675-02c44de246e9",
         "key": "cp_carers__carer_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4976,7 +4976,7 @@
         "failedSamples": null
       },
       {
-        "id": "e6b9b730-0197-421a-b088-9ec6a42fc39b",
+        "id": "c4343fee-8b6a-4448-860a-1c900c288538",
         "key": "cp_carers__carer_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -5002,51 +5002,51 @@
         },
         "failedSamples": [
           {
-            "carer_id": "CARER-000244",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000213",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000250",
-            "duplicate_count": 2
-          },
-          {
             "carer_id": "CARER-000006",
             "duplicate_count": 2
           },
           {
             "carer_id": "CARER-000039",
+            "duplicate_count": 2
+          },
+          {
+            "carer_id": "CARER-000171",
+            "duplicate_count": 2
+          },
+          {
+            "carer_id": "CARER-000244",
+            "duplicate_count": 2
+          },
+          {
+            "carer_id": "CARER-000213",
             "duplicate_count": 2
           }
         ],
         "failed_samples": [
           {
-            "carer_id": "CARER-000244",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000213",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000250",
-            "duplicate_count": 2
-          },
-          {
             "carer_id": "CARER-000006",
             "duplicate_count": 2
           },
           {
             "carer_id": "CARER-000039",
             "duplicate_count": 2
+          },
+          {
+            "carer_id": "CARER-000171",
+            "duplicate_count": 2
+          },
+          {
+            "carer_id": "CARER-000244",
+            "duplicate_count": 2
+          },
+          {
+            "carer_id": "CARER-000213",
+            "duplicate_count": 2
           }
         ]
       },
       {
-        "id": "73e379ca-bf76-4d42-944e-5f00a6f743f5",
+        "id": "16028ad9-33d7-4661-8181-58a6ff1ceec0",
         "key": "cp_carers__carer_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -5074,7 +5074,7 @@
         "failedSamples": null
       },
       {
-        "id": "885a8c45-cdcb-4fb3-826c-5fc31d3a69ac",
+        "id": "78566b32-5aa0-4d6d-85cf-5c202eaca490",
         "key": "cp_carers__carer_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -5145,7 +5145,7 @@
         ]
       },
       {
-        "id": "683b96f0-6be6-4444-91b6-ab8120fae28b",
+        "id": "b20df2fb-ba66-4c5e-aa8d-dff220142e46",
         "key": "cp_carers__given_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5169,7 +5169,7 @@
         "failedSamples": null
       },
       {
-        "id": "35d8c1e8-8bfa-4f3f-bb35-748e2351f9c1",
+        "id": "b02ea7b5-24c5-4b7b-a5be-da56c17d2f7f",
         "key": "cp_carers__given_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5196,7 +5196,7 @@
         "failedSamples": null
       },
       {
-        "id": "34a8228f-9929-4969-a45f-d39636473ada",
+        "id": "485189d2-198b-45b5-b3de-3ce25365b328",
         "key": "cp_carers__given_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -5224,7 +5224,7 @@
         "failedSamples": null
       },
       {
-        "id": "e1a76e75-e6a9-407d-9f21-36ec36c84c24",
+        "id": "51aabded-a5de-473d-ad40-b268726b3b73",
         "key": "cp_carers__family_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5248,7 +5248,7 @@
         "failedSamples": null
       },
       {
-        "id": "87e037fa-b630-45b9-958f-4313a89a5f1e",
+        "id": "ff091fce-43d9-4425-981e-85dcf5c2c7b5",
         "key": "cp_carers__family_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5275,7 +5275,7 @@
         "failedSamples": null
       },
       {
-        "id": "3aca9b72-7477-45be-9a34-85b34811204d",
+        "id": "4914f98b-f012-40af-8495-fcf9a22d1351",
         "key": "cp_carers__family_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -5303,7 +5303,7 @@
         "failedSamples": null
       },
       {
-        "id": "c9a03935-64e3-4cbe-91ce-8522986675b7",
+        "id": "f5ded06c-720a-4ea6-aa6e-df14abdddb14",
         "key": "cp_carers__carer_type__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5327,7 +5327,7 @@
         "failedSamples": null
       },
       {
-        "id": "cbcd77bd-a27f-4018-975b-3783eabf73d0",
+        "id": "bf4fc80b-9368-49ea-9360-0c7e1dea9242",
         "key": "cp_carers__carer_type__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5354,7 +5354,7 @@
         "failedSamples": null
       },
       {
-        "id": "e523a5d0-0784-4c07-8a6e-bb1ed15a0ee2",
+        "id": "624d8441-d9de-49dc-a1e3-48d09ea19e07",
         "key": "cp_carers__carer_type__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -5389,7 +5389,7 @@
         "failedSamples": null
       },
       {
-        "id": "19d0b332-e506-4f19-9872-65773cffd97f",
+        "id": "f78425d4-0275-46ce-8a9b-4589e473bf19",
         "key": "cp_carers__approval_status__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5413,7 +5413,7 @@
         "failedSamples": null
       },
       {
-        "id": "5ac14ed3-186f-45b5-98ef-8eee8fbbae9c",
+        "id": "65392661-18b7-4c43-b5f1-a1fa4c5044e9",
         "key": "cp_carers__approval_status__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5440,7 +5440,7 @@
         "failedSamples": null
       },
       {
-        "id": "7629eb3a-1d66-40f5-8a3f-c1981d97cc3e",
+        "id": "fe194eee-11f0-4681-a32d-8b7e0d6c3072",
         "key": "cp_carers__approval_status__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -5475,7 +5475,7 @@
         "failedSamples": null
       },
       {
-        "id": "da183fae-dfd6-4a5a-a9b8-e9ef9625e111",
+        "id": "2ecb280f-77b7-4467-b0c6-d13534973ce4",
         "key": "cp_carers__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5499,7 +5499,7 @@
         "failedSamples": null
       },
       {
-        "id": "7795c32b-4651-4e9d-a79f-9ec40608f2ef",
+        "id": "8adda363-a0f7-4de8-88ae-f75b2d105f78",
         "key": "cp_carers__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5526,7 +5526,7 @@
         "failedSamples": null
       },
       {
-        "id": "6e95920f-0a4b-4d89-950c-ab6afa0fcfcc",
+        "id": "0b0c4189-bb26-450f-bf1f-29cfbf735aa2",
         "key": "cp_carers__row_count",
         "category": "quality",
         "type": "row_count",
@@ -5552,7 +5552,7 @@
         "failedSamples": null
       },
       {
-        "id": "8c65471c-815a-4930-89df-d794bd5fd2a0",
+        "id": "20b22e1b-af96-4a8b-a3dd-f77c423d7a41",
         "key": "cp_case_workers__worker_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5576,7 +5576,7 @@
         "failedSamples": null
       },
       {
-        "id": "5617aa30-8278-4541-9048-2601abbb74ce",
+        "id": "bd001334-cfc0-4723-83e0-03cf4512d4ab",
         "key": "cp_case_workers__worker_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5603,7 +5603,7 @@
         "failedSamples": null
       },
       {
-        "id": "6328896d-7ff2-4fcc-bd80-9010616bd32c",
+        "id": "748a19b3-d563-4600-9c04-3af9baf6a843",
         "key": "cp_case_workers__worker_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -5649,7 +5649,7 @@
         ]
       },
       {
-        "id": "87e5abd3-d0d1-48f4-8288-25d5484eda85",
+        "id": "07ae9cb3-d500-4093-816b-18c66fe5d407",
         "key": "cp_case_workers__worker_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -5677,7 +5677,7 @@
         "failedSamples": null
       },
       {
-        "id": "8c7391b9-fe34-4cb3-a61c-fa3b89f1a88d",
+        "id": "c4dd2d2d-1475-4d9f-9ad9-f2cfb21c4687",
         "key": "cp_case_workers__worker_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -5704,27 +5704,27 @@
         },
         "failedSamples": [
           {
-            "worker_id": "CPS-STAFF-00011",
+            "worker_id": "CPS-STAFF-00045",
             "duplicate_count": 2
           },
           {
-            "worker_id": "CPS-STAFF-00045",
+            "worker_id": "CPS-STAFF-00011",
             "duplicate_count": 2
           }
         ],
         "failed_samples": [
           {
-            "worker_id": "CPS-STAFF-00011",
+            "worker_id": "CPS-STAFF-00045",
             "duplicate_count": 2
           },
           {
-            "worker_id": "CPS-STAFF-00045",
+            "worker_id": "CPS-STAFF-00011",
             "duplicate_count": 2
           }
         ]
       },
       {
-        "id": "1d964e55-387b-434c-b9ca-21ac8b3a25ed",
+        "id": "38ec9583-e5b3-4212-914c-33d9f25c0e42",
         "key": "cp_case_workers__given_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5748,7 +5748,7 @@
         "failedSamples": null
       },
       {
-        "id": "970cc586-e165-48c9-8ccb-a181a4693d60",
+        "id": "243f674a-6c5b-49be-ae94-74faaa6a0cc4",
         "key": "cp_case_workers__given_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5775,7 +5775,7 @@
         "failedSamples": null
       },
       {
-        "id": "af9f5f6d-fc41-45b1-bbb8-83d819cb0c02",
+        "id": "f0dc1ac0-b9fb-4b3c-b8ff-1bda8ce87c76",
         "key": "cp_case_workers__given_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -5803,7 +5803,7 @@
         "failedSamples": null
       },
       {
-        "id": "d0130d2d-0e5d-4135-bf9d-4d941909d4e6",
+        "id": "2ee722ed-e9ea-4c71-be78-3cef6d7f687f",
         "key": "cp_case_workers__family_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5827,7 +5827,7 @@
         "failedSamples": null
       },
       {
-        "id": "7f80df2b-e293-4fd3-a52d-3d9c308569ee",
+        "id": "a3967f84-e44a-4437-8508-bccc02edbc8c",
         "key": "cp_case_workers__family_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5854,7 +5854,7 @@
         "failedSamples": null
       },
       {
-        "id": "6014a2b4-2e29-41d4-a03f-77069ea03034",
+        "id": "764a6be6-82bc-4e6f-b377-e64430f8731c",
         "key": "cp_case_workers__family_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -5882,7 +5882,7 @@
         "failedSamples": null
       },
       {
-        "id": "d1f2ed7d-cfe4-4177-a521-8b600a7f8e07",
+        "id": "dd39ad42-2e1a-43f5-a4fb-0431df34b297",
         "key": "cp_case_workers__team_region__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5906,7 +5906,7 @@
         "failedSamples": null
       },
       {
-        "id": "b19e879c-defd-4376-aed2-d9d497e802fa",
+        "id": "e9eaf4d9-ec17-4567-a94a-c21e139819c5",
         "key": "cp_case_workers__team_region__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5933,7 +5933,7 @@
         "failedSamples": null
       },
       {
-        "id": "c16a0b46-e3a3-4d04-a5b0-aa1755b42f9a",
+        "id": "9818cd69-cd90-4c24-8cef-9b4920fff00b",
         "key": "cp_case_workers__team_region__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -5975,7 +5975,7 @@
         "failedSamples": null
       },
       {
-        "id": "f610378a-f690-476b-afc4-413755e34597",
+        "id": "ae7bcb05-ef96-4d6c-a068-df42d601aa74",
         "key": "cp_case_workers__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5999,7 +5999,7 @@
         "failedSamples": null
       },
       {
-        "id": "b458ae13-8b03-4765-bbf7-234b1b528fdd",
+        "id": "3ae92523-bcda-4128-a238-fcf35bfb619b",
         "key": "cp_case_workers__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -6026,7 +6026,7 @@
         "failedSamples": null
       },
       {
-        "id": "fe5a3216-7806-4609-a9e3-d9b2f685888e",
+        "id": "ba76d6e1-71ca-48a6-a1c0-bd1102ec8051",
         "key": "cp_case_workers__row_count",
         "category": "quality",
         "type": "row_count",
@@ -6056,88 +6056,1538 @@
       {
         "level": "INFO",
         "message": "Testing data contract",
-        "timestamp": "2026-09-16 10:30:56.738419+00:00"
+        "timestamp": "2026-09-16 10:49:28.283686+00:00"
       },
       {
         "level": "INFO",
         "message": "Data Contract CLI 1.2.0 running as CLI locally",
-        "timestamp": "2026-09-16 10:30:56.739485+00:00"
+        "timestamp": "2026-09-16 10:49:28.284814+00:00"
       },
       {
         "level": "INFO",
         "message": "Running tests for data contract child-protection-casework with server local_test",
-        "timestamp": "2026-09-16 10:30:57.057356+00:00"
+        "timestamp": "2026-09-16 10:49:28.602594+00:00"
       },
       {
         "level": "INFO",
         "message": "Running checks with ibis",
-        "timestamp": "2026-09-16 10:30:57.101390+00:00"
+        "timestamp": "2026-09-16 10:49:28.647035+00:00"
       },
       {
         "level": "INFO",
         "message": "Connecting to local csv via duckdb",
-        "timestamp": "2026-09-16 10:30:57.101415+00:00"
+        "timestamp": "2026-09-16 10:49:28.647064+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_clients for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_10_2026-09-14/cp_clients.csv",
-        "timestamp": "2026-09-16 10:30:57.116944+00:00"
+        "timestamp": "2026-09-16 10:49:28.663353+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'cp_client_id', 'VARCHAR', False, None, False), (1, 'given_name', 'VARCHAR', False, None, False), (2, 'family_name', 'VARCHAR', False, None, False), (3, 'date_of_birth', 'DATE', False, None, False), (4, 'sex', 'VARCHAR', False, None, False), (5, 'suburb', 'VARCHAR', False, None, False), (6, 'postcode', 'VARCHAR', False, None, False), (7, 'case_opened_date', 'DATE', False, None, False), (8, 'case_status', 'VARCHAR', False, None, False), (9, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-16 10:30:57.346566+00:00"
+        "timestamp": "2026-09-16 10:49:28.887104+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_notifications for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_10_2026-09-14/cp_notifications.csv",
-        "timestamp": "2026-09-16 10:30:57.346605+00:00"
+        "timestamp": "2026-09-16 10:49:28.887153+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'notification_id', 'VARCHAR', False, None, False), (1, 'cp_client_id', 'VARCHAR', False, None, False), (2, 'notification_date', 'DATE', False, None, False), (3, 'source_type', 'VARCHAR', False, None, False), (4, 'concern_type', 'VARCHAR', False, None, False), (5, 'risk_rating', 'VARCHAR', False, None, False), (6, 'assigned_worker_id', 'VARCHAR', False, None, False), (7, 'outcome', 'VARCHAR', False, None, False), (8, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-16 10:30:57.747755+00:00"
+        "timestamp": "2026-09-16 10:49:29.297347+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_investigations for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_10_2026-09-14/cp_investigations.csv",
-        "timestamp": "2026-09-16 10:30:57.747820+00:00"
+        "timestamp": "2026-09-16 10:49:29.297394+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'investigation_id', 'VARCHAR', False, None, False), (1, 'notification_id', 'VARCHAR', False, None, False), (2, 'cp_client_id', 'VARCHAR', False, None, False), (3, 'start_date', 'DATE', False, None, False), (4, 'end_date', 'DATE', False, None, False), (5, 'substantiated', 'VARCHAR', False, None, False), (6, 'lead_worker_id', 'VARCHAR', False, None, False), (7, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-16 10:30:57.831336+00:00"
+        "timestamp": "2026-09-16 10:49:29.388836+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_placements for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_10_2026-09-14/cp_placements.csv",
-        "timestamp": "2026-09-16 10:30:57.831370+00:00"
+        "timestamp": "2026-09-16 10:49:29.388883+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'placement_id', 'VARCHAR', False, None, False), (1, 'cp_client_id', 'VARCHAR', False, None, False), (2, 'placement_type', 'VARCHAR', False, None, False), (3, 'carer_id', 'VARCHAR', False, None, False), (4, 'placement_start', 'DATE', False, None, False), (5, 'placement_end', 'DATE', False, None, False), (6, 'placement_suburb', 'VARCHAR', False, None, False), (7, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-16 10:30:57.934049+00:00"
+        "timestamp": "2026-09-16 10:49:29.498186+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_carers for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_10_2026-09-14/cp_carers.csv",
-        "timestamp": "2026-09-16 10:30:57.934082+00:00"
+        "timestamp": "2026-09-16 10:49:29.498234+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'carer_id', 'VARCHAR', False, None, False), (1, 'given_name', 'VARCHAR', False, None, False), (2, 'family_name', 'VARCHAR', False, None, False), (3, 'carer_type', 'VARCHAR', False, None, False), (4, 'approval_status', 'VARCHAR', False, None, False), (5, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-16 10:30:58.016212+00:00"
+        "timestamp": "2026-09-16 10:49:29.584556+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_case_workers for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_10_2026-09-14/cp_case_workers.csv",
-        "timestamp": "2026-09-16 10:30:58.016244+00:00"
+        "timestamp": "2026-09-16 10:49:29.584599+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'worker_id', 'VARCHAR', False, None, False), (1, 'given_name', 'VARCHAR', False, None, False), (2, 'family_name', 'VARCHAR', False, None, False), (3, 'team_region', 'VARCHAR', False, None, False), (4, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-16 10:30:58.044361+00:00"
+        "timestamp": "2026-09-16 10:49:29.618161+00:00"
       }
     ]
-  }
+  },
+  "verified": [
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-clients",
+      "column_name": "cp_client_id",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 527,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-clients",
+      "column_name": "cp_client_id",
+      "check_name": "datacontract:duplicate_count",
+      "dimension": "uniqueness",
+      "label": "Duplicate rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 10,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 527,
+      "row_count_invalid": 10,
+      "failing_sample_keys": [
+        "CPS-738107226",
+        "CPS-410038024",
+        "CPS-452257459",
+        "CPS-755892958",
+        "CPS-788233531"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-clients",
+      "column_name": "given_name",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 12,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 527,
+      "row_count_invalid": 12,
+      "failing_sample_keys": [
+        "CPS-462571663",
+        "CPS-161280072",
+        "CPS-749256554",
+        "CPS-874793513",
+        "CPS-295842047"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-clients",
+      "column_name": "family_name",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 12,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 527,
+      "row_count_invalid": 12,
+      "failing_sample_keys": [
+        "CPS-254756704",
+        "CPS-362149658",
+        "CPS-586494242",
+        "CPS-872899391",
+        "CPS-943597169"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-clients",
+      "column_name": "date_of_birth",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 13,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 527,
+      "row_count_invalid": 13,
+      "failing_sample_keys": [
+        "CPS-941017201",
+        "CPS-582878330",
+        "CPS-229602682",
+        "CPS-603338257",
+        "CPS-612656637"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-clients",
+      "column_name": "date_of_birth",
+      "check_name": "datacontract:sql: Guards against a type/format change upstream turning into silently unparseable or nonsensical dates downstream - same rationale as the Birth Registrations contract's matching rule.\n.",
+      "dimension": "conformity",
+      "label": "Referential integrity",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 31,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": null,
+      "row_count_invalid": 31,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-clients",
+      "column_name": "sex",
+      "check_name": "datacontract:invalid_count",
+      "dimension": "conformity",
+      "label": "Invalid values",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 27,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 527,
+      "row_count_invalid": 27,
+      "failing_sample_keys": [
+        "CPS-300563830",
+        "CPS-389504700",
+        "CPS-185627400",
+        "CPS-161280072",
+        "CPS-452257459"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-clients",
+      "column_name": "suburb",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 13,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 527,
+      "row_count_invalid": 13,
+      "failing_sample_keys": [
+        "CPS-219008104",
+        "CPS-404449915",
+        "CPS-846337870",
+        "CPS-292497373",
+        "CPS-638174996"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-clients",
+      "column_name": "postcode",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 527,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-clients",
+      "column_name": "postcode",
+      "check_name": "datacontract:invalid_count",
+      "dimension": "conformity",
+      "label": "Invalid values",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 18,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 527,
+      "row_count_invalid": 18,
+      "failing_sample_keys": [
+        "CPS-285552313",
+        "CPS-318188370",
+        "CPS-941017201",
+        "CPS-615455186",
+        "CPS-930322444"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-clients",
+      "column_name": "case_opened_date",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 12,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 527,
+      "row_count_invalid": 12,
+      "failing_sample_keys": [
+        "CPS-832330963",
+        "CPS-229602682",
+        "CPS-287973699",
+        "CPS-503274499",
+        "CPS-841905597"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-clients",
+      "column_name": "case_status",
+      "check_name": "datacontract:invalid_count",
+      "dimension": "conformity",
+      "label": "Invalid values",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 527,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-clients",
+      "column_name": "(table)",
+      "check_name": "datacontract:row_count",
+      "dimension": "completeness",
+      "label": "Row count",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 527,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "pass",
+      "on_fail_action": "flag",
+      "row_count_total": 527,
+      "row_count_invalid": null,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-notifications",
+      "column_name": "notification_id",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 1036,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-notifications",
+      "column_name": "notification_id",
+      "check_name": "datacontract:duplicate_count",
+      "dimension": "uniqueness",
+      "label": "Duplicate rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 20,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 1036,
+      "row_count_invalid": 20,
+      "failing_sample_keys": [
+        "NOTIF-00000349",
+        "NOTIF-00000830",
+        "NOTIF-0000081",
+        "NOTIF-00000347",
+        "NOTIF-00000370"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-notifications",
+      "column_name": "cp_client_id",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 10,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 1036,
+      "row_count_invalid": 10,
+      "failing_sample_keys": [
+        "NOTIF-00000130",
+        "NOTIF-00000179",
+        "NOTIF-00000182",
+        "NOTIF-00000375",
+        "NOTIF-00000464"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-notifications",
+      "column_name": "notification_date",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 1036,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-notifications",
+      "column_name": "source_type",
+      "check_name": "datacontract:invalid_count",
+      "dimension": "conformity",
+      "label": "Invalid values",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 46,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 1036,
+      "row_count_invalid": 46,
+      "failing_sample_keys": [
+        "NOTIF-00000002",
+        "NOTIF-00000032",
+        "NOTIF-00000041",
+        "NOTIF-00000050",
+        "NOTIF-00000064"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-notifications",
+      "column_name": "concern_type",
+      "check_name": "datacontract:invalid_count",
+      "dimension": "conformity",
+      "label": "Invalid values",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 55,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 1036,
+      "row_count_invalid": 55,
+      "failing_sample_keys": [
+        "NOTIF-00000013",
+        "NOTIF-00000037",
+        "NOTIF-00000042",
+        "NOTIF-00000094",
+        "NOTIF-00000113"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-notifications",
+      "column_name": "risk_rating",
+      "check_name": "datacontract:invalid_count",
+      "dimension": "conformity",
+      "label": "Invalid values",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 41,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 1036,
+      "row_count_invalid": 41,
+      "failing_sample_keys": [
+        "NOTIF-00000012",
+        "NOTIF-00000035",
+        "NOTIF-00000061",
+        "NOTIF-00000073",
+        "NOTIF-00000074"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-notifications",
+      "column_name": "assigned_worker_id",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 17,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 1036,
+      "row_count_invalid": 17,
+      "failing_sample_keys": [
+        "NOTIF-00000034",
+        "NOTIF-00000077",
+        "NOTIF-00000097",
+        "NOTIF-00000213",
+        "NOTIF-00000233"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-notifications",
+      "column_name": "outcome",
+      "check_name": "datacontract:invalid_count",
+      "dimension": "conformity",
+      "label": "Invalid values",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 46,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 1036,
+      "row_count_invalid": 46,
+      "failing_sample_keys": [
+        "NOTIF-00000032",
+        "NOTIF-00000055",
+        "NOTIF-00000093",
+        "NOTIF-00000104",
+        "NOTIF-00000112"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-notifications",
+      "column_name": "(table)",
+      "check_name": "datacontract:row_count",
+      "dimension": "completeness",
+      "label": "Row count",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 1036,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "pass",
+      "on_fail_action": "flag",
+      "row_count_total": 1036,
+      "row_count_invalid": null,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-notifications",
+      "column_name": "cp_client_id",
+      "check_name": "datacontract:sql: Every notification's cp_client_id must reference an existing cp_clients row.",
+      "dimension": "consistency",
+      "label": "Referential integrity",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 43,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": null,
+      "row_count_invalid": 43,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-notifications",
+      "column_name": "assigned_worker_id",
+      "check_name": "datacontract:sql: Every notification's assigned_worker_id must reference an existing cp_case_workers row.",
+      "dimension": "consistency",
+      "label": "Referential integrity",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 61,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": null,
+      "row_count_invalid": 61,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-notifications",
+      "column_name": "(table)",
+      "check_name": "datacontract:sql: Escalation completeness: a notification recorded with outcome 'Investigation opened' must have a matching cp_investigations row.",
+      "dimension": "completeness",
+      "label": null,
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 8,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": null,
+      "row_count_invalid": 8,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-investigations",
+      "column_name": "investigation_id",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 181,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-investigations",
+      "column_name": "investigation_id",
+      "check_name": "datacontract:duplicate_count",
+      "dimension": "uniqueness",
+      "label": "Duplicate rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 8,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 181,
+      "row_count_invalid": 8,
+      "failing_sample_keys": [
+        "INV-00000082",
+        "INV-00000163",
+        "INV-00000153",
+        "INV-00000126",
+        "INV-00000151"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-investigations",
+      "column_name": "notification_id",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 181,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-investigations",
+      "column_name": "cp_client_id",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 181,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-investigations",
+      "column_name": "start_date",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 4,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 181,
+      "row_count_invalid": 4,
+      "failing_sample_keys": [
+        "INV-00000045",
+        "INV-00000090",
+        "INV-00000097",
+        "INV-00000180"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-investigations",
+      "column_name": "substantiated",
+      "check_name": "datacontract:invalid_count",
+      "dimension": "conformity",
+      "label": "Invalid values",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 181,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-investigations",
+      "column_name": "lead_worker_id",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 10,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 181,
+      "row_count_invalid": 10,
+      "failing_sample_keys": [
+        "INV-00000040",
+        "INV-00000047",
+        "INV-00000048",
+        "INV-00000091",
+        "INV-00000093"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-investigations",
+      "column_name": "(table)",
+      "check_name": "datacontract:row_count",
+      "dimension": "completeness",
+      "label": "Row count",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 181,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "pass",
+      "on_fail_action": "flag",
+      "row_count_total": 181,
+      "row_count_invalid": null,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-investigations",
+      "column_name": "notification_id",
+      "check_name": "datacontract:sql: Every investigation's notification_id must reference an existing cp_notifications row.",
+      "dimension": "consistency",
+      "label": "Referential integrity",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 5,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": null,
+      "row_count_invalid": 5,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-investigations",
+      "column_name": "cp_client_id",
+      "check_name": "datacontract:sql: Every investigation's cp_client_id must reference an existing cp_clients row.",
+      "dimension": "consistency",
+      "label": "Referential integrity",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 9,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": null,
+      "row_count_invalid": 9,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-investigations",
+      "column_name": "lead_worker_id",
+      "check_name": "datacontract:sql: Every investigation's lead_worker_id must reference an existing cp_case_workers row.",
+      "dimension": "consistency",
+      "label": "Referential integrity",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 20,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": null,
+      "row_count_invalid": 20,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-investigations",
+      "column_name": "(table)",
+      "check_name": "datacontract:sql: Closed-case investigation hygiene: an investigation should not still be open (end_date NULL) once its client's case_status is Closed.",
+      "dimension": "consistency",
+      "label": null,
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 8,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": null,
+      "row_count_invalid": 8,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-placements",
+      "column_name": "placement_id",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 242,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-placements",
+      "column_name": "placement_id",
+      "check_name": "datacontract:duplicate_count",
+      "dimension": "uniqueness",
+      "label": "Duplicate rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 6,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 242,
+      "row_count_invalid": 6,
+      "failing_sample_keys": [
+        "PLACE-0000018",
+        "PLACE-0000071",
+        "PLACE-0000221",
+        "PLACE-0000189",
+        "PLACE-0000154"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-placements",
+      "column_name": "cp_client_id",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 11,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 242,
+      "row_count_invalid": 11,
+      "failing_sample_keys": [
+        "PLACE-0000006",
+        "PLACE-0000011",
+        "PLACE-0000016",
+        "PLACE-0000026",
+        "PLACE-0000107"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-placements",
+      "column_name": "placement_type",
+      "check_name": "datacontract:invalid_count",
+      "dimension": "conformity",
+      "label": "Invalid values",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 20,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 242,
+      "row_count_invalid": 20,
+      "failing_sample_keys": [
+        "PLACE-0000010",
+        "PLACE-0000019",
+        "PLACE-0000034",
+        "PLACE-0000035",
+        "PLACE-0000060"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-placements",
+      "column_name": "carer_id",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 242,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-placements",
+      "column_name": "placement_start",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 11,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 242,
+      "row_count_invalid": 11,
+      "failing_sample_keys": [
+        "PLACE-0000001",
+        "PLACE-0000023",
+        "PLACE-0000027",
+        "PLACE-0000096",
+        "PLACE-0000114"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-placements",
+      "column_name": "placement_suburb",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 6,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 242,
+      "row_count_invalid": 6,
+      "failing_sample_keys": [
+        "PLACE-0000018",
+        "PLACE-0000022",
+        "PLACE-0000138",
+        "PLACE-0000151",
+        "PLACE-0000152"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-placements",
+      "column_name": "(table)",
+      "check_name": "datacontract:row_count",
+      "dimension": "completeness",
+      "label": "Row count",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 242,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "pass",
+      "on_fail_action": "flag",
+      "row_count_total": 242,
+      "row_count_invalid": null,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-placements",
+      "column_name": "cp_client_id",
+      "check_name": "datacontract:sql: Every placement's cp_client_id must reference an existing cp_clients row.",
+      "dimension": "consistency",
+      "label": "Referential integrity",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 21,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": null,
+      "row_count_invalid": 21,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-placements",
+      "column_name": "carer_id",
+      "check_name": "datacontract:sql: Every placement's carer_id must reference an existing cp_carers row.",
+      "dimension": "consistency",
+      "label": "Referential integrity",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 8,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": null,
+      "row_count_invalid": 8,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-placements",
+      "column_name": "(table)",
+      "check_name": "datacontract:sql: Placement/carer approval compliance: a placement's carer must be Approved, not Provisional or Under review.",
+      "dimension": "consistency",
+      "label": null,
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 25,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": null,
+      "row_count_invalid": 25,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-carers",
+      "column_name": "carer_id",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 289,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-carers",
+      "column_name": "carer_id",
+      "check_name": "datacontract:duplicate_count",
+      "dimension": "uniqueness",
+      "label": "Duplicate rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 6,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 289,
+      "row_count_invalid": 6,
+      "failing_sample_keys": [
+        "CARER-000244",
+        "CARER-000213",
+        "CARER-000250",
+        "CARER-000006",
+        "CARER-000039"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-carers",
+      "column_name": "given_name",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 289,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-carers",
+      "column_name": "family_name",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 289,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-carers",
+      "column_name": "carer_type",
+      "check_name": "datacontract:invalid_count",
+      "dimension": "conformity",
+      "label": "Invalid values",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 289,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-carers",
+      "column_name": "approval_status",
+      "check_name": "datacontract:invalid_count",
+      "dimension": "conformity",
+      "label": "Invalid values",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 289,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-carers",
+      "column_name": "(table)",
+      "check_name": "datacontract:row_count",
+      "dimension": "completeness",
+      "label": "Row count",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 289,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "pass",
+      "on_fail_action": "flag",
+      "row_count_total": 289,
+      "row_count_invalid": null,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-case-workers",
+      "column_name": "worker_id",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 60,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-case-workers",
+      "column_name": "worker_id",
+      "check_name": "datacontract:duplicate_count",
+      "dimension": "uniqueness",
+      "label": "Duplicate rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 2,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "fail",
+      "on_fail_action": "quarantine",
+      "row_count_total": 60,
+      "row_count_invalid": 2,
+      "failing_sample_keys": [
+        "CPS-STAFF-00045",
+        "CPS-STAFF-00011"
+      ],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-case-workers",
+      "column_name": "given_name",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 60,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-case-workers",
+      "column_name": "family_name",
+      "check_name": "datacontract:missing_count",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 60,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-case-workers",
+      "column_name": "team_region",
+      "check_name": "datacontract:invalid_count",
+      "dimension": "conformity",
+      "label": "Invalid values",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": 0,
+      "status": "pass",
+      "on_fail_action": "quarantine",
+      "row_count_total": 60,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    },
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-case-workers",
+      "column_name": "(table)",
+      "check_name": "datacontract:row_count",
+      "dimension": "completeness",
+      "label": "Row count",
+      "run_id": "cp_run_10_2026-09-14",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 60,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "pass",
+      "on_fail_action": "flag",
+      "row_count_total": 60,
+      "row_count_invalid": null,
+      "failing_sample_keys": [],
+      "engine": "datacontract-cli 1.2.0"
+    }
+  ]
 }

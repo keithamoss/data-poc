@@ -84,8 +84,6 @@ def _custom_sql_label(description: str) -> str | None:
 
 def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
     run = run_against_local_server(CONTRACT_PATH, os.path.join(CP_RAW_DIR, run_id, "{model}.csv"))
-    write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp,
-                     "datacontract", run.model_dump())
 
     results = []
     for c in run.checks:
@@ -141,6 +139,11 @@ def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
             "engine": ENGINE_TAG,
         })
 
+    # No live-query correction needed (row_count is already in the raw
+    # output's own diagnostics) - still writes `verified` for uniformity
+    # with the other 3 tools, same reasoning as run_datacontract_bdm.py.
+    write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp,
+                     "datacontract", run.model_dump(), verified=results)
     return results
 
 

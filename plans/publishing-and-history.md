@@ -605,12 +605,81 @@ without_check_id`, `test_parse_soda_check_metadata_raises_for_checks_
 without_check_id`, `test_parse_contract_check_metadata_raises_for_
 quality_rule_without_check_id`).
 
-**Phase 2 (Thread B - dashboard pipeline's read side):**
+**Phase 2 (Thread B - dashboard pipeline's read side) - [DONE,
+2026-09-16]:**
 - The dashboard pipeline's "read all committed history, merge, reshape"
   step - turning Phase 1's committed per-run files into what the
   dashboard actually renders.
 - Depends on Phase 1's format existing (doesn't need Phase 1's
   validation logic specifically, just the data shape it produces).
+
+**A real gap found before building, not anticipated in the original
+scoping - resolved with Keith upfront rather than discovered mid-build:**
+tracing through the existing `evaluate_dbt_bdm()`/`evaluate_soda_bdm()`
+(and CP counterparts) showed Phase 1's committed `raw_output` alone
+isn't trustworthy or sufficient for this phase. Two real issues, both
+in code that predates this whole publishing-and-history effort:
+- dbt: a documented dbt-core bug (`failures` hardcoded to 0 on some
+  passing-but-actually-nonzero results, dbt-labs/dbt-core#11312,
+  already root-caused - see `plans/qa-pipeline.md`) only gets corrected
+  by a live query against that run's own per-run DuckDB warehouse,
+  computed *after* Phase 1 already wrote the raw file.
+- Soda: `row_count_total` isn't in `scan_results` at all - also a live
+  per-run-warehouse query, same timing problem.
+
+Both live queries need a DuckDB connection to `data/duckdb_runs/`/
+`data/cp_duckdb_runs/` - ephemeral, gitignored, regenerated - which
+won't exist by the time history gets read back later. Put to Keith
+directly (see this file's own AskUserQuestion round, 2026-09-16): bake
+the correction into what's committed, keep it strictly local + depend
+on regenerated warehouses at read time, or accept the raw
+(occasionally wrong) numbers. **Keith's call: bake it in** - as an
+additive field, never by mutating what the tool itself reported.
+
+**Built and verified for real:**
+- `qa_results_writer.write_qa_result()` gained a second top-level
+  field, `verified`, sitting alongside `raw_output` (never inside it -
+  `raw_output` stays genuinely, permanently what the tool reported,
+  bug included, a real audit trail). `verified` is the same
+  fully-resolved, dashboard-ready check-result list `evaluate_*()`
+  already built in memory every run - now also captured at the moment
+  it's built (which for dbt/Soda is *after* their own live-query
+  corrections, not before). All 8 `run_*.py` modules (BDM + CP x 4
+  tools each) moved their `write_qa_result()` call to the end of their
+  `evaluate_*()` function accordingly - including the 2 tools
+  (datacontract-cli, Evidently) that never needed correcting, for
+  uniformity: every committed file has the same shape, so the reader
+  never special-cases which tools happen to need it.
+- `qa_tools/common/qa_results_reader.py` (new) - `read_one()`/
+  `read_qa_results()`, walks the committed tree and concatenates every
+  run's every tool's `verified` list back into one flat list, in the
+  same run-then-tool order a live orchestrator run always produced -
+  purely mechanical, no reshaping of its own.
+- `qa_tools/bdm/build_results_from_history.py` + `qa_tools/cp/
+  build_results_from_history.py` (new) - rebuild `reports/results_bdm.
+  json`/`results_cp.json` purely from committed `qa_results/` +
+  local `manifest.json` (for `"runs"` only - generator-run metadata
+  like delivery dates/resupply chains/dirty_severity stays out of
+  `qa_results/`'s scope, per Thread B's own "tool RESULTS only"
+  boundary already agreed before this phase started). No real tool
+  re-run, no `data/duckdb_runs/`/`data/cp_duckdb_runs/` needed.
+  CP's builder reads two `qa_results/` dataset segments per run (the
+  collection-level one for dbt/Soda/datacontract-cli, Evidently's own
+  table-scoped one) and interleaves them per run_id to match
+  `orchestrate_cp.py`'s own construction order exactly, not two
+  concatenated blocks.
+- Verified by real regeneration, not just unit tests: re-ran both real
+  orchestrators end to end (populating every committed file's new
+  `verified` field, same 1214 BDM / 1770 CP check-result counts as
+  before - no regression from moving the write call), saved their
+  live-run `reports/*.json` output aside, then ran the new history-only
+  builders and diffed - **byte-identical to the live-run output, aside
+  from `generated_at`'s own wall-clock timestamp**, for both datasets.
+  Rebuilt the dashboard from the history-only `reports/*.json` and
+  confirmed a clean render (real Playwright check, zero console
+  errors). 123 tests passing (5 new: `tests/test_qa_results_reader.py`,
+  plus 2 more in `test_qa_results_writer.py` for `verified`), ruff
+  clean.
 
 **Phase 3 (Thread A - CI-gated publishing):**
 - Wires Phase 1's validation logic into the CI gate, alongside the

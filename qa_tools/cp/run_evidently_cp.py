@@ -47,9 +47,8 @@ def evaluate_evidently_cp(run_id: str, run_timestamp: str,
 
     psi, psi_snapshot = compute_psi(current, reference, "concern_type")
     status = status_for_psi(psi, run_id == reference_run_id)
-    write_qa_result(cp_common.AGENCY_ID, DATASET_ID, run_id, run_timestamp, "evidently", {"psi": psi_snapshot})
 
-    return [{
+    results = [{
         "agency_id": cp_common.AGENCY_ID,
         "collection_id": cp_common.COLLECTION_ID,
         "dataset_id": DATASET_ID,
@@ -70,6 +69,9 @@ def evaluate_evidently_cp(run_id: str, run_timestamp: str,
         "engine": ENGINE_TAG,
         "reference_run_id": reference_run_id,
     }]
+    write_qa_result(cp_common.AGENCY_ID, DATASET_ID, run_id, run_timestamp, "evidently", {"psi": psi_snapshot},
+                     verified=results)
+    return results
 
 
 if __name__ == "__main__":

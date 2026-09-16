@@ -1,5 +1,5 @@
 {
-  "run_timestamp": "2026-09-16T10:30:21.814702+00:00",
+  "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
   "raw_output": {
     "psi": {
       "metrics": [
@@ -33,5 +33,28 @@
       ],
       "tests": []
     }
-  }
+  },
+  "verified": [
+    {
+      "agency_id": "child-protection-family-support",
+      "collection_id": "child-protection",
+      "dataset_id": "cp-notifications",
+      "column_name": "concern_type",
+      "check_name": "drift:PSI",
+      "dimension": "consistency",
+      "label": "Distribution drift",
+      "run_id": "cp_run_01_2026-07-13",
+      "run_timestamp": "2026-09-16T10:48:54.476406+00:00",
+      "metric_value": 0.0,
+      "unit": "PSI",
+      "warn_threshold": 0.1,
+      "fail_threshold": 0.25,
+      "status": "pass",
+      "on_fail_action": "flag",
+      "row_count_total": 987,
+      "row_count_invalid": null,
+      "engine": "Evidently 0.7",
+      "reference_run_id": "cp_run_01_2026-07-13"
+    }
+  ]
 }

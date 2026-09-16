@@ -226,8 +226,6 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
     # genuinely operates at collection granularity, so it's written there
     # rather than split artificially per table (would misrepresent what
     # the tool actually ran).
-    write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, "dbt", run_results)
-
     nodes = test_nodes(manifest)
 
     conn = duckdb.connect(db_path, read_only=True)
@@ -292,6 +290,11 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
         })
 
     conn.close()
+    # Committed only now, after the audit-table correction above - see
+    # run_dbt_bdm.py's own identical comment / qa_results_writer.py's
+    # docstring for why.
+    write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, "dbt", run_results,
+                     verified=results)
     return results
 
 

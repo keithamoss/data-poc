@@ -76,7 +76,6 @@ def _custom_sql_label(description: str) -> str | None:
 
 def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str) -> list[dict]:
     run = run_against_local_server(CONTRACT_PATH, os.path.join(RAW_DIR, csv_filename))
-    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "datacontract", run.model_dump())
 
     results = []
     for c in run.checks:
@@ -113,6 +112,12 @@ def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str
             "engine": ENGINE_TAG,
         })
 
+    # No live-query correction needed for this tool (row_count_total is
+    # already in the raw output's own diagnostics) - still writes
+    # `verified` for uniformity with the other 3 tools, so the reader
+    # never has to special-case which tools happen to need it (see
+    # qa_results_writer.py's own docstring).
+    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "datacontract", run.model_dump(), verified=results)
     return results
 
 
