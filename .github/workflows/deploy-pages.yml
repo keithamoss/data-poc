@@ -22,21 +22,23 @@ name: Build, validate, and publish the dashboard
 # human genuinely cannot cause the published data to change without
 # going through a qa_results/ (or check-definition) commit first.
 #
-# The rebuild needs more than qa_results/ alone: pipeline/
-# build_dashboard_data.py's/build_cp_dashboard_data.py's own direct
-# DuckDB queries (e.g. the sex/concern_type value-count charts) run
-# against the regenerated synthetic-data warehouses, not just the
-# committed check-result history - Thread B's own scope boundary
-# ("tool RESULTS only, not the underlying raw synthetic data records")
-# already treats that data as gitignored/regenerated, so this workflow
-# regenerates it fresh every run, same as any local ./run_pipeline.sh
-# does - fully deterministic (every generator call is seeded), so this
-# reproduces byte-identical warehouses without needing them committed.
-# No real dbt-core/Soda Core/datacontract-cli/Evidently run happens
-# here at all - qa_tools.*.build_results_from_history reads back each
-# tool's already-resolved `verified` records straight from committed
-# qa_results/ (plans/publishing-and-history.md Phase 2), so this is
-# fast and needs none of those four tools actually installed... except
+# This job touches ONLY committed files - no data of any kind, real or
+# (in this PoC) synthetic-standing-in-for-real. Keith's hard rule, same
+# day: "CI never touches production data" - full stop, not even this
+# project's own fake stand-in for it, because the point is a pipeline
+# that would actually be safe to point at a real deployment, not one
+# that happens to be harmless today only because today's data isn't
+# real. pipeline/build_dashboard_data.py's/build_cp_dashboard_data.py's
+# own direct DuckDB queries (the sex/concern_type value-count charts,
+# arrival-lag stats) used to need a live warehouse - moved to qa_tools/
+# bdm/dataset_stats.py + qa_tools/cp/dataset_stats.py, computed once by
+# orchestrate_bdm.py/orchestrate_cp.py (the one place with a legitimate
+# connection already open) and committed to qa_results/ alongside each
+# run's check results. No real dbt-core/Soda Core/datacontract-cli/
+# Evidently run happens here either - qa_tools.*.build_results_from_
+# history reads back each tool's already-resolved `verified` records
+# straight from committed qa_results/ (Phase 2), so this is fast and
+# needs none of those four tools actually installed... except
 # `uv sync --dev` installs them anyway (pyproject.toml has no lighter
 # dependency group to sync instead) - a known, accepted inefficiency,
 # not a correctness problem.
@@ -59,6 +61,10 @@ name: Build, validate, and publish the dashboard
 
 on:
   push:
+    # No generator/** here - this job no longer runs anything from it
+    # (see the hard-rule note above), so a generator-only change has no
+    # effect on what this job builds until someone runs it locally and
+    # commits fresh qa_results/ history, which already triggers this.
     branches: [claude/new-session-en9qen]
     paths:
       - "qa_results/**"
@@ -66,7 +72,6 @@ on:
       - "dbt_project/models/staging/schema.yml"
       - "qa_tools/**"
       - "pipeline/**"
-      - "generator/**"
       - "dashboard/**"
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
@@ -107,14 +112,6 @@ jobs:
 
       - name: Install Playwright's Chromium
         run: uv run playwright install --with-deps chromium
-
-      - name: Regenerate synthetic data + combined warehouse (BDM)
-        run: uv run python3 -m pipeline.orchestrate
-
-      - name: Regenerate synthetic data + per-run warehouses (Child Protection)
-        run: |
-          uv run python3 -m generator.generate_cp_runs
-          uv run python3 -m qa_tools.cp.build_cp_warehouses
 
       - name: Rebuild check results from committed qa_results/ history
         run: |

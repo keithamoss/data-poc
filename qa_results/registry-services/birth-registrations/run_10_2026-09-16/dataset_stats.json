@@ -1,0 +1,65 @@
+{
+  "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
+  "raw_output": {
+    "manifest_entry": {
+      "run_id": "run_10_2026-09-16",
+      "run_index": 15,
+      "delivery_id": "delivery_10",
+      "delivery_date": "2026-09-16",
+      "attempt_number": 1,
+      "arrived_date": "2026-09-16",
+      "run_date": "2026-09-16",
+      "is_resupply": false,
+      "supersedes_run_id": null,
+      "n_rows_generated": 1858,
+      "dirty_severity": null,
+      "id_offset": 1000000,
+      "seed": 1010,
+      "file": "run_10_2026-09-16.csv"
+    },
+    "value_counts": {
+      "sex": [
+        [
+          "M",
+          863
+        ],
+        [
+          "F",
+          959
+        ],
+        [
+          "X",
+          36
+        ]
+      ]
+    },
+    "arrival": {
+      "max_lag_hours": 19.0,
+      "earliest_extract": "2026-09-16 01:00:00"
+    },
+    "check_aggregates": {
+      "sex": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 0,
+        "values": []
+      },
+      "place_of_birth_suburb": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 0,
+        "values": []
+      },
+      "date_of_birth": {
+        "type": "numeric_date",
+        "suppressed": false,
+        "total_invalid": 0,
+        "min": null,
+        "max": null,
+        "values": [],
+        "histogram": []
+      }
+    }
+  },
+  "verified": []
+}

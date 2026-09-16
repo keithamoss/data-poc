@@ -820,6 +820,104 @@ additive field, never by mutating what the tool itself reported.
   convention, since only CI's own gated rebuild should ever land in
   git.
 
+**A real, hard-rule gap Keith raised right after the first live CI run,
+not caught while building the above**: Phase 3's CI job was still
+regenerating BDM+CP's synthetic data and warehouses (`pipeline.
+orchestrate`, `generator.generate_cp_runs`, `qa_tools.cp.
+build_cp_warehouses`) so `build_dashboard_data.py`'s/
+`build_cp_dashboard_data.py`'s own direct DuckDB queries (value-count
+charts, per-check aggregate failing-value data, arrival-lag stats) had
+something to query. Harmless *today*, since this PoC's "data" is
+synthetic - but Keith's call, put explicitly: **"that's not great, I
+don't like that... it's a hard rule that CI never touches production
+data"** - not just real data, the PATTERN of CI regenerating anything
+data-shaped, because a pipeline that's only safe by accident of today's
+data being fake isn't a pipeline that generalizes to a real deployment.
+
+**Scoped via 3 rounds of AskUserQuestion before building, per Keith's
+own ask:**
+1. **Fix scope**: confirmed via re-tracing the actual live-query call
+   sites (found a 3rd one missed on the first pass - CP's own per-table
+   arrival-lag stat, `build_cp_dashboard_data.py`'s `build_one_table()`)
+   that this covers all 3 chart/stat use cases AND the "runs" manifest
+   metadata `build_results_from_history.py` was still reading from
+   local `data/raw/manifest.json`/`data/cp_raw/manifest.json` - Keith's
+   call: fix all of it, not just the originally-flagged charts, since a
+   pipeline that still needs *any* local regeneration for *any* reason
+   doesn't satisfy the hard rule either.
+2. **Where it's committed**: inside `qa_results/` - a new per-run
+   pseudo-tool file (`dataset_stats.json`, `tool="dataset_stats"` via
+   the existing `write_qa_result()`), not a separate top-level tree -
+   Keith's call, simplest, no new top-level concept.
+3. **Who writes it**: `orchestrate_bdm.py`/`orchestrate_cp.py` stay the
+   sole `qa_results/` writers (reading `data/raw/manifest.json` back
+   and splitting it per run_id themselves) rather than the generator
+   committing its own manifest entries directly - Keith's call, keeps
+   "what writes to `qa_results/`" a single, consistent answer, and
+   leaves the generator exactly the PoC-only, explicitly-out-of-Thread-
+   B's-scope thing it's always been.
+
+**Built and verified for real:**
+- `qa_tools/bdm/dataset_stats.py` + `qa_tools/cp/dataset_stats.py`
+  (new) - `compute_dataset_stats()`, computing value-count
+  distributions, arrival-lag, and per-check aggregate failing-value
+  data (the `AGGREGATE_SPEC` dicts, moved here from `pipeline/
+  build_*_dashboard_data.py` - now the canonical definition, the
+  dashboard-building layer imports them back for its own `check_names`
+  attach-decision, not a second copy) - against a real DuckDB
+  connection, at the one point in the whole pipeline with a legitimate
+  one already open. 3 tests (`tests/test_dataset_stats.py`), real small
+  DuckDB fixtures, not mocked.
+- `orchestrate_bdm.py`/`orchestrate_cp.py`'s `_run_one()` now also
+  computes and commits `dataset_stats.json`; `run_pipeline()`/
+  `run_pipeline_cp()` read it back (via a new `qa_results_reader.
+  read_dataset_stats()`) to assemble `output["dataset_stats"]` - not
+  threaded through `_run_one()`'s own return value, since
+  `parallel_orchestrate.run_manifest()`'s contract is shared with both
+  datasets and not worth complicating for this; also means the live-run
+  path and the history-rebuild path (below) share the exact same
+  "how do I get dataset_stats for a run" code, so they can't drift.
+- `build_results_from_history.py` (both datasets) rewritten to discover
+  run_ids via a new `qa_results_reader.list_run_ids()` (a directory
+  listing of committed `qa_results/`) instead of reading local manifest
+  files - reconstructs "runs" from each run's own committed
+  `dataset_stats.json["manifest_entry"]`, sorted by `run_index` (not
+  `run_date` - a resupply attempt's own `run_date` is when it actually
+  arrived, which would sort it away from its parent delivery;
+  `run_index` matches the original generation order and doesn't).
+  Neither builder touches `data/raw/`/`data/cp_raw/` at all any more.
+- `pipeline/build_dashboard_data.py`/`build_cp_dashboard_data.py`:
+  every live DuckDB query removed - `import duckdb` is gone from both
+  files entirely. Both are now pure functions of `reports/results_bdm.
+  json`/`results_cp.json` alone (specifically its new `dataset_stats`
+  key).
+- `.github/workflows/deploy-pages.yml`: the "Regenerate synthetic data
+  + warehouse(s)" steps removed entirely - this job now touches nothing
+  but committed files. `generator/**` dropped from the trigger `paths:`
+  list accordingly (a generator-only change has no effect on this job
+  any more).
+- Verified for real, not assumed: re-ran both real orchestrators
+  end-to-end (`--sequential`, same 1214 BDM / 1770 CP check-result
+  counts as before - no regression), backfilling `dataset_stats.json`
+  for all 25 already-committed historical runs. Diffed every specific
+  value this change moved (BDM's sex value-counts + arrival lag, CP's
+  concern_type value-counts + per-table arrival lag) against what the
+  currently-live, pre-refactor dashboard actually showed - exact
+  matches, not just "didn't crash". Full pytest (141 tests, 4 new/
+  reworked) + ruff clean. **A real bug this work's own regression
+  testing caught, not a hypothetical**: the existing `test_orchestrate_
+  reference_run.py` called `_run_one()` directly with a synthetic fake
+  entry - once `_run_one()` started calling `write_qa_result()` for
+  `dataset_stats` too, this test started silently writing a stray
+  directory into the actual project's committed `qa_results/` tree on
+  every run, caught by `pytest` genuinely failing (CP's variant hit a
+  missing-warehouse-file error outright; BDM's variant "passed" while
+  quietly corrupting real repo state, since the combined warehouse
+  happened to already exist) - fixed by monkeypatching `duckdb.connect`/
+  `write_qa_result`/`compute_dataset_stats` in both test cases, per this
+  repo's own "verify a regression test actually fails first, then fix"
+  convention.
+
 **Not yet built - the remaining piece of Phase 3**: the changelog/
 activity-feed DATA logic (reshaping git commit history over the
 committed result paths into "who published what, when" feed entries -

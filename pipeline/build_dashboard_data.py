@@ -28,14 +28,11 @@ from __future__ import annotations
 import json
 import os
 
-import duckdb
-
-from pipeline.aggregate_values import categorical_aggregate, numeric_date_aggregate
+from qa_tools.bdm.dataset_stats import AGGREGATE_SPEC
 from pipeline.dashboard_check_labels import rank_for_headline, display_name
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 REAL_RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
-DB_PATH = os.path.join(ROOT, "data", "warehouse.duckdb")
 OUT_PATH = os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")
 
 ENGINE_SHORT = {
@@ -67,89 +64,13 @@ COLUMN_META = {
 
 ALL_COLUMNS = list(COLUMN_META.keys())
 
-# "Shape 2" aggregate failing-value support (plans/qa-pipeline.md #17) -
-# which columns get an aggregate view, what "invalid" means for each (the
-# exact same valid-value lists dbt_project/models/staging/schema.yml's
-# tests enforce, so this module's notion of "invalid" can't silently drift
-# from what the real checks actually flag), and which specific check(s)
-# on that column the aggregate gets attached to (never every check on the
-# column - e.g. date_of_birth also has a freshness check that has nothing
-# to do with the out-of-range rule this aggregates). `classification` is
-# None for every column registered here today - see aggregate_values.py's
-# own docstring for why the redaction path still exists regardless.
-_SEX_VALID = ["M", "F", "X"]
-_SUBURB_VALID = ["Fremantle", "Subiaco", "Joondalup", "Rockingham", "Mandurah", "Midland", "Armadale", "Cannington",
-                 "Morley", "Cockburn Central", "Scarborough", "Victoria Park", "Bunbury", "Albany", "Geraldton",
-                 "Kalgoorlie", "Broome", "Karratha", "Port Hedland", "Busselton", "Northam", "Narrogin", "Esperance",
-                 "Collie", "Mount Lawley", "Leederville", "Wembley", "Innaloo", "Success", "Baldivis", "Ellenbrook",
-                 "Butler", "Balga", "Girrawheen", "Maddington", "Gosnells", "Kwinana", "Hamilton Hill",
-                 "Beaconsfield", "South Perth", "Bentley", "Willetton", "Riverton", "Karrinyup", "Currambine",
-                 "Clarkson", "Yanchep", "Byford", "Waroona", "Manjimup", "Margaret River"]
-
-
-def _sql_list(values: list[str]) -> str:
-    return ",".join("'" + v.replace("'", "''") + "'" for v in values)
-
-
-AGGREGATE_SPEC = {
-    "sex": {
-        "kind": "categorical",
-        "invalid_condition": f"sex NOT IN ({_sql_list(_SEX_VALID)}) OR sex IS NULL",
-        "classification": None,
-        "check_names": {"dbt:accepted_values", "invalid_percent[all]", "datacontract:invalid_count"},
-    },
-    "place_of_birth_suburb": {
-        "kind": "categorical",
-        "invalid_condition": f"place_of_birth_suburb NOT IN ({_sql_list(_SUBURB_VALID)}) OR place_of_birth_suburb IS NULL",
-        "classification": None,
-        "check_names": {"dbt:accepted_values", "invalid_percent[all]", "datacontract:invalid_count"},
-    },
-    "date_of_birth": {
-        "kind": "numeric_date",
-        # Only datacontract-cli has this rule for BDM (the ODCS type:sql
-        # rule) - no dbt/Soda equivalent exists here, unlike Child
-        # Protection's own version of this check.
-        "invalid_condition": "date_of_birth < DATE '1900-01-01'",
-        "classification": None,
-        "check_names": {"datacontract:custom_sql"},
-    },
-}
-
-
-def _aggregate_for(conn: duckdb.DuckDBPyConnection, col: str, run_id: str) -> dict | None:
-    spec = AGGREGATE_SPEC.get(col)
-    if spec is None:
-        return None
-    condition = f"({spec['invalid_condition']}) AND run_id = ?"
-    if spec["kind"] == "categorical":
-        return categorical_aggregate(conn, "birth_registrations", col, condition, spec["classification"], [run_id])
-    return numeric_date_aggregate(conn, "birth_registrations", col, condition, spec["classification"], [run_id])
-
-
-def _sex_value_counts(conn: duckdb.DuckDBPyConnection, run_id: str) -> list[list]:
-    rows = conn.execute(
-        "SELECT sex, COUNT(*) FROM birth_registrations WHERE run_id = ? GROUP BY sex", [run_id]
-    ).fetchall()
-    counts = {"M": 0, "F": 0, "X": 0}
-    other = 0
-    for val, c in rows:
-        if val in counts:
-            counts[val] += c
-        else:
-            other += c
-    out = [[k, v] for k, v in counts.items()]
-    if other:
-        out.append(["(invalid code)", other])
-    return out
-
 
 def build() -> dict:
     with open(REAL_RESULTS_PATH) as f:
         payload = json.load(f)
     manifest = sorted(payload["runs"], key=lambda r: r["run_date"])
     results = payload["results"]
-
-    conn = duckdb.connect(DB_PATH)
+    dataset_stats = payload["dataset_stats"]
 
     # column_name -> (engine, check_name) -> {unit, warn, fail, by_run_id: {run_id: value}}
     by_column: dict[str, dict[tuple, dict]] = {}
@@ -177,7 +98,6 @@ def build() -> dict:
         checks_for_col = by_column.get(col, {})
 
         agg_spec = AGGREGATE_SPEC.get(col)
-        agg_cache: dict[str, dict] = {}
 
         checks_out = []
         for (engine, check_name), slot in checks_for_col.items():
@@ -188,9 +108,7 @@ def build() -> dict:
                     run_date = next(m["run_date"] for m in manifest if m["run_id"] == run_id)
                     aggregate_values = None
                     if attach_aggregate:
-                        if run_id not in agg_cache:
-                            agg_cache[run_id] = _aggregate_for(conn, col, run_id)
-                        aggregate_values = agg_cache[run_id]
+                        aggregate_values = dataset_stats[run_id]["check_aggregates"].get(col)
                     history.append({
                         "run_date": run_date, "value": slot["by_run"][run_id],
                         "row_count_total": slot["row_count_total"].get(run_id),
@@ -247,8 +165,8 @@ def build() -> dict:
                 stats[label]["valid"] = max(0, total - stats[label]["invalid"])
 
         if col == "sex":
-            stats["current"]["valueCounts"] = _sex_value_counts(conn, latest_run)
-            stats["previous"]["valueCounts"] = _sex_value_counts(conn, prev_run)
+            stats["current"]["valueCounts"] = dataset_stats[latest_run]["value_counts"]["sex"]
+            stats["previous"]["valueCounts"] = dataset_stats[prev_run]["value_counts"]["sex"]
 
         status_rank = {"pass": 0, "warn": 1, "fail": 2}
         # column status = worst status among its real checks (mirrors the
@@ -264,8 +182,6 @@ def build() -> dict:
             "checks": checks_out, "stats": stats,
         })
 
-    conn.close()
-
     # dataset-level: row counts + arrival, from the real generated manifest
     # and extract_timestamp data (extract lag is generated under the 24h SLA
     # for every run in this fixture, so "on time" here is a genuine computed
@@ -273,15 +189,8 @@ def build() -> dict:
     latest_entry = next(m for m in manifest if m["run_id"] == latest_run)
     prev_entry = next(m for m in manifest if m["run_id"] == prev_run)
 
-    conn = duckdb.connect(DB_PATH)
-    max_lag_hours = conn.execute(
-        """SELECT MAX(date_diff('second', date_registered, extract_timestamp)) / 3600.0
-           FROM birth_registrations WHERE run_id = ?""", [latest_run]
-    ).fetchone()[0]
-    earliest_extract = conn.execute(
-        "SELECT MIN(extract_timestamp) FROM birth_registrations WHERE run_id = ?", [latest_run]
-    ).fetchone()[0]
-    conn.close()
+    max_lag_hours = dataset_stats[latest_run]["arrival"]["max_lag_hours"]
+    earliest_extract = dataset_stats[latest_run]["arrival"]["earliest_extract"]
 
     arrival_history = []
     for m in manifest:

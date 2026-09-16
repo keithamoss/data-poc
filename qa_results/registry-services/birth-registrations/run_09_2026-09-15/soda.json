@@ -1,43 +1,19 @@
 {
-  "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+  "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
   "raw_output": {
     "definitionName": null,
     "defaultDataSource": "birth_registrations",
-    "dataTimestamp": "2026-09-16T10:48:23+00:00",
-    "scanStartTimestamp": "2026-09-16T10:48:23+00:00",
-    "scanEndTimestamp": "2026-09-16T10:48:23+00:00",
+    "dataTimestamp": "2026-09-16T11:52:30+00:00",
+    "scanStartTimestamp": "2026-09-16T11:52:30+00:00",
+    "scanEndTimestamp": "2026-09-16T11:52:30+00:00",
     "hasErrors": false,
     "hasWarnings": true,
     "hasFailures": true,
     "metrics": [
       {
-        "identity": "metric-birth_registrations-birth_registrations-row_count-4c8917fe",
-        "metricName": "row_count",
-        "value": 0,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-child_given_names-invalid_count-12333562",
-        "metricName": "invalid_count",
-        "value": 39,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-recent-sex-invalid_count-725b96e3",
-        "metricName": "invalid_count",
-        "value": 51,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-source_system_record_id-invalid_count-fe9dd722",
-        "metricName": "invalid_count",
-        "value": 32,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-place_of_birth_suburb-invalid_count-f8312593",
-        "metricName": "invalid_count",
-        "value": 35,
+        "identity": "metric-birth_registrations-birth_registrations-registering_parent_2_name-missing_percent",
+        "metricName": "missing_percent",
+        "value": 26.02,
         "dataSourceName": "birth_registrations"
       },
       {
@@ -47,31 +23,115 @@
         "dataSourceName": "birth_registrations"
       },
       {
-        "identity": "metric-birth_registrations-birth_registrations-registration_number-duplicate_count",
-        "metricName": "duplicate_count",
-        "value": 26,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-child_given_names-invalid_percent-12333562",
+        "identity": "metric-birth_registrations-birth_registrations-place_of_birth_suburb-invalid_percent-f8312593",
         "metricName": "invalid_percent",
-        "value": 3.17,
+        "value": 2.85,
         "dataSourceName": "birth_registrations"
       },
       {
-        "identity": "metric-birth_registrations-birth_registrations-recent-sex-invalid_percent-725b96e3",
-        "metricName": "invalid_percent",
-        "value": 4.34,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-row_count-b1e47205",
+        "identity": "metric-birth_registrations-birth_registrations-row_count-4c8917fe",
         "metricName": "row_count",
-        "value": 49,
+        "value": 0,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-child_given_names-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
         "dataSourceName": "birth_registrations"
       },
       {
         "identity": "metric-birth_registrations-birth_registrations-extract_timestamp-missing_count",
+        "metricName": "missing_count",
+        "value": 6,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-registering_parent_1_name-invalid_percent-12333562",
+        "metricName": "invalid_percent",
+        "value": 2.68,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-registration_number-missing_count",
+        "metricName": "missing_count",
+        "value": 5,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-recent-sex-invalid_count-725b96e3",
+        "metricName": "invalid_count",
+        "value": 51,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-registering_parent_1_name-missing_percent",
+        "metricName": "missing_percent",
+        "value": 1.79,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-failed rows-a373bf62",
+        "metricName": "failed rows",
+        "value": 18,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-child_given_names-invalid_count-12333562",
+        "metricName": "invalid_count",
+        "value": 39,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-date_of_birth-missing_count",
+        "metricName": "missing_count",
+        "value": 4,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-sex-invalid_percent-725b96e3",
+        "metricName": "invalid_percent",
+        "value": 4.31,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-child_family_name-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-source_system_record_id-duplicate_count",
+        "metricName": "duplicate_count",
+        "value": 29,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-recent-row_count",
+        "metricName": "row_count",
+        "value": 1175,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-child_family_name-invalid_count-12333562",
+        "metricName": "invalid_count",
+        "value": 22,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-place_of_birth_facility-missing_count",
+        "metricName": "missing_count",
+        "value": 684,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-registering_parent_1_name-missing_count",
+        "metricName": "missing_count",
+        "value": 22,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-date_registered-missing_count",
         "metricName": "missing_count",
         "value": 6,
         "dataSourceName": "birth_registrations"
@@ -83,15 +143,21 @@
         "dataSourceName": "birth_registrations"
       },
       {
-        "identity": "metric-birth_registrations-birth_registrations-registering_parent_1_name-invalid_count-12333562",
-        "metricName": "invalid_count",
-        "value": 33,
+        "identity": "metric-birth_registrations-birth_registrations-registration_number-duplicate_count",
+        "metricName": "duplicate_count",
+        "value": 26,
         "dataSourceName": "birth_registrations"
       },
       {
-        "identity": "metric-birth_registrations-birth_registrations-child_given_names-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
+        "identity": "metric-birth_registrations-birth_registrations-row_count-b1e47205",
+        "metricName": "row_count",
+        "value": 49,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-recent-sex-invalid_percent-725b96e3",
+        "metricName": "invalid_percent",
+        "value": 4.34,
         "dataSourceName": "birth_registrations"
       },
       {
@@ -101,9 +167,15 @@
         "dataSourceName": "birth_registrations"
       },
       {
-        "identity": "metric-birth_registrations-birth_registrations-place_of_birth_suburb-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
+        "identity": "metric-birth_registrations-birth_registrations-failed rows-0bc45c06",
+        "metricName": "failed rows",
+        "value": 38,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-source_system_record_id-invalid_count-fe9dd722",
+        "metricName": "invalid_count",
+        "value": 32,
         "dataSourceName": "birth_registrations"
       },
       {
@@ -113,87 +185,9 @@
         "dataSourceName": "birth_registrations"
       },
       {
-        "identity": "metric-birth_registrations-birth_registrations-source_system_record_id-duplicate_count",
-        "metricName": "duplicate_count",
-        "value": 29,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-registration_number-missing_count",
-        "metricName": "missing_count",
-        "value": 5,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-child_family_name-invalid_count-12333562",
-        "metricName": "invalid_count",
-        "value": 22,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-child_family_name-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "birth_registrations"
-      },
-      {
         "identity": "metric-birth_registrations-birth_registrations-row_count",
         "metricName": "row_count",
         "value": 1230,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-date_registered-missing_count",
-        "metricName": "missing_count",
-        "value": 6,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-failed rows-0bc45c06",
-        "metricName": "failed rows",
-        "value": 38,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-registering_parent_1_name-missing_percent",
-        "metricName": "missing_percent",
-        "value": 1.79,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-place_of_birth_facility-missing_percent",
-        "metricName": "missing_percent",
-        "value": 55.61,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-place_of_birth_suburb-invalid_percent-f8312593",
-        "metricName": "invalid_percent",
-        "value": 2.85,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-registering_parent_2_name-invalid_count-12333562",
-        "metricName": "invalid_count",
-        "value": 27,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-registering_parent_1_name-invalid_percent-12333562",
-        "metricName": "invalid_percent",
-        "value": 2.68,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-registering_parent_1_name-missing_count",
-        "metricName": "missing_count",
-        "value": 22,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-registering_parent_2_name-missing_percent",
-        "metricName": "missing_percent",
-        "value": 26.02,
         "dataSourceName": "birth_registrations"
       },
       {
@@ -203,39 +197,45 @@
         "dataSourceName": "birth_registrations"
       },
       {
-        "identity": "metric-birth_registrations-birth_registrations-place_of_birth_facility-missing_count",
-        "metricName": "missing_count",
-        "value": 684,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-sex-invalid_percent-725b96e3",
-        "metricName": "invalid_percent",
-        "value": 4.31,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-date_of_birth-missing_count",
-        "metricName": "missing_count",
-        "value": 4,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-recent-row_count",
-        "metricName": "row_count",
-        "value": 1175,
-        "dataSourceName": "birth_registrations"
-      },
-      {
-        "identity": "metric-birth_registrations-birth_registrations-failed rows-a373bf62",
-        "metricName": "failed rows",
-        "value": 18,
-        "dataSourceName": "birth_registrations"
-      },
-      {
         "identity": "metric-birth_registrations-birth_registrations-registering_parent_2_name-invalid_percent-12333562",
         "metricName": "invalid_percent",
         "value": 2.2,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-child_given_names-invalid_percent-12333562",
+        "metricName": "invalid_percent",
+        "value": 3.17,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-place_of_birth_suburb-invalid_count-f8312593",
+        "metricName": "invalid_count",
+        "value": 35,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-registering_parent_1_name-invalid_count-12333562",
+        "metricName": "invalid_count",
+        "value": 33,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-place_of_birth_suburb-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-registering_parent_2_name-invalid_count-12333562",
+        "metricName": "invalid_count",
+        "value": 27,
+        "dataSourceName": "birth_registrations"
+      },
+      {
+        "identity": "metric-birth_registrations-birth_registrations-place_of_birth_facility-missing_percent",
+        "metricName": "missing_percent",
+        "value": 55.61,
         "dataSourceName": "birth_registrations"
       }
     ],
@@ -786,8 +786,8 @@
                   "fileId": ""
                 }
               },
-              "failingRowsQueryName": "28.birth_registrations.birth_registrations.date_of_birth.failed_rows[missing_count].failing_sql",
-              "passingRowsQueryName": "28.birth_registrations.birth_registrations.date_of_birth.failed_rows[missing_count].passing_sql",
+              "failingRowsQueryName": "164.birth_registrations.birth_registrations.date_of_birth.failed_rows[missing_count].failing_sql",
+              "passingRowsQueryName": "164.birth_registrations.birth_registrations.date_of_birth.failed_rows[missing_count].passing_sql",
               "totalFailingRows": 4,
               "sampleRowCount": 0
             }
@@ -923,8 +923,8 @@
                   "fileId": ""
                 }
               },
-              "failingRowsQueryName": "29.birth_registrations.birth_registrations.registration_number.failed_rows[missing_count].failing_sql",
-              "passingRowsQueryName": "29.birth_registrations.birth_registrations.registration_number.failed_rows[missing_count].passing_sql",
+              "failingRowsQueryName": "165.birth_registrations.birth_registrations.registration_number.failed_rows[missing_count].failing_sql",
+              "passingRowsQueryName": "165.birth_registrations.birth_registrations.registration_number.failed_rows[missing_count].passing_sql",
               "totalFailingRows": 5,
               "sampleRowCount": 0
             }
@@ -1060,8 +1060,8 @@
                   "fileId": ""
                 }
               },
-              "failingRowsQueryName": "25.birth_registrations.birth_registrations.registration_number.duplicate_count.failing_sql",
-              "passingRowsQueryName": "25.birth_registrations.birth_registrations.registration_number.duplicate_count.passing_sql",
+              "failingRowsQueryName": "161.birth_registrations.birth_registrations.registration_number.duplicate_count.failing_sql",
+              "passingRowsQueryName": "161.birth_registrations.birth_registrations.registration_number.duplicate_count.passing_sql",
               "totalFailingRows": 26,
               "sampleRowCount": 0
             }
@@ -1246,8 +1246,8 @@
                   "fileId": ""
                 }
               },
-              "failingRowsQueryName": "30.birth_registrations.birth_registrations.child_given_names.failed_rows[invalid_count].failing_sql",
-              "passingRowsQueryName": "30.birth_registrations.birth_registrations.child_given_names.failed_rows[invalid_count].passing_sql",
+              "failingRowsQueryName": "166.birth_registrations.birth_registrations.child_given_names.failed_rows[invalid_count].failing_sql",
+              "passingRowsQueryName": "166.birth_registrations.birth_registrations.child_given_names.failed_rows[invalid_count].passing_sql",
               "totalFailingRows": 39,
               "sampleRowCount": 0
             }
@@ -1432,8 +1432,8 @@
                   "fileId": ""
                 }
               },
-              "failingRowsQueryName": "31.birth_registrations.birth_registrations.child_family_name.failed_rows[invalid_count].failing_sql",
-              "passingRowsQueryName": "31.birth_registrations.birth_registrations.child_family_name.failed_rows[invalid_count].passing_sql",
+              "failingRowsQueryName": "167.birth_registrations.birth_registrations.child_family_name.failed_rows[invalid_count].failing_sql",
+              "passingRowsQueryName": "167.birth_registrations.birth_registrations.child_family_name.failed_rows[invalid_count].passing_sql",
               "totalFailingRows": 22,
               "sampleRowCount": 0
             }
@@ -1618,8 +1618,8 @@
                   "fileId": ""
                 }
               },
-              "failingRowsQueryName": "32.birth_registrations.birth_registrations.place_of_birth_suburb.failed_rows[invalid_count].failing_sql",
-              "passingRowsQueryName": "32.birth_registrations.birth_registrations.place_of_birth_suburb.failed_rows[invalid_count].passing_sql",
+              "failingRowsQueryName": "168.birth_registrations.birth_registrations.place_of_birth_suburb.failed_rows[invalid_count].failing_sql",
+              "passingRowsQueryName": "168.birth_registrations.birth_registrations.place_of_birth_suburb.failed_rows[invalid_count].passing_sql",
               "totalFailingRows": 35,
               "sampleRowCount": 0
             }
@@ -1755,8 +1755,8 @@
                   "fileId": ""
                 }
               },
-              "failingRowsQueryName": "33.birth_registrations.birth_registrations.date_registered.failed_rows[missing_count].failing_sql",
-              "passingRowsQueryName": "33.birth_registrations.birth_registrations.date_registered.failed_rows[missing_count].passing_sql",
+              "failingRowsQueryName": "169.birth_registrations.birth_registrations.date_registered.failed_rows[missing_count].failing_sql",
+              "passingRowsQueryName": "169.birth_registrations.birth_registrations.date_registered.failed_rows[missing_count].passing_sql",
               "totalFailingRows": 6,
               "sampleRowCount": 0
             }
@@ -1892,8 +1892,8 @@
                   "fileId": ""
                 }
               },
-              "failingRowsQueryName": "34.birth_registrations.birth_registrations.extract_timestamp.failed_rows[missing_count].failing_sql",
-              "passingRowsQueryName": "34.birth_registrations.birth_registrations.extract_timestamp.failed_rows[missing_count].passing_sql",
+              "failingRowsQueryName": "170.birth_registrations.birth_registrations.extract_timestamp.failed_rows[missing_count].failing_sql",
+              "passingRowsQueryName": "170.birth_registrations.birth_registrations.extract_timestamp.failed_rows[missing_count].passing_sql",
               "totalFailingRows": 6,
               "sampleRowCount": 0
             }
@@ -2029,8 +2029,8 @@
                   "fileId": ""
                 }
               },
-              "failingRowsQueryName": "35.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[missing_count].failing_sql",
-              "passingRowsQueryName": "35.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[missing_count].passing_sql",
+              "failingRowsQueryName": "171.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[missing_count].failing_sql",
+              "passingRowsQueryName": "171.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[missing_count].passing_sql",
               "totalFailingRows": 22,
               "sampleRowCount": 0
             }
@@ -2163,8 +2163,8 @@
                   "fileId": ""
                 }
               },
-              "failingRowsQueryName": "36.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[invalid_count].failing_sql",
-              "passingRowsQueryName": "36.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[invalid_count].passing_sql",
+              "failingRowsQueryName": "172.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[invalid_count].failing_sql",
+              "passingRowsQueryName": "172.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[invalid_count].passing_sql",
               "totalFailingRows": 33,
               "sampleRowCount": 0
             }
@@ -2300,8 +2300,8 @@
                   "fileId": ""
                 }
               },
-              "failingRowsQueryName": "37.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[missing_count].failing_sql",
-              "passingRowsQueryName": "37.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[missing_count].passing_sql",
+              "failingRowsQueryName": "173.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[missing_count].failing_sql",
+              "passingRowsQueryName": "173.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[missing_count].passing_sql",
               "totalFailingRows": 320,
               "sampleRowCount": 0
             }
@@ -2434,8 +2434,8 @@
                   "fileId": ""
                 }
               },
-              "failingRowsQueryName": "38.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[invalid_count].failing_sql",
-              "passingRowsQueryName": "38.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[invalid_count].passing_sql",
+              "failingRowsQueryName": "174.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[invalid_count].failing_sql",
+              "passingRowsQueryName": "174.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[invalid_count].passing_sql",
               "totalFailingRows": 27,
               "sampleRowCount": 0
             }
@@ -2571,8 +2571,8 @@
                   "fileId": ""
                 }
               },
-              "failingRowsQueryName": "39.birth_registrations.birth_registrations.sex.failed_rows[invalid_count].failing_sql",
-              "passingRowsQueryName": "39.birth_registrations.birth_registrations.sex.failed_rows[invalid_count].passing_sql",
+              "failingRowsQueryName": "175.birth_registrations.birth_registrations.sex.failed_rows[invalid_count].failing_sql",
+              "passingRowsQueryName": "175.birth_registrations.birth_registrations.sex.failed_rows[invalid_count].passing_sql",
               "totalFailingRows": 53,
               "sampleRowCount": 0
             }
@@ -2708,8 +2708,8 @@
                   "fileId": ""
                 }
               },
-              "failingRowsQueryName": "40.birth_registrations.birth_registrations.place_of_birth_facility.failed_rows[missing_count].failing_sql",
-              "passingRowsQueryName": "40.birth_registrations.birth_registrations.place_of_birth_facility.failed_rows[missing_count].passing_sql",
+              "failingRowsQueryName": "176.birth_registrations.birth_registrations.place_of_birth_facility.failed_rows[missing_count].failing_sql",
+              "passingRowsQueryName": "176.birth_registrations.birth_registrations.place_of_birth_facility.failed_rows[missing_count].passing_sql",
               "totalFailingRows": 684,
               "sampleRowCount": 0
             }
@@ -2845,8 +2845,8 @@
                   "fileId": ""
                 }
               },
-              "failingRowsQueryName": "26.birth_registrations.birth_registrations.source_system_record_id.duplicate_count.failing_sql",
-              "passingRowsQueryName": "26.birth_registrations.birth_registrations.source_system_record_id.duplicate_count.passing_sql",
+              "failingRowsQueryName": "162.birth_registrations.birth_registrations.source_system_record_id.duplicate_count.failing_sql",
+              "passingRowsQueryName": "162.birth_registrations.birth_registrations.source_system_record_id.duplicate_count.passing_sql",
               "totalFailingRows": 29,
               "sampleRowCount": 0
             }
@@ -2982,8 +2982,8 @@
                   "fileId": ""
                 }
               },
-              "failingRowsQueryName": "41.birth_registrations.birth_registrations.source_system_record_id.failed_rows[invalid_count].failing_sql",
-              "passingRowsQueryName": "41.birth_registrations.birth_registrations.source_system_record_id.failed_rows[invalid_count].passing_sql",
+              "failingRowsQueryName": "177.birth_registrations.birth_registrations.source_system_record_id.failed_rows[invalid_count].failing_sql",
+              "passingRowsQueryName": "177.birth_registrations.birth_registrations.source_system_record_id.failed_rows[invalid_count].passing_sql",
               "totalFailingRows": 32,
               "sampleRowCount": 0
             }
@@ -3119,8 +3119,8 @@
                   "fileId": ""
                 }
               },
-              "failingRowsQueryName": "44.birth_registrations.birth_registrations[recent].sex.failed_rows[invalid_count].failing_sql",
-              "passingRowsQueryName": "44.birth_registrations.birth_registrations[recent].sex.failed_rows[invalid_count].passing_sql",
+              "failingRowsQueryName": "180.birth_registrations.birth_registrations[recent].sex.failed_rows[invalid_count].failing_sql",
+              "passingRowsQueryName": "180.birth_registrations.birth_registrations[recent].sex.failed_rows[invalid_count].passing_sql",
               "totalFailingRows": 51,
               "sampleRowCount": 0
             }
@@ -3137,27 +3137,27 @@
     ],
     "queries": [
       {
-        "name": "21.birth_registrations.birth_registrations.aggregation[0]",
+        "name": "157.birth_registrations.birth_registrations.aggregation[0]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": null,
         "sql": "SELECT \n  COUNT(*),\n  COUNT(CASE WHEN date_registered < date_of_birth THEN 1 END),\n  COUNT(CASE WHEN extract_timestamp < date_registered OR extract_timestamp > date_registered + INTERVAL '1' DAY THEN 1 END),\n  COUNT(CASE WHEN date_of_birth IS NULL THEN 1 END),\n  COUNT(CASE WHEN registration_number IS NULL THEN 1 END),\n  COUNT(CASE WHEN child_given_names IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (child_given_names IS NULL) AND NOT (REGEXP_MATCHES(child_given_names, '^[A-Za-z][A-Za-z. -]*$')) THEN 1 END),\n  COUNT(CASE WHEN child_family_name IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (child_family_name IS NULL) AND NOT (REGEXP_MATCHES(child_family_name, '^[A-Za-z][A-Za-z. -]*$')) THEN 1 END),\n  COUNT(CASE WHEN place_of_birth_suburb IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (place_of_birth_suburb IS NULL) AND NOT (place_of_birth_suburb IN ('Fremantle','Subiaco','Joondalup','Rockingham','Mandurah','Midland','Armadale','Cannington','Morley','Cockburn Central','Scarborough','Victoria Park','Bunbury','Albany','Geraldton','Kalgoorlie','Broome','Karratha','Port Hedland','Busselton','Northam','Narrogin','Esperance','Collie','Mount Lawley','Leederville','Wembley','Innaloo','Success','Baldivis','Ellenbrook','Butler','Balga','Girrawheen','Maddington','Gosnells','Kwinana','Hamilton Hill','Beaconsfield','South Perth','Bentley','Willetton','Riverton','Karrinyup','Currambine','Clarkson','Yanchep','Byford','Waroona','Manjimup','Margaret River')) THEN 1 END),\n  COUNT(CASE WHEN date_registered IS NULL THEN 1 END),\n  COUNT(CASE WHEN extract_timestamp IS NULL THEN 1 END),\n  COUNT(CASE WHEN registering_parent_1_name IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (registering_parent_1_name IS NULL) AND NOT (REGEXP_MATCHES(registering_parent_1_name, '^[A-Za-z][A-Za-z. -]*$')) THEN 1 END),\n  COUNT(CASE WHEN registering_parent_2_name IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (registering_parent_2_name IS NULL) AND NOT (REGEXP_MATCHES(registering_parent_2_name, '^[A-Za-z][A-Za-z. -]*$')) THEN 1 END),\n  COUNT(CASE WHEN NOT (sex IS NULL) AND NOT (sex IN ('M','F','X')) THEN 1 END),\n  COUNT(CASE WHEN place_of_birth_facility IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (source_system_record_id IS NULL) AND NOT (REGEXP_MATCHES(source_system_record_id, '^SRC-[0-9]{9}$')) THEN 1 END) \nFROM birth_registrations",
         "exception": null,
-        "duration": "0:00:00.006035"
+        "duration": "0:00:00.009327"
       },
       {
-        "name": "28.birth_registrations.birth_registrations.date_of_birth.failed_rows[missing_count]",
+        "name": "164.birth_registrations.birth_registrations.date_of_birth.failed_rows[missing_count]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "date_of_birth",
         "sql": "SELECT * FROM birth_registrations \n WHERE (date_of_birth IS NULL) \n LIMIT 5",
         "exception": null,
-        "duration": "0:00:00.007575"
+        "duration": "0:00:00.004879"
       },
       {
-        "name": "28.birth_registrations.birth_registrations.date_of_birth.failed_rows[missing_count].failing_sql",
+        "name": "164.birth_registrations.birth_registrations.date_of_birth.failed_rows[missing_count].failing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3167,7 +3167,7 @@
         "duration": null
       },
       {
-        "name": "28.birth_registrations.birth_registrations.date_of_birth.failed_rows[missing_count].passing_sql",
+        "name": "164.birth_registrations.birth_registrations.date_of_birth.failed_rows[missing_count].passing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3177,17 +3177,17 @@
         "duration": null
       },
       {
-        "name": "29.birth_registrations.birth_registrations.registration_number.failed_rows[missing_count]",
+        "name": "165.birth_registrations.birth_registrations.registration_number.failed_rows[missing_count]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "registration_number",
         "sql": "SELECT * FROM birth_registrations \n WHERE (registration_number IS NULL) \n LIMIT 5",
         "exception": null,
-        "duration": "0:00:00.002534"
+        "duration": "0:00:00.004131"
       },
       {
-        "name": "29.birth_registrations.birth_registrations.registration_number.failed_rows[missing_count].failing_sql",
+        "name": "165.birth_registrations.birth_registrations.registration_number.failed_rows[missing_count].failing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3197,7 +3197,7 @@
         "duration": null
       },
       {
-        "name": "29.birth_registrations.birth_registrations.registration_number.failed_rows[missing_count].passing_sql",
+        "name": "165.birth_registrations.birth_registrations.registration_number.failed_rows[missing_count].passing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3207,17 +3207,17 @@
         "duration": null
       },
       {
-        "name": "30.birth_registrations.birth_registrations.child_given_names.failed_rows[invalid_count]",
+        "name": "166.birth_registrations.birth_registrations.child_given_names.failed_rows[invalid_count]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "child_given_names",
         "sql": "SELECT * FROM birth_registrations \n WHERE NOT (child_given_names IS NULL) AND NOT (REGEXP_MATCHES(child_given_names, '^[A-Za-z][A-Za-z. -]*$')) \n LIMIT 5",
         "exception": null,
-        "duration": "0:00:00.003332"
+        "duration": "0:00:00.006196"
       },
       {
-        "name": "30.birth_registrations.birth_registrations.child_given_names.failed_rows[invalid_count].failing_sql",
+        "name": "166.birth_registrations.birth_registrations.child_given_names.failed_rows[invalid_count].failing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3227,7 +3227,7 @@
         "duration": null
       },
       {
-        "name": "30.birth_registrations.birth_registrations.child_given_names.failed_rows[invalid_count].passing_sql",
+        "name": "166.birth_registrations.birth_registrations.child_given_names.failed_rows[invalid_count].passing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3237,17 +3237,17 @@
         "duration": null
       },
       {
-        "name": "31.birth_registrations.birth_registrations.child_family_name.failed_rows[invalid_count]",
+        "name": "167.birth_registrations.birth_registrations.child_family_name.failed_rows[invalid_count]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "child_family_name",
         "sql": "SELECT * FROM birth_registrations \n WHERE NOT (child_family_name IS NULL) AND NOT (REGEXP_MATCHES(child_family_name, '^[A-Za-z][A-Za-z. -]*$')) \n LIMIT 5",
         "exception": null,
-        "duration": "0:00:00.003450"
+        "duration": "0:00:00.007150"
       },
       {
-        "name": "31.birth_registrations.birth_registrations.child_family_name.failed_rows[invalid_count].failing_sql",
+        "name": "167.birth_registrations.birth_registrations.child_family_name.failed_rows[invalid_count].failing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3257,7 +3257,7 @@
         "duration": null
       },
       {
-        "name": "31.birth_registrations.birth_registrations.child_family_name.failed_rows[invalid_count].passing_sql",
+        "name": "167.birth_registrations.birth_registrations.child_family_name.failed_rows[invalid_count].passing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3267,17 +3267,17 @@
         "duration": null
       },
       {
-        "name": "32.birth_registrations.birth_registrations.place_of_birth_suburb.failed_rows[invalid_count]",
+        "name": "168.birth_registrations.birth_registrations.place_of_birth_suburb.failed_rows[invalid_count]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "place_of_birth_suburb",
         "sql": "SELECT * FROM birth_registrations \n WHERE NOT (place_of_birth_suburb IS NULL) AND NOT (place_of_birth_suburb IN ('Fremantle','Subiaco','Joondalup','Rockingham','Mandurah','Midland','Armadale','Cannington','Morley','Cockburn Central','Scarborough','Victoria Park','Bunbury','Albany','Geraldton','Kalgoorlie','Broome','Karratha','Port Hedland','Busselton','Northam','Narrogin','Esperance','Collie','Mount Lawley','Leederville','Wembley','Innaloo','Success','Baldivis','Ellenbrook','Butler','Balga','Girrawheen','Maddington','Gosnells','Kwinana','Hamilton Hill','Beaconsfield','South Perth','Bentley','Willetton','Riverton','Karrinyup','Currambine','Clarkson','Yanchep','Byford','Waroona','Manjimup','Margaret River')) \n LIMIT 5",
         "exception": null,
-        "duration": "0:00:00.008746"
+        "duration": "0:00:00.012288"
       },
       {
-        "name": "32.birth_registrations.birth_registrations.place_of_birth_suburb.failed_rows[invalid_count].failing_sql",
+        "name": "168.birth_registrations.birth_registrations.place_of_birth_suburb.failed_rows[invalid_count].failing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3287,7 +3287,7 @@
         "duration": null
       },
       {
-        "name": "32.birth_registrations.birth_registrations.place_of_birth_suburb.failed_rows[invalid_count].passing_sql",
+        "name": "168.birth_registrations.birth_registrations.place_of_birth_suburb.failed_rows[invalid_count].passing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3297,17 +3297,17 @@
         "duration": null
       },
       {
-        "name": "33.birth_registrations.birth_registrations.date_registered.failed_rows[missing_count]",
+        "name": "169.birth_registrations.birth_registrations.date_registered.failed_rows[missing_count]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "date_registered",
         "sql": "SELECT * FROM birth_registrations \n WHERE (date_registered IS NULL) \n LIMIT 5",
         "exception": null,
-        "duration": "0:00:00.002344"
+        "duration": "0:00:00.004581"
       },
       {
-        "name": "33.birth_registrations.birth_registrations.date_registered.failed_rows[missing_count].failing_sql",
+        "name": "169.birth_registrations.birth_registrations.date_registered.failed_rows[missing_count].failing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3317,7 +3317,7 @@
         "duration": null
       },
       {
-        "name": "33.birth_registrations.birth_registrations.date_registered.failed_rows[missing_count].passing_sql",
+        "name": "169.birth_registrations.birth_registrations.date_registered.failed_rows[missing_count].passing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3327,17 +3327,17 @@
         "duration": null
       },
       {
-        "name": "34.birth_registrations.birth_registrations.extract_timestamp.failed_rows[missing_count]",
+        "name": "170.birth_registrations.birth_registrations.extract_timestamp.failed_rows[missing_count]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "extract_timestamp",
         "sql": "SELECT * FROM birth_registrations \n WHERE (extract_timestamp IS NULL) \n LIMIT 5",
         "exception": null,
-        "duration": "0:00:00.002291"
+        "duration": "0:00:00.004233"
       },
       {
-        "name": "34.birth_registrations.birth_registrations.extract_timestamp.failed_rows[missing_count].failing_sql",
+        "name": "170.birth_registrations.birth_registrations.extract_timestamp.failed_rows[missing_count].failing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3347,7 +3347,7 @@
         "duration": null
       },
       {
-        "name": "34.birth_registrations.birth_registrations.extract_timestamp.failed_rows[missing_count].passing_sql",
+        "name": "170.birth_registrations.birth_registrations.extract_timestamp.failed_rows[missing_count].passing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3357,17 +3357,17 @@
         "duration": null
       },
       {
-        "name": "35.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[missing_count]",
+        "name": "171.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[missing_count]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "registering_parent_1_name",
         "sql": "SELECT * FROM birth_registrations \n WHERE (registering_parent_1_name IS NULL) \n LIMIT 5",
         "exception": null,
-        "duration": "0:00:00.002292"
+        "duration": "0:00:00.004611"
       },
       {
-        "name": "35.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[missing_count].failing_sql",
+        "name": "171.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[missing_count].failing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3377,7 +3377,7 @@
         "duration": null
       },
       {
-        "name": "35.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[missing_count].passing_sql",
+        "name": "171.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[missing_count].passing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3387,17 +3387,17 @@
         "duration": null
       },
       {
-        "name": "36.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[invalid_count]",
+        "name": "172.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[invalid_count]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "registering_parent_1_name",
         "sql": "SELECT * FROM birth_registrations \n WHERE NOT (registering_parent_1_name IS NULL) AND NOT (REGEXP_MATCHES(registering_parent_1_name, '^[A-Za-z][A-Za-z. -]*$')) \n LIMIT 5",
         "exception": null,
-        "duration": "0:00:00.003148"
+        "duration": "0:00:00.005630"
       },
       {
-        "name": "36.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[invalid_count].failing_sql",
+        "name": "172.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[invalid_count].failing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3407,7 +3407,7 @@
         "duration": null
       },
       {
-        "name": "36.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[invalid_count].passing_sql",
+        "name": "172.birth_registrations.birth_registrations.registering_parent_1_name.failed_rows[invalid_count].passing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3417,17 +3417,17 @@
         "duration": null
       },
       {
-        "name": "37.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[missing_count]",
+        "name": "173.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[missing_count]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "registering_parent_2_name",
         "sql": "SELECT * FROM birth_registrations \n WHERE (registering_parent_2_name IS NULL) \n LIMIT 5",
         "exception": null,
-        "duration": "0:00:00.002527"
+        "duration": "0:00:00.004224"
       },
       {
-        "name": "37.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[missing_count].failing_sql",
+        "name": "173.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[missing_count].failing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3437,7 +3437,7 @@
         "duration": null
       },
       {
-        "name": "37.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[missing_count].passing_sql",
+        "name": "173.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[missing_count].passing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3447,17 +3447,17 @@
         "duration": null
       },
       {
-        "name": "38.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[invalid_count]",
+        "name": "174.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[invalid_count]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "registering_parent_2_name",
         "sql": "SELECT * FROM birth_registrations \n WHERE NOT (registering_parent_2_name IS NULL) AND NOT (REGEXP_MATCHES(registering_parent_2_name, '^[A-Za-z][A-Za-z. -]*$')) \n LIMIT 5",
         "exception": null,
-        "duration": "0:00:00.002952"
+        "duration": "0:00:00.005549"
       },
       {
-        "name": "38.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[invalid_count].failing_sql",
+        "name": "174.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[invalid_count].failing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3467,7 +3467,7 @@
         "duration": null
       },
       {
-        "name": "38.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[invalid_count].passing_sql",
+        "name": "174.birth_registrations.birth_registrations.registering_parent_2_name.failed_rows[invalid_count].passing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3477,17 +3477,17 @@
         "duration": null
       },
       {
-        "name": "39.birth_registrations.birth_registrations.sex.failed_rows[invalid_count]",
+        "name": "175.birth_registrations.birth_registrations.sex.failed_rows[invalid_count]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "sex",
         "sql": "SELECT * FROM birth_registrations \n WHERE NOT (sex IS NULL) AND NOT (sex IN ('M','F','X')) \n LIMIT 5",
         "exception": null,
-        "duration": "0:00:00.002696"
+        "duration": "0:00:00.005189"
       },
       {
-        "name": "39.birth_registrations.birth_registrations.sex.failed_rows[invalid_count].failing_sql",
+        "name": "175.birth_registrations.birth_registrations.sex.failed_rows[invalid_count].failing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3497,7 +3497,7 @@
         "duration": null
       },
       {
-        "name": "39.birth_registrations.birth_registrations.sex.failed_rows[invalid_count].passing_sql",
+        "name": "175.birth_registrations.birth_registrations.sex.failed_rows[invalid_count].passing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3507,17 +3507,17 @@
         "duration": null
       },
       {
-        "name": "40.birth_registrations.birth_registrations.place_of_birth_facility.failed_rows[missing_count]",
+        "name": "176.birth_registrations.birth_registrations.place_of_birth_facility.failed_rows[missing_count]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "place_of_birth_facility",
         "sql": "SELECT * FROM birth_registrations \n WHERE (place_of_birth_facility IS NULL) \n LIMIT 5",
         "exception": null,
-        "duration": "0:00:00.002284"
+        "duration": "0:00:00.004262"
       },
       {
-        "name": "40.birth_registrations.birth_registrations.place_of_birth_facility.failed_rows[missing_count].failing_sql",
+        "name": "176.birth_registrations.birth_registrations.place_of_birth_facility.failed_rows[missing_count].failing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3527,7 +3527,7 @@
         "duration": null
       },
       {
-        "name": "40.birth_registrations.birth_registrations.place_of_birth_facility.failed_rows[missing_count].passing_sql",
+        "name": "176.birth_registrations.birth_registrations.place_of_birth_facility.failed_rows[missing_count].passing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3537,17 +3537,17 @@
         "duration": null
       },
       {
-        "name": "41.birth_registrations.birth_registrations.source_system_record_id.failed_rows[invalid_count]",
+        "name": "177.birth_registrations.birth_registrations.source_system_record_id.failed_rows[invalid_count]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "source_system_record_id",
         "sql": "SELECT * FROM birth_registrations \n WHERE NOT (source_system_record_id IS NULL) AND NOT (REGEXP_MATCHES(source_system_record_id, '^SRC-[0-9]{9}$')) \n LIMIT 5",
         "exception": null,
-        "duration": "0:00:00.002940"
+        "duration": "0:00:00.005874"
       },
       {
-        "name": "41.birth_registrations.birth_registrations.source_system_record_id.failed_rows[invalid_count].failing_sql",
+        "name": "177.birth_registrations.birth_registrations.source_system_record_id.failed_rows[invalid_count].failing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3557,7 +3557,7 @@
         "duration": null
       },
       {
-        "name": "41.birth_registrations.birth_registrations.source_system_record_id.failed_rows[invalid_count].passing_sql",
+        "name": "177.birth_registrations.birth_registrations.source_system_record_id.failed_rows[invalid_count].passing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3567,17 +3567,17 @@
         "duration": null
       },
       {
-        "name": "25.birth_registrations.birth_registrations.registration_number.duplicate_count",
+        "name": "161.birth_registrations.birth_registrations.registration_number.duplicate_count",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "registration_number",
         "sql": "\nWITH frequencies AS (\n    SELECT COUNT(*) AS frequency\n    FROM birth_registrations\n    WHERE registration_number IS NOT NULL\n    GROUP BY registration_number)\nSELECT COUNT(*)\nFROM frequencies\nWHERE frequency > 1",
         "exception": null,
-        "duration": "0:00:00.001402"
+        "duration": "0:00:00.002402"
       },
       {
-        "name": "25.birth_registrations.birth_registrations.registration_number.duplicate_count.failing_sql",
+        "name": "161.birth_registrations.birth_registrations.registration_number.duplicate_count.failing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3587,7 +3587,7 @@
         "duration": null
       },
       {
-        "name": "25.birth_registrations.birth_registrations.registration_number.duplicate_count.passing_sql",
+        "name": "161.birth_registrations.birth_registrations.registration_number.duplicate_count.passing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3597,27 +3597,27 @@
         "duration": null
       },
       {
-        "name": "42.birth_registrations.birth_registrations.registration_number.failed_rows[duplicate_count]",
+        "name": "178.birth_registrations.birth_registrations.registration_number.failed_rows[duplicate_count]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "registration_number",
         "sql": "\nWITH frequencies AS (\n    SELECT registration_number\n    FROM birth_registrations\n    WHERE registration_number IS NOT NULL\n    GROUP BY registration_number\n    HAVING COUNT(*) > 1)\nSELECT main.*\nFROM birth_registrations main\nJOIN frequencies ON main.registration_number = frequencies.registration_number\n\nLIMIT 5",
         "exception": null,
-        "duration": "0:00:00.007438"
+        "duration": "0:00:00.010433"
       },
       {
-        "name": "26.birth_registrations.birth_registrations.source_system_record_id.duplicate_count",
+        "name": "162.birth_registrations.birth_registrations.source_system_record_id.duplicate_count",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "source_system_record_id",
         "sql": "\nWITH frequencies AS (\n    SELECT COUNT(*) AS frequency\n    FROM birth_registrations\n    WHERE source_system_record_id IS NOT NULL\n    GROUP BY source_system_record_id)\nSELECT COUNT(*)\nFROM frequencies\nWHERE frequency > 1",
         "exception": null,
-        "duration": "0:00:00.001354"
+        "duration": "0:00:00.002865"
       },
       {
-        "name": "26.birth_registrations.birth_registrations.source_system_record_id.duplicate_count.failing_sql",
+        "name": "162.birth_registrations.birth_registrations.source_system_record_id.duplicate_count.failing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3627,7 +3627,7 @@
         "duration": null
       },
       {
-        "name": "26.birth_registrations.birth_registrations.source_system_record_id.duplicate_count.passing_sql",
+        "name": "162.birth_registrations.birth_registrations.source_system_record_id.duplicate_count.passing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
@@ -3637,37 +3637,37 @@
         "duration": null
       },
       {
-        "name": "43.birth_registrations.birth_registrations.source_system_record_id.failed_rows[duplicate_count]",
+        "name": "179.birth_registrations.birth_registrations.source_system_record_id.failed_rows[duplicate_count]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": "source_system_record_id",
         "sql": "\nWITH frequencies AS (\n    SELECT source_system_record_id\n    FROM birth_registrations\n    WHERE source_system_record_id IS NOT NULL\n    GROUP BY source_system_record_id\n    HAVING COUNT(*) > 1)\nSELECT main.*\nFROM birth_registrations main\nJOIN frequencies ON main.source_system_record_id = frequencies.source_system_record_id\n\nLIMIT 5",
         "exception": null,
-        "duration": "0:00:00.010470"
+        "duration": "0:00:00.011250"
       },
       {
-        "name": "27.birth_registrations.birth_registrations[recent].aggregation[0]",
+        "name": "163.birth_registrations.birth_registrations[recent].aggregation[0]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": "recent",
         "column": null,
         "sql": "SELECT \n  COUNT(*),\n  COUNT(CASE WHEN NOT (sex IS NULL) AND NOT (sex IN ('M','F','X')) THEN 1 END) \nFROM birth_registrations\nWHERE extract_timestamp >= CURRENT_DATE - 1",
         "exception": null,
-        "duration": "0:00:00.001031"
+        "duration": "0:00:00.001978"
       },
       {
-        "name": "44.birth_registrations.birth_registrations[recent].sex.failed_rows[invalid_count]",
+        "name": "180.birth_registrations.birth_registrations[recent].sex.failed_rows[invalid_count]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": "recent",
         "column": "sex",
         "sql": "SELECT * FROM birth_registrations \n WHERE extract_timestamp >= CURRENT_DATE - 1 AND NOT (sex IS NULL) AND NOT (sex IN ('M','F','X')) \n LIMIT 5",
         "exception": null,
-        "duration": "0:00:00.003509"
+        "duration": "0:00:00.004308"
       },
       {
-        "name": "44.birth_registrations.birth_registrations[recent].sex.failed_rows[invalid_count].failing_sql",
+        "name": "180.birth_registrations.birth_registrations[recent].sex.failed_rows[invalid_count].failing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": "recent",
@@ -3677,7 +3677,7 @@
         "duration": null
       },
       {
-        "name": "44.birth_registrations.birth_registrations[recent].sex.failed_rows[invalid_count].passing_sql",
+        "name": "180.birth_registrations.birth_registrations[recent].sex.failed_rows[invalid_count].passing_sql",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": "recent",
@@ -3687,44 +3687,44 @@
         "duration": null
       },
       {
-        "name": "22.birth_registrations.birth_registrations.failed_rows[failed rows]",
+        "name": "158.birth_registrations.birth_registrations.failed_rows[failed rows]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": null,
         "sql": "SELECT registration_number, date_of_birth\nFROM birth_registrations\nWHERE date_of_birth < DATE '1900-01-01' OR date_of_birth > CURRENT_DATE",
         "exception": null,
-        "duration": "0:00:00.001887"
+        "duration": "0:00:00.002407"
       },
       {
-        "name": "23.birth_registrations.birth_registrations.failed_rows[failed rows]",
+        "name": "159.birth_registrations.birth_registrations.failed_rows[failed rows]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": null,
         "sql": "SELECT a.registration_number\nFROM birth_registrations a\nWHERE a.is_multiple_birth = true\n  AND NOT EXISTS (\n    SELECT 1 FROM birth_registrations b\n    WHERE b.is_multiple_birth = true\n      AND b.registration_number != a.registration_number\n      AND b.date_of_birth = a.date_of_birth\n      AND b.place_of_birth_facility IS NOT DISTINCT FROM a.place_of_birth_facility\n      AND b.registering_parent_1_name IS NOT DISTINCT FROM a.registering_parent_1_name\n  )",
         "exception": null,
-        "duration": "0:00:00.006519"
+        "duration": "0:00:00.007592"
       },
       {
-        "name": "24.birth_registrations.birth_registrations.failed_rows[failed rows]",
+        "name": "160.birth_registrations.birth_registrations.failed_rows[failed rows]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": null,
         "sql": "SELECT 1 WHERE NOT EXISTS (\n  SELECT 1 FROM birth_registrations WHERE date_of_birth >= CURRENT_DATE - INTERVAL '7' DAY\n)",
         "exception": null,
-        "duration": "0:00:00.002530"
+        "duration": "0:00:00.003418"
       },
       {
-        "name": "45.birth_registrations.birth_registrations.user_defined_failed_rows_expression_query[failed rows]",
+        "name": "181.birth_registrations.birth_registrations.user_defined_failed_rows_expression_query[failed rows]",
         "dataSource": "birth_registrations",
         "table": "birth_registrations",
         "partition": null,
         "column": null,
         "sql": "SELECT * \nFROM birth_registrations \nWHERE (extract_timestamp < date_registered OR extract_timestamp > date_registered + INTERVAL '1' DAY)",
         "exception": null,
-        "duration": "0:00:00.002821"
+        "duration": "0:00:00.003339"
       }
     ],
     "automatedMonitoringChecks": [],
@@ -3734,584 +3734,584 @@
       {
         "level": "INFO",
         "message": "Soda Core 3.5.6",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 71,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 482,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "Scan summary:",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 72,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 483,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "8/26 checks PASSED: ",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 73,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 484,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "    birth_registrations in birth_registrations",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 74,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 485,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      row_count warn when < 500 fail when < 100 when > 20000 [PASSED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 75,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 486,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      date_registered is not earlier than date_of_birth [PASSED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 76,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 487,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      recent birth dates present (freshness) [PASSED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 77,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 488,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(child_given_names) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 78,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 489,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(child_family_name) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 79,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 490,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(place_of_birth_suburb) warn when > 0 fail when > 1 [PASSED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 80,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 491,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_percent(registering_parent_1_name) warn when > 5% [PASSED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 81,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 492,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_percent(registering_parent_2_name) warn when > 30% [PASSED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 82,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 493,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "6/26 checks WARNED: ",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 83,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 494,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "    birth_registrations in birth_registrations",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 84,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 495,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(date_of_birth) warn when > 0 fail when > 5 [WARNED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 85,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 496,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        check_value: 4",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 86,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 497,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(registration_number) warn when > 0 fail when > 5 [WARNED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 87,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 498,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        check_value: 5",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 88,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 499,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(child_family_name) warn when > 0% fail when > 3% [WARNED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 89,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 500,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        check_value: 1.79",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 90,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 501,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        row_count: 1230",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 91,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 502,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        invalid_count: 22",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 92,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 503,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(place_of_birth_suburb) warn when > 0% fail when > 3% [WARNED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 93,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 504,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        check_value: 2.85",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 94,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 505,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        row_count: 1230",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 95,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 506,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        invalid_count: 35",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 96,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 507,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(registering_parent_1_name) warn when > 0% fail when > 3% [WARNED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 97,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 508,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        check_value: 2.68",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 98,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 509,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        row_count: 1230",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 99,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 510,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        invalid_count: 33",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 100,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 511,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(registering_parent_2_name) warn when > 0% fail when > 3% [WARNED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 101,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 512,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        check_value: 2.2",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 102,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 513,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        row_count: 1230",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 103,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 514,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        invalid_count: 27",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 104,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 515,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "12/26 checks FAILED: ",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 105,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 516,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "    birth_registrations in birth_registrations",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 106,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 517,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      date_of_birth is within a plausible range [FAILED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 107,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 518,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        value: 18",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 108,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 519,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      extract timestamp is logically ordered after date_registered [FAILED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 109,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 520,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        check_value: 49",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 110,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 521,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        failed_rows_sample_ref: not-persisted Captured in-process for the QA dashboard - never sent anywhere external. 16x(0/49)",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 111,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 522,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      multiple birth records have a matching sibling [FAILED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 112,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 523,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        value: 38",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 113,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 524,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      duplicate_count(registration_number) warn when > 0 fail when > 3 [FAILED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 114,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 525,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        check_value: 26",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 115,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 526,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(child_given_names) warn when > 0% fail when > 3% [FAILED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 116,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 527,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        check_value: 3.17",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 117,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 528,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        row_count: 1230",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 118,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 529,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        invalid_count: 39",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 119,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 530,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(date_registered) warn when > 0 fail when > 5 [FAILED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 120,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 531,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        check_value: 6",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 121,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 532,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(extract_timestamp) warn when > 0 fail when > 5 [FAILED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 122,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 533,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        check_value: 6",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 123,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 534,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(sex) warn when > 0% fail when > 2% [FAILED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 124,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 535,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        check_value: 4.31",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 125,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 536,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        row_count: 1230",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 126,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 537,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        invalid_count: 53",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 127,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 538,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_percent(place_of_birth_facility) warn when > 15% fail when > 35% [FAILED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 128,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 539,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        check_value: 55.61",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 129,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 540,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        row_count: 1230",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 130,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 541,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        missing_count: 684",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 131,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 542,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      duplicate_count(source_system_record_id) warn when > 0 fail when > 3 [FAILED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 132,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 543,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        check_value: 29",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 133,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 544,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(source_system_record_id) warn when > 0% fail when > 1% [FAILED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 134,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 545,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        check_value: 2.6",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 135,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 546,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        row_count: 1230",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 136,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 547,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        invalid_count: 32",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 137,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 548,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "    birth_registrations [recent] in birth_registrations",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 138,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 549,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      sex validity, last 24h only [FAILED]",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 139,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 550,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        check_value: 4.34",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 140,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 551,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        row_count: 1175",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 141,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 552,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "        invalid_count: 51",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 142,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 553,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "Oops! 12 failures. 6 warnings. 0 errors. 8 pass.",
-        "timestamp": "2026-09-16T10:48:23+00:00",
-        "index": 143,
+        "timestamp": "2026-09-16T11:52:30+00:00",
+        "index": 554,
         "doc": null,
         "location": null
       }
@@ -4327,7 +4327,7 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 1230,
       "unit": "count",
       "warn_threshold": 500.0,
@@ -4348,7 +4348,7 @@
       "dimension": "conformity",
       "label": "Date-of-birth range",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 18,
       "unit": "count",
       "warn_threshold": null,
@@ -4375,7 +4375,7 @@
       "dimension": "consistency",
       "label": "Registration/birth date ordering",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -4396,7 +4396,7 @@
       "dimension": "consistency",
       "label": "Timestamp ordering",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 49,
       "unit": "count",
       "warn_threshold": null,
@@ -4423,7 +4423,7 @@
       "dimension": "consistency",
       "label": "Sibling record match",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 38,
       "unit": "count",
       "warn_threshold": null,
@@ -4450,7 +4450,7 @@
       "dimension": "timeliness",
       "label": "Freshness",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -4471,7 +4471,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 4,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4497,7 +4497,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 5,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4518,7 +4518,7 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 26,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4545,7 +4545,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4566,7 +4566,7 @@
       "dimension": "validity",
       "label": "Invalid values",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 3.17,
       "unit": "%",
       "warn_threshold": 0.0,
@@ -4593,7 +4593,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4614,7 +4614,7 @@
       "dimension": "validity",
       "label": "Invalid values",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 1.79,
       "unit": "%",
       "warn_threshold": 0.0,
@@ -4641,7 +4641,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4662,7 +4662,7 @@
       "dimension": "validity",
       "label": "Invalid values",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 2.85,
       "unit": "%",
       "warn_threshold": 0.0,
@@ -4689,7 +4689,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 6,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4716,7 +4716,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 6,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4743,7 +4743,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 1.79,
       "unit": "%",
       "warn_threshold": 5.0,
@@ -4770,7 +4770,7 @@
       "dimension": "validity",
       "label": "Invalid values",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 2.68,
       "unit": "%",
       "warn_threshold": 0.0,
@@ -4797,7 +4797,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 26.02,
       "unit": "%",
       "warn_threshold": 30.0,
@@ -4824,7 +4824,7 @@
       "dimension": "validity",
       "label": "Invalid values",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 2.2,
       "unit": "%",
       "warn_threshold": 0.0,
@@ -4851,7 +4851,7 @@
       "dimension": "validity",
       "label": "Invalid values",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 4.31,
       "unit": "%",
       "warn_threshold": 0.0,
@@ -4878,7 +4878,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 55.61,
       "unit": "%",
       "warn_threshold": 15.0,
@@ -4905,7 +4905,7 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 29,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4932,7 +4932,7 @@
       "dimension": "validity",
       "label": "Invalid values",
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 2.6,
       "unit": "%",
       "warn_threshold": 0.0,
@@ -4959,7 +4959,7 @@
       "dimension": "validity",
       "label": null,
       "run_id": "run_09_2026-09-15",
-      "run_timestamp": "2026-09-16T10:47:49.683285+00:00",
+      "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
       "metric_value": 4.34,
       "unit": "%",
       "warn_threshold": 0.0,

@@ -28,8 +28,13 @@ import os
 import sys
 from datetime import datetime, timezone
 
+import duckdb
+
 from qa_tools.common import parallel_orchestrate
+from qa_tools.common.qa_results_reader import read_dataset_stats
+from qa_tools.common.qa_results_writer import write_qa_result
 from . import build_per_run_warehouses
+from . import dataset_stats
 from . import run_dbt_bdm
 from . import run_soda_bdm
 from . import run_datacontract_bdm
@@ -38,6 +43,10 @@ from . import run_evidently_bdm
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 MANIFEST_PATH = os.path.join(ROOT, "data", "raw", "manifest.json")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
+WAREHOUSE_DB_PATH = os.path.join(ROOT, "data", "warehouse.duckdb")
+
+AGENCY_ID = "registry-services"
+DATASET_ID = "birth-registrations"
 
 
 def _run_one(entry: dict, run_timestamp: str, reference_run_id: str, reference_csv: str) -> list[dict]:
@@ -51,6 +60,18 @@ def _run_one(entry: dict, run_timestamp: str, reference_run_id: str, reference_c
     results.extend(run_datacontract_bdm.evaluate_datacontract_bdm(run_id, csv_filename, run_timestamp))
     results.extend(run_evidently_bdm.evaluate_evidently_bdm(
         run_id, csv_filename, run_timestamp, reference_run_id=reference_run_id, reference_csv=reference_csv))
+
+    # Computed and committed here, not by the dashboard-building layer -
+    # this is the one point in the whole pipeline with a legitimate,
+    # already-open connection to real (here, synthetic-standing-in-for-
+    # real) data, so this is where it has to happen. See dataset_stats.py's
+    # own docstring - Keith's hard rule, 2026-09-16: CI must never touch
+    # data, only ever committed history.
+    conn = duckdb.connect(WAREHOUSE_DB_PATH, read_only=True)
+    stats = dataset_stats.compute_dataset_stats(conn, run_id, entry)
+    conn.close()
+    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "dataset_stats", stats)
+
     return results
 
 
@@ -75,6 +96,18 @@ def run_pipeline(sequential: bool = False) -> dict:
         manifest, _run_one, run_timestamp, reference_entry["run_id"], reference_entry["file"],
         sequential=sequential)
 
+    # Read back rather than threaded through _run_one's own return value -
+    # parallel_orchestrate.run_manifest's contract is a flat list of check
+    # results, shared with orchestrate_cp.py, not worth complicating for
+    # this. Also means this is the exact same code path build_results_
+    # from_history.py uses for the committed-history-only rebuild, so the
+    # two can't drift on how dataset_stats gets assembled.
+    dataset_stats_by_run = {}
+    for entry in manifest:
+        stats = read_dataset_stats(AGENCY_ID, DATASET_ID, entry["run_id"])
+        if stats is not None:
+            dataset_stats_by_run[entry["run_id"]] = stats
+
     n_pass = sum(1 for r in all_results if r["status"] == "pass")
     n_warn = sum(1 for r in all_results if r["status"] == "warn")
     n_fail = sum(1 for r in all_results if r["status"] == "fail")
@@ -84,6 +117,7 @@ def run_pipeline(sequential: bool = False) -> dict:
         "generated_at": run_timestamp,
         "dataset": "registry-services.civil-registration.birth-registrations",
         "runs": manifest,
+        "dataset_stats": dataset_stats_by_run,
         "results": all_results,
         "summary": {
             "total_checks": len(all_results),

@@ -20,14 +20,28 @@ rather than relying on the evaluator's own default. This test doesn't
 invoke the real dbt/Soda/datacontract-cli/Evidently tools (out of
 pytest's scope - see test_build_dashboard_data.py's own docstring);
 it stubs out the three other real-tool evaluators and only checks what
-reference_run_id/reference_csv actually reaches the Evidently call."""
+reference_run_id/reference_csv actually reaches the Evidently call.
+
+_run_one() also computes+commits dataset_stats.json now
+(plans/publishing-and-history.md Phase 3) - stubbed out here too, both
+because it needs a real warehouse connection this fake entry has none
+of, and because write_qa_result() defaults to the REAL qa_results_dir;
+without stubbing it, this test would silently write a stray directory
+into the actual project's committed qa_results/ tree on every run (a
+real bug this test itself introduced and caught - see the "verify a
+regression test actually fails first" convention, CLAUDE.md)."""
 from __future__ import annotations
 
 import qa_tools.bdm.orchestrate_bdm as orchestrate_bdm
 import qa_tools.cp.orchestrate_cp as orchestrate_cp
 
 
-def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatch):
+class _FakeConn:
+    def close(self):
+        pass
+
+
+def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatch, tmp_path):
     captured = {}
 
     def fake_evaluate_evidently_bdm(run_id, csv_filename, run_timestamp, reference_run_id=None, reference_csv=None):
@@ -39,6 +53,9 @@ def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypat
     monkeypatch.setattr(orchestrate_bdm.run_soda_bdm, "evaluate_soda_bdm", lambda *a, **k: [])
     monkeypatch.setattr(orchestrate_bdm.run_datacontract_bdm, "evaluate_datacontract_bdm", lambda *a, **k: [])
     monkeypatch.setattr(orchestrate_bdm.run_evidently_bdm, "evaluate_evidently_bdm", fake_evaluate_evidently_bdm)
+    monkeypatch.setattr(orchestrate_bdm.dataset_stats, "compute_dataset_stats", lambda *a, **k: {})
+    monkeypatch.setattr(orchestrate_bdm, "write_qa_result", lambda *a, **k: tmp_path / "unused.json")
+    monkeypatch.setattr(orchestrate_bdm.duckdb, "connect", lambda *a, **k: _FakeConn())
 
     entry = {"run_id": "run_05_2099-01-05", "file": "run_05_2099-01-05.csv"}
     # A reference deliberately different from run_evidently_bdm's own
@@ -51,7 +68,7 @@ def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypat
     assert captured["reference_csv"] == "run_01_2099-01-01.csv"
 
 
-def test_cp_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatch):
+def test_cp_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatch, tmp_path):
     captured = {}
 
     def fake_evaluate_evidently_cp(run_id, run_timestamp, reference_run_id=None):
@@ -62,6 +79,9 @@ def test_cp_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatc
     monkeypatch.setattr(orchestrate_cp.run_soda_cp, "evaluate_soda_cp", lambda *a, **k: [])
     monkeypatch.setattr(orchestrate_cp.run_datacontract_cp, "evaluate_datacontract_cp", lambda *a, **k: [])
     monkeypatch.setattr(orchestrate_cp.run_evidently_cp, "evaluate_evidently_cp", fake_evaluate_evidently_cp)
+    monkeypatch.setattr(orchestrate_cp.dataset_stats, "compute_dataset_stats", lambda *a, **k: {})
+    monkeypatch.setattr(orchestrate_cp, "write_qa_result", lambda *a, **k: tmp_path / "unused.json")
+    monkeypatch.setattr(orchestrate_cp.duckdb, "connect", lambda *a, **k: _FakeConn())
 
     entry = {"run_id": "cp_run_05_2099-02-02"}
     orchestrate_cp._run_one(entry, "2099-02-02T00:00:00Z", "cp_run_01_2099-01-01")

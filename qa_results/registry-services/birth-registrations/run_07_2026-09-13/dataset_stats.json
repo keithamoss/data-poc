@@ -1,0 +1,109 @@
+{
+  "run_timestamp": "2026-09-16T11:50:37.487361+00:00",
+  "raw_output": {
+    "manifest_entry": {
+      "run_id": "run_07_2026-09-13",
+      "run_index": 9,
+      "delivery_id": "delivery_07",
+      "delivery_date": "2026-09-13",
+      "attempt_number": 1,
+      "arrived_date": "2026-09-13",
+      "run_date": "2026-09-13",
+      "is_resupply": false,
+      "supersedes_run_id": null,
+      "n_rows_generated": 1505,
+      "dirty_severity": "amber",
+      "id_offset": 700000,
+      "seed": 1007,
+      "file": "run_07_2026-09-13.csv"
+    },
+    "value_counts": {
+      "sex": [
+        [
+          "M",
+          739
+        ],
+        [
+          "F",
+          722
+        ],
+        [
+          "X",
+          27
+        ],
+        [
+          "(invalid code)",
+          17
+        ]
+      ]
+    },
+    "arrival": {
+      "max_lag_hours": 19.0,
+      "earliest_extract": "2026-09-12 20:00:00"
+    },
+    "check_aggregates": {
+      "sex": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 17,
+        "values": [
+          {
+            "value": "9",
+            "count": 8
+          },
+          {
+            "value": "O",
+            "count": 5
+          },
+          {
+            "value": "U",
+            "count": 4
+          }
+        ]
+      },
+      "place_of_birth_suburb": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 10,
+        "values": [
+          {
+            "value": "TBC",
+            "count": 3
+          },
+          {
+            "value": "Freemantle",
+            "count": 3
+          },
+          {
+            "value": "Unknown",
+            "count": 2
+          },
+          {
+            "value": "Perth Metro",
+            "count": 2
+          }
+        ]
+      },
+      "date_of_birth": {
+        "type": "numeric_date",
+        "suppressed": false,
+        "total_invalid": 1,
+        "min": "1899-01-01",
+        "max": "1899-01-01",
+        "values": [
+          {
+            "value": "1899-01-01",
+            "count": 1
+          }
+        ],
+        "histogram": [
+          {
+            "bucket": "1899-01-01",
+            "count": 1
+          }
+        ]
+      }
+    }
+  },
+  "verified": []
+}

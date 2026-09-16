@@ -28,15 +28,12 @@ from __future__ import annotations
 import json
 import os
 
-import duckdb
-
 from qa_tools.cp import cp_common
-from pipeline.aggregate_values import categorical_aggregate, numeric_date_aggregate
+from qa_tools.cp.dataset_stats import AGGREGATE_SPEC
 from pipeline.dashboard_check_labels import rank_for_headline, display_name
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
-CP_DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
 OUT_PATH = os.path.join(ROOT, "reports", "child_protection_dashboard.json")
 
 ENGINE_SHORT = {
@@ -125,82 +122,7 @@ COLUMN_META = {
 }
 
 
-# "Shape 2" aggregate failing-value support (plans/qa-pipeline.md #17) -
-# see build_dashboard_data.py's own AGGREGATE_SPEC comment for the full
-# rationale (same design, CP counterpart). Keyed by (table, column) since
-# CP has 6 tables, not by column alone.
-_POSTCODE_VALID = ["6007", "6008", "6014", "6018", "6019", "6027", "6028", "6030", "6035", "6036", "6050", "6056",
-                    "6061", "6062", "6064", "6069", "6100", "6102", "6107", "6109", "6110", "6112", "6122", "6148",
-                    "6151", "6155", "6160", "6162", "6163", "6164", "6167", "6168", "6171", "6210", "6215", "6225",
-                    "6230", "6258", "6280", "6285", "6312", "6330", "6401", "6430", "6450", "6530", "6714", "6721",
-                    "6725"]
-_CONCERN_TYPE_VALID = ["Neglect", "Physical abuse", "Emotional abuse", "Sexual abuse",
-                        "Domestic violence exposure", "Parental substance use", "Parental mental health concern"]
-
-
-def _sql_list(values: list[str]) -> str:
-    return ",".join("'" + v.replace("'", "''") + "'" for v in values)
-
-
-AGGREGATE_SPEC = {
-    ("cp_clients", "postcode"): {
-        "kind": "categorical",
-        "invalid_condition": f"postcode NOT IN ({_sql_list(_POSTCODE_VALID)}) OR postcode IS NULL",
-        "classification": None,
-        "check_names": {"dbt:accepted_values", "invalid_percent", "datacontract:invalid_count"},
-    },
-    ("cp_clients", "date_of_birth"): {
-        "kind": "numeric_date",
-        "invalid_condition": "date_of_birth < DATE '1900-01-01'",
-        "classification": None,
-        # Both dbt and Soda have their own version of this check for CP
-        # (unlike BDM, where only datacontract-cli does) - deliberately no
-        # datacontract-cli entry here, since this check was never added
-        # there (see generator/dirty.py's apply_cp_clients_presets docstring).
-        "check_names": {"dbt:cp_client_date_of_birth_range", "date_of_birth out of range"},
-    },
-    ("cp_notifications", "concern_type"): {
-        "kind": "categorical",
-        "invalid_condition": f"concern_type NOT IN ({_sql_list(_CONCERN_TYPE_VALID)}) OR concern_type IS NULL",
-        "classification": None,
-        # Only datacontract-cli has this check today - see
-        # child-protection-soda-checks.yml/schema.yml, neither of which
-        # currently test concern_type directly.
-        "check_names": {"datacontract:invalid_count"},
-    },
-}
-
-
-def _aggregate_for(conn: duckdb.DuckDBPyConnection, table: str, col: str) -> dict | None:
-    spec = AGGREGATE_SPEC.get((table, col))
-    if spec is None:
-        return None
-    full_table = f"raw.{table}"
-    if spec["kind"] == "categorical":
-        return categorical_aggregate(conn, full_table, col, spec["invalid_condition"], spec["classification"])
-    return numeric_date_aggregate(conn, full_table, col, spec["invalid_condition"], spec["classification"])
-
-
-def _concern_type_value_counts(conn: duckdb.DuckDBPyConnection, run_id: str) -> list[list]:
-    rows = conn.execute(
-        "SELECT concern_type, COUNT(*) FROM raw.cp_notifications GROUP BY concern_type"
-    ).fetchall()
-    known = ["Neglect", "Physical abuse", "Emotional abuse", "Sexual abuse",
-             "Domestic violence exposure", "Parental substance use", "Parental mental health concern"]
-    counts = {k: 0 for k in known}
-    other = 0
-    for val, c in rows:
-        if val in counts:
-            counts[val] += c
-        else:
-            other += c
-    out = [[k, v] for k, v in counts.items() if v]
-    if other:
-        out.append(["(invalid code)", other])
-    return out
-
-
-def build_one_table(table: str, results: list[dict], manifest: list[dict]) -> dict:
+def build_one_table(table: str, results: list[dict], manifest: list[dict], dataset_stats: dict) -> dict:
     dataset_id = cp_common.TABLE_DATASET_ID[table]
     column_meta = COLUMN_META[table]
     all_columns = list(column_meta.keys())
@@ -238,27 +160,11 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict]) -> di
     run_ids_in_order = [m["run_id"] for m in manifest]
     latest_run, prev_run = run_ids_in_order[-1], run_ids_in_order[-2]
 
-    latest_db = duckdb.connect(os.path.join(CP_DUCKDB_RUNS_DIR, f"{latest_run}.duckdb"), read_only=True)
-    prev_db = duckdb.connect(os.path.join(CP_DUCKDB_RUNS_DIR, f"{prev_run}.duckdb"), read_only=True)
-
-    # Aggregate values need every run's own warehouse (not just latest/
-    # prev, which arrival-lag below only needs the two most recent for) -
-    # opened lazily and cached, since most runs are clean and never
-    # actually get queried (attach_aggregate below only triggers a lookup
-    # when this run appears in a registered check's own by_run).
-    run_db_cache: dict[str, duckdb.DuckDBPyConnection] = {latest_run: latest_db, prev_run: prev_db}
-
-    def _run_db(run_id: str) -> duckdb.DuckDBPyConnection:
-        if run_id not in run_db_cache:
-            run_db_cache[run_id] = duckdb.connect(os.path.join(CP_DUCKDB_RUNS_DIR, f"{run_id}.duckdb"), read_only=True)
-        return run_db_cache[run_id]
-
     columns_out = []
     for col in all_columns:
         logical_type, desc = column_meta[col]
         checks_for_col = by_column.get(col, {})
         agg_spec = AGGREGATE_SPEC.get((table, col))
-        agg_cache: dict[str, dict] = {}
 
         checks_out = []
         for (engine, check_name), slot in checks_for_col.items():
@@ -269,9 +175,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict]) -> di
                     run_date = next(m["run_date"] for m in manifest if m["run_id"] == run_id)
                     aggregate_values = None
                     if attach_aggregate:
-                        if run_id not in agg_cache:
-                            agg_cache[run_id] = _aggregate_for(_run_db(run_id), table, col)
-                        aggregate_values = agg_cache[run_id]
+                        aggregate_values = dataset_stats[run_id]["check_aggregates"].get(f"{table}.{col}")
                     history.append({
                         "run_date": run_date, "value": slot["by_run"][run_id],
                         "row_count_total": slot["row_count_total"].get(run_id),
@@ -322,8 +226,8 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict]) -> di
                 stats[label]["valid"] = max(0, total - stats[label]["invalid"])
 
         if col == "concern_type":
-            stats["current"]["valueCounts"] = _concern_type_value_counts(latest_db, latest_run)
-            stats["previous"]["valueCounts"] = _concern_type_value_counts(prev_db, prev_run)
+            stats["current"]["valueCounts"] = dataset_stats[latest_run]["value_counts"]["concern_type"]
+            stats["previous"]["valueCounts"] = dataset_stats[prev_run]["value_counts"]["concern_type"]
 
         columns_out.append({
             "name": col, "logicalType": logical_type, "description": desc,
@@ -337,16 +241,10 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict]) -> di
     latest_entry = next(m for m in manifest if m["run_id"] == latest_run)
     prev_entry = next(m for m in manifest if m["run_id"] == prev_run)
 
-    max_lag_hours = latest_db.execute(
-        f"SELECT MAX(date_diff('second', TIMESTAMP '{latest_entry['run_date']}', extract_timestamp)) / 3600.0 "
-        f"FROM raw.{table}"
-    ).fetchone()[0]
-    earliest_extract = latest_db.execute(f"SELECT MIN(extract_timestamp) FROM raw.{table}").fetchone()[0]
+    max_lag_hours = dataset_stats[latest_run]["arrival"][table]["max_lag_hours"]
+    earliest_extract = dataset_stats[latest_run]["arrival"][table]["earliest_extract"]
 
     arrival_history = [{"run_date": m["run_date"], "onTime": True} for m in manifest]  # every run's lag < 24h SLA, verified above for the latest
-
-    for db in run_db_cache.values():
-        db.close()
 
     return {
         "id": dataset_id,
@@ -377,9 +275,10 @@ def build() -> dict:
         payload = json.load(f)
     manifest = sorted(payload["runs"], key=lambda r: r["run_date"])
     results = payload["results"]
+    dataset_stats = payload["dataset_stats"]
 
     by_table = {t: [r for r in results if r["dataset_id"] == cp_common.TABLE_DATASET_ID[t]] for t in cp_common.TABLES}
-    datasets = [build_one_table(t, by_table[t], manifest) for t in cp_common.TABLES]
+    datasets = [build_one_table(t, by_table[t], manifest, dataset_stats) for t in cp_common.TABLES]
     return {"datasets": datasets}
 
 

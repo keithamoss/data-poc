@@ -2,12 +2,15 @@
 against a small fixture rather than a real (slow) qa_tools/bdm/
 orchestrate_bdm.py run - this is meant to catch the kind of silent
 shape/crash regression a full pipeline run wouldn't surface quickly, not
-to duplicate qa_tools' own integration coverage."""
+to duplicate qa_tools' own integration coverage.
+
+No real DuckDB warehouse here since Phase 3 (plans/publishing-and-
+history.md) - value-counts/arrival/check-aggregate data comes from
+results_bdm.json's own "dataset_stats" key now (qa_tools/bdm/
+dataset_stats.py's precomputed output), not a live query."""
 from __future__ import annotations
 
 import json
-
-import duckdb
 
 from pipeline import build_dashboard_data as bdd
 
@@ -21,6 +24,22 @@ FIXTURE_RUNS = [
         "run_date": "2026-09-02", "n_rows_generated": 4, "dirty_severity": "amber",
     },
 ]
+
+FIXTURE_DATASET_STATS = {
+    "run_01_2026-09-01": {
+        "manifest_entry": FIXTURE_RUNS[0],
+        "value_counts": {"sex": [["M", 1], ["F", 2], ["X", 0]]},
+        "arrival": {"max_lag_hours": 5.0, "earliest_extract": "2026-09-01 10:00:00"},
+        "check_aggregates": {"sex": {"type": "categorical", "suppressed": False, "total_invalid": 0, "values": []}},
+    },
+    "run_02_2026-09-02": {
+        "manifest_entry": FIXTURE_RUNS[1],
+        "value_counts": {"sex": [["M", 2], ["F", 1], ["X", 1]]},
+        "arrival": {"max_lag_hours": 6.0, "earliest_extract": "2026-09-02 10:00:00"},
+        "check_aggregates": {"sex": {"type": "categorical", "suppressed": False, "total_invalid": 1,
+                                      "values": [{"value": "X", "count": 1}]}},
+    },
+}
 
 
 def _check(run_id, column_name, value, status="pass", **overrides):
@@ -42,25 +61,16 @@ FIXTURE_RESULTS = [
 ]
 
 
-def test_build_produces_one_entry_per_known_column(tmp_path, monkeypatch):
+def _write_results(tmp_path):
     results_path = tmp_path / "results_bdm.json"
-    results_path.write_text(json.dumps({"runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS}))
+    results_path.write_text(json.dumps({
+        "runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS, "dataset_stats": FIXTURE_DATASET_STATS,
+    }))
+    return results_path
 
-    db_path = tmp_path / "warehouse.duckdb"
-    conn = duckdb.connect(str(db_path))
-    conn.execute("CREATE TABLE birth_registrations (run_id VARCHAR, sex VARCHAR, date_registered DATE, extract_timestamp TIMESTAMP)")
-    conn.execute("INSERT INTO birth_registrations VALUES "
-                  "('run_01_2026-09-01', 'M', '2026-09-01', '2026-09-01 10:00:00'), "
-                  "('run_01_2026-09-01', 'F', '2026-09-01', '2026-09-01 10:00:00'), "
-                  "('run_01_2026-09-01', 'F', '2026-09-01', '2026-09-01 10:00:00'), "
-                  "('run_02_2026-09-02', 'M', '2026-09-02', '2026-09-02 10:00:00'), "
-                  "('run_02_2026-09-02', 'M', '2026-09-02', '2026-09-02 10:00:00'), "
-                  "('run_02_2026-09-02', 'F', '2026-09-02', '2026-09-02 10:00:00'), "
-                  "('run_02_2026-09-02', 'X', '2026-09-02', '2026-09-02 10:00:00')")
-    conn.close()
 
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(results_path))
-    monkeypatch.setattr(bdd, "DB_PATH", str(db_path))
+def test_build_produces_one_entry_per_known_column(tmp_path, monkeypatch):
+    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))
 
     data = bdd.build()
 
@@ -70,18 +80,7 @@ def test_build_produces_one_entry_per_known_column(tmp_path, monkeypatch):
 
 
 def test_a_column_with_a_real_check_carries_it_through(tmp_path, monkeypatch):
-    results_path = tmp_path / "results_bdm.json"
-    results_path.write_text(json.dumps({"runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS}))
-    db_path = tmp_path / "warehouse.duckdb"
-    conn = duckdb.connect(str(db_path))
-    conn.execute("CREATE TABLE birth_registrations (run_id VARCHAR, sex VARCHAR, date_registered DATE, extract_timestamp TIMESTAMP)")
-    conn.execute("INSERT INTO birth_registrations VALUES "
-                  "('run_01_2026-09-01', 'M', '2026-09-01', '2026-09-01 10:00:00'), "
-                  "('run_02_2026-09-02', 'F', '2026-09-02', '2026-09-02 10:00:00')")
-    conn.close()
-
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(results_path))
-    monkeypatch.setattr(bdd, "DB_PATH", str(db_path))
+    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))
 
     data = bdd.build()
     sex_col = next(c for c in data["columns"] if c["name"] == "sex")
@@ -89,21 +88,13 @@ def test_a_column_with_a_real_check_carries_it_through(tmp_path, monkeypatch):
     assert sex_col["checks"][0]["current"] == 1  # run_02's metric_value
     assert sex_col["checks"][0]["previous"] == 0  # run_01's metric_value
     assert len(sex_col["checks"][0]["history"]) == 2
+    # aggregate_values attached from dataset_stats, not a live query
+    assert sex_col["checks"][0]["history"][-1]["aggregate_values"]["total_invalid"] == 1
+    assert sex_col["stats"]["current"]["valueCounts"] == [["M", 2], ["F", 1], ["X", 1]]
 
 
 def test_a_column_with_no_check_gets_an_honest_placeholder(tmp_path, monkeypatch):
-    results_path = tmp_path / "results_bdm.json"
-    results_path.write_text(json.dumps({"runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS}))
-    db_path = tmp_path / "warehouse.duckdb"
-    conn = duckdb.connect(str(db_path))
-    conn.execute("CREATE TABLE birth_registrations (run_id VARCHAR, sex VARCHAR, date_registered DATE, extract_timestamp TIMESTAMP)")
-    conn.execute("INSERT INTO birth_registrations VALUES "
-                  "('run_01_2026-09-01', 'M', '2026-09-01', '2026-09-01 10:00:00'), "
-                  "('run_02_2026-09-02', 'F', '2026-09-02', '2026-09-02 10:00:00')")
-    conn.close()
-
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(results_path))
-    monkeypatch.setattr(bdd, "DB_PATH", str(db_path))
+    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))
 
     data = bdd.build()
     # No check in FIXTURE_RESULTS covers "date_registered" - should get the

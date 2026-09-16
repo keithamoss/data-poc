@@ -1,22 +1,23 @@
 """
-Rebuilds reports/results_cp.json purely from Phase 1's committed
+Rebuilds reports/results_cp.json purely from Phase 1/2/3's committed
 qa_results/ history - the Child Protection counterpart to
 qa_tools/bdm/build_results_from_history.py (see that file's own
-docstring for the full rationale). Runs no real tool, touches no
-per-run DuckDB/CSV data.
+docstring for the full rationale). Runs no real tool, touches no local
+data of any kind.
 
 Reads two qa_results/ dataset segments per run, not one - dbt/Soda/
 datacontract-cli each run once across all 6 CP tables (written under
-the collection id, cp_common.COLLECTION_ID), while Evidently is scoped
-to cp_notifications alone and writes under its own table-scoped dataset
-id (cp_common.TABLE_DATASET_ID["cp_notifications"]) - see
+the collection id, cp_common.COLLECTION_ID - dataset_stats.json lives
+here too, alongside them), while Evidently is scoped to cp_notifications
+alone and writes under its own table-scoped dataset id
+(cp_common.TABLE_DATASET_ID["cp_notifications"]) - see
 qa_results_writer.py callers' own AGENCY_ID/DATASET_ID/COLLECTION_ID
 constants. Interleaved per run_id (not two separate concatenated
 blocks) to match orchestrate_cp.py's own _run_one() order exactly.
 
-"runs" still comes from local data/cp_raw/manifest.json, not
-qa_results/ - same Thread B scope boundary as the BDM builder (tool
-RESULTS only, not generator-run metadata).
+"runs" used to come from local data/cp_raw/manifest.json - changed
+2026-09-16, Keith's hard rule: CI must never touch data, only committed
+history. Same fix as the BDM builder - see that file's own docstring.
 
 Run as `python3 -m qa_tools.cp.build_results_from_history`.
 """
@@ -25,19 +26,27 @@ import json
 import os
 from datetime import datetime, timezone
 
-from qa_tools.common.qa_results_reader import read_one, TOOL_ORDER
+from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats, read_one, TOOL_ORDER
 from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-MANIFEST_PATH = os.path.join(ROOT, "data", "cp_raw", "manifest.json")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
 
 _EVIDENTLY_DATASET_ID = cp_common.TABLE_DATASET_ID["cp_notifications"]
 
 
 def build_results_from_history() -> dict:
-    with open(MANIFEST_PATH) as f:
-        manifest = json.load(f)
+    run_ids = list_run_ids(cp_common.AGENCY_ID, cp_common.COLLECTION_ID)
+
+    manifest = []
+    dataset_stats_by_run = {}
+    for run_id in run_ids:
+        stats = read_dataset_stats(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id)
+        if stats is None:
+            continue
+        manifest.append(stats["manifest_entry"])
+        dataset_stats_by_run[run_id] = stats
+    manifest.sort(key=lambda m: m["run_index"])
 
     all_results: list[dict] = []
     for entry in manifest:
@@ -56,6 +65,7 @@ def build_results_from_history() -> dict:
         "collection": f"{cp_common.AGENCY_ID}.{cp_common.COLLECTION_ID}",
         "datasets": sorted(cp_common.TABLE_DATASET_ID.values()),
         "runs": manifest,
+        "dataset_stats": dataset_stats_by_run,
         "results": all_results,
         "summary": {
             "total_checks": len(all_results),

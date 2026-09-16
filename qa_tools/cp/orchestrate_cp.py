@@ -25,9 +25,14 @@ import os
 import sys
 from datetime import datetime, timezone
 
+import duckdb
+
 from qa_tools.common import parallel_orchestrate
+from qa_tools.common.qa_results_reader import read_dataset_stats
+from qa_tools.common.qa_results_writer import write_qa_result
 from . import build_cp_warehouses
 from . import cp_common
+from . import dataset_stats
 from . import run_dbt_cp
 from . import run_soda_cp
 from . import run_datacontract_cp
@@ -36,6 +41,7 @@ from . import run_evidently_cp
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 MANIFEST_PATH = os.path.join(ROOT, "data", "cp_raw", "manifest.json")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
+CP_DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
 
 
 def _run_one(entry: dict, run_timestamp: str, reference_run_id: str) -> list[dict]:
@@ -47,6 +53,14 @@ def _run_one(entry: dict, run_timestamp: str, reference_run_id: str) -> list[dic
     results.extend(run_soda_cp.evaluate_soda_cp(run_id, run_timestamp))
     results.extend(run_datacontract_cp.evaluate_datacontract_cp(run_id, run_timestamp))
     results.extend(run_evidently_cp.evaluate_evidently_cp(run_id, run_timestamp, reference_run_id=reference_run_id))
+
+    # Same rationale as orchestrate_bdm.py's identical block - see
+    # qa_tools/bdm/dataset_stats.py's own docstring.
+    conn = duckdb.connect(os.path.join(CP_DUCKDB_RUNS_DIR, f"{run_id}.duckdb"), read_only=True)
+    stats = dataset_stats.compute_dataset_stats(conn, entry)
+    conn.close()
+    write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, "dataset_stats", stats)
+
     return results
 
 
@@ -66,6 +80,13 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     all_results = parallel_orchestrate.run_manifest(
         manifest, _run_one, run_timestamp, reference_run_id, sequential=sequential)
 
+    # Same rationale as orchestrate_bdm.py's identical block.
+    dataset_stats_by_run = {}
+    for entry in manifest:
+        stats = read_dataset_stats(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, entry["run_id"])
+        if stats is not None:
+            dataset_stats_by_run[entry["run_id"]] = stats
+
     n_pass = sum(1 for r in all_results if r["status"] == "pass")
     n_warn = sum(1 for r in all_results if r["status"] == "warn")
     n_fail = sum(1 for r in all_results if r["status"] == "fail")
@@ -73,6 +94,7 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
 
     output = {
         "generated_at": run_timestamp,
+        "dataset_stats": dataset_stats_by_run,
         "collection": f"{cp_common.AGENCY_ID}.{cp_common.COLLECTION_ID}",
         "datasets": sorted(cp_common.TABLE_DATASET_ID.values()),
         "runs": manifest,

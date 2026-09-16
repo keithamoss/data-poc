@@ -44,6 +44,34 @@ def read_one(agency: str, dataset: str, run_id: str, tool: str,
     return committed.get("verified") or []
 
 
+def list_run_ids(agency: str, dataset: str, qa_results_dir: Path | str = QA_RESULTS_DIR) -> list[str]:
+    """Every run_id committed under this agency/dataset, sorted - the
+    committed tree's own directory listing is the source of truth for
+    "which runs exist" (Phase 3, plans/publishing-and-history.md),
+    replacing a dependency on local, regenerated manifest.json files."""
+    dataset_dir = Path(qa_results_dir) / agency / dataset
+    if not dataset_dir.is_dir():
+        return []
+    return sorted(p.name for p in dataset_dir.iterdir() if p.is_dir())
+
+
+def read_dataset_stats(agency: str, dataset: str, run_id: str,
+                        qa_results_dir: Path | str = QA_RESULTS_DIR) -> dict | None:
+    """The precomputed value-counts/arrival/check-aggregate/manifest-entry
+    data for one run (qa_tools/<bdm|cp>/dataset_stats.py's output),
+    committed under the pseudo-tool name "dataset_stats" - not a real
+    QA tool, just reusing qa_results_writer.write_qa_result()'s same
+    file shape/writer for consistency. Returns None if this run has no
+    committed dataset_stats.json (shouldn't happen for any run written
+    since Phase 3 - see plans/publishing-and-history.md)."""
+    path = Path(qa_results_dir) / agency / dataset / run_id / "dataset_stats.json"
+    if not path.exists():
+        return None
+    with open(path) as f:
+        committed = json.load(f)
+    return committed.get("raw_output")
+
+
 def read_qa_results(agency: str, dataset: str, qa_results_dir: Path | str = QA_RESULTS_DIR) -> list[dict]:
     """Every committed run's every tool's `verified` records for one
     `agency`/`dataset` pair, concatenated in run-id then tool order.

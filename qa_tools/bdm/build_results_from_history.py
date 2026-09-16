@@ -1,35 +1,36 @@
 """
-Rebuilds reports/results_bdm.json purely from Phase 1's committed
+Rebuilds reports/results_bdm.json purely from Phase 1/2/3's committed
 qa_results/ history - the read side of plans/publishing-and-history.md
-Thread B/Phase 2. Unlike orchestrate_bdm.py, this runs no real tool and
-touches no per-run DuckDB warehouse - every check-result number it needs
-(including dbt's audit-corrected failures/status and Soda's row-count
-totals) was already resolved and committed at run time, in each tool's
-own `verified` field - see qa_results_writer.py's own docstring for why.
+Thread B. Runs no real tool, touches no local data of any kind (not
+`data/raw/`, not any DuckDB warehouse) - every number it needs, check
+results AND the "runs" manifest AND the presentation-layer stats
+(value-counts/arrival/check-aggregates), was already resolved and
+committed at run time (qa_results_writer.py's own docstring; qa_tools/
+bdm/dataset_stats.py's for the stats/manifest side specifically).
 
-"runs" (data/raw/manifest.json's own generator-run metadata - delivery
-dates, resupply chains, dirty_severity) stays sourced from local,
-regenerated data/raw/ rather than qa_results/, matching Thread B's
-explicit scope: tool RESULTS only, not the underlying synthetic-data
-generation metadata (plans/publishing-and-history.md's own "Confirmed
-explicitly with Keith" bullet). So this still needs data/raw/
-manifest.json to exist locally (run ./run_pipeline.sh's first step, or
-generator.generate_runs, if it doesn't) - just not data/duckdb_runs/ or
-data/warehouse.duckdb.
+"runs" used to be sourced from local, regenerated data/raw/manifest.json
+(Phase 2's own deliberate scope boundary) - changed 2026-09-16, Keith's
+hard rule: CI must never touch data, only committed history, full stop,
+not even this project's own synthetic stand-in for it. Each run's own
+manifest entry is now embedded in its own committed dataset_stats.json
+(orchestrate_bdm.py writes it, reading data/raw/manifest.json itself -
+the one place with legitimate access) - reconstructed here by reading
+every committed run back, not the local file.
 
 Run as `python3 -m qa_tools.bdm.build_results_from_history`. Produces
-the exact same reports/results_bdm.json shape orchestrate_bdm.py does,
-so pipeline/build_dashboard_data.py (downstream) needs no changes.
+the exact same reports/results_bdm.json shape orchestrate_bdm.py does
+(now including "dataset_stats"), so pipeline/build_dashboard_data.py
+(downstream) needs no changes to consume it - just to stop live-querying
+a warehouse of its own, which is Phase 3's other half.
 """
 from __future__ import annotations
 import json
 import os
 from datetime import datetime, timezone
 
-from qa_tools.common.qa_results_reader import read_qa_results
+from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats, read_qa_results
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-MANIFEST_PATH = os.path.join(ROOT, "data", "raw", "manifest.json")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
 
 AGENCY_ID = "registry-services"
@@ -37,8 +38,20 @@ DATASET_ID = "birth-registrations"
 
 
 def build_results_from_history() -> dict:
-    with open(MANIFEST_PATH) as f:
-        manifest = json.load(f)
+    run_ids = list_run_ids(AGENCY_ID, DATASET_ID)
+
+    manifest = []
+    dataset_stats_by_run = {}
+    for run_id in run_ids:
+        stats = read_dataset_stats(AGENCY_ID, DATASET_ID, run_id)
+        if stats is None:
+            continue  # shouldn't happen for any real committed run - see dataset_stats.py
+        manifest.append(stats["manifest_entry"])
+        dataset_stats_by_run[run_id] = stats
+    # run_index (not run_date) matches the original generation order - a
+    # resupply attempt's own run_date is when it actually arrived, which
+    # sorts it away from its parent delivery; run_index doesn't.
+    manifest.sort(key=lambda m: m["run_index"])
 
     all_results = read_qa_results(AGENCY_ID, DATASET_ID)
 
@@ -51,6 +64,7 @@ def build_results_from_history() -> dict:
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "dataset": "registry-services.civil-registration.birth-registrations",
         "runs": manifest,
+        "dataset_stats": dataset_stats_by_run,
         "results": all_results,
         "summary": {
             "total_checks": len(all_results),

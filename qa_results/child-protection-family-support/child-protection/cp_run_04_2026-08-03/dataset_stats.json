@@ -1,0 +1,158 @@
+{
+  "run_timestamp": "2026-09-16T11:59:07.252903+00:00",
+  "raw_output": {
+    "manifest_entry": {
+      "run_id": "cp_run_04_2026-08-03",
+      "run_index": 4,
+      "run_date": "2026-08-03",
+      "dirty_severity": "amber",
+      "seed": 5004,
+      "row_counts": {
+        "cp_clients": 527,
+        "cp_notifications": 1001,
+        "cp_investigations": 181,
+        "cp_placements": 242,
+        "cp_carers": 289,
+        "cp_case_workers": 60
+      }
+    },
+    "value_counts": {
+      "concern_type": [
+        [
+          "Neglect",
+          385
+        ],
+        [
+          "Physical abuse",
+          117
+        ],
+        [
+          "Emotional abuse",
+          211
+        ],
+        [
+          "Sexual abuse",
+          34
+        ],
+        [
+          "Domestic violence exposure",
+          138
+        ],
+        [
+          "Parental substance use",
+          73
+        ],
+        [
+          "Parental mental health concern",
+          36
+        ],
+        [
+          "(invalid code)",
+          7
+        ]
+      ]
+    },
+    "check_aggregates": {
+      "cp_clients.postcode": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 4,
+        "values": [
+          {
+            "value": "TBC",
+            "count": 2
+          },
+          {
+            "value": "6000X",
+            "count": 1
+          },
+          {
+            "value": "9999",
+            "count": 1
+          }
+        ]
+      },
+      "cp_clients.date_of_birth": {
+        "type": "numeric_date",
+        "suppressed": false,
+        "total_invalid": 7,
+        "min": "1750-01-01",
+        "max": "1850-06-15",
+        "values": [
+          {
+            "value": "1850-06-15",
+            "count": 3
+          },
+          {
+            "value": "1750-01-01",
+            "count": 2
+          },
+          {
+            "value": "1820-11-30",
+            "count": 2
+          }
+        ],
+        "histogram": [
+          {
+            "bucket": "1750-01-01 to 1766-09-28",
+            "count": 2
+          },
+          {
+            "bucket": "1816-12-20 to 1833-09-17",
+            "count": 2
+          },
+          {
+            "bucket": "1833-09-17 to 1850-06-15",
+            "count": 3
+          }
+        ]
+      },
+      "cp_notifications.concern_type": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 7,
+        "values": [
+          {
+            "value": "Pending classification",
+            "count": 4
+          },
+          {
+            "value": "Code 9",
+            "count": 2
+          },
+          {
+            "value": "Unspecified",
+            "count": 1
+          }
+        ]
+      }
+    },
+    "arrival": {
+      "cp_clients": {
+        "max_lag_hours": 7.0,
+        "earliest_extract": "2026-08-03 01:00:00"
+      },
+      "cp_notifications": {
+        "max_lag_hours": 7.0,
+        "earliest_extract": "2026-08-03 01:00:00"
+      },
+      "cp_investigations": {
+        "max_lag_hours": 7.0,
+        "earliest_extract": "2026-08-03 01:00:00"
+      },
+      "cp_placements": {
+        "max_lag_hours": 7.0,
+        "earliest_extract": "2026-08-03 01:00:00"
+      },
+      "cp_carers": {
+        "max_lag_hours": 7.0,
+        "earliest_extract": "2026-08-03 01:00:00"
+      },
+      "cp_case_workers": {
+        "max_lag_hours": 7.0,
+        "earliest_extract": "2026-08-03 01:00:00"
+      }
+    }
+  },
+  "verified": []
+}
