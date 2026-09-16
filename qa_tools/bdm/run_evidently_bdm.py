@@ -27,6 +27,7 @@ import os
 
 from qa_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, status_for_psi, compute_psi
 from qa_tools.common.csv_io import load_null_values_by_column, read_csv_explicit_nulls
+from qa_tools.common.qa_results_writer import write_qa_result
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 RAW_DIR = os.path.join(ROOT, "data", "raw")
@@ -62,13 +63,14 @@ def _status_for_row_drop(rate_drop: float) -> str:
     return "pass"
 
 
-def _row_count(csv_filename: str) -> int:
+def _row_count(csv_filename: str) -> tuple[int, dict]:
     from evidently import Report
     from evidently.metrics import RowCount
 
     df = read_csv_explicit_nulls(os.path.join(RAW_DIR, csv_filename), _NULL_VALUES)
     snapshot = Report(metrics=[RowCount()]).run(df, None)
-    return int(snapshot.dict()["metrics"][0]["value"])
+    result = snapshot.dict()
+    return int(result["metrics"][0]["value"]), result
 
 
 def _previous_run_file(manifest: list[dict], run_id: str) -> str | None:
@@ -89,8 +91,9 @@ def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
     current = read_csv_explicit_nulls(os.path.join(RAW_DIR, csv_filename), _NULL_VALUES)[["sex"]]
     n_total = len(current)
 
-    psi = compute_psi(current, reference, "sex")
+    psi, psi_snapshot = compute_psi(current, reference, "sex")
     status = status_for_psi(psi, run_id == reference_run_id)
+    raw_output = {"psi": psi_snapshot}
 
     results = [{
         "agency_id": AGENCY_ID,
@@ -118,8 +121,9 @@ def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
         manifest = json.load(f)
     previous_file = _previous_run_file(manifest, run_id)
     if previous_file is not None:
-        current_count = _row_count(csv_filename)
-        previous_count = _row_count(previous_file)
+        current_count, row_count_snapshot = _row_count(csv_filename)
+        previous_count, _ = _row_count(previous_file)  # previous run's own snapshot, already captured when that run was processed
+        raw_output["row_count"] = row_count_snapshot
         rate_drop = (previous_count - current_count) / previous_count if previous_count else 0.0
         results.append({
             "agency_id": AGENCY_ID,
@@ -149,6 +153,7 @@ def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
             "reference_run_id": None,
         })
 
+    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "evidently", raw_output)
     return results
 
 

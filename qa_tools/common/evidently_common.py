@@ -29,14 +29,20 @@ def status_for_psi(psi: float, is_reference: bool) -> str:
     return "pass"
 
 
-def compute_psi(current_df, reference_df, column: str) -> float | None:
+def compute_psi(current_df, reference_df, column: str) -> tuple[float | None, dict]:
+    """Returns (psi_value, raw_snapshot) - the raw Evidently snapshot dict
+    is the real native tool output, committed as-is to qa_results/ by each
+    caller (plans/publishing-and-history.md Thread B) - this function
+    used to discard it, returning only the extracted float."""
     from evidently import Report
     from evidently.presets import DataDriftPreset
 
     report = Report(metrics=[DataDriftPreset(columns=[column], cat_method="psi")])
     snapshot = report.run(current_df, reference_df)
     result = snapshot.dict()
+    psi_value = None
     for m in result["metrics"]:
         if m["metric_name"].startswith(f"ValueDrift(column={column}"):
-            return m["value"]
-    return None
+            psi_value = m["value"]
+            break
+    return psi_value, result

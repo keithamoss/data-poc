@@ -119,6 +119,13 @@ schema:
             mustBe: 0
             severity: error
             description: Every record must carry a registration number.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
           - metric: invalidValues
             dimension: conformity
             arguments:
@@ -128,11 +135,25 @@ schema:
             description: >
               Catches upstream ID-format changes (e.g. a source-system
               migration) before they reach consumers as silent garbage.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.invalidValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
           - metric: duplicateValues
             dimension: uniqueness
             mustBe: 0
             severity: error
             description: No two rows may share a registration_number.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.duplicateValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
 
       - name: child_given_names
         logicalType: string
@@ -157,6 +178,13 @@ schema:
               Allows a small non-zero null rate (data-entry lag at source)
               but alerts if it creeps up - this is the "null rate creeping
               up" failure mode named as a real, recurring problem.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
           - metric: invalidValues
             dimension: conformity
             arguments:
@@ -173,6 +201,13 @@ schema:
               compile down to) has no lookahead support, so a purely
               alphabetic junk word like a bare "TEST" or "UNKNOWN" with no
               digit or symbol in it would NOT be caught by this rule alone.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.invalidValues
+              - property: introduced_date
+                value: "2026-09-15"
+              - property: changelog
+                value: "[]"
 
       - name: child_family_name
         logicalType: string
@@ -185,6 +220,15 @@ schema:
             unit: percent
             mustBeLessThan: 1
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "A child's family name must be recorded, with a small tolerance for data-entry lag."
+              - property: changelog
+                value: "[]"
           - metric: invalidValues
             dimension: conformity
             arguments:
@@ -192,6 +236,13 @@ schema:
             mustBe: 0
             severity: error
             description: Same format rule as child_given_names - see that property's description.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.invalidValues
+              - property: introduced_date
+                value: "2026-09-15"
+              - property: changelog
+                value: "[]"
 
       - name: date_of_birth
         logicalType: date
@@ -202,6 +253,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "A birth registration must carry a date of birth."
+              - property: changelog
+                value: "[]"
           - type: sql
             dimension: conformity
             # mustBeBetween is numeric-only in the real ODCS model (no date
@@ -214,6 +274,13 @@ schema:
               datetime-with-timezone field arriving where a plain date is
               expected) turning into silently unparseable or nonsensical
               dates downstream.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.range_check
+              - property: introduced_date
+                value: "2026-09-13"
+              - property: changelog
+                value: "[]"
           - type: sql
             # "timeliness" (not "conformity"/"consistency" like this
             # column's other 2 rules) - the real ODCS dimension enum's word
@@ -251,6 +318,13 @@ schema:
               regenerating the fixture on a rolling window near "today"
               (the same follow-up already tracked for the [recent] filter)
               would fix both at once.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.freshness
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
 
       - name: sex
         logicalType: string
@@ -267,6 +341,13 @@ schema:
               A closed value set. If BDM's source system starts emitting a
               new code, this fails loudly instead of quietly landing an
               unrecognised value in every downstream eligibility check.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.invalidValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
 
       - name: place_of_birth_suburb
         logicalType: string
@@ -278,6 +359,15 @@ schema:
             unit: percent
             mustBeLessThan: 2
             severity: warning
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.nullValues
+              - property: introduced_date
+                value: "2026-09-15"
+              - property: description
+                value: "Suburb of birth must be recorded - tighter tolerance than most other required columns."
+              - property: changelog
+                value: "[]"
           - metric: invalidValues
             dimension: conformity
             arguments:
@@ -299,6 +389,13 @@ schema:
               An unrecognised suburb means a data-entry typo or a source-
               system change, not a legitimately new WA suburb appearing
               mid-fixture.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.invalidValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
 
       - name: place_of_birth_facility
         logicalType: string
@@ -326,6 +423,13 @@ schema:
               in the Soda checks file - some null rate is expected (home
               births without a recorded facility), but a rate this high
               signals a genuine upstream problem, not normal variation.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_facility.nullValues
+              - property: introduced_date
+                value: "2026-09-15"
+              - property: changelog
+                value: "[]"
 
       - name: date_registered
         logicalType: date
@@ -336,6 +440,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_registered.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "A birth registration must carry the date it was registered."
+              - property: changelog
+                value: "[]"
           - type: sql
             # a cross-field logical rule, not a format/pattern match -
             # ODCS's "consistency" dimension (not "conformity") fits a
@@ -349,6 +462,13 @@ schema:
             mustBe: 0
             severity: error
             description: A registration date earlier than the birth date indicates a corrupt or misjoined record.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_registered.date_ordering
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
 
       - name: registering_parent_1_name
         logicalType: string
@@ -361,6 +481,15 @@ schema:
             unit: percent
             mustBeLessThan: 5
             severity: warning
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Parent 1's name is expected on most registrations, tolerated null up to ~5%."
+              - property: changelog
+                value: "[]"
           - metric: invalidValues
             dimension: conformity
             arguments:
@@ -368,6 +497,13 @@ schema:
             mustBe: 0
             severity: error
             description: Same format rule as child_given_names - see that property's description.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.invalidValues
+              - property: introduced_date
+                value: "2026-09-15"
+              - property: changelog
+                value: "[]"
 
       - name: registering_parent_2_name
         logicalType: string
@@ -381,6 +517,13 @@ schema:
             mustBeLessThan: 30
             severity: info
             description: Higher tolerance - single-parent registrations are legitimately common.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
           - metric: invalidValues
             dimension: conformity
             arguments:
@@ -388,6 +531,13 @@ schema:
             mustBe: 0
             severity: error
             description: Same format rule as child_given_names - see that property's description.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.invalidValues
+              - property: introduced_date
+                value: "2026-09-15"
+              - property: changelog
+                value: "[]"
 
       - name: is_multiple_birth
         logicalType: boolean
@@ -404,6 +554,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Whether a birth was part of a multiple birth must always be recorded, never left unset."
+              - property: changelog
+                value: "[]"
           - type: sql
             dimension: consistency
             # A self-join within one model - datacontract-cli's {model}
@@ -439,6 +598,13 @@ schema:
             mustBe: 0
             severity: error
             description: "Multiple-birth sibling match: every is_multiple_birth record must have a matching sibling row from the same birth event."
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.sibling_match
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
 
       - name: source_system_record_id
         logicalType: string
@@ -451,6 +617,13 @@ schema:
             mustBe: 0
             severity: error
             description: No two rows may share a source_system_record_id - a re-extract landing twice would double-count downstream.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.duplicateValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
           - metric: invalidValues
             dimension: conformity
             arguments:
@@ -458,6 +631,13 @@ schema:
             mustBe: 0
             severity: error
             description: Catches an upstream ID-format change, same rationale as registration_number's own pattern rule.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.invalidValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
 
       - name: extract_timestamp
         logicalType: date
@@ -469,6 +649,15 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.nullValues
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: "Every record must carry the timestamp it was extracted at."
+              - property: changelog
+                value: "[]"
           - type: sql
             dimension: consistency
             query: "SELECT COUNT(*) FROM {model} WHERE extract_timestamp < date_registered OR extract_timestamp > date_registered + INTERVAL 1 DAY"
@@ -480,6 +669,13 @@ schema:
               24h latency SLA (see slaProperties below) - anything else
               indicates clock skew or a backfilled record misdated at
               extraction.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.timestamp_ordering
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
 
     quality:
       # the duplicateCheck rule that used to live here moved to
@@ -497,6 +693,13 @@ schema:
           duplicated/double-loaded file (well above the high end) - the
           "data drift" failure mode that a schema-only check would miss
           entirely, since a doubled file has a perfectly valid schema.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.rowCount
+          - property: introduced_date
+            value: "2026-01-15"
+          - property: changelog
+            value: "[]"
 
 slaProperties:
   - property: frequency

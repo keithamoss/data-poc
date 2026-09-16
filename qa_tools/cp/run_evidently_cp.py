@@ -16,6 +16,7 @@ import os
 
 from qa_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, status_for_psi, compute_psi
 from qa_tools.common.csv_io import load_null_values_by_column, read_csv_explicit_nulls
+from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -44,8 +45,9 @@ def evaluate_evidently_cp(run_id: str, run_timestamp: str,
         os.path.join(CP_RAW_DIR, run_id, "cp_notifications.csv"), _NULL_VALUES)[["concern_type"]]
     n_total = len(current)
 
-    psi = compute_psi(current, reference, "concern_type")
+    psi, psi_snapshot = compute_psi(current, reference, "concern_type")
     status = status_for_psi(psi, run_id == reference_run_id)
+    write_qa_result(cp_common.AGENCY_ID, DATASET_ID, run_id, run_timestamp, "evidently", {"psi": psi_snapshot})
 
     return [{
         "agency_id": cp_common.AGENCY_ID,

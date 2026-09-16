@@ -56,6 +56,7 @@ from qa_tools.common.dbt_common import (
     ENGINE_TAG, parse_threshold, run_dbt, test_nodes,
     failing_sample_keys_direct, failing_sample_keys_via_values,
 )
+from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -220,6 +221,12 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
         manifest = json.load(f)
     with open(os.path.join(target_path, "run_results.json")) as f:
         run_results = json.load(f)
+
+    # One dbt build covers all 6 CP tables at once - the raw output
+    # genuinely operates at collection granularity, so it's written there
+    # rather than split artificially per table (would misrepresent what
+    # the tool actually ran).
+    write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, "dbt", run_results)
 
     nodes = test_nodes(manifest)
 

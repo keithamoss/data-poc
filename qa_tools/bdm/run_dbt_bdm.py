@@ -69,6 +69,7 @@ from qa_tools.common.dbt_common import (
     ENGINE_TAG, parse_threshold, run_dbt, test_nodes,
     failing_sample_keys_direct, failing_sample_keys_via_values,
 )
+from qa_tools.common.qa_results_writer import write_qa_result
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 DBT_PROJECT_DIR = os.path.join(ROOT, "dbt_project")
@@ -246,6 +247,8 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
         manifest = json.load(f)
     with open(os.path.join(target_path, "run_results.json")) as f:
         run_results = json.load(f)
+
+    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "dbt", run_results)
 
     nodes = test_nodes(manifest)
     conn = duckdb.connect(db_path, read_only=True)

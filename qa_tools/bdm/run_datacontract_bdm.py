@@ -34,6 +34,7 @@ from qa_tools.common.datacontract_common import (
     ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
     run_against_local_server, failing_sample_keys,
 )
+from qa_tools.common.qa_results_writer import write_qa_result
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
@@ -75,6 +76,7 @@ def _custom_sql_label(description: str) -> str | None:
 
 def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str) -> list[dict]:
     run = run_against_local_server(CONTRACT_PATH, os.path.join(RAW_DIR, csv_filename))
+    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "datacontract", run.model_dump())
 
     results = []
     for c in run.checks:

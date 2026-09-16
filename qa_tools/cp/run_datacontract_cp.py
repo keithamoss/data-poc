@@ -33,6 +33,7 @@ from qa_tools.common.datacontract_common import (
     ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
     run_against_local_server, failing_sample_keys,
 )
+from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -83,6 +84,8 @@ def _custom_sql_label(description: str) -> str | None:
 
 def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
     run = run_against_local_server(CONTRACT_PATH, os.path.join(CP_RAW_DIR, run_id, "{model}.csv"))
+    write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp,
+                     "datacontract", run.model_dump())
 
     results = []
     for c in run.checks:

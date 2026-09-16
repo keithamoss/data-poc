@@ -18,6 +18,7 @@ import os
 import duckdb
 
 from qa_tools.common.soda_common import ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys
+from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -66,6 +67,7 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
     scan.disable_telemetry()
     scan.execute()
     scan_results = scan.get_scan_results()
+    write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, "soda", scan_results)
     metric_name_by_id = {m["identity"]: m["metricName"] for m in scan_results["metrics"]}
 
     results = []

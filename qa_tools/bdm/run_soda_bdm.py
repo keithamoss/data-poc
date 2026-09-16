@@ -37,6 +37,7 @@ import os
 import duckdb
 
 from qa_tools.common.soda_common import ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys
+from qa_tools.common.qa_results_writer import write_qa_result
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 SODA_CHECKS_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-soda-checks.yml")
@@ -123,6 +124,7 @@ def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     scan.disable_telemetry()
     scan.execute()
     scan_results = scan.get_scan_results()
+    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "soda", scan_results)
     metric_name_by_id = {m["identity"]: m["metricName"] for m in scan_results["metrics"]}
 
     results = []
