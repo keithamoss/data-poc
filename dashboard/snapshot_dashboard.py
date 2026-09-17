@@ -234,9 +234,26 @@ def prepare_deploy_site(site_dir: Path, html_path: Path = DASHBOARD_HTML,
     otherwise just a file-copy step. (An earlier version of this
     docstring said CI should use a bare `python3` here since nothing but
     stdlib is needed - wrong: "doesn't need extra packages" and "so skip
-    uv" aren't the same thing. Corrected 2026-09-16, Keith's own catch.)"""
+    uv" aren't the same thing. Corrected 2026-09-16, Keith's own catch.)
+
+    Also embeds the real, committed manifest.json into the copy of
+    `html_path` written to `site_dir/index.html` - a real bug found
+    2026-09-17 (Keith: "I'm not seeing any snapshots on the live
+    published dashboard") had this NOT happening: embed_dashboard_data.py
+    deliberately leaves SNAPSHOT_MANIFEST alone (it owns the other 3
+    consts only - see its own docstring), and this function used to just
+    byte-copy html_path straight through, so the deployed site's picker
+    always saw the template's empty `[]` placeholder, never the real
+    manifest - even though every snapshot file itself was correctly
+    landing in _site/snapshots/. `html_path` on disk is untouched by
+    this - only the site copy gets the embed, same one-way relationship
+    as embed_dashboard_data.py's own gitignored build output."""
     site_dir.mkdir(parents=True, exist_ok=True)
-    (site_dir / "index.html").write_bytes(html_path.read_bytes())
+    manifest = _read_manifest(snapshots_dir)
+    html = _embed_snapshot_manifest_into_html(
+        html_path.read_text(), manifest, f"{html_path} (deploy site copy)"
+    )
+    (site_dir / "index.html").write_text(html)
 
     if not snapshots_dir.exists():
         return
@@ -266,17 +283,26 @@ def _append_manifest_entry(snapshots_dir: Path, entry: dict) -> list:
     return manifest
 
 
-def _embed_snapshot_manifest(html_path: Path, manifest: list) -> None:
-    """Regenerates the `const SNAPSHOT_MANIFEST = [...];` line inside
-    `html_path` - same mechanism as dashboard/embed_dashboard_data.py's
+def _embed_snapshot_manifest_into_html(html: str, manifest: list, source_desc: str) -> str:
+    """Returns `html` with its `const SNAPSHOT_MANIFEST = [...];` line
+    replaced - same mechanism as dashboard/embed_dashboard_data.py's
     REAL_BIRTH_REG_DATA/REAL_CP_DATA replacement (a single-line const,
     regex-replaced with a lambda substitution so any special characters
     already in the JSON are never reinterpreted as regex backreferences).
-    Kept here rather than in embed_dashboard_data.py since this is
-    specifically about snapshot bookkeeping, not the real-tool results
-    that module embeds - see the module docstring for why this is
-    embedded rather than fetched at runtime."""
-    html = html_path.read_text()
+    `source_desc` is just for the error message, identifying which HTML
+    (a path, or "the deploy site's index.html") failed to match.
+
+    Shared by `_embed_snapshot_manifest` (mutates a dev's local
+    qa-reporting-dashboard.html after `take_snapshot()`) and
+    `prepare_deploy_site` (embeds into the CI-built _site/index.html) -
+    see prepare_deploy_site's own docstring for why the latter needs
+    this at all: embed_dashboard_data.py deliberately never touches
+    SNAPSHOT_MANIFEST (it owns the other 3 consts only), so without this
+    call here too, the deployed site's picker would always see the
+    template's empty placeholder, never the real committed manifest -
+    a real bug found 2026-09-17 (Keith: "I'm not seeing any snapshots on
+    the live published dashboard") despite every snapshot file itself
+    being correctly decompressed into _site/snapshots/."""
     manifest_json = json.dumps(manifest, separators=(",", ":"))
     new_line = f"const SNAPSHOT_MANIFEST = {manifest_json};\n"
 
@@ -284,10 +310,23 @@ def _embed_snapshot_manifest(html_path: Path, manifest: list) -> None:
     html, n = pattern.subn(lambda _m: new_line, html, count=1)
     if n != 1:
         raise RuntimeError(
-            f"Could not find exactly one 'const SNAPSHOT_MANIFEST = ...;' line in {html_path} "
+            f"Could not find exactly one 'const SNAPSHOT_MANIFEST = ...;' line in {source_desc} "
             f"to replace (found {n}) - has the dashboard's structure changed?"
         )
+    return html
+
+
+def _embed_snapshot_manifest(html_path: Path, manifest: list) -> None:
+    """Regenerates `html_path`'s own `SNAPSHOT_MANIFEST` const in place -
+    see `_embed_snapshot_manifest_into_html` for the actual replacement
+    logic, shared with `prepare_deploy_site`."""
+    html = _embed_snapshot_manifest_into_html(html_path.read_text(), manifest, str(html_path))
     html_path.write_text(html)
+
+
+def _read_manifest(snapshots_dir: Path) -> list:
+    manifest_path = snapshots_dir / "manifest.json"
+    return json.loads(manifest_path.read_text()) if manifest_path.exists() else []
 
 
 def main() -> None:

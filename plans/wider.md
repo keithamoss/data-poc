@@ -1272,6 +1272,52 @@ not a schedule.
     taken - it re-embeds AFTER archiving, not before, so a snapshot
     never "knows about" itself or later snapshots.
 
+    **Real bug found and fixed, 2026-09-17** (Keith: "I'm not seeing
+    any snapshots on the live published dashboard. I thought we'd done
+    that."): the picker had been genuinely broken on the LIVE published
+    site since Phase 3's template/build-output split, not visible
+    locally because a dev's own `dashboard/qa-reporting-dashboard.html`
+    had already been manifest-embedded in place by a previous
+    `take_snapshot()` call in the same working tree (a side effect that
+    file itself is gitignored, never committed). Root cause: `_embed_
+    snapshot_manifest()` was only ever called from `take_snapshot()` -
+    `embed_dashboard_data.py` explicitly never touches `SNAPSHOT_
+    MANIFEST` (its own docstring: "the separate SNAPSHOT_MANIFEST const
+    dashboard/snapshot_dashboard.py owns"), and `prepare_deploy_site()`
+    (what CI's "Prepare site" step actually calls) just byte-copied
+    `qa-reporting-dashboard.html` straight to `_site/index.html` with no
+    manifest embed at all. So every CI build - a fresh checkout, no
+    prior local mutation - shipped `_site/index.html` with the
+    template's untouched placeholder (`const SNAPSHOT_MANIFEST = [];`),
+    even though every individual snapshot file WAS correctly landing in
+    `_site/snapshots/` and openable directly by URL. The picker panel's
+    own `if(!SNAPSHOT_MANIFEST.length)` branch rendered "No snapshots
+    yet" on every real deploy since this split - not a design gap or a
+    recent regression, just never actually verified against a real
+    fresh-checkout CI build until Keith looked at the live site itself
+    (earlier "verified in the live picker" claims, item 53's included,
+    were checking a locally-mutated file, not the deployed artifact).
+
+    Fixed by extracting the regex-replace itself into a shared
+    `_embed_snapshot_manifest_into_html(html, manifest, source_desc)`
+    (both `_embed_snapshot_manifest()` - `take_snapshot()`'s local
+    mutate-in-place path - and `prepare_deploy_site()` now call it), and
+    a small `_read_manifest(snapshots_dir)` helper. `prepare_deploy_
+    site()` now reads the real, committed `manifest.json` and embeds it
+    into the `_site/index.html` copy specifically - `html_path` on disk
+    stays untouched, same one-way relationship `embed_dashboard_data.py`
+    already has with its own gitignored build output. Added a
+    regression test (`test_prepare_deploy_site_embeds_the_real_
+    manifest_into_index_html`) that reproduces the bug against a real
+    manifest.json with an actual entry and fails without the fix.
+    Verified end to end against this repo's real 5-entry `dashboard/
+    snapshots/manifest.json`: ran the exact CI sequence locally
+    (`embed_dashboard_data` -> `snapshot_dashboard --prepare-site`) and
+    confirmed with real headless Chromium that the picker panel lists
+    all 5 real snapshots (dates, commit SHAs, sizes) rather than "No
+    snapshots yet." `uv run pytest` (178, up from 177) and `uv run ruff
+    check .` both clean.
+
     Verified end to end with Playwright, not just unit-tested: served a
     real simulation of the Pages deploy output (`gunzip` step run
     locally, exactly as the workflow does it) over a local HTTP server,

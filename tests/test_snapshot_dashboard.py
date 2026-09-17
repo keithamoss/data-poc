@@ -298,6 +298,43 @@ def test_prepare_deploy_site_decompresses_every_committed_snapshot(tmp_path):
     assert (site_snapshots_dir / "manifest.json").read_text() == '[{"file": "irrelevant"}]'
 
 
+def test_prepare_deploy_site_embeds_the_real_manifest_into_index_html(tmp_path):
+    # The actual bug (found 2026-09-17, Keith: "I'm not seeing any
+    # snapshots on the live published dashboard"): prepare_deploy_site()
+    # used to byte-copy html_path straight through, so the deployed
+    # site's SNAPSHOT_MANIFEST const stayed at the template's empty `[]`
+    # placeholder forever - embed_dashboard_data.py deliberately never
+    # touches that const (it owns the other 3), and _embed_snapshot_manifest
+    # was only ever called from take_snapshot(), which never runs in CI.
+    # Every snapshot .gz file landed correctly in _site/snapshots/, but
+    # the picker panel on the live page had nothing to list.
+    html_path = _write_fake_dashboard(tmp_path, "<html>the live dashboard</html>\nconst SNAPSHOT_MANIFEST = [];\n")
+    snapshots_dir = tmp_path / "snapshots"
+    snapshots_dir.mkdir()
+    with gzip.open(snapshots_dir / "20260916T000000Z_abc1234.html.gz", "wb") as f:
+        f.write(b"<html>archived snapshot one</html>")
+    real_manifest = [{
+        "file": "20260916T000000Z_abc1234.html.gz",
+        "taken_at": "2026-09-16T00:00:00+00:00",
+        "commit_sha": "abc1234",
+        "raw_size_bytes": 100,
+        "compressed_size_bytes": 40,
+    }]
+    (snapshots_dir / "manifest.json").write_text(json.dumps(real_manifest))
+    site_dir = tmp_path / "_site"
+
+    snapshot_dashboard.prepare_deploy_site(site_dir, html_path=html_path, snapshots_dir=snapshots_dir)
+
+    index_html = (site_dir / "index.html").read_text()
+    match = re.search(r"const SNAPSHOT_MANIFEST = (\[.*?\]);", index_html)
+    assert match, "expected a SNAPSHOT_MANIFEST const in the deployed index.html"
+    assert json.loads(match.group(1)) == real_manifest, \
+        "the deployed index.html must embed the real committed manifest.json, not the template's empty placeholder"
+    # html_path itself (the committed/gitignored dashboard file, never
+    # the deploy artifact) must stay untouched - only the site copy gets it.
+    assert "const SNAPSHOT_MANIFEST = [];" in html_path.read_text()
+
+
 def test_prepare_deploy_site_is_a_clean_noop_for_snapshots_when_none_exist(tmp_path):
     html_path = _write_fake_dashboard(tmp_path)
     site_dir = tmp_path / "_site"
