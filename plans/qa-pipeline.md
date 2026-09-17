@@ -3210,6 +3210,63 @@ relative, not a schedule — this is weeks of work, not months.
     current run of phases (5d and whatever follows) is done, not to
     build or even design it now.
 
+    **Resolved and built, 2026-09-17 (Phase 5h) - the promised later
+    discussion, then the build.** Scoped via two rounds of
+    AskUserQuestion (Keith's own instruction, "let's do 62"), each
+    answer taking the recommended option except placement: (1) source -
+    a hand-maintained `CHANGELOG.md`, not derived from `qa_results/` or
+    real git commit messages (those exist, but this needs curated,
+    presentable prose, not a mechanical dump); (2) scope - the WHOLE
+    repo's real history, not dashboard-features-only; (3) audience -
+    "something presentable to others too," so entries are genuine
+    release-notes prose, not raw commit-log style; (4) file format -
+    Keep a Changelog style, date-sectioned markdown (`## <date>` /
+    `### <category>` / bullets), not structured YAML/JSON; (5) backfill -
+    the real project history's major milestones curated in (~25 entries
+    across 5 real dates, not all ~130 granular work items, not started
+    empty either); (6) placement - a 6th header button, same row as the
+    other panel-triggering buttons, Keith's own explicit call despite
+    item 63's mobile-crowding flag (not yet addressed, now measurably
+    worse - still open).
+
+    Built: `CHANGELOG.md` at the repo root, backfilled from real `git
+    log` history (pulled directly for accurate real dates, not
+    reconstructed from memory) into 5 dated sections (2026-09-13 through
+    2026-09-17) covering the genuinely significant shipped milestones -
+    the original real-tools wiring, Child Protection's addition, the
+    full check-battery triplication, the whole publishing/check-
+    lifecycle architecture, the as-of picker, and this session's Phase 5
+    sub-phases. `dashboard/changelog_md.py`'s `parse_changelog()` - a
+    small, deliberately narrow line-based parser (no full CommonMark,
+    matching the file's own constrained style: date headings, category
+    subheadings, bullets, multi-line-wrapped bullets joined back
+    together, intro paragraphs before the first heading) - turns that
+    file into `{intro, entries}`, embedded by `embed_dashboard_data.py`
+    into a new `RELEASE_NOTES` const (distinct from the existing
+    `CHANGELOG_FEED` const - three different "changelog"-shaped things
+    now exist in this codebase, at three different scopes: per-check,
+    per-QA-publish, per-tool-release). A new "🗒 Release notes" header
+    button opens a side panel (same drawer/backdrop mechanism as every
+    other header button), rendering each dated entry's sections/bullets,
+    with a small inline-code-span formatter (`` `text` `` → `<code>`,
+    trusted build-time content, not user input, so a plain regex swap is
+    enough - no real markdown-inline parsing needed for just this one
+    form). Added `CHANGELOG.md` to `deploy-pages.yml`'s trigger paths
+    (a real, easy-to-miss gap: without it, a future CHANGELOG-only edit
+    wouldn't have redeployed the live page at all) - found and fixed
+    while building, not left for later.
+
+    7 new tests (`tests/test_changelog_md.py`) against small fixture
+    markdown strings, not the real committed file (whose own content
+    changes over time and isn't what the parser's correctness depends
+    on): single/multiple entries and sections, file-order preservation
+    (never re-sorted), multi-line bullet joining, intro-paragraph
+    capture, and the empty-file edge case. Verified against the real
+    file too, via real headless Chromium: the panel opens/closes
+    correctly, renders all 5 real dated entries (23 real bullet items,
+    7 real inline-code spans), zero console errors. Full `uv run
+    pytest` (188, up from 181) and `uv run ruff check .` both clean.
+
 63. **[parked, 2026-09-17 - for after this phase wraps, Keith's own
     call]** Mobile-responsive pass on the header - "it's getting a bit
     crowded." Real, not hypothetical: the header now holds 5 items

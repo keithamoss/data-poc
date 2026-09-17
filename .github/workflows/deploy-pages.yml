@@ -115,6 +115,7 @@ on:
       - "qa_tools/**"
       - "pipeline/**"
       - "dashboard/**"
+      - "CHANGELOG.md" # item 62's "Release notes" panel embeds this file's own content at build time
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 

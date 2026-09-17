@@ -379,6 +379,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
       <button class="snapshots-btn" id="theme-btn" type="button">🌙 Dark mode</button>
       <button class="snapshots-btn" id="asof-btn" type="button">📅 As of: <span id="asof-btn-label">…</span></button>
       <button class="snapshots-btn" id="activity-btn" type="button">📋 Recent activity</button>
+      <button class="snapshots-btn" id="changelog-btn" type="button">🗒 Release notes</button>
       <button class="snapshots-btn" id="snapshots-btn" type="button">🕐 Past snapshots</button>
       <div class="live"><span class="dot"></span><span id="clock-text">Live · updated moments ago</span></div>
     </div>
@@ -488,6 +489,26 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
     <button class="drawer-close" id="activity-panel-close" aria-label="Close">✕</button>
   </div>
   <div class="drawer-body" id="activity-panel-body"></div>
+</aside>
+
+<!-- Item 62 (plans/qa-pipeline.md, Phase 5h) - "what changed about the
+     PoC/tool itself over time," deliberately distinct from the activity
+     panel just above (that's data-QA-activity; this is the tool's own
+     development history - see RELEASE_NOTES' own comment where it's
+     declared). Same interaction pattern as every other header-button
+     panel, reused deliberately (Keith's own placement call, despite
+     item 63's mobile-header-crowding flag - a 6th button now, not yet
+     addressed). -->
+<div class="backdrop" id="changelog-backdrop"></div>
+<aside class="drawer" id="changelog-panel" aria-hidden="true">
+  <div class="drawer-head">
+    <div>
+      <div class="legend-key" style="margin:0 0 4px;">Tool development history</div>
+      <h3>Release notes</h3>
+    </div>
+    <button class="drawer-close" id="changelog-panel-close" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body" id="changelog-panel-body"></div>
 </aside>
 
 <script>
@@ -623,6 +644,20 @@ function checkStatus(check){ if(check.current>check.fail) return "red"; if(check
    committed_at can't be safely self-recorded at commit time). Sorted
    newest-committed-first, capped to the last 30 entries.
 
+   RELEASE_NOTES — item 62's "🗒 Release notes" panel (plans/qa-
+   pipeline.md, Phase 5h): "what changed about the PoC/tool itself over
+   time" - a genuinely different feed from CHANGELOG_FEED above (that
+   one is data-QA-activity; this one is the tool's own development
+   history). Deliberately NOT derived from qa_results/ or real git
+   commit messages - a hand-maintained ../CHANGELOG.md (repo root),
+   parsed by dashboard/changelog_md.py's parse_changelog() and embedded
+   by dashboard/embed_dashboard_data.py - same "placeholder here, real
+   data only in the built output" treatment as everything else on this
+   page. Shape: {intro: [string, ...], entries: [{date, sections:
+   [{category, items: [string, ...]}, ...]}, ...]} - entries in the
+   file's own top-to-bottom order (Keep a Changelog convention: newest
+   first), never re-sorted here.
+
    A prior generation of this pipeline also ran four hand-written
    equivalent check engines (engines/*.py, built when the original
    session had no PyPI access) and merged their output with the real
@@ -636,6 +671,7 @@ const REAL_CP_DATA = null;
 const SNAPSHOT_MANIFEST = [];
 const AS_OF_OFFSET_DAYS = null;
 const CHANGELOG_FEED = [];
+const RELEASE_NOTES = {intro:[], entries:[]};
 
 // Shared by Birth Registrations (a single dataset) and Child Protection
 // (6 datasets, one per table) - both are reshaped server-side into this
@@ -2290,6 +2326,63 @@ function closeActivityPanel(){
 document.getElementById("activity-btn").addEventListener("click", openActivityPanel);
 document.getElementById("activity-backdrop").addEventListener("click", closeActivityPanel);
 document.getElementById("activity-panel-close").addEventListener("click", closeActivityPanel);
+
+// Item 62 (plans/qa-pipeline.md, Phase 5h) - "Release notes": renders
+// RELEASE_NOTES' own {intro, entries} shape (dashboard/changelog_md.py's
+// parse_changelog() output) as a real, readable page inside the same
+// side-panel mechanism every other header button already uses. Static
+// content (no click-through/filtering) - unlike the activity panel,
+// there's no per-row navigation target, just prose to read.
+// CHANGELOG.md's own prose uses plain markdown inline-code spans
+// (`like this`) for file/module names - this is trusted, build-time-
+// embedded content (same authorship/trust level as every other RELEASE_
+// NOTES-adjacent const on this page), not user input, so a plain regex
+// swap to <code> is enough; no need for a real markdown parser just for
+// this one inline form.
+function mdInlineCode(s){ return s.replace(/`([^`]+)`/g, "<code>$1</code>"); }
+function renderChangelogPanel(){
+  const body = document.getElementById("changelog-panel-body");
+  if(!RELEASE_NOTES.entries.length){
+    body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
+      No release notes yet — this page renders the repo's own committed
+      <code>CHANGELOG.md</code>, hand-maintained alongside real work.
+    </div>`;
+    return;
+  }
+  const intro = RELEASE_NOTES.intro.map(p=>
+    `<div style="font-size:12.5px; color:var(--ink-muted); margin-bottom:10px;">${mdInlineCode(p)}</div>`
+  ).join("");
+  const entries = RELEASE_NOTES.entries.map(e=>{
+    const sections = e.sections.map(s=> `
+      <div class="drawer-section" style="margin-bottom:14px;">
+        <h4>${s.category}</h4>
+        <ul style="margin:0; padding-left:18px; font-size:13px; line-height:1.55;">
+          ${s.items.map(item=>`<li style="margin-bottom:4px;">${mdInlineCode(item)}</li>`).join("")}
+        </ul>
+      </div>`
+    ).join("");
+    return `
+      <div style="margin-bottom:24px; padding-bottom:20px; border-bottom:1px solid var(--line);">
+        <div style="font:700 15px 'IBM Plex Mono',monospace; margin-bottom:12px;">${e.date}</div>
+        ${sections}
+      </div>`;
+  }).join("");
+  body.innerHTML = `<div style="margin-bottom:18px;">${intro}</div>${entries}`;
+}
+function openChangelogPanel(){
+  renderChangelogPanel();
+  document.getElementById("changelog-backdrop").classList.add("open");
+  document.getElementById("changelog-panel").classList.add("open");
+  document.getElementById("changelog-panel").setAttribute("aria-hidden","false");
+}
+function closeChangelogPanel(){
+  document.getElementById("changelog-backdrop").classList.remove("open");
+  document.getElementById("changelog-panel").classList.remove("open");
+  document.getElementById("changelog-panel").setAttribute("aria-hidden","true");
+}
+document.getElementById("changelog-btn").addEventListener("click", openChangelogPanel);
+document.getElementById("changelog-backdrop").addEventListener("click", closeChangelogPanel);
+document.getElementById("changelog-panel-close").addEventListener("click", closeChangelogPanel);
 
 // Thread C - as-of date picker. rebuildData() throws the current DATA
 // away and rebuilds it from scratch against the new date (see buildData()
