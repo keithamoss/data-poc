@@ -2479,6 +2479,46 @@ left, if ever revisited: `synthetic_data_generator/` test coverage
 action item), and the "deliberately NOT done" `check_dashboard_renders.py`
 folding question just above.
 
+**Real gap found after the fact, 2026-09-17 (Phase 7) - Keith's own
+report: "the last GitHub Actions run failed."** Every single `test.yml`
+("Run test suite") run had actually been failing since Phase 6 step 2
+landed - CI's own resolved Python version silently diverged from what
+every local verification this whole session used. `pyproject.toml`'s
+`requires-python = ">=3.11"` has no upper bound and no `.python-version`
+file existed, so `uv sync` picked whatever newest-compatible Python the
+`ubuntu-latest` runner happened to offer - Python 3.12 - while every
+local run in this session (and the sandbox's own system Python) was
+3.11.15. Two real incompatibilities only show up on 3.12: Soda Core's
+own `soda/common/env_helper.py` does `from distutils.util import
+strtobool` - `distutils` was removed from the stdlib in 3.12, so every
+Soda-based test failed with `ModuleNotFoundError`; and the real `dbt
+build` subprocess (same likely root cause, dbt-core/dbt-duckdb under
+3.12) silently failed to write `target/manifest.json` at all, so every
+dbt-based test failed with a real `FileNotFoundError` trying to read
+it. `deploy-pages.yml` (the actual site-publish gate) was NEVER
+affected - it only reads pre-committed `qa_results/` JSON, no real
+Soda import or dbt subprocess call, so the live site has been fine
+throughout; only the newer pytest-based CI gate (Phase 6 step 1) was
+silently red, for the entire span this session's own local
+verification kept reporting green. Fixed with the standard `uv`
+mechanism: a committed `.python-version` file pinning `3.11` (`uv
+python pin 3.11`), so `uv sync` resolves the same interpreter
+everywhere - locally, in `test.yml`, and in `deploy-pages.yml` (was
+already unaffected, now pinned too for consistency). Confirmed the
+real cause locally first (Python 3.11.15's own `distutils` still
+exists, just deprecated - the same Soda import warns but succeeds) 
+before writing the fix, then pushed and watched the actual GitHub
+Actions run (not just local pytest) to confirm green - see this
+session's own transcript for the exact run checked. **Process note for
+future sessions**: a CI gate this project pushes to is only real
+enforcement if someone actually checks the Actions tab after pushing -
+this went unnoticed for 8 commits/2+ hours purely because local
+verification kept passing and nothing prompted a check of the actual
+run. Worth periodically confirming CI is still green, not just
+assuming a passing local suite implies a passing CI one, given they
+can silently diverge on environment details neither `pytest` nor `ruff`
+would ever surface.
+
 ## Doc updates needed once this starts landing
 
 - `CLAUDE.md`: the `data/raw/`, `reports/*.json` gitignored-convention
