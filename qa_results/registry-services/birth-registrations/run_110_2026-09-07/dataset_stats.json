@@ -1,5 +1,5 @@
 {
-  "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+  "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
   "run_by": "fpycnkgvmt@privaterelay.appleid.com",
   "raw_output": {
     "manifest_entry": {
@@ -12,7 +12,7 @@
       "run_date": "2026-09-07",
       "is_resupply": false,
       "supersedes_run_id": null,
-      "n_rows_generated": 1612,
+      "n_rows_generated": 1614,
       "dirty_severity": "amber",
       "id_offset": 11000000,
       "seed": 1110,
@@ -22,15 +22,15 @@
       "sex": [
         [
           "M",
-          798
+          815
         ],
         [
           "F",
-          773
+          761
         ],
         [
           "X",
-          29
+          26
         ],
         [
           "(invalid code)",
@@ -39,8 +39,8 @@
       ]
     },
     "arrival": {
-      "max_lag_hours": 19.0,
-      "earliest_extract": "2026-09-06 20:00:00"
+      "max_lag_hours": 7.384444444444444,
+      "earliest_extract": "2026-09-07 06:39:04.308522"
     },
     "check_aggregates": {
       "sex": {
@@ -53,11 +53,11 @@
             "count": 5
           },
           {
-            "value": "U",
+            "value": "O",
             "count": 4
           },
           {
-            "value": "O",
+            "value": "U",
             "count": 3
           }
         ]
@@ -68,23 +68,19 @@
         "total_invalid": 13,
         "values": [
           {
+            "value": "Not stated",
+            "count": 4
+          },
+          {
+            "value": "Perth Metro",
+            "count": 4
+          },
+          {
             "value": "Freemantle",
             "count": 4
           },
           {
             "value": "Unknown",
-            "count": 3
-          },
-          {
-            "value": "Not stated",
-            "count": 3
-          },
-          {
-            "value": "Perth Metro",
-            "count": 2
-          },
-          {
-            "value": "TBC",
             "count": 1
           }
         ]
@@ -98,10 +94,14 @@
         "values": [
           {
             "value": "1850-06-15",
-            "count": 3
+            "count": 2
           },
           {
             "value": "1750-01-01",
+            "count": 1
+          },
+          {
+            "value": "1820-11-30",
             "count": 1
           }
         ],
@@ -111,8 +111,12 @@
             "count": 1
           },
           {
+            "bucket": "1816-12-20 to 1833-09-17",
+            "count": 1
+          },
+          {
             "bucket": "1833-09-17 to 1850-06-15",
-            "count": 3
+            "count": 2
           }
         ]
       }

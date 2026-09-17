@@ -1,5 +1,5 @@
 {
-  "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+  "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
   "run_by": "fpycnkgvmt@privaterelay.appleid.com",
   "raw_output": {
     "manifest_entry": {
@@ -12,7 +12,7 @@
       "run_date": "2026-06-21",
       "is_resupply": false,
       "supersedes_run_id": null,
-      "n_rows_generated": 1291,
+      "n_rows_generated": 1287,
       "dirty_severity": "red",
       "id_offset": 3200000,
       "seed": 1032,
@@ -22,43 +22,43 @@
       "sex": [
         [
           "M",
-          593
+          598
         ],
         [
           "F",
-          635
+          621
         ],
         [
           "X",
-          20
+          24
         ],
         [
           "(invalid code)",
-          43
+          44
         ]
       ]
     },
     "arrival": {
-      "max_lag_hours": 19.0,
-      "earliest_extract": "2026-06-20 20:00:00"
+      "max_lag_hours": 7.042222222222223,
+      "earliest_extract": "2026-06-21 06:18:32.611989"
     },
     "check_aggregates": {
       "sex": {
         "type": "categorical",
         "suppressed": false,
-        "total_invalid": 43,
+        "total_invalid": 44,
         "values": [
           {
             "value": "O",
-            "count": 17
+            "count": 16
+          },
+          {
+            "value": "9",
+            "count": 14
           },
           {
             "value": "U",
             "count": 14
-          },
-          {
-            "value": "9",
-            "count": 12
           }
         ]
       },
@@ -68,24 +68,24 @@
         "total_invalid": 32,
         "values": [
           {
-            "value": "Unknown",
-            "count": 10
-          },
-          {
             "value": "Freemantle",
             "count": 9
           },
           {
-            "value": "Not stated",
-            "count": 5
+            "value": "Unknown",
+            "count": 8
           },
           {
             "value": "TBC",
+            "count": 8
+          },
+          {
+            "value": "Not stated",
             "count": 4
           },
           {
             "value": "Perth Metro",
-            "count": 4
+            "count": 3
           }
         ]
       },
@@ -101,16 +101,16 @@
             "count": 6
           },
           {
-            "value": "1899-01-01",
-            "count": 4
+            "value": "1850-06-15",
+            "count": 6
           },
           {
             "value": "1820-11-30",
-            "count": 3
+            "count": 2
           },
           {
-            "value": "1850-06-15",
-            "count": 3
+            "value": "1899-01-01",
+            "count": 2
           }
         ],
         "histogram": [
@@ -120,15 +120,15 @@
           },
           {
             "bucket": "1799-09-01 to 1824-07-02",
-            "count": 3
+            "count": 2
           },
           {
             "bucket": "1849-05-02 to 1874-03-02",
-            "count": 3
+            "count": 6
           },
           {
             "bucket": "1874-03-02 to 1899-01-01",
-            "count": 4
+            "count": 2
           }
         ]
       }

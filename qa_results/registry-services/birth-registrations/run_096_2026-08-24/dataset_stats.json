@@ -1,5 +1,5 @@
 {
-  "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+  "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
   "run_by": "fpycnkgvmt@privaterelay.appleid.com",
   "raw_output": {
     "manifest_entry": {
@@ -12,7 +12,7 @@
       "run_date": "2026-08-24",
       "is_resupply": false,
       "supersedes_run_id": null,
-      "n_rows_generated": 1607,
+      "n_rows_generated": 1606,
       "dirty_severity": "amber",
       "id_offset": 9600000,
       "seed": 1096,
@@ -22,15 +22,15 @@
       "sex": [
         [
           "M",
-          816
+          811
         ],
         [
           "F",
-          756
+          757
         ],
         [
           "X",
-          26
+          29
         ],
         [
           "(invalid code)",
@@ -39,8 +39,8 @@
       ]
     },
     "arrival": {
-      "max_lag_hours": 19.0,
-      "earliest_extract": "2026-08-23 20:00:00"
+      "max_lag_hours": 8.016944444444444,
+      "earliest_extract": "2026-08-24 07:17:01.892698"
     },
     "check_aggregates": {
       "sex": {
@@ -50,15 +50,15 @@
         "values": [
           {
             "value": "O",
-            "count": 4
-          },
-          {
-            "value": "U",
-            "count": 3
+            "count": 5
           },
           {
             "value": "9",
-            "count": 2
+            "count": 3
+          },
+          {
+            "value": "U",
+            "count": 1
           }
         ]
       },
@@ -69,7 +69,7 @@
         "values": [
           {
             "value": "Perth Metro",
-            "count": 4
+            "count": 5
           },
           {
             "value": "Not stated",
@@ -77,10 +77,6 @@
           },
           {
             "value": "TBC",
-            "count": 1
-          },
-          {
-            "value": "Freemantle",
             "count": 1
           },
           {
@@ -94,25 +90,33 @@
         "suppressed": false,
         "total_invalid": 3,
         "min": "1820-11-30",
-        "max": "1850-06-15",
+        "max": "1899-01-01",
         "values": [
           {
-            "value": "1850-06-15",
-            "count": 2
+            "value": "1820-11-30",
+            "count": 1
           },
           {
-            "value": "1820-11-30",
+            "value": "1850-06-15",
+            "count": 1
+          },
+          {
+            "value": "1899-01-01",
             "count": 1
           }
         ],
         "histogram": [
           {
-            "bucket": "1820-11-30 to 1825-11-02",
+            "bucket": "1820-11-30 to 1833-12-05",
             "count": 1
           },
           {
-            "bucket": "1845-07-12 to 1850-06-15",
-            "count": 2
+            "bucket": "1846-12-11 to 1859-12-16",
+            "count": 1
+          },
+          {
+            "bucket": "1885-12-26 to 1899-01-01",
+            "count": 1
           }
         ]
       }

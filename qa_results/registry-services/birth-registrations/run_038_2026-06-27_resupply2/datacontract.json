@@ -1,8 +1,8 @@
 {
-  "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+  "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
   "run_by": null,
   "raw_output": {
-    "runId": "260ee737-5e4a-4903-a999-b0b7b79c172f",
+    "runId": "7bf8d795-7e0f-4a09-bc5b-a16eafe4a199",
     "datacontractCliVersion": "1.2.0",
     "dataContractId": "bdm-birth-registrations",
     "dataContractVersion": "1.0.0",
@@ -10,13 +10,13 @@
     "outputPortId": null,
     "server": "local_test",
     "filters": null,
-    "timestampStart": "2026-09-17 14:29:25.960915+00:00",
-    "timestampEnd": "2026-09-17 14:29:28.334585+00:00",
+    "timestampStart": "2026-09-17 15:17:10.412912+00:00",
+    "timestampEnd": "2026-09-17 15:17:12.810955+00:00",
     "result": "failed",
     "dryRun": false,
     "checks": [
       {
-        "id": "a2d8bf28-2244-47a0-8aeb-222df5c38ab5",
+        "id": "d41fdd4b-e649-4c50-99ac-1d19bd5ae855",
         "key": "birth_registrations__registration_number__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -40,7 +40,7 @@
         "failedSamples": null
       },
       {
-        "id": "44d76127-9dfc-4880-83cc-e705b61f62ac",
+        "id": "fbb613a6-8b1b-4951-b287-d808b00084c5",
         "key": "birth_registrations__registration_number__field_required",
         "category": "schema",
         "type": "field_required",
@@ -61,13 +61,13 @@
           "field": "registration_number",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "ec4c1956-abbc-42c4-a76b-f89b4b5dc319",
+        "id": "49cf6d36-1722-4e4c-b835-bf472b5b23e3",
         "key": "birth_registrations__registration_number__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -88,13 +88,13 @@
           "field": "registration_number",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_rows": 0
         },
         "failedSamples": null
       },
       {
-        "id": "1ee95b0a-dfe9-4d0e-ba93-c3bba15dff2d",
+        "id": "1be16f0d-862e-4ce7-8599-0533ac1d2435",
         "key": "birth_registrations__registration_number__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -116,13 +116,13 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "9f938e64-bcb5-4af4-a836-c8784d815928",
+        "id": "464400ee-d084-4e2b-b217-5240b8316415",
         "key": "birth_registrations__registration_number__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -144,7 +144,7 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0,
           "constraint": {
             "pattern": "^BDM-[0-9]{9}$"
@@ -153,7 +153,7 @@
         "failedSamples": null
       },
       {
-        "id": "9da84a04-b816-451e-aeb3-5e17c41333c6",
+        "id": "e4294cf8-880c-4ee6-90f7-b2d236ce25a4",
         "key": "birth_registrations__registration_number__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -175,13 +175,13 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_rows": 0
         },
         "failedSamples": null
       },
       {
-        "id": "9e95a18c-be3d-4571-b2e4-d43b05772e56",
+        "id": "a270cea9-4185-40c9-8796-9d226e161c91",
         "key": "birth_registrations__child_given_names__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -205,7 +205,7 @@
         "failedSamples": null
       },
       {
-        "id": "73d788eb-e317-4648-9e7f-5a35a61eb5a9",
+        "id": "d43ae10c-c629-4595-9d4e-68c219f32b38",
         "key": "birth_registrations__child_given_names__field_required",
         "category": "schema",
         "type": "field_required",
@@ -226,13 +226,13 @@
           "field": "child_given_names",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "16bb6559-38b4-4c7f-8b29-6cf82b8b97c1",
+        "id": "888edd93-178d-4450-b72b-20fdabf493a2",
         "key": "birth_registrations__child_given_names__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -255,14 +255,14 @@
           "unit": "percent",
           "severity": "error",
           "threshold": "< 1",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0,
           "percent": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "94d7945e-805e-41bb-9321-745d904ae61c",
+        "id": "a794360e-4fde-4f9b-9615-e771823d80aa",
         "key": "birth_registrations__child_given_names__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -284,7 +284,7 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0,
           "constraint": {
             "pattern": "^[A-Za-z][A-Za-z. -]*$"
@@ -293,7 +293,7 @@
         "failedSamples": null
       },
       {
-        "id": "e1359989-db90-4405-8ea6-7b1978feccb5",
+        "id": "07c252a7-b24f-4029-8391-0a4562b79fae",
         "key": "birth_registrations__child_family_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -317,7 +317,7 @@
         "failedSamples": null
       },
       {
-        "id": "ec62c7ae-d377-4578-ac72-529a88ae5765",
+        "id": "a42dd407-88c0-42fb-a1a2-d3c7ad57750d",
         "key": "birth_registrations__child_family_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -338,13 +338,13 @@
           "field": "child_family_name",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "08fa778a-f08b-4f7f-bc07-9dafd05179be",
+        "id": "8129f2c9-9a47-4c04-8191-f12fc6a4cda7",
         "key": "birth_registrations__child_family_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -367,14 +367,14 @@
           "unit": "percent",
           "severity": "error",
           "threshold": "< 1",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0,
           "percent": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "e1d0efca-3e8a-4372-ba35-0888d640a5c8",
+        "id": "d66c55d8-b5cd-492b-ba77-d658d6011057",
         "key": "birth_registrations__child_family_name__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -396,7 +396,7 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0,
           "constraint": {
             "pattern": "^[A-Za-z][A-Za-z. -]*$"
@@ -405,7 +405,7 @@
         "failedSamples": null
       },
       {
-        "id": "5ecea6b4-f5a9-4cf9-9b43-9b85c573df2f",
+        "id": "d51e942d-3f49-45d0-bbe7-9d35dde5703a",
         "key": "birth_registrations__date_of_birth__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -429,7 +429,7 @@
         "failedSamples": null
       },
       {
-        "id": "68e25bf9-149a-44f2-8029-5597a18182d9",
+        "id": "a4831e82-a41d-4a2b-9aac-919152889d36",
         "key": "birth_registrations__date_of_birth__field_required",
         "category": "schema",
         "type": "field_required",
@@ -450,13 +450,13 @@
           "field": "date_of_birth",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "cdc376ee-6c5b-4032-beb9-b1cf184af4f0",
+        "id": "799f2349-53bb-4da2-b46f-d71fa7e940b6",
         "key": "birth_registrations__date_of_birth__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -478,13 +478,13 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "41e314f3-261e-45d6-9af2-ce555982d1bf",
+        "id": "22767903-92b6-4738-96a2-f694e69ad4a5",
         "key": "birth_registrations__date_of_birth__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -510,7 +510,7 @@
         "failedSamples": null
       },
       {
-        "id": "e60ac1dd-45af-4a83-9b06-8d714dc0d9f8",
+        "id": "51ebdf71-467a-4113-b0bc-fe380b544608",
         "key": "birth_registrations__date_of_birth__quality_sql_2",
         "category": "quality",
         "type": "field_quality_sql",
@@ -536,7 +536,7 @@
         "failedSamples": null
       },
       {
-        "id": "ba70c84d-d711-4017-97c9-06a99c59c1ae",
+        "id": "4fc919e1-9c2c-4ba7-aa06-1ee54ffb8bd4",
         "key": "birth_registrations__sex__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -560,7 +560,7 @@
         "failedSamples": null
       },
       {
-        "id": "0026e41b-d4b0-4648-8cbf-b6e446c3146f",
+        "id": "ef210b84-55a5-4065-ac39-1e5cdfcb98a1",
         "key": "birth_registrations__sex__field_required",
         "category": "schema",
         "type": "field_required",
@@ -581,13 +581,13 @@
           "field": "sex",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "a150e416-2496-44cf-b52e-b0f331474e02",
+        "id": "e1e32cd2-d24a-4370-b5ef-213c3f8067fa",
         "key": "birth_registrations__sex__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -609,7 +609,7 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0,
           "constraint": {
             "valid_values": [
@@ -622,7 +622,7 @@
         "failedSamples": null
       },
       {
-        "id": "3b65381d-38d5-4b65-acf9-0026e4b7b41a",
+        "id": "11c6c945-2f39-40c0-aa85-434ec1600923",
         "key": "birth_registrations__place_of_birth_suburb__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -646,7 +646,7 @@
         "failedSamples": null
       },
       {
-        "id": "b515b1af-14ac-4278-9b06-35571bb132b2",
+        "id": "93cb58c9-4e5a-4f67-a74c-d29910146d77",
         "key": "birth_registrations__place_of_birth_suburb__field_required",
         "category": "schema",
         "type": "field_required",
@@ -667,13 +667,13 @@
           "field": "place_of_birth_suburb",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "8b694840-f07f-4afb-a2d2-f9997328ba28",
+        "id": "0edd6bc7-a0cb-4230-a108-e421902ea2c3",
         "key": "birth_registrations__place_of_birth_suburb__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -696,14 +696,14 @@
           "unit": "percent",
           "severity": "warning",
           "threshold": "< 2",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0,
           "percent": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "be83d8a6-452d-4c42-8b67-84b812af8f69",
+        "id": "2607cc60-ed54-4f7a-8d3d-ea30dd2279a3",
         "key": "birth_registrations__place_of_birth_suburb__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -725,7 +725,7 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0,
           "constraint": {
             "valid_values": [
@@ -786,7 +786,7 @@
         "failedSamples": null
       },
       {
-        "id": "9cabcb99-c3e6-4957-b2ee-0883073a68f7",
+        "id": "22124442-ea91-4f40-8829-ae66bb5a23ac",
         "key": "birth_registrations__place_of_birth_facility__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -810,7 +810,7 @@
         "failedSamples": null
       },
       {
-        "id": "2f83bf5d-869f-4f47-b086-22bc0e98a716",
+        "id": "8be565f3-1d7a-4d0b-b96d-62a138d0de69",
         "key": "birth_registrations__place_of_birth_facility__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -829,18 +829,18 @@
         "diagnostics": {
           "metric": "missing_count",
           "field": "place_of_birth_facility",
-          "value": 57,
+          "value": 55,
           "unit": "percent",
           "severity": "error",
           "threshold": "< 35",
-          "row_count": 2128,
-          "failed_fraction": 0.026786,
-          "percent": 2.678571
+          "row_count": 2119,
+          "failed_fraction": 0.025956,
+          "percent": 2.595564
         },
         "failedSamples": null
       },
       {
-        "id": "07c7864f-44e0-4a95-829b-c126ae3f58a7",
+        "id": "f679a103-8d9e-431e-bde9-b55314196fe2",
         "key": "birth_registrations__date_registered__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -864,7 +864,7 @@
         "failedSamples": null
       },
       {
-        "id": "bb0492f6-abfd-4a52-9475-8681bb9c56ab",
+        "id": "ade6db20-b1aa-4ab9-88dd-a463f491af5a",
         "key": "birth_registrations__date_registered__field_required",
         "category": "schema",
         "type": "field_required",
@@ -885,13 +885,13 @@
           "field": "date_registered",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "f4736a1a-12e8-470c-820f-5c5cd7aee61a",
+        "id": "092b7972-9a7b-4da2-b917-5863604256e1",
         "key": "birth_registrations__date_registered__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -913,13 +913,13 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "110243c8-d13c-48d1-b4c7-f180004ebecf",
+        "id": "eef0f6f7-6404-4742-8a51-bb9956118638",
         "key": "birth_registrations__date_registered__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -945,7 +945,7 @@
         "failedSamples": null
       },
       {
-        "id": "0b65ad89-e85c-42f3-8db6-8a8e78f19fe7",
+        "id": "01a17526-23f7-4329-ae45-975c9576ba2e",
         "key": "birth_registrations__registering_parent_1_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -969,7 +969,7 @@
         "failedSamples": null
       },
       {
-        "id": "c74101c9-11c5-44f4-a3a2-670fcbd51c18",
+        "id": "12515ee2-b93e-4060-9eec-2b3113f25de7",
         "key": "birth_registrations__registering_parent_1_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -992,14 +992,14 @@
           "unit": "percent",
           "severity": "warning",
           "threshold": "< 5",
-          "row_count": 2128,
-          "failed_fraction": 0.015977,
-          "percent": 1.597744
+          "row_count": 2119,
+          "failed_fraction": 0.016045,
+          "percent": 1.60453
         },
         "failedSamples": null
       },
       {
-        "id": "2b942a5d-679b-4ff2-a923-f8fcd3cfcfab",
+        "id": "e30b616d-798d-4e9c-a645-d2dca8d640bf",
         "key": "birth_registrations__registering_parent_1_name__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1021,7 +1021,7 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0,
           "constraint": {
             "pattern": "^[A-Za-z][A-Za-z. -]*$"
@@ -1030,7 +1030,7 @@
         "failedSamples": null
       },
       {
-        "id": "494804cb-4b05-4105-9cb2-4199b91d0f21",
+        "id": "20f545d8-6531-409f-9115-ad35a328ef72",
         "key": "birth_registrations__registering_parent_2_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1054,7 +1054,7 @@
         "failedSamples": null
       },
       {
-        "id": "2d31a519-d6b9-49da-8103-dff70bb4cea4",
+        "id": "c7fd3d49-d826-4998-b50f-db969d78f931",
         "key": "birth_registrations__registering_parent_2_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1073,18 +1073,18 @@
         "diagnostics": {
           "metric": "missing_count",
           "field": "registering_parent_2_name",
-          "value": 573,
+          "value": 571,
           "unit": "percent",
           "severity": "info",
           "threshold": "< 30",
-          "row_count": 2128,
-          "failed_fraction": 0.269267,
-          "percent": 26.926692
+          "row_count": 2119,
+          "failed_fraction": 0.269467,
+          "percent": 26.946673
         },
         "failedSamples": null
       },
       {
-        "id": "d0147baf-6be6-481a-b827-d2f404f92432",
+        "id": "8d5c5ff5-ea90-4af8-8f5e-0c4398c84e55",
         "key": "birth_registrations__registering_parent_2_name__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1106,7 +1106,7 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0,
           "constraint": {
             "pattern": "^[A-Za-z][A-Za-z. -]*$"
@@ -1115,7 +1115,7 @@
         "failedSamples": null
       },
       {
-        "id": "a3034bfb-ad5c-49b4-af14-cdf42e4f6ce4",
+        "id": "32c80e13-b81e-474e-aecc-d9ae11d4e81d",
         "key": "birth_registrations__is_multiple_birth__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1139,7 +1139,7 @@
         "failedSamples": null
       },
       {
-        "id": "351bf15b-8910-41b1-8d55-ec67b8b93409",
+        "id": "9db8e55f-6af7-4904-9ee5-1ecd624ce76f",
         "key": "birth_registrations__is_multiple_birth__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1160,13 +1160,13 @@
           "field": "is_multiple_birth",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "7f0e711d-c2d1-4853-8a58-8e9317e1299d",
+        "id": "3e844eee-895e-4c08-af49-69fc111ae34c",
         "key": "birth_registrations__is_multiple_birth__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1188,13 +1188,13 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "ebc83e24-8338-4e60-ba02-4530ffe94a77",
+        "id": "0d4b408b-8f3b-4589-90cc-41e719e963d3",
         "key": "birth_registrations__is_multiple_birth__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -1209,18 +1209,18 @@
         "language": "sql",
         "implementation": "SELECT COUNT(*) FROM birth_registrations a WHERE a.is_multiple_birth = true\n  AND NOT EXISTS (\n    SELECT 1 FROM birth_registrations b\n    WHERE b.is_multiple_birth = true\n      AND b.registration_number != a.registration_number\n      AND b.date_of_birth = a.date_of_birth\n      AND b.place_of_birth_facility IS NOT DISTINCT FROM a.place_of_birth_facility\n      AND b.registering_parent_1_name IS NOT DISTINCT FROM a.registering_parent_1_name\n  )\n",
         "result": "failed",
-        "reason": "Actual custom_sql(is_multiple_birth) was 1, expected = 0",
+        "reason": "Actual custom_sql(is_multiple_birth) was 2, expected = 0",
         "diagnostics": {
           "metric": "custom_sql",
           "field": "is_multiple_birth",
-          "value": 1,
+          "value": 2,
           "severity": "error",
           "threshold": "= 0"
         },
         "failedSamples": null
       },
       {
-        "id": "7885ce7c-bbdd-473b-a09e-77ad65d9e822",
+        "id": "ad4aba02-3b1d-49f6-8826-6616ff5cd0e3",
         "key": "birth_registrations__source_system_record_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1244,7 +1244,7 @@
         "failedSamples": null
       },
       {
-        "id": "d27671ad-22e4-4561-9a00-56e3bdb68dc3",
+        "id": "a4e2378c-110a-44f1-b65c-3d34af353d11",
         "key": "birth_registrations__source_system_record_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1265,13 +1265,13 @@
           "field": "source_system_record_id",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "8f91e5c1-dbe1-49e9-ae5b-90ac322a9314",
+        "id": "be641214-862e-46bb-ad08-72898806e765",
         "key": "birth_registrations__source_system_record_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -1293,13 +1293,13 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_rows": 0
         },
         "failedSamples": null
       },
       {
-        "id": "0af0365a-e1b8-4e6c-9ead-30f0261d9fb4",
+        "id": "7f043692-8424-481a-be5a-17228e07dba8",
         "key": "birth_registrations__source_system_record_id__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1321,7 +1321,7 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0,
           "constraint": {
             "pattern": "^SRC-[0-9]{9}$"
@@ -1330,7 +1330,7 @@
         "failedSamples": null
       },
       {
-        "id": "7cbb5d57-017f-4332-b145-b41e0792c61c",
+        "id": "66e8de2a-dd36-4def-983a-b8145c544d95",
         "key": "birth_registrations__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1354,7 +1354,7 @@
         "failedSamples": null
       },
       {
-        "id": "0a93f8c5-6968-46ac-926e-d15d177cfbb4",
+        "id": "28fa758a-e16e-4012-82de-5cd65a72ff71",
         "key": "birth_registrations__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1375,13 +1375,13 @@
           "field": "extract_timestamp",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "e32e4be4-8d43-49b2-9241-88e5cd797e5e",
+        "id": "f1feddc7-cb93-4401-8e6e-caae100f9340",
         "key": "birth_registrations__extract_timestamp__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1403,13 +1403,13 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 2128,
+          "row_count": 2119,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "df585a70-72e5-41e3-8adb-99bba1778db3",
+        "id": "27bf92b2-e4a7-4dca-98d2-33204c5fdb11",
         "key": "birth_registrations__extract_timestamp__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -1435,7 +1435,7 @@
         "failedSamples": null
       },
       {
-        "id": "e1d49084-80b4-41a1-9070-1d886d113594",
+        "id": "f237b884-2a2d-4403-85f8-6ad48ed15869",
         "key": "birth_registrations__row_count",
         "category": "quality",
         "type": "row_count",
@@ -1453,10 +1453,10 @@
         "reason": null,
         "diagnostics": {
           "metric": "row_count",
-          "value": 2128,
+          "value": 2119,
           "severity": "warning",
           "threshold": "between 500 and 20000",
-          "row_count": 2128
+          "row_count": 2119
         },
         "failedSamples": null
       }
@@ -1465,37 +1465,37 @@
       {
         "level": "INFO",
         "message": "Testing data contract",
-        "timestamp": "2026-09-17 14:29:25.960975+00:00"
+        "timestamp": "2026-09-17 15:17:10.412978+00:00"
       },
       {
         "level": "INFO",
         "message": "Data Contract CLI 1.2.0 running as CLI locally",
-        "timestamp": "2026-09-17 14:29:25.962412+00:00"
+        "timestamp": "2026-09-17 15:17:10.414412+00:00"
       },
       {
         "level": "INFO",
         "message": "Running tests for data contract bdm-birth-registrations with server local_test",
-        "timestamp": "2026-09-17 14:29:26.305446+00:00"
+        "timestamp": "2026-09-17 15:17:10.772496+00:00"
       },
       {
         "level": "INFO",
         "message": "Running checks with ibis",
-        "timestamp": "2026-09-17 14:29:26.339150+00:00"
+        "timestamp": "2026-09-17 15:17:10.802656+00:00"
       },
       {
         "level": "INFO",
         "message": "Connecting to local csv via duckdb",
-        "timestamp": "2026-09-17 14:29:26.339178+00:00"
+        "timestamp": "2026-09-17 15:17:10.802680+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table birth_registrations for /home/user/data-poc/qa_tools/bdm/../../data/raw/run_038_2026-06-27_resupply2.csv",
-        "timestamp": "2026-09-17 14:29:26.359830+00:00"
+        "timestamp": "2026-09-17 15:17:10.821595+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'registration_number', 'VARCHAR', False, None, False), (1, 'child_given_names', 'VARCHAR', False, None, False), (2, 'child_family_name', 'VARCHAR', False, None, False), (3, 'date_of_birth', 'DATE', False, None, False), (4, 'sex', 'VARCHAR', False, None, False), (5, 'place_of_birth_suburb', 'VARCHAR', False, None, False), (6, 'place_of_birth_facility', 'VARCHAR', False, None, False), (7, 'date_registered', 'DATE', False, None, False), (8, 'registering_parent_1_name', 'VARCHAR', False, None, False), (9, 'registering_parent_2_name', 'VARCHAR', False, None, False), (10, 'is_multiple_birth', 'BOOLEAN', False, None, False), (11, 'source_system_record_id', 'VARCHAR', False, None, False), (12, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-17 14:29:26.623642+00:00"
+        "timestamp": "2026-09-17 15:17:11.080624+00:00"
       }
     ]
   },
@@ -1510,14 +1510,14 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -1532,14 +1532,14 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -1554,14 +1554,14 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -1576,14 +1576,14 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -1598,14 +1598,14 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -1620,14 +1620,14 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -1642,14 +1642,14 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -1664,14 +1664,14 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -1686,7 +1686,7 @@
       "dimension": "conformity",
       "label": null,
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1708,7 +1708,7 @@
       "dimension": "timeliness",
       "label": "Freshness",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1730,14 +1730,14 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -1752,14 +1752,14 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": null,
       "fail_threshold": null,
       "status": "pass",
       "on_fail_action": "flag",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -1774,14 +1774,14 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -1796,15 +1796,15 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
-      "metric_value": 2.678571,
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
+      "metric_value": 2.595564,
       "unit": "%",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
-      "row_count_invalid": 57,
+      "row_count_total": 2119,
+      "row_count_invalid": 55,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -1818,14 +1818,14 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -1840,7 +1840,7 @@
       "dimension": "consistency",
       "label": null,
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1862,14 +1862,14 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
-      "metric_value": 1.597744,
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
+      "metric_value": 1.60453,
       "unit": "%",
       "warn_threshold": null,
       "fail_threshold": null,
       "status": "pass",
       "on_fail_action": "flag",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 34,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -1884,14 +1884,14 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -1906,15 +1906,15 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
-      "metric_value": 26.926692,
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
+      "metric_value": 26.946673,
       "unit": "%",
       "warn_threshold": null,
       "fail_threshold": null,
       "status": "pass",
       "on_fail_action": "flag",
-      "row_count_total": 2128,
-      "row_count_invalid": 573,
+      "row_count_total": 2119,
+      "row_count_invalid": 571,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -1928,14 +1928,14 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -1950,14 +1950,14 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -1972,15 +1972,15 @@
       "dimension": "consistency",
       "label": "Sibling record match",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
-      "metric_value": 1,
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
+      "metric_value": 2,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "fail",
       "on_fail_action": "quarantine",
       "row_count_total": null,
-      "row_count_invalid": 1,
+      "row_count_invalid": 2,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -1994,14 +1994,14 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -2016,14 +2016,14 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -2038,14 +2038,14 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -2060,7 +2060,7 @@
       "dimension": "consistency",
       "label": "Timestamp ordering",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -2082,14 +2082,14 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "run_038_2026-06-27_resupply2",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
-      "metric_value": 2128,
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
+      "metric_value": 2119,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": null,
       "status": "pass",
       "on_fail_action": "flag",
-      "row_count_total": 2128,
+      "row_count_total": 2119,
       "row_count_invalid": null,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"

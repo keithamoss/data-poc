@@ -1,5 +1,5 @@
 {
-  "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+  "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
   "run_by": "fpycnkgvmt@privaterelay.appleid.com",
   "raw_output": {
     "manifest_entry": {
@@ -12,7 +12,7 @@
       "run_date": "2026-07-26",
       "is_resupply": false,
       "supersedes_run_id": null,
-      "n_rows_generated": 1679,
+      "n_rows_generated": 1682,
       "dirty_severity": "amber",
       "id_offset": 6700000,
       "seed": 1067,
@@ -22,11 +22,11 @@
       "sex": [
         [
           "M",
-          853
+          849
         ],
         [
           "F",
-          790
+          797
         ],
         [
           "X",
@@ -39,8 +39,8 @@
       ]
     },
     "arrival": {
-      "max_lag_hours": 19.0,
-      "earliest_extract": "2026-07-25 20:00:00"
+      "max_lag_hours": 7.416944444444445,
+      "earliest_extract": "2026-07-26 06:41:01.535593"
     },
     "check_aggregates": {
       "sex": {
@@ -54,11 +54,11 @@
           },
           {
             "value": "O",
-            "count": 3
+            "count": 5
           },
           {
             "value": "U",
-            "count": 3
+            "count": 1
           }
         ]
       },
@@ -68,11 +68,15 @@
         "total_invalid": 3,
         "values": [
           {
-            "value": "Not stated",
-            "count": 2
+            "value": "Freemantle",
+            "count": 1
           },
           {
-            "value": "TBC",
+            "value": "Unknown",
+            "count": 1
+          },
+          {
+            "value": "Not stated",
             "count": 1
           }
         ]
@@ -82,25 +86,17 @@
         "suppressed": false,
         "total_invalid": 2,
         "min": "1750-01-01",
-        "max": "1820-11-30",
+        "max": "1750-01-01",
         "values": [
           {
             "value": "1750-01-01",
-            "count": 1
-          },
-          {
-            "value": "1820-11-30",
-            "count": 1
+            "count": 2
           }
         ],
         "histogram": [
           {
-            "bucket": "1750-01-01 to 1761-10-26",
-            "count": 1
-          },
-          {
-            "bucket": "1809-02-04 to 1820-11-30",
-            "count": 1
+            "bucket": "1750-01-01",
+            "count": 2
           }
         ]
       }

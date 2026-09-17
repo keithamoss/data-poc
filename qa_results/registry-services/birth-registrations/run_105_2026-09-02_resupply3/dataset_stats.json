@@ -1,5 +1,5 @@
 {
-  "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+  "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
   "run_by": "fpycnkgvmt@privaterelay.appleid.com",
   "raw_output": {
     "manifest_entry": {
@@ -12,7 +12,7 @@
       "run_date": "2026-09-10",
       "is_resupply": true,
       "supersedes_run_id": "run_105_2026-09-02_resupply2",
-      "n_rows_generated": 1069,
+      "n_rows_generated": 1074,
       "dirty_severity": "red",
       "id_offset": 10500000,
       "seed": 1105,
@@ -22,31 +22,31 @@
       "sex": [
         [
           "M",
-          501
+          506
         ],
         [
           "F",
-          519
+          514
         ],
         [
           "X",
-          11
+          15
         ],
         [
           "(invalid code)",
-          38
+          39
         ]
       ]
     },
     "arrival": {
-      "max_lag_hours": 24.0,
-      "earliest_extract": "2026-09-01 20:00:00"
+      "max_lag_hours": 13.974722222222223,
+      "earliest_extract": "2026-09-02 04:55:58.663538"
     },
     "check_aggregates": {
       "sex": {
         "type": "categorical",
         "suppressed": false,
-        "total_invalid": 38,
+        "total_invalid": 39,
         "values": [
           {
             "value": "9",
@@ -54,11 +54,11 @@
           },
           {
             "value": "O",
-            "count": 12
+            "count": 14
           },
           {
             "value": "U",
-            "count": 12
+            "count": 11
           }
         ]
       },
@@ -68,20 +68,20 @@
         "total_invalid": 30,
         "values": [
           {
+            "value": "Perth Metro",
+            "count": 9
+          },
+          {
             "value": "TBC",
             "count": 8
           },
           {
-            "value": "Perth Metro",
-            "count": 7
+            "value": "Freemantle",
+            "count": 5
           },
           {
             "value": "Unknown",
-            "count": 6
-          },
-          {
-            "value": "Freemantle",
-            "count": 5
+            "count": 4
           },
           {
             "value": "Not stated",
@@ -97,30 +97,30 @@
         "max": "1899-01-01",
         "values": [
           {
-            "value": "1820-11-30",
-            "count": 6
-          },
-          {
-            "value": "1750-01-01",
-            "count": 4
+            "value": "1899-01-01",
+            "count": 7
           },
           {
             "value": "1850-06-15",
             "count": 4
           },
           {
-            "value": "1899-01-01",
+            "value": "1820-11-30",
+            "count": 3
+          },
+          {
+            "value": "1750-01-01",
             "count": 2
           }
         ],
         "histogram": [
           {
             "bucket": "1750-01-01 to 1774-11-01",
-            "count": 4
+            "count": 2
           },
           {
             "bucket": "1799-09-01 to 1824-07-02",
-            "count": 6
+            "count": 3
           },
           {
             "bucket": "1849-05-02 to 1874-03-02",
@@ -128,7 +128,7 @@
           },
           {
             "bucket": "1874-03-02 to 1899-01-01",
-            "count": 2
+            "count": 7
           }
         ]
       }

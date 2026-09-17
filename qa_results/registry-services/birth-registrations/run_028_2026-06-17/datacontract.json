@@ -1,8 +1,8 @@
 {
-  "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+  "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
   "run_by": null,
   "raw_output": {
-    "runId": "b3cf1cf8-4ae5-4474-a923-4eb16e4a983f",
+    "runId": "bbc06d7f-c095-4654-adf9-3894a23d5925",
     "datacontractCliVersion": "1.2.0",
     "dataContractId": "bdm-birth-registrations",
     "dataContractVersion": "1.0.0",
@@ -10,13 +10,13 @@
     "outputPortId": null,
     "server": "local_test",
     "filters": null,
-    "timestampStart": "2026-09-17 14:28:21.785872+00:00",
-    "timestampEnd": "2026-09-17 14:28:28.304644+00:00",
+    "timestampStart": "2026-09-17 15:16:02.166279+00:00",
+    "timestampEnd": "2026-09-17 15:16:09.340758+00:00",
     "result": "failed",
     "dryRun": false,
     "checks": [
       {
-        "id": "d0368250-7596-477a-874e-ab1bb6779f40",
+        "id": "c86121a1-129d-4a29-a9f2-f37f3c035378",
         "key": "birth_registrations__registration_number__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -40,7 +40,7 @@
         "failedSamples": null
       },
       {
-        "id": "03baa617-2c98-4c74-9dfe-3d00f75d6084",
+        "id": "78a4541b-2063-456f-982c-9e91cfe11895",
         "key": "birth_registrations__registration_number__field_required",
         "category": "schema",
         "type": "field_required",
@@ -61,8 +61,8 @@
           "field": "registration_number",
           "value": 1,
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_fraction": 0.000665
+          "row_count": 1506,
+          "failed_fraction": 0.000664
         },
         "failedSamples": [
           {
@@ -76,7 +76,7 @@
         ]
       },
       {
-        "id": "266009e7-3250-4a74-ae82-c6df4f6a86fc",
+        "id": "c83946fd-ded0-4a9c-8607-7cc8d70db349",
         "key": "birth_registrations__registration_number__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -97,56 +97,56 @@
           "field": "registration_number",
           "value": 5,
           "threshold": "= 0",
-          "row_count": 1504,
+          "row_count": 1506,
           "failed_rows": 10
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-303352260",
+            "registration_number": "BDM-899918480",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-320204256",
+            "registration_number": "BDM-456708297",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-229521648",
+            "registration_number": "BDM-500278615",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-686527053",
+            "registration_number": "BDM-530155998",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-315738011",
+            "registration_number": "BDM-098437691",
             "duplicate_count": 2
           }
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-303352260",
+            "registration_number": "BDM-899918480",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-320204256",
+            "registration_number": "BDM-456708297",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-229521648",
+            "registration_number": "BDM-500278615",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-686527053",
+            "registration_number": "BDM-530155998",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-315738011",
+            "registration_number": "BDM-098437691",
             "duplicate_count": 2
           }
         ]
       },
       {
-        "id": "ee65c1fe-8b2e-403a-8cea-fe20de29d272",
+        "id": "f5791491-7413-40fd-90b7-96acb1fc5f27",
         "key": "birth_registrations__registration_number__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -168,8 +168,8 @@
           "value": 1,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_fraction": 0.000665
+          "row_count": 1506,
+          "failed_fraction": 0.000664
         },
         "failedSamples": [
           {
@@ -183,7 +183,7 @@
         ]
       },
       {
-        "id": "b2d97148-98ae-45f3-a955-7f0afa720f6d",
+        "id": "59e402d0-3cf8-4548-9828-d8c8f5781e29",
         "key": "birth_registrations__registration_number__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -205,7 +205,7 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1504,
+          "row_count": 1506,
           "failed_fraction": 0.0,
           "constraint": {
             "pattern": "^BDM-[0-9]{9}$"
@@ -214,7 +214,7 @@
         "failedSamples": null
       },
       {
-        "id": "7d326e72-d671-4473-b60a-fef7fda98fc2",
+        "id": "daf1eca4-a152-4b98-976c-8af3f2ab5459",
         "key": "birth_registrations__registration_number__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -236,56 +236,56 @@
           "value": 5,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1504,
+          "row_count": 1506,
           "failed_rows": 10
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-303352260",
+            "registration_number": "BDM-500278615",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-320204256",
+            "registration_number": "BDM-530155998",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-229521648",
+            "registration_number": "BDM-098437691",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-686527053",
+            "registration_number": "BDM-456708297",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-315738011",
+            "registration_number": "BDM-899918480",
             "duplicate_count": 2
           }
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-303352260",
+            "registration_number": "BDM-500278615",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-320204256",
+            "registration_number": "BDM-530155998",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-229521648",
+            "registration_number": "BDM-098437691",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-686527053",
+            "registration_number": "BDM-456708297",
             "duplicate_count": 2
           },
           {
-            "registration_number": "BDM-315738011",
+            "registration_number": "BDM-899918480",
             "duplicate_count": 2
           }
         ]
       },
       {
-        "id": "a35241c0-9682-4f52-b6b9-d07b1f5a99d7",
+        "id": "37d123e5-3ae5-42d6-b40f-599736d07727",
         "key": "birth_registrations__child_given_names__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -309,7 +309,7 @@
         "failedSamples": null
       },
       {
-        "id": "1c1b2c0a-8089-48e2-be30-ea808dc9a60c",
+        "id": "23a935d9-ea0e-49a4-bde3-73943b1702d3",
         "key": "birth_registrations__child_given_names__field_required",
         "category": "schema",
         "type": "field_required",
@@ -330,13 +330,13 @@
           "field": "child_given_names",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 1504,
+          "row_count": 1506,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "6595113c-91b4-4cb4-9332-873fcde1fb49",
+        "id": "764af8e0-9666-4714-9902-7bafe007f663",
         "key": "birth_registrations__child_given_names__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -359,14 +359,14 @@
           "unit": "percent",
           "severity": "error",
           "threshold": "< 1",
-          "row_count": 1504,
+          "row_count": 1506,
           "failed_fraction": 0.0,
           "percent": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "c6e7abb3-5d62-4390-841f-3d8bfabb94a6",
+        "id": "d178173f-a04d-4cda-ae36-8cf6b7be92fd",
         "key": "birth_registrations__child_given_names__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -381,56 +381,56 @@
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"child_given_names\" IS NULL\n      )\n      AND NOT (\n        REGEXP_MATCHES(\"t0\".\"child_given_names\", '^[A-Za-z][A-Za-z. -]*$')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"birth_registrations__child_given_names__field_invalid_values\"\nFROM \"birth_registrations\" AS \"t0\"",
         "result": "failed",
-        "reason": "Actual invalid_count(child_given_names) was 9, expected = 0",
+        "reason": "Actual invalid_count(child_given_names) was 10, expected = 0",
         "diagnostics": {
           "metric": "invalid_count",
           "field": "child_given_names",
-          "value": 9,
+          "value": 10,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_fraction": 0.005984,
+          "row_count": 1506,
+          "failed_fraction": 0.00664,
           "constraint": {
             "pattern": "^[A-Za-z][A-Za-z. -]*$"
           }
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-656014398"
+            "registration_number": "BDM-065680497"
           },
           {
-            "registration_number": "BDM-226763833"
+            "registration_number": "BDM-571407940"
           },
           {
-            "registration_number": "BDM-561192745"
+            "registration_number": "BDM-679794520"
           },
           {
-            "registration_number": "BDM-301935767"
+            "registration_number": "BDM-097614988"
           },
           {
-            "registration_number": "BDM-034145826"
+            "registration_number": "BDM-951427305"
           }
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-656014398"
+            "registration_number": "BDM-065680497"
           },
           {
-            "registration_number": "BDM-226763833"
+            "registration_number": "BDM-571407940"
           },
           {
-            "registration_number": "BDM-561192745"
+            "registration_number": "BDM-679794520"
           },
           {
-            "registration_number": "BDM-301935767"
+            "registration_number": "BDM-097614988"
           },
           {
-            "registration_number": "BDM-034145826"
+            "registration_number": "BDM-951427305"
           }
         ]
       },
       {
-        "id": "c0775ca6-1723-4c03-89c4-00a965104568",
+        "id": "6317a40a-fa05-4768-adbb-c01b283e7fb2",
         "key": "birth_registrations__child_family_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -454,7 +454,7 @@
         "failedSamples": null
       },
       {
-        "id": "1d1d021b-052f-4a07-bf72-f73de424cf6c",
+        "id": "79ae6f6c-54d4-4aa0-bd06-f36c9c987102",
         "key": "birth_registrations__child_family_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -475,13 +475,13 @@
           "field": "child_family_name",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 1504,
+          "row_count": 1506,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "d051a06c-acd0-4b2e-9046-008a64925d9b",
+        "id": "0f42372b-bed5-4932-af00-76a098e9bde5",
         "key": "birth_registrations__child_family_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -504,14 +504,14 @@
           "unit": "percent",
           "severity": "error",
           "threshold": "< 1",
-          "row_count": 1504,
+          "row_count": 1506,
           "failed_fraction": 0.0,
           "percent": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "d896d268-1dd4-4566-a842-42db8418255c",
+        "id": "65261b4c-3fd2-4e88-9835-b9a26b97a5dd",
         "key": "birth_registrations__child_family_name__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -526,56 +526,56 @@
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"child_family_name\" IS NULL\n      )\n      AND NOT (\n        REGEXP_MATCHES(\"t0\".\"child_family_name\", '^[A-Za-z][A-Za-z. -]*$')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"birth_registrations__child_family_name__field_invalid_values\"\nFROM \"birth_registrations\" AS \"t0\"",
         "result": "failed",
-        "reason": "Actual invalid_count(child_family_name) was 10, expected = 0",
+        "reason": "Actual invalid_count(child_family_name) was 8, expected = 0",
         "diagnostics": {
           "metric": "invalid_count",
           "field": "child_family_name",
-          "value": 10,
+          "value": 8,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_fraction": 0.006649,
+          "row_count": 1506,
+          "failed_fraction": 0.005312,
           "constraint": {
             "pattern": "^[A-Za-z][A-Za-z. -]*$"
           }
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-175181157"
+            "registration_number": "BDM-144375214"
           },
           {
-            "registration_number": "BDM-469287393"
+            "registration_number": "BDM-002746534"
           },
           {
-            "registration_number": "BDM-967980129"
+            "registration_number": "BDM-802164875"
           },
           {
-            "registration_number": "BDM-455333249"
+            "registration_number": "BDM-365172270"
           },
           {
-            "registration_number": "BDM-164995268"
+            "registration_number": "BDM-121469902"
           }
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-175181157"
+            "registration_number": "BDM-144375214"
           },
           {
-            "registration_number": "BDM-469287393"
+            "registration_number": "BDM-002746534"
           },
           {
-            "registration_number": "BDM-967980129"
+            "registration_number": "BDM-802164875"
           },
           {
-            "registration_number": "BDM-455333249"
+            "registration_number": "BDM-365172270"
           },
           {
-            "registration_number": "BDM-164995268"
+            "registration_number": "BDM-121469902"
           }
         ]
       },
       {
-        "id": "659c6eb6-7fef-4409-ad0f-02f63fef2e3f",
+        "id": "cd20b9c6-1564-4023-ac30-21d4c3664c82",
         "key": "birth_registrations__date_of_birth__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -599,7 +599,7 @@
         "failedSamples": null
       },
       {
-        "id": "197d90c5-1ccd-4436-8c1c-61cb1c69563e",
+        "id": "96e67122-c94d-40ba-a2f5-d53fe5e20b1e",
         "key": "birth_registrations__date_of_birth__field_required",
         "category": "schema",
         "type": "field_required",
@@ -620,12 +620,12 @@
           "field": "date_of_birth",
           "value": 2,
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_fraction": 0.00133
+          "row_count": 1506,
+          "failed_fraction": 0.001328
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-303352260",
+            "registration_number": "BDM-899918480",
             "date_of_birth": null
           },
           {
@@ -635,7 +635,7 @@
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-303352260",
+            "registration_number": "BDM-899918480",
             "date_of_birth": null
           },
           {
@@ -645,7 +645,7 @@
         ]
       },
       {
-        "id": "2900383b-baef-4dd4-a076-e8724288f426",
+        "id": "29cb0174-d977-4ec8-89f2-65f6149a3137",
         "key": "birth_registrations__date_of_birth__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -667,12 +667,12 @@
           "value": 2,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_fraction": 0.00133
+          "row_count": 1506,
+          "failed_fraction": 0.001328
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-303352260",
+            "registration_number": "BDM-899918480",
             "date_of_birth": null
           },
           {
@@ -682,7 +682,7 @@
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-303352260",
+            "registration_number": "BDM-899918480",
             "date_of_birth": null
           },
           {
@@ -692,7 +692,7 @@
         ]
       },
       {
-        "id": "7a2ee9e8-d135-4e59-8f2a-4f8af5b9c230",
+        "id": "103161d3-d873-4b0c-8b66-ba158e32f5f7",
         "key": "birth_registrations__date_of_birth__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -718,7 +718,7 @@
         "failedSamples": null
       },
       {
-        "id": "bff96171-b37c-45df-b672-1bad9509e898",
+        "id": "293ce755-2e1b-439c-aace-b4502a7f6712",
         "key": "birth_registrations__date_of_birth__quality_sql_2",
         "category": "quality",
         "type": "field_quality_sql",
@@ -744,7 +744,7 @@
         "failedSamples": null
       },
       {
-        "id": "9018586f-be2f-4cec-a9f1-44acfcda075e",
+        "id": "f02208d2-ea6a-4ea5-8605-5298dbc1e75e",
         "key": "birth_registrations__sex__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -768,7 +768,7 @@
         "failedSamples": null
       },
       {
-        "id": "97fdff6a-0197-4bcb-9873-8669ef2e7a69",
+        "id": "95907c1f-2734-4522-a3a7-df87c81a583e",
         "key": "birth_registrations__sex__field_required",
         "category": "schema",
         "type": "field_required",
@@ -789,13 +789,13 @@
           "field": "sex",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 1504,
+          "row_count": 1506,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "2e569c66-a3d2-4237-b39b-cb714a1e55ed",
+        "id": "386b4ece-c3c4-490c-902c-91a0947d3d9c",
         "key": "birth_registrations__sex__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -817,8 +817,8 @@
           "value": 23,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_fraction": 0.015293,
+          "row_count": 1506,
+          "failed_fraction": 0.015272,
           "constraint": {
             "valid_values": [
               "M",
@@ -829,51 +829,51 @@
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-988478099",
-            "sex": "U"
+            "registration_number": "BDM-712255010",
+            "sex": "9"
           },
           {
             "registration_number": "BDM-849417267",
+            "sex": "U"
+          },
+          {
+            "registration_number": "BDM-692552732",
+            "sex": "U"
+          },
+          {
+            "registration_number": "BDM-645099352",
             "sex": "O"
           },
           {
-            "registration_number": "BDM-019154934",
+            "registration_number": "BDM-956171529",
             "sex": "U"
-          },
-          {
-            "registration_number": "BDM-465770284",
-            "sex": "U"
-          },
-          {
-            "registration_number": "BDM-149861441",
-            "sex": "9"
           }
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-988478099",
-            "sex": "U"
+            "registration_number": "BDM-712255010",
+            "sex": "9"
           },
           {
             "registration_number": "BDM-849417267",
+            "sex": "U"
+          },
+          {
+            "registration_number": "BDM-692552732",
+            "sex": "U"
+          },
+          {
+            "registration_number": "BDM-645099352",
             "sex": "O"
           },
           {
-            "registration_number": "BDM-019154934",
+            "registration_number": "BDM-956171529",
             "sex": "U"
-          },
-          {
-            "registration_number": "BDM-465770284",
-            "sex": "U"
-          },
-          {
-            "registration_number": "BDM-149861441",
-            "sex": "9"
           }
         ]
       },
       {
-        "id": "ad27048b-bcf1-4bb4-a2be-dfc01f24109c",
+        "id": "cee377fa-a825-4460-b4b9-a2f2894368d2",
         "key": "birth_registrations__place_of_birth_suburb__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -897,7 +897,7 @@
         "failedSamples": null
       },
       {
-        "id": "be7e9492-b8da-4a7b-8f61-4243ff8983d7",
+        "id": "da43c7b6-cb0e-4f84-96dc-555b1e1cbc88",
         "key": "birth_registrations__place_of_birth_suburb__field_required",
         "category": "schema",
         "type": "field_required",
@@ -918,13 +918,13 @@
           "field": "place_of_birth_suburb",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 1504,
+          "row_count": 1506,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "38060116-603d-47a7-afdb-9d292286fdb9",
+        "id": "ee5eb22a-d979-4a0a-8e08-1ce53973649d",
         "key": "birth_registrations__place_of_birth_suburb__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -947,14 +947,14 @@
           "unit": "percent",
           "severity": "warning",
           "threshold": "< 2",
-          "row_count": 1504,
+          "row_count": 1506,
           "failed_fraction": 0.0,
           "percent": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "bc22b207-16d1-4db4-a93b-ec7b3cb6b2a6",
+        "id": "feda8c64-eb7b-4c32-a901-1a812bd6326d",
         "key": "birth_registrations__place_of_birth_suburb__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -976,8 +976,8 @@
           "value": 9,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_fraction": 0.005984,
+          "row_count": 1506,
+          "failed_fraction": 0.005976,
           "constraint": {
             "valid_values": [
               "Fremantle",
@@ -1036,51 +1036,51 @@
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-220708925",
-            "place_of_birth_suburb": "Unknown"
-          },
-          {
-            "registration_number": "BDM-683579758",
-            "place_of_birth_suburb": "Unknown"
+            "registration_number": "BDM-803306998",
+            "place_of_birth_suburb": "Perth Metro"
           },
           {
             "registration_number": "BDM-782066792",
             "place_of_birth_suburb": "Unknown"
           },
           {
-            "registration_number": "BDM-053060742",
+            "registration_number": "BDM-384051957",
+            "place_of_birth_suburb": "Unknown"
+          },
+          {
+            "registration_number": "BDM-147938094",
             "place_of_birth_suburb": "TBC"
           },
           {
-            "registration_number": "BDM-181610476",
-            "place_of_birth_suburb": "Perth Metro"
+            "registration_number": "BDM-853598045",
+            "place_of_birth_suburb": "Not stated"
           }
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-220708925",
-            "place_of_birth_suburb": "Unknown"
-          },
-          {
-            "registration_number": "BDM-683579758",
-            "place_of_birth_suburb": "Unknown"
+            "registration_number": "BDM-803306998",
+            "place_of_birth_suburb": "Perth Metro"
           },
           {
             "registration_number": "BDM-782066792",
             "place_of_birth_suburb": "Unknown"
           },
           {
-            "registration_number": "BDM-053060742",
+            "registration_number": "BDM-384051957",
+            "place_of_birth_suburb": "Unknown"
+          },
+          {
+            "registration_number": "BDM-147938094",
             "place_of_birth_suburb": "TBC"
           },
           {
-            "registration_number": "BDM-181610476",
-            "place_of_birth_suburb": "Perth Metro"
+            "registration_number": "BDM-853598045",
+            "place_of_birth_suburb": "Not stated"
           }
         ]
       },
       {
-        "id": "12bd4f26-c67d-4d67-b43c-810305a5281c",
+        "id": "25d65872-2ae9-4214-9f34-8acd3f80b837",
         "key": "birth_registrations__place_of_birth_facility__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1104,7 +1104,7 @@
         "failedSamples": null
       },
       {
-        "id": "75ba69fa-dfd7-426f-9f9c-309449b355f6",
+        "id": "d8c5ccef-7851-40ea-b92e-7c180a1f0c90",
         "key": "birth_registrations__place_of_birth_facility__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1123,18 +1123,18 @@
         "diagnostics": {
           "metric": "missing_count",
           "field": "place_of_birth_facility",
-          "value": 454,
+          "value": 452,
           "unit": "percent",
           "severity": "error",
           "threshold": "< 35",
-          "row_count": 1504,
-          "failed_fraction": 0.301862,
-          "percent": 30.18617
+          "row_count": 1506,
+          "failed_fraction": 0.300133,
+          "percent": 30.01328
         },
         "failedSamples": null
       },
       {
-        "id": "56c5f3bf-97f1-4d43-a6e0-823a3fe1e5de",
+        "id": "11143280-d116-4192-99e5-39f43ff6194f",
         "key": "birth_registrations__date_registered__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1158,7 +1158,7 @@
         "failedSamples": null
       },
       {
-        "id": "a777a1de-7818-478e-ac2c-4ac4f2b4b18a",
+        "id": "2016df04-4943-46ac-a68e-1bdd4a533b16",
         "key": "birth_registrations__date_registered__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1179,48 +1179,48 @@
           "field": "date_registered",
           "value": 4,
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_fraction": 0.00266
+          "row_count": 1506,
+          "failed_fraction": 0.002656
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-767306203",
+            "registration_number": "BDM-447481093",
             "date_registered": null
           },
           {
-            "registration_number": "BDM-396341447",
+            "registration_number": "BDM-946485827",
             "date_registered": null
           },
           {
-            "registration_number": "BDM-548876542",
+            "registration_number": "BDM-686527053",
             "date_registered": null
           },
           {
-            "registration_number": "BDM-005584983",
+            "registration_number": "BDM-725861730",
             "date_registered": null
           }
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-767306203",
+            "registration_number": "BDM-447481093",
             "date_registered": null
           },
           {
-            "registration_number": "BDM-396341447",
+            "registration_number": "BDM-946485827",
             "date_registered": null
           },
           {
-            "registration_number": "BDM-548876542",
+            "registration_number": "BDM-686527053",
             "date_registered": null
           },
           {
-            "registration_number": "BDM-005584983",
+            "registration_number": "BDM-725861730",
             "date_registered": null
           }
         ]
       },
       {
-        "id": "3753086f-fb50-46f9-9e3e-a61ad574c54a",
+        "id": "da7dd6a8-3fb7-4dc6-bfd9-82344e1b55cb",
         "key": "birth_registrations__date_registered__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1242,48 +1242,48 @@
           "value": 4,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_fraction": 0.00266
+          "row_count": 1506,
+          "failed_fraction": 0.002656
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-767306203",
+            "registration_number": "BDM-447481093",
             "date_registered": null
           },
           {
-            "registration_number": "BDM-396341447",
+            "registration_number": "BDM-946485827",
             "date_registered": null
           },
           {
-            "registration_number": "BDM-548876542",
+            "registration_number": "BDM-686527053",
             "date_registered": null
           },
           {
-            "registration_number": "BDM-005584983",
+            "registration_number": "BDM-725861730",
             "date_registered": null
           }
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-767306203",
+            "registration_number": "BDM-447481093",
             "date_registered": null
           },
           {
-            "registration_number": "BDM-396341447",
+            "registration_number": "BDM-946485827",
             "date_registered": null
           },
           {
-            "registration_number": "BDM-548876542",
+            "registration_number": "BDM-686527053",
             "date_registered": null
           },
           {
-            "registration_number": "BDM-005584983",
+            "registration_number": "BDM-725861730",
             "date_registered": null
           }
         ]
       },
       {
-        "id": "c82c9cdb-4f7f-4615-884b-35608c675c54",
+        "id": "e4da314c-640f-4a40-9b9b-caf4e367cbf7",
         "key": "birth_registrations__date_registered__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -1309,7 +1309,7 @@
         "failedSamples": null
       },
       {
-        "id": "aefb2158-99b3-4ec9-b8e9-c1e51cb51a63",
+        "id": "fec7b40b-8757-42cd-ba7d-e96722c387f4",
         "key": "birth_registrations__registering_parent_1_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1333,7 +1333,7 @@
         "failedSamples": null
       },
       {
-        "id": "384263f4-82fd-4de8-9c7a-164d6844990b",
+        "id": "9ffd4e7e-3992-4759-b987-d52605675bbf",
         "key": "birth_registrations__registering_parent_1_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1352,18 +1352,18 @@
         "diagnostics": {
           "metric": "missing_count",
           "field": "registering_parent_1_name",
-          "value": 38,
+          "value": 41,
           "unit": "percent",
           "severity": "warning",
           "threshold": "< 5",
-          "row_count": 1504,
-          "failed_fraction": 0.025266,
-          "percent": 2.526596
+          "row_count": 1506,
+          "failed_fraction": 0.027224,
+          "percent": 2.722444
         },
         "failedSamples": null
       },
       {
-        "id": "57dcfb85-aa5e-48ee-bd48-ee3a3a6180f1",
+        "id": "e62f3274-9f2b-42dd-a09c-42adc269fc81",
         "key": "birth_registrations__registering_parent_1_name__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1378,56 +1378,56 @@
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"registering_parent_1_name\" IS NULL\n      )\n      AND NOT (\n        REGEXP_MATCHES(\"t0\".\"registering_parent_1_name\", '^[A-Za-z][A-Za-z. -]*$')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"birth_registrations__registering_parent_1_name__field_invalid_values\"\nFROM \"birth_registrations\" AS \"t0\"",
         "result": "failed",
-        "reason": "Actual invalid_count(registering_parent_1_name) was 10, expected = 0",
+        "reason": "Actual invalid_count(registering_parent_1_name) was 9, expected = 0",
         "diagnostics": {
           "metric": "invalid_count",
           "field": "registering_parent_1_name",
-          "value": 10,
+          "value": 9,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_fraction": 0.006649,
+          "row_count": 1506,
+          "failed_fraction": 0.005976,
           "constraint": {
             "pattern": "^[A-Za-z][A-Za-z. -]*$"
           }
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-712255010"
+            "registration_number": "BDM-302840224"
           },
           {
-            "registration_number": "BDM-686527053"
+            "registration_number": "BDM-634590152"
           },
           {
-            "registration_number": "BDM-352366654"
+            "registration_number": "BDM-667926083"
           },
           {
-            "registration_number": "BDM-168177289"
+            "registration_number": "BDM-860213843"
           },
           {
-            "registration_number": "BDM-419012619"
+            "registration_number": "BDM-842938076"
           }
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-712255010"
+            "registration_number": "BDM-302840224"
           },
           {
-            "registration_number": "BDM-686527053"
+            "registration_number": "BDM-634590152"
           },
           {
-            "registration_number": "BDM-352366654"
+            "registration_number": "BDM-667926083"
           },
           {
-            "registration_number": "BDM-168177289"
+            "registration_number": "BDM-860213843"
           },
           {
-            "registration_number": "BDM-419012619"
+            "registration_number": "BDM-842938076"
           }
         ]
       },
       {
-        "id": "d4412f9e-4513-4398-acac-d483b86aaa4f",
+        "id": "53e2f39d-cccc-40f4-b461-ad697022b295",
         "key": "birth_registrations__registering_parent_2_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1451,7 +1451,7 @@
         "failedSamples": null
       },
       {
-        "id": "fb9ecce9-f781-460e-bff3-29f5fb8269cb",
+        "id": "42ce267d-768a-426e-8fcb-479476ba3a3a",
         "key": "birth_registrations__registering_parent_2_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1470,18 +1470,18 @@
         "diagnostics": {
           "metric": "missing_count",
           "field": "registering_parent_2_name",
-          "value": 402,
+          "value": 413,
           "unit": "percent",
           "severity": "info",
           "threshold": "< 30",
-          "row_count": 1504,
-          "failed_fraction": 0.267287,
-          "percent": 26.728723
+          "row_count": 1506,
+          "failed_fraction": 0.274236,
+          "percent": 27.423639
         },
         "failedSamples": null
       },
       {
-        "id": "28463dde-0fa9-4ac1-b411-481f413d5bf6",
+        "id": "f6ff328e-8a95-4db2-833d-8b99639e9071",
         "key": "birth_registrations__registering_parent_2_name__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1496,56 +1496,56 @@
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"registering_parent_2_name\" IS NULL\n      )\n      AND NOT (\n        REGEXP_MATCHES(\"t0\".\"registering_parent_2_name\", '^[A-Za-z][A-Za-z. -]*$')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"birth_registrations__registering_parent_2_name__field_invalid_values\"\nFROM \"birth_registrations\" AS \"t0\"",
         "result": "failed",
-        "reason": "Actual invalid_count(registering_parent_2_name) was 9, expected = 0",
+        "reason": "Actual invalid_count(registering_parent_2_name) was 7, expected = 0",
         "diagnostics": {
           "metric": "invalid_count",
           "field": "registering_parent_2_name",
-          "value": 9,
+          "value": 7,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_fraction": 0.005984,
+          "row_count": 1506,
+          "failed_fraction": 0.004648,
           "constraint": {
             "pattern": "^[A-Za-z][A-Za-z. -]*$"
           }
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-101186090"
+            "registration_number": "BDM-962241646"
           },
           {
-            "registration_number": "BDM-593210963"
+            "registration_number": "BDM-102546472"
           },
           {
-            "registration_number": "BDM-141179409"
+            "registration_number": "BDM-329677224"
           },
           {
-            "registration_number": "BDM-863202549"
+            "registration_number": "BDM-919388004"
           },
           {
-            "registration_number": "BDM-256391773"
+            "registration_number": "BDM-692701664"
           }
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-101186090"
+            "registration_number": "BDM-962241646"
           },
           {
-            "registration_number": "BDM-593210963"
+            "registration_number": "BDM-102546472"
           },
           {
-            "registration_number": "BDM-141179409"
+            "registration_number": "BDM-329677224"
           },
           {
-            "registration_number": "BDM-863202549"
+            "registration_number": "BDM-919388004"
           },
           {
-            "registration_number": "BDM-256391773"
+            "registration_number": "BDM-692701664"
           }
         ]
       },
       {
-        "id": "1f7f7d3e-1336-4c22-a59e-be4e633bd49e",
+        "id": "88d05991-63fc-4fb2-9860-54359d32b2e7",
         "key": "birth_registrations__is_multiple_birth__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1569,7 +1569,7 @@
         "failedSamples": null
       },
       {
-        "id": "f453cc56-0cd9-4c2f-9668-5d14da1bac23",
+        "id": "2c9fa80e-c821-4100-9839-6906e5aa3917",
         "key": "birth_registrations__is_multiple_birth__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1590,32 +1590,32 @@
           "field": "is_multiple_birth",
           "value": 2,
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_fraction": 0.00133
+          "row_count": 1506,
+          "failed_fraction": 0.001328
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-987129666",
+            "registration_number": "BDM-468644011",
             "is_multiple_birth": null
           },
           {
-            "registration_number": "BDM-751561933",
+            "registration_number": "BDM-025209209",
             "is_multiple_birth": null
           }
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-987129666",
+            "registration_number": "BDM-468644011",
             "is_multiple_birth": null
           },
           {
-            "registration_number": "BDM-751561933",
+            "registration_number": "BDM-025209209",
             "is_multiple_birth": null
           }
         ]
       },
       {
-        "id": "efe92c32-5e78-459c-85dc-b7f733f222a5",
+        "id": "dbf06536-e3bc-413f-8192-27152989f8a5",
         "key": "birth_registrations__is_multiple_birth__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1637,32 +1637,32 @@
           "value": 2,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_fraction": 0.00133
+          "row_count": 1506,
+          "failed_fraction": 0.001328
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-987129666",
+            "registration_number": "BDM-468644011",
             "is_multiple_birth": null
           },
           {
-            "registration_number": "BDM-751561933",
+            "registration_number": "BDM-025209209",
             "is_multiple_birth": null
           }
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-987129666",
+            "registration_number": "BDM-468644011",
             "is_multiple_birth": null
           },
           {
-            "registration_number": "BDM-751561933",
+            "registration_number": "BDM-025209209",
             "is_multiple_birth": null
           }
         ]
       },
       {
-        "id": "69a1cedb-b767-4efe-bb4e-87e18175b9c9",
+        "id": "45f190cd-a875-4a9f-8b54-01bcd1a7fd09",
         "key": "birth_registrations__is_multiple_birth__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -1677,18 +1677,18 @@
         "language": "sql",
         "implementation": "SELECT COUNT(*) FROM birth_registrations a WHERE a.is_multiple_birth = true\n  AND NOT EXISTS (\n    SELECT 1 FROM birth_registrations b\n    WHERE b.is_multiple_birth = true\n      AND b.registration_number != a.registration_number\n      AND b.date_of_birth = a.date_of_birth\n      AND b.place_of_birth_facility IS NOT DISTINCT FROM a.place_of_birth_facility\n      AND b.registering_parent_1_name IS NOT DISTINCT FROM a.registering_parent_1_name\n  )\n",
         "result": "failed",
-        "reason": "Actual custom_sql(is_multiple_birth) was 36, expected = 0",
+        "reason": "Actual custom_sql(is_multiple_birth) was 21, expected = 0",
         "diagnostics": {
           "metric": "custom_sql",
           "field": "is_multiple_birth",
-          "value": 36,
+          "value": 21,
           "severity": "error",
           "threshold": "= 0"
         },
         "failedSamples": null
       },
       {
-        "id": "8dc8eccb-2ab1-4a3f-a111-23e95b91269d",
+        "id": "70dead0f-a3a0-48b6-83ad-d65633fccd97",
         "key": "birth_registrations__source_system_record_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1712,7 +1712,7 @@
         "failedSamples": null
       },
       {
-        "id": "012eb7ff-67ed-4972-a9ba-a76c3891e3d5",
+        "id": "3bf19340-681e-43ba-abf3-2e4519cfcd63",
         "key": "birth_registrations__source_system_record_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1733,13 +1733,13 @@
           "field": "source_system_record_id",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 1504,
+          "row_count": 1506,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "38a0e5ee-46c9-4a1d-b8b0-e0ff5c316d4e",
+        "id": "9a10577a-6800-4b4e-96b9-f470ae4f0e62",
         "key": "birth_registrations__source_system_record_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -1761,56 +1761,56 @@
           "value": 6,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_rows": 12
+          "row_count": 1506,
+          "failed_rows": 13
         },
         "failedSamples": [
           {
-            "source_system_record_id": "SRC-903808922",
+            "source_system_record_id": "SRC-268534387",
             "duplicate_count": 2
           },
           {
-            "source_system_record_id": "SRC-260510339",
+            "source_system_record_id": "SRCX-123456789",
+            "duplicate_count": 3
+          },
+          {
+            "source_system_record_id": "SRC-373367717",
             "duplicate_count": 2
           },
           {
-            "source_system_record_id": "SRC-906006426",
+            "source_system_record_id": "SRC-014198644",
             "duplicate_count": 2
           },
           {
-            "source_system_record_id": "SRC-151779038",
-            "duplicate_count": 2
-          },
-          {
-            "source_system_record_id": "SRC-869071287",
+            "source_system_record_id": "SRC-621002982",
             "duplicate_count": 2
           }
         ],
         "failed_samples": [
           {
-            "source_system_record_id": "SRC-903808922",
+            "source_system_record_id": "SRC-268534387",
             "duplicate_count": 2
           },
           {
-            "source_system_record_id": "SRC-260510339",
+            "source_system_record_id": "SRCX-123456789",
+            "duplicate_count": 3
+          },
+          {
+            "source_system_record_id": "SRC-373367717",
             "duplicate_count": 2
           },
           {
-            "source_system_record_id": "SRC-906006426",
+            "source_system_record_id": "SRC-014198644",
             "duplicate_count": 2
           },
           {
-            "source_system_record_id": "SRC-151779038",
-            "duplicate_count": 2
-          },
-          {
-            "source_system_record_id": "SRC-869071287",
+            "source_system_record_id": "SRC-621002982",
             "duplicate_count": 2
           }
         ]
       },
       {
-        "id": "5970122f-5e3c-4fee-b779-347df81841dd",
+        "id": "87284229-1752-4ca1-bccf-919fb204ab08",
         "key": "birth_registrations__source_system_record_id__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1832,51 +1832,51 @@
           "value": 4,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_fraction": 0.00266,
+          "row_count": 1506,
+          "failed_fraction": 0.002656,
           "constraint": {
             "pattern": "^SRC-[0-9]{9}$"
           }
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-498619750",
-            "source_system_record_id": "SRC-12345"
+            "registration_number": "BDM-500832496",
+            "source_system_record_id": "SRCX-123456789"
           },
           {
-            "registration_number": "BDM-601353926",
-            "source_system_record_id": "SRC-ABCDEFGHI"
+            "registration_number": "BDM-412345509",
+            "source_system_record_id": "SRC-1234567890"
           },
           {
-            "registration_number": "BDM-579723403",
-            "source_system_record_id": "SRC-ABCDEFGHI"
+            "registration_number": "BDM-885763460",
+            "source_system_record_id": "SRCX-123456789"
           },
           {
-            "registration_number": "BDM-952397428",
+            "registration_number": "BDM-012788466",
             "source_system_record_id": "SRCX-123456789"
           }
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-498619750",
-            "source_system_record_id": "SRC-12345"
+            "registration_number": "BDM-500832496",
+            "source_system_record_id": "SRCX-123456789"
           },
           {
-            "registration_number": "BDM-601353926",
-            "source_system_record_id": "SRC-ABCDEFGHI"
+            "registration_number": "BDM-412345509",
+            "source_system_record_id": "SRC-1234567890"
           },
           {
-            "registration_number": "BDM-579723403",
-            "source_system_record_id": "SRC-ABCDEFGHI"
+            "registration_number": "BDM-885763460",
+            "source_system_record_id": "SRCX-123456789"
           },
           {
-            "registration_number": "BDM-952397428",
+            "registration_number": "BDM-012788466",
             "source_system_record_id": "SRCX-123456789"
           }
         ]
       },
       {
-        "id": "402d061e-cdeb-4db7-9574-f98d75e1a244",
+        "id": "439739a2-e627-45f7-acf6-b475f38b2f18",
         "key": "birth_registrations__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1900,7 +1900,7 @@
         "failedSamples": null
       },
       {
-        "id": "8b9ac7da-917c-467e-aba3-e56b0510ec7b",
+        "id": "3357ce8c-23a6-4e16-b322-4d7ebd787dce",
         "key": "birth_registrations__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1921,40 +1921,40 @@
           "field": "extract_timestamp",
           "value": 3,
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_fraction": 0.001995
+          "row_count": 1506,
+          "failed_fraction": 0.001992
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-686527053",
+            "registration_number": "BDM-456708297",
             "extract_timestamp": null
           },
           {
-            "registration_number": "BDM-149861441",
+            "registration_number": "BDM-956171529",
             "extract_timestamp": null
           },
           {
-            "registration_number": "BDM-688617782",
+            "registration_number": "BDM-274351006",
             "extract_timestamp": null
           }
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-686527053",
+            "registration_number": "BDM-456708297",
             "extract_timestamp": null
           },
           {
-            "registration_number": "BDM-149861441",
+            "registration_number": "BDM-956171529",
             "extract_timestamp": null
           },
           {
-            "registration_number": "BDM-688617782",
+            "registration_number": "BDM-274351006",
             "extract_timestamp": null
           }
         ]
       },
       {
-        "id": "4d631795-2ae6-40cd-a39c-1b03d4505853",
+        "id": "6d89a602-1185-401f-b303-05afe07b77de",
         "key": "birth_registrations__extract_timestamp__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1976,40 +1976,40 @@
           "value": 3,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1504,
-          "failed_fraction": 0.001995
+          "row_count": 1506,
+          "failed_fraction": 0.001992
         },
         "failedSamples": [
           {
-            "registration_number": "BDM-686527053",
+            "registration_number": "BDM-456708297",
             "extract_timestamp": null
           },
           {
-            "registration_number": "BDM-149861441",
+            "registration_number": "BDM-956171529",
             "extract_timestamp": null
           },
           {
-            "registration_number": "BDM-688617782",
+            "registration_number": "BDM-274351006",
             "extract_timestamp": null
           }
         ],
         "failed_samples": [
           {
-            "registration_number": "BDM-686527053",
+            "registration_number": "BDM-456708297",
             "extract_timestamp": null
           },
           {
-            "registration_number": "BDM-149861441",
+            "registration_number": "BDM-956171529",
             "extract_timestamp": null
           },
           {
-            "registration_number": "BDM-688617782",
+            "registration_number": "BDM-274351006",
             "extract_timestamp": null
           }
         ]
       },
       {
-        "id": "dd45902f-21c3-4fd1-b672-faeecf8fbc3b",
+        "id": "3d3f2b11-e3c9-4c66-b9de-7d5fd2786f00",
         "key": "birth_registrations__extract_timestamp__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -2035,7 +2035,7 @@
         "failedSamples": null
       },
       {
-        "id": "ee37c12c-3946-4bf3-b371-ec09293d1e07",
+        "id": "38239579-5bc1-4b00-9788-5f2f608b4d8f",
         "key": "birth_registrations__row_count",
         "category": "quality",
         "type": "row_count",
@@ -2053,10 +2053,10 @@
         "reason": null,
         "diagnostics": {
           "metric": "row_count",
-          "value": 1504,
+          "value": 1506,
           "severity": "warning",
           "threshold": "between 500 and 20000",
-          "row_count": 1504
+          "row_count": 1506
         },
         "failedSamples": null
       }
@@ -2065,37 +2065,37 @@
       {
         "level": "INFO",
         "message": "Testing data contract",
-        "timestamp": "2026-09-17 14:28:21.785931+00:00"
+        "timestamp": "2026-09-17 15:16:02.166330+00:00"
       },
       {
         "level": "INFO",
         "message": "Data Contract CLI 1.2.0 running as CLI locally",
-        "timestamp": "2026-09-17 14:28:21.787526+00:00"
+        "timestamp": "2026-09-17 15:16:02.167887+00:00"
       },
       {
         "level": "INFO",
         "message": "Running tests for data contract bdm-birth-registrations with server local_test",
-        "timestamp": "2026-09-17 14:28:22.152305+00:00"
+        "timestamp": "2026-09-17 15:16:02.524657+00:00"
       },
       {
         "level": "INFO",
         "message": "Running checks with ibis",
-        "timestamp": "2026-09-17 14:28:22.180156+00:00"
+        "timestamp": "2026-09-17 15:16:02.552004+00:00"
       },
       {
         "level": "INFO",
         "message": "Connecting to local csv via duckdb",
-        "timestamp": "2026-09-17 14:28:22.180180+00:00"
+        "timestamp": "2026-09-17 15:16:02.552031+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table birth_registrations for /home/user/data-poc/qa_tools/bdm/../../data/raw/run_028_2026-06-17.csv",
-        "timestamp": "2026-09-17 14:28:22.200237+00:00"
+        "timestamp": "2026-09-17 15:16:02.574741+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'registration_number', 'VARCHAR', False, None, False), (1, 'child_given_names', 'VARCHAR', False, None, False), (2, 'child_family_name', 'VARCHAR', False, None, False), (3, 'date_of_birth', 'DATE', False, None, False), (4, 'sex', 'VARCHAR', False, None, False), (5, 'place_of_birth_suburb', 'VARCHAR', False, None, False), (6, 'place_of_birth_facility', 'VARCHAR', False, None, False), (7, 'date_registered', 'DATE', False, None, False), (8, 'registering_parent_1_name', 'VARCHAR', False, None, False), (9, 'registering_parent_2_name', 'VARCHAR', False, None, False), (10, 'is_multiple_birth', 'BOOLEAN', False, None, False), (11, 'source_system_record_id', 'VARCHAR', False, None, False), (12, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-17 14:28:23.042849+00:00"
+        "timestamp": "2026-09-17 15:16:03.381823+00:00"
       }
     ]
   },
@@ -2110,14 +2110,14 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 1,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "fail",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
+      "row_count_total": 1506,
       "row_count_invalid": 1,
       "failing_sample_keys": [
         "None"
@@ -2134,14 +2134,14 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
+      "row_count_total": 1506,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -2156,21 +2156,21 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 5,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "fail",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
+      "row_count_total": 1506,
       "row_count_invalid": 5,
       "failing_sample_keys": [
-        "BDM-303352260",
-        "BDM-320204256",
-        "BDM-229521648",
-        "BDM-686527053",
-        "BDM-315738011"
+        "BDM-500278615",
+        "BDM-530155998",
+        "BDM-098437691",
+        "BDM-456708297",
+        "BDM-899918480"
       ],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -2184,14 +2184,14 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
+      "row_count_total": 1506,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -2206,21 +2206,21 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
-      "metric_value": 9,
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
+      "metric_value": 10,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "fail",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
-      "row_count_invalid": 9,
+      "row_count_total": 1506,
+      "row_count_invalid": 10,
       "failing_sample_keys": [
-        "BDM-656014398",
-        "BDM-226763833",
-        "BDM-561192745",
-        "BDM-301935767",
-        "BDM-034145826"
+        "BDM-065680497",
+        "BDM-571407940",
+        "BDM-679794520",
+        "BDM-097614988",
+        "BDM-951427305"
       ],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -2234,14 +2234,14 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
+      "row_count_total": 1506,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -2256,21 +2256,21 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
-      "metric_value": 10,
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
+      "metric_value": 8,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "fail",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
-      "row_count_invalid": 10,
+      "row_count_total": 1506,
+      "row_count_invalid": 8,
       "failing_sample_keys": [
-        "BDM-175181157",
-        "BDM-469287393",
-        "BDM-967980129",
-        "BDM-455333249",
-        "BDM-164995268"
+        "BDM-144375214",
+        "BDM-002746534",
+        "BDM-802164875",
+        "BDM-365172270",
+        "BDM-121469902"
       ],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -2284,17 +2284,17 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 2,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "fail",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
+      "row_count_total": 1506,
       "row_count_invalid": 2,
       "failing_sample_keys": [
-        "BDM-303352260",
+        "BDM-899918480",
         "BDM-781843768"
       ],
       "engine": "datacontract-cli 1.2.0"
@@ -2309,7 +2309,7 @@
       "dimension": "conformity",
       "label": null,
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 4,
       "unit": "count",
       "warn_threshold": null,
@@ -2331,7 +2331,7 @@
       "dimension": "timeliness",
       "label": "Freshness",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -2353,21 +2353,21 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 23,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "fail",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
+      "row_count_total": 1506,
       "row_count_invalid": 23,
       "failing_sample_keys": [
-        "BDM-988478099",
+        "BDM-712255010",
         "BDM-849417267",
-        "BDM-019154934",
-        "BDM-465770284",
-        "BDM-149861441"
+        "BDM-692552732",
+        "BDM-645099352",
+        "BDM-956171529"
       ],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -2381,14 +2381,14 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": null,
       "fail_threshold": null,
       "status": "pass",
       "on_fail_action": "flag",
-      "row_count_total": 1504,
+      "row_count_total": 1506,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -2403,21 +2403,21 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 9,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "fail",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
+      "row_count_total": 1506,
       "row_count_invalid": 9,
       "failing_sample_keys": [
-        "BDM-220708925",
-        "BDM-683579758",
+        "BDM-803306998",
         "BDM-782066792",
-        "BDM-053060742",
-        "BDM-181610476"
+        "BDM-384051957",
+        "BDM-147938094",
+        "BDM-853598045"
       ],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -2431,15 +2431,15 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
-      "metric_value": 30.18617,
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
+      "metric_value": 30.01328,
       "unit": "%",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
-      "row_count_invalid": 454,
+      "row_count_total": 1506,
+      "row_count_invalid": 452,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -2453,20 +2453,20 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 4,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "fail",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
+      "row_count_total": 1506,
       "row_count_invalid": 4,
       "failing_sample_keys": [
-        "BDM-767306203",
-        "BDM-396341447",
-        "BDM-548876542",
-        "BDM-005584983"
+        "BDM-447481093",
+        "BDM-946485827",
+        "BDM-686527053",
+        "BDM-725861730"
       ],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -2480,7 +2480,7 @@
       "dimension": "consistency",
       "label": null,
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -2502,15 +2502,15 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
-      "metric_value": 2.526596,
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
+      "metric_value": 2.722444,
       "unit": "%",
       "warn_threshold": null,
       "fail_threshold": null,
       "status": "pass",
       "on_fail_action": "flag",
-      "row_count_total": 1504,
-      "row_count_invalid": 38,
+      "row_count_total": 1506,
+      "row_count_invalid": 41,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -2524,21 +2524,21 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
-      "metric_value": 10,
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
+      "metric_value": 9,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "fail",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
-      "row_count_invalid": 10,
+      "row_count_total": 1506,
+      "row_count_invalid": 9,
       "failing_sample_keys": [
-        "BDM-712255010",
-        "BDM-686527053",
-        "BDM-352366654",
-        "BDM-168177289",
-        "BDM-419012619"
+        "BDM-302840224",
+        "BDM-634590152",
+        "BDM-667926083",
+        "BDM-860213843",
+        "BDM-842938076"
       ],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -2552,15 +2552,15 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
-      "metric_value": 26.728723,
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
+      "metric_value": 27.423639,
       "unit": "%",
       "warn_threshold": null,
       "fail_threshold": null,
       "status": "pass",
       "on_fail_action": "flag",
-      "row_count_total": 1504,
-      "row_count_invalid": 402,
+      "row_count_total": 1506,
+      "row_count_invalid": 413,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -2574,21 +2574,21 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
-      "metric_value": 9,
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
+      "metric_value": 7,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "fail",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
-      "row_count_invalid": 9,
+      "row_count_total": 1506,
+      "row_count_invalid": 7,
       "failing_sample_keys": [
-        "BDM-101186090",
-        "BDM-593210963",
-        "BDM-141179409",
-        "BDM-863202549",
-        "BDM-256391773"
+        "BDM-962241646",
+        "BDM-102546472",
+        "BDM-329677224",
+        "BDM-919388004",
+        "BDM-692701664"
       ],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -2602,18 +2602,18 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 2,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "fail",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
+      "row_count_total": 1506,
       "row_count_invalid": 2,
       "failing_sample_keys": [
-        "BDM-987129666",
-        "BDM-751561933"
+        "BDM-468644011",
+        "BDM-025209209"
       ],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -2627,15 +2627,15 @@
       "dimension": "consistency",
       "label": "Sibling record match",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
-      "metric_value": 36,
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
+      "metric_value": 21,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "fail",
       "on_fail_action": "quarantine",
       "row_count_total": null,
-      "row_count_invalid": 36,
+      "row_count_invalid": 21,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -2649,14 +2649,14 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 6,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "fail",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
+      "row_count_total": 1506,
       "row_count_invalid": 6,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -2671,20 +2671,20 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 4,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "fail",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
+      "row_count_total": 1506,
       "row_count_invalid": 4,
       "failing_sample_keys": [
-        "BDM-498619750",
-        "BDM-601353926",
-        "BDM-579723403",
-        "BDM-952397428"
+        "BDM-500832496",
+        "BDM-412345509",
+        "BDM-885763460",
+        "BDM-012788466"
       ],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -2698,19 +2698,19 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 3,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "fail",
       "on_fail_action": "quarantine",
-      "row_count_total": 1504,
+      "row_count_total": 1506,
       "row_count_invalid": 3,
       "failing_sample_keys": [
-        "BDM-686527053",
-        "BDM-149861441",
-        "BDM-688617782"
+        "BDM-456708297",
+        "BDM-956171529",
+        "BDM-274351006"
       ],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -2724,7 +2724,7 @@
       "dimension": "consistency",
       "label": "Timestamp ordering",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
       "metric_value": 14,
       "unit": "count",
       "warn_threshold": null,
@@ -2746,14 +2746,14 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "run_028_2026-06-17",
-      "run_timestamp": "2026-09-17T14:26:11.762856+00:00",
-      "metric_value": 1504,
+      "run_timestamp": "2026-09-17T15:13:46.213210+00:00",
+      "metric_value": 1506,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": null,
       "status": "pass",
       "on_fail_action": "flag",
-      "row_count_total": 1504,
+      "row_count_total": 1506,
       "row_count_invalid": null,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
