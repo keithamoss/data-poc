@@ -2812,6 +2812,38 @@ relative, not a schedule — this is weeks of work, not months.
     variation instead of collapsing to a flat line. Full `uv run
     pytest` (175 passed) and `uv run ruff check .` clean.
 
+    **Follow-up, same day: the above fix wasn't sufficient at every
+    date - Keith's own re-test.** At as-of `2026-07-19` the sparkline
+    was STILL flat, even though the picked check was now genuinely the
+    one driving `date_of_birth`'s red status (the first fix worked
+    correctly). Root cause this time: ALL THREE of `date_of_birth`'s
+    own red checks (dbt's `recency` test, Soda's matching freshness
+    check, datacontract-cli's `custom_sql`) are constant at exactly `1`
+    across every one of the 176 real runs - a known, already-documented
+    limitation (`dbt_project/models/staging/schema.yml`'s own comment
+    on the `dbt_utils.recency` test: it compares real wall-clock
+    `CURRENT_DATE` against this fixture's simulated historical dates,
+    so it's essentially always red regardless of which historical run
+    is actually in view). Confirmed real, genuinely-varying red checks
+    DID exist on other columns at that same as-of date
+    (`place_of_birth_facility`, `registering_parent_1_name`,
+    `registering_parent_2_name`) but never got picked, since
+    `date_of_birth` happens to be the first column in column order and
+    `allCols.find()` stops at the first status match.
+    `pickRepresentativeCheck()` (moved out to a top-level function,
+    `dashboard/qa-reporting-dashboard.template.html`) now searches ALL
+    columns matching the agency's worst status for one whose worst
+    check has real historical variance (`min !== max`), only falling
+    back to a constant one if truly nothing varies anywhere - a pure
+    "which check illustrates the sparkline" change, no check's own
+    status/correctness anywhere else in the dashboard is touched.
+    Verified for real: re-checked `2026-07-19` plus the same September
+    dates from the first fix - every date now resolves to a genuinely
+    red, genuinely varying check, and the rendered SVG path for
+    `2026-07-19` now spans real y-coordinates (2.0 to 25.4) instead of
+    a flat 2.0-to-2.0 line. Full `uv run pytest` (175 passed) and `uv
+    run ruff check .` clean.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

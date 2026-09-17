@@ -978,6 +978,42 @@ let DATA = buildData(CURRENT_AS_OF);
 function statusForValue(v,warn,fail){ if(v>fail) return "red"; if(v>warn) return "amber"; return "green"; }
 function statusColorVar(s){ return s==="red"?"var(--bad)": s==="amber"?"var(--warn-fill)":"var(--good)"; }
 
+// Executive tier's own worst-check picker (renderExec()'s only caller).
+// Keith's report, 2026-09-17: Registry Services' sparkline flipped
+// between a flat line and a real graph as the as-of date moved through
+// different days. First fix (still needed, kept in pickRepresentativeCheck
+// below): a column's "worst" check should be picked BY STATUS
+// (checkStatus(c)===targetStatus), not by array position - the same
+// principle allCols.find() already applies one level up to pick the
+// worst COLUMN. That alone wasn't enough: at as-of 2026-07-19, ALL
+// THREE of date_of_birth's red checks (dbt's recency test, Soda's
+// matching freshness check, datacontract-cli's custom_sql) are constant
+// at exactly 1 across every one of the 176 real runs - a known,
+// already-documented limitation (see schema.yml's own comment: these
+// compare real wall-clock CURRENT_DATE against this fixture's simulated
+// historical dates, so they're essentially always red regardless of
+// which historical run is in view). Technically correct, but a flat
+// line at a constant value conveys nothing as a TREND sparkline - and
+// date_of_birth happening to be the FIRST column in column order meant
+// it always won over other real, genuinely-varying red checks that
+// exist on other columns (place_of_birth_facility, registering_
+// parent_1_name/2_name) at that same date. Now prefers any worst-status
+// check with real historical variance (min !== max) across ALL matching
+// columns, only falling back to a constant one if truly nothing varies -
+// never changes any check's own status/correctness anywhere else, only
+// which one illustrates this one sparkline.
+function pickRepresentativeCheck(cols, targetStatus){
+  for(const col of cols){
+    if(col.status!==targetStatus) continue;
+    const ck = col.checks.find(c=>checkStatus(c)===targetStatus);
+    if(!ck) continue;
+    const vals = ck.history.map(r=>r.value);
+    if(Math.min(...vals)!==Math.max(...vals)) return ck;
+  }
+  const col = cols.find(c=>c.status===targetStatus) || cols[0];
+  return col ? (col.checks.find(c=>checkStatus(c)===targetStatus) || col.checks[0]) : null;
+}
+
 function sparkline(history, warn, fail){
   const w=180,h=28,pad=2;
   const vals = history.map(r=>r.value);
@@ -1210,19 +1246,7 @@ function renderExec(view){
   grid.innerHTML = DATA.agencies.map(ag=>{
     const nDatasets = ag.collections.reduce((s,c)=>s+c.datasets.length,0);
     const allCols = ag.collections.flatMap(c=>c.datasets.flatMap(d=>d.columns));
-    const worstCol = allCols.find(c=>c.status===ag.status) || allCols[0];
-    // Keith's report, 2026-09-17: on the Executive tier, Registry
-    // Services' sparkline flipped between a flat line and a real graph
-    // as the as-of date moved through September. Root cause: this used
-    // to be worstCol.checks[0] - whichever check happens to be FIRST in
-    // that column's array, not the one actually driving worstCol's own
-    // "worst" status. Confirmed against real data: on 2026-09-01,
-    // registration_number's checks[0] was a dbt regex check that's
-    // 0/0/0 across all 176 real runs (never once fails), while a
-    // DIFFERENT check on that same column was the one actually red -
-    // same "pick by status, not by array position" fix worstCol itself
-    // already gets, one level down.
-    const worstCheck = worstCol ? (worstCol.checks.find(c=>checkStatus(c)===worstCol.status) || worstCol.checks[0]) : null;
+    const worstCheck = pickRepresentativeCheck(allCols, ag.status);
     const spark = worstCheck ? sparkline(worstCheck.history, worstCheck.warn, worstCheck.fail) : "";
     return `<button class="card" data-nav='${JSON.stringify({tier:"agency", agencyId:ag.id})}'>
       <div class="card-top"><h3>${ag.name}</h3>${pill(ag.status)}</div>
