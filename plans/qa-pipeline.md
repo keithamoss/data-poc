@@ -2914,6 +2914,36 @@ relative, not a schedule — this is weeks of work, not months.
     (`description`/`changelog`) rather than treating it as set-and-forget.
     Not scoped further yet - pick up after Phase 5 wraps.
 
+60. **[parked, 2026-09-17 - flagged as a separate sub-phase for the end
+    of this phase, Keith's own call]** A real rethink of what the
+    Executive-tier sparkline should actually measure, distinct from
+    item 56 (which fixed *which single check* gets picked to represent
+    a column/dataset) and item 57 (bringing that same per-check
+    sparkline down to Tiers 2/3). Keith's ask: instead of one
+    representative check's own raw history, the sparkline should be an
+    **aggregate failing-check count over time** - a line at 0 (green)
+    while every check passes, rising into amber/red as the count of
+    failing checks goes up - so the shape of the line reflects overall
+    health trending, not one check's own metric wobbling. Keith's own
+    immediate follow-up, not yet resolved: aggregated at what level?
+    - **Agency-level** (today's Executive-tier scope) - one line per
+      agency, summing failing checks across every dataset/table/column
+      underneath it.
+    - **Dataset/table-level** instead - one line per dataset showing
+      whether that specific dataset is red because of its own
+      column-level checks, which would only make sense once item 57's
+      per-tier sparklines exist to show it at.
+    Real open questions once this gets scoped for real, not yet
+    answered: what "the count of failing checks" means when different
+    runs have different numbers of *applicable* checks (a check added
+    or retired mid-history per the check-lifecycle work - a raw failing
+    count isn't comparable run-to-run if the denominator moves); whether
+    it's a raw count or a failure rate/percentage; and whether amber
+    (warn-level failures) and red (fail-level) get combined into one
+    line or plotted separately. Not built, not fully scoped - deliberately
+    left for a dedicated pass once Phase 5's current sub-phases (5b/5c/5d)
+    are done, per Keith's "flag for work at the end of this phase."
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
