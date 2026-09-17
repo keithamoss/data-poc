@@ -27,15 +27,22 @@ embed_dashboard_data.py as a second JS const (REAL_CP_DATA).
 from __future__ import annotations
 import json
 import os
+from datetime import date, datetime
 
 from qa_tools.cp import cp_common
 from qa_tools.cp.dataset_stats import AGGREGATE_SPEC
 from qa_tools.common.validate_check_lifecycle import collect_checks
+from pipeline.cadence import classify_arrival, parse_cadence_from_contract
 from pipeline.dashboard_check_labels import rank_for_headline, display_name
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
 OUT_PATH = os.path.join(ROOT, "reports", "child_protection_dashboard.json")
+CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-contract.yaml")
+
+
+def _parse_extract_timestamp(s: str) -> datetime:
+    return datetime.fromisoformat(s.replace(" ", "T"))
 
 ENGINE_SHORT = {
     "dbt-core 1.12 + dbt-duckdb": "dbt-core",
@@ -263,40 +270,49 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
             "checks": checks_out, "stats": stats,
         })
 
-    # dataset-level arrival: extract_timestamp vs. that run's own snapshot
-    # (run_date) - the SLA is "extracted within 24h of the snapshot date",
-    # not a fixed daily clock time (this is a quarterly periodic extract,
-    # not a daily event feed - see generator/generate_cp_runs.py).
+    # dataset-level arrival: extract_timestamp vs. that run's own real,
+    # computable cadence (Phase 5j, plans/qa-pipeline.md) - previously
+    # "extracted within 24h of the snapshot date" (a relative check, no
+    # real clock time); CP now has the same real "an agreed hour of the
+    # day" cadence model BDM does, just quarterly with a much larger
+    # latency tolerance - see pipeline/cadence.py.
     latest_entry = next(m for m in manifest if m["run_id"] == latest_run)
     prev_entry = next(m for m in manifest if m["run_id"] == prev_run)
 
+    cadence = parse_cadence_from_contract(CONTRACT_PATH)
+
     max_lag_hours = dataset_stats[latest_run]["arrival"][table]["max_lag_hours"]
     earliest_extract = dataset_stats[latest_run]["arrival"][table]["earliest_extract"]
+    latest_status = classify_arrival(
+        cadence, date.fromisoformat(latest_entry["run_date"]), _parse_extract_timestamp(str(earliest_extract)))
 
     # Genuinely per-run now, not a hardcoded True for every run but the
     # latest - see build_dashboard_data.py's identical comment.
+    # arrivalStatus (replacing the old onTime boolean) is a real 3-state
+    # classify_arrival() result.
     arrival_by_run = {}
     arrival_history = []
     for m in manifest:
         run_id = m["run_id"]
         arrival = dataset_stats[run_id]["arrival"][table]
-        on_time = arrival["max_lag_hours"] < 24
+        status = classify_arrival(
+            cadence, date.fromisoformat(m["run_date"]), _parse_extract_timestamp(str(arrival["earliest_extract"])))
         arrival_by_run[run_id] = {
-            "arrivedAt": str(arrival["earliest_extract"]), "onTime": on_time,
+            "arrivedAt": str(arrival["earliest_extract"]), "arrivalStatus": status,
             "maxLagHours": round(arrival["max_lag_hours"], 1),
         }
-        arrival_history.append({"run_id": run_id, "run_date": m["run_date"], "onTime": on_time})
+        arrival_history.append({"run_id": run_id, "run_date": m["run_date"], "arrivalStatus": status})
 
     return {
         "id": dataset_id,
         "name": cp_common.TABLE_DATASET_NAME[table],
         "provider": "Department for Child Protection and Family Support — Casework Management System",
         "deliveryFormat": "CSV (S3 drop)",
-        "sla": {"frequency": "Quarterly", "expectedBy": "within 24h of extract", "latencyHours": 24},
+        "sla": {"cadence": cadence},
         "lastArrival": {
             "run_date": latest_entry["run_date"],
             "arrivedAt": str(earliest_extract),
-            "onTime": max_lag_hours < 24,
+            "arrivalStatus": latest_status,
             "maxLagHours": round(max_lag_hours, 1),
         },
         "arrivalHistory": arrival_history,

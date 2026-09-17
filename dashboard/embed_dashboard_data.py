@@ -11,11 +11,14 @@ by CI on every push and locally by ./run_pipeline.sh. Run this last,
 after orchestrate.py/orchestrate_cp.py and the two build_*_dashboard_
 data.py scripts, whenever the pipeline is regenerated.
 
-Also re-embeds `const AS_OF_OFFSET_DAYS` from `contract/data-asset.yaml`
-(Thread C, plans/publishing-and-history.md) - the one genuinely
-data-asset-level (not per-dataset) config value the as-of viewing
-feature needs, read the same way check_id's `data-asset-1` placeholder
-already is.
+`const AS_OF_OFFSET_DAYS` used to be re-embedded here too, from
+`contract/data-asset.yaml` (Thread C, plans/publishing-and-history.md) -
+removed entirely 2026-09-17 (plans/qa-pipeline.md Phase 5j), replaced
+by real per-dataset cadence config living in each dataset's own ODCS
+contract (`slaProperties:`, read by pipeline/cadence.py and already
+folded into REAL_BIRTH_REG_DATA/REAL_CP_DATA's own `sla.cadence` field
+by the two build_*_dashboard_data.py scripts above - nothing left for
+this script to separately embed).
 
 And `const CHANGELOG_FEED` (Phase 5a, Thread A, plans/publishing-and-
 history.md) - the global "who published what, when" activity feed,
@@ -57,15 +60,12 @@ import json
 import os
 import re
 
-import yaml
-
 from dashboard.changelog_md import parse_changelog
 from qa_tools.common.changelog import build_changelog
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 TEMPLATE_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.template.html")
 DASHBOARD_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.html")
-DATA_ASSET_YAML = os.path.join(ROOT, "contract", "data-asset.yaml")
 CHANGELOG_MD = os.path.join(ROOT, "CHANGELOG.md")
 
 TARGETS = [
@@ -131,12 +131,6 @@ def embed() -> None:
         real_json = json.dumps(data, separators=(",", ":"))
         html = _replace_const(html, const_name, real_json)
         print(f"Re-embedded {len(real_json)} bytes of real data into {const_name}")
-
-    with open(DATA_ASSET_YAML) as f:
-        data_asset = yaml.safe_load(f)
-    offset_days = data_asset["as_of_offset_days"]
-    html = _replace_const(html, "AS_OF_OFFSET_DAYS", json.dumps(offset_days))
-    print(f"Re-embedded AS_OF_OFFSET_DAYS = {offset_days}")
 
     changelog_feed = _build_changelog_feed()
     html = _replace_const(html, "CHANGELOG_FEED", json.dumps(changelog_feed, separators=(",", ":")))

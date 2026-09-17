@@ -15,17 +15,20 @@
 # cadence. Wrong attachment point - Keith's explicit correction: this
 # is data-asset-level config, genuinely global. ONE offset applies to
 # every dataset's "as of" view, not a different value derived from each
-# dataset's own refresh cadence (so Birth Registrations - a daily feed -
-# also defaults to viewing state this many days behind latest, not the
-# absolute latest, once Thread C's actual as-of viewing logic/UI gets
-# built - still unbuilt as of this file's creation). Value carried over
-# unchanged from the superseded per-dataset config (60 - the number
-# itself wasn't in question, only where it's declared and its scope);
-# revisit if a genuinely global default warrants a different number.
+# dataset's own refresh cadence.
 #
-# See plans/publishing-and-history.md's Thread C entries for the full
-# history, including the now-superseded per-dataset reasoning this
-# replaces.
+# Removed entirely, 2026-09-17 (plans/qa-pipeline.md Phase 5j, Keith's
+# own call, a proper brainstorm not just a number tweak): a flat global
+# day-count was never the right shape for "is this dataset's most
+# recent data still current" - a quarterly dataset's real ~92-day gap
+# between deliveries made this trip constantly even when nothing was
+# wrong (CP read "no data" on the plain default view for roughly
+# two-thirds of every quarter). Replaced by real, per-dataset,
+# computable cadence config living in each dataset's own ODCS contract
+# (`slaProperties:` - see pipeline/cadence.py) - "no data" now means
+# "nothing has landed yet in the CURRENT expected cycle," not "the
+# latest delivery is more than N days old." See that plan file's own
+# entry for the full design history (including the earlier "grow the
+# offset" / "revisit global-vs-per-dataset" options this superseded).
 
 data_asset_id: data-asset-1
-as_of_offset_days: 60

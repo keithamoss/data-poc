@@ -1262,15 +1262,48 @@ schema:
             value: "[]"
 
 slaProperties:
+  # frequency here was stale at "7 d" (weekly) - a leftover from before
+  # this collection's real cadence was migrated to calendar quarters
+  # (2026-09-16) and then re-anchored to Feb/May/Aug/Nov (2026-09-17,
+  # plans/qa-pipeline.md) - neither migration updated this value, since
+  # nothing downstream ever actually read it. Corrected here alongside
+  # adding the real, computable cadence below.
   - property: frequency
-    value: 7
-    unit: d
+    value: 3
+    unit: mo
     element: cp_clients
+  # Real, computable cadence (Phase 5j) - replaces AS_OF_OFFSET_DAYS'
+  # flat global staleness offset and the dashboard's own former
+  # decorative "within 24h of extract"/"latencyHours: 24" text, neither
+  # of which anything ever actually checked. Parsed by pipeline/
+  # cadence.py's parse_cadence_from_contract() - see that module's own
+  # docstring for exactly how each property below is used.
+  # cadenceAnchorMonths/cadenceDayOfMonth mirror generator/generate_cp_
+  # runs.py's own _quarter_start() anchor exactly (Feb/May/Aug/Nov,
+  # day 1) - this is the same real cadence rule the data is actually
+  # generated against, not a separate, potentially-drifting copy of it.
+  # latency (8 business hours) is deliberately much larger than BDM's
+  # daily 60 min - Keith's own call: a quarterly refresh's own latency
+  # tolerance is a real but much less pressing concern than a daily
+  # feed's.
+  - property: cadenceType
+    value: quarterly
+    element: cp_clients
+  - property: cadenceAnchorMonths
+    value: "2,5,8,11"
+    element: cp_clients
+  - property: cadenceDayOfMonth
+    value: 1
+    element: cp_clients
+  - property: expectedTime
+    value: "09:00"
+    element: cp_clients
+    description: Agreed quarterly delivery time, AWST.
   - property: latency
-    value: 24
-    unit: h
+    value: 480
+    unit: min
     element: cp_clients
-    description: Maximum acceptable delay between an extract being pulled and it landing in S3.
+    description: How late (past expectedTime) a delivery can arrive before it counts as late rather than on time.
 
 customProperties:
   - property: currentDeliveryFormat

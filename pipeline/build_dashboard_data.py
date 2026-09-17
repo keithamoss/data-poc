@@ -27,14 +27,21 @@ by embed_dashboard_data.py as a JS const.
 from __future__ import annotations
 import json
 import os
+from datetime import date, datetime
 
 from qa_tools.bdm.dataset_stats import AGGREGATE_SPEC
 from qa_tools.common.validate_check_lifecycle import collect_checks
+from pipeline.cadence import classify_arrival, parse_cadence_from_contract
 from pipeline.dashboard_check_labels import rank_for_headline, display_name
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 REAL_RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
 OUT_PATH = os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")
+CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
+
+
+def _parse_extract_timestamp(s: str) -> datetime:
+    return datetime.fromisoformat(s.replace(" ", "T"))
 
 ENGINE_SHORT = {
     # Same short-name convention as build_cp_dashboard_data.py's own
@@ -226,44 +233,49 @@ def build() -> dict:
         })
 
     # dataset-level: row counts + arrival, from the real generated manifest
-    # and extract_timestamp data (extract lag is generated under the 24h SLA
-    # for every run in this fixture, so "on time" here is a genuine computed
-    # result, not an assumed default - see README's known-simplifications note).
+    # and extract_timestamp data.
     latest_entry = next(m for m in manifest if m["run_id"] == latest_run)
     prev_entry = next(m for m in manifest if m["run_id"] == prev_run)
 
+    cadence = parse_cadence_from_contract(CONTRACT_PATH)
+
     max_lag_hours = dataset_stats[latest_run]["arrival"]["max_lag_hours"]
     earliest_extract = dataset_stats[latest_run]["arrival"]["earliest_extract"]
+    latest_status = classify_arrival(
+        cadence, date.fromisoformat(latest_entry["run_date"]), _parse_extract_timestamp(earliest_extract))
 
     # Genuinely per-run now, not a hardcoded True for every run but the
     # latest - every run's own max_lag_hours/earliest_extract already
     # exists in its committed dataset_stats.json (Phase 3), just not
     # previously surfaced here. arrival_by_run mirrors stats["byRun"]
     # above (run_id-keyed, for Thread C's as-of UI); arrival_history
-    # keeps its existing array shape (one entry per run, in order) but
-    # its onTime is now real, not assumed.
+    # keeps its existing array shape (one entry per run, in order).
+    # arrivalStatus (Phase 5j, replacing the old onTime boolean) is a
+    # real 3-state classify_arrival() result against this run's own
+    # cadence-derived expected moment - see pipeline/cadence.py.
     arrival_by_run = {}
     arrival_history = []
     for m in manifest:
         run_id = m["run_id"]
         arrival = dataset_stats[run_id]["arrival"]
-        on_time = arrival["max_lag_hours"] < 24
+        status = classify_arrival(
+            cadence, date.fromisoformat(m["run_date"]), _parse_extract_timestamp(arrival["earliest_extract"]))
         arrival_by_run[run_id] = {
-            "arrivedAt": arrival["earliest_extract"], "onTime": on_time,
+            "arrivedAt": arrival["earliest_extract"], "arrivalStatus": status,
             "maxLagHours": round(arrival["max_lag_hours"], 1),
         }
-        arrival_history.append({"run_id": run_id, "run_date": m["run_date"], "onTime": on_time})
+        arrival_history.append({"run_id": run_id, "run_date": m["run_date"], "arrivalStatus": status})
 
     return {
         "id": "birth-registrations",
         "name": "Birth Registrations",
         "provider": "Registry of Births, Deaths & Marriages (BDM)",
         "deliveryFormat": "CSV (S3 drop) — Parquet planned",
-        "sla": {"frequency": "Daily", "expectedBy": "06:00 local", "latencyHours": 24},
+        "sla": {"cadence": cadence},
         "lastArrival": {
             "run_date": latest_entry["run_date"],
             "arrivedAt": earliest_extract,
-            "onTime": max_lag_hours < 24,
+            "arrivalStatus": latest_status,
             "maxLagHours": round(max_lag_hours, 1),
         },
         "arrivalHistory": arrival_history,

@@ -582,6 +582,22 @@ function fmtInt(x){ return x.toLocaleString("en-US"); }
 // format, reused rather than inventing a new date style) using the
 // same " · " separator this UI already uses elsewhere.
 function fmtArrival(lastArrival){ return `${lastArrival.arrivedAt} · ${fmtDate(lastArrival.date)}`; }
+// Phase 5j: a human-readable label for a dataset's own real cadence
+// config (ds.sla.cadence - pipeline/cadence.py/contract slaProperties:),
+// replacing the old hand-authored sla.frequency/expectedBy display text.
+const WEEKDAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function cadenceLabel(cadence){
+  const byTime = `by ${cadence.expected_time} AWST`;
+  if(cadence.type==="daily") return `Daily, ${byTime}`;
+  if(cadence.type==="weekly") return `Weekly (${WEEKDAY_NAMES[cadence.weekday]}), ${byTime}`;
+  if(cadence.type==="quarterly"){
+    const months = cadence.anchor_months.map(m=>MONTH_NAMES[m-1]).join("/");
+    return `Quarterly (${months}, day ${cadence.day_of_month}), ${byTime}`;
+  }
+  return "";
+}
+function arrivalStatusLabel(status){ return status==="early" ? "Early" : status==="late" ? "Late" : "On time"; }
 // item 54 (plans/qa-pipeline.md) - Keith's report: "1 collections"/"1
 // datasets" on the Executive tier's agency cards, plus 4 other
 // count-plus-noun sites found in the audit he asked for, all a plain
@@ -641,12 +657,18 @@ function checkStatus(check){ if(check.current>check.fail) return "red"; if(check
    "placeholder here, real data only in the built output" treatment as
    the two consts above.
 
-   AS_OF_OFFSET_DAYS — Thread C's cadence-aware "as of" viewing (plans/
-   publishing-and-history.md): the one genuinely data-asset-level (not
-   per-dataset) config number, re-embedded from the real, committed
-   contract/data-asset.yaml on every build - same treatment as the
-   three consts above. Real value: 60 (as of this file's own last
-   edit - the template's own placeholder is never the real number).
+   AS_OF_OFFSET_DAYS used to be re-embedded here too, from the real,
+   committed contract/data-asset.yaml - removed entirely 2026-09-17
+   (Phase 5j, plans/qa-pipeline.md): a flat global day-count was never
+   the right shape for "is this dataset's most recent data still
+   current" (a quarterly dataset's real ~92-day gap between deliveries
+   made it read "no data" for roughly two-thirds of every quarter, even
+   when nothing was wrong). Replaced by real per-dataset cadence config
+   living in each dataset's own ODCS contract (`slaProperties:`), parsed
+   by pipeline/cadence.py and already folded into REAL_BIRTH_REG_DATA/
+   REAL_CP_DATA's own `sla.cadence` field by the two build_*_dashboard_
+   data.py scripts - see cycleStartDate() below, this page's own JS port
+   of pipeline/cadence.py's cycle_start().
 
    CHANGELOG_FEED — Phase 5a's "📋 Recent activity" panel (Thread A,
    plans/publishing-and-history.md): "who published what, when" -
@@ -688,7 +710,6 @@ function checkStatus(check){ if(check.current>check.fail) return "red"; if(check
 const REAL_BIRTH_REG_DATA = null;
 const REAL_CP_DATA = null;
 const SNAPSHOT_MANIFEST = [];
-const AS_OF_OFFSET_DAYS = null;
 const CHANGELOG_FEED = [];
 const RELEASE_NOTES = {intro:[], entries:[]};
 
@@ -736,8 +757,8 @@ function buildRealDataset(d){
   // this (dataset/collection/agency) rolls up from c.status, so excluding
   // retired checks here is the one place this needs enforcing.
   //
-  // Phase 5g: d.staleAsOf (clipDatasetToAsOf's flag - the most recent
-  // eligible run is older than AS_OF_OFFSET_DAYS tolerance) forces every
+  // Phase 5g/5j: d.staleAsOf (clipDatasetToAsOf's flag - nothing has
+  // landed yet in the as-of date's current cadence cycle) forces every
   // column's ROLLED-UP status to "nodata" too, same reasoning as the
   // retired-check rule just above: we don't trust a stale run to
   // represent "now," so it must never be able to turn a column pill
@@ -751,14 +772,14 @@ function buildRealDataset(d){
   // go neutral, the drill-down data underneath doesn't).
   columns.forEach(c=> c.status = d.staleAsOf ? "nodata" : worstOf(c.checks.filter(ck=>!ck.retired).map(checkStatus)));
 
-  const arrivalHistory = d.arrivalHistory.map((a,i)=>({ idx:i, date: toDate(a.run_date), onTime: a.onTime }));
+  const arrivalHistory = d.arrivalHistory.map((a,i)=>({ idx:i, date: toDate(a.run_date), arrivalStatus: a.arrivalStatus }));
 
   return {
     id: d.id, name: d.name, provider: d.provider, deliveryFormat: d.deliveryFormat,
     sla: d.sla,
     lastArrival: { date: toDate(d.lastArrival.run_date),
       arrivedAt: d.lastArrival.arrivedAt.slice(11,16)+" UTC (earliest extract, latest run)",
-      onTime: d.lastArrival.onTime },
+      arrivalStatus: d.lastArrival.arrivalStatus },
     arrivalHistory,
     rowCount: d.rowCount, prevRowCount: d.prevRowCount,
     columns,
@@ -794,22 +815,62 @@ function buildRealDataset(d){
 // (buildRealDataset, every render function) needs to know "as of"
 // viewing exists at all - they just see a dataset with less history
 // than usual.
+// Phase 5j - JS port of pipeline/cadence.py's cycle_start(): "as of this
+// date, what's the most recent day a delivery was expected under this
+// cadence?" A genuine, unavoidable client/server split (the as-of picker
+// lets a viewer pick ANY date in the browser, not just dates the Python
+// side has already seen when the dashboard was last built) - not
+// duplicated logic that could silently drift, since both sides are
+// tested against the same real cadence configs and known dates
+// (tests/test_cadence.py's own cross-check). Pure date arithmetic, same
+// "YYYY-MM-DD" string convention as every other date helper on this
+// page - no timezone/latency involved (that's classify_arrival()'s job,
+// already computed server-side per real run - see pipeline/cadence.py's
+// own docstring for why that half never needs a JS port).
+function cycleStartDate(cadence, dateStr){
+  if(cadence.type==="daily") return dateStr;
+  if(cadence.type==="weekly"){
+    const d = new Date(dateStr+"T00:00:00Z");
+    const pyWeekday = (d.getUTCDay()+6)%7; // JS Sun=0..Sat=6 -> Mon=0..Sun=6, matching Python's date.weekday()
+    const delta = ((pyWeekday - cadence.weekday) % 7 + 7) % 7;
+    return addDaysToDateStr(dateStr, -delta);
+  }
+  if(cadence.type==="quarterly"){
+    // For each anchor month, consider both this year's and last year's
+    // occurrence, keep only those at or before dateStr, return the
+    // latest - generalizes generator/generate_cp_runs.py's own
+    // _quarter_start() the same way pipeline/cadence.py's cycle_start()
+    // does. ISO "YYYY-MM-DD" strings sort and compare lexicographically,
+    // same as their underlying dates, so plain string comparison/sort is
+    // exact here - no Date object needed.
+    const year = Number(dateStr.slice(0,4));
+    const pad2 = n => String(n).padStart(2,"0");
+    const candidates = [];
+    for(const month of cadence.anchor_months){
+      for(const y of [year, year-1]){
+        const candidate = `${y}-${pad2(month)}-${pad2(cadence.day_of_month)}`;
+        if(candidate <= dateStr) candidates.push(candidate);
+      }
+    }
+    return candidates.sort().pop();
+  }
+  throw new Error(`unknown cadence type ${cadence.type}`);
+}
 function clipDatasetToAsOf(d, asOfDateStr){
   const eligibleRuns = d.runs.filter(r => r.run_date <= asOfDateStr);
   if(!eligibleRuns.length) return null; // never supplied yet as of this date
   const effectiveRun = eligibleRuns[eligibleRuns.length-1];
-  // Staleness-TOLERANCE rule (Keith, 2026-09-16, confirmed via
-  // AskUserQuestion after picking as-of=2026-09-16 kept showing Child
-  // Protection's genuine-but-2.5-months-old July data instead of "no
-  // data"): AS_OF_OFFSET_DAYS isn't just an input to the default-date
-  // computation, it's also how stale a dataset's most recent supply is
-  // allowed to be before this view stops trusting it and shows "no
-  // data" instead. Without this, "no data" was reachable only before a
-  // dataset's very first-ever run - for a quarterly dataset queried
-  // anywhere near "now" that's nearly unreachable, exactly backwards
-  // from Thread C's whole point (a quarterly dataset overdue for its
-  // next refresh should read as overdue, not silently show old data as
-  // if it were current).
+  // Phase 5j (plans/qa-pipeline.md, 2026-09-17 - replacing the flat
+  // AS_OF_OFFSET_DAYS day-count tolerance this same rule used to be):
+  // "no data" now means "nothing has landed yet in the CURRENT expected
+  // cycle," computed fresh from this dataset's own real cadence - not
+  // "the latest delivery is more than N days old." A quarterly dataset
+  // queried any time inside its own current ~3-month cycle now correctly
+  // shows its real, current-cycle delivery instead of reading "no data"
+  // for roughly two-thirds of every quarter, exactly the case that
+  // motivated this rewrite (Keith, 2026-09-16: Child Protection's
+  // genuine, current July data was reading as "no data" against a
+  // 2026-09-16 as-of date under the old flat 60-day rule).
   // Phase 5g (plans/qa-pipeline.md, 2026-09-17 - Keith's own two
   // scenarios walked through explicitly): staleness no longer discards
   // this run's real history outright. It used to return null here too,
@@ -822,7 +883,7 @@ function clipDatasetToAsOf(d, asOfDateStr){
   // the checks' own real current/previous values or their historical
   // trend charts. Only a genuinely EMPTY eligibleRuns (checked above,
   // still returns null) has nothing at all worth passing through.
-  const staleAsOf = AS_OF_OFFSET_DAYS!=null && daysBetween(effectiveRun.run_date, asOfDateStr) > AS_OF_OFFSET_DAYS;
+  const staleAsOf = effectiveRun.run_date < cycleStartDate(d.sla.cadence, asOfDateStr);
   const effectiveRunId = effectiveRun.run_id;
   const prevRunId = eligibleRuns.length>1 ? eligibleRuns[eligibleRuns.length-2].run_id : null;
   const eligibleRunIds = new Set(eligibleRuns.map(r=>r.run_id));
@@ -869,7 +930,7 @@ function clipDatasetToAsOf(d, asOfDateStr){
   const arrivalByRun = d.arrivalByRun || {};
   const arrival = arrivalByRun[effectiveRunId];
   const lastArrival = arrival
-    ? {run_date: eligibleRuns[eligibleRuns.length-1].run_date, arrivedAt: arrival.arrivedAt, onTime: arrival.onTime}
+    ? {run_date: eligibleRuns[eligibleRuns.length-1].run_date, arrivedAt: arrival.arrivedAt, arrivalStatus: arrival.arrivalStatus}
     : d.lastArrival;
 
   return {
@@ -992,12 +1053,14 @@ function genDataset(seedStr, name, provider, format, columnPool, opts){
   // worst-of rollup lands precisely where the narrative intends —
   // the rest of the dataset is unremarkable, same as most real datasets.
   const columns = picked.map((cn,i)=> genColumn(rand, cn, i===0?target:"green"));
-  const arrival=[]; for(let i=0;i<60;i++) arrival.push({idx:i, date:new Date(TODAY.getTime()-(59-i)*DAY), onTime: rand()>0.05});
+  const arrival=[]; for(let i=0;i<60;i++) arrival.push({idx:i, date:new Date(TODAY.getTime()-(59-i)*DAY), arrivalStatus: rand()>0.05 ? "onTime" : "late"});
   const lateToday = opts.lateToday || false;
   return {
     id: seedStr.split(".").pop(), name, provider, deliveryFormat:format,
-    sla:{ frequency:"Daily", expectedBy:"06:00 local", latencyHours:24 },
-    lastArrival:{ date: runDate(0), arrivedAt: lateToday? "07:40 local":"05:0"+Math.floor(rand()*9)+" local", onTime: !lateToday },
+    // Illustrative only - real datasets' cadence comes from their own
+    // ODCS contract's slaProperties: (pipeline/cadence.py, Phase 5j).
+    sla:{ cadence: { type:"daily", expected_time:"06:00", latency_minutes:60 } },
+    lastArrival:{ date: runDate(0), arrivedAt: lateToday? "07:40 local":"05:0"+Math.floor(rand()*9)+" local", arrivalStatus: lateToday ? "late" : "onTime" },
     arrivalHistory: arrival,
     rowCount: 200+Math.floor(rand()*40000), prevRowCount: 200+Math.floor(rand()*40000),
     columns,
@@ -1048,12 +1111,7 @@ function addDaysToDateStr(dateStr, days){
   d.setUTCDate(d.getUTCDate()+days);
   return toDateStr(d);
 }
-function daysBetween(earlierDateStr, laterDateStr){
-  const a = new Date(earlierDateStr+"T00:00:00Z"), b = new Date(laterDateStr+"T00:00:00Z");
-  return Math.round((b-a)/DAY);
-}
-// Default as-of date: the genuine live wall-clock date minus
-// AS_OF_OFFSET_DAYS (contract/data-asset.yaml, Thread D) - corrected
+// Default as-of date: the genuine live wall-clock date - corrected
 // 2026-09-16 (Keith, same day as the picker itself landed): NOT derived
 // from the latest run_date anywhere in committed history (an earlier,
 // self-reasoned version of this function did that, reaching for this
@@ -1070,8 +1128,7 @@ function daysBetween(earlierDateStr, laterDateStr){
 // silently stop being "now minus offset" and nobody would notice.
 function liveNowDateStr(){ return toDateStr(new Date()); }
 function defaultAsOf(){
-  if(AS_OF_OFFSET_DAYS==null) return liveNowDateStr();
-  return addDaysToDateStr(liveNowDateStr(), -AS_OF_OFFSET_DAYS);
+  return liveNowDateStr();
 }
 // URL query-string persistence, deliberately separate from the
 // hash-based STATE mechanism used for drill-down navigation (Thread C -
@@ -1632,7 +1689,8 @@ function renderAgency(view, agencyId){
               <td colspan="4" style="color:var(--ink-faint); font-size:12.5px;">No QA run within tolerance as of the selected date</td>
             </tr>`;
           }
-          const arrivalPill = ds.lastArrival.onTime ? `<span class="pill green sm"><span class="ico"></span>On time</span>` : `<span class="pill red sm"><span class="ico"></span>Late</span>`;
+          const arrivalPillClass = ds.lastArrival.arrivalStatus==="late" ? "red" : ds.lastArrival.arrivalStatus==="early" ? "amber" : "green";
+          const arrivalPill = `<span class="pill ${arrivalPillClass} sm"><span class="ico"></span>${arrivalStatusLabel(ds.lastArrival.arrivalStatus)}</span>`;
           // Item 57 brought the Executive tier's sparkline down to Tier 2;
           // Phase 5e (#60) redesigned what it shows - see
           // aggregateSparkline()'s own comment - scoped here to just this
@@ -1703,13 +1761,13 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     </div>
     ${ds.noDataAsOf ? `
     <div style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:64ch;">
-      Its most recent supply, as of <b>${fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"))}</b>, is older than the
-      data asset's staleness tolerance (${AS_OF_OFFSET_DAYS} ${pluralize(AS_OF_OFFSET_DAYS,"day")}) - so the figures
-      below show its full real history, but no column reads red/amber/green as CURRENT status.
+      As of <b>${fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"))}</b>, nothing has landed yet in this dataset's
+      current expected cycle (started <b>${fmtDate(new Date(cycleStartDate(ds.sla.cadence, CURRENT_AS_OF)+"T00:00:00Z"))}</b>) -
+      so the figures below show its full real history, but no column reads red/amber/green as CURRENT status.
     </div>` : ""}
     <div class="sla-strip">
-      <div class="sla-tile"><div class="k">SLA</div><div class="v" style="font-size:14px;">${ds.sla.frequency}, by ${ds.sla.expectedBy}</div></div>
-      <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono">${fmtArrival(ds.lastArrival)} ${ds.lastArrival.onTime? "":"(late)"}</div></div>
+      <div class="sla-tile"><div class="k">SLA</div><div class="v" style="font-size:14px;">${cadenceLabel(ds.sla.cadence)}</div></div>
+      <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono">${fmtArrival(ds.lastArrival)} ${ds.lastArrival.arrivalStatus!=="onTime" ? "("+arrivalStatusLabel(ds.lastArrival.arrivalStatus)+")" : ""}</div></div>
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>
       <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">${fmtInt(ds.rowCount)} <span style="font-size:11.5px; color:${rowDelta>=0?'var(--good)':'var(--bad)'};">(${rowDelta>=0?'+':''}${fmtInt(rowDelta)})</span></div></div>
     </div>

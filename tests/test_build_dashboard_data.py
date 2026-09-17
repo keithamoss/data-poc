@@ -145,27 +145,34 @@ def test_stats_by_run_carries_every_run_not_just_latest_and_previous(tmp_path, m
     assert set(uncovered["stats"]["byRun"]) == {"run_01_2026-09-01", "run_02_2026-09-02"}
 
 
-def test_arrival_by_run_is_genuinely_computed_not_hardcoded_true(tmp_path, monkeypatch):
-    """A real bug fixed alongside the byRun work: arrivalHistory's onTime
-    used to be hardcoded True for every run but the latest, even though
-    every run's own max_lag_hours already existed to compute it for
-    real. A run with a real >24h lag must now show onTime=False."""
+def test_arrival_status_is_genuinely_computed_from_real_cadence(tmp_path, monkeypatch):
+    """arrivalStatus (Phase 5j, replacing the old hardcoded-then-max-lag-
+    based onTime boolean) is a real classify_arrival() result against
+    this dataset's own real cadence (contract/bdm-birth-registrations-
+    contract.yaml's slaProperties: - daily, 06:00 AWST = 22:00 UTC the
+    day before, 60 min latency grace) - not a hardcoded value. Mutating
+    earliest_extract to fall inside vs. well outside that grace window
+    must flip arrivalStatus accordingly."""
     _no_retired_checks(monkeypatch)
-    late_stats = json.loads(json.dumps(FIXTURE_DATASET_STATS))
-    late_stats["run_01_2026-09-01"]["arrival"]["max_lag_hours"] = 30.0
+    mixed_stats = json.loads(json.dumps(FIXTURE_DATASET_STATS))
+    # run_01: inside the grace window (expected 2026-08-31T22:00:00Z, 60
+    # min grace) -> onTime.
+    mixed_stats["run_01_2026-09-01"]["arrival"]["earliest_extract"] = "2026-08-31 22:30:00"
+    # run_02: hours after the grace window -> late.
+    mixed_stats["run_02_2026-09-02"]["arrival"]["earliest_extract"] = "2026-09-02 10:00:00"
     results_path = tmp_path / "results_bdm.json"
     results_path.write_text(json.dumps({
-        "runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS, "dataset_stats": late_stats,
+        "runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS, "dataset_stats": mixed_stats,
     }))
     monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(results_path))
 
     data = bdd.build()
 
-    assert data["arrivalByRun"]["run_01_2026-09-01"]["onTime"] is False
-    assert data["arrivalByRun"]["run_01_2026-09-01"]["maxLagHours"] == 30.0
-    assert data["arrivalByRun"]["run_02_2026-09-02"]["onTime"] is True
-    history_by_run = {h["run_id"]: h["onTime"] for h in data["arrivalHistory"]}
-    assert history_by_run == {"run_01_2026-09-01": False, "run_02_2026-09-02": True}
+    assert data["arrivalByRun"]["run_01_2026-09-01"]["arrivalStatus"] == "onTime"
+    assert data["arrivalByRun"]["run_01_2026-09-01"]["maxLagHours"] == 5.0
+    assert data["arrivalByRun"]["run_02_2026-09-02"]["arrivalStatus"] == "late"
+    history_by_run = {h["run_id"]: h["arrivalStatus"] for h in data["arrivalHistory"]}
+    assert history_by_run == {"run_01_2026-09-01": "onTime", "run_02_2026-09-02": "late"}
 
 
 def test_a_retired_checks_metadata_is_carried_through(tmp_path, monkeypatch):

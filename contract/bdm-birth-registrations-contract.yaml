@@ -709,11 +709,30 @@ slaProperties:
     value: 1
     unit: d
     element: birth_registrations
-  - property: latency
-    value: 24
-    unit: h
+  # Real, computable cadence (plans/qa-pipeline.md Phase 5j) - replaces
+  # AS_OF_OFFSET_DAYS' flat global staleness offset and the dashboard's
+  # own former decorative "06:00 local"/"latencyHours: 24" text, neither
+  # of which anything ever actually checked (confirmed by grep before
+  # this landed). Parsed by pipeline/cadence.py's parse_cadence_from_
+  # contract() - see that module's own docstring for exactly how each
+  # property below is used. expectedTime is AWST (Western Australia,
+  # Keith's own call - no daylight saving to account for). latency
+  # below (60 min) replaces the old, unused 24h "latency" entry that
+  # used to live here - same real-world "an agreed hour of the day,
+  # tolerate a small amount of lateness" Keith described, not the
+  # coarser day-level tolerance AS_OF_OFFSET_DAYS used to provide.
+  - property: cadenceType
+    value: daily
     element: birth_registrations
-    description: Maximum acceptable delay between a registration event at BDM and its extract landing in S3.
+  - property: expectedTime
+    value: "06:00"
+    element: birth_registrations
+    description: Agreed daily delivery time, AWST.
+  - property: latency
+    value: 60
+    unit: min
+    element: birth_registrations
+    description: How late (past expectedTime) a delivery can arrive before it counts as late rather than on time.
 
 customProperties:
   - property: currentDeliveryFormat

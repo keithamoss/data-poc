@@ -20,14 +20,21 @@ FIXTURE_RUNS = [
 ]
 
 FIXTURE_DATASET_STATS = {
+    # earliest_extract values deliberately placed relative to CP's real
+    # quarterly cadence (contract/child-protection-contract.yaml's
+    # slaProperties: - Feb/May/Aug/Nov day 1, 09:00 AWST, 8h latency
+    # grace) rather than each run's own run_date, so
+    # test_arrival_status_is_genuinely_computed_from_real_cadence below
+    # can tell a real onTime/late classification apart from a hardcoded
+    # one - see that test's own docstring.
     "cp_run_01_2026-01-01": {
         "value_counts": {"concern_type": [["Neglect", 2], ["Physical abuse", 1]]},
-        "arrival": {"cp_notifications": {"max_lag_hours": 5.0, "earliest_extract": "2026-01-01 10:00:00"}},
+        "arrival": {"cp_notifications": {"max_lag_hours": 5.0, "earliest_extract": "2025-11-01 05:00:00"}},
         "check_aggregates": {},
     },
     "cp_run_02_2026-04-01": {
         "value_counts": {"concern_type": [["Neglect", 3], ["Physical abuse", 1]]},
-        "arrival": {"cp_notifications": {"max_lag_hours": 30.0, "earliest_extract": "2026-04-01 10:00:00"}},
+        "arrival": {"cp_notifications": {"max_lag_hours": 30.0, "earliest_extract": "2026-02-01 20:00:00"}},
         "check_aggregates": {},
     },
 }
@@ -70,14 +77,18 @@ def test_stats_by_run_carries_every_run_not_just_latest_and_previous():
     assert col["stats"]["current"]["valueCounts"] == [["Neglect", 3], ["Physical abuse", 1]]
 
 
-def test_arrival_by_run_is_genuinely_computed_not_hardcoded_true():
-    """Same real bug as build_dashboard_data.py's identical test:
-    arrivalHistory's onTime used to be hardcoded True for every run but
-    the latest - a run with a real >24h lag must show onTime=False."""
+def test_arrival_status_is_genuinely_computed_from_real_cadence():
+    """arrivalStatus (Phase 5j, replacing the old hardcoded-then-max-lag-
+    based onTime boolean) is a real classify_arrival() result against
+    this collection's own real quarterly cadence (contract/child-
+    protection-contract.yaml's slaProperties:) - not a hardcoded value.
+    FIXTURE_DATASET_STATS' earliest_extract values are placed inside vs.
+    well outside each run's own cycle's grace window specifically to
+    prove that."""
     dataset = bcd.build_one_table("cp_notifications", FIXTURE_RESULTS, FIXTURE_RUNS, FIXTURE_DATASET_STATS, {})
 
-    assert dataset["arrivalByRun"]["cp_run_01_2026-01-01"]["onTime"] is True
-    assert dataset["arrivalByRun"]["cp_run_02_2026-04-01"]["onTime"] is False
+    assert dataset["arrivalByRun"]["cp_run_01_2026-01-01"]["arrivalStatus"] == "onTime"
+    assert dataset["arrivalByRun"]["cp_run_02_2026-04-01"]["arrivalStatus"] == "late"
     assert dataset["arrivalByRun"]["cp_run_02_2026-04-01"]["maxLagHours"] == 30.0
-    history_by_run = {h["run_id"]: h["onTime"] for h in dataset["arrivalHistory"]}
-    assert history_by_run == {"cp_run_01_2026-01-01": True, "cp_run_02_2026-04-01": False}
+    history_by_run = {h["run_id"]: h["arrivalStatus"] for h in dataset["arrivalHistory"]}
+    assert history_by_run == {"cp_run_01_2026-01-01": "onTime", "cp_run_02_2026-04-01": "late"}
