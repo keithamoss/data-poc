@@ -1731,3 +1731,34 @@ not a schedule.
     original 4 tool-runners) that should collapse first. Not scoped -
     the point of this entry is to not lose the concern before that
     conversation happens.
+
+31. **[parked, 2026-09-17 - Keith's own call: resume after `plans/
+    publishing-and-history.md`'s Phase 6, same sequencing as
+    `plans/qa-pipeline.md` items 66/68]** An MVP external-data ingestion
+    entry point - a real gap this PoC doesn't have an answer for today:
+    every real run's data comes from this repo's own synthetic
+    generator (`generator/`/`synthetic_data_generator/`), never from an
+    outside source. Keith's own framing: not "automate all the data
+    pipes" (a real integration project) but a genuine MVP entry point a
+    team could use to fit this into their CURRENT workflow - pointing
+    the pipeline at a zip file on disk, an S3 bucket, or a plain folder
+    on disk, rather than requiring a real upstream integration before
+    this tool is usable at all.
+
+    Related to, but narrower and more actionable than, action 25 above
+    (that entry's "how checks output/results get stored in a multi-user
+    environment" bullet is already scoped, per its own 2026-09-16
+    update - see `plans/publishing-and-history.md`; this is a new,
+    separate concern action 25's list didn't cover: how REAL INPUT data
+    gets into the pipeline in the first place, not how QA results get
+    stored once computed).
+
+    Real complications Keith already flagged, to work through when this
+    gets scoped for real (a conversation to have then, not decided
+    here): agencies renaming files between deliveries (no stable
+    filename convention to key off); some deliveries arriving zipped,
+    others not; extra, irrelevant files mixed into the same drop (Word
+    docs, README-style cover notes, etc.) that need to be recognized
+    and ignored rather than tripping the pipeline. Not scoped further
+    than that yet - flagged here so the concern and its known
+    complications aren't lost before that conversation happens.
