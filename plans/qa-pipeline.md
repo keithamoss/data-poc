@@ -3623,6 +3623,118 @@ relative, not a schedule — this is weeks of work, not months.
     case a future "is this whole dataset still supported" view is ever
     wanted, but nothing asks for that today.
 
+67. **[built, 2026-09-17]** BDM real arrival-status calibration (Keith's
+    own request: "let's change the data so that BDM arrives on time
+    about 80% of the time... early for 5%... late 15%") - which turned
+    up two real, unrelated bugs before the actual calibration could be
+    built, plus Stage 2 of Phase 5j's cadence work.
+
+    **Bug 1 - `earliest_extract` MIN-contamination
+    (`qa_tools/bdm/dataset_stats.py`).** A plain `MIN(extract_timestamp)`
+    over every row in a run picked up `generator.dirty.
+    inject_extract_timestamp_disorder`'s own deliberately-corrupted rows
+    (shifted to BEFORE `date_registered`, for the unrelated "extract
+    timestamp ordering" check's own benefit - 1-4% of rows on any
+    amber/red-severity run) almost every time, since even a 1% rate
+    against ~2000 rows/run is very likely to plant at least one. A run's
+    `earliest_extract` was silently reporting the worst deliberately-
+    corrupted outlier instead of the batch's genuine earliest arrival -
+    directly distorting `pipeline/cadence.py`'s real early/onTime/late
+    classification (a run could read "early" by weeks purely because one
+    disordered row happened to land in it). Fixed by excluding rows
+    where `extract_timestamp < date_registered` (falling back to the
+    unfiltered MIN only if literally every row in a run were disordered -
+    not currently reachable, but defensive). Regression test written and
+    confirmed to fail against the pre-fix code first, per this repo's own
+    convention (`tests/test_dataset_stats.py`).
+
+    **Bug 2 - `06:00` AWST made "on time" structurally unreachable.**
+    Fixing bug 1 surfaced a deeper, real conflict the original Phase 5j
+    commit hadn't caught: AWST is UTC+8, so `06:00` AWST (the
+    `expectedTime` value Phase 5j shipped, inherited from the dashboard's
+    old decorative "06:00 local" placeholder text rather than derived
+    fresh) converts to `22:00 UTC the PREVIOUS calendar day` - outside
+    the range the real "extract timestamp ordering" check (identical in
+    both `contract/bdm-birth-registrations-soda-checks.yml` and this
+    same contract's own `quality:` block: `extract_timestamp >=
+    date_registered`) allows. Every real BDM run therefore classified as
+    early or late, never on time, no matter how the generator's random
+    spread was tuned - not a data-calibration problem at all, a real
+    modeling bug in this session's own Phase 5j build. Confirmed with
+    Keith before touching it (a value from this session's own earlier,
+    already-approved work): corrected `expectedTime` to `14:00` AWST
+    (`06:00 UTC`, safely inside `date_registered`'s own UTC day with
+    room either side) rather than widening the real, already-correct
+    ordering check - a check on genuinely bad data isn't the thing to
+    weaken to accommodate a placeholder SLA value.
+
+    **The actual calibration
+    (`generator/daily_batch.py`).** Draws ONE characteristic arrival
+    offset per RUN (not per row - a `MIN()` over ~2000 independent
+    per-row draws would collapse onto the extreme low tail almost every
+    time, regardless of the intended split), on a dedicated RNG stream
+    (`seed+5`, isolated from the main stream so retuning this never
+    perturbs unrelated fields like sex/twin flags again), targeting 80%
+    onTime / 5% early / 15% late against the real cadence window. Direct
+    simulation against the real 120 non-resupply BDM seeds (1001-1120)
+    confirms 86 onTime / 24 late / 10 early (71.7%/20%/8.3%) - close to
+    target within normal sampling noise for n=120, and exactly matching
+    what the real regenerated data shows for non-resupply runs.
+
+    **A real, known limitation left as-is, not silently "fixed":** the
+    OVERALL population (176 runs, resupply included) reads 48.9%
+    onTime / 37.5% early / 13.6% late, not 80/5/15 - because all 56
+    resupply entries (32% of history) read "early," 100% of the time.
+    This is a structural consequence of `generator/resupply.py`'s
+    already-deliberate, Keith-approved churn design (a resupply reuses
+    its ORIGINAL delivery's `date_registered`/`extract_timestamp`,
+    since "these are records that should have been in the original
+    file," not a fresh same-day draw) - a resupply's reused, much-older
+    timestamp reads as "early" against the LATER cycle it's actually
+    delivered in. Deliberately not touched here: redesigning churn's
+    timestamp behavior is a separate, larger architectural question
+    from what was asked, and changing it would revisit design Keith
+    signed off on in an earlier session, not something to silently
+    fold into a calibration task. Flagged here in case the overall
+    (not just per-original-delivery) split ever needs to hit 80/5/15
+    for real.
+
+    **Stage 2 - supply/resupply history section (Phase 5j's own
+    Stage 2, deliberately deferred when Stage 1 shipped).** Keith's
+    confirmed design, from a round of `AskUserQuestion`: default to the
+    as-of date's own current cadence cycle, expandable to full history;
+    grouped by cadence cycle (each cycle its own `.dataset-table` block,
+    reusing Tier 2's existing table style - resupply attempts NOT
+    nested under their original delivery, just their own entry with a
+    "Resupply, attempt N" badge); each entry shows arrival status +
+    timestamp, row count, resupply indicator, and injected defect
+    severity; clicking an entry applies that run's own `run_date` as the
+    global as-of date (`applyAsOf()`, reused as-is) rather than building
+    a second drill-down mechanism - since setting as-of to a specific
+    real `run_date` already makes `clipDatasetToAsOf()` pick that exact
+    run as the effective one everywhere else on the page, for free.
+    `buildSupplyHistory()` operates on the RAW (unclipped, full-history)
+    dataset object, not `renderDataset()`'s own as-of-clipped `ds` -
+    needed a new `rawRealDatasetById()` lookup and an extracted
+    `rowCountAtRun()` helper (pulled out of `clipDatasetToAsOf()`, now
+    shared by both) to get at it.
+
+    Verified end to end against real regenerated data (176 BDM runs,
+    15 CP runs, headless Chromium): the current-cycle default correctly
+    shows only today's 1 delivery for BDM (daily) and Aug-1's 1 delivery
+    for CP (quarterly); the "Show all history" toggle correctly reveals
+    all 121/15 cycles and updates its own label; clicking both an
+    original delivery and a resupply attempt correctly updates
+    `CURRENT_AS_OF` to that exact `run_date` and re-renders the real
+    column grid (13 real BDM columns) for that historical point: zero
+    console errors in every case, including the CP quarterly path.
+    Full `uv run pytest` (211, six new: two `tests/test_dataset_stats.py`
+    regression tests for the MIN-contamination fix, plus a new
+    `tests/test_daily_batch.py` covering the calibration's real
+    distribution, the ordering-check regression guard, real-cadence
+    classification, and reproducibility) and `uv run ruff check .`
+    both clean.
+
 68. **[parked, 2026-09-17 - Keith's own call: resume after Phase 6, same
     as item 66]** Polish `RELEASE_NOTES` (item 62/Phase 5h's panel,
     `CHANGELOG.md`) - two separate asks. **Categorization**: label/group
