@@ -197,7 +197,7 @@ def test_manifest_entries_chain_run_ids_and_supersedes():
         run_index_start=10, id_offset=600_000, seed=1006,
     )
     assert [entry["run_id"] for entry in entries] == [
-        "run_06_2026-09-01", "run_06_2026-09-01_resupply1", "run_06_2026-09-01_resupply2",
+        "run_006_2026-09-01", "run_006_2026-09-01_resupply1", "run_006_2026-09-01_resupply2",
     ]
     assert entries[0]["supersedes_run_id"] is None
     assert entries[1]["supersedes_run_id"] == entries[0]["run_id"]

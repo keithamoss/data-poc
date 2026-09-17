@@ -16,10 +16,33 @@ records back into one flat list - not reshaping anything itself.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 QA_RESULTS_DIR = ROOT / "qa_results"
+
+_DIGIT_RUN = re.compile(r"(\d+)")
+
+
+def _natural_sort_key(name: str) -> tuple:
+    """Sorts run_id-shaped strings ("run_5_2026-01-01", "cp_run_005_...",
+    "run_120_2026-09-18_resupply2") in real numeric/chronological order
+    regardless of how many digits any of their numbers happen to have -
+    a plain string sort of these (what both this module's own callers
+    used to do) silently breaks the moment a run number crosses a fixed
+    zero-padding width (2026-09-17: generator/generate_runs.py's
+    delivery/run numbering went 60->120 deliveries and immediately hit
+    exactly this - "delivery_100" < "delivery_11" as plain strings - a
+    real bug a test caught; see that module's own comment). Keith's own
+    call once that surfaced: this dataset's real run count will keep
+    growing into the thousands over the life of the project, so a wider
+    FIXED width (":03d" instead of ":02d") is not a real fix, just a
+    bigger version of the same bug waiting to reoccur - this splits the
+    string into alternating text/number runs and compares numbers as
+    ints instead, so it's correct at any width, forever, with no digit
+    count to eventually outgrow."""
+    return tuple(int(part) if part.isdigit() else part for part in _DIGIT_RUN.split(name))
 
 # Matches orchestrate_bdm.py's/orchestrate_cp.py's own _run_one()
 # construction order - keeps a history-rebuilt results list in the same
@@ -52,7 +75,7 @@ def list_run_ids(agency: str, dataset: str, qa_results_dir: Path | str = QA_RESU
     dataset_dir = Path(qa_results_dir) / agency / dataset
     if not dataset_dir.is_dir():
         return []
-    return sorted(p.name for p in dataset_dir.iterdir() if p.is_dir())
+    return sorted((p.name for p in dataset_dir.iterdir() if p.is_dir()), key=_natural_sort_key)
 
 
 def read_dataset_stats(agency: str, dataset: str, run_id: str,
@@ -110,7 +133,7 @@ def read_qa_results(agency: str, dataset: str, qa_results_dir: Path | str = QA_R
     if not dataset_dir.is_dir():
         return []
     all_results: list[dict] = []
-    for run_dir in sorted(p for p in dataset_dir.iterdir() if p.is_dir()):
+    for run_dir in sorted((p for p in dataset_dir.iterdir() if p.is_dir()), key=lambda p: _natural_sort_key(p.name)):
         for tool in TOOL_ORDER:
             all_results.extend(read_one(agency, dataset, run_dir.name, tool, qa_results_dir))
     return all_results

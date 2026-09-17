@@ -180,3 +180,69 @@ was taken - the #4 parallelism numbers above (45s/36s) are from the
 original, smaller manifests and shouldn't be read as current. Worth a
 real re-measurement if runtime becomes a live concern again at this
 depth, not assumed to still hold linearly.
+
+## Flagged, 2026-09-17 - not investigated yet, follow up next
+
+BDM's manifest grew again, 60 -> 120 scheduled deliveries (176 real
+runs including resupply attempts - see `plans/qa-pipeline.md` item 55
+for why: `AS_OF_OFFSET_DAYS` needed real margin BDM's old 60-delivery
+window didn't have). Keith's own framing, same session: **this
+dataset's real run count is headed into the thousands, not hundreds,
+over the project's life** - the `delivery_id`/`run_id` zero-padding fix
+in that same item was corrected once already for reasoning the same
+way ("wider padding" -> "no width assumption at all") once that became
+clear. Runtime deserves the same treatment before it becomes a live
+problem, not after.
+
+A real data point from this exact regeneration (not extrapolated): the
+qa_results/ write timestamps for BDM's real-tool phase (`qa_tools/bdm/
+orchestrate_bdm.py`, parallel across CPU cores per item #4 above) span
+~11 minutes for 176 runs. That's in line with item #4's/#5's
+steady-state per-run breakdown (dbt-core ~5s, datacontract-cli ~6s,
+Soda/Evidently ~0.1s each, ~11s/run, parallelized ~3.1-3.4x) - nothing
+newly wrong, just a real number to scale from. Naively linear, "a
+couple thousand runs" (roughly 10-15x today's volume) puts this phase
+alone at something like 2 hours wall-clock, which would make
+`./run_pipeline.sh` a genuinely bad local/CI experience, not just a
+slow one - worth getting ahead of before that data volume is actually
+reached, not after someone's stuck waiting on it.
+
+Not investigated or built - candidates for next session's actual
+profiling/decision, roughly in order of expected leverage at this
+scale, least invasive first:
+
+- **Re-score item #3's parked datacontract-cli cost (~6-7s/run).** It
+  was parked at "lower confidence this pays off" when only ~15-85 runs
+  existed - the same fixed per-run cost now applies to 176 runs and
+  will keep compounding as the manifest grows, so the parking math
+  (engineering cost vs. total time saved) may no longer land the same
+  way even though the per-run cost itself hasn't changed.
+- **Increase/verify worker parallelism**: `parallel_orchestrate.py`'s
+  worker count is `os.cpu_count()`-based - confirm this environment
+  isn't leaving real parallelism on the table (or that item #4's
+  already-measured 3.1-3.4x ceiling is genuinely CPU-bound, not an
+  artifact of a smaller test manifest).
+- **Incremental regeneration - the actual structural fix at "thousands"
+  scale, and the biggest engineering lift.** `./run_pipeline.sh` today
+  always regenerates and re-runs everything from scratch - data/raw/
+  wiped, every delivery in the rolling window regenerated, every real
+  tool re-run for every run - even though a rolling-window regeneration
+  mostly just shifts the window forward by however many days passed
+  since the last run, leaving most of the window's runs genuinely
+  unchanged. At hundreds of runs that's wasteful but tolerable; at
+  thousands it's the dominant cost. Turning this into "only regenerate/
+  re-run what's actually new or changed since qa_results/'s own
+  committed history" would cut the common case from O(window size) to
+  O(runs added since last regen) - but needs real design (how to detect
+  "unchanged" reliably including resupply chains, whether it's even
+  compatible with this project's "everything is seeded, full
+  regeneration is a real correctness diff" convention, or whether that
+  convention itself needs to bend at this scale).
+- **dbt-core's ~5s/run fixed startup cost** (Jinja environment,
+  manifest parsing, adapter loading, paid once per subprocess
+  invocation) - amortizing this across runs would need a genuinely
+  different execution strategy (a persistent dbt process/server, or
+  batching multiple runs' checks into fewer invocations), a bigger and
+  riskier architectural change than anything else in this list - only
+  worth it if the simpler items above don't get this phase back under
+  control on their own.

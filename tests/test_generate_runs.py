@@ -40,7 +40,14 @@ def test_severity_counts_match_run_plan():
     assert len(first_attempts) == len(generate_runs.RUN_PLAN)
 
     expected = [severity for (_, _, severity) in generate_runs.RUN_PLAN]
-    actual = [e["dirty_severity"] for e in sorted(first_attempts, key=lambda e: e["delivery_id"])]
+    # sort by run_index (a real int, matching RUN_PLAN's own generation
+    # order), not delivery_id (a zero-padded string) - a plain string
+    # sort broke for real once N_DELIVERIES crossed a fixed padding
+    # width ("delivery_100" < "delivery_11"), which this test itself
+    # caught (2026-09-17); see generate_runs.py's own comment on the
+    # :02d -> :03d fix and qa_results_reader.py's natural-sort fix for
+    # the two real (non-test) places the same bug class was reachable.
+    actual = [e["dirty_severity"] for e in sorted(first_attempts, key=lambda e: e["run_index"])]
     assert actual == expected
 
 

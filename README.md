@@ -48,8 +48,8 @@ you'd hit the real package conflict described just below with no
 equivalent one-step override `uv` gives you — not worth the workaround
 when `uv` is one command to install.)
 
-This regenerates 60 scheduled daily deliveries (up to 85 manifest entries
-once red-triggered resupply attempts are included — see "The 60
+This regenerates 120 scheduled daily deliveries (176 manifest entries
+once red-triggered resupply attempts are included — see "The 120
 (scheduled) runs" below), loads them into DuckDB, runs the four real tools
 against every run, and builds `dashboard/qa-reporting-dashboard.html` from
 `dashboard/qa-reporting-dashboard.template.html` plus the results. Every
@@ -140,9 +140,9 @@ generator/                   a real package (generator/__init__.py) - `python3 -
   daily_batch.py               generates ONE day's birth-registration batch (an event-flow model,
                                deliberately different from the sibling synthetic_data_generator
                                package's whole-population snapshot model — see the file's docstring)
-  generate_runs.py             orchestrates 60 scheduled daily deliveries (12 amber, 12 red) into
+  generate_runs.py             orchestrates 120 scheduled daily deliveries (24 amber, 24 red) into
                                data/raw/ - red ones trigger resupply.py's resupply-chain
-                               simulation, so up to 85 manifest entries actually land, not 60
+                               simulation, so 176 manifest entries actually land, not 120
   resupply.py                  generic resupply-chain orchestration (delay/retry/chaining),
                                driven by a DatasetProvider protocol - knows nothing about how
                                a dataset's rows are actually made, see the file's own docstring
@@ -261,13 +261,18 @@ sequential behaviour.
 See `plans/performance.md` for the full timing investigation, including
 what was tried and measured before landing here.
 
-## The 60 (scheduled) runs — and resupply attempts on top
+## The 120 (scheduled) runs — and resupply attempts on top
 
-`generator/generate_runs.py` schedules sixty daily deliveries (a ~2-month
-rolling window ending on the anchor date, ~1,700-2,050 rows each, deepened
-from an original 10-delivery/~10-day plan on 2026-09-16 - see
-`plans/wider.md`'s history-depth entry): thirty-six clean, twelve
-deliberately "amber", twelve deliberately "red", using `dirty.py`'s
+`generator/generate_runs.py` schedules 120 daily deliveries (a rolling
+window ending on the anchor date, ~1,700-2,050 rows each - widened from
+60 to 120 on 2026-09-17, Keith's own call, after `AS_OF_OFFSET_DAYS`
+and the old 60-delivery window turned out to collide: the as-of
+picker's default view landed one day before this dataset's own
+earliest real run - see `plans/publishing-and-history.md` Thread C and
+`plans/qa-pipeline.md` item 55 for the full account; deepened from an
+original 10-delivery/~10-day plan on 2026-09-16 before that - see
+`plans/wider.md`'s history-depth entry): seventy-two clean, twenty-four
+deliberately "amber", twenty-four deliberately "red", using `dirty.py`'s
 `apply_birth_registrations_presets()` — calibrated to land exactly inside
 the Soda checks file's own warn/fail bands, not arbitrary noise. The exact
 day-by-day severity assignment is seeded (`RUN_PLAN`'s own
@@ -277,11 +282,11 @@ representative clean/amber/red sample:
 
 | Run | Severity | invalid `sex` rate | null `place_of_birth_facility` rate |
 |---|---|---|---|
-| run_01 (clean) | — | 0.0% | 2.1% |
-| run_02 | amber | 0.6% | 31.9% |
-| run_11 | amber | 0.8% | 30.4% |
-| run_06 | red | 3.0% | 57.0% |
-| run_07 | red | 4.5% | 57.5% |
+| run_001 (clean) | — | 0.0% | 2.0% |
+| run_003 | amber | 0.4% | 31.9% |
+| run_018 | amber | 0.5% | 33.2% |
+| run_010 | red | 3.5% | 56.6% |
+| run_015 | red | 3.1% | 56.7% |
 
 **A RED delivery doesn't stop at one row in `manifest.json`.** It
 triggers `generator/resupply.py`'s resupply-chain simulation — modelling
@@ -289,11 +294,20 @@ Keith's team's real practice of requesting a resupply when a file has a
 red failing check, with no single fixed turnaround time. Each subsequent
 attempt gets a business-day-aware delay, a chance of still being red, and
 small organic churn versus a fresh random draw (see that module's own
-docstring and `plans/wider.md` #12/#13 for the full design). The twelve
-red deliveries going red is what pushes the actual row count in
-`data/raw/` and `manifest.json` from 60 to **85 entries** — each attempt
-gets its own CSV and its own `run_id` (e.g.
-`run_58_2026-09-14_resupply3`).
+docstring and `plans/wider.md` #12/#13 for the full design). The
+twenty-four red deliveries going red is what pushes the actual row count
+in `data/raw/` and `manifest.json` from 120 to **176 entries** — each
+attempt gets its own CSV and its own `run_id`, zero-padded to 3 digits
+for readability (e.g. `run_010_2026-05-30_resupply2`) — 2 digits until
+2026-09-17, when a real bug surfaced once the run count first crossed
+99 (a plain string sort of 2-digit-padded ids breaks the moment a 3rd
+digit shows up - `"run_100" < "run_20"`). The width itself is now just
+cosmetic: anything that needs these ids in real chronological order
+(`qa_tools/common/qa_results_reader.py`) sorts them numerically, not
+lexicographically, so it stays correct at any width - this dataset's
+real run count is expected to keep growing well past whatever a fixed
+width could keep up with. See `plans/qa-pipeline.md` item 55 for the
+full account.
 
 ## The dashboard
 

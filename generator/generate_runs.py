@@ -63,21 +63,30 @@ OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 ID_BLOCK = 100_000  # per-delivery id_offset spacing - well above any single delivery's row count
 
 # (day offset from delivery 1, base row count, first-attempt dirty severity or None)
-# 60 scheduled deliveries (deepened 2026-09-16, Keith's own call - see
-# plans/wider.md's "deepening simulated history" follow-up, done together
-# with widening Child Protection's cadence to quarterly since the two were
-# explicitly parked as one piece of work) - same ~60/20/20 clean/amber/red
-# ratio as the original 10-delivery plan (which was itself bumped from a
-# single red to 2 so the resupply-chain simulation below had more than one
+# 120 scheduled deliveries (widened again 2026-09-16, Keith's own call,
+# same day as Thread C's as-of picker landed: the previous 60-delivery
+# window barely cleared AS_OF_OFFSET_DAYS' own 60-day span - the DEFAULT
+# as-of date, today minus 60, landed one day before this dataset's own
+# earliest real run, so the flagship real dataset showed "no data" on
+# the default view. 120 gives genuine margin beyond the 60-day offset,
+# not just enough to scrape by - Keith's own words: "this will mean an
+# occasional regeneration, but that's fine." Originally deepened from
+# ~10 to 60 deliveries on 2026-09-16 too - see plans/wider.md's
+# "deepening simulated history" follow-up, done together with widening
+# Child Protection's cadence to quarterly since the two were explicitly
+# parked as one piece of work) - same ~60/20/20 clean/amber/red ratio as
+# the original 10-delivery plan (which was itself bumped from a single
+# red to 2 so the resupply-chain simulation below had more than one
 # independent example to demonstrate variability), generated rather than
-# hand-listed at this length. First and last deliveries are always clean by
-# construction: the first is orchestrate_bdm.py's own Evidently reference
-# run (must be clean to be a meaningful baseline), the last being clean is
-# the same deliberate framing choice as the original 10-run plan (Keith's
-# own call, 2026-09-13) - Child Protection's own RUN_PLAN deliberately ends
-# red instead, see that module's own comment for why.
+# hand-listed at this length. First and last deliveries are always clean
+# by construction: the first is orchestrate_bdm.py's own Evidently
+# reference run (must be clean to be a meaningful baseline), the last
+# being clean is the same deliberate framing choice as the original
+# 10-run plan (Keith's own call, 2026-09-13) - Child Protection's own
+# RUN_PLAN deliberately ends red instead, see that module's own comment
+# for why.
 _RUN_PLAN_SEED = 1900  # distinct range from per-delivery seeds (1000+i) and id_offset math
-N_DELIVERIES = 60
+N_DELIVERIES = 120
 
 
 def _build_run_plan(n: int, seed: int) -> list[tuple[int, int, str | None]]:
@@ -180,7 +189,20 @@ def _manifest_entries_for_delivery(attempts: list, i: int, delivery_id: str, del
     previous_run_id = None
     for attempt in attempts:
         suffix = "" if attempt.attempt_number == 1 else f"_resupply{attempt.attempt_number - 1}"
-        run_id = f"run_{i:02d}_{delivery_date.isoformat()}{suffix}"
+        # :03d, not :02d - N_DELIVERIES=120 (widened 2026-09-16) needs 3
+        # digits, and the padding must stay WIDE ENOUGH for every id to
+        # sort correctly as a plain string: a real bug caught by
+        # test_severity_counts_match_run_plan when this was still :02d
+        # ("delivery_100" < "delivery_11" lexicographically) - the same
+        # ids get string-sorted for real downstream too
+        # (qa_tools/common/qa_results_reader.py's list_run_ids()/
+        # read_qa_results(), which read the committed qa_results/ tree's
+        # own directory names back). Current callers of those two
+        # happen to re-sort by run_index/run_timestamp afterward so
+        # nothing downstream was actually producing wrong output yet -
+        # still a real, latent defect in what "sorted" means there, not
+        # just this module's own test.
+        run_id = f"run_{i:03d}_{delivery_date.isoformat()}{suffix}"
         entries.append({
             "run_id": run_id,
             "run_index": run_index_start + len(entries) + 1,
@@ -212,7 +234,7 @@ def main() -> None:
     # against an already-failed attempt of the same delivery.
 
     for i, (day_offset, n_rows, severity) in enumerate(RUN_PLAN, start=1):
-        delivery_id = f"delivery_{i:02d}"
+        delivery_id = f"delivery_{i:03d}"
         delivery_date = START_DATE + timedelta(days=day_offset)
         seed = 1000 + i
         id_offset = i * ID_BLOCK

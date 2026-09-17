@@ -739,6 +739,22 @@ true-absence case (an as-of date before CP's very first-ever run)
 still correctly shows "no data" the original way. Full `uv run pytest`
 (170 passed) and `uv run ruff check .` clean.
 
+**Also found live-testing the picker, same day: BDM's own real window
+was too shallow for its own default view.** `AS_OF_OFFSET_DAYS` (60)
+and BDM's real generation window (`generator/generate_runs.py`'s
+`N_DELIVERIES`, also 60) happened to collide - the default as-of date
+landed one day before BDM's own earliest real run, so the flagship
+real dataset showed "no data" on the very first thing anyone sees.
+Keith's fix: widen BDM's rolling window (`N_DELIVERIES` 60 -> 120,
+"from today backward", periodic regeneration accepted as normal
+going forward) - full detail, plus the separate real `delivery_id`/
+`run_id` zero-padding bug this widening exposed (and Keith's own
+"fix properly, not just wider" correction) in `plans/qa-pipeline.md`
+item 55, not repeated here since it's a generator/qa_results_reader.py
+fix, not an as-of-viewing one.
+
+## Build order
+
 Renumbered/reorganized 2026-09-16 (Keith's own call, for ease of
 reasoning/talking about this work) - each phase still names which
 Thread(s) it corresponds to above, for reference back into the detailed

@@ -2735,6 +2735,67 @@ relative, not a schedule — this is weeks of work, not months.
     once looked at properly. Logged for later per Keith's own
     instruction, not investigated further or fixed now.
 
+55. **[fixed, 2026-09-17]** Two real, linked bugs found live-testing the
+    as-of picker, both fixed the same session:
+    - **BDM's default as-of view showed "no data".** Root cause: BDM's
+      real generation window (`generator/generate_runs.py`'s
+      `N_DELIVERIES`) was 60 scheduled deliveries, and
+      `AS_OF_OFFSET_DAYS` (Thread C) is also 60 - the default as-of date
+      (today minus 60) landed one day before BDM's own earliest real
+      run, so the flagship real dataset showed "no data" on the very
+      first thing anyone sees. Introduced by this session's own earlier
+      fix switching the as-of default from a history-derived basis to
+      live wall-clock (see `plans/publishing-and-history.md` Thread C) -
+      that fix was correct, it just exposed this separate, pre-existing
+      collision between two "60"s that happened to coincide. Keith's
+      fix, confirmed via `AskUserQuestion`: widen BDM's real window so
+      there's genuine margin, not just enough to scrape by, and do it
+      as a rolling window from "today" backward (not a fixed calendar
+      range) so the same margin holds up over time, accepting that this
+      means periodic regeneration going forward ("that's fine" - his
+      own words). `N_DELIVERIES` 60 -> 120, full regeneration (176 real
+      runs across all 4 tools, May 20 - Sep 17 2026).
+    - **`delivery_id`/`run_id` zero-padding silently breaks past 99
+      runs.** Both were `f"{i:02d}"` - fine while every id has 2 digits,
+      wrong the instant one has 3: `"delivery_100" < "delivery_11"` as
+      plain strings. `tests/test_generate_runs.py::
+      test_severity_counts_match_run_plan` caught this for real the
+      moment `N_DELIVERIES` crossed 99 (not a design gap - a case where
+      already-existing code produced a genuinely wrong result once the
+      real run count grew, exactly the "actual bug" class this file's
+      own convention wants a regression test for - already had one).
+      First fix was `:02d` -> `:03d` (matches the same session's other
+      instinct: widen enough for what's needed now) - **but Keith's own
+      correction: not good enough, this dataset's real run count is
+      headed into the thousands over the project's life, and any FIXED
+      width is just a bigger version of the same bug waiting to
+      reoccur, not a real fix.** Properly fixed by removing the
+      width-dependent assumption entirely rather than picking a bigger
+      one: `qa_tools/common/qa_results_reader.py` gained
+      `_natural_sort_key()` (splits an id string into alternating
+      text/number segments, comparing the number segments as real ints)
+      and both its lexicographic-sort call sites (`list_run_ids()`,
+      `read_qa_results()`) now use it - correct at any id width,
+      forever, whether BDM ever reaches 1,000 runs or 100,000.
+      `generator/generate_runs.py` keeps `:03d` for readability (a
+      cosmetic width choice now, since correctness no longer depends on
+      it) with a comment explaining exactly that. Every current caller
+      of the two fixed functions (`build_results_from_history.py`,
+      `changelog.py`) turned out to already re-sort by a real int/
+      timestamp afterward, so nothing downstream was actually producing
+      WRONG final output yet from this - still a real, latent defect in
+      what "sorted" meant there, fixed before it could bite for real.
+      New regression test (`tests/test_qa_results_reader.py::
+      test_list_run_ids_and_read_qa_results_sort_numerically_not_
+      lexicographically`) writes run ids out of numeric order
+      specifically to catch a reintroduction. Verified for real:
+      confirmed the plain-string sort actually produces the wrong order
+      for `["run_100","run_3","run_20"]` before writing the fix, not
+      just reasoned about it; full pipeline regeneration (176 BDM runs)
+      completed clean with `:03d` ids; `uv run pytest` (171 passed,
+      including this file's own now-fixed test) and `uv run ruff check
+      .` both clean.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

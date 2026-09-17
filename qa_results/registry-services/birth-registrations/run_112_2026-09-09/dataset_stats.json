@@ -1,0 +1,114 @@
+{
+  "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+  "run_by": "fpycnkgvmt@privaterelay.appleid.com",
+  "raw_output": {
+    "manifest_entry": {
+      "run_id": "run_112_2026-09-09",
+      "run_index": 168,
+      "delivery_id": "delivery_112",
+      "delivery_date": "2026-09-09",
+      "attempt_number": 1,
+      "arrived_date": "2026-09-09",
+      "run_date": "2026-09-09",
+      "is_resupply": false,
+      "supersedes_run_id": null,
+      "n_rows_generated": 1082,
+      "dirty_severity": "amber",
+      "id_offset": 11200000,
+      "seed": 1112,
+      "file": "run_112_2026-09-09.csv"
+    },
+    "value_counts": {
+      "sex": [
+        [
+          "M",
+          530
+        ],
+        [
+          "F",
+          515
+        ],
+        [
+          "X",
+          22
+        ],
+        [
+          "(invalid code)",
+          15
+        ]
+      ]
+    },
+    "arrival": {
+      "max_lag_hours": 19.0,
+      "earliest_extract": "2026-09-08 20:00:00"
+    },
+    "check_aggregates": {
+      "sex": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 15,
+        "values": [
+          {
+            "value": "O",
+            "count": 8
+          },
+          {
+            "value": "U",
+            "count": 5
+          },
+          {
+            "value": "9",
+            "count": 2
+          }
+        ]
+      },
+      "place_of_birth_suburb": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 9,
+        "values": [
+          {
+            "value": "TBC",
+            "count": 3
+          },
+          {
+            "value": "Not stated",
+            "count": 2
+          },
+          {
+            "value": "Freemantle",
+            "count": 2
+          },
+          {
+            "value": "Perth Metro",
+            "count": 1
+          },
+          {
+            "value": "Unknown",
+            "count": 1
+          }
+        ]
+      },
+      "date_of_birth": {
+        "type": "numeric_date",
+        "suppressed": false,
+        "total_invalid": 1,
+        "min": "1750-01-01",
+        "max": "1750-01-01",
+        "values": [
+          {
+            "value": "1750-01-01",
+            "count": 1
+          }
+        ],
+        "histogram": [
+          {
+            "bucket": "1750-01-01",
+            "count": 1
+          }
+        ]
+      }
+    }
+  },
+  "verified": []
+}
