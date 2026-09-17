@@ -43,6 +43,16 @@ try{
   --line:#DED7C4; --line-strong:#C9C0A8;
   --accent:#23425C; --accent-ink:#132635; --accent-soft:#E3EAEF; --accent-soft-line:#C4D3DE;
   --good:#036819; --good-soft:#E1EFDD; --warn:#8A6A00; --warn-fill:#C39600; --warn-soft:#FBF1D8; --bad:#9A1C2E; --bad-soft:#F7E1E1;
+  /* Phase 5d (plans/publishing-and-history.md Thread D): a check's own
+     definition changing over time is a genuinely different kind of
+     event from its pass/fail STATUS (green/amber/red) - deliberately a
+     new hue (violet), not reused from good/warn/bad/accent, so "the
+     check itself changed here" reads as its own consistent visual
+     language wherever it shows up (trend-chart gap/marker, and future
+     changelog UI). Breaking and non-breaking changes share this exact
+     color - shape (gap vs. marker) is what tells them apart, not color -
+     per Keith's own call, 2026-09-16. */
+  --change:#6B3FA0; --change-soft:#F0E7F7;
   --radius-sm:6px; --radius-md:10px; --radius-lg:16px;
   --shadow-1: 0 1px 2px rgba(27,36,32,.06), 0 1px 1px rgba(27,36,32,.04);
   --shadow-2: 0 8px 24px rgba(27,36,32,.12), 0 2px 6px rgba(27,36,32,.08);
@@ -54,6 +64,7 @@ try{
     --line:#2E3329; --line-strong:#3C4234;
     --accent:#8FB6D6; --accent-ink:#D9E9F5; --accent-soft:#1E2D38; --accent-soft-line:#31485A;
     --good:#019F68; --good-soft:#122B1E; --warn:#E0AC3E; --warn-fill:#BC7600; --warn-soft:#2E2510; --bad:#B71532; --bad-soft:#301017;
+    --change:#C9A0E8; --change-soft:#2A1F38;
     --shadow-1: 0 1px 2px rgba(0,0,0,.3); --shadow-2: 0 12px 28px rgba(0,0,0,.45);
   }
 }
@@ -63,6 +74,7 @@ try{
   --line:#2E3329; --line-strong:#3C4234;
   --accent:#8FB6D6; --accent-ink:#D9E9F5; --accent-soft:#1E2D38; --accent-soft-line:#31485A;
   --good:#019F68; --good-soft:#122B1E; --warn:#E0AC3E; --warn-fill:#BC7600; --warn-soft:#2E2510; --bad:#B71532; --bad-soft:#301017;
+  --change:#C9A0E8; --change-soft:#2A1F38;
   --shadow-1: 0 1px 2px rgba(0,0,0,.3); --shadow-2: 0 12px 28px rgba(0,0,0,.45);
 }
 
@@ -333,6 +345,12 @@ button{font:inherit; color:inherit;}
 }
 .chart-tooltip.show{opacity:1;}
 .chart-toolbar{display:flex; justify-content:flex-end; margin-bottom:6px;}
+/* Phase 5d: only rendered when a chart actually has a gap/marker to
+   explain (trendChart()'s own hasChangeUi check) - most checks never
+   show this. */
+.change-legend{display:flex; flex-wrap:wrap; gap:12px; font-size:11px; color:var(--ink-muted); margin:2px 0 10px;}
+.change-legend span{display:inline-flex; align-items:center; gap:4px;}
+.break-glyph, .change-marker{cursor:default;}
 .link-btn{background:none; border:none; text-decoration:underline; text-underline-offset:2px; font-size:12px; color:var(--accent); cursor:pointer; padding:2px;}
 .trend-table{width:100%; border-collapse:collapse; font-size:12px; margin-top:10px;}
 .trend-table th,.trend-table td{padding:5px 8px; border-bottom:1px solid var(--line); text-align:left;}
@@ -677,6 +695,14 @@ function buildRealDataset(d){
     columns,
     isReal: true,
     realRunCount: d.runs.length,
+    // Phase 5d: the dataset's own full run manifest, kept around (not
+    // just its .length like realRunCount above) so trendChart() can tell
+    // "no result for this check between two of its history points" apart
+    // from "no REAL RUN happened at all in that window" - undefined for
+    // illustrative mock datasets (genDataset() below never sets this),
+    // which is fine: trendChart() only attempts reporting-gap detection
+    // when it's given a real runs list.
+    runs: d.runs,
   };
 }
 // Thread C - cadence-aware "as of" viewing (plans/publishing-and-
@@ -1131,7 +1157,56 @@ function sparkline(history, warn, fail){
 }
 
 let chartSeq=0;
-function trendChart(check, compareIdx, onPointClick){
+// Phase 5d (plans/publishing-and-history.md Thread D): detects the two
+// kinds of "something happened between these two history points" that
+// today's plain unbroken line can't represent at all (root cause: xs()
+// below places points by array INDEX, not real elapsed time, so it has
+// no concept of a gap):
+//   - reportGaps[i]: a REAL dataset run happened strictly between
+//     history[i] and history[i+1] that this check has no result for -
+//     detected directly from datasetRuns (ds.runs, the dataset's own
+//     full manifest), not from any retired_as_of metadata. Deliberately
+//     general rather than retirement-specific: it catches ANY reason a
+//     check went quiet for a real run (a temporary retirement being the
+//     one this was built for, but the signal itself is just "the data
+//     genuinely isn't there for a run that otherwise happened"), and it
+//     needs no reconstruction of "was this check retired then
+//     reactivated" from metadata that doesn't actually carry that
+//     history - the gap in qa_results/ itself IS the signal.
+//   - changeMarkers[idx]: check.changelog's own hand-authored entries
+//     (check_lifecycle.py's changelog field, already surfaced in Phase
+//     5c's check-detail panel) mapped onto the first history point AT
+//     OR AFTER each entry's date - "the first run reflecting this
+//     change". idx===0 is skipped: there's no earlier point in the
+//     visible window to draw a before/after split against.
+// Kept as free functions (not inlined in trendChart()) since both need
+// unit-testable-by-inspection logic independent of SVG geometry.
+function computeReportGaps(history, datasetRuns){
+  const gaps = {};
+  if(!datasetRuns || !datasetRuns.length) return gaps;
+  const n = history.length;
+  for(let i=0;i<n-1;i++){
+    const from = history[i].date, to = history[i+1].date;
+    const missed = datasetRuns.some(r=>{
+      const d = new Date(r.run_date+"T00:00:00Z");
+      return d>from && d<to;
+    });
+    if(missed) gaps[i] = true;
+  }
+  return gaps;
+}
+function computeChangeMarkers(history, changelog){
+  const markers = {};
+  (changelog||[]).forEach(entry=>{
+    let idx = history.findIndex(h=>h.date>=entry.date);
+    if(idx===-1) idx = history.length-1; // entry postdates the last known run
+    if(idx<=0) return; // no earlier point in view to split away from
+    if(!markers[idx] || entry.date>markers[idx].date) markers[idx] = entry;
+  });
+  return markers;
+}
+
+function trendChart(check, compareIdx, onPointClick, datasetRuns){
   const id = "chart"+(chartSeq++);
   const history = check.history, warn=check.warn, fail=check.fail, unit=check.unit;
   const W=480,H=180, padL=42,padR=16,padT=14,padB=26;
@@ -1146,7 +1221,72 @@ function trendChart(check, compareIdx, onPointClick){
   // relative to.
   const xs = i=> n===1 ? padL + (W-padL-padR)/2 : padL + i*(W-padL-padR)/(n-1);
   const ys = v=> H-padB - (v/maxV)*(H-padT-padB);
-  let path=""; history.forEach((r,i)=>{ path += (i===0?"M":"L")+xs(i).toFixed(1)+","+ys(r.value).toFixed(1)+" "; });
+
+  const reportGaps = computeReportGaps(history, datasetRuns);
+  const changeMarkers = computeChangeMarkers(history, check.changelog);
+  // breakInfo[i]: true means "no direct line between i and i+1" - ONLY a
+  // breaking changelog entry forces this (a deliberate declaration that
+  // before/after aren't comparable); a reportGap alone still gets a
+  // connecting line, just a visually distinct dashed one (below) rather
+  // than a true blank cut - "this check went quiet for a while" reads
+  // differently from "this check's definition changed here".
+  const breakInfo = {};
+  for(let i=0;i<n-1;i++){
+    const cm = changeMarkers[i+1];
+    if(cm || reportGaps[i]) breakInfo[i] = { breaking: !!(cm && cm.breaking), entry: cm, reportGap: !!reportGaps[i] };
+  }
+
+  // Path built as multiple segments, split at every breakInfo[i].breaking
+  // index - each segment is its own <path>, so a "breaking" gap really is
+  // a blank cut in the SVG, not just a color change.
+  const segments = [];
+  let current = [0];
+  for(let i=0;i<n-1;i++){
+    if(breakInfo[i] && breakInfo[i].breaking){ segments.push(current); current = [i+1]; }
+    else current.push(i+1);
+  }
+  segments.push(current);
+  const segPaths = segments.map(idxs=>{
+    let d = ""; idxs.forEach((i,k)=>{ d += (k===0?"M":"L")+xs(i).toFixed(1)+","+ys(history[i].value).toFixed(1)+" "; });
+    return d;
+  }).join(" ");
+  // Dashed muted connectors for reportGaps that AREN'T also a breaking
+  // split (still one continuous line segment above, since only breaking
+  // splits the path) - drawn as short overlay strokes so that one stretch
+  // of the line reads as "no real data here" without literally cutting it.
+  const dashConnectors = Object.keys(breakInfo).filter(i=> breakInfo[i].reportGap && !breakInfo[i].breaking).map(i=>{
+    i = +i;
+    return `<line x1="${xs(i).toFixed(1)}" y1="${ys(history[i].value).toFixed(1)}" x2="${xs(i+1).toFixed(1)}" y2="${ys(history[i+1].value).toFixed(1)}" stroke="var(--ink-faint)" stroke-width="2" stroke-dasharray="4,3"/>`;
+  }).join("");
+  // Breaking-change glyphs: a small violet double-tick "break" mark at
+  // the midpoint of the cut, classic axis-break shorthand - deliberately
+  // NOT reusing Thread C's no-data-available styling (muted/gray, a
+  // whole different page state, not a chart element) - this is a
+  // specific colored, deliberate "the check itself changed here" event.
+  const breakGlyphs = Object.keys(breakInfo).filter(i=> breakInfo[i].breaking).map(i=>{
+    i = +i;
+    const mx = (xs(i)+xs(i+1))/2, my = (ys(history[i].value)+ys(history[i+1].value))/2;
+    const e = breakInfo[i].entry;
+    const title = `Definition changed ${fmtDate(e.date)}: ${e.description} — ${e.author}`;
+    return `<g class="break-glyph" transform="translate(${mx.toFixed(1)},${my.toFixed(1)})"><title>${title}</title>
+      <line x1="-5" y1="-7" x2="1" y2="7" stroke="var(--change)" stroke-width="2.4" stroke-linecap="round"/>
+      <line x1="-1" y1="-7" x2="5" y2="7" stroke="var(--change)" stroke-width="2.4" stroke-linecap="round"/>
+    </g>`;
+  }).join("");
+  // Non-breaking markers: a small filled diamond ON the still-continuous
+  // line, same --change color as the breaking glyph above (color means
+  // "changed here" either way; shape carries breaking vs. non-breaking -
+  // Keith's own call, 2026-09-16).
+  const changeMarkerGlyphs = Object.keys(changeMarkers).filter(idx=> !changeMarkers[idx].breaking).map(idx=>{
+    idx = +idx;
+    const e = changeMarkers[idx];
+    const px = xs(idx), py = ys(history[idx].value);
+    const title = `Definition changed ${fmtDate(e.date)}: ${e.description} — ${e.author}`;
+    return `<g class="change-marker" transform="translate(${px.toFixed(1)},${py.toFixed(1)})"><title>${title}</title>
+      <rect x="-4" y="-4" width="8" height="8" fill="var(--change)" stroke="var(--surface)" stroke-width="1.2" transform="rotate(45)"/>
+    </g>`;
+  }).join("");
+
   // status color strip beneath
   const stripY = H-padB+8;
   let strip = history.map((r,i)=>{
@@ -1169,6 +1309,16 @@ function trendChart(check, compareIdx, onPointClick){
   const compareMarker = (compareIdx!=null && compareIdx>=0 && compareIdx<n && compareIdx!==n-1)
     ? `<circle cx="${xs(compareIdx).toFixed(1)}" cy="${ys(history[compareIdx].value).toFixed(1)}" r="5.5" fill="none" stroke="var(--accent)" stroke-width="2"/>`
     : "";
+  // Phase 5d: only shown when this check actually has a gap/marker to
+  // explain - the vast majority of checks have neither, and a legend
+  // nobody needs is just noise.
+  const hasChangeUi = breakGlyphs || changeMarkerGlyphs || dashConnectors;
+  const changeLegend = hasChangeUi ? `
+    <div class="change-legend">
+      ${breakGlyphs ? `<span><svg width="12" height="12" viewBox="-6 -6 12 12"><line x1="-4" y1="-5" x2="1" y2="5" stroke="var(--change)" stroke-width="2" stroke-linecap="round"/><line x1="-1" y1="-5" x2="4" y2="5" stroke="var(--change)" stroke-width="2" stroke-linecap="round"/></svg> Breaking definition change</span>` : ""}
+      ${changeMarkerGlyphs ? `<span><svg width="10" height="10" viewBox="-5 -5 10 10"><rect x="-3.5" y="-3.5" width="7" height="7" fill="var(--change)" transform="rotate(45)"/></svg> Non-breaking definition change</span>` : ""}
+      ${dashConnectors ? `<span><svg width="16" height="6"><line x1="0" y1="3" x2="16" y2="3" stroke="var(--ink-faint)" stroke-width="2" stroke-dasharray="4,3"/></svg> Check did not report (e.g. retired)</span>` : ""}
+    </div>` : "";
 
   const svg = `
   <div class="chart-wrap">
@@ -1176,7 +1326,10 @@ function trendChart(check, compareIdx, onPointClick){
       <line x1="${padL}" y1="${warnY}" x2="${W-padR}" y2="${warnY}" stroke="var(--warn-fill)" stroke-dasharray="3,3" stroke-width="1"/>
       <line x1="${padL}" y1="${failY}" x2="${W-padR}" y2="${failY}" stroke="var(--bad)" stroke-dasharray="3,3" stroke-width="1"/>
       <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H-padB}" stroke="var(--line)" stroke-width="1"/>
-      <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      ${dashConnectors}
+      <path d="${segPaths}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      ${breakGlyphs}
+      ${changeMarkerGlyphs}
       <circle cx="${xs(n-1).toFixed(1)}" cy="${ys(last.value).toFixed(1)}" r="3.4" fill="${statusColorVar(lastStatus)}" stroke="var(--surface)" stroke-width="1.5"/>
       <text x="${xs(n-1).toFixed(1)}" y="${(ys(last.value)-9).toFixed(1)}" font-size="10" text-anchor="end" fill="var(--ink)" font-family="IBM Plex Mono, monospace" font-weight="600">${fmtMetric(last.value, unit)}</text>
       ${compareMarker}
@@ -1187,6 +1340,7 @@ function trendChart(check, compareIdx, onPointClick){
     </svg>
     <div class="chart-tooltip" id="${id}-tip"></div>
   </div>
+  ${changeLegend}
   <div class="chart-toolbar">
     <button class="link-btn" data-toggle-table="${id}">View as table</button>
   </div>
@@ -1862,7 +2016,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   const trendBlock = `
     <div class="drawer-section">
       <h4>Over time — every QA run (${n} ${pluralize(n,"run")})</h4>
-      ${trendChart(check, hasCompareRun ? compareIdx : null, n>2 ? (idx)=>setCompareIdx(ag, col, ds, column, check, idx) : null)}
+      ${trendChart(check, hasCompareRun ? compareIdx : null, n>2 ? (idx)=>setCompareIdx(ag, col, ds, column, check, idx) : null, ds.runs)}
     </div>`;
 
   const descBlock = `<div style="font-size:13px; color:var(--ink-muted); margin-bottom:18px;">

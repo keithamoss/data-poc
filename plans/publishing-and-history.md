@@ -2002,33 +2002,107 @@ not a requirement.**
   zero console errors. New test `test_a_checks_description_and_
   changelog_are_carried_through` (`tests/test_build_dashboard_data.py`).
   Full `uv run pytest` (177 passed) and `uv run ruff check .` clean.
-- **Phase 5d (Thread D) - the trend-chart gap/marker work: the biggest,
-  most technically substantial piece, recommended last.** Bundles THREE
-  related fixes that all trace back to the same root cause (`trendChart()`'s
-  `xs()` position function places history points by array INDEX, not
-  real elapsed time, so it has no way to represent "a gap in time"
-  today):
-  - the breaking-change trend-line gap (a real visual split, styled
-    distinctly from Thread C's "no data available" gap - both are "a
-    gap in the line" but mean different things and must not look
-    identical)
-  - the non-breaking-change marker (a subtle marker on the still-
-    continuous line, deliberately the SAME color as the breaking-change
-    styling - color means "the check itself changed here" either way,
-    shape is what carries breaking-vs-non-breaking)
-  - the un-retirement gap bug (`plans/qa-pipeline.md`'s own entry,
-    2026-09-16): today a retired-then-reactivated check's `history`
-    array jumps straight from its last pre-retirement point to its
-    first post-reactivation one with nothing marking the gap, so an
-    index-based x-axis draws it as an ordinary unbroken line - visually
-    implying continuous reporting straight through the retired period,
-    exactly backwards. Keith's own call: fix this together with the
-    breaking-change gap rather than separately, since a real-time-aware
-    x-axis (or at minimum a real-time-aware gap/break check between
-    adjacent history points) likely fixes both at once.
-  Exact visual styling (color/pattern for the breaking-change gap vs.
-  the shared marker color) is still not decided - work that out when
-  this sub-phase is actually built, not before.
+- **Phase 5d (Thread D) - the trend-chart gap/marker work - [DONE,
+  2026-09-17].** Bundled all three related fixes, all traced back to the
+  same root cause (`trendChart()`'s `xs()` position function places
+  history points by array INDEX, not real elapsed time, so it had no way
+  to represent "a gap in time"):
+
+  **Scope decision made before building, not left implicit**: the plan
+  text's own "a date-based x-axis, or at minimum a real-time-aware gap/
+  break check between adjacent history points" left a real engineering
+  choice open. Went with the lighter "at minimum" option deliberately -
+  `xs()` stays exactly as it was (evenly spaced by array index), and
+  gaps/markers are ANNOTATIONS on top of that existing coordinate
+  system, not a rewrite of it. Rejected the full date-proportional
+  x-axis: it would also force reworking `wireChart()`'s hover/click
+  index math and the tick-label placement, and would make a dataset
+  with perfectly regular daily cadence (the overwhelming majority of
+  real checks) look uneven for no benefit, all for a distinction only
+  the rare gap actually needs to carry.
+
+  **Built, as two independent, composable mechanisms** (both new
+  top-level functions, `computeReportGaps()`/`computeChangeMarkers()`,
+  kept out of `trendChart()` itself so their logic is inspectable on its
+  own):
+  - **Reporting gaps** (the un-retirement bug's actual fix, generalized):
+    for each adjacent pair of a check's own `history` points, checks
+    whether the DATASET's own full run manifest (`ds.runs` - now also
+    returned from `buildRealDataset()`, previously only its `.length`
+    was kept) has a real run strictly between their two dates that this
+    check has no result for. Deliberately NOT keyed off `retired_as_of`
+    metadata at all - that only ever describes the check's CURRENT
+    state, not a past retire-then-reactivate cycle, and a check reactivated
+    today would show no trace of it in its own current definition. The
+    gap in `qa_results/` itself (a real run this check has zero result
+    for) is the actual, general, metadata-free signal - it would catch
+    retirement or any other reason a check went quiet for a run, with
+    no need to know or guess why.
+  - **Changelog markers**: each of a check's own `changelog` entries
+    (already surfaced in Phase 5c's panel) maps onto the first history
+    point at or after its date. A BREAKING entry forces a genuine blank
+    cut in the rendered path (multiple `<path>` segments, not one) plus
+    a small violet double-tick glyph at the cut - a real, deliberate
+    visual split, distinct in shape from anything else on the chart. A
+    NON-BREAKING entry gets only a small violet diamond marker sitting
+    ON the still-fully-connected line - no path split at all.
+
+  **Visual styling decided while building, as the plan file flagged it
+  would be**: a new `--change`/`--change-soft` color token (violet -
+  `#6B3FA0` light / `#C9A0E8` dark), deliberately a new hue rather than
+  reusing green/amber/red/accent, so "the check itself changed here"
+  reads as its own consistent visual language. Breaking and non-breaking
+  share this exact color per Keith's 2026-09-16 call - shape (a real
+  gap+glyph vs. a marker on an unbroken line) is what actually
+  distinguishes them, not color. A pure reporting gap (no changelog
+  entry, just detected missing data) gets its own THIRD, distinctly
+  muted treatment - a dashed `var(--ink-faint)` connector across that
+  stretch of line, not a blank cut and not the violet color - since
+  "this check went quiet for a while" is a genuinely different claim
+  from "this check's definition changed here," and neither should read
+  as Thread C's no-data-available EMPTY STATE (a different page
+  entirely, not a chart element, so no real collision risk there
+  either way). A small legend row (`.change-legend`) explaining
+  whichever of these three actually appear is rendered under the chart -
+  omitted entirely for the vast majority of checks that have none of
+  them, so no new UI clutter for the common case.
+
+  **Verification data, decided deliberately per-mechanism, not
+  uniformly**: the non-breaking marker had real data to verify against
+  already - Phase 5b's real retirement changelog entry on
+  `source_system_record_id.matches_regex_dbt` (`breaking: false`).
+  Confirmed for real: opening that check's panel shows exactly one
+  violet diamond marker and the matching legend line, with real data,
+  no fabrication needed. The breaking-gap and reporting-gap mechanisms
+  had no real example anywhere in committed history to verify against -
+  the repo's first-ever retirement (this same one) has never been
+  reactivated, and no check has ever had a real documented
+  `breaking: true` change. Deliberately did NOT manufacture one to get
+  real coverage, unlike Phase 5b's retirement: a fabricated real
+  THRESHOLD change would risk shifting actual historical green/amber/
+  red status values across up to 176 runs of carefully-calibrated real
+  data (README.md's documented clean/amber/red counts, several tests'
+  own hardcoded expectations) - a real, asymmetric risk the retirement
+  never carried (that check was always 0/green, so retiring it changed
+  no historical status anywhere). Verified both mechanisms instead
+  against clearly-labeled, non-committed fixtures injected directly into
+  the live `DATA` object via Playwright (a real check's own history,
+  copied and deliberately mutated in the browser only - never written
+  to any file) - confirmed the breaking case renders exactly 2 path
+  segments and 1 break glyph at the fabricated changelog date, and the
+  reporting-gap case renders exactly 1 dashed connector across a
+  fabricated 5-run missing window, both with the correct legend line and
+  zero console errors. A real end-to-end example of either awaits an
+  actual future breaking change or retire/reactivate cycle - flagged
+  here rather than silently left unverified.
+
+  Additionally verified: a full sweep opening all 424 real + illustrative
+  check panels across every agency (`openCheckPanel()` called directly
+  for each) - zero crashes, zero console errors, confirming the new
+  logic degrades safely for illustrative mock datasets too (`ds.runs` is
+  `undefined` there, `computeReportGaps()` returns no gaps rather than
+  erroring). Full `uv run pytest` (177 passed, unchanged - this was a
+  pure frontend change) and `uv run ruff check .` clean.
 
 **Phase 6 (test coverage) - added 2026-09-16, Keith's own call, once
 Phases 1-5 are otherwise done:** not scoped yet beyond the name - a
