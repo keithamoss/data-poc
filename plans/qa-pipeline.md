@@ -2692,21 +2692,61 @@ relative, not a schedule — this is weeks of work, not months.
     panel was still open, then confirmed exactly ONE click on (X)
     closed it fully.
 
-53. **[todo, resolve at the end of the next phase]** The actual
-    published (live GitHub Pages) dashboard needs a handful of real
-    "🕐 Past snapshots" entries to browse through - Keith's own
-    instruction, 2026-09-16, right after the as-of picker landed:
-    important for demoing the dashboard, so an audience can actually
-    see the time-travel feature working, not just find it empty. The
-    mechanism already exists and works (`dashboard/snapshot_dashboard.py`,
-    opt-in via `SNAPSHOT_DASHBOARD=1 ./run_pipeline.sh`, committed
-    `.html.gz` originals under `dashboard/snapshots/` - see that path's
-    own `CLAUDE.md` entry) - a handful of demo snapshots were taken
-    early on (item 65) but nothing since; taking a few more (spread
-    across different as-of-relevant moments, now that Thread C exists)
-    and committing/pushing them is the actual remaining work here.
-    Explicitly deferred by Keith to the end of the next phase, not
-    investigated or built now.
+53. **[done, 2026-09-17]** The actual published (live GitHub Pages)
+    dashboard needs a handful of real "🕐 Past snapshots" entries to
+    browse through - Keith's own instruction, 2026-09-16, right after
+    the as-of picker landed: important for demoing the dashboard, so an
+    audience can actually see the time-travel feature working, not just
+    find it empty. The mechanism already worked
+    (`dashboard/snapshot_dashboard.py`) - a handful of demo snapshots
+    were taken early on (item 65, all same-day 2026-09-16) but nothing
+    since.
+
+    Took one new real snapshot rather than several manufactured ones,
+    and explaining why: the underlying `qa_results/` history hasn't
+    changed since the June 16 batch (no new real pipeline run happened
+    in between - taking several snapshots back-to-back today would all
+    embed byte-identical data, differing only in timestamp/commit-sha
+    metadata, not in anything a viewer would actually see browsing
+    between them). What HAS changed enormously since June 16 is the
+    dashboard itself - Thread C's as-of picker, Phase 5a's activity
+    panel, 5b's retired-checks toggle, 5c's changelog/description
+    sections, item 57's Tier 2/3 sparklines, and the dark-mode toggle
+    all landed since then - so one fresh snapshot capturing all of that
+    is the genuinely valuable addition, not hollow "spread." Took it via
+    the CI-equivalent no-live-data path (`qa_tools.bdm/cp.
+    build_results_from_history` -> `pipeline.build_*_dashboard_data` ->
+    `dashboard.embed_dashboard_data` -> `SNAPSHOT_DASHBOARD=1 dashboard.
+    snapshot_dashboard`), not a full `./run_pipeline.sh` real-tool
+    re-run - nothing about the committed data needed regenerating, so
+    there was no reason to spend the ~11 real-tool minutes
+    `plans/performance.md` already flagged, and this mirrors exactly
+    what `deploy-pages.yml` itself does on every push (Thread A: rebuild
+    from committed history, never a live re-run).
+
+    Verified for real: the new snapshot
+    (`20260917T085817Z_7bdb0b6.html.gz`, 408KB compressed vs. the June
+    batch's ~53-56KB - genuinely much more real data embedded now, 176
+    BDM + 16 CP runs) appears correctly in the live dashboard's "Past
+    snapshots" panel, newest-first, alongside the 4 existing ones. A
+    real headless-Chromium check opened the new snapshot file directly
+    and confirmed it's a fully self-contained, working copy carrying
+    every feature shipped since June 16 - the dark-mode button, Tier 2/3
+    sparklines, and the retired-checks toggle all present and working,
+    zero console errors. `uv run pytest tests/test_snapshot_dashboard.py`
+    (24 passed) confirms the mechanism itself is unchanged/still correct.
+    Committed: the new `.html.gz` + updated `manifest.json` only (the
+    decompressed local `.html` siblings and the rebuilt `reports/*.json`/
+    dashboard HTML stay gitignored, regenerated, never committed, per
+    this repo's usual convention).
+
+    Not pursued further without asking first: taking MORE snapshots now
+    would need either a genuine new real pipeline run (expensive, and
+    nothing's actually changed that would need one) or more code
+    changes to snapshot in between (which would just mean taking this
+    same snapshot again later, once Phase 5d etc. actually land) -
+    Keith's own call if he wants artificially-spread duplicates anyway
+    for raw browsing-count purposes.
 
 54. **[fixed, 2026-09-17]** A real pluralization bug - Keith's report,
     2026-09-16: on the Executive tier's agency cards, "collections"/
