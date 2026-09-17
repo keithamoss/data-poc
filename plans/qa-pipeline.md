@@ -3019,6 +3019,21 @@ relative, not a schedule — this is weeks of work, not months.
     dashboard. Needs real design thought before building - picking up
     alongside item 60 at the end of this phase.
 
+62. **[parked, 2026-09-17 - for after Phase 5 wraps, Keith's own call]**
+    A dashboard-level changelog/releases page - "what changed about the
+    dashboard/tool itself over time," as its own page within the
+    dashboard. Explicitly distinct from two things already built this
+    session that sound similar but aren't: Phase 5a's "Recent activity"
+    panel (who QA'd/published what dataset, when - a feed over
+    `qa_results/` history) and Phase 5c's per-check changelog section
+    (a single check's own definition-change history, inside that
+    check's detail panel). This would be a THIRD, different feed - the
+    PoC/tool's own development history (new features, fixes, phases
+    shipped) as a real page, not a panel. Not scoped at all yet - Keith's
+    own instruction was to park it for a later discussion, after the
+    current run of phases (5d and whatever follows) is done, not to
+    build or even design it now.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
