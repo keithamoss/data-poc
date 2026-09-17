@@ -95,6 +95,17 @@ tests:
         introduced_date: "2026-01-15"
         description: "Every is_multiple_birth record must have a matching sibling row from the same birth event."
         changelog: []
+  - name: recency
+    config:
+      meta:
+        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.recency_dbt
+        introduced_date: "2026-09-15"
+        description: "At least one birth registration should have a date_of_birth within 7 days of this run's own date_registered - a freshness check."
+        changelog:
+          - date: "2026-09-17T00:00:00Z"
+            description: "Rebuilt as a singular test (tests/recency.sql) anchored to this run's own date_registered instead of real wall-clock CURRENT_DATE - the dbt_utils.recency macro had no way to parametrize its 'now', which is why this check was permanently red. Paired with a new inject_stale_delivery generator defect so the check has something genuine to catch."
+            author: "Keith Moss"
+            breaking: true
   - name: escalation_completeness
     config:
       meta:
@@ -140,27 +151,15 @@ models:
           # and the Soda checks file's matching `failed rows` check - a
           # registration date earlier than the birth date indicates a
           # corrupt or misjoined record.
-      - dbt_utils.recency:
-          meta:
-            check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.recency_dbt
-            introduced_date: "2026-09-15"
-            description: "At least one birth registration should have a date_of_birth within the last 7 days - a freshness check."
-            changelog: []
-          field: date_of_birth
-          datepart: day
-          interval: 7
-          ignore_time_component: true
-          # Replaces tests/recent_births_present.sql. Genuinely the same
-          # check, not just similar: recency fails when max(date_of_birth)
-          # is older than 7 days ago - logically equivalent to "does any
-          # row have a date_of_birth within the last 7 days" (the max IS
-          # achieved by some row). Same honest limitation as the original
-          # (real wall-clock CURRENT_DATE vs. this fixture's fixed Sept
-          # 2026 dates - see the ODCS contract's matching type: sql rule
-          # and the Soda checks file's [recent] filter for the fuller
-          # account). ignore_time_component: true keeps both sides of the
-          # comparison as plain dates, matching date_of_birth's own type
-          # (no timestamp coercion needed or wanted here).
+      # dbt_utils.recency lived here 2026-09-15 through Phase 5f
+      # (2026-09-17, plans/qa-pipeline.md #61) - moved BACK to a singular
+      # test (dbt_project/tests/recency.sql, see its own comment for the
+      # full rationale): dbt_utils.recency's "now" is always dbt.current_
+      # timestamp(), with no way to anchor it against this run's own
+      # date_registered instead of real wall-clock time, which is why
+      # this check was permanently red. Same check_id preserved (a
+      # redefinition, not a retirement) - see the singular test's own
+      # schema.yml entry below for its changelog entry.
     columns:
       - name: registration_number
         description: BDM's unique registration identifier.

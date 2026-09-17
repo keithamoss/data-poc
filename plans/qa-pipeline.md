@@ -3119,6 +3119,82 @@ relative, not a schedule — this is weeks of work, not months.
     dashboard. Needs real design thought before building - picking up
     alongside item 60 at the end of this phase.
 
+    **Resolved and built, 2026-09-17 (Phase 5f).** Re-asked all three
+    open questions via AskUserQuestion; Keith took the recommended
+    option on each: (1) anchor each check to this run's own date instead
+    of real wall-clock time, AND add a new generator defect so the check
+    has something genuine to catch (not anchoring alone, which the ODCS
+    contract's own pre-existing comment had already flagged would make
+    the check trivially always pass - registration lag alone, 0-9 days
+    on every row regardless of any defect, already puts most rows within
+    the 7-day window); (2) occasional WHOLE-RUN staleness, not tied to
+    the existing severity-tier preset mechanism; (3) a real breaking
+    changelog entry on all 3 checks, not a silent bug-fix framing, since
+    this genuinely changes what pass/fail means for them.
+
+    Investigated before building (not assumed): what column each of the
+    3 tools' checks could actually anchor against. `run_date` (added to
+    the dbt-built `stg_birth_registrations` view and the DuckDB `raw.
+    birth_registrations` table dbt/Soda both query) looked like the
+    obvious candidate, but datacontract-cli runs directly against the
+    raw per-run CSV (`run_datacontract_bdm.py`'s own docstring: "this
+    dataset's real production shape... no per-run DuckDB file is needed
+    here"), and `run_date` was never a column of that CSV - confirmed by
+    checking a real file's header. `date_registered` turned out to be
+    the right anchor instead: already a real column in all three tools'
+    data (the raw CSV included), and `daily_batch.py`'s own comment
+    confirms every row's `date_registered` is set to exactly that run's
+    `run_date` by construction ("this run's registrations cluster on
+    run_date") - so no schema change was needed anywhere, in any of the
+    three tools' data sources.
+
+    Built:
+    - `generator/dirty.py`'s new `inject_stale_delivery(df, seed,
+      rate=0.05)` - unlike every other injector in the module (a per-row
+      rate), this is a single coin flip for the WHOLE run: on a trigger,
+      every row's `date_of_birth` gets pushed 15-45 days before its own
+      `date_registered` (well past the 7-day window); `date_registered`
+      itself is left untouched (still reads as this run's own date - a
+      genuinely stale delivery still gets processed "today," it's the
+      underlying birth data that's old). Wired into `generate_runs.py`'s
+      `BirthRegistrationsProvider.generate()`, called once per delivery
+      (not per resupply attempt, so a delivery's staleness stays
+      consistent across its own resupply chain) - exempts the same two
+      bookend deliveries severity already exempts (the first, Evidently's
+      reference run; the last, kept deliberately fresh). 2 new tests
+      (`tests/test_dirty.py`): the triggered case (rate=1.0, deterministic)
+      and the miss case (rate=0.0) - plus added to the shared
+      `test_core_injectors_never_mutate_their_input` parametrization.
+    - dbt: `dbt_utils.recency` (no way to parametrize its own "now")
+      moved BACK to a singular test, `dbt_project/tests/recency.sql` -
+      same `NOT EXISTS` shape as the check it originally replaced
+      (`recent_births_present.sql`, retired 2026-09-15), just anchored
+      to `date_registered` instead of `CURRENT_DATE`. Same `check_id`
+      preserved (a redefinition, not a retirement) - `check_lifecycle.py`
+      only needed a changelog bump, verified clean. Routed through
+      `run_dbt_bdm.py`'s `_AUDIT_AGGREGATE_SQL` dbt-core-bug/flakiness
+      workaround (previously excluded for the macro's different audit
+      shape) - genuinely warranted here, since this exact check (under
+      its old name) is the one #34 already caught exhibiting the
+      still-unexplained nondeterminism that workaround guards against.
+    - Soda (`bdm-birth-registrations-soda-checks.yml`) and the ODCS
+      contract (`bdm-birth-registrations-contract.yaml`, `type: sql`):
+      same one-line anchor swap (`CURRENT_DATE` → `date_registered`) in
+      each check's own query, each with its own breaking changelog entry.
+
+    Verified against a full real regeneration (`./run_pipeline.sh` -
+    generator, all 4 real tools, 176 runs): all 3 checks now read
+    **172 pass / 4 fail** each, out of 176 real runs - a genuine, varying
+    signal instead of permanently red - and, checked directly, ALL THREE
+    TOOLS flag the exact same 4 run_ids (`run_004_2026-05-24`,
+    `run_008_2026-05-28`, `run_042_2026-07-01`, `run_092_2026-08-20`),
+    confirming the injector and all three check definitions agree.
+    `check_lifecycle.validate()` clean (258 checks, matching the
+    previous commit). Dashboard rebuilt and checked with real headless
+    Chromium (zero console errors, the freshness check renders correctly
+    in the date_of_birth column drawer). Full `uv run pytest` (181, up
+    from 178) and `uv run ruff check .` both clean.
+
 62. **[parked, 2026-09-17 - for after Phase 5 wraps, Keith's own call]**
     A dashboard-level changelog/releases page - "what changed about the
     dashboard/tool itself over time," as its own page within the

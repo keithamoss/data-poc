@@ -114,48 +114,58 @@ DATASET_ID = "birth-registrations"
 # is this stops depending on someone having already noticed a given check
 # misbehave.
 #
-# Two test shapes are deliberately excluded: `recency` (dbt_utils' own
-# macro stores a one-row-per-group most_recent/threshold summary, not
-# failing rows - COUNT(*) on it is meaningless), and `accepted_values`/
-# `unique` need SUM(n_records) instead of COUNT(*), since their own
-# main_sql pre-aggregates to (value, count) pairs - see schema.yml's own
-# comment on this distinction.
+# One test shape is deliberately excluded: `accepted_values`/`unique`
+# need SUM(n_records) instead of COUNT(*), since their own main_sql
+# pre-aggregates to (value, count) pairs - see schema.yml's own comment
+# on this distinction. `recency` used to be excluded too (dbt_utils' own
+# macro stored a one-row-per-group most_recent/threshold summary, not
+# failing rows - COUNT(*) on it was meaningless) - Phase 5f (#61)
+# rebuilt it as a singular test (tests/recency.sql) that, like
+# multiple_birth_sibling, returns 0 or 1 synthetic failing rows via
+# --store-failures, so COUNT(*) on its own audit table is now exactly
+# right, and gets the same dbt-core-bug/flakiness protection every other
+# test here does - genuinely warranted here specifically, since this
+# exact check (under its old name, recent_births_present.sql) is the
+# one plans/qa-pipeline.md #34 already caught exhibiting the still-
+# unexplained nondeterminism this workaround guards against.
 _AUDIT_AGGREGATE_SQL = {
     "not_null": "SELECT COUNT(*) FROM {relation}",
     "matches_regex": "SELECT COUNT(*) FROM {relation}",
     "accepted_range": "SELECT COUNT(*) FROM {relation}",
     "expression_is_true": "SELECT COUNT(*) FROM {relation}",
     "multiple_birth_sibling": "SELECT COUNT(*) FROM {relation}",
+    "recency": "SELECT COUNT(*) FROM {relation}",
     "accepted_values": "SELECT COALESCE(SUM(n_records), 0) FROM {relation}",
     "unique": "SELECT COALESCE(SUM(n_records), 0) FROM {relation}",
 }
 
-# multiple_birth_sibling has no attached column of its own (a singular
-# test, not a generic column test) - same class of gap run_dbt_cp.py
-# solves with cp_common.BUSINESS_RULE_HOME_TABLE, just column- rather than
-# table-scoped since this dataset is a single table. Without this, the
-# check would land under column_name="(table)", which the dashboard
-# builder silently drops for birth-registrations (there's no
-# "(table-level checks)" pseudo-column here the way Child Protection has).
-# The only entry left after the 2026-09-15 dbt_utils switch retired the
-# other 3 (each was a genuinely bespoke singular test replaced by an
-# off-the-shelf dbt_utils generic test - see plans/qa-pipeline.md);
-# multiple_birth_sibling stays a singular test because it's a cross-table-
-# shaped self-join no generic test in dbt_utils/dbt-expectations covers.
-_SINGULAR_TESTS = ["multiple_birth_sibling"]
+# Neither multiple_birth_sibling nor recency has an attached column of
+# its own (both singular tests, not generic column tests) - same class
+# of gap run_dbt_cp.py solves with cp_common.BUSINESS_RULE_HOME_TABLE,
+# just column- rather than table-scoped since this dataset is a single
+# table. Without this, either check would land under column_name=
+# "(table)", which the dashboard builder silently drops for birth-
+# registrations (there's no "(table-level checks)" pseudo-column here
+# the way Child Protection has). multiple_birth_sibling has been a
+# singular test since the 2026-09-15 dbt_utils switch (a cross-table-
+# shaped self-join no generic test in dbt_utils/dbt-expectations
+# covers); recency moved BACK to one in Phase 5f (#61, 2026-09-17) -
+# dbt_utils.recency's own macro can't anchor "now" against anything but
+# real wall-clock time, see tests/recency.sql's own comment.
+_SINGULAR_TESTS = ["multiple_birth_sibling", "recency"]
 _SINGULAR_TEST_COLUMN = {
     "multiple_birth_sibling": "is_multiple_birth",
+    "recency": "date_of_birth",
 }
 
-# dbt_utils.expression_is_true/recency are declared at MODEL level in
-# schema.yml (they operate across the model, not one column - a
-# cross-field comparison, a max() aggregate) - same class of routing gap
-# as _SINGULAR_TEST_COLUMN above, just for generic tests whose manifest
-# node genuinely has no column_name (None, not missing) rather than for
-# singular tests (which have no test_metadata at all).
+# dbt_utils.expression_is_true is declared at MODEL level in schema.yml
+# (it operates across the model, not one column - a cross-field
+# comparison) - same class of routing gap as _SINGULAR_TEST_COLUMN
+# above, just for a generic test whose manifest node genuinely has no
+# column_name (None, not missing) rather than for a singular test (which
+# has no test_metadata at all).
 _MODEL_LEVEL_TEST_COLUMN = {
     "expression_is_true": "date_registered",
-    "recency": "date_of_birth",
 }
 
 _DIMENSION_BY_TEST = {
@@ -197,12 +207,12 @@ def _failing_sample_keys(conn, test_name: str, column: str, node: dict, status: 
     failed this test, via dbt's own --store-failures audit table (see
     dbt_common.py) - never full row content, per plans/qa-pipeline.md
     #15's "flag it, not full row content" line. One test shape is
-    deliberately skipped, not an oversight: recency is a max()-aggregate
-    existence check (its audit table has one row per group with
-    most_recent/threshold columns, no row/PK concept at all - see
-    dbt_utils' own recency.sql macro), and any test with no relation_name
-    (shouldn't happen once --store-failures is always on, guarded
-    anyway)."""
+    deliberately skipped, not an oversight: recency's own query (tests/
+    recency.sql) is a NOT EXISTS existence check - its audit table holds
+    at most one synthetic `failing_row` value, no registration_number or
+    any other per-row identifier to sample - and any test with no
+    relation_name (shouldn't happen once --store-failures is always on,
+    guarded anyway)."""
     if status not in ("warn", "fail"):
         return []
     relation_name = node.get("relation_name")
@@ -270,9 +280,10 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
         test_name = meta["name"] if meta else node["name"]
         # Three cases: a real column-level generic test (column_name set);
         # a model-level generic test (test_metadata present, but
-        # column_name is None - dbt_utils.expression_is_true/recency,
-        # declared under the model itself in schema.yml, not a column);
-        # a singular test (no test_metadata at all).
+        # column_name is None - dbt_utils.expression_is_true, declared
+        # under the model itself in schema.yml, not a column); a
+        # singular test (no test_metadata at all - multiple_birth_
+        # sibling, recency).
         if meta and node["column_name"]:
             column = node["column_name"]
         elif meta:

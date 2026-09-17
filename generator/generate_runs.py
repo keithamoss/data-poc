@@ -56,7 +56,7 @@ import pandas as pd
 
 from generator.anchor_date import get_anchor_date
 from generator.daily_batch import generate_daily_batch
-from generator.dirty import apply_birth_registrations_presets
+from generator.dirty import apply_birth_registrations_presets, inject_stale_delivery
 from generator.resupply import MAX_ATTEMPTS, DatasetProvider, run_delivery_chain
 
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
@@ -127,7 +127,20 @@ class BirthRegistrationsProvider:
     loop in main() below."""
 
     def generate(self, run_date: date, seed: int, n_rows: int, id_offset: int) -> pd.DataFrame:
-        return generate_daily_batch(run_date, seed=seed, n_rows=n_rows, id_offset=id_offset)
+        df = generate_daily_batch(run_date, seed=seed, n_rows=n_rows, id_offset=id_offset)
+        # Phase 5f (plans/qa-pipeline.md #61): occasional whole-run
+        # staleness, exempting the same two bookend deliveries severity
+        # already exempts (see RUN_PLAN's own comment) - the first
+        # (orchestrate_bdm.py's Evidently reference run, must be a clean
+        # baseline) and the last (deliberately fresh so the "current"
+        # view reads healthy by default, same reason START_DATE's own
+        # rolling window exists). A distinct seed offset (+50) from
+        # daily_batch.py's own internal +1/+2 draws, so this coin flip
+        # never correlates with the row content it's applied on top of.
+        is_bookend = run_date in (START_DATE, START_DATE + timedelta(days=N_DELIVERIES - 1))
+        if not is_bookend:
+            df = inject_stale_delivery(df, seed=seed + 50)
+        return df
 
     def dirty(self, df: pd.DataFrame, severity: str, seed: int,
               previous_row_count: Optional[int]) -> pd.DataFrame:

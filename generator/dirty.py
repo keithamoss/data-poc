@@ -17,7 +17,7 @@ its own seed, so injecting failures is reproducible and composable - call
 several of these in a row to build up a specific scenario.
 """
 from __future__ import annotations
-from datetime import date
+from datetime import date, timedelta
 
 import numpy as np
 import pandas as pd
@@ -177,6 +177,35 @@ def inject_extract_timestamp_disorder(df: pd.DataFrame, rate: float, seed: int) 
         return out
     shift = pd.to_timedelta(rng.integers(1, 5, size=n), unit="h")
     out.loc[mask, "extract_timestamp"] = pd.to_datetime(out.loc[mask, "date_registered"]) - shift
+    return out
+
+
+def inject_stale_delivery(df: pd.DataFrame, seed: int, rate: float = 0.05) -> pd.DataFrame:
+    """Occasional WHOLE-RUN staleness (Phase 5f, plans/qa-pipeline.md #61,
+    Keith's call: occasional, independent of severity tier - not a preset,
+    not per-row). Simulates an upstream feed that kept arriving on
+    schedule but with old or replayed date_of_birth values - the real
+    scenario the 3 freshness checks (dbt's recency singular test, Soda's
+    matching failed-rows check, datacontract-cli's custom_sql equivalent)
+    exist to catch, now that all 3 are anchored to date_registered
+    instead of real wall-clock CURRENT_DATE (see each check's own
+    comment for why anchoring alone, with no genuine staleness scenario
+    to catch, would have just made them trivially pass every run instead
+    of trivially fail).
+
+    Unlike every rate-based injector above, this is a single coin flip
+    for the WHOLE run, not a per-row rate: `rate` of runs get EVERY row's
+    date_of_birth pushed 15-45 days before its own date_registered - well
+    past the checks' 7-day window. date_registered itself is deliberately
+    left untouched (still equals run_date, per daily_batch.py) - a
+    genuinely stale delivery still gets processed "today", it's the
+    underlying birth data that's old."""
+    rng = np.random.default_rng(seed)
+    if rng.random() >= rate:
+        return df.copy()
+    out = df.copy()
+    lag_days = rng.integers(15, 46, size=len(out))
+    out["date_of_birth"] = [d - timedelta(days=int(n)) for d, n in zip(out["date_registered"], lag_days)]
     return out
 
 

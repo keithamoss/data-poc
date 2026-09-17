@@ -298,33 +298,36 @@ schema:
             query: >
               SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END
               FROM {model}
-              WHERE {field} >= CURRENT_DATE - INTERVAL 7 DAY
+              WHERE {field} >= date_registered - INTERVAL 7 DAY
             mustBe: 0
             severity: error
             description: >
               Freshness / relative-date check: if no record in this batch
-              has a date_of_birth within the last 7 days of the REAL
-              wall-clock date this check runs on (not this run's own
-              date_registered - that would trivially always pass, since
-              date_of_birth is always within ~10 days of date_registered
-              by construction), the upstream feed has likely gone stale -
+              has a date_of_birth within 7 days of THIS RUN's own
+              date_registered, the upstream feed has likely gone stale -
               still delivering files, but with old or replayed data.
-              Honest limitation, same shape as the Soda checks file's
-              [recent] filter (see that file's own comment and
-              plans/qa-pipeline.md #3): this fixture's dates are fixed at
-              Sept 2026, so this check will read as increasingly failing
-              the further real wall-clock time drifts from that fixed
-              window, independent of anything actually being wrong -
-              regenerating the fixture on a rolling window near "today"
-              (the same follow-up already tracked for the [recent] filter)
-              would fix both at once.
+              Phase 5f (plans/qa-pipeline.md #61, 2026-09-17): previously
+              compared against real wall-clock CURRENT_DATE instead,
+              which made this check permanently red as real time drifted
+              from this fixture's fixed dates - anchoring to
+              date_registered fixes that (every row's date_registered is
+              exactly this run's own run_date by construction - see
+              daily_batch.py's own comment), same fix as the dbt/Soda
+              versions of this check. Anchoring alone isn't enough on its
+              own, though: ordinary registration lag (0-9 days on every
+              row, independent of any defect) already puts most rows
+              within the 7-day window, so this would trivially always
+              pass without generator/dirty.py's new inject_stale_delivery
+              - an occasional whole-run defect that pushes every row's
+              date_of_birth 15-45 days before date_registered, giving
+              this check something genuine to occasionally catch.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.freshness_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
-                value: "[]"
+                value: '[{"date": "2026-09-17T00:00:00Z", "description": "Anchored to this run''s own date_registered instead of real wall-clock CURRENT_DATE, which is why this check was permanently red. Paired with a new inject_stale_delivery generator defect so the check has something genuine to catch.", "author": "Keith Moss", "breaking": true}]'
 
       - name: sex
         logicalType: string

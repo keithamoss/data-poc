@@ -380,24 +380,39 @@ checks for birth_registrations:
   # itself flips that back into "0 or 1 failing rows" (a single synthetic
   # row when the inner EXISTS finds nothing) rather than needing a new
   # check shape. Same rule as the ODCS contract's matching type: sql check
-  # on date_of_birth - see that file's own comment for the honest
-  # limitation this shares with the [recent] filter below (real wall-clock
-  # CURRENT_DATE vs. this fixture's fixed Sept 2026 dates). Routed to the
-  # date_of_birth column explicitly, same reason as the two checks above.
-  # No samples limit here (unlike the other failed rows checks above) -
-  # this query structurally returns 0 or 1 synthetic row regardless of
-  # any cap, so an explicit ceiling would be meaningless.
+  # on date_of_birth. Routed to the date_of_birth column explicitly, same
+  # reason as the two checks above. No samples limit here (unlike the
+  # other failed rows checks above) - this query structurally returns 0
+  # or 1 synthetic row regardless of any cap, so an explicit ceiling
+  # would be meaningless.
+  #
+  # Anchored to date_registered rather than real wall-clock CURRENT_DATE
+  # (Phase 5f, plans/qa-pipeline.md #61, 2026-09-17 - was permanently red
+  # before this, same fix as the dbt/datacontract-cli versions of this
+  # check): every row's date_registered is exactly this run's own
+  # run_date (daily_batch.py's own comment: "this run's registrations
+  # cluster on run_date"), so this is genuinely anchored per-run, not to
+  # a fixed date. Not trivially always-passing either - ordinary
+  # registration lag alone (0-9 days on every row) already puts most rows
+  # within the 7-day window, so generator/dirty.py's inject_stale_
+  # delivery (an occasional whole-run defect) is what gives this a real,
+  # occasional failure to catch: on a stale run every row's date_of_birth
+  # sits 15-45 days before date_registered.
   - failed rows:
       fail query: |
         SELECT 1 WHERE NOT EXISTS (
-          SELECT 1 FROM birth_registrations WHERE date_of_birth >= CURRENT_DATE - INTERVAL '7' DAY
+          SELECT 1 FROM birth_registrations WHERE date_of_birth >= date_registered - INTERVAL '7' DAY
         )
       name: recent birth dates present (freshness)
       attributes:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.freshness_soda
         introduced_date: "2026-01-15"
-        description: "At least one birth registration should have a date_of_birth within the last 7 days."
-        changelog: []
+        description: "At least one birth registration should have a date_of_birth within 7 days of this run's own date_registered."
+        changelog:
+          - date: "2026-09-17T00:00:00Z"
+            description: "Anchored to this run's own date_registered instead of real wall-clock CURRENT_DATE, which is why this check was permanently red. Paired with a new inject_stale_delivery generator defect so the check has something genuine to catch."
+            author: "Keith Moss"
+            breaking: true
 
 # --- "Proportion of records since a certain date" ---------------------------
 # Scopes the same invalid-value check to only the last 24 hours of extracts,

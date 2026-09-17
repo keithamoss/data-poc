@@ -1,13 +1,13 @@
 {
-  "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+  "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
   "run_by": null,
   "raw_output": {
     "metadata": {
       "dbt_schema_version": "https://schemas.getdbt.com/dbt/run-results/v6.json",
       "dbt_version": "1.12.4",
-      "generated_at": "2026-09-17T00:20:17.823260Z",
-      "invocation_id": "d0a802de-3aed-48c0-ba60-8150011a928f",
-      "invocation_started_at": "2026-09-17T00:20:13.235135Z",
+      "generated_at": "2026-09-17T11:56:45.909435Z",
+      "invocation_id": "338fe5cc-7045-49c7-bce0-d7bc3c592230",
+      "invocation_started_at": "2026-09-17T11:56:42.424611Z",
       "env": {}
     },
     "results": [
@@ -16,17 +16,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:16.652873Z",
-            "completed_at": "2026-09-17T00:20:16.659916Z"
+            "started_at": "2026-09-17T11:56:44.795513Z",
+            "completed_at": "2026-09-17T11:56:44.803059Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:16.660580Z",
-            "completed_at": "2026-09-17T00:20:16.741373Z"
+            "started_at": "2026-09-17T11:56:44.803630Z",
+            "completed_at": "2026-09-17T11:56:44.872534Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.09055900573730469,
+        "execution_time": 0.07908225059509277,
         "adapter_response": {
           "_message": "OK"
         },
@@ -44,17 +44,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:16.752613Z",
-            "completed_at": "2026-09-17T00:20:16.761210Z"
+            "started_at": "2026-09-17T11:56:44.880547Z",
+            "completed_at": "2026-09-17T11:56:44.889682Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:16.761936Z",
-            "completed_at": "2026-09-17T00:20:16.825431Z"
+            "started_at": "2026-09-17T11:56:44.890390Z",
+            "completed_at": "2026-09-17T11:56:44.961596Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.07621598243713379,
+        "execution_time": 0.08438324928283691,
         "adapter_response": {
           "_message": "OK"
         },
@@ -72,17 +72,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:16.831481Z",
-            "completed_at": "2026-09-17T00:20:16.839246Z"
+            "started_at": "2026-09-17T11:56:44.967978Z",
+            "completed_at": "2026-09-17T11:56:44.976575Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:16.839827Z",
-            "completed_at": "2026-09-17T00:20:16.858802Z"
+            "started_at": "2026-09-17T11:56:44.977227Z",
+            "completed_at": "2026-09-17T11:56:45.007498Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.03516721725463867,
+        "execution_time": 0.042890310287475586,
         "adapter_response": {
           "_message": "OK"
         },
@@ -100,17 +100,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:16.869438Z",
-            "completed_at": "2026-09-17T00:20:16.879647Z"
+            "started_at": "2026-09-17T11:56:45.015728Z",
+            "completed_at": "2026-09-17T11:56:45.027801Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:16.880670Z",
-            "completed_at": "2026-09-17T00:20:16.912686Z"
+            "started_at": "2026-09-17T11:56:45.028541Z",
+            "completed_at": "2026-09-17T11:56:45.062685Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.0462343692779541,
+        "execution_time": 0.052849531173706055,
         "adapter_response": {
           "_message": "OK"
         },
@@ -128,17 +128,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:16.918685Z",
-            "completed_at": "2026-09-17T00:20:16.926859Z"
+            "started_at": "2026-09-17T11:56:45.071085Z",
+            "completed_at": "2026-09-17T11:56:45.079789Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:16.927452Z",
-            "completed_at": "2026-09-17T00:20:16.946187Z"
+            "started_at": "2026-09-17T11:56:45.080667Z",
+            "completed_at": "2026-09-17T11:56:45.106251Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.03589153289794922,
+        "execution_time": 0.03828930854797363,
         "adapter_response": {
           "_message": "OK"
         },
@@ -152,49 +152,21 @@
         "overload_results": null
       },
       {
-        "status": "fail",
-        "timing": [
-          {
-            "name": "compile",
-            "started_at": "2026-09-17T00:20:16.957328Z",
-            "completed_at": "2026-09-17T00:20:16.965083Z"
-          },
-          {
-            "name": "execute",
-            "started_at": "2026-09-17T00:20:16.965651Z",
-            "completed_at": "2026-09-17T00:20:16.988538Z"
-          }
-        ],
-        "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.0341496467590332,
-        "adapter_response": {
-          "_message": "OK"
-        },
-        "message": "Got 1 result, configured to fail if != 0",
-        "failures": 1,
-        "unique_id": "test.birth_registrations.dbt_utils_recency_stg_birth_registrations_day__date_of_birth__True__7.932bd3d78a",
-        "compiled": true,
-        "compiled_code": "\n\n\n\n\n\n\nwith recency as (\n\n    select \n\n      \n      \n        cast(max(date_of_birth) as date) as most_recent\n\n    from \"run_103_2026-08-31\".\"main\".\"stg_birth_registrations\"\n\n    \n\n)\n\nselect\n\n    \n    most_recent,\n    cast(\n\n    (now() + cast(-7 as bigint) * interval 1 day) as date) as threshold\n\nfrom recency\nwhere most_recent < cast(\n\n    (now() + cast(-7 as bigint) * interval 1 day) as date)\n\n",
-        "relation_name": "\"run_103_2026-08-31\".\"main_dbt_test__audit\".\"dbt_utils_recency_stg_birth_re_124be070f26f12277a90773df4e6e2e6\"",
-        "batch_results": null,
-        "overload_results": null
-      },
-      {
         "status": "pass",
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:16.995810Z",
-            "completed_at": "2026-09-17T00:20:17.004396Z"
+            "started_at": "2026-09-17T11:56:45.112553Z",
+            "completed_at": "2026-09-17T11:56:45.120689Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.005052Z",
-            "completed_at": "2026-09-17T00:20:17.025528Z"
+            "started_at": "2026-09-17T11:56:45.121400Z",
+            "completed_at": "2026-09-17T11:56:45.154526Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.03287148475646973,
+        "execution_time": 0.04532456398010254,
         "adapter_response": {
           "_message": "OK"
         },
@@ -212,17 +184,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.031116Z",
-            "completed_at": "2026-09-17T00:20:17.039515Z"
+            "started_at": "2026-09-17T11:56:45.160797Z",
+            "completed_at": "2026-09-17T11:56:45.169963Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.040135Z",
-            "completed_at": "2026-09-17T00:20:17.059956Z"
+            "started_at": "2026-09-17T11:56:45.170583Z",
+            "completed_at": "2026-09-17T11:56:45.202004Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.031690359115600586,
+        "execution_time": 0.044512271881103516,
         "adapter_response": {
           "_message": "OK"
         },
@@ -240,17 +212,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.065525Z",
-            "completed_at": "2026-09-17T00:20:17.072870Z"
+            "started_at": "2026-09-17T11:56:45.208356Z",
+            "completed_at": "2026-09-17T11:56:45.216724Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.073469Z",
-            "completed_at": "2026-09-17T00:20:17.095733Z"
+            "started_at": "2026-09-17T11:56:45.217424Z",
+            "completed_at": "2026-09-17T11:56:45.243901Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.03314995765686035,
+        "execution_time": 0.03867340087890625,
         "adapter_response": {
           "_message": "OK"
         },
@@ -268,17 +240,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.101405Z",
-            "completed_at": "2026-09-17T00:20:17.109092Z"
+            "started_at": "2026-09-17T11:56:45.250192Z",
+            "completed_at": "2026-09-17T11:56:45.258773Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.109666Z",
-            "completed_at": "2026-09-17T00:20:17.142426Z"
+            "started_at": "2026-09-17T11:56:45.259413Z",
+            "completed_at": "2026-09-17T11:56:45.282378Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.045137643814086914,
+        "execution_time": 0.035555124282836914,
         "adapter_response": {
           "_message": "OK"
         },
@@ -296,17 +268,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.149301Z",
-            "completed_at": "2026-09-17T00:20:17.157357Z"
+            "started_at": "2026-09-17T11:56:45.288624Z",
+            "completed_at": "2026-09-17T11:56:45.297549Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.157967Z",
-            "completed_at": "2026-09-17T00:20:17.183815Z"
+            "started_at": "2026-09-17T11:56:45.298222Z",
+            "completed_at": "2026-09-17T11:56:45.322532Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.03753232955932617,
+        "execution_time": 0.036832571029663086,
         "adapter_response": {
           "_message": "OK"
         },
@@ -324,45 +296,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.189517Z",
-            "completed_at": "2026-09-17T00:20:17.197327Z"
+            "started_at": "2026-09-17T11:56:45.328336Z",
+            "completed_at": "2026-09-17T11:56:45.331453Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.197947Z",
-            "completed_at": "2026-09-17T00:20:17.221150Z"
+            "started_at": "2026-09-17T11:56:45.332061Z",
+            "completed_at": "2026-09-17T11:56:45.358077Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.03452634811401367,
-        "adapter_response": {
-          "_message": "OK"
-        },
-        "message": null,
-        "failures": 0,
-        "unique_id": "test.birth_registrations.matches_regex_stg_birth_registrations_source_system_record_id___SRC_0_9_9_.a4b0569bbf",
-        "compiled": true,
-        "compiled_code": "\n\nselect *\nfrom \"run_103_2026-08-31\".\"main\".\"stg_birth_registrations\"\nwhere source_system_record_id is not null\n  and not regexp_matches(source_system_record_id, '^SRC-[0-9]{9}$')\n\n",
-        "relation_name": "\"run_103_2026-08-31\".\"main_dbt_test__audit\".\"matches_regex_stg_birth_regist_a721d5972f57d4a540efb8670e610bb6\"",
-        "batch_results": null,
-        "overload_results": null
-      },
-      {
-        "status": "pass",
-        "timing": [
-          {
-            "name": "compile",
-            "started_at": "2026-09-17T00:20:17.226743Z",
-            "completed_at": "2026-09-17T00:20:17.229746Z"
-          },
-          {
-            "name": "execute",
-            "started_at": "2026-09-17T00:20:17.230331Z",
-            "completed_at": "2026-09-17T00:20:17.259571Z"
-          }
-        ],
-        "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.03564858436584473,
+        "execution_time": 0.03251147270202637,
         "adapter_response": {
           "_message": "OK"
         },
@@ -380,17 +324,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.265159Z",
-            "completed_at": "2026-09-17T00:20:17.276374Z"
+            "started_at": "2026-09-17T11:56:45.363599Z",
+            "completed_at": "2026-09-17T11:56:45.373965Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.277068Z",
-            "completed_at": "2026-09-17T00:20:17.296848Z"
+            "started_at": "2026-09-17T11:56:45.374550Z",
+            "completed_at": "2026-09-17T11:56:45.393165Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.034644126892089844,
+        "execution_time": 0.03235363960266113,
         "adapter_response": {
           "_message": "OK"
         },
@@ -408,17 +352,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.302441Z",
-            "completed_at": "2026-09-17T00:20:17.310755Z"
+            "started_at": "2026-09-17T11:56:45.398651Z",
+            "completed_at": "2026-09-17T11:56:45.406657Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.311381Z",
-            "completed_at": "2026-09-17T00:20:17.333582Z"
+            "started_at": "2026-09-17T11:56:45.407263Z",
+            "completed_at": "2026-09-17T11:56:45.426228Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.03400826454162598,
+        "execution_time": 0.03037285804748535,
         "adapter_response": {
           "_message": "OK"
         },
@@ -436,17 +380,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.339296Z",
-            "completed_at": "2026-09-17T00:20:17.347292Z"
+            "started_at": "2026-09-17T11:56:45.431728Z",
+            "completed_at": "2026-09-17T11:56:45.439608Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.347863Z",
-            "completed_at": "2026-09-17T00:20:17.376012Z"
+            "started_at": "2026-09-17T11:56:45.440216Z",
+            "completed_at": "2026-09-17T11:56:45.460118Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.03960108757019043,
+        "execution_time": 0.031166553497314453,
         "adapter_response": {
           "_message": "OK"
         },
@@ -464,17 +408,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.381640Z",
-            "completed_at": "2026-09-17T00:20:17.389478Z"
+            "started_at": "2026-09-17T11:56:45.465633Z",
+            "completed_at": "2026-09-17T11:56:45.473355Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.390081Z",
-            "completed_at": "2026-09-17T00:20:17.412485Z"
+            "started_at": "2026-09-17T11:56:45.473963Z",
+            "completed_at": "2026-09-17T11:56:45.492397Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.03375577926635742,
+        "execution_time": 0.02965688705444336,
         "adapter_response": {
           "_message": "OK"
         },
@@ -492,17 +436,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.418103Z",
-            "completed_at": "2026-09-17T00:20:17.425946Z"
+            "started_at": "2026-09-17T11:56:45.497976Z",
+            "completed_at": "2026-09-17T11:56:45.505692Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.426522Z",
-            "completed_at": "2026-09-17T00:20:17.445577Z"
+            "started_at": "2026-09-17T11:56:45.506306Z",
+            "completed_at": "2026-09-17T11:56:45.524963Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.030304670333862305,
+        "execution_time": 0.03027796745300293,
         "adapter_response": {
           "_message": "OK"
         },
@@ -520,17 +464,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.451158Z",
-            "completed_at": "2026-09-17T00:20:17.458995Z"
+            "started_at": "2026-09-17T11:56:45.530898Z",
+            "completed_at": "2026-09-17T11:56:45.538745Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.459577Z",
-            "completed_at": "2026-09-17T00:20:17.484542Z"
+            "started_at": "2026-09-17T11:56:45.539468Z",
+            "completed_at": "2026-09-17T11:56:45.561298Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.03708529472351074,
+        "execution_time": 0.03655052185058594,
         "adapter_response": {
           "_message": "OK"
         },
@@ -548,17 +492,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.491982Z",
-            "completed_at": "2026-09-17T00:20:17.500624Z"
+            "started_at": "2026-09-17T11:56:45.570228Z",
+            "completed_at": "2026-09-17T11:56:45.578252Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.501254Z",
-            "completed_at": "2026-09-17T00:20:17.522786Z"
+            "started_at": "2026-09-17T11:56:45.578852Z",
+            "completed_at": "2026-09-17T11:56:45.599947Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.034122467041015625,
+        "execution_time": 0.037245988845825195,
         "adapter_response": {
           "_message": "OK"
         },
@@ -576,17 +520,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.529624Z",
-            "completed_at": "2026-09-17T00:20:17.540180Z"
+            "started_at": "2026-09-17T11:56:45.610156Z",
+            "completed_at": "2026-09-17T11:56:45.618466Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.541036Z",
-            "completed_at": "2026-09-17T00:20:17.564706Z"
+            "started_at": "2026-09-17T11:56:45.619074Z",
+            "completed_at": "2026-09-17T11:56:45.645009Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.038366079330444336,
+        "execution_time": 0.03776216506958008,
         "adapter_response": {
           "_message": "OK"
         },
@@ -604,17 +548,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.570632Z",
-            "completed_at": "2026-09-17T00:20:17.578665Z"
+            "started_at": "2026-09-17T11:56:45.650652Z",
+            "completed_at": "2026-09-17T11:56:45.658840Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.579263Z",
-            "completed_at": "2026-09-17T00:20:17.604109Z"
+            "started_at": "2026-09-17T11:56:45.659425Z",
+            "completed_at": "2026-09-17T11:56:45.680586Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.03639626502990723,
+        "execution_time": 0.03283190727233887,
         "adapter_response": {
           "_message": "OK"
         },
@@ -632,17 +576,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.609840Z",
-            "completed_at": "2026-09-17T00:20:17.617641Z"
+            "started_at": "2026-09-17T11:56:45.686307Z",
+            "completed_at": "2026-09-17T11:56:45.694545Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.618242Z",
-            "completed_at": "2026-09-17T00:20:17.641808Z"
+            "started_at": "2026-09-17T11:56:45.695170Z",
+            "completed_at": "2026-09-17T11:56:45.717652Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.03481006622314453,
+        "execution_time": 0.03430032730102539,
         "adapter_response": {
           "_message": "OK"
         },
@@ -660,17 +604,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.647779Z",
-            "completed_at": "2026-09-17T00:20:17.656249Z"
+            "started_at": "2026-09-17T11:56:45.723473Z",
+            "completed_at": "2026-09-17T11:56:45.731549Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.657055Z",
-            "completed_at": "2026-09-17T00:20:17.684842Z"
+            "started_at": "2026-09-17T11:56:45.732168Z",
+            "completed_at": "2026-09-17T11:56:45.753531Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.0398862361907959,
+        "execution_time": 0.033812761306762695,
         "adapter_response": {
           "_message": "OK"
         },
@@ -688,17 +632,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.690680Z",
-            "completed_at": "2026-09-17T00:20:17.699306Z"
+            "started_at": "2026-09-17T11:56:45.760454Z",
+            "completed_at": "2026-09-17T11:56:45.768753Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.699909Z",
-            "completed_at": "2026-09-17T00:20:17.724603Z"
+            "started_at": "2026-09-17T11:56:45.769418Z",
+            "completed_at": "2026-09-17T11:56:45.789294Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.03698372840881348,
+        "execution_time": 0.031713247299194336,
         "adapter_response": {
           "_message": "OK"
         },
@@ -716,17 +660,45 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.730499Z",
-            "completed_at": "2026-09-17T00:20:17.740298Z"
+            "started_at": "2026-09-17T11:56:45.795022Z",
+            "completed_at": "2026-09-17T11:56:45.797977Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.740969Z",
-            "completed_at": "2026-09-17T00:20:17.767971Z"
+            "started_at": "2026-09-17T11:56:45.798522Z",
+            "completed_at": "2026-09-17T11:56:45.817939Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.04401993751525879,
+        "execution_time": 0.025665283203125,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.recency",
+        "compiled": true,
+        "compiled_code": "-- Real dbt singular test - REPLACES dbt_utils.recency (Phase 5f,\n-- plans/qa-pipeline.md #61). That macro's \"now\" is always dbt.current_\n-- timestamp() (real wall-clock time), with no way to parametrize it per\n-- run - the honest reason this check was permanently red: this fixture's\n-- dates are fixed to a window generated at some point in the past, and\n-- every day real wall-clock time passes without a fresh regeneration,\n-- CURRENT_DATE drifts further from it. The ODCS contract's matching\n-- type: sql rule and the Soda checks file's matching `failed rows` check\n-- have the same fix, same reason.\n--\n-- Each run's own DuckDB warehouse holds only that run's own batch\n-- (see run_dbt_bdm.py's own docstring), and stg_birth_registrations\n-- already carries date_registered as a real column - daily_batch.py\n-- sets it to exactly this run's own run_date for every row (its own\n-- comment: \"this run's registrations cluster on run_date\"). So \"is\n-- date_of_birth fresh\" can be answered against THIS RUN's own date\n-- instead of the real machine's clock, with zero new plumbing, and the\n-- same anchor works identically for Soda (queries the same warehouse)\n-- and datacontract-cli (date_registered is a real column of the raw CSV\n-- it reads directly - no DuckDB-specific column needed).\n--\n-- NOT simply \"date_of_birth close to date_registered, always\": ordinary\n-- registration lag (daily_batch.py's reg_lag_days, 0-9 days, on every\n-- row regardless of any injected defect) already puts most rows within\n-- 7 days of their own date_registered, so anchoring alone would make\n-- this check trivially pass almost every run - no more meaningful than\n-- the \"always red\" it replaces. generator/dirty.py's inject_stale_\n-- delivery (an occasional whole-run defect, independent of severity\n-- tier) is what gives this something real to fail on: on an\n-- injected-stale run, EVERY row's date_of_birth gets pushed 15-45 days\n-- before its own date_registered (well past the 7-day window), and this\n-- test correctly goes red only then - date_registered itself is left\n-- untouched by that injector, still reading as this run's own date.\nselect 1 as failing_row\nwhere not exists (\n  select 1\n  from \"run_103_2026-08-31\".\"main\".\"stg_birth_registrations\"\n  where date_of_birth >= date_registered - interval '7' day\n)",
+        "relation_name": "\"run_103_2026-08-31\".\"main_dbt_test__audit\".\"recency\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-17T11:56:45.823452Z",
+            "completed_at": "2026-09-17T11:56:45.834733Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-17T11:56:45.835446Z",
+            "completed_at": "2026-09-17T11:56:45.857451Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.036905527114868164,
         "adapter_response": {
           "_message": "OK"
         },
@@ -744,17 +716,17 @@
         "timing": [
           {
             "name": "compile",
-            "started_at": "2026-09-17T00:20:17.777595Z",
-            "completed_at": "2026-09-17T00:20:17.786598Z"
+            "started_at": "2026-09-17T11:56:45.863130Z",
+            "completed_at": "2026-09-17T11:56:45.871026Z"
           },
           {
             "name": "execute",
-            "started_at": "2026-09-17T00:20:17.787225Z",
-            "completed_at": "2026-09-17T00:20:17.810356Z"
+            "started_at": "2026-09-17T11:56:45.871621Z",
+            "completed_at": "2026-09-17T11:56:45.897229Z"
           }
         ],
         "thread_id": "Thread-1 (worker)",
-        "execution_time": 0.0357661247253418,
+        "execution_time": 0.03703141212463379,
         "adapter_response": {
           "_message": "OK"
         },
@@ -768,92 +740,93 @@
         "overload_results": null
       }
     ],
-    "elapsed_time": 1.3119823932647705,
+    "elapsed_time": 1.2829372882843018,
     "args": {
-      "use_v2_parser": false,
+      "support_custom_ref_kwargs": false,
+      "store_failures": true,
       "use_colors": true,
-      "require_valid_schema_from_generate_schema_name": false,
-      "maximum_seed_size_mib": 1,
-      "indirect_selection": "eager",
+      "allow_jinja_file_extensions": false,
       "partial_parse": true,
-      "export_saved_queries": false,
-      "require_nested_cumulative_type_params": true,
-      "partial_parse_file_diff": true,
-      "introspect": true,
-      "log_path": "/home/user/data-poc/qa_tools/bdm/../../dbt_project/logs",
-      "print": true,
       "validate_macro_args": true,
-      "log_level": "info",
-      "log_format": "default",
-      "require_yaml_configuration_for_mf_time_spines": true,
+      "log_path": "/home/user/data-poc/qa_tools/bdm/../../dbt_project/logs",
+      "exclude": [],
       "printer_width": 80,
+      "require_explicit_package_overrides_for_builtin_materializations": true,
+      "vars": {},
+      "require_yaml_configuration_for_mf_time_spines": true,
+      "log_file_max_bytes": 10485760,
+      "state_modified_compare_vars": false,
+      "v2_parser": "dbt-core-experimental-parser parse",
+      "use_colors_file": true,
+      "resource_types": [],
+      "snowflake_projects_otel": false,
+      "print": true,
+      "quiet": true,
+      "require_nested_cumulative_type_params": true,
+      "indirect_selection": "eager",
+      "target_path": "/home/user/data-poc/qa_tools/bdm/../../dbt_project/target/run_103_2026-08-31",
+      "hints_enabled": true,
+      "require_source_and_semantic_model_names_without_spaces": false,
+      "favor_state": false,
+      "enable_grouped_warn_error_parser_logs": false,
+      "show_resource_report": false,
+      "state_modified_compare_more_unrendered_values": true,
+      "partial_parse_file_diff": true,
+      "require_corrected_analysis_fqns": false,
+      "require_resource_names_without_spaces": true,
+      "profiles_dir": "/home/user/data-poc/qa_tools/bdm/../dbt_profiles",
+      "require_generic_test_arguments_property": true,
+      "macro_debugging": false,
+      "require_all_warnings_handled_by_warn_error": true,
+      "require_valid_schema_from_generate_schema_name": false,
+      "strict_mode": false,
+      "require_ref_searches_node_package_before_root": false,
+      "cache_selected_only": false,
+      "source_freshness_run_project_hooks": true,
+      "log_format": "default",
+      "use_catalogs_v2": false,
+      "use_fast_test_edges": false,
+      "send_anonymous_usage_stats": false,
+      "exclude_resource_types": [],
+      "require_unique_project_resource_names": false,
+      "invocation_command": "dbt build --profiles-dir /home/user/data-poc/qa_tools/bdm/../dbt_profiles --project-dir /home/user/data-poc/qa_tools/bdm/../../dbt_project --quiet --target-path /home/user/data-poc/qa_tools/bdm/../../dbt_project/target/run_103_2026-08-31 --select stg_birth_registrations multiple_birth_sibling recency --store-failures",
+      "show_all_deprecations": false,
+      "require_sql_header_in_test_configs": false,
+      "include_saved_query": false,
+      "export_saved_queries": false,
+      "select": [
+        "stg_birth_registrations",
+        "multiple_birth_sibling",
+        "recency"
+      ],
+      "upload_to_artifacts_ingest_api": false,
+      "log_format_file": "debug",
+      "write_json": true,
+      "static_parser": true,
+      "log_level_file": "debug",
+      "which": "build",
+      "project_dir": "/home/user/data-poc/qa_tools/bdm/../../dbt_project",
+      "defer": false,
+      "use_v2_parser": false,
+      "latest_version_pointer_enabled_by_default": false,
       "show": false,
       "version_check": true,
-      "require_ref_searches_node_package_before_root": false,
-      "log_format_file": "debug",
-      "require_resource_names_without_spaces": true,
-      "require_explicit_package_overrides_for_builtin_materializations": true,
-      "exclude": [],
-      "hints_enabled": true,
-      "exclude_resource_types": [],
       "warn_error_options": {
         "error": [],
         "warn": [],
         "silence": []
       },
-      "support_custom_ref_kwargs": false,
-      "use_fast_test_edges": false,
-      "show_all_deprecations": false,
-      "v2_parser": "dbt-core-experimental-parser parse",
-      "require_corrected_analysis_fqns": false,
-      "macro_debugging": false,
-      "strict_mode": false,
-      "show_resource_report": false,
       "skip_nodes_if_on_run_start_fails": true,
-      "quiet": true,
-      "select": [
-        "stg_birth_registrations",
-        "multiple_birth_sibling"
-      ],
-      "invocation_command": "dbt build --profiles-dir /home/user/data-poc/qa_tools/bdm/../dbt_profiles --project-dir /home/user/data-poc/qa_tools/bdm/../../dbt_project --quiet --target-path /home/user/data-poc/qa_tools/bdm/../../dbt_project/target/run_103_2026-08-31 --select stg_birth_registrations multiple_birth_sibling --store-failures",
-      "allow_jinja_file_extensions": false,
-      "profiles_dir": "/home/user/data-poc/qa_tools/bdm/../dbt_profiles",
-      "resource_types": [],
-      "empty": false,
-      "require_batched_execution_for_custom_microbatch_strategy": true,
-      "source_freshness_run_project_hooks": true,
-      "latest_version_pointer_enabled_by_default": false,
-      "log_file_max_bytes": 10485760,
-      "log_level_file": "debug",
-      "state_modified_compare_more_unrendered_values": true,
-      "require_unique_project_resource_names": false,
-      "store_failures": true,
-      "static_parser": true,
-      "defer": false,
       "sqlparse": {
         "MAX_GROUPING_DEPTH": null,
         "MAX_GROUPING_TOKENS": null
       },
-      "upload_to_artifacts_ingest_api": false,
-      "require_all_warnings_handled_by_warn_error": true,
-      "target_path": "/home/user/data-poc/qa_tools/bdm/../../dbt_project/target/run_103_2026-08-31",
-      "favor_state": false,
-      "use_catalogs_v2": false,
+      "introspect": true,
+      "log_level": "info",
+      "maximum_seed_size_mib": 1,
       "populate_cache": true,
-      "include_saved_query": false,
-      "require_sql_header_in_test_configs": false,
-      "state_modified_compare_vars": false,
-      "enable_grouped_warn_error_parser_logs": false,
-      "write_json": true,
-      "project_dir": "/home/user/data-poc/qa_tools/bdm/../../dbt_project",
-      "require_source_and_semantic_model_names_without_spaces": false,
-      "use_colors_file": true,
-      "which": "build",
-      "require_generic_test_arguments_property": true,
-      "vars": {},
-      "cache_selected_only": false,
-      "snowflake_projects_otel": false,
-      "send_anonymous_usage_stats": false
+      "empty": false,
+      "require_batched_execution_for_custom_microbatch_strategy": true
     }
   },
   "verified": [
@@ -867,7 +840,7 @@
       "dimension": "validity",
       "label": "Invalid values",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -889,7 +862,7 @@
       "dimension": "validity",
       "label": "Invalid values",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -911,7 +884,7 @@
       "dimension": "conformity",
       "label": "Date-of-birth range",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -933,7 +906,7 @@
       "dimension": "consistency",
       "label": "Registration/birth date ordering",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -949,35 +922,13 @@
       "agency_id": "registry-services",
       "collection_id": "civil-registration",
       "dataset_id": "birth-registrations",
-      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.recency_dbt",
-      "column_name": "date_of_birth",
-      "check_name": "dbt:recency",
-      "dimension": "timeliness",
-      "label": "Freshness",
-      "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
-      "metric_value": 1,
-      "unit": "count",
-      "warn_threshold": null,
-      "fail_threshold": null,
-      "status": "fail",
-      "on_fail_action": "flag",
-      "row_count_total": 2010,
-      "row_count_invalid": 1,
-      "failing_sample_keys": [],
-      "engine": "dbt-core 1.12 + dbt-duckdb"
-    },
-    {
-      "agency_id": "registry-services",
-      "collection_id": "civil-registration",
-      "dataset_id": "birth-registrations",
       "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.matches_regex_dbt",
       "column_name": "child_family_name",
       "check_name": "dbt:matches_regex",
       "dimension": "validity",
       "label": "Invalid values",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -999,7 +950,7 @@
       "dimension": "validity",
       "label": "Invalid values",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1021,7 +972,7 @@
       "dimension": "validity",
       "label": "Invalid values",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1043,7 +994,7 @@
       "dimension": "validity",
       "label": "Invalid values",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1065,29 +1016,7 @@
       "dimension": "validity",
       "label": "Invalid values",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
-      "metric_value": 0,
-      "unit": "count",
-      "warn_threshold": null,
-      "fail_threshold": null,
-      "status": "pass",
-      "on_fail_action": "flag",
-      "row_count_total": 2010,
-      "row_count_invalid": 0,
-      "failing_sample_keys": [],
-      "engine": "dbt-core 1.12 + dbt-duckdb"
-    },
-    {
-      "agency_id": "registry-services",
-      "collection_id": "civil-registration",
-      "dataset_id": "birth-registrations",
-      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.matches_regex_dbt",
-      "column_name": "source_system_record_id",
-      "check_name": "dbt:matches_regex",
-      "dimension": "validity",
-      "label": "Invalid values",
-      "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1109,7 +1038,7 @@
       "dimension": "consistency",
       "label": "Sibling record match",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1131,7 +1060,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1153,7 +1082,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1175,7 +1104,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1197,7 +1126,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1219,7 +1148,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1241,7 +1170,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1263,7 +1192,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 43,
       "unit": "count",
       "warn_threshold": 300.0,
@@ -1285,7 +1214,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1307,7 +1236,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 43,
       "unit": "count",
       "warn_threshold": 90.0,
@@ -1329,7 +1258,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 538,
       "unit": "count",
       "warn_threshold": 550.0,
@@ -1351,7 +1280,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1373,7 +1302,29 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "pass",
+      "on_fail_action": "flag",
+      "row_count_total": 2010,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.recency_dbt",
+      "column_name": "date_of_birth",
+      "check_name": "dbt:recency",
+      "dimension": "timeliness",
+      "label": "Freshness",
+      "run_id": "run_103_2026-08-31",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1395,7 +1346,7 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -1417,7 +1368,7 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "run_103_2026-08-31",
-      "run_timestamp": "2026-09-17T00:10:35.066224+00:00",
+      "run_timestamp": "2026-09-17T11:48:02.896590+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,

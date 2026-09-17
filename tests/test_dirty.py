@@ -131,6 +131,7 @@ CORE_INJECTOR_CALLS = [
      lambda df: dirty.inject_extract_timestamp_disorder(df, 0.3, seed=1)),
     ("truncate_rows", lambda df: dirty.truncate_rows(df, 0.3, seed=1)),
     ("truncate_to_row_count", lambda df: dirty.truncate_to_row_count(df, len(df) // 2, seed=1)),
+    ("inject_stale_delivery", lambda df: dirty.inject_stale_delivery(df, seed=1, rate=1.0)),
 ]
 
 
@@ -250,6 +251,29 @@ def test_inject_extract_timestamp_disorder_only_shifts_affected_rows_before_regi
     _approx(changed.sum(), 0.3 * len(df))
     assert (out.loc[changed, "extract_timestamp"] < out.loc[changed, "date_registered"]).all()
     assert (out.loc[~changed, "extract_timestamp"] == df.loc[~changed, "extract_timestamp"]).all()
+
+
+def test_inject_stale_delivery_pushes_every_row_past_the_freshness_window_when_triggered():
+    # Phase 5f (plans/qa-pipeline.md #61): rate=1.0 forces the whole-run
+    # coin flip to trigger deterministically (rng.random() is always
+    # strictly < 1.0), so every row should end up well past the 3
+    # freshness checks' 7-day window - date_registered untouched.
+    df = _base_df()
+    out = dirty.inject_stale_delivery(df, seed=1, rate=1.0)
+    lag_days = (pd.to_datetime(out["date_registered"]) - pd.to_datetime(out["date_of_birth"])).dt.days
+    assert (lag_days > 7).all()
+    assert (lag_days >= 15).all() and (lag_days <= 45).all()
+    assert (out["date_registered"] == df["date_registered"]).all()
+
+
+def test_inject_stale_delivery_is_a_noop_when_the_coin_flip_misses():
+    # rate=0.0 guarantees the flip never triggers (rng.random() is
+    # always >= 0.0) - the whole point of this being a single per-run
+    # coin flip, not a per-row rate like every other injector, is that a
+    # miss must leave the run entirely untouched.
+    df = _base_df()
+    out = dirty.inject_stale_delivery(df, seed=1, rate=0.0)
+    pd.testing.assert_frame_equal(out, df)
 
 
 def test_truncate_rows_drops_approximately_the_requested_fraction():
