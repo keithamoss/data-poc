@@ -3787,6 +3787,14 @@ relative, not a schedule — this is weeks of work, not months.
     status and the new counter (including chaining through 2+ resupply
     attempts).
 
+    **Superseded, 2026-09-17 (item 73)**: the "is this entry a resupply"
+    question this item answers is still correct, but WHICH entries count
+    as a resupply is no longer read from `is_resupply`/
+    `supersedes_run_id` at all - see item 73 and
+    `plans/conceptual-design.md` Thread A. `daysSincePrevious` itself is
+    unchanged in behaviour, just recomputed from real chain position
+    instead of a `supersedes_run_id` lookup.
+
 70. **[investigated + defensive fix applied, 2026-09-17 (Phase 7) - the
     ORIGINAL "looks like Times New Roman" report could NOT be
     reproduced]** Real investigation, not a guess: loaded the real
@@ -3865,6 +3873,16 @@ relative, not a schedule — this is weeks of work, not months.
     resupplies entirely, or show something else when the latest thing
     IS a resupply, is a real design question, not an obvious bug fix.
 
+    **Superseded, 2026-09-17 (item 73)**: the specific fix here
+    (`delivery_date`-based grouping) is replaced outright, not just
+    extended - see item 73 and `plans/conceptual-design.md` Thread A.
+    Keith's own follow-up critique, prompted by this exact bug: "suppliers
+    won't actually label a resupply as against the original supply... I
+    think something you're modeling about supplies and resupplies
+    doesn't make sense." The related risk flagged above
+    (`lastArrival`/`latest_status`) is still open and unchanged by item
+    73 - explicitly deferred, see that item's own note.
+
 72. **[explained, 2026-09-17 (Phase 7) - Keith's own question: "I can
     see there's a little pill with red/amber severity injected... I
     don't understand what that means though"]** The `dirtySeverity`
@@ -3897,6 +3915,148 @@ relative, not a schedule — this is weeks of work, not months.
     explaining why the checks below are flagging things) or get
     reframed/hidden as an implementation detail a real production
     dashboard would never actually have.
+
+    **Resolved, 2026-09-17 (item 73)**: Keith's own follow-up answered
+    the open question above - "we can drop the dirty severity pill" -
+    and it's gone, replaced by a real (not synthetic) aggregate
+    red/amber/green status pill. See item 73.
+
+73. **[built, 2026-09-17 (Phase 7) - Keith's own redesign, worked out
+    loud over several turns and captured in full in
+    `plans/conceptual-design.md` Thread A]** Replaced the resupply-chain
+    model entirely. The previous design (items 29/71) grouped a
+    dataset's real run history using synthetic generator bookkeeping
+    (`is_resupply`/`delivery_id`/`delivery_date`/`supersedes_run_id`,
+    `generator/generate_runs.py`) - real for the generator's OWN
+    simulation of a churned re-attempt, but nothing a real production
+    dashboard would ever have, since a real supplier's resupply just
+    arrives with no flag saying what it's a resupply of. Keith's own
+    words, investigating item 71's bug: "suppliers won't actually label
+    a resupply as against the original supply. It will just appear at a
+    certain time. So I think something you're modeling about supplies
+    and resupplies doesn't make sense."
+
+    New model, cadence-agnostic (identical logic for a daily feed and a
+    quarterly one) and derived from exactly two real, already-available
+    facts: `pipeline/cadence.py`'s cadence rules (via the dashboard's own
+    `cycleStartDate()` - used only to anchor where a NEW chain starts,
+    never to decide membership run by run) and each arrival's own real
+    aggregate quality status - red/amber/green, the worst status among
+    every real check across every column for that specific run. A new
+    `datasetStatusByRun(d)` computes this once per dataset, purely from
+    data already embedded in the dashboard JSON (`checks[].history[]`
+    against each check's own `warn`/`fail` thresholds) - no new pipeline
+    computation, no live data access. `buildSupplyHistory()` walks a
+    dataset's real arrivals in chronological `run_date` order: a RED
+    arrival starts (or continues, if the current chain is still open) a
+    resupply chain; the chain CLOSES on the first AMBER or GREEN arrival
+    after a RED. "Let's keep it simple - an amber or a green supply can
+    count as the end of a resupply chain" - Keith's own final call,
+    reached after weighing out loud whether amber should count as a real
+    resolution or an accepted-but-unresolved state (the amber-governance
+    question this raised is explicitly parked, not resolved, in
+    `plans/conceptual-design.md` Thread A). An ordinary green/amber
+    arrival with no open chain before it is still just a one-entry group,
+    same as before - most of BDM's real history is unaffected by this
+    change in practice, only the genuinely red-then-recovered sequences
+    are.
+
+    The exact same `datasetStatusByRun()` computation also powers the
+    separately-requested aggregate status pill on each supply/resupply
+    row (Keith: "an overall pill on each supply, showing whether it's
+    red, amber, or green... an aggregate of all of the checks for the
+    dataset and all its columns") - deliberately one computation, two UI
+    uses, replacing the old `dirtySeverity` pill (item 72's own dropped
+    concept) in `renderSupplyCycleRows()`. `daysSincePrevious` (item 69)
+    is now just the gap between consecutive entries in the SAME derived
+    chain, walked in order - no `supersedes_run_id` lookup needed any
+    more, since the chain itself already is that sequence.
+
+    Deliberately NOT changed: the generator
+    (`generator/resupply.py`/`generator/generate_runs.py`) still writes
+    its own `is_resupply`/`delivery_id`/etc. into `manifest.json` - real,
+    legitimate bookkeeping for how the SYNTHETIC DATA was generated, just
+    no longer trusted or read by the dashboard's chain-derivation logic.
+    `tests-js/supply-history.test.js` was rewritten (not just extended)
+    for the new model: chain start/continue/close behaviour under every
+    red/amber/green sequence shape, the "keep it simple" amber-closes-
+    exactly-like-green rule, a new chain starting fresh after a closed
+    one, `daysSincePrevious`/`arrivalStatus` derived from real chain
+    position, and a regression test re-expressing the original Sept 14
+    bug scenario in the new model's own terms (a still-open chain
+    correctly absorbing a later arrival that happens to land on another
+    day, rather than the old bug of two unrelated things merging purely
+    by calendar coincidence).
+
+74. **[found, 2026-09-17 (Phase 7) - surfaced by item 73's own new
+    aggregate-status pill, NOT fixed here - real, wide blast radius,
+    needs Keith's own call, not a unilateral fix]** Item 73's new
+    per-run aggregate status made a pre-existing, previously-easy-to-
+    miss calibration problem impossible to ignore: `birth-registrations`
+    currently shows ONE never-closing resupply chain covering its entire
+    176-run real history, because at least one check reads "red" on
+    essentially every single run. Root-caused to TWO separate, real, pre-
+    existing bugs in how a check's `warn`/`fail` thresholds get encoded
+    for the dashboard - neither introduced by item 73's own new code,
+    both just newly visible now that every run's own aggregate status is
+    actually being looked at, not just the current run's:
+
+    - **Bug A - an unconfigured threshold silently becomes a zero
+      threshold.** `pipeline/build_dashboard_data.py` (and CP's own
+      equivalent) substitutes `0` for a `None` `warn`/`fail` when
+      building each check's dashboard record. For a genuinely warn-ONLY
+      check (no fail configured at all - by design, e.g.
+      `missing_percent(registering_parent_1_name)` in
+      `contract/bdm-birth-registrations-soda-checks.yml`, whose own
+      comment says "SodaCL has no 'info' severity, so the info-tier rule
+      below only sets warn - there's nothing stricter to escalate it
+      to"), this silently converts "can never fail" into "fails on ANY
+      nonzero value" - `checkStatus()`/`statusForValue()` both check
+      `fail` before `warn`, so a null-defaulted-to-0 `fail` overrides a
+      real, deliberately-configured `warn` entirely. Verified for real:
+      `registering_parent_1_name`'s Soda `missing_percent` check reads
+      RED on all 176 real committed runs despite `warn: when > 5%` being
+      the only threshold that check's own YAML ever configures.
+    - **Bug B - datacontract-cli's real numeric threshold gets discarded
+      for any `severity: error` rule.** `qa_tools/bdm/
+      run_datacontract_bdm.py` line 112: `"fail_threshold": 0 if
+      diag.get("severity") == "error" else None`. Correct for the
+      overwhelming majority of this contract's error-severity rules,
+      which genuinely use `mustBe: 0` (zero tolerance IS the real rule,
+      so `fail_threshold=0` is a faithful encoding - see README's own
+      "Known simplifications" section, which already documents ODCS's
+      single-tier severity as a deliberate scoping choice). But a small
+      minority use a real, non-zero `mustBeLessThan` with
+      `severity: error` - most visibly `place_of_birth_facility`'s
+      `missing_percent` rule (`mustBeLessThan: 35`, real observed values
+      around 2%, genuinely PASSING against the real 35% rule
+      `datacontract test` itself correctly evaluates) - and for those,
+      the blanket `fail_threshold=0` throws the real 35% threshold away
+      entirely, so the dashboard reads it as failing on almost every
+      run regardless of the real rule. (`child_given_names`/
+      `child_family_name`'s `mustBeLessThan: 1` rules have the same
+      structural bug but a much narrower practical window - a required
+      field's null rate landing between 0% and 1% - so they're far less
+      likely to actually misfire in practice; `place_of_birth_facility`
+      is the clear, real, currently-misfiring case.)
+
+    NOT fixed here, deliberately. Both are genuine, pre-existing bugs
+    (not something item 73's own new code introduced - `git stash`-
+    verified the CURRENT-view dataset status pill already read "Red" for
+    `birth-registrations` before ANY of item 73's changes), but fixing
+    either one properly touches shared, currently-working rendering code
+    well beyond the resupply-chain feature itself - trend-chart y-axis
+    ticks (`[0,warn,fail]`), the check-detail panel's threshold text
+    (`fmtMetric(ck.warn,...)`), and every existing column/dataset status
+    pill across the whole app, BDM and CP alike - real design questions
+    (what does a trend chart look like with a `null` fail line? does
+    fixing this change status pills Keith has already seen and accepted
+    as "just how this demo looks"?) that need his own call, not a
+    drive-by fix bundled into an unrelated feature. Item 73's own new
+    resupply-chain logic is functioning exactly as designed against
+    today's real (bug-affected) data - the never-closing chain is an
+    accurate computation given that input, not a bug in the new
+    derivation logic itself.
 
 ## Held over from the original (equivalent-only) build
 

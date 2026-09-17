@@ -888,72 +888,112 @@ function rowCountAtRun(d, runId){
   }
   return null;
 }
+// Real per-run aggregate quality status (red/amber/green) - the worst
+// status among every real check that has a result for that specific
+// run, across every column. A generalization of checkStatus()/worstOf()
+// (which only ever look at the as-of CURRENT value) to "any historical
+// run's own value" - pure function of data already embedded in the
+// dashboard JSON (each check's own history[] against its own warn/fail
+// thresholds), no new pipeline computation needed. Built once per
+// dataset (a Map, not a per-run re-scan) since it's used both by
+// buildSupplyHistory() below (chain derivation) and by the aggregate
+// status pill shown against each supply/resupply row (Phase 7,
+// 2026-09-17 - Keith's own request: "an overall pill on each supply...
+// an aggregate of all of the checks for the dataset and all its
+// columns" - deliberately the SAME computation as the chain-derivation
+// rule below, not two implementations that could drift - see
+// plans/conceptual-design.md Thread A).
+function datasetStatusByRun(d){
+  const byRun = new Map();
+  for(const col of d.columns || []){
+    for(const ck of col.checks || []){
+      for(const h of ck.history || []){
+        const s = statusForValue(h.value, ck.warn, ck.fail);
+        const prev = byRun.get(h.run_id) || "green";
+        if(STATUS_ORDER[s] > STATUS_ORDER[prev]) byRun.set(h.run_id, s);
+      }
+    }
+  }
+  return byRun;
+}
 // Phase 5j Stage 2 (2026-09-17) - "a final view of how the refresh
 // period went" (Keith's own original framing for this whole feature).
-// Groups a dataset's REAL run history by cadence cycle (cycleStartDate()
-// - the same function clipDatasetToAsOf() already uses for its own
-// staleAsOf check, so a run's cycle here can never disagree with
-// whether it currently reads "no data"). Operates on the RAW dataset
-// shape (d.runs/d.arrivalByRun/d.columns - the same object
-// clipDatasetToAsOf() takes), not the already-clipped one, since this
-// section deliberately shows the WHOLE history grouped by cycle, not
-// just what's eligible as of the current as-of date - renderDataset()
-// picks which cycle to show BY DEFAULT (Keith's confirmed answer:
-// the as-of date's own current cycle, expandable to the rest).
-// Resupply attempts are NOT nested under their original delivery here
-// (Keith's confirmed answer only asked for cycle-level grouping) - each
-// attempt is its own entry within the cycle, newest first, with its own
-// resupply/attempt-number badge.
+// REDESIGNED Phase 7 (2026-09-17, plans/conceptual-design.md Thread A) -
+// Keith's own critique of the original design: "suppliers won't actually
+// label a resupply as against the original supply. It will just appear
+// at a certain time" - so this no longer trusts the generator's own
+// is_resupply/delivery_id/delivery_date/supersedes_run_id bookkeeping
+// (real for the SYNTHETIC DATA's own generation, but nothing a real
+// production dashboard would ever have). Chain membership is now derived
+// purely from two real, cadence-agnostic facts: cycleStartDate() (only
+// used to anchor where a NEW chain starts) and each arrival's own real
+// aggregate status (datasetStatusByRun() above). Walking a dataset's
+// real arrivals in chronological (run_date) order: a RED arrival starts
+// (or continues, if the current chain is still open) a resupply chain;
+// the chain CLOSES on the first AMBER or GREEN arrival after a RED -
+// "let's keep it simple - an amber or a green supply can count as the
+// end of a resupply chain" (Keith's own final call). An ordinary
+// green/amber arrival with no open chain before it is just a one-entry
+// group, same as before. Operates on the RAW dataset shape (d.runs/
+// d.arrivalByRun/d.columns - the same object clipDatasetToAsOf() takes),
+// not the already-clipped one, since this section deliberately shows the
+// WHOLE history, not just what's eligible as of the current as-of date -
+// renderDataset() picks which group to show BY DEFAULT (Keith's
+// confirmed answer: the as-of date's own current cycle, expandable to
+// the rest). Resupply attempts are NOT nested under their original
+// delivery (Keith's original confirmed answer only asked for grouping,
+// not nesting) - each attempt is its own entry, newest first, with its
+// own resupply/attempt-number badge.
 function buildSupplyHistory(d){
   const cadence = d.sla.cadence;
   const arrivalByRun = d.arrivalByRun || {};
-  const byRunId = Object.fromEntries((d.runs || []).map(r => [r.run_id, r]));
-  const groups = new Map(); // cycleStart -> entries[]
-  for(const run of (d.runs || [])){
-    // Group by which delivery cycle this run is FOR (delivery_date - the
-    // original due date, real per manifest entry, real for both an
-    // original supply and any of its resupplies), never by run_date
-    // (when it actually arrived) - a real, confirmed bug (Keith's own
-    // report, 2026-09-17): a resupply landing weeks late on some OTHER
-    // cycle's own delivery day used to get lumped into THAT cycle's own
-    // group purely by coincidence of arrival date, sitting right next to
-    // a completely unrelated delivery and reading as if they were the
-    // same story. delivery_date falls back to run_date for any manifest
-    // entry from before this field existed (none currently committed,
-    // but real historical data should never hard-crash on this).
-    const cycleStart = cycleStartDate(cadence, run.delivery_date || run.run_date);
+  const statusByRun = datasetStatusByRun(d);
+  const runsChronological = [...(d.runs || [])]
+    .sort((a,b)=> a.run_date.localeCompare(b.run_date) || a.run_id.localeCompare(b.run_id));
+
+  const chains = []; // {cycleStart, entries[], open}
+  let current = null;
+  for(const run of runsChronological){
+    const status = statusByRun.get(run.run_id) || "green";
+    if(!current || !current.open){
+      // No open chain to continue - this arrival starts a fresh one,
+      // anchored at ITS OWN cadence cycle (never the previous chain's -
+      // a resolved chain is done, whatever cycle the next arrival lands
+      // in is a new story).
+      current = {cycleStart: cycleStartDate(cadence, run.run_date), entries: [], open: false};
+      chains.push(current);
+    }
+    const idx = current.entries.length;
+    const previous = idx>0 ? current.entries[idx-1] : null;
     const arrival = arrivalByRun[run.run_id] || {};
-    if(!groups.has(cycleStart)) groups.set(cycleStart, []);
-    // A resupply's own "time since" is measured against whatever it
-    // itself superseded (supersedes_run_id - the immediately previous
-    // attempt for the SAME delivery, real per manifest entry), not the
-    // original delivery's own due date - "how long since the previous
-    // supply OR the previous resupply" (Keith's own framing, replacing
-    // arrivalStatus for resupplies below).
-    const previous = run.is_resupply && run.supersedes_run_id ? byRunId[run.supersedes_run_id] : null;
-    const daysSincePrevious = previous ? dateStrDiffDays(previous.run_date, run.run_date) : null;
-    groups.get(cycleStart).push({
+    current.entries.push({
       run_id: run.run_id, run_date: run.run_date,
-      // arrivalStatus only means anything for an ORIGINAL supply -
-      // Keith's own call, 2026-09-17 (item 69): a resupply reuses its
-      // original delivery's own extract_timestamp (generator/resupply.py's
-      // churn design), so comparing that stale timestamp against
-      // whatever cycle it eventually lands in is a category error, not a
-      // real fact about lateness - every real resupply read "early"
-      // this way, which is misleading, not informative. daysSincePrevious
-      // replaces it for a resupply row instead.
-      arrivalStatus: run.is_resupply ? undefined : arrival.arrivalStatus,
-      arrivedAt: run.is_resupply ? undefined : arrival.arrivedAt,
-      daysSincePrevious,
+      status,
+      // arrivalStatus only means anything for the FIRST arrival of a
+      // chain (item 69's own reasoning, now derived from real chain
+      // position instead of the synthetic is_resupply flag): every
+      // later attempt in an open chain reuses its predecessor's real
+      // row data via the generator's churn design, so comparing its
+      // stale extract_timestamp against whatever cycle it eventually
+      // lands in is a category error, not a real fact about lateness.
+      arrivalStatus: idx===0 ? arrival.arrivalStatus : undefined,
+      arrivedAt: idx===0 ? arrival.arrivedAt : undefined,
+      // "how long since the previous supply or resupply" (Keith's own
+      // framing) - now just the previous entry in this SAME chain,
+      // walked in chronological order, rather than a separate
+      // supersedes_run_id lookup - the chain itself already IS that
+      // sequence.
+      daysSincePrevious: previous ? dateStrDiffDays(previous.run_date, run.run_date) : null,
       rowCount: rowCountAtRun(d, run.run_id),
-      isResupply: !!run.is_resupply, attemptNumber: run.attempt_number || 1,
-      dirtySeverity: run.dirty_severity || null,
+      isResupply: idx>0, attemptNumber: idx+1,
     });
+    current.open = status==="red";
   }
-  return [...groups.entries()]
-    .map(([cycleStart, entries]) => ({
-      cycleStart,
-      entries: entries.sort((a,b)=> b.run_date.localeCompare(a.run_date) || b.run_id.localeCompare(a.run_id)),
+
+  return chains
+    .map(chain => ({
+      cycleStart: chain.cycleStart,
+      entries: chain.entries.sort((a,b)=> b.run_date.localeCompare(a.run_date) || b.run_id.localeCompare(a.run_id)),
     }))
     .sort((a,b)=> b.cycleStart.localeCompare(a.cycleStart));
 }
@@ -1838,22 +1878,28 @@ function renderSupplyCycleRows(entries){
   return entries.map(e => {
     const resupplyBadge = e.isResupply
       ? `<span class="pill tag sm"><span class="ico"></span>Resupply, attempt ${e.attemptNumber}</span>` : "";
-    const severityBadge = e.dirtySeverity
-      ? `<span class="pill ${e.dirtySeverity==="red"?"red":"amber"} sm"><span class="ico"></span>${e.dirtySeverity==="red"?"Red-severity defect":"Amber-severity defect"} injected</span>`
-      : "";
-    // A resupply has no real arrivalStatus (buildSupplyHistory()'s own
-    // comment on why - item 69) - shows how long it's been since the
-    // previous supply/resupply attempt instead, not a status pill at all.
-    const statusCell = e.isResupply
+    // Phase 7 (2026-09-17, plans/conceptual-design.md Thread A) - the
+    // real aggregate red/amber/green status IS this row's own chain
+    // signal now (a red status is exactly what starts/continues a
+    // chain), so it's shown directly rather than the old, dropped
+    // dirtySeverity pill (a synthetic-generation-only concept no real
+    // production dashboard would have - item 72).
+    const statusBadge = pill(e.status, "sm");
+    // A resupply (any entry after the first in its chain) has no real
+    // arrivalStatus (item 69's own reasoning, now keyed off real chain
+    // position) - shows how long it's been since the previous supply/
+    // resupply attempt instead, not an arrival pill at all.
+    const arrivalCell = e.isResupply
       ? (e.daysSincePrevious!=null
           ? `<span class="mono" style="color:var(--ink-muted); font-size:12.5px;">${e.daysSincePrevious} ${pluralize(e.daysSincePrevious,"day")} since previous</span>`
           : "")
       : `${e.arrivalStatus ? arrivalPill(e.arrivalStatus,"sm") : ""} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt||""}</span>`;
     return `<tr data-run-date="${e.run_date}">
       <td class="mono">${e.run_date}</td>
-      <td>${statusCell}</td>
+      <td>${statusBadge}</td>
+      <td>${arrivalCell}</td>
       <td class="mono">${e.rowCount!=null ? fmtInt(e.rowCount) : "—"}</td>
-      <td>${resupplyBadge} ${severityBadge}</td>
+      <td>${resupplyBadge}</td>
     </tr>`;
   }).join("");
 }
@@ -1870,7 +1916,7 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
       </div>
       <div class="overflow-x">
       <table class="dataset-table">
-        <thead><tr><th>Arrived</th><th>Status</th><th>Rows</th><th></th></tr></thead>
+        <thead><tr><th>Arrived</th><th>Status</th><th>Timing</th><th>Rows</th><th></th></tr></thead>
         <tbody>${renderSupplyCycleRows(c.entries)}</tbody>
       </table>
       </div>

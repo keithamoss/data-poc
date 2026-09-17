@@ -1,10 +1,11 @@
 # Orientation for a new session
 
-Read this first, then `plans/wider.md`, `plans/qa-pipeline.md`, and
-`plans/publishing-and-history.md` in full before doing anything else.
-This project is worked across many separate chat sessions over a period
-of weeks - those files are the actual persistent memory of the project,
-not this chat history. They're kept current as work happens: design
+Read this first, then `plans/wider.md`, `plans/qa-pipeline.md`,
+`plans/publishing-and-history.md`, and `plans/conceptual-design.md` in
+full before doing anything else. This project is worked across many
+separate chat sessions over a period of weeks - those files are the
+actual persistent memory of the project, not this chat history. They're
+kept current as work happens: design
 decisions, the questions that were asked to scope them, what was
 verified and how, and what's still open. Don't re-derive a decision
 that's already recorded there, and don't re-propose something already
@@ -34,6 +35,16 @@ scoped.
   dashboard's publish/deploy path, check lifecycle, or the as-of
   viewing/picker - the design already accounts for changes in this area
   that haven't all landed in code yet.
+- `plans/conceptual-design.md` - real conceptual/design tensions in how
+  this PoC MODELS real-world concepts (e.g. whether a resupply chain
+  should be derived from synthetic generator bookkeeping or from real,
+  observable facts) - a different kind of question from a bug, a
+  feature, or the publishing mechanism, and the other three files aren't
+  the right place for it. Read this before touching resupply-chain/
+  supply-history logic or anything about red/amber/green status
+  semantics - it records real decisions already made (don't re-litigate
+  them) and real questions deliberately left open (don't try to resolve
+  them unprompted).
 
 ## Who this is for
 
