@@ -242,6 +242,18 @@ button{font:inherit; color:inherit;}
 .check-card .thresholds{font-size:11.5px; color:var(--ink-muted); font-family:"IBM Plex Mono",monospace;}
 .check-card-hint{font-size:11px; color:var(--accent); margin-top:8px;}
 
+/* Phase 5b: retired checks hidden from the current-status view by
+   default (plans/publishing-and-history.md Thread D) - pure CSS
+   show/hide off one class on the list container, so the existing
+   index-based check-card click wiring in openColumnDrawer() never needs
+   to change, whichever checks happen to be visible. */
+.checks-list.hide-retired .check-card.is-retired{display:none;}
+.check-card.is-retired{opacity:.65;}
+.pill.retired{background:var(--surface-alt); color:var(--ink-faint); border:1px solid var(--line);}
+.retired-toggle{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--ink-muted); margin-bottom:12px; cursor:pointer; user-select:none;}
+.retired-toggle input{cursor:pointer;}
+.retired-note{font-size:11.5px; color:var(--ink-faint); margin-top:6px; font-style:italic;}
+
 .status-dot-row{display:flex; gap:6px; flex-wrap:wrap;}
 .status-dot{width:16px; height:16px; border-radius:4px; display:inline-block;}
 
@@ -560,15 +572,30 @@ function buildRealDataset(d){
 
   const columns = d.columns.map(col => {
     const checks = col.checks.map(ck => ({
-      name: ck.name, dimension: ck.dimension, unit: ck.unit, warn: ck.warn, fail: ck.fail,
+      check_id: ck.check_id, name: ck.name, dimension: ck.dimension, unit: ck.unit, warn: ck.warn, fail: ck.fail,
       current: ck.current, previous: ck.previous, note: ck.note,
+      // Phase 5b (plans/publishing-and-history.md Thread D): a check is
+      // "retired" once its own definition carries a retired_as_of date -
+      // explicit metadata from check_lifecycle.py, never inferred from a
+      // check going quiet (see that plan file's own "explicit
+      // declaration, not inferred from absence" rule). retired_as_of/
+      // retired_reason pass straight through for display; `retired` is
+      // the boolean the rest of the dashboard actually branches on.
+      retired: ck.retired_as_of != null, retiredAsOf: ck.retired_as_of ? toDate(ck.retired_as_of) : null,
+      retiredReason: ck.retired_reason,
       history: ck.history.map((h,i)=>({ idx:i, date: toDate(h.run_date), value: h.value,
         row_count_total: h.row_count_total, row_count_invalid: h.row_count_invalid,
         failing_sample_keys: h.failing_sample_keys, aggregate_values: h.aggregate_values })),
     }));
     return { name: col.name, logicalType: col.logicalType, description: col.description, checks, stats: col.stats };
   });
-  columns.forEach(c=> c.status = worstOf(c.checks.map(checkStatus)));
+  // A retired check must never be able to turn a column/dataset/agency
+  // status pill red or amber on its own (Keith's call, Phase 5b) - it's
+  // still fully visible via the drawer's "show retired checks" toggle,
+  // just never part of what CURRENT status means. Every status above
+  // this (dataset/collection/agency) rolls up from c.status, so excluding
+  // retired checks here is the one place this needs enforcing.
+  columns.forEach(c=> c.status = worstOf(c.checks.filter(ck=>!ck.retired).map(checkStatus)));
 
   const arrivalHistory = d.arrivalHistory.map((a,i)=>({ idx:i, date: toDate(a.run_date), onTime: a.onTime }));
 
@@ -1003,15 +1030,21 @@ function statusColorVar(s){ return s==="red"?"var(--bad)": s==="amber"?"var(--wa
 // never changes any check's own status/correctness anywhere else, only
 // which one illustrates this one sparkline.
 function pickRepresentativeCheck(cols, targetStatus){
+  // Phase 5b: a retired check can never surface as the check illustrating
+  // current status anywhere, sparklines included - same "never able to
+  // turn a status red/amber on its own once retired" rule col.status
+  // already enforces one level down, applied here too since a retired
+  // check could otherwise still coincidentally match targetStatus.
   for(const col of cols){
     if(col.status!==targetStatus) continue;
-    const ck = col.checks.find(c=>checkStatus(c)===targetStatus);
+    const ck = col.checks.find(c=>!c.retired && checkStatus(c)===targetStatus);
     if(!ck) continue;
     const vals = ck.history.map(r=>r.value);
     if(Math.min(...vals)!==Math.max(...vals)) return ck;
   }
   const col = cols.find(c=>c.status===targetStatus) || cols[0];
-  return col ? (col.checks.find(c=>checkStatus(c)===targetStatus) || col.checks[0]) : null;
+  const active = col ? col.checks.filter(c=>!c.retired) : [];
+  return col ? (active.find(c=>checkStatus(c)===targetStatus) || active[0] || col.checks[0]) : null;
 }
 
 function sparkline(history, warn, fail){
@@ -1406,19 +1439,34 @@ function openColumnDrawer(ag, col, ds, column, opts){
       </div>` : ""}
     </div>` : "";
 
+  // Phase 5b: retired checks stay fully visible in this list (history is
+  // never hidden, plans/publishing-and-history.md Thread D), just hidden
+  // BY DEFAULT behind a toggle so they don't clutter "what's currently
+  // being checked" - see the .hide-retired CSS rule above.
+  const retiredCount = column.checks.filter(ck=>ck.retired).length;
   const checksBlock = `
     <div class="drawer-section">
       <h4>Checks run on this column</h4>
+      ${retiredCount>0 ? `
+      <label class="retired-toggle">
+        <input type="checkbox" id="show-retired-toggle">
+        Show ${retiredCount} retired ${pluralize(retiredCount,"check")}
+      </label>` : ""}
+      <div class="checks-list hide-retired">
       ${column.checks.map(ck=>{
         const st = checkStatus(ck);
-        return `<div class="check-card" tabindex="0" role="button" aria-label="View details for ${ck.name}">
-          <div class="row1"><span class="name">${ck.name}</span>${pill(st,"sm")}</div>
+        return `<div class="check-card ${ck.retired?'is-retired':''}" tabindex="0" role="button" aria-label="View details for ${ck.name}">
+          <div class="row1"><span class="name">${ck.name}</span>
+            ${ck.retired? `<span class="pill retired sm" title="Retired ${fmtDate(ck.retiredAsOf)}${ck.retiredReason?': '+ck.retiredReason:''}"><span class="ico"></span>Retired</span>` : pill(st,"sm")}
+          </div>
           ${ck.dimension? `<div class="dim-tag">${ck.dimension}</div>`:""}
           <div class="thresholds">warn &gt; ${fmtMetric(ck.warn,ck.unit)} · fail &gt; ${fmtMetric(ck.fail,ck.unit)} · current ${fmtMetric(ck.current,ck.unit)}</div>
           ${ck.note? `<div style="font-size:12px; color:var(--ink-muted); margin-top:6px;">${ck.note}</div>`:""}
+          ${ck.retired? `<div class="retired-note">Retired ${fmtDate(ck.retiredAsOf)}${ck.retiredReason?' — '+ck.retiredReason:''} — no longer part of current status.</div>` : ""}
           <div class="check-card-hint">View current &amp; historical run detail ›</div>
         </div>`;
       }).join("")}
+      </div>
     </div>`;
 
   // Column-level summary, replacing what used to be a single arbitrarily-
@@ -1426,9 +1474,12 @@ function openColumnDrawer(ag, col, ds, column, opts){
   // "the column's own history" when it was really just one check's,
   // picked only because it happened to be the worst-status one right now.
   // This shows the real all-checks picture instead; click any card above
-  // for that specific check's own compare/trend/row-detail.
+  // for that specific check's own compare/trend/row-detail. Retired
+  // checks are excluded from these counts always, regardless of the
+  // toggle above (Phase 5b) - same "never affects current status" rule
+  // as column/dataset/agency status pills.
   const statusCounts = {green:0, amber:0, red:0};
-  column.checks.forEach(ck=> statusCounts[checkStatus(ck)]++);
+  column.checks.filter(ck=>!ck.retired).forEach(ck=> statusCounts[checkStatus(ck)]++);
   const statusHistory = statusHistoryForColumn(column);
   const summaryBlock = `
     <div class="drawer-section">
@@ -1456,6 +1507,12 @@ function openColumnDrawer(ag, col, ds, column, opts){
     el.addEventListener("click", open);
     el.addEventListener("keydown", (e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); } });
   });
+  const retiredToggle = document.getElementById("show-retired-toggle");
+  if(retiredToggle){
+    retiredToggle.addEventListener("change", (e)=>{
+      body.querySelector(".checks-list").classList.toggle("hide-retired", !e.target.checked);
+    });
+  }
 }
 function hideDrawer(){
   document.getElementById("backdrop").classList.remove("open");
@@ -1577,7 +1634,14 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   // Reuses the exact same pill() component, scoped via AskUserQuestion
   // (2026-09-15): color + label only, no inline threshold math (the
   // compare-grid/thresholds line already has the numbers).
-  document.getElementById("check-panel-status").innerHTML = pill(checkStatus(check), "sm");
+  // Phase 5b: mirrors the check-card's own "Retired" badge (checksBlock
+  // above) rather than a status pill that no longer means current status
+  // for this check - full changelog/retirement-reason display in the
+  // panel body is Phase 5c's job, this is just the header staying
+  // consistent with where the panel was opened from.
+  document.getElementById("check-panel-status").innerHTML = check.retired
+    ? `<span class="pill retired sm" title="Retired ${fmtDate(check.retiredAsOf)}${check.retiredReason?': '+check.retiredReason:''}"><span class="ico"></span>Retired</span>`
+    : pill(checkStatus(check), "sm");
   const body = document.getElementById("check-panel-body");
 
   // #45: which run is "current" is fixed (always the latest); which run

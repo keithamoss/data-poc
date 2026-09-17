@@ -419,13 +419,14 @@ models:
                 introduced_date: "2026-01-15"
                 description: "Every record must carry BDM's internal record ID."
                 changelog: []
-          - matches_regex:
-              pattern: '^SRC-[0-9]{9}$'
-              meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.matches_regex_dbt
-                introduced_date: "2026-01-15"
-                description: "Catches upstream internal-ID-format changes before they reach consumers as silent garbage."
-                changelog: []
+          # matches_regex on this column retired 2026-09-17 - see
+          # dbt_project/schema-retired.yml's own copy of this test for the
+          # full retirement metadata (retired_as_of/retired_reason). First
+          # real check_id ever retired via this mechanism (Phase 5b,
+          # plans/publishing-and-history.md) - picked deliberately: this
+          # is BDM's own internal re-extraction-trace ID, not part of the
+          # feed's real business data, so retiring format validation on it
+          # is genuinely low-stakes.
 
       - name: extract_timestamp
         tests:

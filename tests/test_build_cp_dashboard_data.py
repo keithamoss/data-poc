@@ -41,6 +41,7 @@ def _check(run_id, column_name, value, status="pass", **overrides):
         "warn_threshold": 0.0, "fail_threshold": 5.0, "status": status,
         "row_count_total": 3, "row_count_invalid": 0,
         "engine": "dbt-core 1.12 + dbt-duckdb",
+        "check_id": f"data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.{column_name}.accepted_values_dbt",
     }
     rec.update(overrides)
     return rec
@@ -53,7 +54,7 @@ FIXTURE_RESULTS = [
 
 
 def test_stats_by_run_carries_every_run_not_just_latest_and_previous():
-    dataset = bcd.build_one_table("cp_notifications", FIXTURE_RESULTS, FIXTURE_RUNS, FIXTURE_DATASET_STATS)
+    dataset = bcd.build_one_table("cp_notifications", FIXTURE_RESULTS, FIXTURE_RUNS, FIXTURE_DATASET_STATS, {})
 
     col = next(c for c in dataset["columns"] if c["name"] == "concern_type")
     by_run = col["stats"]["byRun"]
@@ -73,7 +74,7 @@ def test_arrival_by_run_is_genuinely_computed_not_hardcoded_true():
     """Same real bug as build_dashboard_data.py's identical test:
     arrivalHistory's onTime used to be hardcoded True for every run but
     the latest - a run with a real >24h lag must show onTime=False."""
-    dataset = bcd.build_one_table("cp_notifications", FIXTURE_RESULTS, FIXTURE_RUNS, FIXTURE_DATASET_STATS)
+    dataset = bcd.build_one_table("cp_notifications", FIXTURE_RESULTS, FIXTURE_RUNS, FIXTURE_DATASET_STATS, {})
 
     assert dataset["arrivalByRun"]["cp_run_01_2026-01-01"]["onTime"] is True
     assert dataset["arrivalByRun"]["cp_run_02_2026-04-01"]["onTime"] is False

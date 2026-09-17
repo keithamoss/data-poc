@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 
+from qa_tools.common.check_lifecycle import CheckMetadata
 from pipeline import build_dashboard_data as bdd
 
 FIXTURE_RUNS = [
@@ -50,6 +51,7 @@ def _check(run_id, column_name, value, status="pass", **overrides):
         "warn_threshold": 0.0, "fail_threshold": 5.0, "status": status,
         "row_count_total": 3, "row_count_invalid": 0,
         "engine": "dbt-core 1.12 + dbt-duckdb (real)",
+        "check_id": f"data-asset-1.registry-services.birth-registrations.stg_birth_registrations.{column_name}.accepted_values_dbt",
     }
     rec.update(overrides)
     return rec
@@ -69,7 +71,18 @@ def _write_results(tmp_path):
     return results_path
 
 
+def _no_retired_checks(monkeypatch):
+    """Phase 5b's retirement lookup reads real, committed check-definition
+    files (collect_checks(None)) - stubbed out here so this fixture-driven
+    smoke test stays isolated from the real repo's schema.yml/Soda/contract/
+    Evidently files, same as test_embed_dashboard_data.py's own pattern of
+    monkeypatching an external collection function rather than depending on
+    real repo state."""
+    monkeypatch.setattr(bdd, "collect_checks", lambda ref: [])
+
+
 def test_build_produces_one_entry_per_known_column(tmp_path, monkeypatch):
+    _no_retired_checks(monkeypatch)
     monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))
 
     data = bdd.build()
@@ -80,6 +93,7 @@ def test_build_produces_one_entry_per_known_column(tmp_path, monkeypatch):
 
 
 def test_a_column_with_a_real_check_carries_it_through(tmp_path, monkeypatch):
+    _no_retired_checks(monkeypatch)
     monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))
 
     data = bdd.build()
@@ -94,6 +108,7 @@ def test_a_column_with_a_real_check_carries_it_through(tmp_path, monkeypatch):
 
 
 def test_a_column_with_no_check_gets_an_honest_placeholder(tmp_path, monkeypatch):
+    _no_retired_checks(monkeypatch)
     monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))
 
     data = bdd.build()
@@ -108,6 +123,7 @@ def test_stats_by_run_carries_every_run_not_just_latest_and_previous(tmp_path, m
     stats["current"]/["previous"] stay exactly as before, but stats
     ["byRun"] now carries every run, keyed by run_id - the actual data
     Thread C's as-of picker will need."""
+    _no_retired_checks(monkeypatch)
     monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))
 
     data = bdd.build()
@@ -134,6 +150,7 @@ def test_arrival_by_run_is_genuinely_computed_not_hardcoded_true(tmp_path, monke
     used to be hardcoded True for every run but the latest, even though
     every run's own max_lag_hours already existed to compute it for
     real. A run with a real >24h lag must now show onTime=False."""
+    _no_retired_checks(monkeypatch)
     late_stats = json.loads(json.dumps(FIXTURE_DATASET_STATS))
     late_stats["run_01_2026-09-01"]["arrival"]["max_lag_hours"] = 30.0
     results_path = tmp_path / "results_bdm.json"
@@ -149,3 +166,27 @@ def test_arrival_by_run_is_genuinely_computed_not_hardcoded_true(tmp_path, monke
     assert data["arrivalByRun"]["run_02_2026-09-02"]["onTime"] is True
     history_by_run = {h["run_id"]: h["onTime"] for h in data["arrivalHistory"]}
     assert history_by_run == {"run_01_2026-09-01": False, "run_02_2026-09-02": True}
+
+
+def test_a_retired_checks_metadata_is_carried_through(tmp_path, monkeypatch):
+    """Phase 5b (plans/publishing-and-history.md Thread D): a check
+    result whose check_id has a retired_as_of in check_lifecycle's
+    collection gets retired_as_of/retired_reason attached in the
+    dashboard-data output - the frontend's retired-checks toggle reads
+    these two fields directly."""
+    sex_check_id = "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.accepted_values_dbt"
+    monkeypatch.setattr(bdd, "collect_checks", lambda ref: [
+        CheckMetadata(check_id=sex_check_id, tool="dbt", config_hash="abc123", source_file="fake.yml",
+                      retired_as_of="2026-09-17", retired_reason="Superseded by a stricter rule."),
+    ])
+    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))
+
+    data = bdd.build()
+
+    sex_col = next(c for c in data["columns"] if c["name"] == "sex")
+    assert sex_col["checks"][0]["retired_as_of"] == "2026-09-17"
+    assert sex_col["checks"][0]["retired_reason"] == "Superseded by a stricter rule."
+    # an unrelated column's check, with no matching check_id in the
+    # (stubbed) retirement collection, stays un-retired
+    uncovered = next(c for c in data["columns"] if c["name"] == "date_registered")
+    assert uncovered["checks"][0].get("retired_as_of") is None

@@ -19,5 +19,27 @@
 # for generic tests, top-level `tests: [{name, config: {meta}}]` for
 # singular tests.
 version: 2
-models: []
+models:
+  - name: stg_birth_registrations
+    columns:
+      - name: source_system_record_id
+        tests:
+          - matches_regex:
+              pattern: '^SRC-[0-9]{9}$'
+              meta:
+                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.matches_regex_dbt
+                introduced_date: "2026-01-15"
+                retired_as_of: "2026-09-17"
+                retired_reason: >
+                  source_system_record_id is BDM's internal re-extraction-trace
+                  ID, not part of the feed's real business data - no downstream
+                  consumer reads it. Format validation on a field nothing
+                  downstream relies on isn't worth keeping as an active gate;
+                  the not_null test on this column stays active.
+                description: "Catches upstream internal-ID-format changes before they reach consumers as silent garbage."
+                changelog:
+                  - date: "2026-09-17T00:00:00Z"
+                    description: "Retired - low-value check on an internal-only trace field, no downstream consumer."
+                    author: "Keith Moss"
+                    breaking: false
 tests: []

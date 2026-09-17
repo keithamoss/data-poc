@@ -30,6 +30,7 @@ import os
 
 from qa_tools.cp import cp_common
 from qa_tools.cp.dataset_stats import AGGREGATE_SPEC
+from qa_tools.common.validate_check_lifecycle import collect_checks
 from pipeline.dashboard_check_labels import rank_for_headline, display_name
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -122,7 +123,8 @@ COLUMN_META = {
 }
 
 
-def build_one_table(table: str, results: list[dict], manifest: list[dict], dataset_stats: dict) -> dict:
+def build_one_table(table: str, results: list[dict], manifest: list[dict], dataset_stats: dict,
+                     retirement_by_id: dict) -> dict:
     dataset_id = cp_common.TABLE_DATASET_ID[table]
     column_meta = COLUMN_META[table]
     all_columns = list(column_meta.keys())
@@ -149,7 +151,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         key = (r["engine"], r["check_name"])
         slot = by_column.setdefault(col, {}).setdefault(key, {
             "unit": r["unit"], "warn": r["warn_threshold"], "fail": r["fail_threshold"],
-            "dimension": r["dimension"], "label": r.get("label"),
+            "dimension": r["dimension"], "label": r.get("label"), "check_id": r["check_id"],
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
         })
         slot["by_run"][r["run_id"]] = r["metric_value"]
@@ -190,7 +192,9 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
             if not history:
                 continue
             engine_short = ENGINE_SHORT.get(engine, engine)
+            lifecycle = retirement_by_id.get(slot["check_id"])
             checks_out.append({
+                "check_id": slot["check_id"],
                 "name": display_name(check_name, engine_short, slot["label"]),
                 "dimension": slot["dimension"],
                 "unit": slot["unit"],
@@ -200,6 +204,8 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                 "previous": slot["by_run"].get(prev_run, 0),
                 "history": history,
                 "note": f"Computed by {engine} against this run's real data — not a fabricated figure.",
+                "retired_as_of": lifecycle.retired_as_of if lifecycle else None,
+                "retired_reason": lifecycle.retired_reason if lifecycle else None,
             })
 
         if not checks_out:
@@ -314,8 +320,12 @@ def build() -> dict:
     results = payload["results"]
     dataset_stats = payload["dataset_stats"]
 
+    # Same retirement lookup as build_dashboard_data.py's identical block -
+    # computed once here, not once per table.
+    retirement_by_id = {c.check_id: c for c in collect_checks(None)}
+
     by_table = {t: [r for r in results if r["dataset_id"] == cp_common.TABLE_DATASET_ID[t]] for t in cp_common.TABLES}
-    datasets = [build_one_table(t, by_table[t], manifest, dataset_stats) for t in cp_common.TABLES]
+    datasets = [build_one_table(t, by_table[t], manifest, dataset_stats, retirement_by_id) for t in cp_common.TABLES]
     return {"datasets": datasets}
 
 

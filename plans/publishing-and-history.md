@@ -1856,10 +1856,99 @@ not a requirement.**
   `build_changelog`, not real git/qa_results access). Full `uv run
   pytest` (175 passed) and `uv run ruff check .` clean.
 - **Phase 5b (Thread D) - retired checks default out of the
-  current-status view, with a toggle to bring them back.** Column
-  drawer + overall summary. Independent of the other 3 sub-phases -
-  purely additive (filter + a toggle control), no chart-rendering
-  changes.
+  current-status view, with a toggle to bring them back - [DONE,
+  2026-09-17].** Column drawer + overall summary.
+
+  Found before building anything: every one of the 4 tools' `-retired`
+  sibling files (`schema-retired.yml`, both `*-checks-retired.yml`, both
+  `*-contract-retired.yaml`, both `evidently_check_lifecycle_retired.py`)
+  was still empty - no check had ever actually been retired via this
+  mechanism, so there was nothing real to build/verify the toggle
+  against. Put to Keith rather than assumed: build against zero real
+  retired checks (verify later, whenever the first real retirement
+  happens) or retire one real check now so this phase has something
+  genuine to demo. Keith's call: retire one now, same "verify against
+  real data, not just a fixture" standard as everything else this
+  session. Picked `source_system_record_id`'s `matches_regex` dbt test
+  (BDM) - a real, low-stakes, genuinely-defensible choice: this column
+  is BDM's own internal re-extraction-trace ID (COLUMN_META's own
+  description), no downstream consumer reads it, so retiring format
+  validation on it (`not_null` stays active) is a plausible real
+  decision, not a check invented just to have something to retire.
+  Moved its whole `meta:` block from `dbt_project/models/staging/
+  schema.yml` into `dbt_project/schema-retired.yml` unchanged except
+  adding `retired_as_of: "2026-09-17"`/`retired_reason`/a changelog
+  entry - confirmed `check_lifecycle.validate()` stays clean (config_hash
+  unaffected since meta is excluded from it; check_id doesn't "disappear"
+  since it's still found via the retired file) and confirmed (re-reading
+  `dbt_project/dbt_project.yml`'s `model-paths: ["models"]`) that
+  `schema-retired.yml` sits genuinely outside what a real `dbt build`
+  ever scans - no pipeline re-run needed, existing committed `qa_results/`
+  history for this check_id (176 runs, always-0/green - this format never
+  actually breaks in this fixture) stays exactly as committed, per
+  Thread D's "history stays fully visible" rule.
+
+  Second real fork, also put to Keith rather than assumed: should a
+  retired check's last-known status still count toward column/dataset/
+  agency "current status" (the worst-of rollup that drives every status
+  pill), or always excluded - visible via the toggle for history/audit,
+  never able to turn a pill red/amber on its own? Keith's call: always
+  excluded - retiring a check removes it from what CURRENT health means
+  entirely.
+
+  Built: `pipeline/build_dashboard_data.py`/`build_cp_dashboard_data.py`
+  both now build a `{check_id: CheckMetadata}` lookup once per run via
+  `qa_tools.common.validate_check_lifecycle.collect_checks(None)` (reuse,
+  not a second copy of the same active+retired source-file list CI's
+  own gate already walks) and attach `check_id`/`retired_as_of`/
+  `retired_reason` to every check record - static config-file parsing
+  only, no live data/DuckDB access, same CI-safety class as everything
+  else in this build path. `buildRealDataset()` (the template) derives
+  `retired: ck.retired_as_of != null` client-side (explicit declaration,
+  never inferred from absence, matching Thread D's original rule) and
+  now computes `column.status` from `c.checks.filter(ck=>!ck.retired)` -
+  the one place this needed enforcing, since every status above it
+  (dataset/collection/agency) already rolls up from `c.status`.
+  `pickRepresentativeCheck()` (the Executive-tier sparkline picker, items
+  55/56) got the same exclusion, since a retired check could otherwise
+  still coincidentally match a target status and get picked to illustrate
+  current health. The column drawer's "Checks run on this column" list
+  now renders every check including retired ones (history never hidden),
+  behind a `.hide-retired` CSS class toggled by a "Show N retired
+  check(s)" checkbox that only renders when `retiredCount>0` - pure
+  CSS show/hide off one container class, so the drawer's existing
+  index-based check-card click wiring never needed to change. A retired
+  check's card gets a "Retired" pill (title tooltip: date + reason) in
+  place of its status pill, plus an inline note; the "All checks on this
+  column — current run" Passing/Warning/Failing counts always exclude
+  retired checks, independent of the toggle. The check-detail panel's own
+  header status badge mirrors the same "Retired" pill when opened from a
+  retired card - full changelog/description display in the panel body
+  stays Phase 5c's job, this is just the header staying consistent with
+  where the panel was opened from. Explicitly NOT touched (out of scope
+  for this sub-phase, per its own "no chart-rendering changes" framing):
+  the "Worst status across all checks — every QA run" historical
+  status-dot row still includes retired checks' past contributions
+  (correct - they really did contribute to status before their own
+  retirement) - the trend-chart gap/marker treatment for retired periods
+  is Phase 5d's job.
+
+  Verified for real: `check_lifecycle.validate()` clean against the
+  retirement change; rebuilt `reports/results_bdm.json`/
+  `birth_registrations_dashboard.json` from committed history (no live
+  pipeline re-run); a real headless-Chromium check confirmed the toggle
+  starts unchecked with the retired card hidden, checking it reveals
+  exactly the 1 retired check with the right pill/tooltip/note text, the
+  column's own status pill is unaffected (green, all 7 checks - 6 active
+  + 1 retired - present in `column.checks`), and the check-detail panel
+  opened from the retired card shows the same "Retired" badge, with zero
+  console errors throughout. 2 new fixture tests added
+  (`test_build_dashboard_data.py`'s existing 4 tests updated for the new
+  required `check_id` field, plus a new
+  `test_a_retired_checks_metadata_is_carried_through`); `build_one_table`
+  in `build_cp_dashboard_data.py` gained a new required `retirement_by_id`
+  parameter, its own 2 existing tests updated to pass `{}`. Full `uv run
+  pytest` (176 passed) and `uv run ruff check .` clean.
 - **Phase 5c (Thread D) - changelog + description sections in the
   existing check-detail panel.** Surfaces each check's own hand-authored
   `changelog`/`description` metadata (already collected by

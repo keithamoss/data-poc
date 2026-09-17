@@ -29,6 +29,7 @@ import json
 import os
 
 from qa_tools.bdm.dataset_stats import AGGREGATE_SPEC
+from qa_tools.common.validate_check_lifecycle import collect_checks
 from pipeline.dashboard_check_labels import rank_for_headline, display_name
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -72,6 +73,14 @@ def build() -> dict:
     results = payload["results"]
     dataset_stats = payload["dataset_stats"]
 
+    # check_id -> CheckMetadata, from every real check definition (active +
+    # retired) across all 4 tools x both datasets - Phase 5b's retired-
+    # checks toggle (plans/publishing-and-history.md Thread D). Static
+    # config-file parsing only (schema.yml/soda YAML/contract YAML/
+    # evidently_check_lifecycle*.py), no live data/DuckDB access, so this
+    # is safe for CI same as any other "read committed history" path.
+    retirement_by_id = {c.check_id: c for c in collect_checks(None)}
+
     # column_name -> (engine, check_name) -> {unit, warn, fail, by_run_id: {run_id: value}}
     by_column: dict[str, dict[tuple, dict]] = {}
     for r in results:
@@ -81,7 +90,7 @@ def build() -> dict:
         key = (r["engine"], r["check_name"])
         slot = by_column.setdefault(col, {}).setdefault(key, {
             "unit": r["unit"], "warn": r["warn_threshold"], "fail": r["fail_threshold"],
-            "dimension": r["dimension"], "label": r.get("label"),
+            "dimension": r["dimension"], "label": r.get("label"), "check_id": r["check_id"],
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
         })
         slot["by_run"][r["run_id"]] = r["metric_value"]
@@ -124,7 +133,9 @@ def build() -> dict:
             if not history:
                 continue
             engine_short = ENGINE_SHORT.get(engine, engine)
+            lifecycle = retirement_by_id.get(slot["check_id"])
             checks_out.append({
+                "check_id": slot["check_id"],
                 "name": display_name(check_name, engine_short, slot["label"]),
                 "dimension": slot["dimension"],
                 "unit": slot["unit"],
@@ -134,6 +145,8 @@ def build() -> dict:
                 "previous": slot["by_run"].get(prev_run, 0),
                 "history": history,
                 "note": f"Computed by {engine} against this run's real data — not a fabricated figure.",
+                "retired_as_of": lifecycle.retired_as_of if lifecycle else None,
+                "retired_reason": lifecycle.retired_reason if lifecycle else None,
             })
 
         if not checks_out:
