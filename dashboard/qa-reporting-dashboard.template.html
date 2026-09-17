@@ -907,14 +907,44 @@ function rowCountAtRun(d, runId){
 function buildSupplyHistory(d){
   const cadence = d.sla.cadence;
   const arrivalByRun = d.arrivalByRun || {};
+  const byRunId = Object.fromEntries((d.runs || []).map(r => [r.run_id, r]));
   const groups = new Map(); // cycleStart -> entries[]
   for(const run of (d.runs || [])){
-    const cycleStart = cycleStartDate(cadence, run.run_date);
+    // Group by which delivery cycle this run is FOR (delivery_date - the
+    // original due date, real per manifest entry, real for both an
+    // original supply and any of its resupplies), never by run_date
+    // (when it actually arrived) - a real, confirmed bug (Keith's own
+    // report, 2026-09-17): a resupply landing weeks late on some OTHER
+    // cycle's own delivery day used to get lumped into THAT cycle's own
+    // group purely by coincidence of arrival date, sitting right next to
+    // a completely unrelated delivery and reading as if they were the
+    // same story. delivery_date falls back to run_date for any manifest
+    // entry from before this field existed (none currently committed,
+    // but real historical data should never hard-crash on this).
+    const cycleStart = cycleStartDate(cadence, run.delivery_date || run.run_date);
     const arrival = arrivalByRun[run.run_id] || {};
     if(!groups.has(cycleStart)) groups.set(cycleStart, []);
+    // A resupply's own "time since" is measured against whatever it
+    // itself superseded (supersedes_run_id - the immediately previous
+    // attempt for the SAME delivery, real per manifest entry), not the
+    // original delivery's own due date - "how long since the previous
+    // supply OR the previous resupply" (Keith's own framing, replacing
+    // arrivalStatus for resupplies below).
+    const previous = run.is_resupply && run.supersedes_run_id ? byRunId[run.supersedes_run_id] : null;
+    const daysSincePrevious = previous ? dateStrDiffDays(previous.run_date, run.run_date) : null;
     groups.get(cycleStart).push({
       run_id: run.run_id, run_date: run.run_date,
-      arrivalStatus: arrival.arrivalStatus, arrivedAt: arrival.arrivedAt,
+      // arrivalStatus only means anything for an ORIGINAL supply -
+      // Keith's own call, 2026-09-17 (item 69): a resupply reuses its
+      // original delivery's own extract_timestamp (generator/resupply.py's
+      // churn design), so comparing that stale timestamp against
+      // whatever cycle it eventually lands in is a category error, not a
+      // real fact about lateness - every real resupply read "early"
+      // this way, which is misleading, not informative. daysSincePrevious
+      // replaces it for a resupply row instead.
+      arrivalStatus: run.is_resupply ? undefined : arrival.arrivalStatus,
+      arrivedAt: run.is_resupply ? undefined : arrival.arrivedAt,
+      daysSincePrevious,
       rowCount: rowCountAtRun(d, run.run_id),
       isResupply: !!run.is_resupply, attemptNumber: run.attempt_number || 1,
       dirtySeverity: run.dirty_severity || null,
@@ -1183,6 +1213,16 @@ function addDaysToDateStr(dateStr, days){
   const d = new Date(dateStr+"T00:00:00Z");
   d.setUTCDate(d.getUTCDate()+days);
   return toDateStr(d);
+}
+// Whole calendar days between two "YYYY-MM-DD" strings (later minus
+// earlier) - buildSupplyHistory()'s own "how long since the previous
+// supply or resupply" counter, replacing arrivalStatus for a resupply
+// row (item 69, Keith's own call: a resupply's reused extract_timestamp
+// makes early/late classification a category error, not a real fact).
+function dateStrDiffDays(fromDateStr, toDateStr_){
+  const from = new Date(fromDateStr+"T00:00:00Z");
+  const to = new Date(toDateStr_+"T00:00:00Z");
+  return Math.round((to.getTime()-from.getTime())/DAY);
 }
 // Default as-of date: the genuine live wall-clock date - corrected
 // 2026-09-16 (Keith, same day as the picker itself landed): NOT derived
@@ -1801,9 +1841,17 @@ function renderSupplyCycleRows(entries){
     const severityBadge = e.dirtySeverity
       ? `<span class="pill ${e.dirtySeverity==="red"?"red":"amber"} sm"><span class="ico"></span>${e.dirtySeverity==="red"?"Red-severity defect":"Amber-severity defect"} injected</span>`
       : "";
+    // A resupply has no real arrivalStatus (buildSupplyHistory()'s own
+    // comment on why - item 69) - shows how long it's been since the
+    // previous supply/resupply attempt instead, not a status pill at all.
+    const statusCell = e.isResupply
+      ? (e.daysSincePrevious!=null
+          ? `<span class="mono" style="color:var(--ink-muted); font-size:12.5px;">${e.daysSincePrevious} ${pluralize(e.daysSincePrevious,"day")} since previous</span>`
+          : "")
+      : `${e.arrivalStatus ? arrivalPill(e.arrivalStatus,"sm") : ""} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt||""}</span>`;
     return `<tr data-run-date="${e.run_date}">
       <td class="mono">${e.run_date}</td>
-      <td>${e.arrivalStatus ? arrivalPill(e.arrivalStatus,"sm") : ""} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt||""}</span></td>
+      <td>${statusCell}</td>
       <td class="mono">${e.rowCount!=null ? fmtInt(e.rowCount) : "—"}</td>
       <td>${resupplyBadge} ${severityBadge}</td>
     </tr>`;

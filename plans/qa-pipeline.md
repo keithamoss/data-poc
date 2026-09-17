@@ -3758,29 +3758,34 @@ relative, not a schedule — this is weeks of work, not months.
     category needs to be to match how he actually talks about the
     work), not the other way around.
 
-69. **[parked, 2026-09-17 - Keith's own call: revisit once the current
-    round of work wraps up]** Whether `arrivalStatus` (early/onTime/
-    late) is even a meaningful concept for RESUPPLY attempts, or
-    whether it should only ever apply to a delivery's original supply.
-    Direct follow-up to item 67's own flagged limitation: every real
-    resupply currently reads "early" (100% of BDM's 56 resupply
-    attempts), because `generator/resupply.py`'s churn design
-    deliberately reuses the original delivery's `date_registered`/
-    `extract_timestamp` rather than drawing fresh ones - a resupply's
-    real-world arrival is genuinely later (that's the whole point of a
-    resupply), but its reused timestamp reads as "early" against the
-    cycle it's actually delivered in, which is arguably a category
-    error rather than a real fact about lateness. Keith's own framing:
-    "that may or may not be a concept we actually want for resupplies -
-    it may only apply to the original supply." Not scoped further than
-    that yet - a genuine open design question (does a resupply have its
-    own on-time/late semantics at all - e.g. "on time relative to the
-    resupply's own agreed turnaround," not the original cadence cycle -
-    or does `arrivalStatus` just not apply to it, with the dashboard
-    showing something else for a resupply row instead, e.g. only the
-    resupply/attempt-number badge item 67's supply-history section
-    already renders, no status pill at all) to have a real conversation
-    about before building anything, not a decision made here.
+69. **[decided + built, 2026-09-17 (Phase 7)]** Whether `arrivalStatus`
+    (early/onTime/late) is even a meaningful concept for RESUPPLY
+    attempts, or whether it should only ever apply to a delivery's
+    original supply. Direct follow-up to item 67's own flagged
+    limitation: every real resupply used to read "early" (100% of
+    BDM's 56 resupply attempts), because `generator/resupply.py`'s
+    churn design deliberately reuses the original delivery's
+    `date_registered`/`extract_timestamp` rather than drawing fresh
+    ones - a resupply's real-world arrival is genuinely later (that's
+    the whole point of a resupply), but its reused timestamp reads as
+    "early" against the cycle it's actually delivered in, a category
+    error rather than a real fact about lateness. **Keith's decision**:
+    drop `arrivalStatus` for resupplies entirely, replace it with a
+    counter showing how long it's been since the previous supply or
+    resupply attempt. `buildSupplyHistory()`
+    (`dashboard/qa-reporting-dashboard.template.html`) now sets
+    `arrivalStatus`/`arrivedAt` to `undefined` for any entry with
+    `is_resupply: true` (so `renderSupplyCycleRows()`'s status column
+    renders nothing for them, rather than a misleading pill), and
+    computes a real `daysSincePrevious` for it instead - whole calendar
+    days between this attempt's own `run_date` and whichever run it
+    `supersedes_run_id` points at (the immediately previous attempt for
+    the SAME delivery, real per manifest entry - a fresh, real
+    `dateStrDiffDays()` helper, not a reused date function repurposed).
+    Rendered as "N day(s) since previous" in place of the old status
+    pill. `tests-js/supply-history.test.js` covers both the dropped
+    status and the new counter (including chaining through 2+ resupply
+    attempts).
 
 70. **[investigated + defensive fix applied, 2026-09-17 (Phase 7) - the
     ORIGINAL "looks like Times New Roman" report could NOT be
@@ -3812,6 +3817,86 @@ relative, not a schedule — this is weeks of work, not months.
     OS/zoom combination, or something else entirely - worth a
     screenshot or more specific repro steps next time it's seen, rather
     than re-guessing at a cause from here.
+
+71. **[real bug found + fixed, 2026-09-17 (Phase 7) - Keith's own report
+    from the deployed site]** A resupply landing weeks late on some
+    OTHER cycle's own delivery day got grouped into THAT cycle's own
+    supply-history block, purely by coincidence of arrival date -
+    Keith's own report: "the September 14th resupply for birth data
+    shows a late supply followed by a resupply, but it's labeled as
+    resupply attempt five, which doesn't make sense." Confirmed for
+    real, not guessed: `qa_results/registry-services/birth-
+    registrations/run_099_2026-08-27_resupply4/dataset_stats.json`'s
+    own `manifest_entry` has `delivery_date: "2026-08-27"` (its real
+    original due date) but `run_date`/`arrived_date: "2026-09-14"` (18
+    days late) - `buildSupplyHistory()`
+    (`dashboard/qa-reporting-dashboard.template.html`) was grouping by
+    `run.run_date` (when a delivery actually arrived) instead of
+    `run.delivery_date` (which cycle it's actually FOR), so this
+    resupply landed in Sept 14's own group, sitting right next to
+    `run_117_2026-09-14` - a completely unrelated, genuinely on-schedule
+    delivery for that real day - reading as if they were one continuous
+    story. Verified with a direct probe against the real built dashboard
+    before AND after the fix (jsdom, calling `buildSupplyHistory()`
+    directly on the real `birth-registrations` dataset): before, Sept
+    14's group had 2 entries (the real delivery + the mislabeled late
+    resupply); after, Sept 14 has exactly its own 1 real delivery, and
+    Aug 27's own group correctly shows all 5 of that delivery's real
+    attempts together (original + 4 resupplies) - confirmed with a real
+    screenshot too. Fixed: `cycleStart = cycleStartDate(cadence,
+    run.delivery_date || run.run_date)` (falls back to `run_date` only
+    for a hypothetical manifest entry from before `delivery_date`
+    existed - none currently committed). A REGRESSION test locks this
+    in (`tests-js/supply-history.test.js`, a synthetic two-entry
+    scenario mirroring the real Sept 14/Aug 27 case exactly), confirmed
+    to fail against the pre-fix code first, per this repo's own
+    convention. **Related, currently-inactive risk flagged while
+    investigating, not fixed here**: `pipeline/build_dashboard_data.py`'s
+    own `lastArrival`/`latest_status` (the SLA tile's "Latest arrival"
+    pill, and the Tier 2 agency-view row pill) picks the single most
+    recent run in the WHOLE manifest by `run_date`, with no exclusion
+    for a resupply - today's real committed history happens to have an
+    original (non-resupply) run as the literal latest thing, so this
+    isn't currently showing anything wrong, but the same category-error
+    risk item 69 already resolved for the supply-history table exists
+    here too, architecturally, the moment a resupply becomes the
+    chronologically-latest thing in a dataset's history. Not built
+    without asking first - whether "latest arrival" should skip
+    resupplies entirely, or show something else when the latest thing
+    IS a resupply, is a real design question, not an obvious bug fix.
+
+72. **[explained, 2026-09-17 (Phase 7) - Keith's own question: "I can
+    see there's a little pill with red/amber severity injected... I
+    don't understand what that means though"]** The `dirtySeverity`
+    pill in the supply-history table (`Red-severity defect injected` /
+    `Amber-severity defect injected`) is a synthetic-data-generation
+    artifact, not anything a real production pipeline would ever know
+    in advance. `generator/generate_runs.py`'s own `_build_run_plan()`
+    deliberately seeds roughly 60% of BDM's 120 scheduled deliveries as
+    clean, 20% with an amber-severity defect, and 20% with a
+    red-severity one (`generator/dirty.py`'s
+    `apply_birth_registrations_presets(severity=...)` - calibrated to
+    land in each real check's own warn ("amber") or fail ("red") band,
+    not just randomly bad data) - purely so this PoC's real dbt/Soda/
+    datacontract-cli/Evidently checks have something real and
+    predictable to catch, demonstrating the pipeline actually works.
+    The pill is this project surfacing "we know in advance this
+    delivery was deliberately made bad, and at which severity" - real,
+    useful information for demonstrating/debugging the PoC itself, but
+    not a concept that exists in a real production data pipeline (a
+    real pipeline never knows a delivery is bad until its own checks
+    say so). The real Aug 27 resupply chain (item 71's own example) is
+    a genuinely good illustration of what it's for: the original
+    delivery and its first 3 resupply attempts all carry
+    `Red-severity defect injected` (the underlying problem wasn't
+    actually fixed those times), and only the 4th resupply attempt - the
+    one that finally lands clean - has no severity badge at all, a
+    coherent "kept trying, finally worked" story. Not changed here -
+    Keith asked what it means, not to remove or relabel it; worth
+    asking directly whether it should stay exactly as-is (a demo aid,
+    explaining why the checks below are flagging things) or get
+    reframed/hidden as an implementation detail a real production
+    dashboard would never actually have.
 
 ## Held over from the original (equivalent-only) build
 
