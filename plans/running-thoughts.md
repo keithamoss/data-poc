@@ -38,6 +38,34 @@ of this PoC's build - a seam only) - this may be the point that design
 actually gets built against, not just designed around. Worth rereading
 that doc before scoping the MVP.
 
+**Subagent research findings, 2026-09-18 (business-analyst pass, no
+code/issues created)**: Issues ARE enabled on `keithamoss/data-poc`
+(confirmed via a real, live `list_issues` call), and this session's own
+credentials can read them - `get_me` resolved to Keith's own personal
+account, not a scoped service/bot identity, so automation currently
+would act with his own full permissions, not a narrower one. The org
+already has GitHub's newer Issue Types configured (Task/Bug/Feature) -
+a real, empty slot for a 4th type rather than needing to overload
+labels. No custom issue fields exist yet (severity/SLA/accept-reject
+state would need labels, new custom fields, or body encoding - nothing
+pre-built). `docs/remediation-workflow-design.md`'s mechanical parts
+(universal creation, one queue, recurrence-as-cross-referenced-issue,
+joint ownership, automated status comments, human-required closing) map
+cleanly; dedup/escalation/suppression are real application logic GitHub
+Issues has no native concept of; and genuine fit gaps were flagged: the
+repo's public status (synthetic data was the reason that was fine - a
+ticket holding real QA-failure detail is a different calculus), no
+per-viewer content redaction (so the doc's provider-facing PK-only
+convention becomes the ONLY real mitigation, not one option), external
+providers needing real GitHub identities to be first-class actors, and
+ticket state living only in GitHub's own live API - a real
+discontinuity from this repo's everywhere-else "reconstructable from
+committed git history, no live dependency" pattern. Full clarifying-
+questions list (9, grouped: MVP scope, ticket lifecycle, roles/access,
+platform/technical) was relayed to Keith directly rather than
+duplicated here - see chat history for the complete text if needed
+again.
+
 ### 2. Data-asset-level people/roles config
 
 A new config file (alongside `contract/data-asset.yaml`'s existing
