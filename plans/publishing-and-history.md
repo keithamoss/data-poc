@@ -2186,12 +2186,104 @@ not a requirement.**
   pure frontend change) and `uv run ruff check .` clean.
 
 **Phase 6 (test coverage) - added 2026-09-16, Keith's own call, once
-Phases 1-5 are otherwise done:** not scoped yet beyond the name - a
-deliberate placeholder so the ask isn't lost, not scoped in depth here
-since Keith hasn't asked for that yet. Depends on everything above
-existing to have something real to cover. Scope for real (what's
-covered vs. gap, unit vs. integration, real-tool-run coverage vs.
-fixture-only) when this phase is actually reached.
+Phases 1-5 are otherwise done. Scoped for real 2026-09-17**, after a
+subagent survey of actual coverage (211 tests, no zero-coverage modules
+in the real BDM/CP data path itself - see the survey's own findings,
+not repeated in full here) turned up two things worth fixing more than
+any specific missing test: CI never runs `pytest` at all today
+(`deploy-pages.yml` only runs the build pipeline + `validate_check_
+lifecycle`/`check_dashboard_renders` as Pages gates - the 211-test
+suite is enforced nowhere), and the real dbt/Soda/datacontract-cli/
+Evidently output-PARSING logic (`qa_tools/*/run_{dbt,soda,datacontract,
+evidently}_*.py`) is monkeypatched out in the one test that touches
+`orchestrate_bdm.py`/`orchestrate_cp.py` - a deliberate, correct choice
+for that one test's own narrow purpose (checking reference-run
+forwarding, not re-running real tools), but with the side effect that
+nothing ever exercises the real "turn this tool's actual output into
+our check-result shape" logic under `pytest` at all - only a real,
+slow, full `./run_pipeline.sh` run does.
+
+Real forks resolved (a genuine scoping conversation with Keith, not a
+single answer):
+- **CI execution: yes** - wire `uv run pytest` into CI. Currently zero
+  enforcement path for the whole suite.
+- **Coverage tooling: `pytest-cov` + a real threshold**, not just a
+  one-time fix-the-gaps pass - Keith's own words, "so we can't silently
+  regress" again. The actual threshold number should be set once the
+  real achieved coverage from the work below is known, not picked
+  first and built toward - an arbitrary a-priori number would either be
+  trivially easy (if too low) or force padding coverage with low-value
+  tests just to hit it (if picked before knowing what's realistic).
+- **`synthetic_data_generator/` stays OUT of scope** - real gap (zero
+  coverage), but also currently entirely unused/not wired into the real
+  pipeline (see `plans/wider.md` action 20's own history) - covering
+  dormant code isn't a good use of this phase. Revisit noted separately
+  (see below) rather than silently dropped.
+- **New backend coverage, Keith's own explicit order:**
+  1. The real-tool output-parsing logic named above (`run_dbt_bdm.py`/
+     `run_soda_bdm.py`/`run_datacontract_bdm.py`/`run_evidently_bdm.py`
+     and their CP counterparts) - the highest-value gap, since it's the
+     actual "does this project correctly understand what the real tool
+     told it" logic, currently unverified by anything except a full
+     manual pipeline run.
+  2. The other real gaps found by the survey - `qa_tools/{bdm,cp}/
+     build_*_warehouses.py`, `build_results_from_history.py` (both
+     datasets), `evidently_check_lifecycle.py`/`_retired.py` (both
+     datasets), `qa_tools/common/{datacontract,dbt,evidently,
+     soda}_common.py`, `pipeline/{aggregate_values,dashboard_check_
+     labels,load,orchestrate}.py`, `generator/{anchor_date,names_au,
+     presentation}.py` - thinner, more mechanical glue code, real but
+     lower-risk than (1).
+- **Dashboard JS: yes, but as its own separate follow-up step after the
+  backend work above, not bundled into it.** Zero automated JS
+  assertions exist today (~2,500 lines of inline logic - cadence math,
+  status rollups, drill-down navigation, the new supply-history code -
+  verified only by hand-written, throwaway Playwright scripts each
+  session). Vitest is Keith's own preference from past experience, open
+  to alternatives if it turns out to be a bad fit for a single-file
+  inline-`<script>` dashboard with no existing build step - this repo
+  has never had a JS test runner or bundler before, so first setup is
+  real, non-trivial work in its own right (how the template's inline
+  functions get imported into a test file without a real module system
+  is the concrete thing to figure out first).
+- **Real Playwright end-to-end integration tests: yes, real user-flow
+  scenarios**, not just an extension of `check_dashboard_renders.py`'s
+  existing render-and-zero-console-errors check - e.g. picking an as-of
+  date and confirming the right dataset goes to no-data, clicking a
+  supply-history entry and confirming it drills into the right run,
+  toggling dark mode and confirming it persists. Confirmed with Keith:
+  a well-built suite (a shared pytest-playwright fixture asserting zero
+  console errors as part of every single test's teardown, not just one
+  dedicated test) naturally subsumes `check_dashboard_renders.py`'s
+  built-output check as a side effect of testing real behavior - **but
+  the raw TEMPLATE-with-no-real-data-embedded case (illustrative mock
+  fallback) needs to stay its own explicit scenario**, since a suite
+  built against the real built output wouldn't otherwise cover it.
+  Once `pytest` runs in CI (per the CI-execution decision above),
+  `check_dashboard_renders.py`'s separate standalone-script CI step
+  likely folds into this same suite rather than staying a second,
+  parallel gate - the original reasoning for keeping it outside pytest
+  ("not worth mocking a browser for here") stops applying once this
+  phase is investing in real browser tests under pytest anyway.
+
+Build order for the work above, once started (not yet begun as of this
+scoping pass): (1) wire `pytest` into CI early - immediately valuable,
+blocks nothing else, and everything built after this point should
+already be enforced as it lands, not bolted on at the end; (2) the
+real-tool parsing logic; (3) the other backend gaps; (4) set the real
+`pytest-cov` threshold once (2)+(3)'s actual achieved number is known;
+(5) dashboard JS tests (Vitest, own setup work); (6) real Playwright
+user-flow scenarios, absorbing `check_dashboard_renders.py`. (5) and
+(6) weren't given a strict relative order by Keith - both are "after
+the backend work," not ordered against each other - so either can lead
+once reached, revisit which makes more sense at that point rather than
+assuming this order is fixed.
+
+**Separately parked, not part of Phase 6 itself**: `synthetic_data_
+generator/` test coverage - Keith's own words, "when we come back to
+it, have a note that we should consider adding tests for it." See
+`plans/wider.md`'s own action-items list for the actual parked entry
+(added alongside this scoping pass) rather than duplicating it here.
 
 ## Doc updates needed once this starts landing
 

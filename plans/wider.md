@@ -1762,3 +1762,14 @@ not a schedule.
     and ignored rather than tripping the pipeline. Not scoped further
     than that yet - flagged here so the concern and its known
     complications aren't lost before that conversation happens.
+
+32. **[parked, 2026-09-17 - Keith's own call, surfaced while scoping
+    `plans/publishing-and-history.md`'s Phase 6]** `synthetic_data_
+    generator/` has zero test coverage - a real gap a coverage survey
+    found - but Keith's own call was to leave it out of Phase 6's scope,
+    since the package is also currently entirely unused (not wired into
+    the real BDM/CP pipeline at all - see action 20's own history).
+    His own words: "when we come back to it, have a note that we should
+    consider adding tests for it." Not scoped further than that -
+    revisit alongside whatever eventually wires this package into the
+    real pipeline (if it ever does), not before.
