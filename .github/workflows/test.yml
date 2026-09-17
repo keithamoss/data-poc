@@ -1,0 +1,44 @@
+name: Run test suite
+
+# Phase 6 of plans/publishing-and-history.md (test coverage), scoped
+# 2026-09-17: 211+ tests existed with zero CI enforcement path before
+# this - deploy-pages.yml only ever ran the build/validate/publish
+# steps for the dashboard itself, scoped to a narrow set of paths that
+# don't even include generator/ or tests/ (see that workflow's own
+# trigger comment). This is deliberately a SEPARATE workflow, not a step
+# bolted onto deploy-pages.yml, because the two have genuinely different
+# scopes: deploy-pages.yml only needs to re-run when something that
+# affects the PUBLISHED DASHBOARD changes; this workflow needs to catch
+# a regression anywhere in the codebase, including generator/ changes
+# that never touch a committed dashboard artifact at all - so no path
+# filter, runs on every push to the working branch.
+#
+# `uv run pytest` is what's gated here - `uv run ruff check .` stays a
+# local/pre-commit concern (pre-commit already wires it into every
+# `git commit`, so a real lint regression can't reach this branch in
+# the first place; this workflow's job is catching what pre-commit
+# CAN'T catch, a genuine test failure, not re-litigating lint).
+
+on:
+  push:
+    branches: [claude/new-session-en9qen]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Sync dependencies
+        run: uv sync --dev
+
+      - name: Run test suite
+        run: uv run pytest
