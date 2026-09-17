@@ -199,3 +199,28 @@ batch above, but landed in the same conversation)
 - **CI monitoring shouldn't block the loop**: amended in CLAUDE.md's own
   standing convention (the "check real CI" bullet) rather than logged
   here - a process fix, not a project idea.
+
+### 9. Human-friendlier URLs (small, follow up later today)
+
+Keith's own words: "improve the human friendliness of the URLs, so we
+don't have to rely on hash URLs so much." Real, current state: the
+dashboard's whole routing (`stateToHash()`/`hashToState()`,
+`dashboard/qa-reporting-dashboard.template.html`) encodes the entire
+`STATE` object as URL-encoded JSON in the fragment - e.g. navigating to
+a dataset produces something like
+`#%7B%22tier%22%3A%22dataset%22%2C%22agencyId%22%3A%22registry-services%22...%7D`,
+completely opaque to a human reading/sharing the link. Framed as small
+and explicitly deferred ("follow up in later today," not now) - not
+scoped further than that yet. Worth noting when it IS picked up: this
+is a genuinely static, single-file HTML page with no server-side
+routing, deployed to GitHub Pages - real path segments (no `#`) would
+need either a SPA-redirect trick (a `404.html` that redirects back to
+`index.html`, preserving the intended path) or staying hash-based but
+switching from an opaque encoded-JSON blob to a readable path-like
+scheme (e.g. `#/agency/registry-services/dataset/birth-registrations`),
+parsed back into the same `STATE` shape - the second is the smaller,
+lower-risk change and probably the right first cut. The existing
+`asof=` query param (`setAsOfInUrl()`) already shows the app mixing
+real query-string params with the hash - whatever scheme is chosen
+should keep that working too, not just the tier/agency/dataset
+navigation.
