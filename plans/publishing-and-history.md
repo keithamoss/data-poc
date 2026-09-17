@@ -739,6 +739,32 @@ true-absence case (an as-of date before CP's very first-ever run)
 still correctly shows "no data" the original way. Full `uv run pytest`
 (170 passed) and `uv run ruff check .` clean.
 
+**Revisited, 2026-09-17 - the "DEFAULT as-of still shows real data"
+verification above no longer holds, now that CP's real cadence has
+been re-anchored** (Feb/May/Aug/Nov, `plans/qa-pipeline.md` item 59's
+follow-on - CP's latest real delivery moved from 2026-07-01 to
+2026-08-01). The 17-day gap that made the default view safe above is
+now a case where the default as-of (`today - 60` = 2026-07-19) falls
+BEFORE CP's real Aug-1 delivery, hiding it from the default view
+entirely and falling back to the May-1 delivery instead - 79 days
+stale relative to Jul 19, past the 60-day tolerance. Net effect: the
+whole Department for Child Protection agency now reads `nodata` on the
+plain Executive overview by default, not just on a deliberately-picked
+near-today date the way the original design/verification anticipated.
+Confirmed for real (`ag.status === "nodata"` at the live default
+as-of, headless-Chromium). This is the SAME open tension flagged
+immediately below ("`AS_OF_OFFSET_DAYS` is deliberately global, not
+per-dataset") made concretely visible for the first time, not a new
+bug - put to Keith with the exact numbers; not yet resolved as of this
+entry. Three options on the table: grow the shared offset to
+accommodate CP's ~91-day cadence (loosens BDM's own daily staleness
+sensitivity, since it's one shared value); reopen global-vs-per-dataset
+properly; or accept this default-view consequence for now. Keith's
+initial answer ("flag it and move on") was given before seeing this
+concrete default-view manifestation - re-raised once the severity
+became visible rather than silently proceeding on the earlier, more
+abstract answer.
+
 **Also found live-testing the picker, same day: BDM's own real window
 was too shallow for its own default view.** `AS_OF_OFFSET_DAYS` (60)
 and BDM's real generation window (`generator/generate_runs.py`'s

@@ -47,7 +47,7 @@ ENGINE_SHORT = {
 BUSINESS_RULE_PSEUDO_COLUMN = "(table-level checks)"
 
 TABLE_META = {
-    "cp_clients": "One row per child with a Child Protection casework history, per weekly snapshot extract.",
+    "cp_clients": "One row per child with a Child Protection casework history, per quarterly snapshot extract.",
     "cp_notifications": "One row per notification (a report of concern about a child) - 1-4 per client, more for children with a higher-risk history.",
     "cp_investigations": "One row per investigation opened from an escalated notification.",
     "cp_placements": "One row per out-of-home-care placement (0-2 per client; not every client has one).",
@@ -265,8 +265,8 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
 
     # dataset-level arrival: extract_timestamp vs. that run's own snapshot
     # (run_date) - the SLA is "extracted within 24h of the snapshot date",
-    # not a fixed daily clock time (this is a weekly periodic extract, not
-    # a daily event feed - see generator/generate_cp_runs.py).
+    # not a fixed daily clock time (this is a quarterly periodic extract,
+    # not a daily event feed - see generator/generate_cp_runs.py).
     latest_entry = next(m for m in manifest if m["run_id"] == latest_run)
     prev_entry = next(m for m in manifest if m["run_id"] == prev_run)
 
@@ -292,7 +292,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         "name": cp_common.TABLE_DATASET_NAME[table],
         "provider": "Department for Child Protection and Family Support — Casework Management System",
         "deliveryFormat": "CSV (S3 drop)",
-        "sla": {"frequency": "Weekly", "expectedBy": "within 24h of extract", "latencyHours": 24},
+        "sla": {"frequency": "Quarterly", "expectedBy": "within 24h of extract", "latencyHours": 24},
         "lastArrival": {
             "run_date": latest_entry["run_date"],
             "arrivedAt": str(earliest_extract),

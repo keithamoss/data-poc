@@ -111,7 +111,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Every client record must carry a client ID."
               - property: changelog
@@ -124,7 +124,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.duplicateValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Client IDs must not be duplicated."
               - property: changelog
@@ -143,7 +143,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.given_name.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "A client's given name must be recorded."
               - property: changelog
@@ -162,7 +162,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.family_name.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "A client's family name must be recorded."
               - property: changelog
@@ -180,7 +180,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "A client record must carry a date of birth."
               - property: changelog
@@ -210,7 +210,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.range_check_datacontract
               - property: introduced_date
-                value: "2026-09-15"
+                value: "2023-01-15"
               - property: changelog
                 value: "[]"
       - name: sex
@@ -228,7 +228,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.sex.invalidValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Sex must be one of the closed value set M, F, or X."
               - property: changelog
@@ -246,7 +246,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.suburb.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "A client's suburb must be recorded."
               - property: changelog
@@ -264,7 +264,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "A client's postcode must be recorded."
               - property: changelog
@@ -285,7 +285,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.invalidValues_datacontract
               - property: introduced_date
-                value: "2026-09-15"
+                value: "2023-01-15"
               - property: changelog
                 value: "[]"
       - name: case_opened_date
@@ -301,7 +301,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.case_opened_date.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "A client record must carry the date its case was opened."
               - property: changelog
@@ -322,7 +322,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.case_status.invalidValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Case status must be one of Open or Closed."
               - property: changelog
@@ -345,7 +345,7 @@ schema:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.rowCount_datacontract
           - property: introduced_date
-            value: "2026-01-15"
+            value: "2023-01-15"
           - property: changelog
             value: "[]"
 
@@ -369,7 +369,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Every notification must carry a notification ID."
               - property: changelog
@@ -388,7 +388,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.duplicateValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: changelog
                 value: "[]"
       - name: cp_client_id
@@ -404,7 +404,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Every notification must reference a client."
               - property: changelog
@@ -422,7 +422,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_date.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Every notification must carry the date it was made."
               - property: changelog
@@ -442,7 +442,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.source_type.invalidValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Notification source must be one of the closed value set."
               - property: changelog
@@ -467,7 +467,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.concern_type.invalidValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: changelog
                 value: "[]"
       - name: risk_rating
@@ -485,7 +485,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.risk_rating.invalidValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Risk rating must be one of the closed value set."
               - property: changelog
@@ -503,7 +503,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Every notification must be assigned to a case worker."
               - property: changelog
@@ -523,7 +523,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.outcome.invalidValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Notification outcome must be one of the closed value set."
               - property: changelog
@@ -541,7 +541,7 @@ schema:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.rowCount_datacontract
           - property: introduced_date
-            value: "2026-01-15"
+            value: "2023-01-15"
           - property: changelog
             value: "[]"
       - type: sql
@@ -554,7 +554,7 @@ schema:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.relationships_datacontract
           - property: introduced_date
-            value: "2026-09-15"
+            value: "2023-01-15"
           - property: changelog
             value: "[]"
       - type: sql
@@ -567,7 +567,7 @@ schema:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.relationships_datacontract
           - property: introduced_date
-            value: "2026-09-15"
+            value: "2023-01-15"
           - property: changelog
             value: "[]"
       - type: sql
@@ -594,7 +594,7 @@ schema:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.escalation_completeness_datacontract
           - property: introduced_date
-            value: "2026-01-15"
+            value: "2023-01-15"
           - property: changelog
             value: "[]"
 
@@ -616,7 +616,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Every investigation record must carry an investigation ID."
               - property: changelog
@@ -629,7 +629,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.duplicateValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Investigation IDs must not be duplicated."
               - property: changelog
@@ -647,7 +647,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Every investigation must reference the notification that escalated into it."
               - property: changelog
@@ -665,7 +665,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Every investigation must reference a client."
               - property: changelog
@@ -683,7 +683,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.start_date.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Every investigation must carry the date it started."
               - property: changelog
@@ -708,7 +708,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.substantiated.invalidValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Investigation outcome must be one of the closed value set."
               - property: changelog
@@ -726,7 +726,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Every investigation must have a lead case worker assigned."
               - property: changelog
@@ -744,7 +744,7 @@ schema:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.rowCount_datacontract
           - property: introduced_date
-            value: "2026-01-15"
+            value: "2023-01-15"
           - property: changelog
             value: "[]"
       - type: sql
@@ -757,7 +757,7 @@ schema:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.relationships_datacontract
           - property: introduced_date
-            value: "2026-09-15"
+            value: "2023-01-15"
           - property: changelog
             value: "[]"
       - type: sql
@@ -770,7 +770,7 @@ schema:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.relationships_datacontract
           - property: introduced_date
-            value: "2026-09-15"
+            value: "2023-01-15"
           - property: changelog
             value: "[]"
       - type: sql
@@ -783,7 +783,7 @@ schema:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.relationships_datacontract
           - property: introduced_date
-            value: "2026-09-15"
+            value: "2023-01-15"
           - property: changelog
             value: "[]"
       - type: sql
@@ -811,7 +811,7 @@ schema:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.closed_case_hygiene_datacontract
           - property: introduced_date
-            value: "2026-01-15"
+            value: "2023-01-15"
           - property: changelog
             value: "[]"
 
@@ -833,7 +833,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Every placement record must carry a placement ID."
               - property: changelog
@@ -846,7 +846,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.duplicateValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Placement IDs must not be duplicated."
               - property: changelog
@@ -864,7 +864,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Every placement must reference a client."
               - property: changelog
@@ -884,7 +884,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_type.invalidValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Placement type must be one of the closed value set."
               - property: changelog
@@ -902,7 +902,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Every placement must have a carer assigned."
               - property: changelog
@@ -920,7 +920,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_start.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Every placement must carry the date it started."
               - property: changelog
@@ -943,7 +943,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_suburb.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Every placement must carry the suburb it's located in."
               - property: changelog
@@ -961,7 +961,7 @@ schema:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.rowCount_datacontract
           - property: introduced_date
-            value: "2026-01-15"
+            value: "2023-01-15"
           - property: changelog
             value: "[]"
       - type: sql
@@ -974,7 +974,7 @@ schema:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.relationships_datacontract
           - property: introduced_date
-            value: "2026-09-15"
+            value: "2023-01-15"
           - property: changelog
             value: "[]"
       - type: sql
@@ -987,7 +987,7 @@ schema:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.relationships_datacontract
           - property: introduced_date
-            value: "2026-09-15"
+            value: "2023-01-15"
           - property: changelog
             value: "[]"
       - type: sql
@@ -1014,7 +1014,7 @@ schema:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.approval_compliance_datacontract
           - property: introduced_date
-            value: "2026-01-15"
+            value: "2023-01-15"
           - property: changelog
             value: "[]"
 
@@ -1036,7 +1036,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Every carer record must carry a carer ID."
               - property: changelog
@@ -1049,7 +1049,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.duplicateValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Carer IDs must not be duplicated."
               - property: changelog
@@ -1068,7 +1068,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.given_name.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "A carer's given name must be recorded."
               - property: changelog
@@ -1087,7 +1087,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.family_name.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "A carer's family name must be recorded."
               - property: changelog
@@ -1107,7 +1107,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_type.invalidValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Carer type must be one of the closed value set."
               - property: changelog
@@ -1127,7 +1127,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.approval_status.invalidValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Approval status must be one of the closed value set."
               - property: changelog
@@ -1145,7 +1145,7 @@ schema:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.rowCount_datacontract
           - property: introduced_date
-            value: "2026-01-15"
+            value: "2023-01-15"
           - property: changelog
             value: "[]"
 
@@ -1167,7 +1167,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Every case worker record must carry a worker ID."
               - property: changelog
@@ -1180,7 +1180,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.duplicateValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Case worker IDs must not be duplicated."
               - property: changelog
@@ -1199,7 +1199,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.given_name.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "A case worker's given name must be recorded."
               - property: changelog
@@ -1218,7 +1218,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.family_name.nullValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "A case worker's family name must be recorded."
               - property: changelog
@@ -1239,7 +1239,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.team_region.invalidValues_datacontract
               - property: introduced_date
-                value: "2026-01-15"
+                value: "2023-01-15"
               - property: description
                 value: "Team region must be one of the closed value set of WA regions."
               - property: changelog
@@ -1257,7 +1257,7 @@ schema:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.rowCount_datacontract
           - property: introduced_date
-            value: "2026-01-15"
+            value: "2023-01-15"
           - property: changelog
             value: "[]"
 

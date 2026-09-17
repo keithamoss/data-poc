@@ -18,7 +18,7 @@ PSI_CHECK_ID = (
 
 CHECK_LIFECYCLE = {
     PSI_CHECK_ID: {
-        "introduced_date": "2026-01-15",
+        "introduced_date": "2023-01-15",
         "description": "Population Stability Index on concern_type's value distribution vs. the reference run - this collection's own traffic-light demo column.",
         "changelog": [],
     },

@@ -82,25 +82,28 @@ BASE_SEED = 5000  # distinct range from generate_runs.py's 1000s and generate.py
 
 TABLES = ["cp_clients", "cp_notifications", "cp_investigations", "cp_placements", "cp_carers", "cp_case_workers"]
 
-# (quarter offset from run 1, dirty severity or None) - 16 quarterly
-# snapshots spanning 4 years (widened from 10 WEEKLY snapshots,
-# 2026-09-16, Keith's own call - see plans/wider.md's cadence-widening +
-# history-depth follow-up notes: CP's own framing as "a periodic full
-# extract" fits a quarterly re-extract more naturally than a weekly one
-# for a real casework/investigation collection, and getting real
-# quarterly-spaced history is also a meaningful stress test for the
-# as-of/time-travel features, which need genuinely deep, sparse history
-# to demonstrate against; 4 years rather than 3, Keith's own follow-up
-# call, for even deeper history). Ratio scaled from the original 10-run
-# plan's 7 clean / 2 amber / 1 red. Deliberately ends on the red run
-# (unchanged from the original plan): Keith wanted the dashboard's
-# default/latest view to show real red on this collection specifically,
-# not just buried a few runs back in the trend history - see
-# plans/wider.md and the AskUserQuestion decision that shaped this
-# ("make the latest run itself dirty" / "Child Protection only"). First
-# run stays clean - it's orchestrate_cp.py's own Evidently reference run.
+# (quarter offset from run 1, dirty severity or None) - 15 quarterly
+# snapshots spanning ~4 years, Feb/May/Aug/Nov-anchored (re-anchored
+# 2026-09-17, Keith's own call, plans/qa-pipeline.md item 59's follow-on
+# discussion: "1 February being the expected date of supply, then
+# working forwards in three month increments from there" - replacing
+# the previous CALENDAR-quarter anchor, Jan/Apr/Jul/Oct 1, set
+# 2026-09-16 - see plans/wider.md's cadence-widening notes for that
+# still-accurate earlier history: weekly -> quarterly, 10 -> 16 runs,
+# 3 -> 4 years deep). This is a RE-ANCHOR of an already-quarterly
+# cadence, not a weekly-to-quarterly conversion - only the day-of-quarter
+# the boundary falls on changes (Feb 1 vs. Jan 1), which shifts every
+# run's date and drops the count from 16 to 15: 4 years of Feb-anchored
+# quarters ending on the last one at or before "today" (2026-09-17) is
+# 2023-02-01 through 2026-08-01 (2026-11-01 would be the 16th, but that's
+# in the future relative to the fixture's own "today," which this
+# project's real data never extends past - see generate_runs.py's
+# identical BDM-side convention). Ratio/shape below (first run clean,
+# last run red, ~25% amber in between) is unchanged from the calendar-
+# quarter version - only N_QUARTERS and _quarter_start()'s anchor month
+# moved.
 _RUN_PLAN_SEED = 5900  # distinct range from generation seeds (BASE_SEED+...)
-N_QUARTERS = 16
+N_QUARTERS = 15
 
 
 def _build_run_plan(n: int, seed: int) -> list[tuple[int, str | None]]:
@@ -116,13 +119,23 @@ RUN_PLAN = _build_run_plan(N_QUARTERS, _RUN_PLAN_SEED)
 
 
 def _quarter_start(d: date) -> date:
-    """The first day of the calendar quarter containing `d` - a real
-    periodic full-collection extract lands on quarter boundaries
-    (Jan/Apr/Jul/Oct 1) more naturally than on an arbitrary day, same
-    "keep it realistic" rationale the old weekly version applied via its
-    own always-a-Monday alignment."""
-    quarter_start_month = ((d.month - 1) // 3) * 3 + 1
-    return date(d.year, quarter_start_month, 1)
+    """The first day of the Feb/May/Aug/Nov-anchored quarter containing
+    `d` - Keith's own explicit anchor (2026-09-17): "1 February being
+    the expected date of supply, then working forwards in three month
+    increments." NOT calendar quarters (Jan/Apr/Jul/Oct), which this
+    replaced. Computed on a continuous months-since-year-0 index rather
+    than per-case month arithmetic, so the year boundary (a January or
+    December date's quarter actually starts the PRIOR November) falls
+    out of the same formula instead of needing special-casing - verified
+    against both a January date (2026-01-15 -> 2025-11-01, the Nov-Jan
+    quarter it's really in) and the exact anchor month (2026-09-17 ->
+    2026-08-01) before trusting it."""
+    total_months = d.year * 12 + (d.month - 1)  # 0 = Jan of year 0
+    feb_offset = 1  # February = month index 1 within a year (Jan=0)
+    quarter_index = (total_months - feb_offset) // 3
+    start_total_months = quarter_index * 3 + feb_offset
+    year, month = start_total_months // 12, start_total_months % 12 + 1
+    return date(year, month, 1)
 
 
 def _add_quarters(d: date, n: int) -> date:

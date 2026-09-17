@@ -146,8 +146,8 @@ generator/                   a real package (generator/__init__.py) - `python3 -
   resupply.py                  generic resupply-chain orchestration (delay/retry/chaining),
                                driven by a DatasetProvider protocol - knows nothing about how
                                a dataset's rows are actually made, see the file's own docstring
-  generate_cp_runs.py          orchestrates 16 quarterly Child Protection snapshots (4 years) into
-                               data/cp_raw/
+  generate_cp_runs.py          orchestrates 15 quarterly Child Protection snapshots (Feb/May/Aug/Nov
+                               anchor, ~4 years) into data/cp_raw/
   names_au.py, presentation.py, dirty.py   the canonical copies - synthetic_data_generator/
                                imports these from here rather than keeping its own duplicates
                                (see "Relationship to the synthetic_data_generator package" below)
@@ -342,7 +342,7 @@ from the start rather than retrofitting them for something they were
 never built to do.
 
 ```bash
-uv run python3 -m generator.generate_cp_runs       # -> data/cp_raw/ (16 quarterly snapshots, 4 years)
+uv run python3 -m generator.generate_cp_runs       # -> data/cp_raw/ (15 quarterly snapshots, ~4 years)
 uv run python3 -m qa_tools.cp.orchestrate_cp        # -> reports/results_cp.json
 uv run python3 -m pipeline.build_cp_dashboard_data  # -> reports/child_protection_dashboard.json
 uv run python3 -m dashboard.embed_dashboard_data    # re-embeds BOTH real datasets into the HTML
@@ -354,9 +354,9 @@ it end to end rather than assumed:
 - **Generation model is different on purpose.** Birth Registrations is an
   event feed (a fresh cohort of newborns each day); Child Protection is a
   periodic *snapshot* extract of the same underlying casework collection,
-  re-pulled weekly (`generator/generate_cp_runs.py`) — row counts stay
-  roughly stable run to run, matching what a real active-caseload extract
-  looks like.
+  re-pulled quarterly, anchored to 1 February each year
+  (`generator/generate_cp_runs.py`) — row counts stay roughly stable run
+  to run, matching what a real active-caseload extract looks like.
 - **The 7 FK relationship checks never fail on this fixture** — `dirty.py`'s
   CP presets never touch a foreign-key column, only `concern_type` (the
   traffic-light demo column, same role `sex` plays for Birth

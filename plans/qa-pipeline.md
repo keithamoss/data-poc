@@ -2962,6 +2962,61 @@ relative, not a schedule — this is weeks of work, not months.
     should happen, so it needs re-tuning if real-world spike timing
     ever shifts - worth surfacing in the check's own lifecycle metadata
     (`description`/`changelog`) rather than treating it as set-and-forget.
+
+    **Follow-on, 2026-09-17 (before the check itself gets built): CP's
+    real cadence re-anchored to Feb/May/Aug/Nov.** Discussing this item
+    surfaced that CP's real cadence (in code since the 2026-09-16
+    calendar-quarter migration, Jan/Apr/Jul/Oct) didn't match what Keith
+    actually wanted - explicit correction: "1 February being the
+    expected date of supply, then working forwards in three month
+    increments from there," 4 years of depth. Re-anchored
+    `generator/generate_cp_runs.py`'s `_quarter_start()` from calendar
+    quarters to Feb/May/Aug/Nov (continuous months-since-year-0 index,
+    not per-case month arithmetic - verified against both a January
+    date, which belongs to the PRIOR year's Nov-quarter, and the exact
+    anchor month). `N_QUARTERS` 16 -> 15 (4 years of Feb-anchored
+    quarters ending at-or-before "today" 2026-09-17 lands on
+    2023-02-01..2026-08-01 - a 16th, 2026-11-01, would be in the future,
+    which this project's real data never extends past). Also backdated
+    every CP check's `introduced_date` (was `2026-01-15`/`2026-09-15`,
+    Phase 1 retrofit-time artifacts) to `2023-01-15` - Keith's explicit
+    call, recommended option: honest fix, since real committed results
+    now exist for 2023, checks claiming to be "introduced" in 2026 would
+    have predated their own results. Fixed two stale `"Weekly"` labels
+    found along the way (`pipeline/build_cp_dashboard_data.py`'s `sla`
+    dict + a docstring, `README.md`) that were never updated when CP
+    actually went quarterly back on 2026-09-16 - this was a re-anchor of
+    an already-quarterly cadence, not a weekly-to-quarterly conversion,
+    once investigated (a subagent research pass caught this before any
+    code was touched, correcting an assumption in Keith's own framing of
+    the ask). `qa_results/child-protection-family-support/` nuked and
+    regenerated against the new 15-run real history (real tools re-run
+    for real, not a fixture). Full `uv run pytest` (177 passed - no test
+    hardcodes CP's real cadence/dates, confirmed before starting) and
+    `uv run ruff check .` clean.
+
+    **Found while verifying: `AS_OF_OFFSET_DAYS` (60) now visibly
+    conflicts with CP's real cadence at the DEFAULT view, not just when
+    deliberately probing near-today dates.** The staleness-tolerance
+    rule itself isn't new (Thread C, 2026-09-16, tested against CP's
+    prior July-1 delivery) - what's new is that it now trips on the
+    plain default Executive-tier view, not only when a viewer manually
+    picks an as-of date near "today": default as-of is `today - 60` =
+    2026-07-19; CP's real Aug-1-2026 delivery (fully real, on schedule,
+    only 47 days before today) falls AFTER that default as-of date, so
+    it's invisible to the default view entirely; the nearest earlier
+    real delivery from that default as-of's own perspective is May 1 -
+    79 days before Jul 19, past the 60-day tolerance - so the whole
+    Department for Child Protection and Family Support agency now reads
+    `nodata` on the plain Executive overview, not just on some
+    deliberately-picked stale date. Confirmed for real via a headless-
+    Chromium check (`ag.status === "nodata"` at the live default
+    as-of). Put back to Keith with the concrete numbers rather than
+    silently patched - genuinely his call given the tradeoffs (grow the
+    shared offset vs. revisit global-vs-per-dataset vs. accept this
+    default-view consequence for now) - not yet resolved as of this
+    entry; see `plans/publishing-and-history.md` Thread C for the fuller
+    account once it lands.
     Not scoped further yet - pick up after Phase 5 wraps.
 
 60. **[parked, 2026-09-17 - flagged as a separate sub-phase for the end
