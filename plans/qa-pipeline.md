@@ -2870,6 +2870,29 @@ relative, not a schedule — this is weeks of work, not months.
       needs its own layout pass, not just wiring in the same function
       call the other two tiers can use as-is.
 
+58. **[investigated, 2026-09-17, not a bug - open design question for
+    Keith]** Keith's report: picking as-of = real "today" (2026-09-17)
+    for Registry Services still shows "a lot of points" on the
+    Executive-tier sparkline; expected "no points, or only one."
+    Investigated live against the real built dashboard (Playwright JS
+    eval, not just reasoning about the code): real wall-clock today is
+    2026-09-17; BDM's committed history runs `run_001_2026-05-21`
+    through `run_120_2026-09-17` (plus a resupply attempt arriving
+    2026-09-21, correctly excluded by as-of clipping since its
+    `run_date` is after today). At `CURRENT_AS_OF = "2026-09-17"`,
+    `pickRepresentativeCheck()` resolves to a genuinely-varying,
+    genuinely-worst check with `historyLen: 175` - i.e. the sparkline is
+    correctly showing this daily-cadence dataset's full accumulated
+    history up to today, per the as-of clipping design verified
+    repeatedly earlier this same session (items 55/56) - no clipping
+    error found. Not fixed, because there's nothing broken to fix: the
+    open question is whether "as of today, show full accumulated
+    history" is actually the product behaviour Keith wants for the
+    Executive-tier sparkline, or whether he wants it windowed to only
+    recent history (e.g. trailing 30 days) regardless of as-of date -
+    that's a real design fork, not something to guess at and change
+    unilaterally.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
