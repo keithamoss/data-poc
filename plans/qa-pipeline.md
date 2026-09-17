@@ -3219,6 +3219,74 @@ relative, not a schedule — this is weeks of work, not months.
     narrow-viewport pass done as they were added. Not investigated or
     scoped yet - just logged so it isn't lost.
 
+64. **[built, 2026-09-17 - Phase 5g]** Tier 3's no-data drill-down gap -
+    found investigating Keith's own two walked-through scenarios ("as of
+    1 August I should see red/amber/green; as of 28 July I should see
+    no data, but still be able to click through to tier two and see no
+    data against all the datasets, then click into a dataset and see no
+    data against all the columns... but I should still be able to see
+    the historical graphs and comparison stuff"). Both scenarios already
+    worked correctly for status COLORS at Tier 1/2 - the real,
+    structural gap was narrower and specific to Tier 3: once a dataset's
+    latest real supply fell outside `AS_OF_OFFSET_DAYS`' staleness
+    tolerance, `clipDatasetToAsOf()` returned `null` unconditionally,
+    and `noDataDataset()` built a placeholder with `columns: []` -
+    discarding ALL real historical column/check data even when plenty
+    existed, so Tier 3 rendered only a text blurb, nothing clickable, no
+    charts. Contrary to what Keith described wanting: no colors, but
+    still-clickable columns with real historical trend/comparison data.
+
+    Asked Keith one real open design question before building (his own
+    instruction: "ask me questions as you go"): once a no-data column
+    tile is showing (Phase 5e's aggregate sparkline still attached to
+    it), should that sparkline suppress its own real historical colors
+    to match the neutral pill next to it, or keep showing them? Keith's
+    call: **keep the sparkline's real colors** - only the AGGREGATE
+    status pills (dataset-level, column-tile-level) go neutral "no
+    data"; the sparkline's own historical shape/color, and everything
+    inside a column's drawer (per-check current/previous values, status
+    pills, and each check's own trend chart), stay fully real and
+    unchanged. This turned out to need no extra design for the drawer
+    at all: `openColumnDrawer()` already derives its own summaries
+    entirely from `column.checks[]` (real `current`/`previous`/`history`/
+    `warn`/`fail`, via `checkStatus(ck)` per check) - it never reads
+    `column.status` - so leaving `checks[]` completely untouched and
+    only overriding the ROLLED-UP `column.status`/`dataset.status` was
+    already exactly the right scope, no drawer changes needed.
+
+    Built: `clipDatasetToAsOf()` now only returns `null` for a
+    genuinely EMPTY dataset (zero eligible runs as of the selected
+    date) - a stale-but-real dataset (eligible runs exist, just past
+    tolerance) builds normally and gets a new `staleAsOf` flag instead.
+    `buildRealDataset()` reads that flag: forces every column's rolled-
+    up `.status` to `"nodata"` (leaving `checks[]` real), and sets the
+    dataset's own `status`/`noDataAsOf` to match - mirroring exactly the
+    `noDataAsOf`/`status` pairing `noDataDataset()` already used for the
+    empty case, so `rollup()`/`rollupStatuses()` (both already written
+    to treat any `noDataAsOf` dataset as "don't let it vote green")
+    needed zero changes. `renderDataset()` splits its old single
+    `if(ds.noDataAsOf)` branch on `!ds.columns.length` - genuinely empty
+    keeps the old text-only page; stale-with-data falls through to the
+    NORMAL render path (SLA strip, legend, full clickable column grid),
+    with one new explanatory line under the header (why the pills read
+    "no data" despite real figures below).
+
+    Verified against real, live data - CP is *currently* in exactly
+    this state at the default as-of view (the still-open
+    `AS_OF_OFFSET_DAYS`-vs-CP-cadence conflict from
+    `plans/publishing-and-history.md` Thread C's 2026-09-17 "Revisited"
+    entry): headless Chromium confirmed Tier 1 agency status still
+    `nodata`, Tier 2 still shows the "no data" row, and Tier 3 - the
+    actual fix - now renders 11 real, clickable column tiles (each with
+    "no data" pills and its own real sparkline) instead of a blank text
+    page; clicking one opens the drawer with a fully real "6 Passing/
+    Warning/Failing" summary and 6 real check cards. Also verified the
+    genuinely-empty case (`applyAsOf("2020-01-01")`, before BDM's
+    earliest real run) still renders the plain text-only page
+    unchanged, zero column tiles. Zero console errors either way. Full
+    `uv run pytest` (181, unchanged - a pure frontend change) and
+    `uv run ruff check .` clean.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

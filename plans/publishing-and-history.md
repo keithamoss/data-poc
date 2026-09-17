@@ -765,6 +765,26 @@ concrete default-view manifestation - re-raised once the severity
 became visible rather than silently proceeding on the earlier, more
 abstract answer.
 
+**Follow-up, same day: a real Tier 3 structural gap found (and fixed)
+while walking Keith through this mechanism.** Asked him to describe
+exactly what he expected to see in two concrete as-of scenarios;
+comparing that against actual behavior found status COLORS already
+worked correctly at Tier 1/2, but Tier 3 discarded ALL historical
+column/check data the moment a dataset went stale (`clipDatasetToAsOf()`
+returning `null` unconditionally, `noDataDataset()`'s `columns: []`) -
+no drill-down, nothing clickable, contrary to Keith's explicit "no red
+amber and greens, but I should still be able to see the historical
+graphs and comparison stuff." Built and verified for real against CP's
+own live stale state - full account, including the one real design
+question asked along the way (whether the no-data column tile's own
+sparkline should suppress its real colors or keep them - Keith: keep
+them), in `plans/qa-pipeline.md` item 64 (Phase 5g), not repeated here.
+This is a genuinely separate fix from the `AS_OF_OFFSET_DAYS`-vs-CP-
+cadence question just above - it makes the CURRENT no-data behavior
+usable/drillable, it doesn't change when a dataset qualifies as
+no-data at all, so the three options above remain exactly as open as
+before this landed.
+
 **Also found live-testing the picker, same day: BDM's own real window
 was too shallow for its own default view.** `AS_OF_OFFSET_DAYS` (60)
 and BDM's real generation window (`generator/generate_runs.py`'s

@@ -680,7 +680,21 @@ function buildRealDataset(d){
   // just never part of what CURRENT status means. Every status above
   // this (dataset/collection/agency) rolls up from c.status, so excluding
   // retired checks here is the one place this needs enforcing.
-  columns.forEach(c=> c.status = worstOf(c.checks.filter(ck=>!ck.retired).map(checkStatus)));
+  //
+  // Phase 5g: d.staleAsOf (clipDatasetToAsOf's flag - the most recent
+  // eligible run is older than AS_OF_OFFSET_DAYS tolerance) forces every
+  // column's ROLLED-UP status to "nodata" too, same reasoning as the
+  // retired-check rule just above: we don't trust a stale run to
+  // represent "now," so it must never be able to turn a column pill
+  // red/amber/green either. Deliberately narrow - this only touches
+  // c.status (what the tile pill and rollup() read), never c.checks
+  // itself, which keeps every check's own real current/previous/
+  // history/warn/fail untouched, so the drawer and its trend charts
+  // still show full real historical data once you click in (Keith's own
+  // "no red amber and greens... but I should still be able to see the
+  // historical graphs and comparison stuff" - the aggregate-level pills
+  // go neutral, the drill-down data underneath doesn't).
+  columns.forEach(c=> c.status = d.staleAsOf ? "nodata" : worstOf(c.checks.filter(ck=>!ck.retired).map(checkStatus)));
 
   const arrivalHistory = d.arrivalHistory.map((a,i)=>({ idx:i, date: toDate(a.run_date), onTime: a.onTime }));
 
@@ -695,6 +709,15 @@ function buildRealDataset(d){
     columns,
     isReal: true,
     realRunCount: d.runs.length,
+    // Phase 5g: mirrors noDataDataset()'s own noDataAsOf/status pairing
+    // for the "genuinely empty" case above, but with real columns/checks
+    // attached (see the c.status loop above) - the wiring pass below
+    // (data.agencies.forEach...) only recomputes ds.status when
+    // !ds.noDataAsOf, so this has to be set correctly here or not at
+    // all. undefined (not false) when NOT stale, so the wiring pass's
+    // own falsy check still runs its normal worstOf() computation.
+    noDataAsOf: d.staleAsOf || undefined,
+    status: d.staleAsOf ? "nodata" : undefined,
     // Phase 5d: the dataset's own full run manifest, kept around (not
     // just its .length like realRunCount above) so trendChart() can tell
     // "no result for this check between two of its history points" apart
@@ -732,7 +755,19 @@ function clipDatasetToAsOf(d, asOfDateStr){
   // from Thread C's whole point (a quarterly dataset overdue for its
   // next refresh should read as overdue, not silently show old data as
   // if it were current).
-  if(AS_OF_OFFSET_DAYS!=null && daysBetween(effectiveRun.run_date, asOfDateStr) > AS_OF_OFFSET_DAYS) return null;
+  // Phase 5g (plans/qa-pipeline.md, 2026-09-17 - Keith's own two
+  // scenarios walked through explicitly): staleness no longer discards
+  // this run's real history outright. It used to return null here too,
+  // which made noDataDataset() below throw away every column/check -
+  // Tier 3 had nothing left to render but a text blurb, not even
+  // clickable. Now it's flagged (staleAsOf) and passed through
+  // unchanged so buildRealDataset() can still build real columns/checks/
+  // history for drill-down - only the ROLLED-UP dataset/column status
+  // pills go neutral "no data" (buildRealDataset()'s own job), never
+  // the checks' own real current/previous values or their historical
+  // trend charts. Only a genuinely EMPTY eligibleRuns (checked above,
+  // still returns null) has nothing at all worth passing through.
+  const staleAsOf = AS_OF_OFFSET_DAYS!=null && daysBetween(effectiveRun.run_date, asOfDateStr) > AS_OF_OFFSET_DAYS;
   const effectiveRunId = effectiveRun.run_id;
   const prevRunId = eligibleRuns.length>1 ? eligibleRuns[eligibleRuns.length-2].run_id : null;
   const eligibleRunIds = new Set(eligibleRuns.map(r=>r.run_id));
@@ -789,6 +824,7 @@ function clipDatasetToAsOf(d, asOfDateStr){
     arrivalHistory: (d.arrivalHistory || []).filter(a => eligibleRunIds.has(a.run_id)),
     lastArrival,
     rowCount, prevRowCount,
+    staleAsOf,
   };
 }
 
@@ -1573,7 +1609,19 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     {tier:"Tier 2",label:ag.name, nav:{tier:"agency",agencyId}},
     {tier:"Tier 3",label:ds.name, nav:{tier:"dataset",agencyId,collectionId,datasetId}},
   ]);
-  if(ds.noDataAsOf){
+  // Phase 5g: genuinely EMPTY (never supplied at all as of this date -
+  // clipDatasetToAsOf() returned null outright, so noDataDataset() gave
+  // us columns: []) is the only case left with nothing to drill into -
+  // stays the plain text-only page. A STALE dataset (real history
+  // exists, just past the staleness tolerance - clipDatasetToAsOf()
+  // still built real columns/checks, only flagged staleAsOf) falls
+  // through to the normal render path below instead: same column grid,
+  // same clickable tiles, same drawer/trend-chart drill-down - only the
+  // pills read "no data" (buildRealDataset()'s own doing), not the
+  // underlying check history. Keith's own words: "no red amber and
+  // greens... but I should still be able to see the historical graphs
+  // and comparison stuff."
+  if(ds.noDataAsOf && !ds.columns.length){
     view.innerHTML = `
       <div class="view-head">
         <div>
@@ -1583,10 +1631,8 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       </div>
       <div style="padding:40px 0; color:var(--ink-muted); font-size:14px; max-width:56ch;">
         No QA run within the accepted freshness window as of <b>${fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"))}</b> —
-        either this dataset hadn't been supplied yet by that date, or its most
-        recent supply by then is older than the data asset's staleness
-        tolerance (${AS_OF_OFFSET_DAYS} ${pluralize(AS_OF_OFFSET_DAYS,"day")}). Pick a later date, or reset to
-        the default, using the 📅 As of control above.
+        this dataset hadn't been supplied yet by that date. Pick a later
+        date, or reset to the default, using the 📅 As of control above.
       </div>
     `;
     return;
@@ -1600,6 +1646,12 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       </div>
       ${pill(ds.status)}
     </div>
+    ${ds.noDataAsOf ? `
+    <div style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:64ch;">
+      Its most recent supply, as of <b>${fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"))}</b>, is older than the
+      data asset's staleness tolerance (${AS_OF_OFFSET_DAYS} ${pluralize(AS_OF_OFFSET_DAYS,"day")}) - so the figures
+      below show its full real history, but no column reads red/amber/green as CURRENT status.
+    </div>` : ""}
     <div class="sla-strip">
       <div class="sla-tile"><div class="k">SLA</div><div class="v" style="font-size:14px;">${ds.sla.frequency}, by ${ds.sla.expectedBy}</div></div>
       <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono">${fmtArrival(ds.lastArrival)} ${ds.lastArrival.onTime? "":"(late)"}</div></div>
