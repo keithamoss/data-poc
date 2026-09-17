@@ -3049,6 +3049,51 @@ relative, not a schedule — this is weeks of work, not months.
     left for a dedicated pass once Phase 5's current sub-phases (5b/5c/5d)
     are done, per Keith's "flag for work at the end of this phase."
 
+    **Resolved and built, 2026-09-17 (Phase 5e).** Re-asked all three open
+    questions via AskUserQuestion; Keith took the recommended option on
+    each: (1) each tier aggregates its own scope - Tier 1 sums across the
+    whole agency, Tier 2 across just that dataset, Tier 3 across just
+    that column, now that item 57's per-tier sparklines all exist to
+    scope against; (2) failure RATE (failing ÷ applicable checks that
+    run), not a raw count, so an added/retired check mid-history never
+    fakes a trend just because the denominator moved; (3) one combined
+    line, worst-of coloring (red > amber > green), not separate
+    amber/red lines - matching the same worst-of rule already used
+    everywhere else in this dashboard.
+
+    Replaced `pickRepresentativeCheck()`/`sparkline()` (item 56/57's
+    single-representative-check design) with `aggregateFailureSeries(cols)`
+    + `aggregateSparkline(cols)` in `dashboard/qa-reporting-
+    dashboard.template.html`. `aggregateFailureSeries()` flattens `cols`
+    to every non-retired check (same "can never affect current status"
+    rule enforced everywhere else), groups each check's own history
+    entries by run DATE (a Map, not array index) into `{total, failing,
+    worst}` per date - `total`/`failing` naturally only count checks that
+    actually have a history entry at that date, so a check introduced or
+    retired mid-window is correctly excluded from the denominator on
+    dates it doesn't apply to, without needing to reconstruct applicability
+    from `retired_as_of` separately. `aggregateSparkline()` renders the
+    resulting `{date, rate, status}` series the same visual way the old
+    `sparkline()` did (muted path, colored endpoint dot) - a 0.05 floor
+    on the y-axis max avoids a divide-by-zero flat line when every run in
+    view is fully green. All three call sites updated: `renderExec()`
+    (Tier 1, `allCols` = every column under the agency), `renderAgency()`'s
+    dataset-table (Tier 2, `ds.columns`), `renderDataset()`'s column grid
+    (Tier 3, `[c]`).
+
+    Verified against real data via headless Chromium: sparklines render
+    with zero console errors at all three tiers on the real Registry
+    Services (Birth Registrations) and Department for Child Protection
+    and Family Support agencies; spot-checked
+    `aggregateFailureSeries(ds.columns)` directly for real Birth
+    Registrations data - 60 real points, failure rate genuinely varying
+    between ~10.5% and ~77.9% across the window, status tracking red
+    correctly (matches item 61's still-open "always-1" red checks - this
+    redesign doesn't fix that underlying issue, it just stops one
+    constant check from dominating the whole aggregate the way a single
+    representative check used to). `uv run pytest` (178) and `uv run
+    ruff check .` both clean.
+
 61. **[parked, 2026-09-17 - flagged for the end of this phase, Keith's
     own call]** Actually fix the root cause behind item 56's "always-1"
     checks, rather than continuing to work around them. Item 56's

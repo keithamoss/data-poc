@@ -1098,61 +1098,62 @@ let DATA = buildData(CURRENT_AS_OF);
 function statusForValue(v,warn,fail){ if(v>fail) return "red"; if(v>warn) return "amber"; return "green"; }
 function statusColorVar(s){ return s==="red"?"var(--bad)": s==="amber"?"var(--warn-fill)":"var(--good)"; }
 
-// Executive tier's own worst-check picker (renderExec()'s only caller).
-// Keith's report, 2026-09-17: Registry Services' sparkline flipped
-// between a flat line and a real graph as the as-of date moved through
-// different days. First fix (still needed, kept in pickRepresentativeCheck
-// below): a column's "worst" check should be picked BY STATUS
-// (checkStatus(c)===targetStatus), not by array position - the same
-// principle allCols.find() already applies one level up to pick the
-// worst COLUMN. That alone wasn't enough: at as-of 2026-07-19, ALL
-// THREE of date_of_birth's red checks (dbt's recency test, Soda's
-// matching freshness check, datacontract-cli's custom_sql) are constant
-// at exactly 1 across every one of the 176 real runs - a known,
-// already-documented limitation (see schema.yml's own comment: these
-// compare real wall-clock CURRENT_DATE against this fixture's simulated
-// historical dates, so they're essentially always red regardless of
-// which historical run is in view). Technically correct, but a flat
-// line at a constant value conveys nothing as a TREND sparkline - and
-// date_of_birth happening to be the FIRST column in column order meant
-// it always won over other real, genuinely-varying red checks that
-// exist on other columns (place_of_birth_facility, registering_
-// parent_1_name/2_name) at that same date. Now prefers any worst-status
-// check with real historical variance (min !== max) across ALL matching
-// columns, only falling back to a constant one if truly nothing varies -
-// never changes any check's own status/correctness anywhere else, only
-// which one illustrates this one sparkline.
-function pickRepresentativeCheck(cols, targetStatus){
-  // Phase 5b: a retired check can never surface as the check illustrating
-  // current status anywhere, sparklines included - same "never able to
-  // turn a status red/amber on its own once retired" rule col.status
-  // already enforces one level down, applied here too since a retired
-  // check could otherwise still coincidentally match targetStatus.
-  for(const col of cols){
-    if(col.status!==targetStatus) continue;
-    const ck = col.checks.find(c=>!c.retired && checkStatus(c)===targetStatus);
-    if(!ck) continue;
-    const vals = ck.history.map(r=>r.value);
-    if(Math.min(...vals)!==Math.max(...vals)) return ck;
-  }
-  const col = cols.find(c=>c.status===targetStatus) || cols[0];
-  const active = col ? col.checks.filter(c=>!c.retired) : [];
-  return col ? (active.find(c=>checkStatus(c)===targetStatus) || active[0] || col.checks[0]) : null;
+// Phase 5e (plans/qa-pipeline.md #60), replacing the earlier
+// pickRepresentativeCheck()/sparkline() pair (one representative check's
+// own raw value - history holds that design if it's ever needed again):
+// Keith's redesign call, 2026-09-17 - the sparkline should show the
+// AGGREGATE FAILING-CHECK TREND across every non-retired check in scope,
+// not one check's own metric. `cols` is whatever set of columns the
+// calling tier already has in hand - the whole agency's columns at
+// Tier 1, one dataset's at Tier 2, a single column's (wrapped in an
+// array) at Tier 3 - so the same two functions serve all three, each
+// aggregating only over its own scope (Keith's own answer when asked).
+//
+// Grouped by run DATE (a Map, not array index or raw count): a check
+// introduced or retired mid-history changes how many checks are even
+// applicable at a given run, so "N of M failing" only stays comparable
+// run to run as a RATE (failing/applicable that run), never a raw count
+// that could rise or fall just because the denominator moved (Keith's
+// own follow-up concern, also answered: rate, not raw count). Point
+// color is the same worst-of rule used everywhere else in this
+// dashboard (any red check that run makes the run red, else any amber
+// makes it amber) - the rate drives the line's SHAPE, worst-of drives
+// its endpoint COLOR, one combined signal rather than separate
+// amber/red lines (Keith's third answer).
+function aggregateFailureSeries(cols){
+  const checks = cols.flatMap(c=>c.checks.filter(ck=>!ck.retired));
+  const byDate = new Map();
+  checks.forEach(ck=>{
+    ck.history.forEach(h=>{
+      const status = statusForValue(h.value, ck.warn, ck.fail);
+      const key = h.date.getTime();
+      if(!byDate.has(key)) byDate.set(key, {date:h.date, total:0, failing:0, worst:"green"});
+      const e = byDate.get(key);
+      e.total++;
+      if(status!=="green") e.failing++;
+      if(STATUS_ORDER[status]>STATUS_ORDER[e.worst]) e.worst=status;
+    });
+  });
+  return [...byDate.values()].sort((a,b)=>a.date-b.date)
+    .map(e=>({date:e.date, rate:e.failing/e.total, status:e.worst}));
 }
 
-function sparkline(history, warn, fail){
+function aggregateSparkline(cols){
+  const points = aggregateFailureSeries(cols);
+  if(points.length<2) return "";
   const w=180,h=28,pad=2;
-  const vals = history.map(r=>r.value);
-  const max = Math.max(fail*1.05, ...vals, 0.001);
-  const n=vals.length;
+  // 0.05 floor (not 0): an all-green run of history should still draw a
+  // flat line pinned near the bottom, not divide-by-zero into a NaN path.
+  const max = Math.max(...points.map(p=>p.rate), 0.05);
+  const n = points.length;
   const x=i=> pad + i*(w-2*pad)/(n-1);
   const y=v=> h-pad - (v/max)*(h-2*pad);
   let d="";
-  vals.forEach((v,i)=>{ d += (i===0?"M":"L")+x(i).toFixed(1)+","+y(v).toFixed(1)+" "; });
-  const last = vals[vals.length-1], lastStatus = statusForValue(last,warn,fail);
-  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="trend sparkline">
+  points.forEach((p,i)=>{ d += (i===0?"M":"L")+x(i).toFixed(1)+","+y(p.rate).toFixed(1)+" "; });
+  const last = points[points.length-1];
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="aggregate failing-check trend sparkline">
     <path d="${d}" fill="none" stroke="var(--ink-faint)" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
-    <circle cx="${x(n-1).toFixed(1)}" cy="${y(last).toFixed(1)}" r="2.6" fill="${statusColorVar(lastStatus)}"/>
+    <circle cx="${x(n-1).toFixed(1)}" cy="${y(last.rate).toFixed(1)}" r="2.6" fill="${statusColorVar(last.status)}"/>
   </svg>`;
 }
 
@@ -1500,8 +1501,7 @@ function renderExec(view){
   grid.innerHTML = DATA.agencies.map(ag=>{
     const nDatasets = ag.collections.reduce((s,c)=>s+c.datasets.length,0);
     const allCols = ag.collections.flatMap(c=>c.datasets.flatMap(d=>d.columns));
-    const worstCheck = pickRepresentativeCheck(allCols, ag.status);
-    const spark = worstCheck ? sparkline(worstCheck.history, worstCheck.warn, worstCheck.fail) : "";
+    const spark = aggregateSparkline(allCols);
     return `<button class="card" data-nav='${JSON.stringify({tier:"agency", agencyId:ag.id})}'>
       <div class="card-top"><h3>${ag.name}</h3>${pill(ag.status)}</div>
       <div style="color:var(--ink-muted); font-size:12.5px;">${ag.blurb}</div>
@@ -1542,13 +1542,11 @@ function renderAgency(view, agencyId){
             </tr>`;
           }
           const arrivalPill = ds.lastArrival.onTime ? `<span class="pill green sm"><span class="ico"></span>On time</span>` : `<span class="pill red sm"><span class="ico"></span>Late</span>`;
-          // Item 57 (plans/qa-pipeline.md): the Executive tier's sparkline
-          // brought down to Tier 2 - the same pickRepresentativeCheck()/
-          // sparkline() pair item 56 built, just scoped to this one
-          // dataset's own columns instead of every column across the
-          // whole agency.
-          const dsWorstCheck = pickRepresentativeCheck(ds.columns, ds.status);
-          const dsSpark = dsWorstCheck ? sparkline(dsWorstCheck.history, dsWorstCheck.warn, dsWorstCheck.fail) : "";
+          // Item 57 brought the Executive tier's sparkline down to Tier 2;
+          // Phase 5e (#60) redesigned what it shows - see
+          // aggregateSparkline()'s own comment - scoped here to just this
+          // one dataset's own columns.
+          const dsSpark = aggregateSparkline(ds.columns);
           return `<tr data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td><div class="dataset-name">${ds.name}${ds.isReal?` <span class="pill tag sm"><span class="ico"></span>Real pipeline data</span>`:""}</div><div class="dataset-provider">${ds.provider}</div></td>
             <td>${pill(ds.status,"sm")}</td>
@@ -1615,14 +1613,11 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     <div class="col-grid" id="col-grid"></div>
   `;
   const grid = document.getElementById("col-grid");
-  // Item 57 (plans/qa-pipeline.md): Tier 3's own sparkline, narrower still
-  // than Tier 2's - pickRepresentativeCheck() called with just this ONE
-  // column's own checks, so it finds the best-varying check WITHIN that
-  // column specifically (same fallback-to-constant behaviour as the other
-  // two tiers if every one of its checks happens to be constant).
+  // Item 57 brought Tier 2's sparkline down to Tier 3, narrower still -
+  // Phase 5e (#60) redesigned what it shows (see aggregateSparkline()'s
+  // own comment), scoped here to just this one column's own checks.
   grid.innerHTML = ds.columns.map(c=> {
-    const colWorstCheck = pickRepresentativeCheck([c], c.status);
-    const colSpark = colWorstCheck ? sparkline(colWorstCheck.history, colWorstCheck.warn, colWorstCheck.fail) : "";
+    const colSpark = aggregateSparkline([c]);
     return `
     <button class="col-tile" data-status="${c.status}" data-col="${c.name}">
       <div class="name">${c.name}</div>
