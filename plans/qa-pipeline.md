@@ -3089,6 +3089,15 @@ relative, not a schedule — this is weeks of work, not months.
     current run of phases (5d and whatever follows) is done, not to
     build or even design it now.
 
+63. **[parked, 2026-09-17 - for after this phase wraps, Keith's own
+    call]** Mobile-responsive pass on the header - "it's getting a bit
+    crowded." Real, not hypothetical: the header now holds 5 items
+    (wordmark, 🌙 Dark mode, 📅 As of, 📋 Recent activity, 🕐 Past
+    snapshots, plus the live-updated indicator) after this session's
+    additions (dark mode toggle, activity panel), none of which had a
+    narrow-viewport pass done as they were added. Not investigated or
+    scoped yet - just logged so it isn't lost.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
