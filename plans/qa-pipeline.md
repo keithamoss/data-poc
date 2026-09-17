@@ -3758,6 +3758,30 @@ relative, not a schedule — this is weeks of work, not months.
     category needs to be to match how he actually talks about the
     work), not the other way around.
 
+69. **[parked, 2026-09-17 - Keith's own call: revisit once the current
+    round of work wraps up]** Whether `arrivalStatus` (early/onTime/
+    late) is even a meaningful concept for RESUPPLY attempts, or
+    whether it should only ever apply to a delivery's original supply.
+    Direct follow-up to item 67's own flagged limitation: every real
+    resupply currently reads "early" (100% of BDM's 56 resupply
+    attempts), because `generator/resupply.py`'s churn design
+    deliberately reuses the original delivery's `date_registered`/
+    `extract_timestamp` rather than drawing fresh ones - a resupply's
+    real-world arrival is genuinely later (that's the whole point of a
+    resupply), but its reused timestamp reads as "early" against the
+    cycle it's actually delivered in, which is arguably a category
+    error rather than a real fact about lateness. Keith's own framing:
+    "that may or may not be a concept we actually want for resupplies -
+    it may only apply to the original supply." Not scoped further than
+    that yet - a genuine open design question (does a resupply have its
+    own on-time/late semantics at all - e.g. "on time relative to the
+    resupply's own agreed turnaround," not the original cadence cycle -
+    or does `arrivalStatus` just not apply to it, with the dashboard
+    showing something else for a resupply row instead, e.g. only the
+    resupply/attempt-number badge item 67's supply-history section
+    already renders, no status pill at all) to have a real conversation
+    about before building anything, not a decision made here.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
