@@ -2844,6 +2844,32 @@ relative, not a schedule — this is weeks of work, not months.
     a flat 2.0-to-2.0 line. Full `uv run pytest` (175 passed) and `uv
     run ruff check .` clean.
 
+57. **[todo, parked - Keith's own call, 2026-09-17]** Bring the
+    Executive tier's sparkline down into the lower tiers too: Tier 2
+    (`renderAgency()`, the per-dataset table rows - `dashboard/
+    qa-reporting-dashboard.template.html`) and, Keith's own hedge,
+    "maybe even" Tier 3 (`renderDataset()`, the per-column tile grid).
+    Not investigated or built - logged for later per Keith's own
+    instruction, but scoped enough here to pick up cleanly:
+    - **Tier 2** would be one sparkline per dataset ROW, the same
+      `pickRepresentativeCheck()`/`sparkline()` pair item 56 just built
+      for the Executive tier, just called with that one dataset's own
+      `columns` (and its own `status` as the target) instead of every
+      column across the whole agency - `pickRepresentativeCheck()`
+      already takes a columns list + a target status as plain
+      arguments, so this is a straight reuse, not a rebuild.
+    - **Tier 3** would be one sparkline per COLUMN tile - narrower
+      still: `pickRepresentativeCheck([column], column.status)` (a
+      single-column list) would find the best-varying check WITHIN
+      that one column specifically, same fallback-to-constant behaviour
+      as the other two tiers if every one of that column's own checks
+      happens to be constant.
+    - Real open question once this gets built for real: `.col-tile` is
+      a small, dense grid item (name + type + status pill today, no
+      room budgeted for a chart) - fitting a legible sparkline there
+      needs its own layout pass, not just wiring in the same function
+      call the other two tiers can use as-is.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
