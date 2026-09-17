@@ -17,7 +17,24 @@ data-asset-level (not per-dataset) config value the as-of viewing
 feature needs, read the same way check_id's `data-asset-1` placeholder
 already is.
 
-This only replaces those three lines - the rest of the dashboard (its
+And `const CHANGELOG_FEED` (Phase 5a, Thread A, plans/publishing-and-
+history.md) - the global "who published what, when" activity feed,
+built by calling qa_tools.common.changelog.build_changelog() directly
+(a pure function of committed qa_results/ + real git history, same
+"safe to run in CI" status as everything else this script touches - no
+live data/DuckDB access) for each of the two real dataset scopes
+(Birth Registrations, Child Protection's collection-level scope - NOT
+once per CP table, since a real CP run QAs and commits all 6 tables
+together as one event), merged, sorted newest-published-first, and
+capped to CHANGELOG_DEPTH entries. This is the reason this script now
+runs as `python3 -m dashboard.embed_dashboard_data` rather than a bare
+`python3 dashboard/embed_dashboard_data.py` - the bare form puts only
+`dashboard/` on sys.path, not the repo root, so `import qa_tools...`
+would fail; `-m` (from the repo root, which every caller already `cd`s
+to first) puts the repo root on sys.path instead, same as every other
+cross-package script in this repo already runs.
+
+This only replaces those four consts - the rest of the dashboard (its
 CSS, the rendering code, the other 14 illustrative datasets, and the
 separate SNAPSHOT_MANIFEST const dashboard/snapshot_dashboard.py owns)
 is copied through unchanged from the template.
@@ -29,6 +46,8 @@ import re
 
 import yaml
 
+from qa_tools.common.changelog import build_changelog
+
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 TEMPLATE_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.template.html")
 DASHBOARD_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.html")
@@ -38,6 +57,38 @@ TARGETS = [
     ("REAL_BIRTH_REG_DATA", os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")),
     ("REAL_CP_DATA", os.path.join(ROOT, "reports", "child_protection_dashboard.json")),
 ]
+
+# (agency, dataset-or-collection id, display label) - the same two real
+# scopes TARGETS above embeds, just identified the way qa_results/'s own
+# directory layout (and build_changelog()'s own signature) needs them,
+# not the reshaped-JSON-file layout TARGETS uses.
+CHANGELOG_SOURCES = [
+    ("registry-services", "birth-registrations", "Birth Registrations"),
+    ("child-protection-family-support", "child-protection", "Child Protection"),
+]
+
+# "Something like the last 20-50 entries" (plans/publishing-and-
+# history.md's own Thread A write-up left the exact number open) - 30,
+# the middle of that range, picked here rather than left further open;
+# trivial to change later if it turns out wrong once there's enough
+# real history to judge by.
+CHANGELOG_DEPTH = 30
+
+
+def _build_changelog_feed() -> list[dict]:
+    feed = []
+    for agency, dataset, label in CHANGELOG_SOURCES:
+        for entry in build_changelog(agency, dataset):
+            feed.append({**entry, "label": label})
+    # Newest-published-first ("recent activity", not "oldest first" -
+    # build_changelog()'s own return order - its docstring explicitly
+    # leaves re-sorting to the UI). committed_at is the "recent
+    # activity" feed's actual subject (plans/publishing-and-history.md:
+    # "who's committed/pushed what dataset's QA recently") - run_timestamp
+    # stays on each entry for the UI to show alongside it, not as the
+    # sort key.
+    feed.sort(key=lambda e: e["committed_at"] or "", reverse=True)
+    return feed[:CHANGELOG_DEPTH]
 
 
 def _replace_const(html: str, const_name: str, value_json: str) -> str:
@@ -71,6 +122,10 @@ def embed() -> None:
     offset_days = data_asset["as_of_offset_days"]
     html = _replace_const(html, "AS_OF_OFFSET_DAYS", json.dumps(offset_days))
     print(f"Re-embedded AS_OF_OFFSET_DAYS = {offset_days}")
+
+    changelog_feed = _build_changelog_feed()
+    html = _replace_const(html, "CHANGELOG_FEED", json.dumps(changelog_feed, separators=(",", ":")))
+    print(f"Re-embedded CHANGELOG_FEED = {len(changelog_feed)} entries")
 
     with open(DASHBOARD_HTML, "w") as f:
         f.write(html)

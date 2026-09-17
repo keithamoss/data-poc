@@ -32,7 +32,7 @@ uv run python3 -m pipeline.build_dashboard_data
 
 echo
 echo "== 4/5: re-embed real data into the dashboard HTML =="
-uv run python3 dashboard/embed_dashboard_data.py
+uv run python3 -m dashboard.embed_dashboard_data
 
 echo
 echo "== 5/5: archive a dashboard snapshot ('time travel' - plans/wider.md) =="
@@ -40,7 +40,7 @@ echo "== 5/5: archive a dashboard snapshot ('time travel' - plans/wider.md) =="
 # "a real scheduled data refresh" and "a developer iterating on code", and
 # only the former should ever get archived. Pass SNAPSHOT_DASHBOARD=1 to
 # take one: SNAPSHOT_DASHBOARD=1 ./run_pipeline.sh
-uv run python3 dashboard/snapshot_dashboard.py
+uv run python3 -m dashboard.snapshot_dashboard
 
 echo
 echo "Done. Open dashboard/qa-reporting-dashboard.html in a browser to view it,"

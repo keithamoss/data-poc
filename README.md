@@ -345,7 +345,7 @@ never built to do.
 uv run python3 -m generator.generate_cp_runs       # -> data/cp_raw/ (16 quarterly snapshots, 4 years)
 uv run python3 -m qa_tools.cp.orchestrate_cp        # -> reports/results_cp.json
 uv run python3 -m pipeline.build_cp_dashboard_data  # -> reports/child_protection_dashboard.json
-uv run python3 dashboard/embed_dashboard_data.py    # re-embeds BOTH real datasets into the HTML
+uv run python3 -m dashboard.embed_dashboard_data    # re-embeds BOTH real datasets into the HTML
 ```
 
 A few things specific to this collection, each found by actually running

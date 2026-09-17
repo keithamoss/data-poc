@@ -1809,11 +1809,52 @@ build order below; the 4 sub-phases have no dependencies on each other
 (each is a self-contained UI addition), so the order is a suggestion,
 not a requirement.**
 
-- **Phase 5a (Thread A) - the "📋 Recent activity" panel.** Header
-  button + panel for the publish changelog, same interaction pattern as
-  the already-built "🕐 Past snapshots" - the smallest, most
-  self-contained piece (reuses an existing UI pattern, no new data
-  shape to design), recommended starting point.
+- **Phase 5a (Thread A) - the "📋 Recent activity" panel - [DONE,
+  2026-09-17].** Header button ("📋 Recent activity") + side panel,
+  same interaction pattern as the already-built "🕐 Past snapshots".
+  `dashboard/embed_dashboard_data.py` now also builds `CHANGELOG_FEED`
+  by calling `qa_tools/common/changelog.py`'s `build_changelog()` for
+  each real dataset scope (Birth Registrations; Child Protection's
+  whole collection, NOT once per table, since a real CP run QAs and
+  commits all 6 tables together as one event), merging the results,
+  sorting newest-published-first (`committed_at`, not `run_timestamp` -
+  "published/committed" is this feed's actual subject per the original
+  ask), and capping to 30 entries (the exact number was left open in
+  this file's own Thread A write-up - "something like the last 20-50" -
+  30 picked as the middle of that range rather than left further open).
+  Each row shows both timestamps the design called for - when the QA
+  itself ran and when it was actually published - noting the gap
+  between them only when it's ≥5 minutes (a near-zero gap on every
+  normal run/push would just be noise, not the "QA'd today but not
+  published for days" signal this exists to catch).
+
+  Real, not hypothetical data to build/verify against: two genuine
+  events exist right now (one Birth Registrations publish, one Child
+  Protection publish, both from earlier the same day this was built),
+  confirming the whole pipeline - real git history walk, real
+  `run_by`/`run_timestamp`/`commit_sha`/`committed_at` resolution -
+  end to end, not just against a synthetic fixture.
+
+  Found and fixed a real, separate wiring bug while building this:
+  `embed_dashboard_data.py` needs `import qa_tools.common.changelog`,
+  but `run_pipeline.sh`/`deploy-pages.yml` both invoked it as a bare
+  `python3 dashboard/embed_dashboard_data.py` - which puts only
+  `dashboard/` on `sys.path`, not the repo root, so the import would
+  fail. Fixed by switching both to `python3 -m dashboard.embed_
+  dashboard_data` (matching how `dashboard/check_dashboard_renders.py`/
+  `dashboard/snapshot_dashboard.py` were already correctly invoked) -
+  `run_pipeline.sh`'s own `snapshot_dashboard.py` call switched the same
+  way for consistency, though it didn't strictly need to yet.
+
+  Verified for real: a headless-Chromium check confirming the panel
+  opens, shows the 2 real entries with correct relative/absolute
+  timestamps and the BDM entry's real ~19-minute QA-to-publish gap,
+  Escape closes it, and the template's own placeholder (`CHANGELOG_FEED
+  = []`) renders a real "no activity yet" empty state rather than
+  crashing. New `tests/test_embed_dashboard_data.py` covers the
+  merge/label/sort/cap logic in isolation (monkeypatched
+  `build_changelog`, not real git/qa_results access). Full `uv run
+  pytest` (175 passed) and `uv run ruff check .` clean.
 - **Phase 5b (Thread D) - retired checks default out of the
   current-status view, with a toggle to bring them back.** Column
   drawer + overall summary. Independent of the other 3 sub-phases -

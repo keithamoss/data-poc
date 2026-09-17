@@ -318,6 +318,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
       <button class="snapshots-btn" id="asof-btn" type="button">📅 As of: <span id="asof-btn-label">…</span></button>
+      <button class="snapshots-btn" id="activity-btn" type="button">📋 Recent activity</button>
       <button class="snapshots-btn" id="snapshots-btn" type="button">🕐 Past snapshots</button>
       <div class="live"><span class="dot"></span><span id="clock-text">Live · updated moments ago</span></div>
     </div>
@@ -406,6 +407,27 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
       <button class="link-btn" id="asof-reset-btn" type="button">Reset to default (<span id="asof-default-label"></span>)</button>
     </div>
   </div>
+</aside>
+
+<!-- Phase 5a (Thread A, plans/publishing-and-history.md) - the global
+     "who published what, when" activity feed. Same interaction pattern
+     as "Past snapshots" above (a header button opening a side panel),
+     deliberately reused rather than inventing a new one - but a
+     genuinely different thing: this is a live view over the current
+     dashboard's own real committed history, not an archive of a past
+     render. One global feed across every real dataset, not per-dataset
+     (matches the original ask: "who's committed/pushed what dataset's
+     QA recently" as a single cross-cutting view). -->
+<div class="backdrop" id="activity-backdrop"></div>
+<aside class="drawer" id="activity-panel" aria-hidden="true">
+  <div class="drawer-head">
+    <div>
+      <div class="legend-key" style="margin:0 0 4px;">Publish history</div>
+      <h3>Recent activity</h3>
+    </div>
+    <button class="drawer-close" id="activity-panel-close" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body" id="activity-panel-body"></div>
 </aside>
 
 <script>
@@ -499,6 +521,21 @@ function checkStatus(check){ if(check.current>check.fail) return "red"; if(check
    three consts above. Real value: 60 (as of this file's own last
    edit - the template's own placeholder is never the real number).
 
+   CHANGELOG_FEED — Phase 5a's "📋 Recent activity" panel (Thread A,
+   plans/publishing-and-history.md): "who published what, when" -
+   built from qa_tools/common/changelog.py's build_changelog(), called
+   once per real dataset scope (Birth Registrations; Child Protection's
+   whole collection, not once per table, since a real run QAs and
+   commits all 6 CP tables together as one event) and merged, by
+   dashboard/embed_dashboard_data.py - same "placeholder here, real
+   data only in the built output" treatment as everything else on this
+   page. Each entry: {agency, dataset, label, run_timestamp, run_by,
+   commit_sha, committed_at} - run_timestamp is when the QA itself ran,
+   committed_at is when it actually landed on the shared branch (can
+   genuinely differ - see that module's own docstring for why
+   committed_at can't be safely self-recorded at commit time). Sorted
+   newest-committed-first, capped to the last 30 entries.
+
    A prior generation of this pipeline also ran four hand-written
    equivalent check engines (engines/*.py, built when the original
    session had no PyPI access) and merged their output with the real
@@ -511,6 +548,7 @@ const REAL_BIRTH_REG_DATA = null;
 const REAL_CP_DATA = null;
 const SNAPSHOT_MANIFEST = [];
 const AS_OF_OFFSET_DAYS = null;
+const CHANGELOG_FEED = [];
 
 // Shared by Birth Registrations (a single dataset) and Child Protection
 // (6 datasets, one per table) - both are reshaped server-side into this
@@ -1758,6 +1796,80 @@ document.getElementById("snapshots-btn").addEventListener("click", openSnapshots
 document.getElementById("snapshots-backdrop").addEventListener("click", closeSnapshotsPanel);
 document.getElementById("snapshots-panel-close").addEventListener("click", closeSnapshotsPanel);
 
+// Phase 5a (Thread A) - the "Recent activity" publish-history feed.
+// CHANGELOG_FEED is already sorted newest-committed-first and capped
+// (dashboard/embed_dashboard_data.py's own _build_changelog_feed()) -
+// this just renders it, same "dumb template, data prep happens
+// server-side" split every other embedded const on this page follows.
+function fmtRelativeTime(isoString){
+  const then = new Date(isoString), now = new Date();
+  const mins = Math.round((now-then)/60000);
+  if(mins<1) return "just now";
+  if(mins<60) return `${mins} ${pluralize(mins,"minute")} ago`;
+  const hours = Math.round(mins/60);
+  if(hours<24) return `${hours} ${pluralize(hours,"hour")} ago`;
+  const days = Math.round(hours/24);
+  if(days<30) return `${days} ${pluralize(days,"day")} ago`;
+  return fmtDate(then);
+}
+function renderActivityPanel(){
+  const body = document.getElementById("activity-panel-body");
+  if(!CHANGELOG_FEED.length){
+    body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
+      No published QA activity yet — this feed is built from committed
+      qa_results/ history and real git commit history, so it fills in as
+      real pipeline runs (<code>qa_tools/bdm/orchestrate_bdm.py</code>,
+      <code>qa_tools/cp/orchestrate_cp.py</code>) get committed and pushed.
+    </div>`;
+    return;
+  }
+  const intro = `<div style="font-size:12.5px; color:var(--ink-muted); margin-bottom:14px;">
+    Who published QA results for which dataset, and when — the last
+    ${CHANGELOG_FEED.length} ${pluralize(CHANGELOG_FEED.length,"event")}, newest first.
+    "Published" is when the results actually landed on the shared branch,
+    which can be meaningfully later than when the QA itself ran.
+  </div>`;
+  // A gap only gets its own line when it's actually notable (≥5 min) -
+  // for the common case (someone runs the pipeline and pushes within a
+  // couple of minutes) showing a near-zero gap would just be noise, not
+  // the "QA'd today but not published for days" signal this exists for.
+  const rows = CHANGELOG_FEED.map(e=>{
+    const committedText = e.committed_at
+      ? `${fmtRelativeTime(e.committed_at)} (${fmtDate(new Date(e.committed_at))})`
+      : "commit not found in this checkout's history";
+    let gapNote = "";
+    if(e.committed_at && e.run_timestamp){
+      const gapMins = Math.round((new Date(e.committed_at)-new Date(e.run_timestamp))/60000);
+      if(gapMins>=5){
+        const gapText = gapMins<60 ? `${gapMins} ${pluralize(gapMins,"minute")}`
+          : `${Math.round(gapMins/60)} ${pluralize(Math.round(gapMins/60),"hour")}`;
+        gapNote = ` · QA ran ${gapText} earlier`;
+      }
+    }
+    return `<div class="snapshot-row">
+        <div class="meta">
+          <div class="date">${e.label}</div>
+          <div class="sub">published by ${e.run_by} — ${committedText}${gapNote}</div>
+        </div>
+      </div>`;
+  }).join("");
+  body.innerHTML = intro + rows;
+}
+function openActivityPanel(){
+  renderActivityPanel();
+  document.getElementById("activity-backdrop").classList.add("open");
+  document.getElementById("activity-panel").classList.add("open");
+  document.getElementById("activity-panel").setAttribute("aria-hidden","false");
+}
+function closeActivityPanel(){
+  document.getElementById("activity-backdrop").classList.remove("open");
+  document.getElementById("activity-panel").classList.remove("open");
+  document.getElementById("activity-panel").setAttribute("aria-hidden","true");
+}
+document.getElementById("activity-btn").addEventListener("click", openActivityPanel);
+document.getElementById("activity-backdrop").addEventListener("click", closeActivityPanel);
+document.getElementById("activity-panel-close").addEventListener("click", closeActivityPanel);
+
 // Thread C - as-of date picker. rebuildData() throws the current DATA
 // away and rebuilds it from scratch against the new date (see buildData()
 // above), the same "no leftover state" approach navigate() already uses -
@@ -1804,6 +1916,7 @@ document.addEventListener("keydown", (e)=>{
   if(e.key!=="Escape") return;
   if(document.getElementById("snapshots-panel").classList.contains("open")) closeSnapshotsPanel();
   else if(document.getElementById("asof-panel").classList.contains("open")) closeAsOfPanel();
+  else if(document.getElementById("activity-panel").classList.contains("open")) closeActivityPanel();
   else if(STATE && STATE.checkKey) closeCheckPanel();
   else closeDrawer();
 });

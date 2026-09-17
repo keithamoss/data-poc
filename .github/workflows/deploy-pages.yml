@@ -159,7 +159,7 @@ jobs:
           uv run python3 -m pipeline.build_cp_dashboard_data
 
       - name: Embed real data into the dashboard
-        run: uv run python3 dashboard/embed_dashboard_data.py
+        run: uv run python3 -m dashboard.embed_dashboard_data
 
       - name: Gate - check-lifecycle validation (Thread D)
         run: uv run python3 -m qa_tools.common.validate_check_lifecycle
