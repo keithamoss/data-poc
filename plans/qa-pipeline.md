@@ -3782,6 +3782,22 @@ relative, not a schedule — this is weeks of work, not months.
     already renders, no status pill at all) to have a real conversation
     about before building anything, not a decision made here.
 
+70. **[parked, 2026-09-17 - Keith's own call: resume after Phase 6, same
+    as items 66/68]** Real UI bug, logged not fixed: the SLA tile's
+    text (the "SLA"/cadence-label value and the "Delivery format" value,
+    `.sla-tile .v` in `dashboard/qa-reporting-dashboard.template.html`)
+    renders as a generic serif font (looks like Times New Roman) instead
+    of the intended "Source Serif 4". Likely cause, not yet confirmed -
+    `.sla-tile .v`'s `font-family:"Source Serif 4",serif;` (line ~198)
+    has no intermediate fallback before the bare `serif` generic (unlike
+    `h1-h4`'s `"Source Serif 4", Georgia, serif`), so if the self-hosted
+    `@font-face` (`fonts/source-serif-4.woff2`) fails to load for any
+    reason, this is the one place on the page with nothing readable
+    between the real font and a raw OS default. Not investigated further
+    yet - why the font itself might be failing to load (a real asset
+    problem) is a separate question from the missing-fallback pattern
+    (a real defensive-CSS gap, present regardless of the root cause).
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
