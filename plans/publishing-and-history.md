@@ -2417,6 +2417,67 @@ plowing through... do all of phase six" without further check-ins:
   different toolchain, `actions/setup-node@v4` + `npm ci` + `npm test`).
   `CLAUDE.md` gained a `tests-js/` layout-table entry and a pointer from
   the testing-conventions bullet; `.gitignore` gained `node_modules/`.
+- **Step 6 (Playwright e2e user-flow tests) - DONE.** `pytest-playwright`
+  added as a dev dependency (its own `page` fixture - sync API, no
+  `pytest-asyncio` needed, unlike `check_dashboard_renders.py`'s own
+  `async_playwright` usage). `tests/test_dashboard_e2e.py`'s
+  `built_dashboard_html` fixture runs the exact same real, CI-safe build
+  chain `deploy-pages.yml` itself runs (`qa_tools.{bdm,cp}.
+  build_results_from_history` -> `pipeline.build_{,cp_}dashboard_data`
+  -> `dashboard.embed_dashboard_data`, via real subprocess calls to each
+  module, matching that workflow's own steps rather than reimplementing
+  their `__main__` write-to-file logic) - session-scoped, built once,
+  reused by every test. A shared `clean_page` fixture wraps
+  pytest-playwright's own `page` and asserts zero real console errors/
+  uncaught exceptions in ITS OWN teardown, so every test gets that bar
+  for free, not just one dedicated test - Keith's own confirmed design.
+  5 tests, all passing: `TestBuiltDashboardRenders` (`#view` populated,
+  zero console errors - absorbs `check_dashboard_renders.py`'s
+  built-output half) and the sibling `test_raw_template_renders_with_
+  zero_console_errors` (the raw-template-with-mock-data scenario,
+  deliberately its own explicit test - a suite built only against the
+  real built output wouldn't otherwise cover this path);
+  `TestAsOfDatePicking` (a date computed as 1000 days before the
+  EARLIEST real committed run - read from `qa_results/` at test time
+  via `qa_results_reader`, never hardcoded, so it can't go stale as
+  history grows - shows a real "No data" pill); `TestSupplyHistoryDrillDown`
+  (clicking a real supply-history row sets the URL's `asof=<that run's
+  date>` - a first version picked whichever row rendered first and hit
+  a real edge case, a run genuinely dated "today" in this environment,
+  where `setAsOfInUrl()` deliberately OMITS the `asof` param when it
+  equals `DEFAULT_AS_OF` - fixed by picking a row whose date isn't
+  today, not by weakening the assertion); `TestDarkModeToggle` (toggle,
+  reload, same theme persists via `localStorage`).
+
+  Environment note, not a design decision: this sandboxed dev
+  environment pre-installs a version-pinned Chromium at a fixed path
+  Playwright's own default resolution doesn't find (a real, reproduced
+  failure - `BrowserType.launch: Executable doesn't exist at .../
+  chromium_headless_shell-1234/...`, version mismatch between the
+  installed browser and what this Playwright version expects) -
+  `tests/conftest.py` gained a `browser_type_launch_args` override that
+  adds `executable_path` ONLY when `PLAYWRIGHT_CHROMIUM_PATH` is set,
+  the same escape hatch `check_dashboard_renders.py` already had for
+  this exact situation - a no-op on a real contributor machine or CI
+  (both run `uv run playwright install chromium` normally).
+  `.github/workflows/test.yml`'s `test` job gained that install step.
+
+  **Deliberately NOT done**: folding `check_dashboard_renders.py`'s own
+  CI step out of `deploy-pages.yml`, even though the new suite now
+  covers the same real-browser ground. That script is the actual
+  pre-publish gate for a public site - judged too risky to remove or
+  restructure unsupervised, on a design point ("likely folds into this
+  same suite") that was tentative, not a firm instruction. Left as
+  deliberate, explained redundancy: both now check the built output
+  renders cleanly, which is safe overlap, not a gap. Revisit with Keith
+  if it's ever worth actually merging the two.
+
+**All of Phase 6 is now DONE** (steps 1-6, plus the scoping pass
+itself) - see each step's own write-up above for what was built. What's
+left, if ever revisited: `synthetic_data_generator/` test coverage
+(deliberately parked, not part of Phase 6 - `plans/wider.md`'s own
+action item), and the "deliberately NOT done" `check_dashboard_renders.py`
+folding question just above.
 
 ## Doc updates needed once this starts landing
 

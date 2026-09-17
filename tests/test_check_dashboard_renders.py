@@ -1,7 +1,14 @@
 """Tests for dashboard/check_dashboard_renders.py's structural check
 (the embedded-JSON half of Phase 3's CI gate) - not the real-browser
-render half, which needs an actual Chromium and is exercised by hand/
-in CI itself, not worth mocking a browser for here."""
+render half. That half now IS covered under pytest, just not in this
+file: tests/test_dashboard_e2e.py's TestBuiltDashboardRenders/
+test_raw_template_renders_with_zero_console_errors (Phase 6 step 6,
+plans/publishing-and-history.md) cover the same real-browser ground
+this script's own _check_render() does, as a side effect of that
+suite's real user-flow tests. check_dashboard_renders.py itself is
+left in place as deploy-pages.yml's own separate pre-publish gate
+rather than folded away - see that test module's own docstring and
+the step 6 write-up for why."""
 from __future__ import annotations
 
 from dashboard import check_dashboard_renders as cdr

@@ -20,12 +20,29 @@ real output" requires actually running the real tool."""
 from __future__ import annotations
 
 import json
+import os
 from datetime import date
 
 import pytest
 
 from generator.daily_batch import generate_daily_batch
 from generator.dirty import apply_birth_registrations_presets
+
+
+@pytest.fixture(scope="session")
+def browser_type_launch_args(browser_type_launch_args):
+    """pytest-playwright's own launch-args fixture, extended with the
+    same PLAYWRIGHT_CHROMIUM_PATH escape hatch dashboard/
+    check_dashboard_renders.py already uses - some sandboxed dev
+    environments pre-install a version-pinned Chromium at a fixed path
+    that Playwright's own default channel/download lookup won't find.
+    Unset everywhere else (a real contributor machine or CI runner,
+    both of which run `uv run playwright install chromium` per
+    pyproject.toml's dev dependency group), so this is a no-op there."""
+    chromium_path = os.environ.get("PLAYWRIGHT_CHROMIUM_PATH")
+    if not chromium_path:
+        return browser_type_launch_args
+    return {**browser_type_launch_args, "executable_path": chromium_path}
 
 # Real, calibrated defect injection (generator/dirty.py's own "severity:
 # 'amber' or 'red' - matches the warn/fail bands ... exactly" contract)

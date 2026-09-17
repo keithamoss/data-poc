@@ -135,7 +135,18 @@ Rough layout:
   config.js` at repo root, `npm ci` once after cloning), covers the
   dashboard template's own inline JS - see `tests-js/`'s own table entry
   above. Touching `dashboard/qa-reporting-dashboard.template.html`
-  itself should run both.
+  itself should run both, PLUS `tests/test_dashboard_e2e.py` (Phase 6
+  step 6, 2026-09-17) - real Playwright browser tests (as-of date
+  picking, supply-history drill-down, dark mode persistence, plus the
+  raw-template-with-mock-data render check absorbed from `dashboard/
+  check_dashboard_renders.py`), included in `uv run pytest`'s normal
+  run once `uv run playwright install chromium` has been done (same
+  one-time step this project's other Playwright-based tools already
+  need - see that dev dependency's own comment in `pyproject.toml`).
+  These build the real dashboard first (the same CI-safe chain
+  `deploy-pages.yml` runs - committed `qa_results/` history only, never
+  `data/`), so expect this one test module to take longer than the rest
+  of the suite.
 - **CI (and any "read committed history" code path - `qa_tools/*/
   build_results_from_history.py`, `pipeline/build_*_dashboard_data.py`)
   must never depend on live data access, real or synthetic.** Not "must

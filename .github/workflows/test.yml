@@ -38,6 +38,19 @@ name: Run test suite
 # parallel (independent toolchains, uv vs npm, no shared state) and a
 # JS-only failure is immediately visibly distinct from a Python one in
 # the Actions UI.
+#
+# Phase 6 step 6 (2026-09-17): tests/test_dashboard_e2e.py adds real
+# Playwright browser tests (as-of date picking, supply-history
+# drill-down, dark mode persistence, plus the raw-template-with-mock-
+# data render check absorbed from dashboard/check_dashboard_renders.py -
+# see that test module's own docstring), so this job now also installs
+# Chromium (same step deploy-pages.yml already runs). deploy-pages.yml's
+# own check_dashboard_renders.py CI gate step is intentionally left in
+# place rather than removed - it's the actual pre-publish gate for a
+# public site, and folding it into this suite instead was judged too
+# risky to do unsupervised (see plans/publishing-and-history.md's step
+# 6 write-up for the reasoning) - the two now overlap in what they
+# cover, which is redundant but safe, not a gap.
 
 on:
   push:
@@ -59,6 +72,9 @@ jobs:
 
       - name: Sync dependencies
         run: uv sync --dev
+
+      - name: Install Playwright's Chromium
+        run: uv run playwright install --with-deps chromium
 
       - name: Run test suite
         run: uv run pytest --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov-report=term-missing
