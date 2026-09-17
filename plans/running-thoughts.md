@@ -236,3 +236,42 @@ lower-risk change and probably the right first cut. The existing
 real query-string params with the hash - whatever scheme is chosen
 should keep that working too, not just the tier/agency/dataset
 navigation.
+
+### 10. Expose the planning markdown files in the dashboard (MVP)
+
+Keith's own words: he'd like the `plans/*.md` files themselves
+browsable inside the dashboard, not just on GitHub/locally. His own
+framing already anticipates this isn't a simple "embed the raw
+markdown" job: "that'll probably involve a bit more work to like break
+them up and give them statuses and yeah, a bit more rich information so
+I can kind of like look at them." Real, current shape of the source
+material, worth having in mind before scoping: these files are long,
+prose-heavy, chronological narrative logs of numbered items (`wider.md`
+action N, `qa-pipeline.md` item N, etc.), each hand-tagged inline with a
+free-text status marker (`[done]`/`[todo]`/`[parked]`/`[investigate]`/
+`[fixed, <date>]`/`[decided + built, <date>]` and more - never a closed,
+consistent enum) - not a structured, queryable data model today. A real
+MVP would likely need either (a) a lightweight parser that extracts
+each numbered item plus its bracketed status tag as structured data
+(similar in spirit to `dashboard/changelog_md.py`'s narrow line-based
+`CHANGELOG.md` parser), which only works if those bracketed tags get
+made consistent enough to parse reliably (they're currently free text,
+written for a human reader in the moment, not a fixed vocabulary), or
+(b) a real restructuring of how these files are authored going forward
+(a stricter, more consistent status vocabulary, maybe even one
+item/decision per file or a lightweight front-matter block) - a much
+bigger, more consequential change to how this project's own memory gets
+written, not just how it gets displayed. Worth scoping which of those
+two directions (parse-what-exists vs. change-how-it's-written) before
+building anything, since they have very different costs and very
+different effects on every future session's own workflow, not just the
+dashboard's.
+
+Related to, but distinct from, item #7 (a live business-requirements/
+MoSCoW page): #7 is about a NEW structured data model for requirements/
+acceptance criteria that doesn't exist yet; this item is about surfacing
+the EXISTING planning memory (`plans/*.md`) that already drives every
+session's own work. They could plausibly share UI/rendering
+infrastructure once both exist, but are two separate asks with two
+separate scoping conversations - don't conflate them when either comes
+up for real.
