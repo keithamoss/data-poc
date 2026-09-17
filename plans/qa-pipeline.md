@@ -2944,6 +2944,31 @@ relative, not a schedule — this is weeks of work, not months.
     left for a dedicated pass once Phase 5's current sub-phases (5b/5c/5d)
     are done, per Keith's "flag for work at the end of this phase."
 
+61. **[parked, 2026-09-17 - flagged for the end of this phase, Keith's
+    own call]** Actually fix the root cause behind item 56's "always-1"
+    checks, rather than continuing to work around them. Item 56's
+    follow-up found three of `date_of_birth`'s red BDM checks - dbt's
+    `dbt_utils.recency` test, Soda's matching freshness check, and
+    datacontract-cli's `custom_sql` equivalent - are constant at exactly
+    `1` (i.e. permanently failing) across all 176 real runs, because
+    each compares real wall-clock `CURRENT_DATE` against this fixture's
+    simulated historical `date_of_birth` values (documented as a known
+    limitation in `dbt_project/models/staging/schema.yml`'s own comment
+    at the time). `pickRepresentativeCheck()` was built to route the
+    sparkline around these checks rather than fix them, which was the
+    right call for that specific bug at the time - it's a display-layer
+    fix, not this one. The real problem persists underneath: any check
+    genuinely built as "how stale is this relative to right now" can't
+    produce a meaningful/varying result when replayed against fixed
+    historical dates compared to the *actual* today. Not scoped yet -
+    the honest fix likely means changing what "now" means for these
+    checks when running against historical fixture data (e.g. anchoring
+    freshness against each run's own simulated "as of" date rather than
+    real wall-clock time), which touches how the checks are defined in
+    all three tools (dbt, Soda, datacontract-cli), not just the
+    dashboard. Needs real design thought before building - picking up
+    alongside item 60 at the end of this phase.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
