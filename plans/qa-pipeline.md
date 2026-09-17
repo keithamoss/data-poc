@@ -3508,6 +3508,119 @@ relative, not a schedule — this is weeks of work, not months.
     `arrivalStatus` is computed from real timestamps, not `max_lag_
     hours`) and `uv run ruff check .` both clean.
 
+66. **[investigate, 2026-09-17]** Explore the real ODCS contract format
+    more thoroughly - Keith's own ask, after Phase 5j's `slaProperties:`
+    work turned up a mechanism (a real, well-defined SLA property shape)
+    neither of us knew was there beforehand: "what else does ODCS have
+    that we're not using yet, and is any of it worth adopting." Read the
+    real ODCS 3.2.0 JSON Schema this repo's own `datacontract-cli`
+    dependency ships (`.venv/lib/python3.11/site-packages/datacontract/
+    schemas/odcs-3.2.0.schema.json` - not the general web spec, the exact
+    schema our real tool validates against) end to end and diffed it
+    against what both real contracts (`contract/bdm-birth-registrations-
+    contract.yaml`, `contract/child-protection-contract.yaml`) currently
+    use. Currently used: `apiVersion`, `id`, `kind`, `name`, `version`,
+    `status`, `domain`, `description`, `schema` (with `quality:` using
+    the `library` (`metric:`) and `sql` types), `servers`, `team`,
+    `support`, `slaProperties`, `customProperties` (our own check-
+    lifecycle metadata, per `qa_tools/common/check_lifecycle.py`).
+    Analysis only below - nothing built yet, no priority order implied
+    by the list ordering; a real discussion with Keith on what's worth
+    the build effort is the actual next step, not a to-do list to just
+    start working through.
+
+    **Worth a real look, roughly most to least interesting:**
+
+    - **`relationships:`** (`SchemaObject`/`SchemaBaseProperty` level) -
+      a real, formal foreign-key declaration shape (`from`/`to`/`type`,
+      default `type: foreignKey`), completely separate from `quality:`.
+      Child Protection's real cross-table FK checks (client_id across
+      `cp_notifications`/`cp_investigations`/`cp_placements` etc.) exist
+      today only as hand-written dbt singular tests / Soda checks with
+      no contract-level statement that the relationship itself exists -
+      this would give the dashboard something real to render (an
+      ER-diagram-ish relationship list per dataset) and check_lifecycle
+      metadata a more natural anchor than a singular test's file name.
+    - **`quality.type: "custom"`** (`engine` + `implementation`, with
+      `engine` examples including `"dbt"`/`"soda"` by name in the real
+      schema) - ODCS's own quality rules already support REFERENCING an
+      external tool's check rather than only encoding `library`/`sql`
+      rules natively. Right now this repo's real quality logic is
+      authored 4 separate times per check (dbt `schema.yml`, Soda
+      `checks.yml`, the contract's own `quality:` block, Evidently) with
+      `check_lifecycle.py` gluing them together via a shared `check_id`
+      after the fact. A `type: custom, engine: dbt` entry pointing at
+      the real dbt test name (or `engine: soda` at the real Soda check)
+      could make the contract the single authoring surface that NAMES
+      every check across all 4 tools, rather than 4 independent places
+      that happen to agree - a genuinely bigger change than anything in
+      this list, not a quick win, but the most structurally interesting
+      one: it's closer to "the contract as source of truth" than what
+      exists today.
+    - **SLA `schedule`/`scheduler`** (cron string + scheduler name,
+      already a real field on `ServiceLevelAgreementProperty` - example
+      given in the schema itself: `schedule: "0 20 * * *"`) - Phase 5j's
+      own cadence work (`pipeline/cadence.py`) invented custom
+      `slaProperties` property names (`cadenceType`, `cadenceWeekday`,
+      `cadenceAnchorMonths`, `cadenceDayOfMonth`, `expectedTime`,
+      `latency`) rather than using this. Real trade-off, not a clear
+      win either way: a cron string is standard, tool-portable, and
+      what a real scheduler config would actually look like - but
+      `cycle_start()`/`cycleStartDate()`'s daily/weekly/quarterly-with-
+      anchor-months logic is arguably clearer to read and test as
+      explicit fields than as a cron expression a human then has to
+      mentally parse, and cron doesn't natively express "quarterly on
+      the 1st of Feb/May/Aug/Nov" without a periodic day-of-year hack.
+      Also worth noting: the real schema's own recommended top-level
+      `property` values (from its `odcs-3.2.0.init.yaml` example) are
+      `latency`/`availability`, not the custom `cadenceType`-style names
+      Phase 5j used - a real, if minor, non-standardness worth being
+      aware of even if the custom shape is kept.
+    - **`context:`** (RFC-0038, "AI and semantic context block" - free-
+      text `instructions` plus a `verifiedStatements` array of canonical
+      Q&A pairs, at contract level or per-`SchemaObject`) - directly on-
+      theme for a QA dashboard: could seed a real "how to interpret this
+      dataset" panel from genuinely-authored, verified facts, or (more
+      speculatively) ground some future "ask a question about this
+      dataset" feature in something other than the raw check data.
+      Nobody's asked for either yet - flagged because it's new enough
+      (RFC-0038) that it's easy to have missed entirely, not because
+      there's a concrete use case identified.
+    - **`authoritativeDefinitions:`** (link-outs to external definitions
+      - glossary, git repo, data catalog, training video, etc., at
+      contract/schema-element/team/SLA level) - could point each real
+      dataset at this repo's own `README.md`/`generator/` source, or a
+      future real data catalog entry, surfaced as a "Learn more" section
+      on the dataset page.
+    - **`classification`/`criticalDataElement`** (`SchemaBaseProperty`
+      level - "confidential"/"restricted"/"public" etc., already a real
+      field neither contract sets on any column despite BDM/CP both
+      carrying genuinely PII-shaped columns like `child_given_names`/
+      `deceased_given_names`) - could drive a "sensitive data" badge on
+      the dashboard's column tiles, independent of pass/fail status.
+    - **`tags:`** (contract level, `SchemaElement` level, `Team`/
+      `TeamMember` level) - a real cross-cutting axis the dashboard
+      doesn't have today (grouping is purely structural: agency >
+      collection > dataset). Could power filtering/search across the
+      agency tree instead of only browsing the fixed hierarchy.
+    - **`roles:`** (named IAM roles with `access` type + first/second-
+      level approvers) - adjacent to the `team`/`support` blocks already
+      used; could back a real "who has access, and who approves it"
+      panel per dataset.
+
+    **Looked at, probably not worth it for this PoC:** `price`/
+    `Pricing` (subscription pricing - this isn't a data marketplace);
+    `tenant` (multi-tenant property association - not a concept this
+    single-agency-per-dataset PoC has); `synonyms:` (business-glossary
+    aliases - genuinely nice for a data-literacy feature, but nothing
+    in this PoC currently surfaces column names to a non-technical
+    audience where a synonym would help); the top-level `status` enum
+    (`proposed`/`draft`/`active`/`deprecated`/`retired`) - real, but at
+    dataset-lifecycle granularity, not the check-lifecycle granularity
+    `check_lifecycle.py` already tracks in detail; noting it exists in
+    case a future "is this whole dataset still supported" view is ever
+    wanted, but nothing asks for that today.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
