@@ -2366,6 +2366,57 @@ plowing through... do all of phase six" without further check-ins:
   push. `CLAUDE.md`'s testing-convention bullet updated too - it had
   gone stale ("fast smoke tests... ~3s for 13 tests") the moment step
   2's real-tool integration tests landed (now ~2-3 minutes, 270 tests).
+- **Step 5 (dashboard JS tests, Vitest) - DONE.** The concrete question
+  this step was scoped around - how does the template's own inline
+  `<script>` logic (no module system, ~2,500 lines, hand-authored,
+  edited directly per `CLAUDE.md`'s own description) get imported into a
+  test file at all - resolved to: it doesn't need to be imported, it
+  needs to be RUN, the same way a browser runs it. `tests-js/support/
+  loadDashboard.js` loads the real, committed template into a real
+  jsdom `Window` via `runScripts:"dangerously"`, which executes both
+  inline `<script>` blocks in document order against the template's own
+  real markup (the theme button, panels, etc. all already exist in that
+  markup - no synthetic DOM stubbing needed beyond `matchMedia`/
+  `scrollTo`, two real jsdom "not implemented" gaps, not page bugs).
+  Every top-level `function foo(){}` declaration becomes a plain
+  `window.foo` property this way (true in any non-module browser
+  script, not a jsdom quirk) - confirmed against the real template
+  before committing to this approach (a throwaway probe script), not
+  assumed. Zero changes to the template itself - the single-file
+  hand-authored source stays exactly that, structurally impossible to
+  accidentally couple to a test-only module system. Only `const`/`let`
+  top-level bindings (`REAL_BIRTH_REG_DATA`, `STATE`, etc.) stay
+  unreachable this way, same as in a real browser - tests that need to
+  observe those go through the DOM/URL hash instead, not a direct
+  reference (see `tests-js/navigation.test.js`'s own comments on this).
+  New toolchain, `package.json`/`package-lock.json`/`vitest.config.js`
+  at repo root, `npm test` to run, genuinely separate from the Python
+  side (no coverage threshold set here - this step's scope was the 4
+  named areas below, not full-suite parity with `pytest-cov`). 45 tests
+  across 5 files: `tests-js/dashboard-loads.test.js` (the raw-template-
+  with-mock-data scenario itself, including a real "zero console
+  errors" assertion - the same bar `check_dashboard_renders.py` already
+  holds the BUILT output to), `cadence.test.js` (`cadenceLabel`/
+  `cycleStartDate`/`cycleLabel`/`addDaysToDateStr` - the JS-side mirror
+  of `pipeline/cadence.py`'s `cycle_start()`), `status-rollups.test.js`
+  (`checkStatus`/`worstOf`/`rollupStatuses`/`rollup` - including the
+  "nodata" special case, STATUS_ORDER's own "must never win a worstOf()
+  reduce... must never silently vanish one level up"), `navigation.
+  test.js` (`stateToHash`/`hashToState` round-tripping, plus a real
+  `navigate()` call driving the actual DOM through jsdom - hash update,
+  rail breadcrumb text, exec-grid removal, `resolveContext()` resolving
+  the exact real dataset), and `supply-history.test.js`
+  (`buildSupplyHistory()`/`rowCountAtRun()` - cycle grouping, newest-
+  first ordering within a cycle, resupply attempts as sibling entries
+  not nested children, per Keith's own confirmed Stage 2 answer). All
+  45 passed on first real run (unlike step 2's BDM/CP batches, no
+  test-authoring bugs surfaced here - these are pure functions with
+  behaviour read directly from source before each assertion was
+  written, not assumed). `.github/workflows/test.yml` gained a second,
+  independent `js-tests` job (parallel to the Python `test` job -
+  different toolchain, `actions/setup-node@v4` + `npm ci` + `npm test`).
+  `CLAUDE.md` gained a `tests-js/` layout-table entry and a pointer from
+  the testing-conventions bullet; `.gitignore` gained `node_modules/`.
 
 ## Doc updates needed once this starts landing
 

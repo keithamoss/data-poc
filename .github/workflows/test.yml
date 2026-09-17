@@ -28,6 +28,16 @@ name: Run test suite
 # below it). --cov-report=term-missing here (not just the pass/fail
 # gate) so a real regression's own missing lines show up directly in
 # the workflow log, not just a bare percentage.
+#
+# Phase 6 step 5 (2026-09-17): a second, independent `js-tests` job runs
+# Vitest against the dashboard's own inline JS (tests-js/ - see that
+# directory's own tests-js/support/loadDashboard.js docstring for how a
+# hand-authored, no-module-system single-file template gets loaded into
+# a real jsdom Window with no changes to the template itself). A
+# separate job, not a step tacked onto `test` above, so the two run in
+# parallel (independent toolchains, uv vs npm, no shared state) and a
+# JS-only failure is immediately visibly distinct from a Python one in
+# the Actions UI.
 
 on:
   push:
@@ -52,3 +62,21 @@ jobs:
 
       - name: Run test suite
         run: uv run pytest --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov-report=term-missing
+
+  js-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run dashboard JS test suite
+        run: npm test
