@@ -3782,21 +3782,36 @@ relative, not a schedule — this is weeks of work, not months.
     already renders, no status pill at all) to have a real conversation
     about before building anything, not a decision made here.
 
-70. **[parked, 2026-09-17 - Keith's own call: resume after Phase 6, same
-    as items 66/68]** Real UI bug, logged not fixed: the SLA tile's
-    text (the "SLA"/cadence-label value and the "Delivery format" value,
-    `.sla-tile .v` in `dashboard/qa-reporting-dashboard.template.html`)
-    renders as a generic serif font (looks like Times New Roman) instead
-    of the intended "Source Serif 4". Likely cause, not yet confirmed -
-    `.sla-tile .v`'s `font-family:"Source Serif 4",serif;` (line ~198)
-    has no intermediate fallback before the bare `serif` generic (unlike
-    `h1-h4`'s `"Source Serif 4", Georgia, serif`), so if the self-hosted
-    `@font-face` (`fonts/source-serif-4.woff2`) fails to load for any
-    reason, this is the one place on the page with nothing readable
-    between the real font and a raw OS default. Not investigated further
-    yet - why the font itself might be failing to load (a real asset
-    problem) is a separate question from the missing-fallback pattern
-    (a real defensive-CSS gap, present regardless of the root cause).
+70. **[investigated + defensive fix applied, 2026-09-17 (Phase 7) - the
+    ORIGINAL "looks like Times New Roman" report could NOT be
+    reproduced]** Real investigation, not a guess: loaded the real
+    template in a real headless browser (Playwright) and checked
+    `document.fonts` directly against `.sla-tile .v` (the "SLA"/
+    cadence-label and "Delivery format" tiles). The self-hosted
+    `Source Serif 4` `@font-face` (`fonts/source-serif-4.woff2`, a
+    genuinely valid 122KB woff2 file, magic bytes confirmed) reports
+    `status:"loaded"`, `document.fonts.check('600 16px "Source Serif
+    4"')` returns `true`, and `getComputedStyle(el).fontFamily` on the
+    live tile correctly resolves to `"Source Serif 4", serif` - the
+    font genuinely loads and the browser genuinely prioritizes it. A
+    screenshot alongside the `<h1>` (same font, same weight) shows no
+    visible difference either. So item 70's own "likely cause, not yet
+    confirmed" theory - the missing `Georgia` intermediate fallback
+    (unlike `h1-h4`'s `"Source Serif 4", Georgia, serif`) causing a
+    fallback-to-generic-serif render - does NOT hold up: there's
+    nothing to fall back FROM here, the primary font loads fine every
+    time this was checked. The missing fallback was still a real,
+    if currently inert, defensive-CSS gap on its own terms (every other
+    serif use on the page has one, this didn't) - added anyway
+    (`.sla-tile .v` now reads `font-family:"Source Serif 4", Georgia,
+    serif;`, matching `h1-h4`), but this should NOT be read as "the bug
+    is fixed," since no reproducible bug was ever found to fix. If
+    Keith still sees the generic-serif look, it's something this
+    investigation didn't catch - a transient `font-display:swap` FOUC
+    at a moment this check didn't happen to catch, a specific browser/
+    OS/zoom combination, or something else entirely - worth a
+    screenshot or more specific repro steps next time it's seen, rather
+    than re-guessing at a cause from here.
 
 ## Held over from the original (equivalent-only) build
 
