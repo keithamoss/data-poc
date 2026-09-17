@@ -2482,42 +2482,62 @@ folding question just above.
 **Real gap found after the fact, 2026-09-17 (Phase 7) - Keith's own
 report: "the last GitHub Actions run failed."** Every single `test.yml`
 ("Run test suite") run had actually been failing since Phase 6 step 2
-landed - CI's own resolved Python version silently diverged from what
-every local verification this whole session used. `pyproject.toml`'s
-`requires-python = ">=3.11"` has no upper bound and no `.python-version`
-file existed, so `uv sync` picked whatever newest-compatible Python the
-`ubuntu-latest` runner happened to offer - Python 3.12 - while every
-local run in this session (and the sandbox's own system Python) was
-3.11.15. Two real incompatibilities only show up on 3.12: Soda Core's
-own `soda/common/env_helper.py` does `from distutils.util import
+landed - TWO genuinely separate real bugs, not one, both invisible
+locally the entire time.
+
+**Bug 1 - Python version drift.** CI's own resolved Python version
+silently diverged from what every local verification this whole
+session used. `pyproject.toml`'s `requires-python = ">=3.11"` has no
+upper bound and no `.python-version` file existed, so `uv sync` picked
+whatever newest-compatible Python the `ubuntu-latest` runner happened
+to offer - Python 3.12 - while every local run in this session (and
+the sandbox's own system Python) was 3.11.15. Soda Core's own
+`soda/common/env_helper.py` does `from distutils.util import
 strtobool` - `distutils` was removed from the stdlib in 3.12, so every
-Soda-based test failed with `ModuleNotFoundError`; and the real `dbt
-build` subprocess (same likely root cause, dbt-core/dbt-duckdb under
-3.12) silently failed to write `target/manifest.json` at all, so every
-dbt-based test failed with a real `FileNotFoundError` trying to read
-it. `deploy-pages.yml` (the actual site-publish gate) was NEVER
-affected - it only reads pre-committed `qa_results/` JSON, no real
-Soda import or dbt subprocess call, so the live site has been fine
+Soda-based test failed with `ModuleNotFoundError`. Fixed with the
+standard `uv` mechanism: a committed `.python-version` file pinning
+`3.11` (`uv python pin 3.11`).
+
+**Bug 2 - missing `dbt deps` in `test.yml` (initially misattributed to
+bug 1, confirmed separate by checking the ACTUAL CI run after bug 1's
+fix landed).** Every dbt-based test still failed with the exact same
+`FileNotFoundError` reading `target/<run_id>/manifest.json`, even once
+Python correctly resolved 3.11.16 in CI - proving it wasn't the Python
+version after all. Real root cause: `test.yml` never ran
+`uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/
+dbt_profiles` (README.md/CLAUDE.md's own documented one-time step,
+installs `dbt_utils` - several real checks use macros that package
+ships, not dbt-core itself, so `dbt build` won't even compile without
+it). `dbt_project/dbt_packages/` is gitignored, never committed, so
+every fresh CI checkout genuinely needs this - invisible locally
+because this sandbox already had it installed from earlier session
+work. Reproduced for real before fixing (moved `dbt_packages/` aside
+locally, got the identical error, ran `dbt deps`, confirmed it
+resolved) rather than guessed. Fixed by adding the step to `test.yml`.
+
+Neither bug ever touched `deploy-pages.yml` (the actual site-publish
+gate) - it only reads pre-committed `qa_results/` JSON, no real Soda
+import or dbt subprocess call at all, so the live site was fine
 throughout; only the newer pytest-based CI gate (Phase 6 step 1) was
 silently red, for the entire span this session's own local
-verification kept reporting green. Fixed with the standard `uv`
-mechanism: a committed `.python-version` file pinning `3.11` (`uv
-python pin 3.11`), so `uv sync` resolves the same interpreter
-everywhere - locally, in `test.yml`, and in `deploy-pages.yml` (was
-already unaffected, now pinned too for consistency). Confirmed the
-real cause locally first (Python 3.11.15's own `distutils` still
-exists, just deprecated - the same Soda import warns but succeeds) 
-before writing the fix, then pushed and watched the actual GitHub
-Actions run (not just local pytest) to confirm green - see this
-session's own transcript for the exact run checked. **Process note for
-future sessions**: a CI gate this project pushes to is only real
-enforcement if someone actually checks the Actions tab after pushing -
-this went unnoticed for 8 commits/2+ hours purely because local
-verification kept passing and nothing prompted a check of the actual
-run. Worth periodically confirming CI is still green, not just
-assuming a passing local suite implies a passing CI one, given they
-can silently diverge on environment details neither `pytest` nor `ruff`
-would ever surface.
+verification kept reporting green. Both fixes pushed as separate
+commits, each verified against the REAL GitHub Actions run (via the
+GitHub MCP tools, not just local pytest) before moving on - the first
+push (Python pin alone) was still red, which is exactly what surfaced
+bug 2 as genuinely separate rather than assuming one fix covered both.
+The final run (after both fixes) came back `conclusion: success`,
+confirmed by checking the API directly.
+
+**Process fix, not just the two point fixes**: Keith's own explicit
+ask - "think about how you fix the root cause of this, which is that
+you aren't actually monitoring the health of the CI action. You are
+just assuming - that's not good enough." `CLAUDE.md`'s conventions
+section now carries a standing rule: after every push that touches
+CI-relevant files, actually check the real GitHub Actions run (the
+GitHub MCP tools' `actions_list`/`get_job_logs`) before considering
+the work done - a passing local `uv run pytest` is a necessary check,
+never a sufficient one, since CI's environment can silently diverge on
+things neither `pytest` nor `ruff` would ever catch.
 
 ## Doc updates needed once this starts landing
 

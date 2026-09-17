@@ -147,6 +147,26 @@ Rough layout:
   `deploy-pages.yml` runs - committed `qa_results/` history only, never
   `data/`), so expect this one test module to take longer than the rest
   of the suite.
+- **A passing local `uv run pytest` is NOT evidence CI is green - after
+  pushing to this branch, actually check the real GitHub Actions run
+  (the GitHub MCP tools' `actions_list`/`get_job_logs`, or the Actions
+  tab) before calling the work done.** Real incident, 2026-09-17: every
+  `test.yml` run silently failed for 8+ commits/2+ hours (Phase 6 step
+  2 through the start of Phase 7) because GitHub's `ubuntu-latest`
+  runner resolved a different Python version than this session's local
+  sandbox (no `.python-version` existed yet), and separately because
+  `test.yml` never ran the documented one-time `dbt deps` step - both
+  invisible locally since the local environment didn't have either gap.
+  Keith caught it by checking the Actions tab himself, not because
+  anything here noticed. The fix for both was real and specific (a
+  committed `.python-version` pinning 3.11; the missing `dbt deps`
+  step), but the STANDING process fix is this bullet: local passing is
+  a necessary check, never a sufficient one, precisely because CI's
+  environment can silently diverge from local on things neither
+  `pytest` nor `ruff` would ever catch (interpreter version, one-time
+  setup steps a local session already had installed from earlier work,
+  etc.). Check the actual run after every push that touches CI-relevant
+  files, not just once in a while.
 - **CI (and any "read committed history" code path - `qa_tools/*/
   build_results_from_history.py`, `pipeline/build_*_dashboard_data.py`)
   must never depend on live data access, real or synthetic.** Not "must
