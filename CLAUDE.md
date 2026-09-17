@@ -185,7 +185,7 @@ Rough layout:
   setup steps a local session already had installed from earlier work,
   etc.). Check the actual run after every push that touches CI-relevant
   files, not just once in a while.
-  **Amended, 2026-09-18 (Keith's own explicit call): don't block on it.**
+  **Amended, 2026-09-17 (Keith's own explicit call): don't block on it.**
   The lesson above stands - a real, verified CI result is still required
   before calling CI-relevant work done, never just assumed from local
   `pytest` - but checking it is not a reason to sit idle waiting for a
@@ -195,6 +195,23 @@ Rough layout:
   turn on it. Report back proactively if it's actually red; a green run
   doesn't need its own announcement, just a passing mention next time
   it's relevant.
+- **A push that ships anything release-note-worthy gets a `CHANGELOG.md`
+  entry in the SAME push, not backfilled later.** "Release-note-worthy"
+  is the same bar `CHANGELOG.md`'s own intro and item 62's original
+  scoping already set (`plans/qa-pipeline.md`): a real feature, fix, or
+  architectural change to the PoC itself - the whole repo's real
+  history, not dashboard-features-only - curated prose, not a
+  mechanical commit dump, so not every commit needs one (a `plans/*.md`
+  update, a wording tweak, or this file's own conventions don't - those
+  belong in the relevant `plans/*.md` file, not here). Add to that day's
+  own `## <date>` section if one already exists (Keep a Changelog style
+  - `### Added`/`### Fixed`/`### Changed`), matching the file's existing
+  entries' voice and level of detail, rather than assuming a new date
+  section is needed. Real incident, 2026-09-17: a full day of Phase 6/7
+  work (test coverage, the resupply-chain redesign, two real CI fixes)
+  shipped with zero `CHANGELOG.md` entries, only caught when Keith asked
+  for them directly - the STANDING fix is this bullet, not just that
+  one-off backfill.
 - **CI (and any "read committed history" code path - `qa_tools/*/
   build_results_from_history.py`, `pipeline/build_*_dashboard_data.py`)
   must never depend on live data access, real or synthetic.** Not "must

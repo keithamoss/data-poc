@@ -10,10 +10,10 @@ and not "a real conceptual tension in how the PoC models something"
 raw ideas before the next session so nothing gets lost, and a queue to
 work through: scope each one with Keith via clarifying questions before
 building, same working pattern as everywhere else in this project.
-Created 2026-09-18, after Phase 7 wrapped, at Keith's own explicit
+Created 2026-09-17, after Phase 7 wrapped, at Keith's own explicit
 request.
 
-## Batch 1 (2026-09-18, post-Phase-7 run)
+## Batch 1 (2026-09-17, post-Phase-7 run)
 
 Keith's own framing throughout: work through these once the current
 loop (Phase 7 / whatever's active) is done, not immediately.
@@ -26,7 +26,7 @@ ticketing/case-management system for QA follow-up work, rather than a
 separate tool - "that's a really good solution, it's an easy
 integration." An MVP of this is next up once the current loop (Phase 6
 test coverage / Phase 7 follow-ups) wraps. A subagent was sent off in
-parallel (2026-09-18) to research this as a business analyst would -
+parallel (2026-09-17) to research this as a business analyst would -
 scoping real GitHub Issues access from this session, and coming back
 with clarifying questions for Keith as product owner, before any
 scoping conversation happens for real. See that subagent's own findings
@@ -38,7 +38,7 @@ of this PoC's build - a seam only) - this may be the point that design
 actually gets built against, not just designed around. Worth rereading
 that doc before scoping the MVP.
 
-**Subagent research findings, 2026-09-18 (business-analyst pass, no
+**Subagent research findings, 2026-09-17 (business-analyst pass, no
 code/issues created)**: Issues ARE enabled on `keithamoss/data-poc`
 (confirmed via a real, live `list_issues` call), and this session's own
 credentials can read them - `get_me` resolved to Keith's own personal

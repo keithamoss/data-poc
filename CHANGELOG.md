@@ -42,6 +42,15 @@ generation window.
   when its most recent supply falls outside the "as of" staleness
   window: real historical columns, checks, and trend charts stay
   browsable, just without misleading current-status colors.
+- Full integration test coverage against all four real QA tools, a unit
+  test suite for the dashboard's own inline JavaScript, and real-browser
+  end-to-end tests (as-of date picking, supply-history drill-down, dark
+  mode) - plus a measured code-coverage floor now enforced on every
+  push, not just a speed-focused smoke-test suite.
+- A real aggregate red/amber/green status shown against every entry in
+  a dataset's supply history - the worst status among every check
+  across every column for that specific delivery - and a genuine "N
+  days since the previous supply" counter on resupply attempts.
 
 ### Fixed
 - The three `date_of_birth` freshness checks (dbt, Soda, datacontract-
@@ -54,10 +63,23 @@ generation window.
   actually shown a real snapshot on the published site - the archived
   snapshot files were there, the picker's own list of them just never
   made it into the deployed page.
+- A resupply-history grouping bug: a resupply landing weeks late used
+  to get lumped in with an unrelated delivery that merely happened to
+  arrive on the same calendar day.
+- Two real continuous-integration failures that had gone unnoticed for
+  hours: GitHub's own runner resolving a newer Python version than this
+  project had ever been tested against, and a missing one-time setup
+  step for one of the real check tools.
 
 ### Changed
 - Child Protection's quarterly delivery cadence re-anchored to
   February/May/August/November.
+- How a resupply chain gets identified: no longer inferred from
+  internal bookkeeping about which delivery a resupply was "for," but
+  derived purely from a delivery's real cadence-aware timing and each
+  arrival's own real pass/fail outcome - closer to what could actually
+  be observed from a real production feed, where a resupply never
+  arrives labelled as such.
 
 ## 2026-09-16
 
