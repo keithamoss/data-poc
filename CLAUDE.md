@@ -110,15 +110,26 @@ Rough layout:
   `expression_is_true`/`recency`, added in the 2026-09-15 dbt_utils
   switch - see `plans/qa-pipeline.md`) use macros that package ships,
   not dbt-core itself, so `dbt build` won't compile without it. Run
-  `uv run pytest` (fast smoke tests - generator layer runs the real
-  seeded generator, dashboard-builder layer uses fixtures, no slow
-  real-tool run needed) and `uv run ruff check .` (a deliberately lean
-  rule set - real bugs only, not style) before considering a change
-  done. `pre-commit install` wires ruff into `git commit` automatically.
-  Not needed yet, but flagged: once the suite runs long enough that
-  wall-clock time actually matters (currently ~3s for 13 tests - `pytest-
-  xdist` would add more overhead than it saves), switch to `pytest-xdist`
-  for parallel test execution rather than just tolerating a slower suite.
+  `uv run pytest` and `uv run ruff check .` (a deliberately lean rule
+  set - real bugs only, not style) before considering a change done.
+  `pre-commit install` wires ruff into `git commit` automatically. The
+  suite is no longer just fast fixture-based smoke tests - Phase 6 of
+  `plans/publishing-and-history.md` (2026-09-17) added real dbt-core/
+  Soda Core/datacontract-cli/Evidently integration tests
+  (`tests/test_run_*_{bdm,cp}.py`, against small real fixtures built by
+  `tests/conftest.py`'s own session-scoped fixtures) alongside the
+  original fixture-based ones, so the full suite now takes ~2-3 minutes
+  (270 tests as of that pass), not seconds - `pytest-xdist` (parallel
+  test execution) is worth revisiting now that this has actually
+  happened, not just flagged for someday. CI (`.github/workflows/
+  test.yml`) runs the full suite with `pytest-cov` on every push and
+  enforces `pyproject.toml`'s `[tool.coverage.report] fail_under` - a
+  real, measured threshold (not a guessed one - see
+  `plans/publishing-and-history.md`'s Phase 6 "Build progress" note for
+  how it was set), so real coverage can't silently regress. Run
+  `uv run pytest --cov=qa_tools --cov=pipeline --cov=generator
+  --cov=dashboard --cov-report=term-missing` locally to check the same
+  gate before pushing, if a change might have reduced coverage.
 - **CI (and any "read committed history" code path - `qa_tools/*/
   build_results_from_history.py`, `pipeline/build_*_dashboard_data.py`)
   must never depend on live data access, real or synthetic.** Not "must

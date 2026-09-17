@@ -48,6 +48,34 @@ testpaths = ["tests"]
 # sys.path.insert hack) are gone.
 pythonpath = ["."]
 
+[tool.coverage.run]
+# Just the real pipeline source - not tests/ itself, not dbt_project/
+# (dbt-generated), not synthetic_data_generator/ (deliberately out of
+# Phase 6's scope - plans/publishing-and-history.md/plans/wider.md
+# action 32 - dormant/unwired code, not worth a coverage floor yet).
+source = ["qa_tools", "pipeline", "generator", "dashboard"]
+
+[tool.coverage.report]
+exclude_also = [
+    # Never executed under pytest (every qa_tools/*/run_*.py,
+    # build_*.py, orchestrate_*.py CLI entrypoint) - not a real gap,
+    # just how every one of these scripts is actually invoked
+    # (`python3 -m qa_tools.bdm.orchestrate_bdm`, ./run_pipeline.sh,
+    # etc.), never as an imported function call under test.
+    "if __name__ == .__main__.:",
+]
+# The real, measured floor as of the Phase 6 step 3 coverage pass
+# (2026-09-17, plans/publishing-and-history.md's own "Build progress"
+# note - 93.73% across these 4 packages with __main__ guards excluded
+# as above, up from 91% before that exclusion) - a small buffer below
+# that measured number, not the number itself, so a
+# single new untested edge branch doesn't immediately fail CI the way
+# sitting exactly at the ceiling would; still real enforcement against
+# an actual regression, not a symbolic value picked in advance (Keith's
+# own words: pytest-cov + a real threshold "so we can't silently
+# regress" - plans/publishing-and-history.md's Phase 6 scoping).
+fail_under = 92
+
 [tool.ruff]
 target-version = "py311"
 line-length = 120

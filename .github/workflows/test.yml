@@ -18,6 +18,16 @@ name: Run test suite
 # `git commit`, so a real lint regression can't reach this branch in
 # the first place; this workflow's job is catching what pre-commit
 # CAN'T catch, a genuine test failure, not re-litigating lint).
+#
+# Phase 6 step 4 (2026-09-17): also runs with coverage and enforces
+# pyproject.toml's [tool.coverage.report] fail_under - Keith's own
+# words, pytest-cov + a real threshold "so we can't silently regress",
+# the real achieved number only set once step 3's actual gap-closing
+# work was done (see plans/publishing-and-history.md's own "Build
+# progress" note for that number and the reasoning behind the buffer
+# below it). --cov-report=term-missing here (not just the pass/fail
+# gate) so a real regression's own missing lines show up directly in
+# the workflow log, not just a bare percentage.
 
 on:
   push:
@@ -41,4 +51,4 @@ jobs:
         run: uv sync --dev
 
       - name: Run test suite
-        run: uv run pytest
+        run: uv run pytest --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov-report=term-missing

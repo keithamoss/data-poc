@@ -2349,9 +2349,23 @@ plowing through... do all of phase six" without further check-ins:
   `test_dashboard_check_labels.py`, `test_anchor_date.py`,
   `test_evidently_check_lifecycle_retired.py`,
   `test_build_warehouses_rebuild.py`.
-- **Step 4 (set the real pytest-cov threshold) - up next.** 91% is now
-  the real, known number step 4 sets a threshold from - `pytest-cov`
-  itself already added as a dev dependency.
+- **Step 4 (set the real pytest-cov threshold) - DONE.**
+  `pyproject.toml` gained `[tool.coverage.run]` (scoped to `qa_tools`/
+  `pipeline`/`generator`/`dashboard` - not `tests/` itself, not
+  `synthetic_data_generator/`, deliberately out of Phase 6's scope) and
+  `[tool.coverage.report]`, with an `exclude_also` for every
+  `if __name__ == "__main__":` entrypoint line (never executed under
+  `pytest` - not a real gap, just how every one of these scripts is
+  actually invoked) - excluding those bumped the real measured number
+  from 91% to 93.73%. `fail_under = 92` - a small buffer below that
+  measured number, not the number itself, so one new untested edge
+  branch doesn't immediately fail CI, while still catching an actual
+  regression. `.github/workflows/test.yml`'s test step now runs with
+  `--cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard
+  --cov-report=term-missing`, enforcing that same `fail_under` on every
+  push. `CLAUDE.md`'s testing-convention bullet updated too - it had
+  gone stale ("fast smoke tests... ~3s for 13 tests") the moment step
+  2's real-tool integration tests landed (now ~2-3 minutes, 270 tests).
 
 ## Doc updates needed once this starts landing
 
