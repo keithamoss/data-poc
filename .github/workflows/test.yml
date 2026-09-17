@@ -51,6 +51,26 @@ name: Run test suite
 # risky to do unsupervised (see plans/publishing-and-history.md's step
 # 6 write-up for the reasoning) - the two now overlap in what they
 # cover, which is redundant but safe, not a gap.
+#
+# 2026-09-17 (Phase 7, Keith's own report of a failed run): this job was
+# missing `dbt deps` - README.md/CLAUDE.md's own documented one-time
+# step that installs dbt_utils (several real dbt checks use macros that
+# package ships, not dbt-core itself - `dbt build` won't even compile
+# without it). deploy-pages.yml never needed this (it never runs a real
+# `dbt build`, only reads pre-committed qa_results/ JSON) and
+# dbt_project/dbt_packages/ is gitignored, never committed, so every
+# fresh CI checkout genuinely needs this run fresh - this job's own
+# real dbt-core integration tests (Phase 6 step 2) were failing on
+# every single push since they landed, invisible locally because this
+# sandbox already had dbt_packages/ installed from earlier session
+# work. Found alongside, and initially misattributed to, the Python
+# 3.12 fix above - confirmed as a genuinely separate cause by checking
+# the actual CI run AFTER that fix landed: Python was correctly 3.11 by
+# then, but every dbt-based test still failed with the exact same
+# `FileNotFoundError` for target/<run_id>/manifest.json - dbt was
+# erroring out during compile, silently, since run_dbt() calls
+# subprocess.run(..., check=False, capture_output=True) and nothing
+# surfaces a failed dbt invocation's own stderr.
 
 on:
   push:
@@ -72,6 +92,9 @@ jobs:
 
       - name: Sync dependencies
         run: uv sync --dev
+
+      - name: Install dbt_utils
+        run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
 
       - name: Install Playwright's Chromium
         run: uv run playwright install --with-deps chromium
