@@ -197,6 +197,11 @@ button{font:inherit; color:inherit;}
 .col-tile:hover{border-color:var(--line-strong); background:var(--surface-alt);}
 .col-tile .name{font-weight:600; font-size:13.5px; word-break:break-word;}
 .col-tile .type{font-size:11px; color:var(--ink-faint); font-family:"IBM Plex Mono",monospace;}
+/* Item 57 (plans/qa-pipeline.md): a shorter spark for this dense,
+   many-tiles-per-screen grid than Tier 1's card-sized one (.spark's own
+   28px default) - the tile has no room budgeted for a full-height chart,
+   just enough to show the shape of the trend at a glance. */
+.spark-wrap .spark{height:16px;}
 
 /* ============ Drawer ============ */
 .backdrop{position:fixed; inset:0; background:rgba(15,18,14,.42); opacity:0; pointer-events:none; transition:opacity .18s ease; z-index:40;}
@@ -1372,23 +1377,31 @@ function renderAgency(view, agencyId){
       <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}</div>
       <div class="overflow-x">
       <table class="dataset-table">
-        <thead><tr><th>Dataset</th><th>Status</th><th>Latest arrival</th><th>Rows, latest run</th><th>Last QA run</th></tr></thead>
+        <thead><tr><th>Dataset</th><th>Status</th><th>Latest arrival</th><th>Rows, latest run</th><th>Last QA run</th><th>Trend</th></tr></thead>
         <tbody>
         ${col.datasets.map(ds=>{
           if(ds.noDataAsOf){
             return `<tr data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
               <td><div class="dataset-name">${ds.name}</div><div class="dataset-provider">${ds.provider}</div></td>
               <td>${pill(ds.status,"sm")}</td>
-              <td colspan="3" style="color:var(--ink-faint); font-size:12.5px;">No QA run within tolerance as of the selected date</td>
+              <td colspan="4" style="color:var(--ink-faint); font-size:12.5px;">No QA run within tolerance as of the selected date</td>
             </tr>`;
           }
           const arrivalPill = ds.lastArrival.onTime ? `<span class="pill green sm"><span class="ico"></span>On time</span>` : `<span class="pill red sm"><span class="ico"></span>Late</span>`;
+          // Item 57 (plans/qa-pipeline.md): the Executive tier's sparkline
+          // brought down to Tier 2 - the same pickRepresentativeCheck()/
+          // sparkline() pair item 56 built, just scoped to this one
+          // dataset's own columns instead of every column across the
+          // whole agency.
+          const dsWorstCheck = pickRepresentativeCheck(ds.columns, ds.status);
+          const dsSpark = dsWorstCheck ? sparkline(dsWorstCheck.history, dsWorstCheck.warn, dsWorstCheck.fail) : "";
           return `<tr data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td><div class="dataset-name">${ds.name}${ds.isReal?` <span class="pill tag sm"><span class="ico"></span>Real pipeline data</span>`:""}</div><div class="dataset-provider">${ds.provider}</div></td>
             <td>${pill(ds.status,"sm")}</td>
             <td>${arrivalPill} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${fmtArrival(ds.lastArrival)}</span></td>
             <td class="mono">${fmtInt(ds.rowCount)}</td>
             <td class="mono" style="color:var(--ink-muted);">${fmtDate(ds.lastArrival.date)}</td>
+            <td style="min-width:100px;">${dsSpark}</td>
           </tr>`;
         }).join("")}
         </tbody>
@@ -1448,12 +1461,22 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     <div class="col-grid" id="col-grid"></div>
   `;
   const grid = document.getElementById("col-grid");
-  grid.innerHTML = ds.columns.map(c=> `
+  // Item 57 (plans/qa-pipeline.md): Tier 3's own sparkline, narrower still
+  // than Tier 2's - pickRepresentativeCheck() called with just this ONE
+  // column's own checks, so it finds the best-varying check WITHIN that
+  // column specifically (same fallback-to-constant behaviour as the other
+  // two tiers if every one of its checks happens to be constant).
+  grid.innerHTML = ds.columns.map(c=> {
+    const colWorstCheck = pickRepresentativeCheck([c], c.status);
+    const colSpark = colWorstCheck ? sparkline(colWorstCheck.history, colWorstCheck.warn, colWorstCheck.fail) : "";
+    return `
     <button class="col-tile" data-status="${c.status}" data-col="${c.name}">
       <div class="name">${c.name}</div>
       <div class="type">${c.logicalType}</div>
+      ${colSpark ? `<div class="spark-wrap">${colSpark}</div>` : ""}
       ${pill(c.status,"sm")}
-    </button>`).join("");
+    </button>`;
+  }).join("");
   grid.querySelectorAll(".col-tile").forEach(btn=> btn.addEventListener("click", ()=> openColumnDrawer(ag, col, ds, ds.columns.find(c=>c.name===btn.dataset.col))));
 }
 

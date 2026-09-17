@@ -2844,31 +2844,41 @@ relative, not a schedule — this is weeks of work, not months.
     a flat 2.0-to-2.0 line. Full `uv run pytest` (175 passed) and `uv
     run ruff check .` clean.
 
-57. **[todo, parked - Keith's own call, 2026-09-17]** Bring the
-    Executive tier's sparkline down into the lower tiers too: Tier 2
-    (`renderAgency()`, the per-dataset table rows - `dashboard/
-    qa-reporting-dashboard.template.html`) and, Keith's own hedge,
-    "maybe even" Tier 3 (`renderDataset()`, the per-column tile grid).
-    Not investigated or built - logged for later per Keith's own
-    instruction, but scoped enough here to pick up cleanly:
-    - **Tier 2** would be one sparkline per dataset ROW, the same
-      `pickRepresentativeCheck()`/`sparkline()` pair item 56 just built
-      for the Executive tier, just called with that one dataset's own
-      `columns` (and its own `status` as the target) instead of every
-      column across the whole agency - `pickRepresentativeCheck()`
-      already takes a columns list + a target status as plain
-      arguments, so this is a straight reuse, not a rebuild.
-    - **Tier 3** would be one sparkline per COLUMN tile - narrower
-      still: `pickRepresentativeCheck([column], column.status)` (a
-      single-column list) would find the best-varying check WITHIN
-      that one column specifically, same fallback-to-constant behaviour
-      as the other two tiers if every one of that column's own checks
-      happens to be constant.
-    - Real open question once this gets built for real: `.col-tile` is
-      a small, dense grid item (name + type + status pill today, no
-      room budgeted for a chart) - fitting a legible sparkline there
-      needs its own layout pass, not just wiring in the same function
-      call the other two tiers can use as-is.
+57. **[done, 2026-09-17]** Brought the Executive tier's sparkline down
+    into the lower tiers too: Tier 2 (`renderAgency()`, the per-dataset
+    table rows - `dashboard/qa-reporting-dashboard.template.html`) and
+    Tier 3 (`renderDataset()`, the per-column tile grid) - built exactly
+    as scoped below, no surprises found along the way:
+    - **Tier 2**: a straight reuse, as scoped - a new "Trend" column in
+      `dataset-table` (thead + one `<td>` per row), `pickRepresentativeCheck
+      (ds.columns, ds.status)` called per dataset row instead of every
+      column across the whole agency. The `noDataAsOf` row's own merged
+      cell (`colspan="3"` covering the old 3 trailing columns) bumped to
+      `colspan="4"` to still span correctly now there are 4.
+    - **Tier 3**: also a straight reuse of the exact call scoped below -
+      `pickRepresentativeCheck([column], column.status)` per column tile.
+      The flagged layout question resolved simply: `.col-tile` is already
+      `display:flex; flex-direction:column` with an 8px gap, so the
+      sparkline just slots in as a new flex child (between the type label
+      and the status pill) and the tile grows a little taller - no
+      restructuring needed. Given a `.spark` for 13 tiles per screen
+      (Birth Registrations' real column count) is a lot denser than one
+      per Executive-tier card, added a `.spark-wrap .spark{height:16px;}`
+      override (vs. the default 28px) to keep each tile compact - the
+      `sparkline()` function itself needed zero changes, since its SVG
+      already uses `viewBox`/`preserveAspectRatio="none"`, so it was
+      always going to stretch to whatever CSS gave it.
+    Verified for real, not just reasoned about: a real headless-Chromium
+    check across the Executive tier's own 6 agencies (both real datasets
+    and all 4 illustrative-mock ones) confirmed every dataset table row
+    and every column tile renders its own sparkline with zero console
+    errors - 3/3 Registry Services rows, 13/13 Birth Registrations tiles,
+    6/6 Child Protection rows, 11/11 its first table's tiles, and the
+    4 remaining mock agencies' rows/tiles all present too (the same
+    `pickRepresentativeCheck()`/`sparkline()` pair already used for mock
+    data at Tier 1). Confirmed in both themes (screenshots taken in
+    light and dark). No Python touched - pure frontend addition, `uv run
+    pytest` (177 passed, unchanged) and `uv run ruff check .` clean.
 
 58. **[resolved, 2026-09-17 - confirmed intended, not a bug]** Keith's
     report: picking as-of = real "today" (2026-09-17) for Registry
