@@ -2870,28 +2870,49 @@ relative, not a schedule — this is weeks of work, not months.
       needs its own layout pass, not just wiring in the same function
       call the other two tiers can use as-is.
 
-58. **[investigated, 2026-09-17, not a bug - open design question for
-    Keith]** Keith's report: picking as-of = real "today" (2026-09-17)
-    for Registry Services still shows "a lot of points" on the
-    Executive-tier sparkline; expected "no points, or only one."
-    Investigated live against the real built dashboard (Playwright JS
-    eval, not just reasoning about the code): real wall-clock today is
-    2026-09-17; BDM's committed history runs `run_001_2026-05-21`
-    through `run_120_2026-09-17` (plus a resupply attempt arriving
-    2026-09-21, correctly excluded by as-of clipping since its
-    `run_date` is after today). At `CURRENT_AS_OF = "2026-09-17"`,
-    `pickRepresentativeCheck()` resolves to a genuinely-varying,
-    genuinely-worst check with `historyLen: 175` - i.e. the sparkline is
-    correctly showing this daily-cadence dataset's full accumulated
-    history up to today, per the as-of clipping design verified
-    repeatedly earlier this same session (items 55/56) - no clipping
-    error found. Not fixed, because there's nothing broken to fix: the
-    open question is whether "as of today, show full accumulated
-    history" is actually the product behaviour Keith wants for the
-    Executive-tier sparkline, or whether he wants it windowed to only
-    recent history (e.g. trailing 30 days) regardless of as-of date -
-    that's a real design fork, not something to guess at and change
-    unilaterally.
+58. **[resolved, 2026-09-17 - confirmed intended, not a bug]** Keith's
+    report: picking as-of = real "today" (2026-09-17) for Registry
+    Services still shows "a lot of points" on the Executive-tier
+    sparkline; expected "no points, or only one." Investigated live
+    against the real built dashboard (Playwright JS eval, not just
+    reasoning about the code): real wall-clock today is 2026-09-17;
+    BDM's committed history runs `run_001_2026-05-21` through
+    `run_120_2026-09-17` (plus a resupply attempt arriving 2026-09-21,
+    correctly excluded by as-of clipping since its `run_date` is after
+    today). At `CURRENT_AS_OF = "2026-09-17"`, `pickRepresentativeCheck()`
+    resolves to a genuinely-varying, genuinely-worst check with
+    `historyLen: 175` - i.e. the sparkline is correctly showing this
+    daily-cadence dataset's full accumulated history up to today, per
+    the as-of clipping design verified repeatedly earlier this same
+    session (items 55/56) - no clipping error found. Put to Keith as a
+    real design fork (full history-to-date vs. windowed to recent-only)
+    rather than guessed at - his answer: it was his own misreading of
+    what "as of" means ("it's the 'as of' date looking backwards,
+    right?"), and full history up to the as-of date is in fact what he
+    wants. No code change - confirms the existing behaviour is correct
+    as built.
+
+59. **[parked, 2026-09-17 - for a near-term discussion after Phase 5,
+    Keith's own call]** How to model a check for data with a lumpy,
+    calendar-shaped expected pattern: quiet/near-flat for 3 quarters,
+    then a real, expected spike once a year at a known time (raised
+    for Child Protection's quarterly cadence, but the shape is generic).
+    A single fixed-threshold range check can't work here - too tight
+    and it fires every spike quarter as a false positive, too loose and
+    it misses a genuine anomaly in one of the quiet quarters. Recommended
+    direction, not yet built or scoped in detail: make the check
+    **calendar-aware rather than value-aware** - bucket by which
+    quarter/month a run falls in (or just "is this the known spike
+    period") and apply a different expected range per bucket, rather
+    than one check with one threshold. Both dbt and Soda can express
+    this today without a new engine - a date-filtered/`variable`-
+    parameterized threshold, or two separate checks each scoped by a
+    date condition on the run date. Main tradeoff/caveat to carry into
+    the real design: this bakes in an assumption about *when* the spike
+    should happen, so it needs re-tuning if real-world spike timing
+    ever shifts - worth surfacing in the check's own lifecycle metadata
+    (`description`/`changelog`) rather than treating it as set-and-forget.
+    Not scoped further yet - pick up after Phase 5 wraps.
 
 ## Held over from the original (equivalent-only) build
 
