@@ -211,7 +211,13 @@ Rough layout:
   work (test coverage, the resupply-chain redesign, two real CI fixes)
   shipped with zero `CHANGELOG.md` entries, only caught when Keith asked
   for them directly - the STANDING fix is this bullet, not just that
-  one-off backfill.
+  one-off backfill. Concretely: before every commit that isn't purely
+  `plans/*.md`/process-only, ask "does this meet the bar above" as a
+  real step, the same way `pytest`/`ruff` are already a real step before
+  considering a change done - not something to remember only when
+  reminded. If the release-notes scope itself ever seems unclear for a
+  specific change, ask Keith rather than guessing either way (include
+  something too granular, or skip something real).
 - **CI (and any "read committed history" code path - `qa_tools/*/
   build_results_from_history.py`, `pipeline/build_*_dashboard_data.py`)
   must never depend on live data access, real or synthetic.** Not "must

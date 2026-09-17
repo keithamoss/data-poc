@@ -89,13 +89,25 @@ implementation guess.
 
 ### 4. GitHub Issues -> Microsoft Teams integration (research first)
 
-Idea: have the GitHub Issues ticketing system (#1) post live updates
-into a Microsoft Teams chat as datasets arrive and get QA'd - possibly
-with a small piece of the gamification idea (#3) folded in, celebrating
-individual staff members' wins in the Teams feed itself. Keith's own
-framing: "do some research online" first - this is a research task
-(what's actually possible/idiomatic for a GitHub Issues -> Teams
-webhook/bot integration, not yet a build task).
+Idea: live notifications into a Microsoft Teams chat as datasets arrive
+and get QA'd - possibly with a small piece of the gamification idea
+(#3) folded in, celebrating individual staff members' wins in the Teams
+feed itself. **Architecturally important, clarified 2026-09-17 (Keith's
+own follow-up, in case it wasn't clear the first time round): this
+tool/pipeline never talks to Teams directly, and never gets its own
+Teams webhook/bot credentials.** GitHub Issues (#1) is the ONLY
+integration point - Teams is notified purely via GitHub's own
+Teams<->GitHub bridge (an existing Microsoft/GitHub connector, not
+something this project builds), subscribed to this repo's Issues
+activity. So the pipeline's own job stops at "open/update/comment on a
+real GitHub Issue accurately" - everything from there to a Teams
+channel is GitHub's and Teams' own integration, not this codebase's
+concern or code. Keith's own framing: "do some research online" first -
+this is a research task (what's actually possible/idiomatic for that
+GitHub<->Teams connector - what it can/can't surface, whether it
+supports enough granularity for the gamification angle - not yet a
+build task, and specifically not a "build a Teams webhook integration"
+task).
 
 ### 5. Staff adoption - two threads
 
