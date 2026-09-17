@@ -2285,6 +2285,74 @@ it, have a note that we should consider adding tests for it." See
 `plans/wider.md`'s own action-items list for the actual parked entry
 (added alongside this scoping pass) rather than duplicating it here.
 
+**Build progress, 2026-09-17** - Keith's own authorization to "keep
+plowing through... do all of phase six" without further check-ins:
+- **Step 1 (CI wiring) - DONE.** `.github/workflows/test.yml`, a new
+  workflow separate from `deploy-pages.yml` (that workflow's own
+  `on.push.paths` filter excludes `generator/**`, and it never ran
+  `pytest` anywhere in its existing steps) - `uv sync --dev` then
+  `uv run pytest` on every push to this branch.
+- **Step 2 (real-tool output-parsing logic) - DONE**, both datasets.
+  `tests/conftest.py` gained session-scoped fixtures building small,
+  REAL BDM/CP data (real `generator`/`synthetic_data_generator` output,
+  real per-run DuckDB warehouses via the actual `build_per_run_
+  warehouses.build_all()`/`build_cp_warehouses.build_all()`) - a clean
+  reference run plus a red-severity dirty run per dataset, real defect
+  injection via `apply_*_presets(severity="red")` rather than
+  hand-crafted rows. 8 new test files (`tests/test_run_{dbt,soda,
+  datacontract,evidently}_{bdm,cp}.py`, `evidently`'s CP file named
+  `test_run_evidently_cp_real.py` since `test_run_evidently_cp.py`
+  already existed for a different, narrower concern) call each real
+  `evaluate_*()` function directly against these fixtures. Real
+  surprises found writing these, not assumed: the CP fixture's row
+  counts had to clear the real Soda `row_count` warn floors
+  (`contract/child-protection-soda-checks.yml` - `cp_clients` 300,
+  `cp_notifications` 600, `cp_carers` 150), which needed a 45,000-person
+  base population (not the 70k production scale, but well past an
+  initial, too-small 8,000 guess) for the "clean" reference run to
+  genuinely have zero real Soda failures; datacontract-cli's custom_sql
+  rules only label 3 of 5 real rules (`_CUSTOM_SQL_LABEL`) - a first
+  test version wrongly asserted all 5 got a label; Evidently's
+  row-count-growth `metric_value` is a positive drop percentage, not
+  negative - a first test version had the sign backwards.
+- **Step 3 (other backend gaps) - DONE**, every module the scoping list
+  named. Coverage across `qa_tools`+`pipeline`+`generator`+`dashboard`
+  went from 85% to 91% (`--cov-report=term-missing`, real number, not
+  guessed) - `qa_tools/{bdm,cp}/build_results_from_history.py` (0% ->
+  ~94%, tested against this repo's own REAL committed `qa_results/`
+  history, not a fixture - exactly what CI itself reads), `pipeline/
+  load.py` (0% -> 95%, reusing the step-2 `bdm_raw_dir` fixture),
+  `pipeline/orchestrate.py` (0% -> 92%, a wiring-only test via
+  monkeypatched stubs - genuinely regenerating/loading real project
+  data here would itself violate the "CI must never touch data" rule),
+  `pipeline/aggregate_values.py` (48% -> 100%, real DuckDB queries
+  against an in-memory table), `pipeline/dashboard_check_labels.py`
+  (92% -> 100%), `generator/anchor_date.py` (88% -> 100%),
+  `evidently_check_lifecycle_retired.py` both datasets (0% -> 100% -
+  these are read as plain text by `validate_check_lifecycle.py`, never
+  `import`-ed by real code, so a real `import` in a test was the only
+  way to close this at all), the "rebuild an existing .duckdb/warehouse
+  file" branch in `build_per_run_warehouses.py`/`build_cp_warehouses.py`/
+  `pipeline/load.py` (only hit by calling `build_all()`/`load_all()`
+  twice against the same path), and the failure/no-match/empty edge
+  branches in `qa_tools/common/{dbt,soda,datacontract,evidently}_
+  common.py` (87-96% -> 100% each) that the real-tool integration tests
+  above don't happen to trigger on their own "happy path" fixtures.
+  Remaining gaps in these modules are essentially all `if __name__ ==
+  "__main__":` entrypoint lines (never executed under `pytest`, not a
+  real gap) plus one genuinely-defensive "shouldn't happen for any real
+  committed run" branch in both `build_results_from_history.py` files -
+  left alone rather than fabricated a broken committed file just to hit
+  it. 9 new test files: `tests/test_build_results_from_history.py`,
+  `test_pipeline_load.py`, `test_pipeline_orchestrate.py`,
+  `test_aggregate_values.py`, `test_common_helpers.py`,
+  `test_dashboard_check_labels.py`, `test_anchor_date.py`,
+  `test_evidently_check_lifecycle_retired.py`,
+  `test_build_warehouses_rebuild.py`.
+- **Step 4 (set the real pytest-cov threshold) - up next.** 91% is now
+  the real, known number step 4 sets a threshold from - `pytest-cov`
+  itself already added as a dev dependency.
+
 ## Doc updates needed once this starts landing
 
 - `CLAUDE.md`: the `data/raw/`, `reports/*.json` gitignored-convention
