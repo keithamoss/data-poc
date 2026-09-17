@@ -2788,6 +2788,30 @@ relative, not a schedule — this is weeks of work, not months.
       including this file's own now-fixed test) and `uv run ruff check
       .` both clean.
 
+56. **[fixed, 2026-09-17]** A real Executive-tier sparkline bug - Keith's
+    report: Registry Services' sparkline on the Executive tier flipped
+    between a flat line and a real graph as the as-of date moved through
+    different days in September. Root cause, confirmed against real
+    data before fixing (not just reasoned about): the sparkline was
+    drawn from `worstCol.checks[0]` - whichever check happens to be
+    FIRST in the "worst status" column's own checks array, not
+    necessarily the check actually driving that column's worst status.
+    On 2026-09-01, `registration_number`'s `checks[0]` was a dbt
+    `matches_regex` test that's 0/0/0 (warn/fail/every historical value)
+    across all 176 real runs - it never once fails - while a completely
+    different check on that same column (`dbt:not_null`) was the one
+    genuinely red. Same class of bug `worstCol` itself already avoids
+    one level up (`allCols.find(c=>c.status===ag.status)` picks BY
+    STATUS, not by array position) - `checks[0]` just never got the
+    same treatment. Fixed with the identical pattern: `worstCol.checks.
+    find(c=>checkStatus(c)===worstCol.status) || worstCol.checks[0]`.
+    Verified for real: re-checked the same 2026-09-01/09-10 as-of dates
+    that showed the bug - the selected check is now genuinely red (not
+    an inert 0/0/0 one) and has real variance (min 0, max 19) at every
+    date checked, and the rendered SVG path now has real coordinate
+    variation instead of collapsing to a flat line. Full `uv run
+    pytest` (175 passed) and `uv run ruff check .` clean.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

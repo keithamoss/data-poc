@@ -1211,7 +1211,19 @@ function renderExec(view){
     const nDatasets = ag.collections.reduce((s,c)=>s+c.datasets.length,0);
     const allCols = ag.collections.flatMap(c=>c.datasets.flatMap(d=>d.columns));
     const worstCol = allCols.find(c=>c.status===ag.status) || allCols[0];
-    const spark = worstCol ? sparkline(worstCol.checks[0].history, worstCol.checks[0].warn, worstCol.checks[0].fail) : "";
+    // Keith's report, 2026-09-17: on the Executive tier, Registry
+    // Services' sparkline flipped between a flat line and a real graph
+    // as the as-of date moved through September. Root cause: this used
+    // to be worstCol.checks[0] - whichever check happens to be FIRST in
+    // that column's array, not the one actually driving worstCol's own
+    // "worst" status. Confirmed against real data: on 2026-09-01,
+    // registration_number's checks[0] was a dbt regex check that's
+    // 0/0/0 across all 176 real runs (never once fails), while a
+    // DIFFERENT check on that same column was the one actually red -
+    // same "pick by status, not by array position" fix worstCol itself
+    // already gets, one level down.
+    const worstCheck = worstCol ? (worstCol.checks.find(c=>checkStatus(c)===worstCol.status) || worstCol.checks[0]) : null;
+    const spark = worstCheck ? sparkline(worstCheck.history, worstCheck.warn, worstCheck.fail) : "";
     return `<button class="card" data-nav='${JSON.stringify({tier:"agency", agencyId:ag.id})}'>
       <div class="card-top"><h3>${ag.name}</h3>${pill(ag.status)}</div>
       <div style="color:var(--ink-muted); font-size:12.5px;">${ag.blurb}</div>
