@@ -1950,12 +1950,58 @@ not a requirement.**
   parameter, its own 2 existing tests updated to pass `{}`. Full `uv run
   pytest` (176 passed) and `uv run ruff check .` clean.
 - **Phase 5c (Thread D) - changelog + description sections in the
-  existing check-detail panel.** Surfaces each check's own hand-authored
-  `changelog`/`description` metadata (already collected by
-  `check_lifecycle.py` since Phase 1) as new sections of the panel that
-  already shows a check's status/history/comparison - mostly plumbing
-  already-available data into new panel sections, no new data source
-  needed.
+  existing check-detail panel - [DONE, 2026-09-17].** Surfaces each
+  check's own hand-authored `changelog`/`description` metadata (already
+  collected by `check_lifecycle.py` since Phase 1) as new sections of the
+  panel that already shows a check's status/history/comparison - mostly
+  plumbing already-available data into new panel sections, confirmed no
+  new data source needed (Phase 5b's `lifecycle_by_id` lookup already
+  parses every check's full `CheckMetadata`, `description`/`changelog`
+  included, just wasn't read yet).
+
+  Built: `pipeline/build_dashboard_data.py`/`build_cp_dashboard_data.py`
+  (the same `lifecycle_by_id` lookup Phase 5b added, renamed from
+  `retirement_by_id` since it's no longer retirement-only) now also
+  attach `description`/`changelog` to every check record.
+  `buildRealDataset()` (the template) passes `description` straight
+  through and maps `changelog` entries into real `Date` objects for
+  display - a real, found-before-shipping bug here: the existing
+  `toDate()` helper assumes either a bare `"YYYY-MM-DD"` or a
+  space-separated `"YYYY-MM-DD HH:MM:SS"` string (both used elsewhere in
+  this app for `run_date`/`run_timestamp`) and unconditionally appends a
+  `"Z"` - but `check_lifecycle.py`'s own authored changelog dates are
+  ALREADY full ISO-8601 (`"2026-09-17T00:00:00Z"`, this file's own
+  earlier schema example), so running them through `toDate()` would have
+  produced `"...T00:00:00ZZ"` and silently rendered "Invalid Date"
+  everywhere a changelog date was shown. Caught before ever hitting a
+  browser, by re-reading `toDate()`'s own two branches against the
+  actual string shape rather than assuming reuse was safe; fixed with a
+  bare `new Date(e.date)` for changelog entries specifically, left a
+  comment explaining why the two helpers can't be interchanged.
+  `openCheckPanel()` gained two new sections: "What this check does"
+  (only rendered when `check.description` is set - not every check has
+  one yet) right under the existing dimension/note blurb, and "Definition
+  changelog (N changes)" (only rendered when at least one entry exists)
+  as the panel's last section - each entry shows its date, a
+  Breaking/Non-breaking pill (red border-left + red pill for breaking,
+  matching Thread D's "color means the check changed" convention Phase
+  5d's own trend-gap work will extend), the human-written description,
+  and the author, newest first. A retired check's own retirement is
+  just another changelog entry here (see `dbt_project/schema-
+  retired.yml`'s real one from Phase 5b) rather than special-cased -
+  the "Retired" badge in the panel header (Phase 5b) already covers the
+  current-state signal, this covers the audit trail.
+
+  Verified for real: rebuilt `reports/*.json` + the embedded dashboard;
+  a real headless-Chromium check confirmed a normal check (`sex`'s
+  `accepted_values` test) shows its real hand-authored description with
+  no changelog section (zero entries, correctly omitted), and the
+  Phase 5b-retired check shows both its description AND its one real
+  changelog entry - correct date (Sep 17, 2026), "Non-breaking" pill,
+  the actual retirement-reason text, and "Keith Moss" as author - with
+  zero console errors. New test `test_a_checks_description_and_
+  changelog_are_carried_through` (`tests/test_build_dashboard_data.py`).
+  Full `uv run pytest` (177 passed) and `uv run ruff check .` clean.
 - **Phase 5d (Thread D) - the trend-chart gap/marker work: the biggest,
   most technically substantial piece, recommended last.** Bundles THREE
   related fixes that all trace back to the same root cause (`trendChart()`'s

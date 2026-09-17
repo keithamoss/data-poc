@@ -124,7 +124,7 @@ COLUMN_META = {
 
 
 def build_one_table(table: str, results: list[dict], manifest: list[dict], dataset_stats: dict,
-                     retirement_by_id: dict) -> dict:
+                     lifecycle_by_id: dict) -> dict:
     dataset_id = cp_common.TABLE_DATASET_ID[table]
     column_meta = COLUMN_META[table]
     all_columns = list(column_meta.keys())
@@ -192,7 +192,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
             if not history:
                 continue
             engine_short = ENGINE_SHORT.get(engine, engine)
-            lifecycle = retirement_by_id.get(slot["check_id"])
+            lifecycle = lifecycle_by_id.get(slot["check_id"])
             checks_out.append({
                 "check_id": slot["check_id"],
                 "name": display_name(check_name, engine_short, slot["label"]),
@@ -206,6 +206,8 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                 "note": f"Computed by {engine} against this run's real data — not a fabricated figure.",
                 "retired_as_of": lifecycle.retired_as_of if lifecycle else None,
                 "retired_reason": lifecycle.retired_reason if lifecycle else None,
+                "description": lifecycle.description if lifecycle else None,
+                "changelog": lifecycle.changelog if lifecycle else [],
             })
 
         if not checks_out:
@@ -322,10 +324,10 @@ def build() -> dict:
 
     # Same retirement lookup as build_dashboard_data.py's identical block -
     # computed once here, not once per table.
-    retirement_by_id = {c.check_id: c for c in collect_checks(None)}
+    lifecycle_by_id = {c.check_id: c for c in collect_checks(None)}
 
     by_table = {t: [r for r in results if r["dataset_id"] == cp_common.TABLE_DATASET_ID[t]] for t in cp_common.TABLES}
-    datasets = [build_one_table(t, by_table[t], manifest, dataset_stats, retirement_by_id) for t in cp_common.TABLES]
+    datasets = [build_one_table(t, by_table[t], manifest, dataset_stats, lifecycle_by_id) for t in cp_common.TABLES]
     return {"datasets": datasets}
 
 

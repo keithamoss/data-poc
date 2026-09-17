@@ -79,7 +79,7 @@ def build() -> dict:
     # config-file parsing only (schema.yml/soda YAML/contract YAML/
     # evidently_check_lifecycle*.py), no live data/DuckDB access, so this
     # is safe for CI same as any other "read committed history" path.
-    retirement_by_id = {c.check_id: c for c in collect_checks(None)}
+    lifecycle_by_id = {c.check_id: c for c in collect_checks(None)}
 
     # column_name -> (engine, check_name) -> {unit, warn, fail, by_run_id: {run_id: value}}
     by_column: dict[str, dict[tuple, dict]] = {}
@@ -133,7 +133,7 @@ def build() -> dict:
             if not history:
                 continue
             engine_short = ENGINE_SHORT.get(engine, engine)
-            lifecycle = retirement_by_id.get(slot["check_id"])
+            lifecycle = lifecycle_by_id.get(slot["check_id"])
             checks_out.append({
                 "check_id": slot["check_id"],
                 "name": display_name(check_name, engine_short, slot["label"]),
@@ -147,6 +147,8 @@ def build() -> dict:
                 "note": f"Computed by {engine} against this run's real data — not a fabricated figure.",
                 "retired_as_of": lifecycle.retired_as_of if lifecycle else None,
                 "retired_reason": lifecycle.retired_reason if lifecycle else None,
+                "description": lifecycle.description if lifecycle else None,
+                "changelog": lifecycle.changelog if lifecycle else [],
             })
 
         if not checks_out:

@@ -254,6 +254,17 @@ button{font:inherit; color:inherit;}
 .retired-toggle input{cursor:pointer;}
 .retired-note{font-size:11.5px; color:var(--ink-faint); margin-top:6px; font-style:italic;}
 
+/* Phase 5c: check-detail panel's changelog section - one entry per
+   documented definition change (qa_tools/common/check_lifecycle.py's
+   own changelog: field), newest first. */
+.changelog-entry{border-left:2px solid var(--line); padding:2px 0 10px 12px; margin-bottom:2px;}
+.changelog-entry:last-child{padding-bottom:0;}
+.changelog-entry.breaking{border-left-color:var(--bad);}
+.changelog-entry-head{display:flex; align-items:center; gap:8px; margin-bottom:3px;}
+.changelog-date{font:600 11.5px "IBM Plex Mono",monospace; color:var(--ink-muted);}
+.changelog-desc{font-size:13px; color:var(--ink);}
+.changelog-author{font-size:11px; color:var(--ink-faint); margin-top:2px;}
+
 .status-dot-row{display:flex; gap:6px; flex-wrap:wrap;}
 .status-dot{width:16px; height:16px; border-radius:4px; display:inline-block;}
 
@@ -583,6 +594,16 @@ function buildRealDataset(d){
       // the boolean the rest of the dashboard actually branches on.
       retired: ck.retired_as_of != null, retiredAsOf: ck.retired_as_of ? toDate(ck.retired_as_of) : null,
       retiredReason: ck.retired_reason,
+      // Phase 5c: hand-authored check-lifecycle metadata (check_lifecycle.py's
+      // description/changelog fields), same source as retired_as_of/reason
+      // above - surfaced in the check-detail panel, not the drawer's card.
+      description: ck.description,
+      // changelog dates are already full ISO-8601 ("2026-09-17T00:00:00Z",
+      // check_lifecycle.py's own authored format) - new Date() directly,
+      // NOT toDate() above (that helper's "append Z" branch is for the
+      // space-separated/bare-date formats run_date/run_timestamp use
+      // elsewhere in this app; applying it here would double up the Z).
+      changelog: (ck.changelog||[]).map(e=>({ date: new Date(e.date), description: e.description, author: e.author, breaking: e.breaking })),
       history: ck.history.map((h,i)=>({ idx:i, date: toDate(h.run_date), value: h.value,
         row_count_total: h.row_count_total, row_count_invalid: h.row_count_invalid,
         failing_sample_keys: h.failing_sample_keys, aggregate_values: h.aggregate_values })),
@@ -1784,7 +1805,42 @@ function openCheckPanel(ag, col, ds, column, check, opts){
     ${check.dimension? `<div class="dim-tag">${check.dimension}</div>`:""}${check.note||""}
   </div>`;
 
-  body.innerHTML = descBlock + compareBlock + rowDetailBlock + trendBlock;
+  // Phase 5c: check.description is the hand-authored, plain-English
+  // explanation of what the check does and why (check_lifecycle.py's
+  // description field) - distinct from check.note above, which is this
+  // dashboard's own generated "computed by <tool>" provenance line. Not
+  // every check has one yet (retrofit is ongoing), so this section is
+  // omitted rather than shown empty when it's missing.
+  const whatItDoesBlock = check.description ? `
+    <div class="drawer-section">
+      <h4>What this check does</h4>
+      <div style="font-size:13px; color:var(--ink-muted);">${check.description}</div>
+    </div>` : "";
+
+  // Phase 5c: check.changelog is the hand-authored history of documented
+  // definition changes (check_lifecycle.py's changelog field) - newest
+  // first, each carries date/description/author/breaking. Only shown
+  // when at least one entry exists; a retired check's own retirement is
+  // just another entry here (see dbt_project/schema-retired.yml's real
+  // example) rather than special-cased - the "Retired" badge in the
+  // panel header (Phase 5b) already covers the current-state signal.
+  const changelogBlock = (check.changelog && check.changelog.length) ? `
+    <div class="drawer-section">
+      <h4>Definition changelog (${check.changelog.length} ${pluralize(check.changelog.length,"change")})</h4>
+      ${check.changelog.slice().sort((a,b)=>b.date-a.date).map(e=> `
+        <div class="changelog-entry ${e.breaking?'breaking':''}">
+          <div class="changelog-entry-head">
+            <span class="changelog-date">${fmtDate(e.date)}</span>
+            ${e.breaking
+              ? `<span class="pill red sm"><span class="ico"></span>Breaking</span>`
+              : `<span class="pill tag sm"><span class="ico"></span>Non-breaking</span>`}
+          </div>
+          <div class="changelog-desc">${e.description}</div>
+          <div class="changelog-author">— ${e.author}</div>
+        </div>`).join("")}
+    </div>` : "";
+
+  body.innerHTML = descBlock + whatItDoesBlock + compareBlock + rowDetailBlock + trendBlock + changelogBlock;
   document.getElementById("check-backdrop").classList.add("open");
   document.getElementById("check-panel").classList.add("open");
   document.getElementById("check-panel").setAttribute("aria-hidden","false");

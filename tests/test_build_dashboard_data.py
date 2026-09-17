@@ -190,3 +190,27 @@ def test_a_retired_checks_metadata_is_carried_through(tmp_path, monkeypatch):
     # (stubbed) retirement collection, stays un-retired
     uncovered = next(c for c in data["columns"] if c["name"] == "date_registered")
     assert uncovered["checks"][0].get("retired_as_of") is None
+
+
+def test_a_checks_description_and_changelog_are_carried_through(tmp_path, monkeypatch):
+    """Phase 5c (plans/publishing-and-history.md Thread D): the
+    check-detail panel's new "What this check does"/changelog sections
+    read description/changelog straight off the check record - same
+    lifecycle_by_id lookup Phase 5b's retired_as_of/reason already use."""
+    sex_check_id = "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.accepted_values_dbt"
+    changelog = [{"date": "2026-06-01T10:00:00Z", "description": "Tightened threshold",
+                  "author": "Keith Moss", "breaking": False}]
+    monkeypatch.setattr(bdd, "collect_checks", lambda ref: [
+        CheckMetadata(check_id=sex_check_id, tool="dbt", config_hash="abc123", source_file="fake.yml",
+                      description="Sex must be one of the closed value set.", changelog=changelog),
+    ])
+    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))
+
+    data = bdd.build()
+
+    sex_col = next(c for c in data["columns"] if c["name"] == "sex")
+    assert sex_col["checks"][0]["description"] == "Sex must be one of the closed value set."
+    assert sex_col["checks"][0]["changelog"] == changelog
+    # a check with no matching check_id gets an empty changelog, not a crash
+    uncovered = next(c for c in data["columns"] if c["name"] == "date_registered")
+    assert uncovered["checks"][0].get("description") is None
