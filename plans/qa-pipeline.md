@@ -3623,6 +3623,29 @@ relative, not a schedule — this is weeks of work, not months.
     case a future "is this whole dataset still supported" view is ever
     wanted, but nothing asks for that today.
 
+68. **[parked, 2026-09-17 - Keith's own call: resume after Phase 6, same
+    as item 66]** Polish `RELEASE_NOTES` (item 62/Phase 5h's panel,
+    `CHANGELOG.md`) - two separate asks. **Categorization**: label/group
+    entries by which part of the system they touched (e.g. Dashboard,
+    Generator, QA Pipeline/checks, Contracts, Publishing/CI), possibly
+    with small iconography per category, rather than today's flat Keep-
+    a-Changelog `### Added`/`### Fixed` sections with no component axis
+    at all. Needs a real scoping pass when picked up - how a
+    category is assigned to a past entry (hand-tagged retroactively vs.
+    only for new ones going forward), whether an entry can carry more
+    than one category, and how deep to go on iconography (a handful of
+    inline emoji vs. real SVG icons, given `dashboard/changelog_md.py`'s
+    `parse_changelog()` would need to carry the extra field through to
+    `RELEASE_NOTES`'s embedded shape either way). **Writing style**:
+    Keith wants a few rounds of him rephrasing/giving feedback on
+    existing real entries in `CHANGELOG.md` so future entries match his
+    preferred voice/level of detail, before either of the above gets
+    built - a calibration pass on the actual prose, not just the data
+    shape. Do the writing-style rounds first; they'll likely inform
+    how the categorization ends up looking (e.g. how granular a
+    category needs to be to match how he actually talks about the
+    work), not the other way around.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
