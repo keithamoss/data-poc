@@ -3,6 +3,19 @@
 <meta charset="utf-8">
 <title>Data Asset QA Register</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+// Applied synchronously, before <style> even parses, so a stored
+// explicit preference (localStorage, set by the theme-btn toggle further
+// down) takes effect before first paint - no flash of the wrong theme.
+// No preference stored means no data-theme attribute at all, which
+// leaves the CSS's own @media (prefers-color-scheme: dark) rule in
+// charge (design tokens, below) - "no explicit choice yet" stays
+// genuinely OS-preference-following, not silently pinned to light.
+try{
+  const t = localStorage.getItem("theme");
+  if(t==="light"||t==="dark") document.documentElement.setAttribute("data-theme", t);
+}catch(e){}
+</script>
 <style>
 /* Self-hosted fonts (fonts/*.woff2, latin subset only - this dashboard is
    English-only) - previously loaded from fonts.googleapis.com. Fetched the
@@ -340,6 +353,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
       </div>
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
+      <button class="snapshots-btn" id="theme-btn" type="button">🌙 Dark mode</button>
       <button class="snapshots-btn" id="asof-btn" type="button">📅 As of: <span id="asof-btn-label">…</span></button>
       <button class="snapshots-btn" id="activity-btn" type="button">📋 Recent activity</button>
       <button class="snapshots-btn" id="snapshots-btn" type="button">🕐 Past snapshots</button>
@@ -455,6 +469,33 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
 
 <script>
 "use strict";
+/* =========================================================================
+   0. THEME TOGGLE — explicit light/dark override, persisted in
+      localStorage. The <head>'s own tiny inline script (above) already
+      applied any stored preference before first paint; this just keeps
+      the button's own label in sync and handles the click. No stored
+      preference means no explicit override at all (data-theme left
+      unset), which is deliberate - the CSS's prefers-color-scheme rule
+      stays in charge until the user actually picks a theme, rather than
+      this defaulting to "light" the moment the button renders.
+========================================================================= */
+function currentTheme(){
+  let stored = null;
+  try{ stored = localStorage.getItem("theme"); }catch(e){}
+  if(stored==="light"||stored==="dark") return stored;
+  return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+function applyTheme(t){
+  document.documentElement.setAttribute("data-theme", t);
+  document.getElementById("theme-btn").textContent = t==="dark" ? "☀️ Light mode" : "🌙 Dark mode";
+}
+applyTheme(currentTheme());
+document.getElementById("theme-btn").addEventListener("click", ()=>{
+  const next = currentTheme()==="dark" ? "light" : "dark";
+  try{ localStorage.setItem("theme", next); }catch(e){}
+  applyTheme(next);
+});
+
 /* =========================================================================
    1. DETERMINISTIC RNG  (mulberry32, seeded by a hashed string) — the mock
       dataset regenerates identically on every reload/theme toggle.
