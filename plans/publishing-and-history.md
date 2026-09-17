@@ -1795,17 +1795,64 @@ rather than now.
 
 **Phase 5 (UI presentation - spans Thread D's check-lifecycle UI and
 Thread A's changelog/activity-feed UI) - its own standalone phase,
-pinned per Keith's own call:**
-- Thread D: the breaking-change trend-line gap, the non-breaking marker
-  (same color, no gap), **retired-checks dropping from the default
-  current-status view with a toggle to show them**, and the changelog +
-  description sections in the existing check-detail panel.
-- Thread A: the "📋 Recent activity" header button + panel for the
-  publish changelog (same interaction pattern as "🕐 Past snapshots").
-- Depends on Phase 1 (check-lifecycle data to render) and Phase 3
-  (publish-activity data to render) - not on Phase 2 directly (though
-  Phase 2 is what makes the check-lifecycle data actually renderable)
-  or Phase 4.
+pinned per Keith's own call. Split into 4 sub-phases, 2026-09-17
+(Keith's own follow-up call, same reasoning as the earlier "split into
+5 phases" reorg above): the original single-phase bundle mixed one
+genuinely substantial piece of work (a real trend-chart architecture
+change) in with three much smaller, independent, purely-additive UI
+pieces - splitting lets each land and get verified on its own rather
+than as one large, harder-to-review change. Depends on Phase 1
+(check-lifecycle data to render) and Phase 3 (publish-activity data to
+render) - not on Phase 2 directly (though Phase 2 is what makes the
+check-lifecycle data actually renderable) or Phase 4. Recommended
+build order below; the 4 sub-phases have no dependencies on each other
+(each is a self-contained UI addition), so the order is a suggestion,
+not a requirement.**
+
+- **Phase 5a (Thread A) - the "📋 Recent activity" panel.** Header
+  button + panel for the publish changelog, same interaction pattern as
+  the already-built "🕐 Past snapshots" - the smallest, most
+  self-contained piece (reuses an existing UI pattern, no new data
+  shape to design), recommended starting point.
+- **Phase 5b (Thread D) - retired checks default out of the
+  current-status view, with a toggle to bring them back.** Column
+  drawer + overall summary. Independent of the other 3 sub-phases -
+  purely additive (filter + a toggle control), no chart-rendering
+  changes.
+- **Phase 5c (Thread D) - changelog + description sections in the
+  existing check-detail panel.** Surfaces each check's own hand-authored
+  `changelog`/`description` metadata (already collected by
+  `check_lifecycle.py` since Phase 1) as new sections of the panel that
+  already shows a check's status/history/comparison - mostly plumbing
+  already-available data into new panel sections, no new data source
+  needed.
+- **Phase 5d (Thread D) - the trend-chart gap/marker work: the biggest,
+  most technically substantial piece, recommended last.** Bundles THREE
+  related fixes that all trace back to the same root cause (`trendChart()`'s
+  `xs()` position function places history points by array INDEX, not
+  real elapsed time, so it has no way to represent "a gap in time"
+  today):
+  - the breaking-change trend-line gap (a real visual split, styled
+    distinctly from Thread C's "no data available" gap - both are "a
+    gap in the line" but mean different things and must not look
+    identical)
+  - the non-breaking-change marker (a subtle marker on the still-
+    continuous line, deliberately the SAME color as the breaking-change
+    styling - color means "the check itself changed here" either way,
+    shape is what carries breaking-vs-non-breaking)
+  - the un-retirement gap bug (`plans/qa-pipeline.md`'s own entry,
+    2026-09-16): today a retired-then-reactivated check's `history`
+    array jumps straight from its last pre-retirement point to its
+    first post-reactivation one with nothing marking the gap, so an
+    index-based x-axis draws it as an ordinary unbroken line - visually
+    implying continuous reporting straight through the retired period,
+    exactly backwards. Keith's own call: fix this together with the
+    breaking-change gap rather than separately, since a real-time-aware
+    x-axis (or at minimum a real-time-aware gap/break check between
+    adjacent history points) likely fixes both at once.
+  Exact visual styling (color/pattern for the breaking-change gap vs.
+  the shared marker color) is still not decided - work that out when
+  this sub-phase is actually built, not before.
 
 **Phase 6 (test coverage) - added 2026-09-16, Keith's own call, once
 Phases 1-5 are otherwise done:** not scoped yet beyond the name - a
