@@ -799,6 +799,36 @@ going forward) - full detail, plus the separate real `delivery_id`/
 item 55, not repeated here since it's a generator/qa_results_reader.py
 fix, not an as-of-viewing one.
 
+**Superseded, 2026-09-17 (Phase 5j, `plans/qa-pipeline.md` item 65) -
+`AS_OF_OFFSET_DAYS` itself is gone, not just re-tuned.** Everything
+above this note (the "staleness TOLERANCE" design, the three options
+on the table for the CP-cadence collision, BDM's own window-collision
+fix) is history, not current design - kept for the record of how this
+was reasoned through, not as a description of what's built now.
+Walking through the actual open tension with Keith (why a flat global
+day-count kept trading BDM's sensitivity against CP's cadence,
+concretely: CP's real ~92-day gap between deliveries made the default
+view read `nodata` for roughly two-thirds of every quarter) surfaced
+that the real problem was the day-count SHAPE itself, not which one
+number to pick. Keith's own reframe, prompted by "tell me more about
+this" rather than the `AskUserQuestion` 3-option menu originally
+planned to resolve it: the actual intent was never "N days of
+tolerance," it was "a team on a quarterly cadence should be able to
+set the as-of date to their own cycle's start and watch deliveries
+flip from no-data to real status (and see whether they arrived late,
+or early) as the day goes on" - a concept that needs to work
+identically for a team on a daily cadence too. That reframing is what
+replaced the day-count with real, per-dataset cadence config (daily/
+weekly/quarterly, each with an AWST expected time + latency grace,
+authored in each dataset's own ODCS contract's `slaProperties:`) -
+"no data" now means "nothing has landed in the CURRENT expected
+cycle," computed fresh from cadence, never a day-count comparison.
+Confirmed fixed for real: CP's default as-of view (2026-09-17, inside
+its current Aug-1-anchored quarterly cycle) now shows real status
+instead of `nodata`. Full design history, what was built, and how it
+was verified against real regenerated data: `plans/qa-pipeline.md`
+item 65 - not repeated here.
+
 ## Build order
 
 Renumbered/reorganized 2026-09-16 (Keith's own call, for ease of
@@ -1838,6 +1868,11 @@ rather than now.
   simplicity, not because of a real dependency.
 - Includes Thread C's own UI (the as-of date picker/calendar widget,
   URL param persistence) - that's part of this phase, not Phase 5 below.
+- The picker widget itself and its URL persistence are still exactly
+  as built here; only the staleness rule UNDERNEATH it (what makes a
+  dataset read "no data" for a given as-of date) later changed - see
+  the "Superseded, 2026-09-17" note earlier in this thread and
+  `plans/qa-pipeline.md` item 65 (Phase 5j).
 
 **Phase 5 (UI presentation - spans Thread D's check-lifecycle UI and
 Thread A's changelog/activity-feed UI) - its own standalone phase,

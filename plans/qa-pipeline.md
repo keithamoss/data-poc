@@ -3378,6 +3378,136 @@ relative, not a schedule — this is weeks of work, not months.
     `uv run pytest` (181, unchanged - a pure frontend change) and
     `uv run ruff check .` clean.
 
+65. **[built, 2026-09-17 - Phase 5j]** Replaced `AS_OF_OFFSET_DAYS` (the
+    flat global day-count staleness tolerance item 64/`plans/publishing-
+    and-history.md` Thread C left open, "CP reads no data for roughly
+    two-thirds of every quarter") with real, per-dataset, computable
+    "expected refresh cadence" config - a genuine design change, not a
+    number tweak, scoped with Keith across an extended brainstorm before
+    building anything (see `plans/publishing-and-history.md` Thread C's
+    own write-up for the full back-and-forth). Keith's actual intent,
+    once unpacked: a team running a quarterly refresh should be able to
+    set the as-of date to their own cycle's start and watch datasets
+    flip from "no data" to real red/amber/green (and see whether each
+    arrived late or *early*) as the day's deliveries land - the same
+    concept needing to work for a team on a daily cadence too, so
+    "refresh window" (my first framing) was wrong; Keith's own
+    correction: "tying it into...an 'expected refresh cadence' /
+    'expected arrival dates' for each dataset." Split into two stages
+    (Keith's agreement, "Yes, go ahead," was for Stage 1 only): **Stage
+    1** (this entry) - cadence config + the no-data trigger rewrite +
+    real on-time/late/early classification. **Stage 2** (not started) -
+    a supply/resupply history section on the dataset page (Option A,
+    bolted onto the existing `renderDataset()` page, working uniformly
+    regardless of cadence type) - explicitly deferred to a later session.
+
+    Cadence model (three types only, per Keith's own scope - "daily and
+    weekly and quarterly"): `{type: "daily"|"weekly"|"quarterly",
+    weekday (weekly only, 0=Monday), anchor_months/day_of_month
+    (quarterly only), expected_time (AWST wall-clock, "HH:MM"),
+    latency_minutes}`. AWST (UTC+8, fixed, no daylight saving in WA -
+    Keith: "AWST for the Timezone please") makes the UTC conversion
+    plain arithmetic, no timezone library needed. Keith's own revision
+    mid-brainstorm mattered here: initial scope was "must arrive on the
+    day expected, no grace," which would have meant dropping the SLA's
+    existing (if previously-unused) `latencyHours` concept entirely; he
+    then explicitly asked to keep a real latency tolerance - "an agreed
+    hour of the day...allow some sort of latency, probably on the order
+    of minutes or an hour or so" for daily, "less of an issue" but still
+    real for quarterly ("some hours...eight hours...for a business
+    day") - landing on `expected_time` + `latency_minutes` (Keith:
+    "Minutes is fine" as the one consistent unit across all three
+    cadence types) rather than pure date-only comparison.
+
+    Where the config lives: each dataset's own real ODCS contract's
+    `slaProperties:` array (`contract/bdm-birth-registrations-
+    contract.yaml`, `contract/child-protection-contract.yaml`) - Keith
+    asked directly "Inside the odcs contract?" and "How does it work
+    alongside the sla frequency and expectedBy???" before this was
+    settled. Confirmed via the real ODCS 3.2.0 schema that
+    `slaProperties:` genuinely supports arbitrary `property` names (no
+    enum, `additionalProperties: false` only on each entry object, not
+    the array) - a real mechanism, not a repurposed one. The old
+    `sla.frequency`/`sla.expectedBy`/`sla.latencyHours` decorative text
+    was confirmed by grep to be completely unread by anything (not even
+    the dashboard's own display used `latencyHours` - the old `onTime`
+    computation used a hardcoded `< 24h` literal) - all three replaced
+    by the real `cadence` block; `frequency` is now a derived display
+    label (`cadenceLabel()`), never separately hand-authored. Fixed a
+    real, pre-existing inaccuracy found along the way: CP's
+    `slaProperties.frequency` had been stale at "7 d" (weekly) since
+    before this collection's real cadence was migrated to calendar
+    quarters - never updated through either of CP's later quarterly-
+    anchor migrations, since nothing downstream ever actually read it.
+    Corrected to "3 mo" alongside adding the real cadence.
+
+    Built: `pipeline/cadence.py` - `parse_cadence_from_contract()`,
+    `cycle_start(cadence, on_or_before)` (pure date arithmetic - "the
+    most recent day, at or before this date, a delivery was expected" -
+    generalizes `generator/generate_cp_runs.py`'s own `_quarter_start()`
+    to arbitrary anchor months/day-of-month, cross-checked against it
+    directly for CP's real config across ~140 dates in
+    `tests/test_cadence.py`), and `classify_arrival(cadence, run_date,
+    earliest_extract_utc)` (a real timestamp comparison against the
+    cadence-derived expected UTC moment + latency grace - "early" /
+    "onTime" / "late", replacing the old boolean `onTime`).
+    `cycle_start()` needed a JS port (`cycleStartDate()` in the
+    dashboard template) since the as-of picker lets a viewer pick any
+    date the Python side hasn't seen - cross-verified byte-for-byte
+    against the Python implementation across daily/weekly/quarterly
+    cases (weekday math, quarter-boundary math) before trusting it.
+    `classify_arrival()` never needed a JS port - it's computed once,
+    server-side, per real run (in `pipeline/build_dashboard_data.py`/
+    `build_cp_dashboard_data.py`, reusing each run's own already-
+    committed `earliest_extract`/`max_lag_hours` from `qa_results/*/
+    dataset_stats.json` - no live DB access, keeping CI's never-touch-
+    data rule intact) and embedded as a fixed historical fact; a past
+    run's real arrival time never changes no matter what as-of date
+    someone later picks.
+
+    `clipDatasetToAsOf()`'s `staleAsOf` flag (item 64's mechanism,
+    reused unchanged) now triggers on "the most recent eligible run's
+    own date is before this as-of date's current cadence cycle start"
+    instead of a day-count comparison. `AS_OF_OFFSET_DAYS` removed
+    entirely (from the template, `contract/data-asset.yaml`, and
+    `dashboard/embed_dashboard_data.py`'s embed step) - `defaultAsOf()`
+    now just returns real wall-clock "today," since there's no offset
+    left to subtract. All `onTime` call sites (arrival pills, the SLA
+    strip's "Latest arrival" line, `arrivalHistory`/`arrivalByRun`)
+    converted to the 3-state `arrivalStatus`, with a new amber pill for
+    "early" alongside the existing green/red for onTime/late.
+
+    Verified against real, live data - the actual regression this fixes:
+    headless Chromium confirmed CP's default as-of view (2026-09-17,
+    inside the current Aug-1-anchored quarterly cycle) now shows real
+    status (`agencyStatus: "red"`, `dsStatus: "red"`, `noDataAsOf:
+    false`, `arrivalStatus: "onTime"`, 11 real column tiles) instead of
+    the old "no data" fallback - CP's real Aug 1 2026 delivery genuinely
+    falls inside its own current cycle. The genuinely-empty case
+    (`applyAsOf("2020-01-01")`) still correctly shows `nodata`/zero
+    columns. A real regenerated BDM history (176 runs) shows a genuine
+    mix of `early`/`late` and zero `onTime` - the real synthetic
+    extraction-time distribution (clustered around 20:00 UTC and 01:00
+    UTC) straddles the expected 22:00-23:00 UTC grace window narrowly
+    on both sides, so the classification is working correctly, it's
+    just revealing that the generator's actual delivery timing doesn't
+    happen to land inside a tight 60-minute window - not a bug, a real
+    finding worth flagging to Keith if the `onTime` state's practical
+    unreachability for BDM turns out to matter later. CP's own history
+    (all 15 real runs) is `onTime` throughout, consistent with its much
+    wider 8-hour grace window. Zero console errors in all cases. Real
+    end-to-end regeneration: `qa_tools.bdm.orchestrate_bdm` (176 runs,
+    14,079 checks: 9770 pass / 806 warn / 3503 fail, unchanged from the
+    pre-Phase-5j run - only tool-invocation metadata differs, verified
+    by diff) and `qa_tools.cp.orchestrate_cp` (15 runs, 2655 checks:
+    2141 pass / 126 warn / 388 fail). Full `uv run pytest` (205, two
+    updated - `test_build_dashboard_data.py`/`test_build_cp_dashboard_
+    data.py`'s `onTime`-hardcoding regression tests re-targeted at
+    `arrivalStatus`, since the old test's premise - mutating
+    `max_lag_hours` to flip status - no longer applies now that
+    `arrivalStatus` is computed from real timestamps, not `max_lag_
+    hours`) and `uv run ruff check .` both clean.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
