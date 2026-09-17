@@ -3276,6 +3276,40 @@ relative, not a schedule — this is weeks of work, not months.
     narrow-viewport pass done as they were added. Not investigated or
     scoped yet - just logged so it isn't lost.
 
+    **Built, 2026-09-17 (Phase 5i).** Now 6 buttons (item 62's "Release
+    notes" landed in between and made it measurably worse, per that
+    item's own note). Screenshotted the real, current header at 375px
+    before touching anything, rather than guessing at the problem: the
+    button row - a plain `display:flex; gap:10px` div with no wrap -
+    had no narrow-viewport treatment at all, so the as-of button's own
+    dynamic label ("As of: Jul 19, 2026") wrapped mid-button into 3
+    lines and the whole row simply overflowed past the viewport edge,
+    cutting "Past snapshots" off mid-word ("snap…"). `.masthead` itself
+    already had `flex-wrap:wrap` (why the button row was already
+    dropping to its own line below the wordmark) - the gap was entirely
+    WITHIN that row, one level down.
+
+    Fix, CSS-only, no new UI paradigm (no hamburger/overflow menu, no
+    icon-only collapse, no horizontal scroll - the simplest option that
+    fit this project's plain hand-authored-CSS style): a new
+    `.header-actions` class (`display:flex; flex-wrap:wrap; gap:10px;
+    row-gap:8px`) replacing the button row's old inline style, plus
+    `white-space:nowrap` added to `.snapshots-btn` so each button's own
+    label stays atomic and moves to the next row as a whole rather than
+    splitting internally - the two changes together mean the row now
+    wraps onto as many lines as it needs instead of overflowing.
+    `@media (max-width:480px)` additionally trims button/live-indicator
+    padding and font-size a bit, fitting more per row before it has to
+    wrap further, without truncating or hiding any real content.
+
+    Verified with real headless Chromium screenshots at 375px, 414px,
+    and 768px (iPhone SE/standard mobile/tablet), light and dark mode:
+    every button's full label stays intact, no mid-button wrapping, no
+    row overflow, all 6 buttons still open/close correctly at 375px
+    (clicked through Release notes and the dark mode toggle for real).
+    Full `uv run pytest` (188, unchanged - a pure CSS change) and `uv
+    run ruff check .` both clean.
+
 64. **[built, 2026-09-17 - Phase 5g]** Tier 3's no-data drill-down gap -
     found investigating Keith's own two walked-through scenarios ("as of
     1 August I should see red/amber/green; as of 28 July I should see

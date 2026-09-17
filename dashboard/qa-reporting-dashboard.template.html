@@ -310,8 +310,20 @@ button{font:inherit; color:inherit;}
    happen to already be open (plans/wider.md #26's picker follow-up). */
 #snapshots-backdrop{z-index:44;}
 #snapshots-panel{z-index:45;}
-.snapshots-btn{background:var(--surface-alt); border:1px solid var(--line); border-radius:999px; padding:6px 14px; font:600 12.5px "Public Sans",sans-serif; color:var(--ink); cursor:pointer;}
+.snapshots-btn{background:var(--surface-alt); border:1px solid var(--line); border-radius:999px; padding:6px 14px; font:600 12.5px "Public Sans",sans-serif; color:var(--ink); cursor:pointer; white-space:nowrap;}
 .snapshots-btn:hover{border-color:var(--line-strong);}
+/* Item 63 (plans/qa-pipeline.md, Phase 5i) - the header's own button row
+   (6 of them now, plus the live indicator) had no narrow-viewport
+   treatment at all: no wrap on the row itself, no white-space:nowrap on
+   the buttons, so the as-of button's own dynamic label ("As of: Jul 19,
+   2026") wrapped mid-button into 3 lines and the row simply overflowed
+   past the viewport edge, cutting "Past snapshots" off mid-word.
+   header-actions gives that row somewhere to go (its own wrapped rows,
+   same way .masthead already wraps the wordmark away from it) instead
+   of overflowing; white-space:nowrap above keeps each button's own
+   label atomic so it moves to the next row as one whole button, never
+   splits internally. */
+.header-actions{display:flex; align-items:center; gap:10px; row-gap:8px; flex-wrap:wrap;}
 .snapshot-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border:1px solid var(--line); border-radius:var(--radius-md); margin-bottom:8px;}
 .snapshot-row .meta{font-size:13px;}
 .snapshot-row .meta .date{font-weight:600;}
@@ -362,6 +374,13 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
 @media (max-width:480px){
   .compare-grid{grid-template-columns:1fr;}
   .drawer{width:100%;}
+  /* Item 63: trims each header button down before they wrap onto more
+     rows than the screen has room for - real content (dark mode label,
+     the as-of date, "Recent activity"/"Release notes"/"Past snapshots")
+     stays intact, just tighter, rather than truncating or icon-only
+     collapsing any of it away. */
+  .snapshots-btn{padding:6px 11px; font-size:11.5px;}
+  .live{font-size:11.5px; padding:5px 10px 5px 8px;}
 }
 </style>
 
@@ -375,7 +394,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
         <h1>Data Asset QA Register</h1>
       </div>
     </div>
-    <div style="display:flex; align-items:center; gap:10px;">
+    <div class="header-actions">
       <button class="snapshots-btn" id="theme-btn" type="button">🌙 Dark mode</button>
       <button class="snapshots-btn" id="asof-btn" type="button">📅 As of: <span id="asof-btn-label">…</span></button>
       <button class="snapshots-btn" id="activity-btn" type="button">📋 Recent activity</button>
