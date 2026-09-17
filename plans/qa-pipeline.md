@@ -3508,8 +3508,10 @@ relative, not a schedule — this is weeks of work, not months.
     `arrivalStatus` is computed from real timestamps, not `max_lag_
     hours`) and `uv run ruff check .` both clean.
 
-66. **[investigate, 2026-09-17]** Explore the real ODCS contract format
-    more thoroughly - Keith's own ask, after Phase 5j's `slaProperties:`
+66. **[parked, 2026-09-17 - Keith's own call: resume after `plans/
+    publishing-and-history.md`'s Phase 6 (test coverage pass) is done,
+    not before]** Explore the real ODCS contract format more thoroughly
+    - Keith's own ask, after Phase 5j's `slaProperties:`
     work turned up a mechanism (a real, well-defined SLA property shape)
     neither of us knew was there beforehand: "what else does ODCS have
     that we're not using yet, and is any of it worth adopting." Read the
