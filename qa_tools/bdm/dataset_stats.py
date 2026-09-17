@@ -100,9 +100,33 @@ def _arrival(conn: duckdb.DuckDBPyConnection, run_id: str) -> dict:
         """SELECT MAX(date_diff('second', date_registered, extract_timestamp)) / 3600.0
            FROM birth_registrations WHERE run_id = ?""", [run_id]
     ).fetchone()[0]
+    # A real bug found 2026-09-17 (Phase 5j's arrival-status work): a
+    # plain MIN(extract_timestamp) over every row picks up
+    # generator.dirty.inject_extract_timestamp_disorder's own rows too -
+    # deliberately shifted to BEFORE their row's date_registered, to give
+    # the UNRELATED "extract timestamp ordering" check something real to
+    # catch (rate_ts_disorder in generator/dirty.py, 1-4% of rows on any
+    # amber/red-severity run). With thousands of rows per run, even a 1%
+    # rate almost always plants at least one such row, so earliest_extract
+    # was silently reporting the worst deliberately-corrupted outlier
+    # rather than the batch's genuine earliest arrival - directly
+    # distorting pipeline.cadence.classify_arrival()'s real early/onTime/
+    # late classification (a run's arrival could read "early" by weeks
+    # purely because one disordered row happened to land in it). Filtered
+    # to `extract_timestamp >= date_registered` - the same "is this row's
+    # timestamp even physically possible" test the ordering check itself
+    # applies - so a run's genuine earliest arrival is used instead;
+    # falls back to the unfiltered MIN only in the (currently unreachable
+    # in this generator, but defensive) case where literally every row in
+    # the run was disordered.
     earliest_extract = conn.execute(
-        "SELECT MIN(extract_timestamp) FROM birth_registrations WHERE run_id = ?", [run_id]
+        """SELECT MIN(extract_timestamp) FROM birth_registrations
+           WHERE run_id = ? AND extract_timestamp >= date_registered""", [run_id]
     ).fetchone()[0]
+    if earliest_extract is None:
+        earliest_extract = conn.execute(
+            "SELECT MIN(extract_timestamp) FROM birth_registrations WHERE run_id = ?", [run_id]
+        ).fetchone()[0]
     return {"max_lag_hours": max_lag_hours, "earliest_extract": str(earliest_extract) if earliest_extract else None}
 
 

@@ -25,6 +25,39 @@ from generator.presentation import present_identity_batch
 
 FACILITY_SUFFIXES = ["Community Hospital", "Birth Centre", "District Hospital", "Regional Hospital"]
 
+# Real-world arrival calibration (Keith, 2026-09-17): "on time about 80%
+# of the time... early for 5%... late 15%" - against BDM's real cadence
+# (contract/bdm-birth-registrations-contract.yaml's slaProperties: -
+# daily, 14:00 AWST expected, 60 min latency grace; see pipeline/
+# cadence.py's classify_arrival()). 14:00 AWST is UTC-8h = 06:00 UTC the
+# SAME day as date_registered's own midnight (that same contract entry's
+# own comment explains why 14:00, not the more obvious-sounding 06:00 -
+# AWST hours before 08:00 convert to a UTC moment on the PREVIOUS
+# calendar day, which the real "extract timestamp ordering" check
+# always rejects - 06:00 AWST made "on time" structurally unreachable),
+# so the on-time window in hours-from-midnight-UTC terms is [6, 7] (the
+# 60-minute grace after 06:00 UTC); early is anything before 6h, late
+# anything after 7h - both kept comfortably inside [0, 24) so neither
+# genuinely trips that same ordering check on its own.
+ARRIVAL_ON_TIME_PROB = 0.80
+ARRIVAL_EARLY_PROB = 0.05  # remainder (1 - ON_TIME - EARLY) is late
+_ARRIVAL_ON_TIME_RANGE = (6.0, 7.0)
+_ARRIVAL_EARLY_RANGE = (2.0, 6.0)  # up to 4h early
+_ARRIVAL_LATE_RANGE = (7.0, 11.0)  # up to 4h late
+
+
+def _draw_arrival_base_offset_hours(rng: np.random.Generator) -> float:
+    """One draw per RUN (not per row - see generate_daily_batch's own
+    call site for why), giving this batch's own characteristic
+    extraction-start time as an offset in hours from date_registered's
+    midnight UTC."""
+    r = rng.random()
+    if r < ARRIVAL_ON_TIME_PROB:
+        return rng.uniform(*_ARRIVAL_ON_TIME_RANGE)
+    if r < ARRIVAL_ON_TIME_PROB + ARRIVAL_EARLY_PROB:
+        return rng.uniform(*_ARRIVAL_EARLY_RANGE)
+    return rng.uniform(*_ARRIVAL_LATE_RANGE)
+
 
 def generate_daily_batch(run_date: date, seed: int, n_rows: int, id_offset: int = 0) -> pd.DataFrame:
     """id_offset: added to the per-row counter used to mint registration_number/
@@ -89,7 +122,27 @@ def generate_daily_batch(run_date: date, seed: int, n_rows: int, id_offset: int 
                               np.char.add(np.char.add(p2_given.astype(str), " "), p2_family.astype(str)),
                               None)
 
-    extract_timestamp = pd.to_datetime(date_registered) + pd.to_timedelta(rng.integers(1, 20, size=n), unit="h")
+    # A dedicated RNG stream (seed+5 - seed+1..+4 already taken by the
+    # present_identity_batch() calls above/below), so retuning this
+    # doesn't perturb the main `rng` stream's draw order and change
+    # unrelated fields (sex/names/twin flags) that happen to be drawn
+    # after this point. One CHARACTERISTIC offset per run (not per row -
+    # a real batch's extraction genuinely starts at one point in time,
+    # not 2000 independent random times; earliest_extract is a MIN()
+    # over the whole run downstream (qa_tools/bdm/dataset_stats.py), so
+    # per-row-independent offsets across a wide range would make that
+    # MIN collapse onto the range's extreme low tail almost every run,
+    # regardless of the intended on-time/early/late split above), plus a
+    # small non-negative per-row jitter so rows within the same batch
+    # aren't all identically timestamped.
+    arrival_rng = np.random.default_rng(seed + 5)
+    base_offset_hours = _draw_arrival_base_offset_hours(arrival_rng)
+    jitter_minutes = arrival_rng.integers(0, 45, size=n)
+    extract_timestamp = (
+        pd.to_datetime(date_registered)
+        + pd.to_timedelta(base_offset_hours, unit="h")
+        + pd.to_timedelta(jitter_minutes, unit="m")
+    )
 
     # twin_rate of rows below become the FIRST twin of a real sibling pair
     # (a second row is appended for each, below) - previously is_multiple_

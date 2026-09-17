@@ -724,8 +724,27 @@ slaProperties:
   - property: cadenceType
     value: daily
     element: birth_registrations
+  # 14:00 AWST (not the original 06:00 placeholder inherited from the
+  # dashboard's old decorative "06:00 local" text, mentioned above) -
+  # corrected 2026-09-17, calibrating real BDM arrival data to Keith's
+  # own real-world split (~80% on time, 5% early, 15% late - see
+  # generator/daily_batch.py) surfaced a genuine conflict this contract
+  # value had with an already-real, already-shipped check: AWST is
+  # UTC+8, so any expectedTime before 08:00 AWST converts to a UTC
+  # moment on the PREVIOUS calendar day - before date_registered's own
+  # UTC midnight, which the real "extract timestamp ordering" check
+  # (identical in both contract/bdm-birth-registrations-soda-checks.yml
+  # and this same file's own quality: block - `extract_timestamp >=
+  # date_registered`) always rejects. Under 06:00, "on time" was
+  # therefore structurally unreachable - every real run classified as
+  # early or late, never on time, no matter how the generator's random
+  # spread was tuned. 14:00 AWST = 06:00 UTC, safely inside date_
+  # registered's own UTC day with room either side for early/late,
+  # resolves this without touching the ordering check itself (a real,
+  # already-correct DQ check on genuinely bad data - not the thing to
+  # weaken).
   - property: expectedTime
-    value: "06:00"
+    value: "14:00"
     element: birth_registrations
     description: Agreed daily delivery time, AWST.
   - property: latency

@@ -59,6 +59,62 @@ def test_bdm_check_aggregates_are_scoped_by_run_id():
     assert stats["check_aggregates"]["sex"]["total_invalid"] == 0
 
 
+def test_bdm_earliest_extract_ignores_disordered_rows():
+    """Real bug (2026-09-17, Phase 5j): generator.dirty.
+    inject_extract_timestamp_disorder deliberately shifts a fraction of
+    rows' extract_timestamp to BEFORE their own date_registered, so the
+    unrelated 'extract timestamp ordering' check has something real to
+    catch. A plain MIN(extract_timestamp) picked up those rows too,
+    reporting a batch's earliest arrival as days/weeks earlier than any
+    row genuinely arrived - silently distorting arrival-status
+    classification. earliest_extract must skip rows where
+    extract_timestamp < date_registered and report the genuine earliest
+    arrival instead."""
+    conn = duckdb.connect(":memory:")
+    conn.execute("""
+        CREATE TABLE birth_registrations (
+            run_id VARCHAR, sex VARCHAR, place_of_birth_suburb VARCHAR,
+            date_of_birth DATE, date_registered DATE, extract_timestamp TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        INSERT INTO birth_registrations VALUES
+        -- a disordered row: extract_timestamp BEFORE date_registered (the injected defect)
+        ('run_01', 'M', 'Fremantle', '2020-01-01', '2020-01-05', '2020-01-04 20:00:00'),
+        -- the genuine earliest arrival for this run
+        ('run_01', 'F', 'Fremantle', '2020-01-01', '2020-01-05', '2020-01-05 09:00:00'),
+        ('run_01', 'M', 'Fremantle', '2020-01-01', '2020-01-05', '2020-01-05 14:00:00')
+    """)
+
+    arrival = bdm_stats._arrival(conn, "run_01")
+
+    assert arrival["earliest_extract"] == "2020-01-05 09:00:00"
+
+
+def test_bdm_earliest_extract_falls_back_to_min_if_every_row_disordered():
+    """Defensive edge case for the fix above: if EVERY row in a run were
+    disordered (not currently reachable via the real generator's own
+    rates, but the code shouldn't silently return no arrival data at
+    all), earliest_extract falls back to the plain MIN rather than
+    None."""
+    conn = duckdb.connect(":memory:")
+    conn.execute("""
+        CREATE TABLE birth_registrations (
+            run_id VARCHAR, sex VARCHAR, place_of_birth_suburb VARCHAR,
+            date_of_birth DATE, date_registered DATE, extract_timestamp TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        INSERT INTO birth_registrations VALUES
+        ('run_01', 'M', 'Fremantle', '2020-01-01', '2020-01-05', '2020-01-04 20:00:00'),
+        ('run_01', 'F', 'Fremantle', '2020-01-01', '2020-01-05', '2020-01-04 22:00:00')
+    """)
+
+    arrival = bdm_stats._arrival(conn, "run_01")
+
+    assert arrival["earliest_extract"] == "2020-01-04 20:00:00"
+
+
 def test_cp_compute_dataset_stats_shape():
     conn = duckdb.connect(":memory:")
     conn.execute("CREATE SCHEMA raw")

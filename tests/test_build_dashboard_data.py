@@ -149,15 +149,18 @@ def test_arrival_status_is_genuinely_computed_from_real_cadence(tmp_path, monkey
     """arrivalStatus (Phase 5j, replacing the old hardcoded-then-max-lag-
     based onTime boolean) is a real classify_arrival() result against
     this dataset's own real cadence (contract/bdm-birth-registrations-
-    contract.yaml's slaProperties: - daily, 06:00 AWST = 22:00 UTC the
-    day before, 60 min latency grace) - not a hardcoded value. Mutating
+    contract.yaml's slaProperties: - daily, 14:00 AWST = 06:00 UTC the
+    same day, 60 min latency grace - corrected from an original 06:00
+    AWST placeholder that made "on time" structurally unreachable
+    against the real extract-timestamp-ordering check, plans/qa-
+    pipeline.md item 67) - not a hardcoded value. Mutating
     earliest_extract to fall inside vs. well outside that grace window
     must flip arrivalStatus accordingly."""
     _no_retired_checks(monkeypatch)
     mixed_stats = json.loads(json.dumps(FIXTURE_DATASET_STATS))
-    # run_01: inside the grace window (expected 2026-08-31T22:00:00Z, 60
+    # run_01: inside the grace window (expected 2026-09-01T06:00:00Z, 60
     # min grace) -> onTime.
-    mixed_stats["run_01_2026-09-01"]["arrival"]["earliest_extract"] = "2026-08-31 22:30:00"
+    mixed_stats["run_01_2026-09-01"]["arrival"]["earliest_extract"] = "2026-09-01 06:30:00"
     # run_02: hours after the grace window -> late.
     mixed_stats["run_02_2026-09-02"]["arrival"]["earliest_extract"] = "2026-09-02 10:00:00"
     results_path = tmp_path / "results_bdm.json"

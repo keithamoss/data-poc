@@ -198,6 +198,14 @@ button{font:inherit; color:inherit;}
 .sla-tile .v{font-size:17px; font-weight:600; font-family:"Source Serif 4",serif;}
 .sla-tile .v.mono{font-family:"IBM Plex Mono",monospace; font-size:15px;}
 
+/* Phase 5j Stage 2 - supply/resupply history */
+.supply-history{margin-block:8px 30px;}
+.supply-history-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;}
+.supply-history-head h3{font-size:16px; font-family:"Public Sans",sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted);}
+.supply-cycle{margin-bottom:18px;}
+.supply-cycle-label{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-muted); margin-bottom:8px;}
+.supply-cycle-label b{color:var(--ink);}
+
 .col-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(196px,1fr)); gap:10px; margin-block:8px 30px;}
 .col-tile{
   background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:12px 13px;
@@ -598,6 +606,10 @@ function cadenceLabel(cadence){
   return "";
 }
 function arrivalStatusLabel(status){ return status==="early" ? "Early" : status==="late" ? "Late" : "On time"; }
+function arrivalPill(status, size){
+  const cls = status==="late" ? "red" : status==="early" ? "amber" : "green";
+  return `<span class="pill ${cls} ${size||""}"><span class="ico"></span>${arrivalStatusLabel(status)}</span>`;
+}
 // item 54 (plans/qa-pipeline.md) - Keith's report: "1 collections"/"1
 // datasets" on the Executive tier's agency cards, plus 4 other
 // count-plus-noun sites found in the audit he asked for, all a plain
@@ -856,6 +868,71 @@ function cycleStartDate(cadence, dateStr){
   }
   throw new Error(`unknown cadence type ${cadence.type}`);
 }
+// stats.byRun's own "total" is already the dataset-wide row count at
+// that run (qa_tools' dataset_stats.py/pipeline's build_*_dashboard_
+// data.py - every column shares the same value) - reused here rather
+// than re-deriving row counts from the raw manifest, which for Child
+// Protection would need a table-name lookup (row_counts is keyed by
+// real table name, e.g. "cp_notifications", not this dataset's own
+// hyphenated id, e.g. "cp-notifications") this layer shouldn't have to
+// know about. Checked more than one column in case the first one's own
+// byRun doesn't happen to cover every run (a column/check introduced
+// partway through history) - returns null if truly none of them do,
+// left to each caller's own fallback. Extracted out of
+// clipDatasetToAsOf() (Phase 5j Stage 2) so buildSupplyHistory() below
+// can reuse the exact same lookup rather than re-deriving it.
+function rowCountAtRun(d, runId){
+  for(const col of d.columns){
+    const byRun = col.stats && col.stats.byRun;
+    if(byRun && byRun[runId]) return byRun[runId].total;
+  }
+  return null;
+}
+// Phase 5j Stage 2 (2026-09-17) - "a final view of how the refresh
+// period went" (Keith's own original framing for this whole feature).
+// Groups a dataset's REAL run history by cadence cycle (cycleStartDate()
+// - the same function clipDatasetToAsOf() already uses for its own
+// staleAsOf check, so a run's cycle here can never disagree with
+// whether it currently reads "no data"). Operates on the RAW dataset
+// shape (d.runs/d.arrivalByRun/d.columns - the same object
+// clipDatasetToAsOf() takes), not the already-clipped one, since this
+// section deliberately shows the WHOLE history grouped by cycle, not
+// just what's eligible as of the current as-of date - renderDataset()
+// picks which cycle to show BY DEFAULT (Keith's confirmed answer:
+// the as-of date's own current cycle, expandable to the rest).
+// Resupply attempts are NOT nested under their original delivery here
+// (Keith's confirmed answer only asked for cycle-level grouping) - each
+// attempt is its own entry within the cycle, newest first, with its own
+// resupply/attempt-number badge.
+function buildSupplyHistory(d){
+  const cadence = d.sla.cadence;
+  const arrivalByRun = d.arrivalByRun || {};
+  const groups = new Map(); // cycleStart -> entries[]
+  for(const run of (d.runs || [])){
+    const cycleStart = cycleStartDate(cadence, run.run_date);
+    const arrival = arrivalByRun[run.run_id] || {};
+    if(!groups.has(cycleStart)) groups.set(cycleStart, []);
+    groups.get(cycleStart).push({
+      run_id: run.run_id, run_date: run.run_date,
+      arrivalStatus: arrival.arrivalStatus, arrivedAt: arrival.arrivedAt,
+      rowCount: rowCountAtRun(d, run.run_id),
+      isResupply: !!run.is_resupply, attemptNumber: run.attempt_number || 1,
+      dirtySeverity: run.dirty_severity || null,
+    });
+  }
+  return [...groups.entries()]
+    .map(([cycleStart, entries]) => ({
+      cycleStart,
+      entries: entries.sort((a,b)=> b.run_date.localeCompare(a.run_date) || b.run_id.localeCompare(a.run_id)),
+    }))
+    .sort((a,b)=> b.cycleStart.localeCompare(a.cycleStart));
+}
+function cycleLabel(cadence, cycleStartStr){
+  const label = fmtDate(new Date(cycleStartStr+"T00:00:00Z"));
+  if(cadence.type==="daily") return label;
+  if(cadence.type==="weekly") return `Week of ${label}`;
+  return `Cycle starting ${label}`;
+}
 function clipDatasetToAsOf(d, asOfDateStr){
   const eligibleRuns = d.runs.filter(r => r.run_date <= asOfDateStr);
   if(!eligibleRuns.length) return null; // never supplied yet as of this date
@@ -908,24 +985,8 @@ function clipDatasetToAsOf(d, asOfDateStr){
     }};
   });
 
-  // stats.byRun's own "total" is already the dataset-wide row count at
-  // that run (qa_tools' dataset_stats.py/pipeline's build_*_dashboard_
-  // data.py - every column shares the same value) - reused here rather
-  // than re-deriving row counts from the raw manifest, which for Child
-  // Protection would need a table-name lookup this layer shouldn't have
-  // to know about. Checked more than one column in case the first one's
-  // own byRun doesn't happen to cover every run (a column/check
-  // introduced partway through history) - falls back to the dataset's
-  // own unclipped rowCount only if truly none of them do.
-  const rowCountAt = runId => {
-    for(const col of d.columns){
-      const byRun = col.stats && col.stats.byRun;
-      if(byRun && byRun[runId]) return byRun[runId].total;
-    }
-    return null;
-  };
-  const rowCount = rowCountAt(effectiveRunId) ?? d.rowCount;
-  const prevRowCount = (prevRunId && rowCountAt(prevRunId)) ?? rowCount;
+  const rowCount = rowCountAtRun(d, effectiveRunId) ?? d.rowCount;
+  const prevRowCount = (prevRunId && rowCountAtRun(d, prevRunId)) ?? rowCount;
 
   const arrivalByRun = d.arrivalByRun || {};
   const arrival = arrivalByRun[effectiveRunId];
@@ -992,6 +1053,18 @@ function buildChildProtectionDatasets(asOfDateStr){
     return clipped ? buildRealDataset(clipped)
       : noDataDataset(d.id, d.name, d.provider, d.deliveryFormat, d.sla);
   });
+}
+// Phase 5j Stage 2: the RAW (unclipped, full-history) real dataset
+// object for a given id - renderDataset()'s own `ds` is always the
+// AS-OF-CLIPPED build (buildRealDataset()'s output), whose own `.runs`
+// is only the eligible subset, not the dataset's whole real history -
+// buildSupplyHistory() needs the latter. Dataset ids are unique across
+// both real domains (e.g. "birth-registrations" vs. "cp-notifications"),
+// so no agency/collection context is needed to disambiguate.
+function rawRealDatasetById(datasetId){
+  if(REAL_BIRTH_REG_DATA && REAL_BIRTH_REG_DATA.id===datasetId) return REAL_BIRTH_REG_DATA;
+  if(REAL_CP_DATA && REAL_CP_DATA.datasets) return REAL_CP_DATA.datasets.find(d=>d.id===datasetId) || null;
+  return null;
 }
 
 
@@ -1689,8 +1762,7 @@ function renderAgency(view, agencyId){
               <td colspan="4" style="color:var(--ink-faint); font-size:12.5px;">No QA run within tolerance as of the selected date</td>
             </tr>`;
           }
-          const arrivalPillClass = ds.lastArrival.arrivalStatus==="late" ? "red" : ds.lastArrival.arrivalStatus==="early" ? "amber" : "green";
-          const arrivalPill = `<span class="pill ${arrivalPillClass} sm"><span class="ico"></span>${arrivalStatusLabel(ds.lastArrival.arrivalStatus)}</span>`;
+          const arrivalPillHtml = arrivalPill(ds.lastArrival.arrivalStatus, "sm");
           // Item 57 brought the Executive tier's sparkline down to Tier 2;
           // Phase 5e (#60) redesigned what it shows - see
           // aggregateSparkline()'s own comment - scoped here to just this
@@ -1699,7 +1771,7 @@ function renderAgency(view, agencyId){
           return `<tr data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td><div class="dataset-name">${ds.name}${ds.isReal?` <span class="pill tag sm"><span class="ico"></span>Real pipeline data</span>`:""}</div><div class="dataset-provider">${ds.provider}</div></td>
             <td>${pill(ds.status,"sm")}</td>
-            <td>${arrivalPill} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${fmtArrival(ds.lastArrival)}</span></td>
+            <td>${arrivalPillHtml} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${fmtArrival(ds.lastArrival)}</span></td>
             <td class="mono">${fmtInt(ds.rowCount)}</td>
             <td class="mono" style="color:var(--ink-muted);">${fmtDate(ds.lastArrival.date)}</td>
             <td style="min-width:100px;">${dsSpark}</td>
@@ -1711,6 +1783,74 @@ function renderAgency(view, agencyId){
     </div>
   `).join("");
   wrap.querySelectorAll("tbody tr").forEach(tr=> tr.addEventListener("click", ()=> navigate(JSON.parse(tr.dataset.nav))));
+}
+
+// Phase 5j Stage 2 - one cycle group's own entries as a `.dataset-table`
+// (the same reusable table style/hover-cursor Tier 2's dataset listing
+// already uses, not a new visual language). Each row's click applies
+// that entry's own run_date as the global as-of date (Keith's confirmed
+// answer: clicking an entry should drill into that run's own real
+// column/check breakdown) - reusing applyAsOf() rather than building a
+// second drill-down mechanism, since setting as-of to a specific real
+// run_date already makes clipDatasetToAsOf() pick that exact run as the
+// effective one everywhere else on this same page.
+function renderSupplyCycleRows(entries){
+  return entries.map(e => {
+    const resupplyBadge = e.isResupply
+      ? `<span class="pill tag sm"><span class="ico"></span>Resupply, attempt ${e.attemptNumber}</span>` : "";
+    const severityBadge = e.dirtySeverity
+      ? `<span class="pill ${e.dirtySeverity==="red"?"red":"amber"} sm"><span class="ico"></span>${e.dirtySeverity==="red"?"Red-severity defect":"Amber-severity defect"} injected</span>`
+      : "";
+    return `<tr data-run-date="${e.run_date}">
+      <td class="mono">${e.run_date}</td>
+      <td>${e.arrivalStatus ? arrivalPill(e.arrivalStatus,"sm") : ""} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt||""}</span></td>
+      <td class="mono">${e.rowCount!=null ? fmtInt(e.rowCount) : "—"}</td>
+      <td>${resupplyBadge} ${severityBadge}</td>
+    </tr>`;
+  }).join("");
+}
+function renderSupplyHistorySection(ds, cycles, currentCycleStart){
+  if(!cycles.length) return "";
+  const current = cycles.find(c=>c.cycleStart===currentCycleStart);
+  const older = cycles.filter(c=>c.cycleStart!==currentCycleStart);
+  const cycleBlock = c => `
+    <div class="supply-cycle">
+      <div class="supply-cycle-label">
+        <b>${cycleLabel(ds.sla.cadence, c.cycleStart)}</b>
+        ${c.cycleStart===currentCycleStart ? '<span class="pill tag sm"><span class="ico"></span>Current cycle</span>' : ""}
+        <span style="color:var(--ink-faint);">${c.entries.length} ${pluralize(c.entries.length,"delivery","deliveries")}</span>
+      </div>
+      <div class="overflow-x">
+      <table class="dataset-table">
+        <thead><tr><th>Arrived</th><th>Status</th><th>Rows</th><th></th></tr></thead>
+        <tbody>${renderSupplyCycleRows(c.entries)}</tbody>
+      </table>
+      </div>
+    </div>`;
+  return `
+    <div class="supply-history">
+      <div class="supply-history-head">
+        <h3>Supply history</h3>
+        ${older.length ? `<button class="link-btn" id="supply-history-toggle" type="button">Show all history (${cycles.length} cycles)</button>` : ""}
+      </div>
+      ${current ? cycleBlock(current) : `<div style="color:var(--ink-faint); font-size:13px;">No deliveries in the current cycle yet.</div>`}
+      ${older.length ? `<div id="supply-history-older" hidden>${older.map(cycleBlock).join("")}</div>` : ""}
+    </div>
+  `;
+}
+function wireSupplyHistorySection(container){
+  const toggle = container.querySelector("#supply-history-toggle");
+  const older = container.querySelector("#supply-history-older");
+  if(toggle && older){
+    toggle.addEventListener("click", ()=>{
+      const showing = !older.hidden;
+      older.hidden = showing;
+      toggle.textContent = showing ? toggle.dataset.collapsedLabel : "Show current cycle only";
+    });
+    toggle.dataset.collapsedLabel = toggle.textContent;
+  }
+  container.querySelectorAll(".supply-history tbody tr").forEach(tr=>
+    tr.addEventListener("click", ()=> applyAsOf(tr.dataset.runDate)));
 }
 
 function renderDataset(view, agencyId, collectionId, datasetId){
@@ -1776,6 +1916,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       <span style="color:var(--ink-faint);">— click a column for the full check-by-check breakdown, run-over-run comparison, and history</span>
     </div>
     <div class="col-grid" id="col-grid"></div>
+    <div id="supply-history-wrap"></div>
   `;
   const grid = document.getElementById("col-grid");
   // Item 57 brought Tier 2's sparkline down to Tier 3, narrower still -
@@ -1792,6 +1933,18 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     </button>`;
   }).join("");
   grid.querySelectorAll(".col-tile").forEach(btn=> btn.addEventListener("click", ()=> openColumnDrawer(ag, col, ds, ds.columns.find(c=>c.name===btn.dataset.col))));
+
+  // Phase 5j Stage 2 - "a final view of how the refresh period went."
+  // Needs the RAW (unclipped, full-history) dataset object, not `ds`
+  // (already as-of-clipped) - see rawRealDatasetById()'s own comment.
+  const rawDs = ds.isReal ? rawRealDatasetById(datasetId) : null;
+  const historyWrap = document.getElementById("supply-history-wrap");
+  if(rawDs){
+    const cycles = buildSupplyHistory(rawDs);
+    const currentCycleStart = cycleStartDate(ds.sla.cadence, CURRENT_AS_OF);
+    historyWrap.innerHTML = renderSupplyHistorySection(ds, cycles, currentCycleStart);
+    wireSupplyHistorySection(historyWrap);
+  }
 }
 
 function wireCards(grid){ grid.querySelectorAll(".card").forEach(el=> el.addEventListener("click", ()=> navigate(JSON.parse(el.dataset.nav)))); }
