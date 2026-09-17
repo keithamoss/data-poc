@@ -2656,36 +2656,41 @@ relative, not a schedule — this is weeks of work, not months.
     during is in `plans/publishing-and-history.md`'s Thread D section
     (search "check_id propagated into every real check RESULT record").
 
-52. **[todo, resolve at the end of the next phase]** The check-detail
-    panel's (X) close button sometimes needs several clicks before it
-    actually closes - Keith's report, 2026-09-16. Root cause, from
-    reading the dashboard's own JS (`dashboard/qa-reporting-
-    dashboard.template.html`): `closeCheckPanel()` (~line 1388) does
-    `if(STATE && STATE.checkKey) history.back();` - a single step back
-    through browser history. But `setCompareIdx()` (~line 1378, item
-    45's "Compared run" selector) pushes a BRAND NEW history entry
-    every time a different comparison run is picked, via `STATE = {...
+52. **[fixed, 2026-09-17]** The check-detail panel's (X) close button
+    sometimes needed several clicks before it actually closed - Keith's
+    report, 2026-09-16. Root cause, from reading the dashboard's own JS
+    (`dashboard/qa-reporting-dashboard.template.html`): `closeCheckPanel()`
+    did `if(STATE && STATE.checkKey) history.back();` - a single step
+    back through browser history. But `setCompareIdx()` (item 45's
+    "Compared run" selector) pushed a BRAND NEW history entry every
+    time a different comparison run was picked, via `STATE = {...
     STATE, compareIdx: idx}; history.pushState(...)` - and `checkKey`
-    stays set on every one of those pushed states, since changing the
+    stayed set on every one of those pushed states, since changing the
     comparison run doesn't close the panel. So picking N different
-    "Compared run" dates before closing means N extra history entries
-    all satisfying `STATE.checkKey`, and one (X) click only pops the
+    "Compared run" dates before closing meant N extra history entries
+    all satisfying `STATE.checkKey`, and one (X) click only popped the
     MOST RECENT compare-selection, not all the way back to "panel
-    wasn't open" - the panel visually stays open (just with an earlier
-    compare selection) until enough clicks work through every pushed
-    compare-selection entry. Same root shape as `closeDrawer()`
-    (~line 1104) for the outer column drawer, though not confirmed
-    whether that one is reachable the same way (the column drawer has
-    no per-selection push of its own today, only `checkKey`/`columnName`
-    changes on open). Not yet scoped: whether the fix is "X always
-    replaces state back to pre-panel, not history.back()" (loses the
-    real forward/back-button symmetry this history-based design was
-    built for - see closeDrawer()'s own comment on why pushState was
-    chosen over a plain hide) or "setCompareIdx() should replaceState,
-    not pushState" (compare-selection stops being independently
-    back/forward-navigable, which may or may not be a real loss - not
-    decided). Logged for later per Keith's own instruction, not
-    investigated further now.
+    wasn't open." Two fixes were on the table (logged, not decided, at
+    the time): "X always replaces state back to pre-panel" (loses real
+    forward/back-button symmetry) or "`setCompareIdx()` should
+    `replaceState`, not `pushState`" (compare-selection stops being
+    independently back/forward-navigable). Went with the second -
+    consistent with the exact same call already made for the as-of date
+    picker (`setAsOfInUrl()`'s own comment: an in-panel/in-view
+    refinement isn't a top-level navigation worth its own back/forward
+    stop) - `setCompareIdx()` now `replaceState`s; the URL still
+    updates (a reload/shared link still lands on the chosen comparison),
+    it just no longer creates a new history entry, so `closeCheckPanel()`'s
+    existing single `history.back()` is correct again regardless of how
+    many comparisons were picked. `closeDrawer()` (the outer column
+    drawer) was confirmed to never have had the same per-selection-push
+    problem in the first place - it has no compare-style re-push of its
+    own, only the one `checkKey`/`columnName` push on open - so it
+    needed no change. Verified for real via headless Chromium: opened a
+    real check panel, called `setCompareIdx()` three times in a row
+    (simulating three different "Compared run" picks), confirmed the
+    panel was still open, then confirmed exactly ONE click on (X)
+    closed it fully.
 
 53. **[todo, resolve at the end of the next phase]** The actual
     published (live GitHub Pages) dashboard needs a handful of real
@@ -2703,37 +2708,24 @@ relative, not a schedule — this is weeks of work, not months.
     Explicitly deferred by Keith to the end of the next phase, not
     investigated or built now.
 
-54. **[todo, resolve at the end of the next phase]** A real pluralization
-    bug - Keith's report, 2026-09-16: on the Executive tier's agency
-    cards, "collections"/"datasets" stay plural even when the count is
-    1 (`dashboard/qa-reporting-dashboard.template.html`, the
-    `card-meta` block, `${ag.collections.length}</b> collections` /
-    `${nDatasets}</b> datasets`). Keith's own instruction: fix this
-    specific spot AND find every other place with the same
-    count-plus-noun pattern, applying one generalized fix rather than
-    patching each site by hand. Audited (not fixed) while logging this:
-    the same shape shows up in at least 4 other places, all a plain
-    `${count} noun` template-literal with no singular/plural branching -
-    - the dataset-detail "Real pipeline data" badge: `${ds.realRunCount}
-      computed runs` (would read "1 computed runs" for a brand-new
-      dataset's very first run)
-    - the "no data as of" empty state's tolerance text: `(${AS_OF_OFFSET_DAYS}
-      days)` (would read "1 days" if the offset were ever configured to 1)
-    - the column drawer's checks-history heading: `every QA run
-      (${statusHistory.length} runs)`
-    - the check-detail panel's trend heading: `every QA run (${n} runs)`
-
-    None of today's real data happens to hit count=1 for any of these
-    (BDM/CP have 80+/16+ runs, the offset is 60, collections/datasets
-    per agency are mostly >1), which is presumably why this has sat
-    unnoticed - but it's a real, reachable bug (a brand-new dataset's
-    first-ever run, or a future single-collection agency, would show
-    it immediately) not just a hypothetical. Not yet scoped: what the
-    generalized fix actually looks like (a small `pluralize(n, noun,
-    pluralNoun?)` helper reused at all 5 sites is the obvious shape,
-    but not decided) or whether there are more sites this audit missed
-    once looked at properly. Logged for later per Keith's own
-    instruction, not investigated further or fixed now.
+54. **[fixed, 2026-09-17]** A real pluralization bug - Keith's report,
+    2026-09-16: on the Executive tier's agency cards, "collections"/
+    "datasets" stayed plural even when the count is 1 - and, per real
+    data checked while fixing this, not just a hypothetical edge case:
+    Registry Services and the Child Protection agency both genuinely
+    have exactly 1 collection today, so this was visibly wrong on the
+    live dashboard's own Executive tier right now, not just for some
+    future single-collection agency. Fixed with the generalized helper
+    the earlier audit anticipated - `pluralize(n, singular, plural?)` -
+    applied at all 5 sites the audit found: the Executive-tier
+    `card-meta` block (collections/datasets), the dataset-detail "Real
+    pipeline data" badge's "N computed runs", the "no data as of" empty
+    state's "(N days)" tolerance text, the column drawer's checks-
+    history heading, and the check-detail panel's trend heading.
+    Verified for real via headless Chromium: `pluralize()` itself
+    against 0/1/2 inputs, and the actual rendered Executive-tier card
+    text for Registry Services confirmed reading "1 collection" (not
+    "1 collections") against the real, current data.
 
 55. **[fixed, 2026-09-17]** Two real, linked bugs found live-testing the
     as-of picker, both fixed the same session:

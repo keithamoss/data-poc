@@ -433,6 +433,12 @@ function fmtInt(x){ return x.toLocaleString("en-US"); }
 // format, reused rather than inventing a new date style) using the
 // same " · " separator this UI already uses elsewhere.
 function fmtArrival(lastArrival){ return `${lastArrival.arrivedAt} · ${fmtDate(lastArrival.date)}`; }
+// item 54 (plans/qa-pipeline.md) - Keith's report: "1 collections"/"1
+// datasets" on the Executive tier's agency cards, plus 4 other
+// count-plus-noun sites found in the audit he asked for, all a plain
+// `${n} noun` template literal with no singular/plural branching. One
+// helper reused everywhere instead of patching each site by hand.
+function pluralize(n, singular, plural){ return n===1 ? singular : (plural || singular+"s"); }
 function fmtMetric(x, unit){
   if(unit==="%") return x.toFixed(2)+"%";
   if(unit==="hrs") return x.toFixed(1)+"h";
@@ -1172,7 +1178,7 @@ function renderExec(view){
       <div class="card-top"><h3>${ag.name}</h3>${pill(ag.status)}</div>
       <div style="color:var(--ink-muted); font-size:12.5px;">${ag.blurb}</div>
       ${spark}
-      <div class="card-meta"><span><b>${ag.collections.length}</b> collections</span><span><b>${nDatasets}</b> datasets</span></div>
+      <div class="card-meta"><span><b>${ag.collections.length}</b> ${pluralize(ag.collections.length,"collection")}</span><span><b>${nDatasets}</b> ${pluralize(nDatasets,"dataset")}</span></div>
     </button>`;
   }).join("");
   wireCards(grid);
@@ -1245,7 +1251,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         No QA run within the accepted freshness window as of <b>${fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"))}</b> —
         either this dataset hadn't been supplied yet by that date, or its most
         recent supply by then is older than the data asset's staleness
-        tolerance (${AS_OF_OFFSET_DAYS} days). Pick a later date, or reset to
+        tolerance (${AS_OF_OFFSET_DAYS} ${pluralize(AS_OF_OFFSET_DAYS,"day")}). Pick a later date, or reset to
         the default, using the 📅 As of control above.
       </div>
     `;
@@ -1255,7 +1261,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   view.innerHTML = `
     <div class="view-head">
       <div>
-        <h2>${ds.name}${ds.isReal?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed runs</span>`:` <span class="pill illustrative"><span class="ico"></span>Illustrative mock data</span>`}</h2>
+        <h2>${ds.name}${ds.isReal?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:` <span class="pill illustrative"><span class="ico"></span>Illustrative mock data</span>`}</h2>
         <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${ds.isReal?" · figures below are computed by real dbt/Soda/datacontract-cli/Evidently tools against real generated runs — not fabricated in the browser.":""}</div>
       </div>
       ${pill(ds.status)}
@@ -1360,7 +1366,7 @@ function openColumnDrawer(ag, col, ds, column, opts){
       </div>
     </div>
     <div class="drawer-section">
-      <h4>Worst status across all checks — every QA run (${statusHistory.length} runs)</h4>
+      <h4>Worst status across all checks — every QA run (${statusHistory.length} ${pluralize(statusHistory.length,"run")})</h4>
       <div class="status-dot-row">
         ${statusHistory.map(pt=> `<span class="status-dot" style="background:${statusColorVar(pt.worst)};" title="${fmtDate(pt.date)}: ${STATUS_LABEL[pt.worst]}"></span>`).join("")}
       </div>
@@ -1632,7 +1638,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
 
   const trendBlock = `
     <div class="drawer-section">
-      <h4>Over time — every QA run (${n} runs)</h4>
+      <h4>Over time — every QA run (${n} ${pluralize(n,"run")})</h4>
       ${trendChart(check, hasCompareRun ? compareIdx : null, n>2 ? (idx)=>setCompareIdx(ag, col, ds, column, check, idx) : null)}
     </div>`;
 
@@ -1658,13 +1664,22 @@ function openCheckPanel(ag, col, ds, column, check, opts){
 // #45: re-renders the check-panel with a newly chosen comparison run -
 // called from the dropdown's change handler above and from a trend-
 // chart point click (trendChart()'s onPointClick, wired in wireChart()).
-// Pushes its own history entry (persisting the choice in the URL, same
-// pattern as checkKey) rather than replacing state, so back/forward
-// steps through previously-viewed comparisons one at a time - consistent
-// with how opening/closing the panel itself already behaves.
+// Fixed 2026-09-17 (plans/qa-pipeline.md item 52, Keith's report): used
+// to pushState here, so N different "Compared run" picks left N extra
+// history entries all satisfying STATE.checkKey - closeCheckPanel()'s
+// own single history.back() then only popped the MOST RECENT compare
+// selection, leaving the panel visually open until enough (X) clicks
+// worked back through every one. Now replaceState instead - compare
+// selection is an in-panel refinement, not a top-level navigation worth
+// its own back/forward stop, same reasoning already applied to the
+// as-of date picker (setAsOfInUrl()'s own comment). URL still updates
+// (a reload/shared link still lands on the chosen comparison), it just
+// no longer creates a new history entry to step through - (X) now
+// always closes the panel in exactly one click, however many
+// comparisons were picked along the way.
 function setCompareIdx(ag, col, ds, column, check, idx){
   STATE = {...STATE, compareIdx: idx};
-  history.pushState(STATE, "", stateToHash(STATE));
+  history.replaceState(STATE, "", stateToHash(STATE));
   openCheckPanel(ag, col, ds, column, check, {pushHistory:false});
 }
 function hideCheckPanel(){
