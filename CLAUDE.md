@@ -231,7 +231,7 @@ Rough layout:
   turn on it. Report back proactively if it's actually red; a green run
   doesn't need its own announcement, just a passing mention next time
   it's relevant.
-  **Amended again, 2026-09-19 (Keith's own explicit call): run selective
+  **Amended again, 2026-09-18 evening (Keith's own explicit call): run selective
   tests locally for smaller/medium changes, rely on CI for the full
   suite.** For a change scoped to one or two modules, run just the
   directly affected test file(s) locally (e.g. `uv run pytest
