@@ -408,6 +408,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
       <button class="snapshots-btn" id="activity-btn" type="button">📋 Recent activity</button>
       <button class="snapshots-btn" id="changelog-btn" type="button">🗒 Release notes</button>
       <button class="snapshots-btn" id="requirements-btn" type="button">📐 Requirements</button>
+      <button class="snapshots-btn" id="leaderboard-btn" type="button">🏆 Leaderboard</button>
       <button class="snapshots-btn" id="snapshots-btn" type="button">🕐 Past snapshots</button>
       <div class="live"><span class="dot"></span><span id="clock-text">Live · updated moments ago</span></div>
     </div>
@@ -554,6 +555,21 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
     <button class="drawer-close" id="requirements-panel-close" aria-label="Close">✕</button>
   </div>
   <div class="drawer-body" id="requirements-panel-body"></div>
+</aside>
+
+<!-- running-thoughts.md #3 ("gamification MVP", 2026-09-18) - a real
+     per-person, per-dataset current not-red streak leaderboard. Same
+     interaction pattern as every other header-button panel. -->
+<div class="backdrop" id="leaderboard-backdrop"></div>
+<aside class="drawer" id="leaderboard-panel" aria-hidden="true">
+  <div class="drawer-head">
+    <div>
+      <div class="legend-key" style="margin:0 0 4px;">Who's kept a dataset out of the red the longest</div>
+      <h3>Leaderboard</h3>
+    </div>
+    <button class="drawer-close" id="leaderboard-panel-close" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body" id="leaderboard-panel-body"></div>
 </aside>
 
 <script>
@@ -787,6 +803,7 @@ const TICKET_STATUS = {};
 const GITHUB_LINKS = {checks:{}, agencies:{}, datasets:{}};
 const ACCEPTANCES = {};
 const ASSIGNMENTS = {agencies:{}, datasets:{}};
+const LEADERBOARD = [];
 
 // Shared by Birth Registrations (a single dataset) and Child Protection
 // (6 datasets, one per table) - both are reshaped server-side into this
@@ -1894,7 +1911,7 @@ function hashToState(){
 
 // panel=/cmp= (see comment above): read from location.search, same
 // URLSearchParams pattern asOfFromUrl() already established.
-const SIDE_PANELS = ["activity","changelog","requirements","snapshots"];
+const SIDE_PANELS = ["activity","changelog","requirements","snapshots","leaderboard"];
 function panelFromUrl(){
   const v = new URLSearchParams(location.search).get("panel");
   return SIDE_PANELS.includes(v) ? v : undefined;
@@ -2799,7 +2816,7 @@ function renderSnapshotsPanel(){
 // deliberately NOT one of these 4 - it keeps its own separate, no-
 // history-entry behaviour (openAsOfPanel()/closeAsOfPanel() below,
 // unchanged) since Thread C's own design already settled that.
-const PANEL_RENDER = {activity:renderActivityPanel, changelog:renderChangelogPanel, requirements:renderRequirementsPanel, snapshots:renderSnapshotsPanel};
+const PANEL_RENDER = {activity:renderActivityPanel, changelog:renderChangelogPanel, requirements:renderRequirementsPanel, snapshots:renderSnapshotsPanel, leaderboard:renderLeaderboardPanel};
 function showPanelDom(name){
   document.getElementById(`${name}-backdrop`).classList.add("open");
   document.getElementById(`${name}-panel`).classList.add("open");
@@ -2994,6 +3011,42 @@ function renderRequirementsPanel(){
 document.getElementById("requirements-btn").addEventListener("click", ()=> openPanel("requirements"));
 document.getElementById("requirements-backdrop").addEventListener("click", closePanel);
 document.getElementById("requirements-panel-close").addEventListener("click", closePanel);
+
+// running-thoughts.md #3 ("gamification MVP", 2026-09-18, scoped via
+// two AskUserQuestion rounds) - LEADERBOARD is already a flat, real,
+// pre-sorted (streak descending) list of {dataset_id, name, nickname,
+// github, streak} rows, built server-side (qa_tools/common/
+// leaderboard.py) from committed qa_results/ + contract/people.yaml -
+// this just renders it, same "dumb template, data prep happens
+// server-side" split every other embedded const on this page follows.
+// rawRealDatasetById() (already used by the supply-history section)
+// resolves a real dataset's own display name from its id.
+function renderLeaderboardPanel(){
+  const body = document.getElementById("leaderboard-panel-body");
+  if(!LEADERBOARD.length){
+    body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
+      No streaks yet — this celebrates a real person's own current run of
+      not-red QA results on a dataset (amber doesn't break it, only a red
+      run does). Add real people to <code>contract/people.yaml</code> to
+      see this fill in.
+    </div>`;
+    return;
+  }
+  body.innerHTML = LEADERBOARD.map((r,i)=>{
+    const ds = rawRealDatasetById(r.dataset_id);
+    const dsName = ds ? ds.name : r.dataset_id;
+    const label = r.nickname || r.name || r.github || "Someone";
+    return `<div class="snapshot-row">
+        <div class="meta">
+          <div class="date">#${i+1} — ${label}</div>
+          <div class="sub">${dsName} · ${fmtInt(r.streak)} ${pluralize(r.streak,"run")} not-red</div>
+        </div>
+      </div>`;
+  }).join("");
+}
+document.getElementById("leaderboard-btn").addEventListener("click", ()=> openPanel("leaderboard"));
+document.getElementById("leaderboard-backdrop").addEventListener("click", closePanel);
+document.getElementById("leaderboard-panel-close").addEventListener("click", closePanel);
 
 // Thread C - as-of date picker. rebuildData() throws the current DATA
 // away and rebuilds it from scratch against the new date (see buildData()

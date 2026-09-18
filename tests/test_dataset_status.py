@@ -5,7 +5,7 @@ checkStatus(). Fixture-based dataset dicts, matching the real shape
 pipeline/build_dashboard_data.py/build_cp_dashboard_data.py produce."""
 from __future__ import annotations
 
-from qa_tools.common.dataset_status import dataset_status, status_for_value
+from qa_tools.common.dataset_status import dataset_status, status_by_run, status_for_value
 
 
 def _check(current, warn, fail, retired_as_of=None):
@@ -14,6 +14,11 @@ def _check(current, warn, fail, retired_as_of=None):
 
 def _dataset(*columns_of_checks):
     return {"columns": [{"checks": list(checks)} for checks in columns_of_checks]}
+
+
+def _history_check(warn, fail, *history, retired_as_of=None):
+    return {"warn": warn, "fail": fail, "retired_as_of": retired_as_of,
+            "history": [{"run_id": run_id, "value": value} for run_id, value in history]}
 
 
 def test_status_for_value_green_amber_red_bands():
@@ -48,3 +53,32 @@ def test_dataset_with_no_columns_is_green():
 
 def test_column_with_no_checks_is_green():
     assert dataset_status({"columns": [{"checks": []}]}) == "green"
+
+
+class TestStatusByRun:
+    def test_worst_check_per_run_id_wins(self):
+        d = {"columns": [
+            {"checks": [_history_check(1, 2, ("run_1", 0), ("run_2", 3))]},
+            {"checks": [_history_check(1, 2, ("run_1", 1.5), ("run_2", 0))]},
+        ]}
+        assert status_by_run(d) == {"run_1": "amber", "run_2": "red"}
+
+    def test_an_all_green_run_is_absent_not_explicitly_recorded(self):
+        """A real, faithfully-mirrored quirk of the dashboard's own
+        client-side datasetStatusByRun() - see status_by_run()'s own
+        docstring. Callers must treat a missing run_id as green."""
+        d = {"columns": [{"checks": [_history_check(1, 2, ("run_1", 0))]}]}
+        assert status_by_run(d) == {}
+        assert status_by_run(d).get("run_1", "green") == "green"
+
+    def test_retired_checks_still_contribute_unlike_dataset_status(self):
+        """Deliberately different from dataset_status()'s own filtering -
+        mirrors the dashboard's own client-side datasetStatusByRun()
+        exactly, which never excludes retired checks either (that
+        function's own real behavior, this Python port's job is to
+        match it, not "fix" it)."""
+        d = {"columns": [{"checks": [_history_check(1, 2, ("run_1", 3), retired_as_of="2026-09-18")]}]}
+        assert status_by_run(d) == {"run_1": "red"}
+
+    def test_no_history_anywhere_returns_an_empty_map(self):
+        assert status_by_run({"columns": [{"checks": [_history_check(1, 2)]}]}) == {}

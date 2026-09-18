@@ -121,7 +121,19 @@ own call, CLAUDE.md), and a person's email has no reason to be baked
 into a publicly-deployed static page just because their name/GitHub
 username already is.
 
-This only replaces those ten consts - the rest of the dashboard (its
+And `const LEADERBOARD` (running-thoughts.md #3, "gamification MVP",
+2026-09-18, scoped via two AskUserQuestion rounds) - a real per-person,
+per-dataset "current not-red streak" (qa_tools/common/leaderboard.py's
+own build_leaderboard()), sorted by streak descending. CI-safe like
+ASSIGNMENTS above (committed qa_results/ + already-built dashboard JSON
++ contract/people.yaml - no `gh`/token, no CI-only raw-fetch step). The
+already-loaded REAL_BIRTH_REG_DATA/REAL_CP_DATA payloads (captured into
+`real_data` in the TARGETS loop above) are reused directly rather than
+re-reading those same two files a second time. Same public-page privacy
+rule as ASSIGNMENTS: only people with a real contract/people.yaml entry
+ever appear, by name/nickname - a bare `run_by` email is never shown.
+
+This only replaces those eleven consts - the rest of the dashboard (its
 CSS, the rendering code, the other 14 illustrative datasets, and the
 separate SNAPSHOT_MANIFEST const dashboard/snapshot_dashboard.py owns)
 is copied through unchanged from the template.
@@ -136,6 +148,7 @@ from dashboard.requirements_yaml import parse_requirements
 from qa_tools.common.acceptance_sync import build_acceptances
 from qa_tools.common.changelog import build_changelog
 from qa_tools.common.github_links import build_check_source_links, build_folder_links, current_commit_sha
+from qa_tools.common.leaderboard import build_leaderboard
 from qa_tools.common.people import PEOPLE_YAML, assignees_for, parse_people_config
 from qa_tools.common.ticket_status import parse_open_tickets
 from qa_tools.common.ticket_sync import DATASET_AGENCY
@@ -205,9 +218,11 @@ def embed() -> None:
     with open(TEMPLATE_HTML) as f:
         html = f.read()
 
+    real_data = {}  # const_name -> already-loaded dict, reused below by the LEADERBOARD step
     for const_name, data_json_path in TARGETS:
         with open(data_json_path) as f:
             data = json.load(f)
+        real_data[const_name] = data
         real_json = json.dumps(data, separators=(",", ":"))
         html = _replace_const(html, const_name, real_json)
         print(f"Re-embedded {len(real_json)} bytes of real data into {const_name}")
@@ -264,6 +279,13 @@ def embed() -> None:
     }
     html = _replace_const(html, "ASSIGNMENTS", json.dumps(assignments, separators=(",", ":")))
     print(f"Re-embedded ASSIGNMENTS = {len(assignments['agencies'])} agency/{len(assignments['datasets'])} dataset assignment(s)")
+
+    dataset_jsons = {real_data["REAL_BIRTH_REG_DATA"]["id"]: real_data["REAL_BIRTH_REG_DATA"]}
+    for ds in real_data["REAL_CP_DATA"]["datasets"]:
+        dataset_jsons[ds["id"]] = ds
+    leaderboard_rows = build_leaderboard(dataset_jsons, people_config)
+    html = _replace_const(html, "LEADERBOARD", json.dumps(leaderboard_rows, separators=(",", ":")))
+    print(f"Re-embedded LEADERBOARD = {len(leaderboard_rows)} real streak row(s)")
 
     with open(DASHBOARD_HTML, "w") as f:
         f.write(html)

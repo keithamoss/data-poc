@@ -131,6 +131,49 @@ yet (leaderboard? badges? a streak counter? per-agency vs. per-person?).
 Needs a real scoping conversation before building anything, not just an
 implementation guess.
 
+**Built, 2026-09-18 evening.** Scoped via two real `AskUserQuestion`
+rounds: consistency (green streaks), not turnaround speed; a
+leaderboard, not badges/a bare counter; per-person, not per-agency -
+each a real fork, not a guess. Two more forks fell out of turning
+"consistency" into an actual computation: amber does NOT break a
+streak (only a real red run does - Keith's own call, given how common
+amber legitimately is, 77 real BDM runs alone), and a streak is scored
+per (person, dataset), not blended across everything a person's
+touched - keeps BDM and CP's genuinely different check batteries from
+being compared as if they were the same thing.
+
+A streak belongs to a PERSON's own chronological sequence of runs on
+one dataset - `qa_tools/common/leaderboard.py`'s `compute_streaks()`
+skips over any other person's interleaved runs entirely (they neither
+extend nor break this person's own streak), then counts backward from
+their own most recent run until hitting a red one. New `status_by_run()`
+in `dataset_status.py` is the Python port of the dashboard's own
+client-side `datasetStatusByRun()` (real per-run status, not just
+"current") - found and documented a genuine quirk of that already-
+shipped JS function while porting it (an all-green run is never
+explicitly recorded, only implied by absence - callers must default a
+missing run_id to green), mirrored faithfully rather than "fixed",
+since the real behavior is already correct end-to-end via that
+convention.
+
+Same privacy rule as item #2's ASSIGNMENTS (this repo is public): only
+people with a real `contract/people.yaml` entry ever appear, by name/
+nickname - `run_by` is a real email, never shown bare. A 5th header
+panel ("🏆 Leaderboard") reuses the existing `openPanel()`/`closePanel()`
+mechanism from items #6-#9's own work, not a new pattern.
+
+Verified against this repo's own real committed history (not just
+fixtures): a real run_by identity already exists in real `qa_results/`
+(a private-relay email, the same real git identity this whole project's
+history was generated under) - with a fake `contract/people.yaml` entry
+for it, the leaderboard correctly produced 5 real rows across BDM and
+4 real CP tables, sorted by streak descending (18/4/2/2/2), with a real
+browser confirming the panel renders, opens as a real history entry,
+and Back closes it, zero console errors. Deliberately left the REAL
+`contract/people.yaml` empty rather than seeding it with that real
+identity myself - same reasoning as item #2 (not this session's call to
+make unilaterally); Keith can add himself to see this fill in for real.
+
 ### 4. GitHub Issues -> Microsoft Teams integration (research first)
 
 Idea: live notifications into a Microsoft Teams chat as datasets arrive
