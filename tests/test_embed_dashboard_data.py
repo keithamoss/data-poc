@@ -122,3 +122,46 @@ def test_embed_reads_real_open_tickets_json_when_present(monkeypatch, tmp_path):
             "title": "Birth Registrations is red", "updated_at": "2026-09-18T00:00:00Z",
         }
     }
+
+
+def _run_embed_and_extract_leaderboard(monkeypatch, tmp_path, raw_ticket_resolutions=None):
+    out_html = tmp_path / "out.html"
+    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
+    if raw_ticket_resolutions is None:
+        monkeypatch.setattr(edd, "TICKET_RESOLUTIONS_JSON", tmp_path / "does_not_exist.json")
+    else:
+        path = tmp_path / "ticket_resolutions.json"
+        path.write_text(json.dumps(raw_ticket_resolutions))
+        monkeypatch.setattr(edd, "TICKET_RESOLUTIONS_JSON", path)
+
+    edd.embed()
+
+    html = out_html.read_text()
+    match = re.search(r"const LEADERBOARD = (.*?);\n", html)
+    assert match, "LEADERBOARD const not found in built output"
+    return json.loads(match.group(1))
+
+
+def test_embed_defaults_to_empty_leaderboard_when_file_absent(monkeypatch, tmp_path):
+    """Real scenario, same as TICKET_STATUS/ACCEPTANCES above: a local
+    ./run_pipeline.sh build has no GH token, so .github/workflows/
+    deploy-pages.yml's own TICKET_RESOLUTIONS_JSON-writing step (qa_tools/
+    common/leaderboard.py's own real `gh` boundary) never ran - embed()
+    must degrade to [] rather than crash."""
+    assert _run_embed_and_extract_leaderboard(monkeypatch, tmp_path) == []
+
+
+def test_embed_reads_real_ticket_resolutions_json_when_present(monkeypatch, tmp_path):
+    raw_tickets = [{
+        "number": 1, "labels": [{"name": "dataset:birth-registrations"}],
+        "events": [{"event": "closed", "actor": "knownperson", "created_at": "2026-01-01T09:00:00Z"}],
+    }]
+    monkeypatch.setattr(edd, "parse_people_config", lambda path: {
+        "people": {"known@example.com": {"name": "Known Person", "nickname": "KP", "github": "knownperson"}},
+        "agency_assignments": {}, "dataset_assignments": {},
+    })
+    leaderboard_rows = _run_embed_and_extract_leaderboard(monkeypatch, tmp_path, raw_tickets)
+    assert leaderboard_rows == [{
+        "dataset_id": "birth-registrations", "name": "Known Person", "nickname": "KP",
+        "github": "knownperson", "streak": 1,
+    }]

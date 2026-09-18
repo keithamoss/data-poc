@@ -122,16 +122,24 @@ into a publicly-deployed static page just because their name/GitHub
 username already is.
 
 And `const LEADERBOARD` (running-thoughts.md #3, "gamification MVP",
-2026-09-18, scoped via two AskUserQuestion rounds) - a real per-person,
-per-dataset "current not-red streak" (qa_tools/common/leaderboard.py's
-own build_leaderboard()), sorted by streak descending. CI-safe like
-ASSIGNMENTS above (committed qa_results/ + already-built dashboard JSON
-+ contract/people.yaml - no `gh`/token, no CI-only raw-fetch step). The
-already-loaded REAL_BIRTH_REG_DATA/REAL_CP_DATA payloads (captured into
-`real_data` in the TARGETS loop above) are reused directly rather than
-re-reading those same two files a second time. Same public-page privacy
-rule as ASSIGNMENTS: only people with a real contract/people.yaml entry
-ever appear, by name/nickname - a bare `run_by` email is never shown.
+2026-09-18, scoped via two AskUserQuestion rounds; REDESIGNED the same
+day, running-thoughts.md #3's own automation-tension follow-up to item
+#5 Thread B, scoped via two more AskUserQuestion rounds) - a real
+per-person, per-dataset streak of CLEAN TICKET RESOLUTIONS (qa_tools/
+common/leaderboard.py's own build_leaderboard()), sorted by streak
+descending. No longer CI-safe without a token the way ASSIGNMENTS is -
+same real-source-not-a-file-this-script-reads-directly treatment as
+TICKET_STATUS/ACCEPTANCES above, for the same reason (a real `gh` call
+needs a real token this script doesn't have): `.github/workflows/
+deploy-pages.yml` writes the raw ticket close/reopen history for every
+real qa-ticket issue to TICKET_RESOLUTIONS_JSON below (via `python3 -m
+qa_tools.common.leaderboard`, that module's own real `gh` boundary), and
+this script calls leaderboard.build_leaderboard() (pure, no `gh`/network
+here either) to turn it into the final embed. Empty [] locally with no
+such file, same graceful degradation as TICKET_STATUS/ACCEPTANCES. Same
+public-page privacy rule as ASSIGNMENTS: only people with a real
+contract/people.yaml entry ever appear, by name/nickname - resolved by
+real GitHub LOGIN now (whoever closed the ticket), not by email.
 
 This only replaces those eleven consts - the rest of the dashboard (its
 CSS, the rendering code, the other 14 illustrative datasets, and the
@@ -160,6 +168,7 @@ CHANGELOG_MD = os.path.join(ROOT, "CHANGELOG.md")
 REQUIREMENTS_YAML = os.path.join(ROOT, "requirements.yaml")
 OPEN_TICKETS_JSON = os.path.join(ROOT, "reports", "open_tickets.json")
 QA_COMMENTS_JSON = os.path.join(ROOT, "reports", "qa_comments.json")
+TICKET_RESOLUTIONS_JSON = os.path.join(ROOT, "reports", "ticket_resolutions.json")
 
 TARGETS = [
     ("REAL_BIRTH_REG_DATA", os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")),
@@ -218,11 +227,9 @@ def embed() -> None:
     with open(TEMPLATE_HTML) as f:
         html = f.read()
 
-    real_data = {}  # const_name -> already-loaded dict, reused below by the LEADERBOARD step
     for const_name, data_json_path in TARGETS:
         with open(data_json_path) as f:
             data = json.load(f)
-        real_data[const_name] = data
         real_json = json.dumps(data, separators=(",", ":"))
         html = _replace_const(html, const_name, real_json)
         print(f"Re-embedded {len(real_json)} bytes of real data into {const_name}")
@@ -280,12 +287,15 @@ def embed() -> None:
     html = _replace_const(html, "ASSIGNMENTS", json.dumps(assignments, separators=(",", ":")))
     print(f"Re-embedded ASSIGNMENTS = {len(assignments['agencies'])} agency/{len(assignments['datasets'])} dataset assignment(s)")
 
-    dataset_jsons = {real_data["REAL_BIRTH_REG_DATA"]["id"]: real_data["REAL_BIRTH_REG_DATA"]}
-    for ds in real_data["REAL_CP_DATA"]["datasets"]:
-        dataset_jsons[ds["id"]] = ds
-    leaderboard_rows = build_leaderboard(dataset_jsons, people_config)
+    if os.path.exists(TICKET_RESOLUTIONS_JSON):
+        with open(TICKET_RESOLUTIONS_JSON) as f:
+            raw_ticket_resolutions = json.load(f)
+    else:
+        raw_ticket_resolutions = []
+    leaderboard_rows = build_leaderboard(raw_ticket_resolutions, people_config)
     html = _replace_const(html, "LEADERBOARD", json.dumps(leaderboard_rows, separators=(",", ":")))
-    print(f"Re-embedded LEADERBOARD = {len(leaderboard_rows)} real streak row(s)")
+    print(f"Re-embedded LEADERBOARD = {len(leaderboard_rows)} real streak row(s)"
+          + ("" if os.path.exists(TICKET_RESOLUTIONS_JSON) else " (no reports/ticket_resolutions.json - local build, embedding empty)"))
 
     with open(DASHBOARD_HTML, "w") as f:
         f.write(html)

@@ -126,6 +126,18 @@ name: Build, validate, and publish the dashboard
 # ever typed by a human. Same real-read, `issues: read`-only treatment
 # as the ticket fetch above - this job still never writes to GitHub,
 # only ever reads a comment someone else already posted there.
+#
+# running-thoughts.md #3's leaderboard, REDESIGNED 2026-09-18 (the
+# automation-tension follow-up to item #5 Thread B): used to be fully
+# CI-safe with no `gh` call at all (built purely from committed qa_
+# results/ history); now measures a real person's own streak of clean
+# GitHub-ticket RESOLUTIONS instead of clean QA RUNS (see qa_tools/
+# common/leaderboard.py's own docstring for why), which needs the real
+# WHO-closed-this-ticket data only GitHub's classic Issue Events API
+# exposes - so this job now also fetches every real qa-ticket issue's
+# own real closed/reopened history (qa_tools/common/leaderboard.py's own
+# real `gh` boundary) to reports/ticket_resolutions.json, same real-
+# read/`issues: read`-only treatment as everything else above.
 
 on:
   push:
@@ -219,6 +231,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: uv run python3 -m qa_tools.common.acceptance_sync > reports/qa_comments.json
+
+      - name: Fetch QA ticket resolution history (for the leaderboard)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: uv run python3 -m qa_tools.common.leaderboard > reports/ticket_resolutions.json
 
       - name: Embed real data into the dashboard
         run: uv run python3 -m dashboard.embed_dashboard_data

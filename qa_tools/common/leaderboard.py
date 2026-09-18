@@ -1,103 +1,208 @@
 """
-Real per-person, per-dataset "current not-red streak" leaderboard
-(running-thoughts.md #3, "gamification MVP", 2026-09-18, scoped via two
-AskUserQuestion rounds with Keith): celebrates CONSISTENCY, not
-turnaround speed - a deliberately narrowed scope, not a guess. A streak
-belongs to a PERSON within one dataset, not to the dataset's own run
-count: it walks that person's own chronological sequence of runs THEY
-personally published on that one dataset (skipping over any other
-person's interleaved runs entirely - those neither extend nor break
-this person's own streak), and counts backward from their own most
-recent run until hitting a red one. Amber does NOT break it (Keith's
-own explicit call, given how common a real amber run legitimately is
-in this project's own committed history - 77 of them in BDM alone).
+Real per-person, per-dataset "streak of clean ticket resolutions"
+leaderboard (running-thoughts.md #3, redesigned 2026-09-18 - the
+automation-tension follow-up raised the same day, after item #5 Thread
+B's own future AWS/S3-event-triggered vision surfaced a real problem
+with the ORIGINAL design below: once QA *running* itself is automated,
+there's no human left to credit for a "not-red run streak" - `run_by`
+has nothing to attach to. Scoped with Keith via two more AskUserQuestion
+rounds on top of the original two: the human role SHIFTS rather than
+disappearing ("I think it shifts") - what's worth celebrating once
+running is automated is "resolving red to green", which - per ticket_
+sync.py's own repeated, load-bearing design principle ("closing it is
+always a human decision, never automatic") - maps onto whoever actually
+CLOSES a real GitHub QA ticket, the one action in this whole system
+already guaranteed to require a person, regardless of whether the QA run
+that opened it was ever triggered by one. Metric shape is "streak of
+clean resolutions" (Keith's own final answer, after asking for the
+question to be re-explained in more concrete terms): a person's own last
+N ticket closes in a row that were never reopened - same STREAK feel as
+the original design, just counting ticket resolutions instead of runs.
 
-CI-safe: reads only already-built dashboard JSON (dataset_status.
-status_by_run()'s real input) and committed qa_results/ history
-(qa_results_reader) - no `gh` call, no live data, matching CLAUDE.md's
-hard rule.
+Superseded original design (kept only in git history, `git log -p` on
+this file - running-thoughts.md #3's own entry has the full account):
+walked each person's own chronological RUN sequence per dataset
+(qa_results_reader + dataset_status.status_by_run()), counting backward
+from their most recent run until a red one, amber not breaking it. Fully
+replaced, not kept alongside - Keith's own explicit call ("redesign the
+leaderboard now", overriding this session's own "recommended: defer"
+default).
 
-Privacy (this repo is public, Keith's own call): only people with a
-real entry in contract/people.yaml ever appear here, by name/nickname -
-`run_by` is a real email address (qa_tools/common/git_identity.py), and
-this module never surfaces a bare email on a publicly-deployed page. A
-run published by someone with no matching people.yaml entry - which is
-exactly every real run in this project's own history today, since that
-file ships empty - simply doesn't count toward anyone's streak yet.
+Real-fetch/pure-parse split, same convention as ticket_status.py/
+acceptance_sync.py: fetch_ticket_resolution()/fetch_all_ticket_
+resolutions() are the one real `gh` boundary - `gh issue view --json
+number,labels` (for the real `dataset:<id>` label, same as acceptance_
+sync.py's own grouping) PLUS a real call to GitHub's classic Issue
+Events API (`gh api repos/{owner}/{repo}/issues/{n}/events`) for the one
+thing `gh issue view` can never expose: WHO closed/reopened a ticket.
+Verified for real against this project's own live repo, 2026-09-18 (no
+`gh` CLI available in this sandbox, so verified via a direct authenticated
+REST call instead, using the same GITHUB_TOKEN a real Actions job already
+gets): the endpoint is reachable with that token, returns a real JSON
+array with `event`/`actor.login`/`created_at` per entry - confirmed on a
+real `labeled` event against this repo's own issue #2 (none of this
+project's 7 real tickets has been closed yet, so a real `closed`/
+`reopened` event itself is still unobserved - but `event`/`actor`/
+`created_at` is GitHub's own long-documented, stable shape for every
+event type on this endpoint, not something specific to `labeled`).
+build_resolution_episodes()/compute_resolution_streaks()/
+build_leaderboard() are pure functions over already-fetched data,
+independently testable with plain dict fixtures, no `gh`/network here.
+
+Same CI-safe-but-needs-a-token treatment as TICKET_STATUS/ACCEPTANCES
+(dashboard/embed_dashboard_data.py's own docstring) - unlike the
+original design (which never needed `gh` at all, only committed qa_
+results/ + already-built dashboard JSON), this one now DOES need a real
+raw-fetch step in .github/workflows/deploy-pages.yml, same shape as
+qa_tools.common.acceptance_sync's own QA_COMMENTS_JSON step.
+
+Identity now comes from a real GitHub LOGIN (the actor who closed the
+ticket), never an email - a ticket-close event has no email attached at
+all. Resolved against contract/people.yaml's own `github:` field (the
+same field ticket_sync.py's own --assignee resolution already uses),
+not the `email:` key the original design matched on. Same public-page
+privacy rule as before: only people with a real people.yaml entry ever
+appear, by name/nickname.
 """
 from __future__ import annotations
 
-from qa_tools.common.acceptance_sync import QA_RESULTS_SCOPE_FOR_DATASET
-from qa_tools.common.dataset_status import status_by_run
-from qa_tools.common.qa_results_reader import QA_RESULTS_DIR, list_run_ids, read_run_provenance
+import json
+import os
+import subprocess
+
+from qa_tools.common.acceptance_sync import list_ticket_numbers
 
 
-def _person_runs(dataset_id: str, qa_results_dir=QA_RESULTS_DIR) -> list[dict]:
-    """[{run_id, run_by}, ...] in real chronological order
-    (list_run_ids()'s own natural sort) - one entry per real committed
-    run for this dataset's own qa_results scope (Child Protection's 6
-    real tables all resolve to the SAME collection-level scope here,
-    same as acceptance_sync.py's own run-window logic), skipping any
-    run with no real run_by recorded (committed before git_identity.py's
-    stamping existed, or dataset_stats genuinely missing)."""
-    scope = QA_RESULTS_SCOPE_FOR_DATASET.get(dataset_id)
-    if scope is None:
-        return []
-    agency, dataset = scope
-    runs = []
-    for run_id in list_run_ids(agency, dataset, qa_results_dir):
-        provenance = read_run_provenance(agency, dataset, run_id, qa_results_dir)
-        if provenance and provenance.get("run_by"):
-            runs.append({"run_id": run_id, "run_by": provenance["run_by"]})
-    return runs
+def _run_gh(args: list[str]) -> str:
+    result = subprocess.run(["gh", *args], capture_output=True, text=True, check=True)
+    return result.stdout
 
 
-def compute_streaks(dataset_id: str, dataset_json: dict, qa_results_dir=QA_RESULTS_DIR) -> dict[str, dict]:
-    """{run_by_email: {"streak": n, "last_run_id": ...}} - each real
-    person's own CURRENT not-red streak on this one dataset. `dataset_
-    json` is the already-built dashboard JSON for this one dataset
-    (reports/birth_registrations_dashboard.json, or one entry of
-    child_protection_dashboard.json's own `datasets` list) -
-    status_by_run()'s own real input shape. Only people with a streak
-    of at least 1 appear (someone whose own most recent run was red has
-    nothing to show)."""
-    runs = _person_runs(dataset_id, qa_results_dir)
-    status = status_by_run(dataset_json)
+def fetch_ticket_resolution(owner: str, repo: str, issue_number: int) -> dict:
+    """Real {number, labels, events} for one real qa-ticket issue -
+    `labels` from `gh issue view` (for dataset:<id> grouping, same shape
+    acceptance_sync.py's own fetch_ticket_comments() already uses);
+    `events` the real closed/reopened history from GitHub's classic
+    Issue Events API, filtered down to just those two event types and
+    just the fields build_resolution_episodes() actually needs
+    (`event`, the real actor login, `created_at`) - the raw payload
+    carries a lot more (full user objects, commit refs, label colors)
+    that has no use here."""
+    meta = json.loads(_run_gh([
+        "issue", "view", str(issue_number), "--repo", f"{owner}/{repo}",
+        "--json", "number,labels",
+    ]))
+    raw_events = json.loads(_run_gh([
+        "api", f"repos/{owner}/{repo}/issues/{issue_number}/events",
+        "-f", "per_page=100",
+    ]))
+    meta["events"] = [
+        {
+            "event": e["event"],
+            "actor": (e.get("actor") or {}).get("login", "unknown"),
+            "created_at": e["created_at"],
+        }
+        for e in raw_events
+        if e.get("event") in ("closed", "reopened")
+    ]
+    return meta
 
+
+def fetch_all_ticket_resolutions(owner: str, repo: str) -> list[dict]:
+    """Every real qa-ticket issue this project has ever opened (open AND
+    closed - list_ticket_numbers() already covers both, same as
+    acceptance_sync.py's own use of it) with its own real close/reopen
+    history attached."""
+    return [fetch_ticket_resolution(owner, repo, n) for n in list_ticket_numbers(owner, repo)]
+
+
+def build_resolution_episodes(raw_tickets: list[dict]) -> dict[str, list[dict]]:
+    """{dataset_id: [{closed_by, closed_at, clean}, ...]} in real
+    chronological order across EVERY real ticket that dataset has ever
+    had (a dataset can accumulate more than one separate ticket over
+    time - ticket_sync.py's own find_open_ticket() only ever reopens the
+    CURRENTLY open one; once a ticket's closed, the next red/amber event
+    opens a brand new issue rather than reopening the old one, so a
+    dataset's own resolution history can legitimately span several real
+    issue numbers). Each real `closed` event is one resolution episode,
+    credited to whoever actually closed it (a real GitHub login);
+    `clean` is False only when THAT SAME issue was later reopened -
+    GitHub's own events for one issue always alternate open/closed, so
+    checking whether the very next event is a `reopened` is sufficient,
+    no windowing needed. A ticket missing a real `dataset:<id>` label is
+    skipped (same defensive treatment acceptance_sync.py's own build_
+    acceptances() already applies)."""
+    by_dataset: dict[str, list[dict]] = {}
+    for ticket in raw_tickets:
+        labels = [label["name"] for label in ticket.get("labels", [])]
+        dataset_id = next((label.split(":", 1)[1] for label in labels if label.startswith("dataset:")), None)
+        if dataset_id is None:
+            continue
+        events = sorted(ticket.get("events", []), key=lambda e: e["created_at"])
+        episodes = []
+        for i, event in enumerate(events):
+            if event["event"] != "closed":
+                continue
+            reopened_next = i + 1 < len(events) and events[i + 1]["event"] == "reopened"
+            episodes.append({
+                "closed_by": event["actor"],
+                "closed_at": event["created_at"],
+                "clean": not reopened_next,
+            })
+        if episodes:
+            by_dataset.setdefault(dataset_id, []).extend(episodes)
+
+    for episodes in by_dataset.values():
+        episodes.sort(key=lambda ep: ep["closed_at"])
+    return by_dataset
+
+
+def compute_resolution_streaks(episodes: list[dict]) -> dict[str, dict]:
+    """{github_login: {"streak": n, "last_closed_at": ...}} - each real
+    person's own CURRENT streak of clean resolutions on one dataset:
+    walk their own chronological sequence of real closes (skipping over
+    anyone else's interleaved closes entirely - those neither extend nor
+    break this person's own streak, same "own sequence only" treatment
+    the original run-based design already used), counting backward from
+    their own most recent close until hitting one that was later
+    reopened. Only people with a streak of at least 1 appear."""
     by_person: dict[str, list[dict]] = {}
-    for run in runs:
-        by_person.setdefault(run["run_by"], []).append(run)
+    for episode in episodes:
+        by_person.setdefault(episode["closed_by"], []).append(episode)
 
     streaks: dict[str, dict] = {}
-    for person, person_runs in by_person.items():
-        # person_runs inherits `runs`'s own real chronological order -
-        # walk backward from this person's own most recent run.
+    for person, person_episodes in by_person.items():
         streak = 0
-        last_run_id = None
-        for run in reversed(person_runs):
-            if status.get(run["run_id"], "green") == "red":
+        last_closed_at = None
+        for episode in reversed(person_episodes):
+            if not episode["clean"]:
                 break
-            if last_run_id is None:
-                last_run_id = run["run_id"]
+            if last_closed_at is None:
+                last_closed_at = episode["closed_at"]
             streak += 1
         if streak:
-            streaks[person] = {"streak": streak, "last_run_id": last_run_id}
+            streaks[person] = {"streak": streak, "last_closed_at": last_closed_at}
     return streaks
 
 
-def build_leaderboard(dataset_jsons: dict[str, dict], people_config: dict,
-                       qa_results_dir=QA_RESULTS_DIR) -> list[dict]:
+def build_leaderboard(raw_tickets: list[dict], people_config: dict) -> list[dict]:
     """[{dataset_id, name, nickname, github, streak}, ...], sorted by
     streak descending - the real, publicly-embeddable rows dashboard/
     embed_dashboard_data.py's own LEADERBOARD const uses directly.
-    `dataset_jsons`: {dataset_id: already-built dashboard JSON for that
-    one dataset}, one entry per real scope this covers. `email` is
-    deliberately never included in a row - see this module's own
-    docstring on why."""
+    `raw_tickets` is fetch_all_ticket_resolutions()'s own real,
+    already-fetched shape. Resolved against contract/people.yaml's
+    `github:` field, never `email:` - a ticket-close event carries a
+    real GitHub login, never an email address. Someone who closes real
+    tickets without a matching people.yaml `github:` entry simply
+    doesn't appear, same graceful degradation as every other optional
+    embedded feed in this project."""
+    github_to_person = {p["github"]: p for p in people_config["people"].values() if p.get("github")}
+    by_dataset = build_resolution_episodes(raw_tickets)
+
     rows = []
-    for dataset_id, dataset_json in dataset_jsons.items():
-        for email, info in compute_streaks(dataset_id, dataset_json, qa_results_dir).items():
-            person = people_config["people"].get(email)
+    for dataset_id, episodes in by_dataset.items():
+        for github_login, info in compute_resolution_streaks(episodes).items():
+            person = github_to_person.get(github_login)
             if person is None:
                 continue
             rows.append({
@@ -109,3 +214,12 @@ def build_leaderboard(dataset_jsons: dict[str, dict], people_config: dict,
             })
     rows.sort(key=lambda r: r["streak"], reverse=True)
     return rows
+
+
+def main() -> None:
+    owner, repo = os.environ["GITHUB_REPOSITORY"].split("/", 1)
+    print(json.dumps(fetch_all_ticket_resolutions(owner, repo)))
+
+
+if __name__ == "__main__":
+    main()

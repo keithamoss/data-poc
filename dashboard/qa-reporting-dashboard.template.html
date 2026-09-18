@@ -557,14 +557,16 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
   <div class="drawer-body" id="requirements-panel-body"></div>
 </aside>
 
-<!-- running-thoughts.md #3 ("gamification MVP", 2026-09-18) - a real
-     per-person, per-dataset current not-red streak leaderboard. Same
-     interaction pattern as every other header-button panel. -->
+<!-- running-thoughts.md #3 ("gamification MVP", 2026-09-18; redesigned
+     the same day for the automation-tension follow-up to item #5 Thread
+     B) - a real per-person, per-dataset streak of clean GitHub-ticket
+     resolutions. Same interaction pattern as every other header-button
+     panel. -->
 <div class="backdrop" id="leaderboard-backdrop"></div>
 <aside class="drawer" id="leaderboard-panel" aria-hidden="true">
   <div class="drawer-head">
     <div>
-      <div class="legend-key" style="margin:0 0 4px;">Who's kept a dataset out of the red the longest</div>
+      <div class="legend-key" style="margin:0 0 4px;">Who's resolved the most QA tickets in a row without reopening</div>
       <h3>Leaderboard</h3>
     </div>
     <button class="drawer-close" id="leaderboard-panel-close" aria-label="Close">✕</button>
@@ -3013,22 +3015,30 @@ document.getElementById("requirements-backdrop").addEventListener("click", close
 document.getElementById("requirements-panel-close").addEventListener("click", closePanel);
 
 // running-thoughts.md #3 ("gamification MVP", 2026-09-18, scoped via
-// two AskUserQuestion rounds) - LEADERBOARD is already a flat, real,
-// pre-sorted (streak descending) list of {dataset_id, name, nickname,
-// github, streak} rows, built server-side (qa_tools/common/
-// leaderboard.py) from committed qa_results/ + contract/people.yaml -
-// this just renders it, same "dumb template, data prep happens
-// server-side" split every other embedded const on this page follows.
-// rawRealDatasetById() (already used by the supply-history section)
-// resolves a real dataset's own display name from its id.
+// two AskUserQuestion rounds; REDESIGNED the same day, the automation-
+// tension follow-up to item #5 Thread B, scoped via two more
+// AskUserQuestion rounds) - once QA *running* itself is automated
+// there's no human left to credit for a not-red RUN streak, so this now
+// celebrates "resolving red to green" instead: a real person's own
+// streak of GitHub QA tickets they've closed in a row that were never
+// reopened - closing a ticket is always a human decision (ticket_sync.py's
+// own repeated design principle), so it survives automation regardless
+// of who/what triggered the underlying QA run. LEADERBOARD is already a
+// flat, real, pre-sorted (streak descending) list of {dataset_id, name,
+// nickname, github, streak} rows, built server-side (qa_tools/common/
+// leaderboard.py) from a real GitHub ticket-resolution fetch + contract/
+// people.yaml - this just renders it, same "dumb template, data prep
+// happens server-side" split every other embedded const on this page
+// follows. rawRealDatasetById() (already used by the supply-history
+// section) resolves a real dataset's own display name from its id.
 function renderLeaderboardPanel(){
   const body = document.getElementById("leaderboard-panel-body");
   if(!LEADERBOARD.length){
     body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
       No streaks yet — this celebrates a real person's own current run of
-      not-red QA results on a dataset (amber doesn't break it, only a red
-      run does). Add real people to <code>contract/people.yaml</code> to
-      see this fill in.
+      GitHub QA tickets closed in a row without being reopened. Add real
+      people to <code>contract/people.yaml</code> (matched by GitHub
+      username) to see this fill in.
     </div>`;
     return;
   }
@@ -3039,7 +3049,7 @@ function renderLeaderboardPanel(){
     return `<div class="snapshot-row">
         <div class="meta">
           <div class="date">#${i+1} — ${label}</div>
-          <div class="sub">${dsName} · ${fmtInt(r.streak)} ${pluralize(r.streak,"run")} not-red</div>
+          <div class="sub">${dsName} · ${fmtInt(r.streak)} clean ${pluralize(r.streak,"resolution")} in a row</div>
         </div>
       </div>`;
   }).join("");

@@ -174,6 +174,67 @@ and Back closes it, zero console errors. Deliberately left the REAL
 identity myself - same reasoning as item #2 (not this session's call to
 make unilaterally); Keith can add himself to see this fill in for real.
 
+**Redesigned, 2026-09-18 later the same evening - the automation-tension
+follow-up.** Right after shipping the above, Keith raised a real problem
+with it unprompted: "how will automating running factor in" - item #5
+Thread B's own future AWS/S3-event-triggered vision has QA running
+happen with no human "clicking run" at all, so the original design's
+whole foundation (`run_by`, a real git identity captured at RUN time)
+has nothing left to attach to once running itself is automated. Scoped
+via two more real `AskUserQuestion` rounds (four total across this
+item's life): the human role SHIFTS rather than the leaderboard just
+going away ("I think it shifts"); what's worth celebrating once running
+is automated is "resolving red to green"; this is a redesign to make
+NOW, not a known future change to just document and defer (Keith
+explicitly overrode this session's own "recommended: defer" default);
+and the metric shape is "streak of clean resolutions" - a person's own
+last N real GitHub tickets closed in a row that were never reopened,
+picked after the first attempt at asking that question used jargon
+("continuous per-run state") Keith flagged directly ("explain the
+question again") - re-asked with a plain, worked example instead.
+
+The mapping from "resolving red to green" to "whoever closes the real
+GitHub ticket" is this session's own reasoning, not something Keith was
+separately asked to confirm in as many words: `qa_tools/common/
+ticket_sync.py`'s own repeated, load-bearing design principle -
+"closing it is always a human decision, never automatic" - makes
+ticket-closing the one real action in this whole system already
+guaranteed to require a person, regardless of whether the QA run that
+opened the ticket was ever triggered by one. Worth Keith double-checking
+that inference specifically, not just the four scoped forks above.
+
+Fully replaced the original run-based design (not kept alongside) -
+`qa_tools/common/leaderboard.py`'s own module docstring says so, and
+git history (`git log -p` on that file) has the full original
+implementation if it's ever needed again. New real-fetch/pure-parse
+split, same convention as `ticket_status.py`/`acceptance_sync.py`:
+`fetch_ticket_resolution()`/`fetch_all_ticket_resolutions()` are the one
+real `gh` boundary, now including a call to GitHub's classic Issue
+Events API (`gh api repos/{owner}/{repo}/issues/{n}/events`) - the only
+way to learn WHO closed/reopened a ticket, since `gh issue view --json`
+exposes `closedAt` but never an actor. **Partially unverified against
+real GitHub behavior**: no `gh` CLI is available in this sandbox, so the
+endpoint itself was verified for real via a direct authenticated REST
+call using this session's own `GITHUB_TOKEN` (confirmed reachable,
+confirmed the real `event`/`actor.login`/`created_at` shape - but only
+against a real `labeled` event on this repo's own issue #2, since none
+of the 7 real tickets this project has ever opened has actually been
+closed yet). The `closed`/`reopened` event shape itself is GitHub's own
+long-documented, stable behavior, not something this session invented -
+but genuinely worth Keith watching the first time a real ticket gets
+closed, to confirm it resolves exactly as designed.
+
+This also changes the leaderboard from fully CI-safe-with-no-token (the
+original design needed nothing beyond committed `qa_results/` +
+already-built dashboard JSON) to needing a real `gh` fetch step in
+`.github/workflows/deploy-pages.yml`, same treatment TICKET_STATUS/
+ACCEPTANCES already have - a real, deliberate architectural cost of this
+redesign, not an oversight. Identity also shifted from a real git email
+(`run_by`, resolved against `contract/people.yaml`'s `email:` field) to
+a real GitHub login (`ticket_sync.py`'s own `--assignee` field,
+resolved against that same file's `github:` field instead) - a
+ticket-close event has no email attached at all.
+
 ### 4. GitHub Issues -> Microsoft Teams integration (research first)
 
 Idea: live notifications into a Microsoft Teams chat as datasets arrive
@@ -226,6 +287,17 @@ not yet solved:
   orchestration/sequencing design question for the AWS-event-driven
   version, not something the current local, manually-sequenced pipeline
   had to solve.
+- **Already caused one real redesign, 2026-09-18**: item #3's own
+  leaderboard originally credited whoever's local `git config user.email`
+  ran the QA tooling (`run_by`) - which has nothing to attach to once
+  running itself is automated under this thread's own vision. Redesigned
+  the same day to credit ticket-CLOSING instead (a real human decision
+  that survives automation regardless of what triggered the run) - see
+  item #3's own "Redesigned" write-up for the full account. Worth
+  re-checking every other `run_by`-based feature (the changelog/activity
+  feed, anything else built on `git_identity.py`) against this same
+  question before this thread's AWS MVP is ever actually built, not just
+  the leaderboard.
 
 ### 6. Read-only tension: accepting/rejecting Amber supplies
 
