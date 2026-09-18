@@ -22,6 +22,14 @@ first.
 ## 2026-09-18
 
 ### Added
+- **8:39pm** — A real way to accept an amber supply: commenting `/accept` on that
+  dataset's own GitHub QA ticket now records a real acknowledgment
+  against the exact supply that was current at the time - no ID to
+  type or copy. The supply itself stays amber (accepting never
+  silently reads as green); a small badge shows who accepted it,
+  linking to the real comment. An amber-only dataset now gets a real
+  ticket too, not just a red one. Publishes within roughly a minute or
+  two of the comment, not the next unrelated push.
 - **8:11pm** — Real deep links from the dashboard back into GitHub: clicking a check
   now opens its actual source (the real dbt test/Soda check/datacontract
   rule/Evidently preset that defines it, at the exact line), and clicking
