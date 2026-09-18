@@ -22,6 +22,11 @@ first.
 ## 2026-09-18
 
 ### Added
+- **8:00pm** — Human-readable dashboard URLs: the address bar now shows a real path
+  (`#/agency/.../dataset/.../column/.../check/...`) instead of an opaque
+  block of URL-encoded JSON - every drill-down level, the 4 header side
+  panels, and the check-comparison picker are all genuinely shareable
+  links now, not just the top-level page.
 - **6:52pm** — Real resupply-chain simulation for Child Protection: a red quarterly
   delivery now gets a real, later resupply attempt (a genuinely slower
   turnaround than Birth Registrations' own daily-feed curve - a full
