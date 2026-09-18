@@ -22,6 +22,10 @@ first.
 ## 2026-09-18
 
 ### Added
+- **1:02pm** — A real timestamp against every entry on this very page (real AWST
+  git-commit time, never fabricated), sorted newest-first within each
+  date's own category - also shown in the dashboard's own Release
+  Notes panel, not just this markdown file.
 - **12:24pm** — A GitHub Issues ticketing MVP: a new, separate write-permitted
   workflow that opens a real GitHub Issue per real dataset (birth
   registrations, and each of Child Protection's six real tables
