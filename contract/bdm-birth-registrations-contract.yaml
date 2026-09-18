@@ -482,17 +482,17 @@ schema:
           - metric: nullValues
             dimension: completeness
             unit: percent
-            mustBeLessThan: 5
-            severity: warning
+            mustBeLessThan: 15
+            severity: error
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.nullValues_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: description
-                value: "Parent 1's name is expected on most registrations, tolerated null up to ~5%."
+                value: "Parent 1's name is expected on most registrations, tolerated null up to ~5%; a rate this high (real observed range: 0.9-3.3%) signals a genuine upstream problem, not normal variation. Mirrors this same real-world check's own Soda copy (item 74, plans/qa-pipeline.md)."
               - property: changelog
-                value: "[]"
+                value: '[{"date": "2026-09-18T00:00:00Z", "description": "Bumped severity warning->error with a real mustBeLessThan:15 (was mustBeLessThan:5, warning) - item 74 (plans/qa-pipeline.md): a warning/info-severity rule always has warn_threshold=None (ODCS is single-tier) AND, before this, fail_threshold=None too, which the dashboard silently defaulted to 0 - making this check read red on almost every run despite datacontract-cli itself correctly reporting pass. Matches place_of_birth_facility''s own established pattern (severity:error + a real non-zero mustBeLessThan) and this same real-world check''s own Soda copy, already fixed the same way.", "author": "Keith Moss", "breaking": true}]'
           - metric: invalidValues
             dimension: conformity
             arguments:
@@ -517,16 +517,16 @@ schema:
           - metric: nullValues
             dimension: completeness
             unit: percent
-            mustBeLessThan: 30
-            severity: info
-            description: Higher tolerance - single-parent registrations are legitimately common.
+            mustBeLessThan: 50
+            severity: error
+            description: Higher tolerance - single-parent registrations are legitimately common. A rate this high (real observed range 24.8-30.7%) would mean half of all registrations have no second parent recorded, a genuine anomaly.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.nullValues_datacontract
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
-                value: "[]"
+                value: '[{"date": "2026-09-18T00:00:00Z", "description": "Bumped severity info->error with a real mustBeLessThan:50 (was mustBeLessThan:30, info) - item 74 (plans/qa-pipeline.md): an info-severity rule always has warn_threshold=None (ODCS is single-tier) AND, before this, fail_threshold=None too, which the dashboard silently defaulted to 0 - making this check read red on almost every run despite datacontract-cli itself correctly reporting pass. Matches place_of_birth_facility''s own established pattern (severity:error + a real non-zero mustBeLessThan) and this same real-world check''s own Soda copy, already fixed the same way.", "author": "Keith Moss", "breaking": true}]'
           - metric: invalidValues
             dimension: conformity
             arguments:

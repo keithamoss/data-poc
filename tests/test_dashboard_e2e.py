@@ -201,8 +201,19 @@ def dashboard_html_with_ticket(built_dashboard_html, tmp_path, monkeypatch) -> P
     reports/*.json from built_dashboard_html (an explicit dependency
     above, ensuring those files exist first) rather than re-running the
     whole build chain - dashboard.embed_dashboard_data.embed() is the
-    only step that actually needs to re-run."""
+    only step that actually needs to re-run.
+
+    Symlinks dashboard/fonts/ alongside the output file: the template
+    loads its real local @font-face files via a path relative to the
+    HTML file's own directory, which only resolves when something is
+    actually there - built_dashboard_html doesn't need this since it
+    writes into the real dashboard/ directory itself, alongside the
+    real fonts/, but this fixture deliberately writes to tmp_path
+    instead (see OPEN_TICKETS_JSON's own docstring on why isolating
+    embed()'s real file targets matters here)."""
     from dashboard import embed_dashboard_data as edd
+
+    (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
 
     tickets_path = tmp_path / "open_tickets.json"
     tickets_path.write_text(json.dumps([{

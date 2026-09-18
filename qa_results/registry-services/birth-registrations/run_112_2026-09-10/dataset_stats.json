@@ -1,0 +1,114 @@
+{
+  "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+  "run_by": "fpycnkgvmt@privaterelay.appleid.com",
+  "raw_output": {
+    "manifest_entry": {
+      "run_id": "run_112_2026-09-10",
+      "run_index": 168,
+      "delivery_id": "delivery_112",
+      "delivery_date": "2026-09-10",
+      "attempt_number": 1,
+      "arrived_date": "2026-09-10",
+      "run_date": "2026-09-10",
+      "is_resupply": false,
+      "supersedes_run_id": null,
+      "n_rows_generated": 1083,
+      "dirty_severity": "amber",
+      "id_offset": 11200000,
+      "seed": 1112,
+      "file": "run_112_2026-09-10.csv"
+    },
+    "value_counts": {
+      "sex": [
+        [
+          "M",
+          529
+        ],
+        [
+          "F",
+          518
+        ],
+        [
+          "X",
+          21
+        ],
+        [
+          "(invalid code)",
+          15
+        ]
+      ]
+    },
+    "arrival": {
+      "max_lag_hours": 7.465833333333333,
+      "earliest_extract": "2026-09-10 06:43:57.959093"
+    },
+    "check_aggregates": {
+      "sex": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 15,
+        "values": [
+          {
+            "value": "O",
+            "count": 8
+          },
+          {
+            "value": "U",
+            "count": 5
+          },
+          {
+            "value": "9",
+            "count": 2
+          }
+        ]
+      },
+      "place_of_birth_suburb": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 9,
+        "values": [
+          {
+            "value": "Freemantle",
+            "count": 3
+          },
+          {
+            "value": "Not stated",
+            "count": 2
+          },
+          {
+            "value": "Perth Metro",
+            "count": 2
+          },
+          {
+            "value": "TBC",
+            "count": 1
+          },
+          {
+            "value": "Unknown",
+            "count": 1
+          }
+        ]
+      },
+      "date_of_birth": {
+        "type": "numeric_date",
+        "suppressed": false,
+        "total_invalid": 1,
+        "min": "1820-11-30",
+        "max": "1820-11-30",
+        "values": [
+          {
+            "value": "1820-11-30",
+            "count": 1
+          }
+        ],
+        "histogram": [
+          {
+            "bucket": "1820-11-30",
+            "count": 1
+          }
+        ]
+      }
+    }
+  },
+  "verified": []
+}

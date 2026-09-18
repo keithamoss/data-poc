@@ -1,0 +1,66 @@
+{
+  "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+  "run_by": "fpycnkgvmt@privaterelay.appleid.com",
+  "raw_output": {
+    "manifest_entry": {
+      "run_id": "run_069_2026-07-29_resupply1",
+      "run_index": 101,
+      "delivery_id": "delivery_069",
+      "delivery_date": "2026-07-29",
+      "attempt_number": 2,
+      "arrived_date": "2026-07-31",
+      "run_date": "2026-07-31",
+      "is_resupply": true,
+      "supersedes_run_id": "run_069_2026-07-29",
+      "n_rows_generated": 2039,
+      "dirty_severity": null,
+      "id_offset": 6900000,
+      "seed": 1069,
+      "file": "run_069_2026-07-29_resupply1.csv"
+    },
+    "value_counts": {
+      "sex": [
+        [
+          "M",
+          1006
+        ],
+        [
+          "F",
+          999
+        ],
+        [
+          "X",
+          34
+        ]
+      ]
+    },
+    "arrival": {
+      "max_lag_hours": 14.106388888888889,
+      "earliest_extract": "2026-07-29 06:09:14.240474"
+    },
+    "check_aggregates": {
+      "sex": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 0,
+        "values": []
+      },
+      "place_of_birth_suburb": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 0,
+        "values": []
+      },
+      "date_of_birth": {
+        "type": "numeric_date",
+        "suppressed": false,
+        "total_invalid": 0,
+        "min": null,
+        "max": null,
+        "values": [],
+        "histogram": []
+      }
+    }
+  },
+  "verified": []
+}

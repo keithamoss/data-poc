@@ -63,8 +63,14 @@ tool's own server-side UTC clock.
   hours: GitHub's own runner resolving a newer Python version than this
   project had ever been tested against, and a missing one-time setup
   step for one of the real check tools.
+- A local build failure: re-running the real check tools without first
+  refreshing the combined warehouse left one column's arrival stats
+  looking up a run that wasn't there yet.
 
 ### Changed
+- A real YAML syntax mistake in a hand-edited contract file went
+  uncaught until the next tool run parsed it - a real `check-yaml`
+  pre-commit check now catches this class of mistake at commit time.
 - How a resupply chain gets identified: no longer inferred from
   internal bookkeeping about which delivery a resupply was "for," but
   derived purely from a delivery's real cadence-aware timing and each

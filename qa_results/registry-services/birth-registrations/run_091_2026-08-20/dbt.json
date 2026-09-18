@@ -1,0 +1,1479 @@
+{
+  "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+  "run_by": null,
+  "raw_output": {
+    "metadata": {
+      "dbt_schema_version": "https://schemas.getdbt.com/dbt/run-results/v6.json",
+      "dbt_version": "1.12.4",
+      "generated_at": "2026-09-18T04:06:16.852736Z",
+      "invocation_id": "982152a0-b48a-4d66-89f1-0279e9787479",
+      "invocation_started_at": "2026-09-18T04:06:14.998863Z",
+      "env": {}
+    },
+    "results": [
+      {
+        "status": "success",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:15.800723Z",
+            "completed_at": "2026-09-18T04:06:15.807294Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:15.807795Z",
+            "completed_at": "2026-09-18T04:06:15.868854Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.06976556777954102,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "OK",
+        "failures": null,
+        "unique_id": "model.birth_registrations.stg_birth_registrations",
+        "compiled": true,
+        "compiled_code": "-- Real dbt staging model SQL - would run as-is under `dbt run` once a real\n-- adapter is wired to data/warehouse.db (see ../dbt_project.yml). Casts\n-- is_multiple_birth back to boolean (SQLite has no native bool - the loader\n-- stores it as 0/1) and gives the layer its conventional dbt name; every\n-- other column passes through unchanged, since the source is already close\n-- to analysis-ready.\n\nwith source as (\n    select * from \"run_091_2026-08-20\".\"raw\".\"birth_registrations\"\n)\n\nselect\n    registration_number,\n    child_given_names,\n    child_family_name,\n    date_of_birth,\n    sex,\n    place_of_birth_suburb,\n    place_of_birth_facility,\n    date_registered,\n    registering_parent_1_name,\n    registering_parent_2_name,\n    cast(is_multiple_birth as boolean) as is_multiple_birth,\n    source_system_record_id,\n    extract_timestamp,\n    run_id,\n    run_date,\n    dirty_severity\nfrom source",
+        "relation_name": "\"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:15.875537Z",
+            "completed_at": "2026-09-18T04:06:16.024247Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.024820Z",
+            "completed_at": "2026-09-18T04:06:16.081235Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.20863962173461914,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 37 results, configured to fail if >30",
+        "failures": 37,
+        "unique_id": "test.birth_registrations.accepted_values_stg_birth_registrations_place_of_birth_suburb__Fremantle__Subiaco__Joondalup__Rockingham__Mandurah__Midland__Armadale__Cannington__Morley__Cockburn_Central__Scarborough__Victoria_Park__Bunbury__Albany__Geraldton__Kalgoorlie__Broome__Karratha__Port_Hedland__Busselton__Northam__Narrogin__Esperance__Collie__Mount_Lawley__Leederville__Wembley__Innaloo__Success__Baldivis__Ellenbrook__Butler__Balga__Girrawheen__Maddington__Gosnells__Kwinana__Hamilton_Hill__Beaconsfield__South_Perth__Bentley__Willetton__Riverton__Karrinyup__Currambine__Clarkson__Yanchep__Byford__Waroona__Manjimup__Margaret_River.30876d5bd9",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        place_of_birth_suburb as value_field,\n        count(*) as n_records\n\n    from \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\n    group by place_of_birth_suburb\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    'Fremantle','Subiaco','Joondalup','Rockingham','Mandurah','Midland','Armadale','Cannington','Morley','Cockburn Central','Scarborough','Victoria Park','Bunbury','Albany','Geraldton','Kalgoorlie','Broome','Karratha','Port Hedland','Busselton','Northam','Narrogin','Esperance','Collie','Mount Lawley','Leederville','Wembley','Innaloo','Success','Baldivis','Ellenbrook','Butler','Balga','Girrawheen','Maddington','Gosnells','Kwinana','Hamilton Hill','Beaconsfield','South Perth','Bentley','Willetton','Riverton','Karrinyup','Currambine','Clarkson','Yanchep','Byford','Waroona','Manjimup','Margaret River'\n)\n\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"accepted_values_stg_birth_regi_3b44ec4b96ecc6c1f2afef84316aaed4\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.087185Z",
+            "completed_at": "2026-09-18T04:06:16.100799Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.101268Z",
+            "completed_at": "2026-09-18T04:06:16.116592Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.032062530517578125,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 59 results, configured to fail if >30",
+        "failures": 59,
+        "unique_id": "test.birth_registrations.accepted_values_stg_birth_registrations_sex__M__F__X.612f03b449",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nwith all_values as (\n\n    select\n        sex as value_field,\n        count(*) as n_records\n\n    from \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\n    group by sex\n\n)\n\nselect *\nfrom all_values\nwhere value_field not in (\n    'M','F','X'\n)\n\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"accepted_values_stg_birth_registrations_sex__M__F__X\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.121151Z",
+            "completed_at": "2026-09-18T04:06:16.140404Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.140846Z",
+            "completed_at": "2026-09-18T04:06:16.158168Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.039400339126586914,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 15 results, configured to fail if != 0",
+        "failures": 15,
+        "unique_id": "test.birth_registrations.dbt_utils_accepted_range_stg_birth_registrations_date_of_birth__CURRENT_DATE__DATE_1900_01_01_.3532572ade",
+        "compiled": true,
+        "compiled_code": "\n\nwith meet_condition as(\n  select *\n  from \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\n),\n\nvalidation_errors as (\n  select *\n  from meet_condition\n  where\n    -- never true, defaults to an empty result set. Exists to ensure any combo of the `or` clauses below succeeds\n    1 = 2\n    -- records with a value >= min_value are permitted. The `not` flips this to find records that don't meet the rule.\n    or not date_of_birth >= DATE '1900-01-01'\n    -- records with a value <= max_value are permitted. The `not` flips this to find records that don't meet the rule.\n    or not date_of_birth <= CURRENT_DATE\n)\n\nselect *\nfrom validation_errors\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"dbt_utils_accepted_range_stg_b_031e58d0766eb8287ecda01df7082f62\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.164192Z",
+            "completed_at": "2026-09-18T04:06:16.176399Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.176846Z",
+            "completed_at": "2026-09-18T04:06:16.191995Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.030713558197021484,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.dbt_utils_expression_is_true_stg_birth_registrations_date_registered_date_of_birth.e658113e8e",
+        "compiled": true,
+        "compiled_code": "\n\n\n\nselect\n    *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\n\nwhere not(date_registered >= date_of_birth)\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"dbt_utils_expression_is_true_s_5944eb80d2649b5fb1246246074a7d94\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.196865Z",
+            "completed_at": "2026-09-18T04:06:16.205770Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.206234Z",
+            "completed_at": "2026-09-18T04:06:16.229700Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.035280704498291016,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 35 results, configured to fail if != 0",
+        "failures": 35,
+        "unique_id": "test.birth_registrations.matches_regex_stg_birth_registrations_child_family_name___A_Za_z_A_Za_z_.15babc434d",
+        "compiled": true,
+        "compiled_code": "\n\nselect *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere child_family_name is not null\n  and not regexp_matches(child_family_name, '^[A-Za-z][A-Za-z. -]*$')\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"matches_regex_stg_birth_regist_f6f5d040a167ad5fe22929904e297070\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.234521Z",
+            "completed_at": "2026-09-18T04:06:16.240143Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.240614Z",
+            "completed_at": "2026-09-18T04:06:16.258602Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.02634119987487793,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 29 results, configured to fail if != 0",
+        "failures": 29,
+        "unique_id": "test.birth_registrations.matches_regex_stg_birth_registrations_child_given_names___A_Za_z_A_Za_z_.cc3c59d397",
+        "compiled": true,
+        "compiled_code": "\n\nselect *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere child_given_names is not null\n  and not regexp_matches(child_given_names, '^[A-Za-z][A-Za-z. -]*$')\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"matches_regex_stg_birth_regist_78f652bc8ccc010ce02ceb8378877f76\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.263261Z",
+            "completed_at": "2026-09-18T04:06:16.268927Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.269440Z",
+            "completed_at": "2026-09-18T04:06:16.293765Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.03282952308654785,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 36 results, configured to fail if != 0",
+        "failures": 36,
+        "unique_id": "test.birth_registrations.matches_regex_stg_birth_registrations_registering_parent_1_name___A_Za_z_A_Za_z_.806d5304a8",
+        "compiled": true,
+        "compiled_code": "\n\nselect *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere registering_parent_1_name is not null\n  and not regexp_matches(registering_parent_1_name, '^[A-Za-z][A-Za-z. -]*$')\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"matches_regex_stg_birth_regist_4da34f7d86a823d6fa82747744294ed0\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.298520Z",
+            "completed_at": "2026-09-18T04:06:16.304062Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.304568Z",
+            "completed_at": "2026-09-18T04:06:16.323219Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.02700352668762207,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 25 results, configured to fail if != 0",
+        "failures": 25,
+        "unique_id": "test.birth_registrations.matches_regex_stg_birth_registrations_registering_parent_2_name___A_Za_z_A_Za_z_.f6242a7e25",
+        "compiled": true,
+        "compiled_code": "\n\nselect *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere registering_parent_2_name is not null\n  and not regexp_matches(registering_parent_2_name, '^[A-Za-z][A-Za-z. -]*$')\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"matches_regex_stg_birth_regist_163857278cd7a0fe2c008a3f8617c12e\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.327923Z",
+            "completed_at": "2026-09-18T04:06:16.336777Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.337284Z",
+            "completed_at": "2026-09-18T04:06:16.355036Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.03182578086853027,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.matches_regex_stg_birth_registrations_registration_number___BDM_0_9_9_.97f6c225b3",
+        "compiled": true,
+        "compiled_code": "\n\nselect *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere registration_number is not null\n  and not regexp_matches(registration_number, '^BDM-[0-9]{9}$')\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"matches_regex_stg_birth_regist_19a4ee487109e705793fbcf0c6f4b606\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.361608Z",
+            "completed_at": "2026-09-18T04:06:16.363883Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.364393Z",
+            "completed_at": "2026-09-18T04:06:16.391028Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.031565189361572266,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 25 results, configured to fail if != 0",
+        "failures": 25,
+        "unique_id": "test.birth_registrations.multiple_birth_sibling",
+        "compiled": true,
+        "compiled_code": "-- Real dbt singular test - a self-join within stg_birth_registrations\n-- (the same model, referenced twice via two aliases - dbt's ref()\n-- resolves to the same relation both times, so this genuinely joins the\n-- table to itself). See contract/bdm-birth-registrations-contract.yaml's\n-- matching type: sql version of this check (is_multiple_birth property)\n-- for the full rationale.\n--\n-- Every is_multiple_birth record must have a matching sibling row from\n-- the same birth event (same date_of_birth, facility, and registering\n-- parent 1). Passes (0 rows) on every clean run - daily_batch.py's\n-- generator fix (see plans/qa-pipeline.md) now actually generates a real\n-- sibling row for every is_multiple_birth flag, rather than leaving it an\n-- unenforced random flag. dirty.py's break_multiple_birth_siblings\n-- (amber/red only) drops one twin from a fraction of real pairs to\n-- demonstrate a real violation.\n\n-- IS NOT DISTINCT FROM (not plain =) on place_of_birth_facility and\n-- registering_parent_1_name: both can legitimately be null (home births;\n-- the ~2% parent1-name null rate), and plain `=` against NULL is never\n-- true in SQL even when both sides are the same NULL - found as a real,\n-- live false-positive (4 flagged rows on a clean run where every sibling\n-- pair genuinely matched) before switching to null-safe equality.\nselect a.registration_number\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\" a\nwhere a.is_multiple_birth = true\n  and not exists (\n    select 1\n    from \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\" b\n    where b.is_multiple_birth = true\n      and b.registration_number != a.registration_number\n      and b.date_of_birth = a.date_of_birth\n      and b.place_of_birth_facility is not distinct from a.place_of_birth_facility\n      and b.registering_parent_1_name is not distinct from a.registering_parent_1_name\n  )",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"multiple_birth_sibling\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.395598Z",
+            "completed_at": "2026-09-18T04:06:16.403350Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.403799Z",
+            "completed_at": "2026-09-18T04:06:16.419239Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.025862693786621094,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_birth_registrations_child_family_name.67a03ad9e7",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere child_family_name is null\n\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"not_null_stg_birth_registrations_child_family_name\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.423432Z",
+            "completed_at": "2026-09-18T04:06:16.429013Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.429510Z",
+            "completed_at": "2026-09-18T04:06:16.459052Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.04431724548339844,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_birth_registrations_child_given_names.3295137471",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere child_given_names is null\n\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"not_null_stg_birth_registrations_child_given_names\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.469465Z",
+            "completed_at": "2026-09-18T04:06:16.474900Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.475348Z",
+            "completed_at": "2026-09-18T04:06:16.507080Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.04212355613708496,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 8 results, configured to fail if != 0",
+        "failures": 8,
+        "unique_id": "test.birth_registrations.not_null_stg_birth_registrations_date_of_birth.4e9362d564",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere date_of_birth is null\n\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"not_null_stg_birth_registrations_date_of_birth\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.514073Z",
+            "completed_at": "2026-09-18T04:06:16.519656Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.520148Z",
+            "completed_at": "2026-09-18T04:06:16.534358Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.022322416305541992,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 7 results, configured to fail if != 0",
+        "failures": 7,
+        "unique_id": "test.birth_registrations.not_null_stg_birth_registrations_date_registered.5e64a996c2",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere date_registered is null\n\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"not_null_stg_birth_registrations_date_registered\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.538469Z",
+            "completed_at": "2026-09-18T04:06:16.544193Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.544685Z",
+            "completed_at": "2026-09-18T04:06:16.559535Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.023151397705078125,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 7 results, configured to fail if != 0",
+        "failures": 7,
+        "unique_id": "test.birth_registrations.not_null_stg_birth_registrations_extract_timestamp.5c57d42578",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere extract_timestamp is null\n\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"not_null_stg_birth_registrations_extract_timestamp\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.563968Z",
+            "completed_at": "2026-09-18T04:06:16.569740Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.570240Z",
+            "completed_at": "2026-09-18T04:06:16.585393Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.02358698844909668,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 10 results, configured to fail if != 0",
+        "failures": 10,
+        "unique_id": "test.birth_registrations.not_null_stg_birth_registrations_is_multiple_birth.29e2313a67",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere is_multiple_birth is null\n\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"not_null_stg_birth_registrations_is_multiple_birth\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.590076Z",
+            "completed_at": "2026-09-18T04:06:16.596052Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.596562Z",
+            "completed_at": "2026-09-18T04:06:16.619948Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.03208732604980469,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 731 results, configured to fail if >600",
+        "failures": 731,
+        "unique_id": "test.birth_registrations.not_null_stg_birth_registrations_place_of_birth_facility.c847246944",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere place_of_birth_facility is null\n\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"not_null_stg_birth_registrations_place_of_birth_facility\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.624656Z",
+            "completed_at": "2026-09-18T04:06:16.630480Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.630968Z",
+            "completed_at": "2026-09-18T04:06:16.645674Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.023275375366210938,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_birth_registrations_place_of_birth_suburb.79c42ea1cb",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere place_of_birth_suburb is null\n\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"not_null_stg_birth_registrations_place_of_birth_suburb\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.649822Z",
+            "completed_at": "2026-09-18T04:06:16.655619Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.656092Z",
+            "completed_at": "2026-09-18T04:06:16.671424Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.0236971378326416,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_birth_registrations_registering_parent_1_name.6f5fb18aea",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere registering_parent_1_name is null\n\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"not_null_stg_birth_registrations_registering_parent_1_name\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.675152Z",
+            "completed_at": "2026-09-18T04:06:16.680356Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.680806Z",
+            "completed_at": "2026-09-18T04:06:16.696836Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.023901939392089844,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.not_null_stg_birth_registrations_registering_parent_2_name.6f6f89257a",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere registering_parent_2_name is null\n\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"not_null_stg_birth_registrations_registering_parent_2_name\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.701144Z",
+            "completed_at": "2026-09-18T04:06:16.707219Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.707709Z",
+            "completed_at": "2026-09-18T04:06:16.732190Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.033243656158447266,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 9 results, configured to fail if != 0",
+        "failures": 9,
+        "unique_id": "test.birth_registrations.not_null_stg_birth_registrations_registration_number.90b6b6799c",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere registration_number is null\n\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"not_null_stg_birth_registrations_registration_number\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.737055Z",
+            "completed_at": "2026-09-18T04:06:16.743533Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.744043Z",
+            "completed_at": "2026-09-18T04:06:16.760023Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.025362491607666016,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 4 results, configured to fail if != 0",
+        "failures": 4,
+        "unique_id": "test.birth_registrations.not_null_stg_birth_registrations_source_system_record_id.39d557cbea",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\n\n\nselect *\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere source_system_record_id is null\n\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"not_null_stg_birth_registrations_source_system_record_id\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "pass",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.764935Z",
+            "completed_at": "2026-09-18T04:06:16.767156Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.767638Z",
+            "completed_at": "2026-09-18T04:06:16.782242Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.019566774368286133,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": null,
+        "failures": 0,
+        "unique_id": "test.birth_registrations.recency",
+        "compiled": true,
+        "compiled_code": "-- Real dbt singular test - REPLACES dbt_utils.recency (Phase 5f,\n-- plans/qa-pipeline.md #61). That macro's \"now\" is always dbt.current_\n-- timestamp() (real wall-clock time), with no way to parametrize it per\n-- run - the honest reason this check was permanently red: this fixture's\n-- dates are fixed to a window generated at some point in the past, and\n-- every day real wall-clock time passes without a fresh regeneration,\n-- CURRENT_DATE drifts further from it. The ODCS contract's matching\n-- type: sql rule and the Soda checks file's matching `failed rows` check\n-- have the same fix, same reason.\n--\n-- Each run's own DuckDB warehouse holds only that run's own batch\n-- (see run_dbt_bdm.py's own docstring), and stg_birth_registrations\n-- already carries date_registered as a real column - daily_batch.py\n-- sets it to exactly this run's own run_date for every row (its own\n-- comment: \"this run's registrations cluster on run_date\"). So \"is\n-- date_of_birth fresh\" can be answered against THIS RUN's own date\n-- instead of the real machine's clock, with zero new plumbing, and the\n-- same anchor works identically for Soda (queries the same warehouse)\n-- and datacontract-cli (date_registered is a real column of the raw CSV\n-- it reads directly - no DuckDB-specific column needed).\n--\n-- NOT simply \"date_of_birth close to date_registered, always\": ordinary\n-- registration lag (daily_batch.py's reg_lag_days, 0-9 days, on every\n-- row regardless of any injected defect) already puts most rows within\n-- 7 days of their own date_registered, so anchoring alone would make\n-- this check trivially pass almost every run - no more meaningful than\n-- the \"always red\" it replaces. generator/dirty.py's inject_stale_\n-- delivery (an occasional whole-run defect, independent of severity\n-- tier) is what gives this something real to fail on: on an\n-- injected-stale run, EVERY row's date_of_birth gets pushed 15-45 days\n-- before its own date_registered (well past the 7-day window), and this\n-- test correctly goes red only then - date_registered itself is left\n-- untouched by that injector, still reading as this run's own date.\nselect 1 as failing_row\nwhere not exists (\n  select 1\n  from \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\n  where date_of_birth >= date_registered - interval '7' day\n)",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"recency\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.786421Z",
+            "completed_at": "2026-09-18T04:06:16.793985Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.794541Z",
+            "completed_at": "2026-09-18T04:06:16.809547Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.025397300720214844,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 31 results, configured to fail if != 0",
+        "failures": 31,
+        "unique_id": "test.birth_registrations.unique_stg_birth_registrations_registration_number.2910805016",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nselect\n    registration_number as unique_field,\n    count(*) as n_records\n\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere registration_number is not null\ngroup by registration_number\nhaving count(*) > 1\n\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"unique_stg_birth_registrations_registration_number\"",
+        "batch_results": null,
+        "overload_results": null
+      },
+      {
+        "status": "fail",
+        "timing": [
+          {
+            "name": "compile",
+            "started_at": "2026-09-18T04:06:16.814181Z",
+            "completed_at": "2026-09-18T04:06:16.819789Z"
+          },
+          {
+            "name": "execute",
+            "started_at": "2026-09-18T04:06:16.820286Z",
+            "completed_at": "2026-09-18T04:06:16.840518Z"
+          }
+        ],
+        "thread_id": "Thread-1 (worker)",
+        "execution_time": 0.028560638427734375,
+        "adapter_response": {
+          "_message": "OK"
+        },
+        "message": "Got 31 results, configured to fail if != 0",
+        "failures": 31,
+        "unique_id": "test.birth_registrations.unique_stg_birth_registrations_source_system_record_id.6647ff830a",
+        "compiled": true,
+        "compiled_code": "\n    \n    \n\nselect\n    source_system_record_id as unique_field,\n    count(*) as n_records\n\nfrom \"run_091_2026-08-20\".\"main\".\"stg_birth_registrations\"\nwhere source_system_record_id is not null\ngroup by source_system_record_id\nhaving count(*) > 1\n\n\n",
+        "relation_name": "\"run_091_2026-08-20\".\"main_dbt_test__audit\".\"unique_stg_birth_registrations_source_system_record_id\"",
+        "batch_results": null,
+        "overload_results": null
+      }
+    ],
+    "elapsed_time": 1.1870033740997314,
+    "args": {
+      "show_resource_report": false,
+      "require_ref_searches_node_package_before_root": false,
+      "export_saved_queries": false,
+      "log_level": "info",
+      "require_explicit_package_overrides_for_builtin_materializations": true,
+      "defer": false,
+      "warn_error_options": {
+        "error": [],
+        "warn": [],
+        "silence": []
+      },
+      "empty": false,
+      "use_catalogs_v2": false,
+      "log_path": "/home/user/data-poc/qa_tools/bdm/../../dbt_project/logs",
+      "populate_cache": true,
+      "use_v2_parser": false,
+      "require_yaml_configuration_for_mf_time_spines": true,
+      "latest_version_pointer_enabled_by_default": false,
+      "static_parser": true,
+      "favor_state": false,
+      "log_file_max_bytes": 10485760,
+      "require_sql_header_in_test_configs": false,
+      "require_resource_names_without_spaces": true,
+      "show": false,
+      "printer_width": 80,
+      "skip_nodes_if_on_run_start_fails": true,
+      "state_modified_compare_vars": false,
+      "require_generic_test_arguments_property": true,
+      "partial_parse_file_diff": true,
+      "introspect": true,
+      "use_colors": true,
+      "quiet": true,
+      "strict_mode": false,
+      "version_check": true,
+      "print": true,
+      "maximum_seed_size_mib": 1,
+      "use_colors_file": true,
+      "require_source_and_semantic_model_names_without_spaces": false,
+      "require_valid_schema_from_generate_schema_name": false,
+      "upload_to_artifacts_ingest_api": false,
+      "use_fast_test_edges": false,
+      "require_corrected_analysis_fqns": false,
+      "macro_debugging": false,
+      "include_saved_query": false,
+      "sqlparse": {
+        "MAX_GROUPING_DEPTH": null,
+        "MAX_GROUPING_TOKENS": null
+      },
+      "support_custom_ref_kwargs": false,
+      "write_json": true,
+      "state_modified_compare_more_unrendered_values": true,
+      "send_anonymous_usage_stats": false,
+      "log_level_file": "debug",
+      "v2_parser": "dbt-core-experimental-parser parse",
+      "project_dir": "/home/user/data-poc/qa_tools/bdm/../../dbt_project",
+      "hints_enabled": true,
+      "partial_parse": true,
+      "log_format": "default",
+      "vars": {},
+      "validate_macro_args": true,
+      "profiles_dir": "/home/user/data-poc/qa_tools/bdm/../dbt_profiles",
+      "source_freshness_run_project_hooks": true,
+      "allow_jinja_file_extensions": false,
+      "resource_types": [],
+      "require_batched_execution_for_custom_microbatch_strategy": true,
+      "target_path": "/home/user/data-poc/qa_tools/bdm/../../dbt_project/target/run_091_2026-08-20",
+      "snowflake_projects_otel": false,
+      "which": "build",
+      "store_failures": true,
+      "enable_grouped_warn_error_parser_logs": false,
+      "log_format_file": "debug",
+      "show_all_deprecations": false,
+      "require_all_warnings_handled_by_warn_error": true,
+      "select": [
+        "stg_birth_registrations",
+        "multiple_birth_sibling",
+        "recency"
+      ],
+      "exclude": [],
+      "cache_selected_only": false,
+      "require_unique_project_resource_names": false,
+      "indirect_selection": "eager",
+      "exclude_resource_types": [],
+      "require_nested_cumulative_type_params": true,
+      "invocation_command": "dbt build --profiles-dir /home/user/data-poc/qa_tools/bdm/../dbt_profiles --project-dir /home/user/data-poc/qa_tools/bdm/../../dbt_project --quiet --target-path /home/user/data-poc/qa_tools/bdm/../../dbt_project/target/run_091_2026-08-20 --select stg_birth_registrations multiple_birth_sibling recency --store-failures"
+    }
+  },
+  "verified": [
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.accepted_values_dbt",
+      "column_name": "place_of_birth_suburb",
+      "check_name": "dbt:accepted_values",
+      "dimension": "validity",
+      "label": "Invalid values",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 37,
+      "unit": "count",
+      "warn_threshold": 0.0,
+      "fail_threshold": 30.0,
+      "status": "fail",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 37,
+      "failing_sample_keys": [
+        "BDM-893105709",
+        "BDM-070738417",
+        "BDM-152294284",
+        "BDM-172617987",
+        "BDM-815118185"
+      ],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.accepted_values_dbt",
+      "column_name": "sex",
+      "check_name": "dbt:accepted_values",
+      "dimension": "validity",
+      "label": "Invalid values",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 59,
+      "unit": "count",
+      "warn_threshold": 0.0,
+      "fail_threshold": 30.0,
+      "status": "fail",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 59,
+      "failing_sample_keys": [
+        "BDM-836378912",
+        "BDM-523957117",
+        "BDM-266900825",
+        "BDM-964501985",
+        "BDM-895703496"
+      ],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.accepted_range_dbt",
+      "column_name": "date_of_birth",
+      "check_name": "dbt:accepted_range",
+      "dimension": "conformity",
+      "label": "Date-of-birth range",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 15,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "fail",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 15,
+      "failing_sample_keys": [
+        "BDM-589905963",
+        "BDM-553648953",
+        "BDM-957470337",
+        "BDM-327315554",
+        "BDM-834754467"
+      ],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.expression_is_true_dbt",
+      "column_name": "date_registered",
+      "check_name": "dbt:expression_is_true",
+      "dimension": "consistency",
+      "label": "Registration/birth date ordering",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "pass",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.matches_regex_dbt",
+      "column_name": "child_family_name",
+      "check_name": "dbt:matches_regex",
+      "dimension": "validity",
+      "label": "Invalid values",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 35,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "fail",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 35,
+      "failing_sample_keys": [
+        "BDM-049769641",
+        "BDM-330821052",
+        "BDM-157609253",
+        "BDM-230692226",
+        "BDM-217038166"
+      ],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.matches_regex_dbt",
+      "column_name": "child_given_names",
+      "check_name": "dbt:matches_regex",
+      "dimension": "validity",
+      "label": "Invalid values",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 29,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "fail",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 29,
+      "failing_sample_keys": [
+        "BDM-049769641",
+        "BDM-929417725",
+        "BDM-224489315",
+        "BDM-457412793",
+        "BDM-327730272"
+      ],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.matches_regex_dbt",
+      "column_name": "registering_parent_1_name",
+      "check_name": "dbt:matches_regex",
+      "dimension": "validity",
+      "label": "Invalid values",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 36,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "fail",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 36,
+      "failing_sample_keys": [
+        "BDM-198105308",
+        "BDM-157609253",
+        "BDM-266900825",
+        "BDM-549058083",
+        "BDM-190843621"
+      ],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.matches_regex_dbt",
+      "column_name": "registering_parent_2_name",
+      "check_name": "dbt:matches_regex",
+      "dimension": "validity",
+      "label": "Invalid values",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 25,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "fail",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 25,
+      "failing_sample_keys": [
+        "BDM-370081105",
+        "BDM-839598470",
+        "BDM-757495381",
+        "BDM-129625357",
+        "BDM-955116170"
+      ],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.matches_regex_dbt",
+      "column_name": "registration_number",
+      "check_name": "dbt:matches_regex",
+      "dimension": "validity",
+      "label": "Invalid values",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "pass",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.multiple_birth_sibling_dbt",
+      "column_name": "is_multiple_birth",
+      "check_name": "dbt:multiple_birth_sibling",
+      "dimension": "consistency",
+      "label": "Sibling record match",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 25,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "fail",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 25,
+      "failing_sample_keys": [
+        "BDM-365703100",
+        "BDM-808453166",
+        "BDM-966155128",
+        "BDM-281118485",
+        "BDM-970900185"
+      ],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.not_null_dbt",
+      "column_name": "child_family_name",
+      "check_name": "dbt:not_null",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "pass",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.not_null_dbt",
+      "column_name": "child_given_names",
+      "check_name": "dbt:not_null",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "pass",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.not_null_dbt",
+      "column_name": "date_of_birth",
+      "check_name": "dbt:not_null",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 8,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "fail",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 8,
+      "failing_sample_keys": [
+        "BDM-565483651",
+        "BDM-119289164",
+        "BDM-122571945",
+        "BDM-795051210",
+        "BDM-712150234"
+      ],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_registered.not_null_dbt",
+      "column_name": "date_registered",
+      "check_name": "dbt:not_null",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 7,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "fail",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 7,
+      "failing_sample_keys": [
+        "BDM-777221989",
+        "BDM-159420844",
+        "BDM-780952268",
+        "BDM-721577249",
+        "BDM-203399603"
+      ],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.not_null_dbt",
+      "column_name": "extract_timestamp",
+      "check_name": "dbt:not_null",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 7,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "fail",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 7,
+      "failing_sample_keys": [
+        "BDM-206536775",
+        "BDM-496391128",
+        "BDM-613935397",
+        "BDM-497083670",
+        "BDM-120605993"
+      ],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.not_null_dbt",
+      "column_name": "is_multiple_birth",
+      "check_name": "dbt:not_null",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 10,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "fail",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 10,
+      "failing_sample_keys": [
+        "BDM-407489143",
+        "BDM-839106823",
+        "BDM-178128749",
+        "BDM-177902641",
+        "BDM-763054743"
+      ],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_facility.not_null_dbt",
+      "column_name": "place_of_birth_facility",
+      "check_name": "dbt:not_null",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 731,
+      "unit": "count",
+      "warn_threshold": 300.0,
+      "fail_threshold": 600.0,
+      "status": "fail",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 731,
+      "failing_sample_keys": [
+        "BDM-058919626",
+        "BDM-879851040",
+        "BDM-700587477",
+        "BDM-428302315",
+        "BDM-887954056"
+      ],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.not_null_dbt",
+      "column_name": "place_of_birth_suburb",
+      "check_name": "dbt:not_null",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "pass",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.not_null_dbt",
+      "column_name": "registering_parent_1_name",
+      "check_name": "dbt:not_null",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 26,
+      "unit": "count",
+      "warn_threshold": 90.0,
+      "fail_threshold": 200.0,
+      "status": "pass",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 26,
+      "failing_sample_keys": [],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.not_null_dbt",
+      "column_name": "registering_parent_2_name",
+      "check_name": "dbt:not_null",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 375,
+      "unit": "count",
+      "warn_threshold": 550.0,
+      "fail_threshold": 700.0,
+      "status": "pass",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 375,
+      "failing_sample_keys": [],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.not_null_dbt",
+      "column_name": "registration_number",
+      "check_name": "dbt:not_null",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 9,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "fail",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 9,
+      "failing_sample_keys": [],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.not_null_dbt",
+      "column_name": "source_system_record_id",
+      "check_name": "dbt:not_null",
+      "dimension": "completeness",
+      "label": "Null rate",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 4,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "fail",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 4,
+      "failing_sample_keys": [
+        "BDM-795051210",
+        "BDM-112631916",
+        "BDM-404244531",
+        "BDM-036956884"
+      ],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.recency_dbt",
+      "column_name": "date_of_birth",
+      "check_name": "dbt:recency",
+      "dimension": "timeliness",
+      "label": "Freshness",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 0,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "pass",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.unique_dbt",
+      "column_name": "registration_number",
+      "check_name": "dbt:unique",
+      "dimension": "uniqueness",
+      "label": "Duplicate rate",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 62,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "fail",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 62,
+      "failing_sample_keys": [
+        "BDM-790452358",
+        "BDM-790452358",
+        "BDM-682457277",
+        "BDM-177902641",
+        "BDM-236286460"
+      ],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    },
+    {
+      "agency_id": "registry-services",
+      "collection_id": "civil-registration",
+      "dataset_id": "birth-registrations",
+      "check_id": "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.unique_dbt",
+      "column_name": "source_system_record_id",
+      "check_name": "dbt:unique",
+      "dimension": "uniqueness",
+      "label": "Duplicate rate",
+      "run_id": "run_091_2026-08-20",
+      "run_timestamp": "2026-09-18T04:01:18.340489+00:00",
+      "metric_value": 83,
+      "unit": "count",
+      "warn_threshold": null,
+      "fail_threshold": null,
+      "status": "fail",
+      "on_fail_action": "flag",
+      "row_count_total": 1324,
+      "row_count_invalid": 83,
+      "failing_sample_keys": [
+        "BDM-879851040",
+        "BDM-742522833",
+        "BDM-457412793",
+        "BDM-963340089",
+        "BDM-157609253"
+      ],
+      "engine": "dbt-core 1.12 + dbt-duckdb"
+    }
+  ]
+}
