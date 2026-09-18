@@ -221,7 +221,11 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
     # already silently skips via node["test_metadata"] being absent from
     # non-test nodes entirely (KeyError-safe since we only look them up
     # for uids present in `nodes`, which is test-only).
-    target_path = os.path.join(DBT_PROJECT_DIR, "target", run_id)
+    # See qa_tools/bdm/run_dbt_bdm.py's own evaluate_dbt_bdm() comment on
+    # this same fix - lives beside db_path (CP_DUCKDB_RUNS_DIR), not under
+    # the fixed, repo-relative DBT_PROJECT_DIR/target/, for real parallel-
+    # test safety (plans/running-thoughts.md #12).
+    target_path = os.path.join(CP_DUCKDB_RUNS_DIR, "dbt_target", run_id)
     run_dbt(db_path, "build", CP_MODELS + CP_SINGULAR_TESTS, target_path, PROFILES_DIR, DBT_PROJECT_DIR, ROOT)
 
     with open(os.path.join(target_path, "manifest.json")) as f:

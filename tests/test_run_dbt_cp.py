@@ -6,23 +6,26 @@ audit-table workaround" logic, plus CP-specific routing (which of the
 cp_common.BUSINESS_RULE_HOME_TABLE)."""
 from __future__ import annotations
 
-import shutil
-
 import pytest
 
 import qa_tools.cp.run_dbt_cp as run_dbt_cp
 
+# Must match conftest.py's own _CP_REF_RUN_ID/_CP_DIRTY_RUN_ID exactly -
+# see tests/test_run_dbt_bdm.py's own comment on why (real parallel-test
+# safety for dbt's target-path output lives in evaluate_dbt_cp() itself,
+# not here - plans/running-thoughts.md #12).
 _REF_RUN_ID = "pytest_cp_ref"
 _DIRTY_RUN_ID = "pytest_cp_dirty"
 
 
 @pytest.fixture
 def _dbt_cp(monkeypatch, cp_duckdb_dir):
+    # dbt's own target_path now lives under CP_DUCKDB_RUNS_DIR itself (see
+    # evaluate_dbt_cp()'s own comment) - a per-worker pytest tmp dir, so
+    # no manual cleanup is needed here any more, same as
+    # tests/test_run_dbt_bdm.py's own equivalent fixture.
     monkeypatch.setattr(run_dbt_cp, "CP_DUCKDB_RUNS_DIR", cp_duckdb_dir)
     monkeypatch.setattr(run_dbt_cp, "write_qa_result", lambda *a, **k: None)
-    yield
-    for run_id in (_REF_RUN_ID, _DIRTY_RUN_ID):
-        shutil.rmtree(f"{run_dbt_cp.DBT_PROJECT_DIR}/target/{run_id}", ignore_errors=True)
 
 
 def test_clean_run_resolves_every_check_id_across_all_6_tables(_dbt_cp):

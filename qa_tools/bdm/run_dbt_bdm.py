@@ -258,7 +258,18 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     # then also contains the model-build step's own result, which the
     # parsing below already silently skips (nodes.get() returns None for
     # anything that isn't a test node), so nothing further changes.
-    target_path = os.path.join(DBT_PROJECT_DIR, "target", run_id)
+    # Lives beside db_path (DUCKDB_RUNS_DIR/<run_id>.duckdb), not under
+    # DBT_PROJECT_DIR/target/ - that's a fixed, repo-relative path shared
+    # by every invocation regardless of DUCKDB_RUNS_DIR, so two tests
+    # reusing the same run_id (tests/test_run_dbt_bdm.py's own two tests,
+    # by design, matching conftest.py's fixture-built data) would collide
+    # if ever scheduled onto different parallel workers - a real risk,
+    # not hypothetical (plans/running-thoughts.md #12, confirmed by
+    # reproducing it). DUCKDB_RUNS_DIR is already genuinely unique per
+    # real production run (untouched) and, in tests, already monkeypatched
+    # to a per-worker tmp dir - so basing target_path on it inherits that
+    # same uniqueness for free, no test-file changes needed.
+    target_path = os.path.join(DUCKDB_RUNS_DIR, "dbt_target", run_id)
     run_dbt(db_path, "build", ["stg_birth_registrations", *_SINGULAR_TESTS], target_path,
             PROFILES_DIR, DBT_PROJECT_DIR, ROOT)
 

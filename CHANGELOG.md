@@ -28,6 +28,18 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-18
 
 ### Added
+- **11:44pm** — **Parallel Test Runs** **[Testing & dev tooling]** `pytest-xdist` adopted for a real, measured ~2x faster full local test
+  run (`uv run pytest -n auto` - ~59s vs ~122s serial on a 4-core
+  machine), not just installed on faith. Found and fixed a real bug
+  along the way: two dbt-based integration tests shared a literal run
+  id that mapped to dbt's own shared `dbt_project/target/` output
+  directory - safe only because tests ran one at a time before, and a
+  genuine collision once run in parallel (reproduced directly, not
+  assumed). Fixed by co-locating each run's dbt scratch output with its
+  own DuckDB file instead of a fixed, repo-shared path - a small
+  production improvement in its own right, not just a test workaround.
+  Plain `uv run pytest` stays serial by default for easier single-test
+  debugging.
 - **11:25pm** — **Plans Tab** **[Dashboard UI]** **[Docs & process]** A real "Plans" page inside the dashboard - browse, search, and filter this
   project's own `plans/*.md` planning memory (status/component tags on
   every item and Thread) without leaving the live site. A genuinely new

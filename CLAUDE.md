@@ -180,14 +180,21 @@ Rough layout:
   (~9s each, ~52s total for identical, deterministic output); now a
   single `scope="module"` fixture, real ~43s saved for zero coverage
   loss), not seconds - `pytest-xdist` (parallel test execution) is
-  worth revisiting now that this has actually happened, not just
-  flagged for someday (checked 2026-09-18: not yet installed - the
-  real-tool integration fixtures in `tests/conftest.py` already use
-  per-session `tmp_path_factory` dirs, but whether the real dbt
-  subprocess calls those fixtures make would collide across PARALLEL
-  workers - dbt's own shared `dbt_project/target/` default, the same
-  class of problem `qa_tools/common/parallel_orchestrate.py` had to fix
-  with a `--target-path` per run - hasn't been checked). CI
+  now installed and verified (2026-09-18 night, `plans/running-
+  thoughts.md` #12): the real dbt-target-path collision this bullet
+  used to flag as unchecked was confirmed real (reproduced it), fixed
+  at the source (`evaluate_dbt_bdm()`/`evaluate_dbt_cp()` now build
+  `target_path` from `DUCKDB_RUNS_DIR`/`CP_DUCKDB_RUNS_DIR` - already
+  genuinely unique per run, already monkeypatched to a per-worker tmp
+  dir in tests - instead of the fixed, repo-relative `dbt_project/
+  target/`), and the other 3 tools' own fixtures were confirmed already
+  safe (their scratch dirs were already monkeypatched to per-worker
+  `tmp_path_factory` dirs). `uv run pytest -n auto` is the recommended
+  fast path for a full local run (real ~59s/411 tests measured on this
+  4-core sandbox, down from ~122s serial) - NOT the new default for a
+  bare `uv run pytest`, which stays serial on purpose (easier single-
+  test debugging, matching `qa_tools/common/parallel_orchestrate.py`'s
+  own stated preference for a sequential mode). CI
   (`.github/workflows/
   test.yml`) runs the full suite with `pytest-cov` on every push and
   enforces `pyproject.toml`'s `[tool.coverage.report] fail_under` - a
@@ -292,7 +299,12 @@ Rough layout:
   feeling: ~2m43s/163 tests (pre-2026-09-18) -> ~2min/302 tests
   (2026-09-18 morning, after `test_generate_runs.py`'s own fixture
   consolidation) -> ~193s/346 tests (2026-09-18 evening, the git-walk
-  bug above) -> ~122s/346 tests (2026-09-18 evening, after that fix).
+  bug above) -> ~122s/346 tests (2026-09-18 evening, after that fix)
+  -> ~59s/411 tests (2026-09-18 night, `pytest-xdist` `-n 4` - see
+  `plans/running-thoughts.md` #12's own real fix/verification account;
+  plain serial `uv run pytest` is still ~122s-equivalent at today's test
+  count, `-n auto` is the fast path, not the new default - see that
+  item for why).
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.

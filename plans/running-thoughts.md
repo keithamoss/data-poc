@@ -819,19 +819,64 @@ identical, deterministic output. Fixed (2026-09-18): a single
 `scope="module"` fixture generates once, all 6 tests read it - real
 ~43s saved, full suite now 163s -> a measured 120s, zero coverage lost.
 
-Still open, not yet done - explicitly grouped with item #11 above for
-the same weekend planning loop, not picked off individually:
-- `pytest-xdist` (parallel test workers) - flagged as worth revisiting
-  once the real-tool integration tests actually landed (CLAUDE.md's own
-  note); not yet installed. Real open question before adopting it: do
-  the real dbt subprocess calls different test FILES make collide on
-  dbt's shared `dbt_project/target/` default when run in PARALLEL
-  workers, the same class of problem `qa_tools/common/
-  parallel_orchestrate.py` had to fix with a `--target-path` per run for
-  the real orchestration scripts - not yet checked for the test suite's
-  own dbt-based tests.
-- The remaining ~70s of real dbt-core/datacontract-cli integration test
-  cost is closer to the genuine floor (actually invoking real tools,
-  not mocked) - xdist parallelism is the more promising lever here than
-  further fixture restructuring, once the collision question above is
-  answered.
+**`pytest-xdist` built and verified, 2026-09-18 night** - Keith's own
+explicit call to pick this back up despite the "weekend loop" grouping
+above (item #11 stays parked). Investigated the real open question
+first, not assumed: does a real dbt subprocess call collide with
+another one on dbt's shared `dbt_project/target/` default when run in
+PARALLEL workers - confirmed genuinely real, not hypothetical, by
+reading `qa_tools/bdm/run_dbt_bdm.py`'s own `evaluate_dbt_bdm()`:
+`target_path = os.path.join(DBT_PROJECT_DIR, "target", run_id)` is a
+fixed, repo-relative path (NOT inside any per-worker tmp dir the way
+`DUCKDB_RUNS_DIR`/`RAW_DIR` already are for Soda/datacontract-cli/
+Evidently's own tests), and `tests/test_run_dbt_bdm.py`/
+`test_run_dbt_cp.py` each have 2 tests that deliberately share the same
+literal `run_id` (matching `conftest.py`'s own fixture-built file
+names) - safe today only because pytest runs them sequentially with a
+cleanup step between. Reproduced the real failure first (two tests
+landing on different xdist workers, same target dir, genuine
+`FileNotFoundError`/`CatalogException` from a real dbt race), confirmed
+Soda/datacontract-cli/Evidently's own tests were NOT at risk (their
+directories are already monkeypatched to worker-unique
+`tmp_path_factory` dirs - the "hasn't been checked" note above is now
+checked and confirmed safe for those three).
+
+A first fix attempt (suffixing the test files' own `run_id` constants
+by `PYTEST_XDIST_WORKER`) was wrong and caught by re-running the tests,
+not assumed correct: it broke the coupling between `conftest.py`'s
+fixture-built DuckDB file names (keyed by the UNSUFFIXED literal
+`run_id`) and what the test then asked `evaluate_dbt_bdm()`/
+`evaluate_dbt_cp()` to look up, producing a real, different failure
+(`CatalogException: schema "raw" does not exist"` - the suffixed run_id
+pointed at a DuckDB file that was never built). **Real fix**: left
+`run_id` alone everywhere (test files reverted to match `conftest.py`
+exactly), and instead changed `evaluate_dbt_bdm()`/`evaluate_dbt_cp()`
+themselves to build `target_path` from `DUCKDB_RUNS_DIR`/
+`CP_DUCKDB_RUNS_DIR` (wherever `db_path` already lives - genuinely
+unique per production run, and already monkeypatched to a per-worker
+tmp dir in tests, same as the other three tools) instead of the fixed,
+repo-relative `DBT_PROJECT_DIR/target/`. A real, small production
+improvement in its own right (co-locates a run's dbt scratch output
+with its own db file), not just a test-only hack - and it also meant
+the two dbt test fixtures' manual `shutil.rmtree` cleanup (there
+specifically to avoid `dbt_project/target/` clutter in the real repo)
+was no longer needed at all, since the new location is already a tmp
+dir pytest cleans up itself.
+
+Verified: sequential run still passes (6/6, unchanged), `-n 4` passes
+(6/6) across 3 repeated runs with no flakiness, and the FULL suite
+under `-n 4` - `411 passed, 13 errors` (same pre-existing, unrelated
+Playwright browser-binary gap documented elsewhere in this file/
+CLAUDE.md, not a regression) - **in a real, measured 59s, down from the
+~120s serial baseline** (item #12's own earlier fixture-consolidation
+number) - close to the theoretical ~2x ceiling on this 4-core sandbox.
+`pytest-xdist`/`execnet` added as real dev dependencies
+(`pyproject.toml`). Deliberately NOT made the default for a bare
+`uv run pytest` (Keith's own established preference, `qa_tools/common/
+parallel_orchestrate.py`'s own docstring: parallel workers make stack
+traces/print-debugging messier) - `-n auto` is documented as the
+recommended flag for a fast FULL local run, plain `uv run pytest`
+stays serial for easy single-test debugging. Whether to also enable
+`-n auto` in CI's own `test.yml` (lower risk there - no interactive
+debugging happening) is a real, deliberately unactioned follow-up, not
+decided here.

@@ -10,28 +10,33 @@ invocation startup cost - see plans/performance.md), a deliberate
 trade for real confidence in this specific logic."""
 from __future__ import annotations
 
-import shutil
-
 import pytest
 
 import qa_tools.bdm.run_dbt_bdm as run_dbt_bdm
 
+# Must match conftest.py's own _REF_RUN_ID/_DIRTY_RUN_ID exactly - those
+# are the literal names bdm_duckdb_dir's fixture builds the real per-run
+# DuckDB files under, and evaluate_dbt_bdm() looks up db_path purely from
+# this run_id, so the two can never drift apart. (Real parallel-test
+# safety for dbt's own target-path output lives in evaluate_dbt_bdm()
+# itself now - see that function's own comment, plans/running-thoughts.md
+# #12 - not here.)
 _REF_RUN_ID = "pytest_bdm_ref"
 _DIRTY_RUN_ID = "pytest_bdm_dirty"
 
 
 @pytest.fixture
 def _dbt_bdm(monkeypatch, bdm_duckdb_dir):
+    # dbt's own target_path now lives under DUCKDB_RUNS_DIR itself (see
+    # evaluate_dbt_bdm()'s own comment) - a per-worker pytest tmp dir, not
+    # a real repo-relative location, so no manual cleanup is needed here
+    # any more (pytest's own tmp dir retention handles it, same as every
+    # other tmp_path_factory-based fixture in this suite).
     monkeypatch.setattr(run_dbt_bdm, "DUCKDB_RUNS_DIR", bdm_duckdb_dir)
     captured = {}
     monkeypatch.setattr(run_dbt_bdm, "write_qa_result",
                          lambda *a, **k: captured.setdefault("write_qa_result_called", True))
-    yield captured
-    # dbt writes into the REAL project's dbt_project/target/<run_id> -
-    # gitignored, but cleaned up here so repeated local test runs don't
-    # accumulate clutter there.
-    for run_id in (_REF_RUN_ID, _DIRTY_RUN_ID):
-        shutil.rmtree(f"{run_dbt_bdm.DBT_PROJECT_DIR}/target/{run_id}", ignore_errors=True)
+    return captured
 
 
 def test_clean_run_resolves_every_check_id_and_mostly_passes(_dbt_bdm):
