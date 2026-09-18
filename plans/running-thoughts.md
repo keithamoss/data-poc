@@ -235,6 +235,21 @@ a real GitHub login (`ticket_sync.py`'s own `--assignee` field,
 resolved against that same file's `github:` field instead) - a
 ticket-close event has no email attached at all.
 
+**Real CI bug, caught and fixed the same evening, before this ever
+reached Pages.** This redesign's own first live CI run (commit
+`48b89a7`) failed on its own new step: `gh api .../events -f
+per_page=100` returned a real 415 - `gh api` silently switches an
+otherwise-GET request to POST the moment ANY `-f`/`-F` param is given
+(unless `-X GET` is also passed explicitly), and this read-only
+endpoint doesn't accept POST. Confirmed directly against this repo's
+own real issue #8 while diagnosing (the same call via `-f` returns 415;
+a plain GET with `?per_page=100` in the URL returns 200). Fixed by
+moving `per_page` into the URL's own query string; added a regression
+test (`tests/test_leaderboard.py`) that locks in the `gh` invocation
+shape without needing a real `gh`/network call. Nothing broken ever
+reached Pages - the gate caught it before the deploy step ran. Fixed in
+`6fa8039`, confirmed green on the next real CI run.
+
 ### 4. GitHub Issues -> Microsoft Teams integration (research first)
 
 Idea: live notifications into a Microsoft Teams chat as datasets arrive
@@ -256,6 +271,54 @@ GitHub<->Teams connector - what it can/can't surface, whether it
 supports enough granularity for the gamification angle - not yet a
 build task, and specifically not a "build a Teams webhook integration"
 task).
+
+**Research done, 2026-09-18 evening.** Confirmed for real (official
+GitHub docs snippets, GitHub's own open-source `integrations/microsoft-
+teams` repo, the app's own Marketplace listing - `docs.github.com`
+itself was unreachable from this sandbox, egress-blocked, so verified
+via search-engine-crawled snippets of that same official content plus
+whatever of the source repo `github.com` itself would serve directly):
+
+- It's the official, actively-maintained "GitHub for Microsoft Teams"
+  Bot Framework app - not a legacy Office 365 Connector (those are being
+  retired across Microsoft 365 generally; unrelated tech, no
+  deprecation risk here).
+- `@GitHub subscribe org/repo` in a channel, scopable to specific event
+  "features" (issues, pull requests, reviews, comments, workflow runs at
+  minimum).
+- **Label filtering is real and works for issues**: `@GitHub subscribe
+  org/repo+label:"qa-ticket"` - every real ticket this pipeline opens
+  already carries that label (plus a per-dataset `dataset:<id>` one), so
+  a channel could subscribe to just this pipeline's own tickets.
+- **Hard constraint**: no custom message content. The app's card layout
+  is fixed - there's no way to inject our own text into what Teams
+  renders. The only lever this pipeline has at all is what `ticket_
+  sync.py` already writes into the real GitHub issue/comment, which
+  Teams then mirrors verbatim.
+- **Keith's call on that constraint**: try to carry the gamification
+  angle over anyway, via the existing real comment body (not a separate
+  custom card) - low-effort, no guarantee it reads well in the resulting
+  Teams thread, not yet attempted.
+
+**Parked as a known unknown, 2026-09-18 evening (Keith's own call):**
+whether the Teams close-event card actually NAMES who closed the
+ticket, or just shows the new status - every source describes the
+card's shape (threaded reply, parent card carries title/status/
+assignees/labels/checks) without confirming an actor field on a close
+event specifically. Pushed hard on this from multiple angles (official
+docs, the source repo, the Marketplace listing, `teams.github.com`,
+Wayback Machine, a text-proxy fetcher, ~8 different search phrasings)
+and hit a genuine wall: this sandbox's egress proxy blocks every domain
+except `github.com` itself, and no search-engine snippet quotes the
+actual close-event card content either way. Not resolvable by more
+searching from THIS environment - settling it for real needs either (a)
+someone installing the app in a real Teams channel and watching an
+actual close event, or (b) research from an environment with
+unrestricted web access. One relevant data point either way: GitHub's
+own Issue Events API (verified live against this repo's own ticket #8
+while building item #3's redesign above) DOES carry a real actor on
+every event, so the underlying data GitHub has to work with is there
+even if the Teams card doesn't surface it.
 
 ### 5. Staff adoption - two threads
 
