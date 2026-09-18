@@ -269,6 +269,21 @@ Rough layout:
   repo growth, not just row/run counts - a real `pytest --durations=30`
   profile is the way to find where new growth actually went, the same
   diagnostic step that caught it here, not a guess.
+  **Standing practice, 2026-09-18 evening (Keith's own explicit ask):
+  keep an eye on this going forward, informally - report back if
+  runtime has grown noticeably since the last time it was checked, the
+  same way this entry itself does. Deliberately NOT a CI-enforced gate
+  (unlike `pytest-cov`'s real, measured coverage threshold) - Keith's
+  own words: "no need to put it into CI or anything." A rough running
+  log of full-suite `uv run pytest` timings, newest last, so "has this
+  grown" has a real number to compare against rather than a vague
+  feeling: ~2m43s/163 tests (pre-2026-09-18) -> ~2min/302 tests
+  (2026-09-18 morning, after `test_generate_runs.py`'s own fixture
+  consolidation) -> ~193s/346 tests (2026-09-18 evening, the git-walk
+  bug above) -> ~122s/346 tests (2026-09-18 evening, after that fix).
+  Whenever a full local run happens anyway (not a reason to run one
+  that selective testing above would otherwise skip), note the real
+  number here.
 - **A push that ships anything release-note-worthy gets a `CHANGELOG.md`
   entry in the SAME push, not backfilled later.** "Release-note-worthy"
   is the same bar `CHANGELOG.md`'s own intro and item 62's original
