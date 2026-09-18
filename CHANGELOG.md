@@ -88,6 +88,10 @@ first.
   arrive on the same calendar day.
 
 ### Changed
+- **7:08pm** — Child Protection's resupply simulation, calibrated further: a dirty
+  delivery now only fails 2-3 of its 6 real tables, not all of them,
+  and the most recent delivery is no longer forced red - both random,
+  same as every other delivery.
 - **12:01pm** — A real YAML syntax mistake in a hand-edited contract file went
   uncaught until the next tool run parsed it - a real `check-yaml`
   pre-commit check now catches this class of mistake at commit time.

@@ -4555,6 +4555,20 @@ relative, not a schedule — this is weeks of work, not months.
     design this whole redesign was built around, now visibly true for a
     second dataset, not just claimed for one.
 
+    **Follow-up, same day, dictated feedback**: two real calibration
+    corrections. (1) "only some tables in CP to fail... two or three
+    could fail, and the rest could be fine" - `ChildProtectionProvider.
+    dirty()` used to apply the delivery's severity to all 6 real tables
+    uniformly; now defers to a new `_pick_dirty_tables(seed)`, drawing
+    2 or 3 of the 6 per dirty() call (own test:
+    `test_dirty_only_picks_2_or_3_of_the_6_tables`). (2) "no need for
+    the latest one to always fail... happy for it to be random" -
+    `RUN_PLAN`'s last slot folded into the same shuffle as every other
+    non-first delivery; only the first stays forced clean (a real
+    technical need - `orchestrate_cp.py`'s own Evidently reference
+    run). Regenerated + re-verified via Playwright the same way as the
+    initial build above.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
