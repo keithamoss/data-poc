@@ -231,6 +231,44 @@ Rough layout:
   turn on it. Report back proactively if it's actually red; a green run
   doesn't need its own announcement, just a passing mention next time
   it's relevant.
+  **Amended again, 2026-09-19 (Keith's own explicit call): run selective
+  tests locally for smaller/medium changes, rely on CI for the full
+  suite.** For a change scoped to one or two modules, run just the
+  directly affected test file(s) locally (e.g. `uv run pytest
+  tests/test_changelog.py -q`), not the whole suite - then push and let
+  `test.yml` report the full-suite result, same as the "don't block on
+  CI" amendment above already established for waiting on it. Still run
+  the full local suite (plus `ruff`/`npm test`) for a genuinely large
+  or cross-cutting change, or when actually uncertain whether something
+  distant broke - this is about not defaulting to the heaviest check
+  for every change, not skipping real verification.
+- **The full local `uv run pytest` run took a real, measured ~193s
+  (346 tests) as of 2026-09-18 evening - up from the ~2min/302-test
+  figure recorded earlier the same day - not because the suite grew
+  meaningfully, but because of a real, since-fixed performance bug.**
+  `qa_tools/common/changelog.py`'s `_committed_at_by_run_timestamp()`
+  (walked by `dashboard/embed_dashboard_data.py`'s `embed()`, which
+  several tests exercise - `test_embed_dashboard_data.py`,
+  `test_dashboard_e2e.py`'s `TestBuiltDashboardRenders`/`TestTicketBadge`)
+  used to spawn one `git show <sha>` subprocess PER commit that ever
+  touched a dataset's `qa_results/` subtree, diffing that commit's
+  ENTIRE changed tree - real cost that scales with both commit COUNT
+  and DIFF SIZE, and both grew a lot the same day this was found
+  (several qa_results/ regeneration commits touching 80-900+ files
+  each, mostly full-file rewrites). Measured before the fix: ~13s for
+  Birth Registrations' own 12 commits alone, 225MB/5.3M lines of raw
+  diff output. Fixed two ways: one `git log -p` call instead of N
+  `git show` calls, AND narrowing the pathspec to `dataset_stats.json`
+  files specifically - the only file this function (or its caller)
+  ever actually reads, so excluding the real, verbose dbt.json/soda.json
+  tool output (the bulk of the diff volume) is what did most of the
+  work - measured after: 0.7s, 1.7MB/56K lines, a ~13x reduction on
+  that one call; full local suite back down to ~122s/346 tests after
+  the fix, in line with the earlier ~2min baseline. The STANDING
+  lesson: this class of "walk real git history" logic scales with real
+  repo growth, not just row/run counts - a real `pytest --durations=30`
+  profile is the way to find where new growth actually went, the same
+  diagnostic step that caught it here, not a guess.
 - **A push that ships anything release-note-worthy gets a `CHANGELOG.md`
   entry in the SAME push, not backfilled later.** "Release-note-worthy"
   is the same bar `CHANGELOG.md`'s own intro and item 62's original
