@@ -4356,13 +4356,59 @@ relative, not a schedule — this is weeks of work, not months.
     absent wiring) plus a real-browser Playwright test (`tests/
     test_dashboard_e2e.py::TestTicketBadge`) - manually verified working
     (real badge, real link, both tiers) via an injected `TICKET_STATUS`
-    before the automated test was written; the automated version itself
-    is currently blocked from actually running by item 77's own
-    `qa_results/` cleanup blocker above (the shared `built_dashboard_
-    html` fixture it depends on rebuilds from the same broken state) -
-    not a problem with this feature's own code. `uv run ruff check .`
-    clean; `npm test` (unaffected by the qa_results/ issue - tests the
-    raw template) passes.
+    before the automated test was written. Its own real-browser
+    fixture (a bare `tmp_path`, deliberately isolated from `dashboard/`
+    itself - see `OPEN_TICKETS_JSON`'s own docstring) initially failed
+    for a real, separate reason: the template's local `@font-face`
+    files resolve relative to the HTML file's own directory, which
+    only has `dashboard/fonts/` alongside it when writing into the
+    real `dashboard/` directory - fixed by symlinking `dashboard/
+    fonts/` into the fixture's own `tmp_path`. Confirmed green both
+    locally (full suite, 333 passed) and in real CI. `uv run ruff
+    check .` clean.
+
+79. **[investigated, 2026-09-18]** Keith's own follow-up question once
+    item 74's fix was verified: why do `child-protection`'s own 6 real
+    datasets still read red? Checked properly this time (item 74's own
+    write-up above already learned the lesson of not stopping at a
+    narrow grep) - real, complete, and boring: `data/cp_raw/
+    manifest.json`'s own real dirty_severity rotation across all 15
+    real quarterly deliveries (`cp_run_01_2023-02-01` through
+    `cp_run_15_2026-08-01`) happens to land on `red` for the MOST
+    RECENT one - a deliberate, heavy synthetic-corruption injection
+    (the same generator mechanism BDM's own dirty runs use), not a
+    threshold-encoding bug. Real violation counts checked against
+    real row counts (e.g. 14 duplicate `cp_client_id`s out of 527 real
+    `cp_clients` rows, ~20 invalid `sex` values out of ~1000
+    `cp_notifications` rows) - all in the few-percent range a "red"
+    severity injection would produce, nothing implausible or
+    compounding. Also checked CP's own contract for any remaining
+    instance of item 74's Bug A pattern (a genuinely-tolerant
+    `severity: warning`/`info` rule silently zero-defaulted) - the
+    only 6 warning-severity rules in `contract/child-protection-
+    contract.yaml` are all `rowCount` `mustBeBetween` checks, already
+    correctly excluded from the per-column dashboard entirely (see
+    `build_cp_dashboard_data.py`'s own comment on why). **Conclusion:
+    CP's red status is a genuine true positive, same class of finding
+    as `birth-registrations`' own `is_multiple_birth` result above -
+    nothing to fix.** No code/config change made. The real, open
+    question this surfaces instead - CP's next quarterly delivery
+    (whenever it's next generated/committed) would presumably read
+    green/amber again, so CP's own ticket, once `ticket-sync.yml`'s
+    push trigger opens one for real, will get a real "resolved"
+    comment on that future run rather than staying open indefinitely -
+    not itself a problem, just worth knowing going in.
+
+    **`ticket-sync.yml`'s automatic push trigger enabled the same day**
+    (Keith's own explicit go-ahead, asked directly given this finding:
+    "yes, enable it now" over "investigate CP first") - `on: push:`
+    added, paths mirroring `deploy-pages.yml`'s own trigger (minus
+    `dashboard/**`/`CHANGELOG.md`/`requirements.yaml`, which this job
+    never touches). All 7 real datasets' current red/green status is
+    now genuinely real, not a threshold-encoding artifact - the first
+    real tickets this opens (`birth-registrations` for the real
+    sibling-mismatch, all 6 CP tables for the real dirty-severity
+    delivery) both reflect genuine findings, not noise.
 
 ## Held over from the original (equivalent-only) build
 
