@@ -785,6 +785,7 @@ const RELEASE_NOTES = {intro:[], entries:[]};
 const REQUIREMENTS = [];
 const TICKET_STATUS = {};
 const GITHUB_LINKS = {checks:{}, agencies:{}, datasets:{}};
+const ACCEPTANCES = {};
 
 // Shared by Birth Registrations (a single dataset) and Child Protection
 // (6 datasets, one per table) - both are reshaped server-side into this
@@ -2043,7 +2044,26 @@ function renderAgency(view, agencyId){
 // second drill-down mechanism, since setting as-of to a specific real
 // run_date already makes clipDatasetToAsOf() pick that exact run as the
 // effective one everywhere else on this same page.
-function renderSupplyCycleRows(entries){
+// running-thoughts.md #6 ("read-only tension: accepting/rejecting amber
+// supplies", 2026-09-18) - ACCEPTANCES is keyed by dataset_id then
+// run_id (qa_tools/common/acceptance_sync.py, matched purely by comment
+// timestamp against that run's own real arrival window - no run_id
+// ever typed by anyone). Deliberately gated on `status==="amber"` here,
+// not just "does a record exist": a /accept comment's timestamp could
+// in principle fall inside a run that was actually red or green (e.g.
+// someone commented early or the check history hasn't been rebuilt
+// yet) - this badge is specifically an AMBER acknowledgment, so it only
+// ever renders on a row this page ALSO independently computed as
+// amber, never silently relabelling a red or green row. The pill
+// itself never changes color - accepting an amber supply does not make
+// it read as green (Keith's own explicit call, AskUserQuestion).
+function acceptanceBadge(datasetId, runId, status){
+  if(status!=="amber") return "";
+  const a = ACCEPTANCES[datasetId] && ACCEPTANCES[datasetId][runId];
+  if(!a) return "";
+  return `<a href="${a.comment_url}" target="_blank" rel="noopener" class="pill tag sm" title="Accepted ${fmtDate(new Date(a.accepted_at))} - click to view the real comment" onclick="event.stopPropagation()"><span class="ico"></span>✓ Accepted by ${a.accepted_by}</a>`;
+}
+function renderSupplyCycleRows(entries, datasetId){
   return entries.map(e => {
     const resupplyBadge = e.isResupply
       ? `<span class="pill tag sm"><span class="ico"></span>Resupply, attempt ${e.attemptNumber}</span>` : "";
@@ -2053,7 +2073,7 @@ function renderSupplyCycleRows(entries){
     // chain), so it's shown directly rather than the old, dropped
     // dirtySeverity pill (a synthetic-generation-only concept no real
     // production dashboard would have - item 72).
-    const statusBadge = pill(e.status, "sm");
+    const statusBadge = pill(e.status, "sm") + " " + acceptanceBadge(datasetId, e.run_id, e.status);
     // A resupply (any entry after the first in its chain) has no real
     // arrivalStatus (item 69's own reasoning, now keyed off real chain
     // position) - shows how long it's been since the previous supply/
@@ -2086,7 +2106,7 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
       <div class="overflow-x">
       <table class="dataset-table">
         <thead><tr><th>Arrived</th><th>Status</th><th>Timing</th><th>Rows</th><th></th></tr></thead>
-        <tbody>${renderSupplyCycleRows(c.entries)}</tbody>
+        <tbody>${renderSupplyCycleRows(c.entries, ds.id)}</tbody>
       </table>
       </div>
     </div>`;

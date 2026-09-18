@@ -179,6 +179,58 @@ MVP scope (does accept/reject live IN the ticket, or does the ticket
 just point at a separate acceptance record?) so probably needs
 resolving alongside it, not after.
 
+**Built, 2026-09-18 evening (mechanism only - the amber-GOVERNANCE
+question above stays parked, deliberately not resolved by this).**
+Scoped across three real rounds of `AskUserQuestion` plus a follow-up
+"how do we make this near-real-time" question, each resolved before
+building:
+
+- **Write path**: a human comments `/accept` on the dataset's own real
+  GitHub Issue - never a button in the dashboard (this tool has no
+  backend, so there's nowhere for one to write to). The dashboard stays
+  genuinely read-only; the write happens on GitHub itself, the same
+  place a data steward already works.
+- **No run_id needed**: every real run already has a real arrival
+  window (its own `arrived_date` up to the next run's, sourced from
+  committed `qa_results/` history, no live data) - a bare `/accept`
+  comment is matched to whichever run's window contains the comment's
+  own real timestamp. Nobody types or copies an identifier.
+- **Ticketing scope widened to amber**: `qa_tools/common/ticket_sync.py`
+  was red-only - an amber-only dataset had no real ticket to comment on
+  at all. Now opens (and keeps commenting on) a real ticket for amber
+  too.
+- **Effect of accept**: the pill stays amber - accepting never silently
+  reads as green. A small "✓ Accepted by `<user>`" badge appears next
+  to it, linking to the real comment, gated on the SAME client-side
+  amber computation the row's own pill already uses (never trusts a
+  stray `/accept` timestamp that happens to fall inside a run that
+  wasn't actually amber).
+- **Per-run, not standing**: a new amber arrival gets its own fresh
+  window and needs its own fresh `/accept` - an old acceptance never
+  silently carries forward.
+- **Near-real-time**: `deploy-pages.yml` gained an `issue_comment`
+  trigger (re-running the SAME build/validate/publish job, not a
+  duplicate workflow - explicitly not following `ticket_sync.py`'s own
+  separate-workflow precedent here, since this trigger is still a pure
+  read, never a write back to GitHub), gated by a job-level `if:` so
+  only a real `/accept` on a real `qa-ticket` issue pays for a rebuild.
+  Realistic latency: roughly 1-2 minutes from comment to live page.
+- **Reject deliberately out of scope** for this pass - it implies
+  actually changing displayed status, which is the amber-governance
+  question this build explicitly left parked.
+
+New `qa_tools/common/acceptance_sync.py` (real-fetch/pure-match split,
+mirroring `ticket_status.py`/`ticket_sync.py`'s own precedent exactly),
+wired into `embed_dashboard_data.py` as a new `ACCEPTANCES` const.
+Verified: 9 tests for the widened `ticket_sync.py`, 15 pure tests for
+`acceptance_sync.py` (including against this repo's own real committed
+`qa_results/` history - confirmed all 6 real Child Protection tables
+correctly share the same real collection-level run windows, not 6
+separate per-table histories), 2 real-browser e2e tests confirming a
+fake-but-realistic `/accept` comment resolves to the exact right real
+amber run and renders its badge while a different amber run with no
+comment shows none, full JS suite (71 passed), ruff clean.
+
 ### 7. Business requirements page on the dashboard
 
 A new dashboard page/view showing live-maintained user stories,

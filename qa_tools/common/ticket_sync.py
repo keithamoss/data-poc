@@ -9,11 +9,18 @@ registrations`, plus each of Child Protection's 6 real tables
 separately - not one combined CP ticket, and not per-column either,
 both real forks Keith resolved explicitly), keyed off each dataset's
 own current real aggregate status (qa_tools/common/dataset_status.py).
-Red-only for this MVP (amber sidestepped - plans/conceptual-design.md
-Thread A's own governance question stays parked, not blocking this);
-no escalation, no suppression, no provider access - all real pieces of
-the original design (docs/remediation-workflow-design.md) explicitly
-deferred past this MVP, not overlooked.
+Was red-only through the initial MVP; extended to amber too (2026-09-18,
+running-thoughts.md #6, "read-only tension: accepting/rejecting amber
+supplies") once a real accept mechanism needed somewhere to write a
+decision - a dataset that's only ever been amber, never red, had no
+real ticket to comment `/accept` on until this. plans/conceptual-
+design.md Thread A's own amber-GOVERNANCE question (does amber ever
+NEED a decision, is it a legitimate steady state, etc.) stays parked,
+not blocking this - this is mechanism only, scoped that way
+deliberately via AskUserQuestion. No escalation, no suppression, no
+provider access - all real pieces of the original design (docs/
+remediation-workflow-design.md) explicitly deferred past this MVP, not
+overlooked.
 
 Runs via the real `gh` CLI (subprocess - same convention this project
 already uses for dbt/soda/datacontract-cli) - authenticates via
@@ -33,6 +40,8 @@ by a `dataset:<id>` label search. Behaviour per (open ticket?, current
 status):
 
   no ticket,  red         -> open a new one
+  no ticket,  amber       -> open a new one (2026-09-18 - see above)
+  no ticket,  green       -> nothing to do
   ticket,     red         -> post a real "still red" comment (the
                               original design's own "even non-
                               transitions post" principle - evidence of
@@ -41,7 +50,6 @@ status):
                               - never auto-closes (closing always
                               requires a human, unchanged from the
                               original design)
-  no ticket,  amber/green -> nothing to do
 
 Reads ONLY the already-built dashboard JSON (reports/
 birth_registrations_dashboard.json / child_protection_dashboard.json -
@@ -134,12 +142,12 @@ def _ensure_label(owner: str, repo: str, name: str, description: str) -> None:
     ])
 
 
-def open_ticket(owner: str, repo: str, scope: DatasetScope) -> int:
+def open_ticket(owner: str, repo: str, scope: DatasetScope, status: str) -> int:
     _ensure_label(owner, repo, TICKET_LABEL, "Opened automatically by this project's real QA pipeline")
     _ensure_label(owner, repo, _dataset_label(scope.id), f"Real QA tickets for {scope.name}")
 
     body = (
-        f"**{scope.name}** (`{scope.id}`) is currently reading **red** - "
+        f"**{scope.name}** (`{scope.id}`) is currently reading **{status}** - "
         f"the worst status among its own real checks across every column.\n\n"
         f"Opened automatically by this project's real QA pipeline "
         f"(`qa_tools/common/ticket_sync.py`) - see the live dashboard's own "
@@ -147,10 +155,18 @@ def open_ticket(owner: str, repo: str, scope: DatasetScope) -> int:
         f"This ticket will get a real comment on every future QA run while "
         f"it stays open - closing it is always a human decision, never "
         f"automatic."
+        + (
+            "\n\nA real supply, even amber, can be accepted for now by "
+            "commenting `/accept` on this issue - it's matched to whichever "
+            "run was current at the time (running-thoughts.md #6). The "
+            "supply itself stays amber on the dashboard; a real "
+            "acknowledgment badge shows next to it."
+            if status == "amber" else ""
+        )
     )
     out = _run_gh([
         "issue", "create", "--repo", f"{owner}/{repo}",
-        "--title", f"{scope.name} is red",
+        "--title", f"{scope.name} is {status}",
         "--body", body,
         "--label", f"{TICKET_LABEL},{_dataset_label(scope.id)}",
     ])
@@ -171,9 +187,9 @@ def sync_dataset(owner: str, repo: str, scope: DatasetScope, dataset: dict) -> s
     existing = find_open_ticket(owner, repo, scope.id)
 
     if existing is None:
-        if status == "red":
-            issue_number = open_ticket(owner, repo, scope)
-            return f"{scope.id}: opened #{issue_number} (red)"
+        if status in ("red", "amber"):
+            issue_number = open_ticket(owner, repo, scope, status)
+            return f"{scope.id}: opened #{issue_number} ({status})"
         return f"{scope.id}: {status}, no open ticket - nothing to do"
 
     if status == "red":

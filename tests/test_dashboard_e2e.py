@@ -323,3 +323,64 @@ class TestTicketBadge:
             state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "death-registrations"},
         )
         assert clean_page.locator("a.pill.tag[href*='github.com'][href*='issues']").count() == 0
+
+
+@pytest.fixture
+def dashboard_html_with_acceptance(built_dashboard_html, tmp_path, monkeypatch) -> Path:
+    """running-thoughts.md #6 ("read-only tension: accepting/rejecting
+    amber supplies") - same real-fake-injection shape as dashboard_html_
+    with_ticket above (a real gh call only deploy-pages.yml can make
+    locally), via QA_COMMENTS_JSON instead of OPEN_TICKETS_JSON. Targets
+    a REAL, currently-amber committed run (run_001_2026-05-22, birth-
+    registrations) - found by actually computing this dataset's own
+    per-run status from reports/birth_registrations_dashboard.json, not
+    assumed - so the acceptance badge's own real gating condition
+    (status==="amber") has a genuine amber row to attach to."""
+    from dashboard import embed_dashboard_data as edd
+
+    (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
+
+    comments_path = tmp_path / "qa_comments.json"
+    comments_path.write_text(json.dumps([{
+        "number": 998, "labels": [{"name": "qa-ticket"}, {"name": "dataset:birth-registrations"}],
+        "comments": [{
+            "author": {"login": "keithamoss"}, "body": "/accept",
+            "createdAt": "2026-05-22T10:00:00Z",
+            "url": "https://github.com/keithamoss/data-poc/issues/998#issuecomment-1",
+        }],
+    }]))
+    out_html = tmp_path / "dashboard_with_acceptance.html"
+    monkeypatch.setattr(edd, "QA_COMMENTS_JSON", comments_path)
+    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
+    edd.embed()
+    return out_html
+
+
+class TestAcceptanceBadge:
+    def test_a_real_accept_comment_shows_a_linked_badge_on_its_matching_amber_run(self, clean_page, dashboard_html_with_acceptance):
+        _goto(
+            clean_page, dashboard_html_with_acceptance,
+            state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "birth-registrations"},
+        )
+        toggle = clean_page.locator("#supply-history-toggle")
+        if toggle.count():
+            toggle.click()
+
+        row = clean_page.locator('tr[data-run-date="2026-05-22"]')
+        assert row.count() > 0, "the real amber run this test targets isn't in the rendered supply history"
+        badge = row.locator("a.pill.tag[href*='issuecomment-1']")
+        assert badge.count() > 0, "no acceptance badge rendered on the real amber run it was accepted against"
+        assert "keithamoss" in badge.first.inner_text()
+
+    def test_a_different_amber_run_with_no_accept_comment_shows_no_badge(self, clean_page, dashboard_html_with_acceptance):
+        _goto(
+            clean_page, dashboard_html_with_acceptance,
+            state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "birth-registrations"},
+        )
+        toggle = clean_page.locator("#supply-history-toggle")
+        if toggle.count():
+            toggle.click()
+
+        row = clean_page.locator('tr[data-run-date="2026-05-23"]')  # a different real amber run (run_002)
+        assert row.count() > 0
+        assert row.locator("a.pill.tag[href*='issuecomment']").count() == 0

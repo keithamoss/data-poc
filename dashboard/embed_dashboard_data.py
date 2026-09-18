@@ -90,7 +90,24 @@ branch, so it always shows exactly what a check looked like when this
 dashboard was published, same reproducibility stance as everything else
 this script embeds.
 
-This only replaces those eight consts - the rest of the dashboard (its
+And `const ACCEPTANCES` (running-thoughts.md #6, "read-only tension:
+accepting/rejecting amber supplies", 2026-09-18, scoped via two
+AskUserQuestion rounds) - `{dataset_id: {run_id: {accepted_by,
+accepted_at, comment_url}}}`, a real human's `/accept` comment on that
+dataset's own QA ticket, matched to the real run it applies to purely
+by comment timestamp against that run's own real arrival window
+(qa_tools/common/acceptance_sync.py - no run_id ever typed by anyone).
+Same real-source-not-a-file-this-script-reads-directly treatment as
+TICKET_STATUS above, for the same reason (a real `gh` call needs a real
+token this script doesn't have): `.github/workflows/deploy-pages.yml`
+writes the raw `gh issue view` output for every real qa-ticket issue to
+QA_COMMENTS_JSON below (via `python3 -m qa_tools.common.acceptance_sync`,
+the one real `gh`-calling boundary), and this script calls
+acceptance_sync.build_acceptances() (pure, no `gh`/network here either)
+to turn it into the final embed. Empty {} locally with no such file,
+same graceful degradation as TICKET_STATUS.
+
+This only replaces those nine consts - the rest of the dashboard (its
 CSS, the rendering code, the other 14 illustrative datasets, and the
 separate SNAPSHOT_MANIFEST const dashboard/snapshot_dashboard.py owns)
 is copied through unchanged from the template.
@@ -102,6 +119,7 @@ import re
 
 from dashboard.changelog_md import parse_changelog
 from dashboard.requirements_yaml import parse_requirements
+from qa_tools.common.acceptance_sync import build_acceptances
 from qa_tools.common.changelog import build_changelog
 from qa_tools.common.github_links import build_check_source_links, build_folder_links, current_commit_sha
 from qa_tools.common.ticket_status import parse_open_tickets
@@ -112,6 +130,7 @@ DASHBOARD_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard
 CHANGELOG_MD = os.path.join(ROOT, "CHANGELOG.md")
 REQUIREMENTS_YAML = os.path.join(ROOT, "requirements.yaml")
 OPEN_TICKETS_JSON = os.path.join(ROOT, "reports", "open_tickets.json")
+QA_COMMENTS_JSON = os.path.join(ROOT, "reports", "qa_comments.json")
 
 TARGETS = [
     ("REAL_BIRTH_REG_DATA", os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")),
@@ -203,6 +222,16 @@ def embed() -> None:
     github_links = {"checks": build_check_source_links(sha=sha), **build_folder_links(sha=sha)}
     html = _replace_const(html, "GITHUB_LINKS", json.dumps(github_links, separators=(",", ":")))
     print(f"Re-embedded GITHUB_LINKS = {len(github_links['checks'])} check link(s) at commit {sha[:12]}")
+
+    if os.path.exists(QA_COMMENTS_JSON):
+        with open(QA_COMMENTS_JSON) as f:
+            raw_tickets = json.load(f)
+    else:
+        raw_tickets = []
+    acceptances = build_acceptances(raw_tickets)
+    html = _replace_const(html, "ACCEPTANCES", json.dumps(acceptances, separators=(",", ":")))
+    print(f"Re-embedded ACCEPTANCES = {sum(len(v) for v in acceptances.values())} accepted run(s) across {len(acceptances)} dataset(s)"
+          + ("" if os.path.exists(QA_COMMENTS_JSON) else " (no reports/qa_comments.json - local build, embedding empty)"))
 
     with open(DASHBOARD_HTML, "w") as f:
         f.write(html)

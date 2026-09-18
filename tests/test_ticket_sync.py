@@ -49,6 +49,10 @@ def _red_dataset():
     return {"columns": [{"checks": [{"current": 5, "warn": 1, "fail": 2, "retired_as_of": None}]}]}
 
 
+def _amber_dataset():
+    return {"columns": [{"checks": [{"current": 1.5, "warn": 1, "fail": 2, "retired_as_of": None}]}]}
+
+
 @pytest.fixture
 def scope():
     return DatasetScope(id="birth-registrations", name="Birth Registrations")
@@ -68,6 +72,24 @@ def test_no_open_ticket_and_red_opens_a_new_one(monkeypatch, scope):
     assert "dataset:birth-registrations" in label_value
 
 
+def test_no_open_ticket_and_amber_opens_a_new_one(monkeypatch, scope):
+    """2026-09-18 (running-thoughts.md #6): amber-only datasets used to
+    get no real ticket at all ("no ticket, amber/green -> nothing to
+    do") - nowhere for a human to comment /accept on. Now amber opens
+    one too, same as red always has."""
+    fake = FakeGh(list_response=[])
+    monkeypatch.setattr(ticket_sync, "_run_gh", fake)
+
+    result = sync_dataset("o", "r", scope, _amber_dataset())
+
+    assert result == "birth-registrations: opened #42 (amber)"
+    create_call = next(c for c in fake.calls if c[:2] == ["issue", "create"])
+    title = create_call[create_call.index("--title") + 1]
+    assert title == "Birth Registrations is amber"
+    body = create_call[create_call.index("--body") + 1]
+    assert "/accept" in body
+
+
 def test_opening_a_ticket_ensures_both_real_labels_exist_first(monkeypatch, scope):
     """Real bug, 2026-09-18 (plans/qa-pipeline.md item 79): `gh issue
     create --label` fails outright if the label isn't already a real
@@ -78,7 +100,7 @@ def test_opening_a_ticket_ensures_both_real_labels_exist_first(monkeypatch, scop
     fake = FakeGh(list_response=[])
     monkeypatch.setattr(ticket_sync, "_run_gh", fake)
 
-    ticket_sync.open_ticket("o", "r", scope)
+    ticket_sync.open_ticket("o", "r", scope, "red")
 
     label_create_calls = [c for c in fake.calls if c[:2] == ["label", "create"]]
     created_names = {c[2] for c in label_create_calls}
@@ -146,4 +168,4 @@ def test_find_open_ticket_returns_the_real_issue_number(monkeypatch):
 def test_open_ticket_parses_the_issue_number_from_gh_own_url_output(monkeypatch, scope):
     fake = FakeGh(create_url="https://github.com/o/r/issues/123")
     monkeypatch.setattr(ticket_sync, "_run_gh", fake)
-    assert ticket_sync.open_ticket("o", "r", scope) == 123
+    assert ticket_sync.open_ticket("o", "r", scope, "red") == 123

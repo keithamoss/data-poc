@@ -115,6 +115,17 @@ name: Build, validate, and publish the dashboard
 # write`, this job doesn't write to git either way. A real external
 # read, not "data" in CLAUDE.md's hard-rule sense (that rule is about
 # data/*, never about calling GitHub's own API for issue state).
+#
+# running-thoughts.md #6 ("read-only tension: accepting/rejecting amber
+# supplies", 2026-09-18, scoped via two AskUserQuestion rounds): also
+# fetches every real qa-ticket issue's own comments (open AND closed -
+# qa_tools/common/acceptance_sync.py's own real `gh` boundary), writes
+# them to reports/qa_comments.json, and embed_dashboard_data.py matches
+# any real /accept comment to the real run it applies to purely by
+# timestamp against that run's own committed arrival window - no run_id
+# ever typed by a human. Same real-read, `issues: read`-only treatment
+# as the ticket fetch above - this job still never writes to GitHub,
+# only ever reads a comment someone else already posted there.
 
 on:
   push:
@@ -134,6 +145,19 @@ on:
       - "requirements.yaml" # item 75's "Requirements" panel embeds this file's own content at build time
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
+  # running-thoughts.md #6 ("read-only tension: accepting/rejecting
+  # amber supplies") - near-real-time publishing of a real /accept
+  # comment: a human commenting on a real qa-ticket issue re-triggers
+  # this exact same build/validate/publish job (never a separate,
+  # lighter workflow - this IS already "rebuild from committed history,
+  # gate, publish", just from a different real event). Gated below (the
+  # job's own `if:`) so an unrelated comment on an unrelated issue never
+  # triggers a real rebuild - only a comment starting with /accept on an
+  # issue that actually carries the real qa-ticket label does. Still a
+  # pure read (parses the comment, never writes back to the issue) - no
+  # new permission needed, `issues: read` below already covers it.
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read # back to read-only, 2026-09-16 - see the "stop committing" note above; this job no longer writes to git at all
@@ -147,6 +171,14 @@ concurrency:
 
 jobs:
   build-validate-publish:
+    # See the issue_comment trigger's own comment above - only a real
+    # /accept comment on a real qa-ticket issue should pay for a full
+    # rebuild; every other event (push/workflow_dispatch, or any other
+    # issue_comment) always runs.
+    if: >
+      github.event_name != 'issue_comment' ||
+      (startsWith(github.event.comment.body, '/accept') &&
+       contains(github.event.issue.labels.*.name, 'qa-ticket'))
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -182,6 +214,11 @@ jobs:
         run: |
           gh issue list --repo "$GITHUB_REPOSITORY" --label qa-ticket --state open \
             --json number,title,url,labels,updatedAt --limit 100 > reports/open_tickets.json
+
+      - name: Fetch QA ticket comments (for real /accept matching)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: uv run python3 -m qa_tools.common.acceptance_sync > reports/qa_comments.json
 
       - name: Embed real data into the dashboard
         run: uv run python3 -m dashboard.embed_dashboard_data
