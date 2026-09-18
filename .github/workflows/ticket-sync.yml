@@ -34,19 +34,30 @@ name: Sync QA status to GitHub Issues
 # job never needs `contents: write` - it changes nothing in this repo's
 # own git history, only real GitHub Issues).
 
-# NOT triggered on push yet, deliberately - see plans/qa-pipeline.md
-# item 74 (still open, found 2026-09-17): a real, pre-existing
-# threshold-encoding bug currently makes every one of this project's 7
-# real datasets read red on every run (confirmed again while building
-# this - qa_tools.common.dataset_status.dataset_status() against
-# today's real, committed history returns "red" for all 7). Turning the
-# push trigger on before that's fixed would open 7 real, permanently-
-# visible GitHub Issues immediately, none of them reflecting a genuine
-# problem. Manually triggerable (workflow_dispatch) so it's real and
-# testable now; Keith's own call on when to add the push trigger back -
-# either after item 74's fixed, or explicitly accepting the current
-# noise.
+# Push trigger enabled 2026-09-18 (plans/qa-pipeline.md item 77, Keith's
+# own explicit go-ahead) once item 74's threshold-encoding bug was fixed
+# and verified against real regenerated data: birth-registrations no
+# longer reads red from that bug (registering_parent_1_name/_2_name
+# confirmed green/pass across all 3 engines on all 176 real runs) - its
+# remaining red is a genuine is_multiple_birth sibling-mismatch
+# violation, a true positive. child-protection's own 6 real datasets
+# are NOT part of that fix (still red on real, unexamined data as of
+# this change) - Keith's own explicit call was to enable the trigger
+# anyway, accepting that those first real tickets may reflect real,
+# not-yet-diagnosed problems rather than something already understood.
+# Paths mirror deploy-pages.yml's own trigger (same build chain this
+# job reads), minus dashboard/**/CHANGELOG.md/requirements.yaml - this
+# job never touches the dashboard itself.
 on:
+  push:
+    branches: [claude/new-session-en9qen]
+    paths:
+      - "qa_results/**"
+      - "contract/**"
+      - "dbt_project/models/staging/schema.yml"
+      - "qa_tools/**"
+      - "pipeline/**"
+      - ".github/workflows/ticket-sync.yml"
   workflow_dispatch:
 
 permissions:
