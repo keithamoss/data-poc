@@ -4209,6 +4209,114 @@ relative, not a schedule — this is weeks of work, not months.
     never actually cause). 316 tests passing (up from 302), `uv run
     ruff check .` clean.
 
+77. **[code fixed, 2026-09-18; data regen blocked - see below]** Item
+    74's two threshold-encoding bugs, fixed at Keith's own explicit
+    request ("let's fix item 74"), scoped via a second AskUserQuestion
+    round rather than assumed:
+    - **Bug A** (a missing fail threshold silently defaults to 0):
+      Keith's real question - "shouldn't a check always have a fail
+      threshold? What's the use case for not having one?" - answered
+      with real data (only 2 of 79+138 real checks are genuinely
+      warn-only, both already covered by a separate `invalid_percent`
+      check with a real fail threshold on the same column) and resolved
+      to the narrower fix: `registering_parent_1_name`/`_2_name`'s
+      `missing_percent` Soda checks get real fail thresholds (>15%/
+      >50%, both well above every real observed value) instead of
+      teaching `checkStatus()`/the trend chart a new "no fail
+      configured" code path - `contract/bdm-birth-registrations-soda-
+      checks.yml`, with real changelog entries.
+    - **Bug B** (datacontract-cli's `severity: error` rules discarding
+      their own real non-zero threshold): new `fail_threshold_from_
+      quality_definition()` (`qa_tools/common/datacontract_common.py`)
+      parses the real `mustBe`/`mustBeLessThan`/`mustBeLessOrEqualTo`
+      value out of each check's own `qualityDefinition` instead of a
+      blanket 0 - verified both real contracts only ever use those 3
+      shapes with `severity: error` today (`mustBeGreaterThan`/
+      `mustBeBetween` are real ODCS shapes but never used that way here
+      - this project's own convention, per the freshness check's own
+      comment, is to flip the query to a "0/low = healthy" `mustBe: 0`
+      shape instead of a lower-bound threshold), so those fall back to
+      the old default rather than guessing at a comparison direction
+      with no real example. `place_of_birth_facility`'s real
+      `mustBeLessThan: 35` rule (real observed ~2%, genuinely passing)
+      was the clearest real-world case this was silently breaking - now
+      covered by a real regression test.
+
+    8 new tests, all passing; `uv run ruff check .` clean. Committed and
+    pushed (code/config only, commit `4e15db0`).
+
+    **Blocked, not yet done: regenerating `qa_results/` history under
+    these fixes.** Running `orchestrate_bdm.py` to verify the fix
+    against real data surfaced a genuinely separate, previously-
+    undiscovered issue: BDM's generator anchors its 176-run rolling
+    window to real "today" (`generator/anchor_date.py`), and the
+    window had rolled forward one real day since the last committed
+    regeneration (a `tests/test_generate_runs.py` fixture regenerates
+    the real `data/raw/` on every full local `pytest` run - real,
+    by design - and that had already happened once today before this
+    session's own work). Since `data/raw/` is never cleared between
+    regenerations, re-running `orchestrate_bdm.py` produced 176 BRAND
+    NEW, non-overlapping `qa_results/` run directories (`run_001_2026-
+    05-22` ... `run_120_2026-09-18`) alongside - not replacing - the
+    176 already-committed ones (`run_001_2026-05-21` ... `run_120_
+    2026-09-17`), doubling BDM's `qa_results/` on disk to 352 real
+    directories. This matches the exact "rolling-window regen on a new
+    calendar day" pattern behind two earlier, Keith-approved "nuke and
+    regenerate" operations (the `run_by` backfill and the deepened-
+    history regen, both in `plans/publishing-and-history.md`) - the
+    fix is the same: delete the now-superseded old 176-run window,
+    keep the freshly-generated 176. **Blocked on a real permission
+    denial**, not a design question: this session's own auto-mode
+    classifier denies any bulk file-deletion command (`git rm -r`,
+    `git clean -fd`) as "Irreversible Local Destruction," even scoped
+    to only the untracked stray directories. Needs Keith's own
+    explicit permission grant (a Bash rule, or running the cleanup
+    himself) before this can finish - see the session's own message to
+    him. Until then, `reports/results_bdm.json`/the local dashboard
+    build are ALSO broken (rebuilding from the current, doubled-window
+    `qa_results/` state crashes `pipeline/build_dashboard_data.py` on
+    an inconsistent `extract_timestamp` - a real, cascading
+    consequence of the same blocker, not a second bug), and item 76's
+    own real, load-bearing finding (all 7 real datasets reading red)
+    hasn't been re-verified against the fix yet either.
+
+78. **[built, 2026-09-18, scoped via AskUserQuestion]** GitHub Issues ->
+    dashboard integration, at Keith's own request ("integrate the
+    GitHub issues with the reporting UI as well"): a small badge on
+    each dataset's own tile (Tier 2's dataset table + Tier 3's header,
+    both the normal and no-data-as-of row/page variants) linking
+    straight to that dataset's real, currently-open GitHub Issue (item
+    76's ticketing MVP), when one exists. Scoped in two rounds:
+    placement (badge on the tile itself, not a separate panel or folded
+    into the changelog feed) and data flow (embedded at dashboard BUILD
+    TIME via a new `.github/workflows/deploy-pages.yml` step - a real,
+    read-only `gh issue list --label qa-ticket --state open` call,
+    `issues: read` only, never `contents: write` - rather than a live
+    client-side call to GitHub's API from the visitor's browser, same
+    "placeholder here, real data only in the built output" treatment
+    every other embedded feed on this page already gets).
+
+    Built: `qa_tools/common/ticket_status.py` (new - `parse_open_
+    tickets()`, a pure reshape of `gh issue list`'s own JSON into
+    `dataset_id -> {number, url, title, updated_at}`, keyed off the
+    `dataset:<id>` label `ticket_sync.py`'s own `open_ticket()` already
+    attaches); a new `TICKET_STATUS` const wired through `dashboard/
+    embed_dashboard_data.py` (reads `reports/open_tickets.json` when
+    present, gracefully embeds `{}` when absent - a local
+    `./run_pipeline.sh` build has no real token); `ticketBadge()` in the
+    template, wired into both Tier 2/Tier 3 real-data and no-data
+    variants. 7 new Python tests (parsing + embed()'s file-present/
+    absent wiring) plus a real-browser Playwright test (`tests/
+    test_dashboard_e2e.py::TestTicketBadge`) - manually verified working
+    (real badge, real link, both tiers) via an injected `TICKET_STATUS`
+    before the automated test was written; the automated version itself
+    is currently blocked from actually running by item 77's own
+    `qa_results/` cleanup blocker above (the shared `built_dashboard_
+    html` fixture it depends on rebuilds from the same broken state) -
+    not a problem with this feature's own code. `uv run ruff check .`
+    clean; `npm test` (unaffected by the qa_results/ issue - tests the
+    raw template) passes.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

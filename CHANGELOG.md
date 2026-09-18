@@ -44,8 +44,18 @@ tool's own server-side UTC clock.
   read red because of the known threshold-encoding bug tracked
   separately, and turning the automatic trigger on before that's fixed
   would open seven tickets that don't reflect a genuine problem.
+- A small badge on each dataset's own tile linking straight to its
+  real, currently-open GitHub Issue (when one exists) - embedded at
+  dashboard build time from a real, read-only GitHub API call, same
+  treatment every other embedded feed on the page already gets.
 
 ### Fixed
+- Two real threshold-encoding bugs behind the dashboard's red/amber/
+  green status: a check with no fail threshold configured used to
+  silently read as failing almost every run (a missing threshold
+  defaulted to zero rather than "can't fail"), and a handful of real
+  contract rules with a genuine non-zero tolerance had that real
+  threshold discarded entirely.
 - A resupply-history grouping bug: a resupply landing weeks late used
   to get lumped in with an unrelated delivery that merely happened to
   arrive on the same calendar day.
