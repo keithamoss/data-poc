@@ -36,6 +36,8 @@ class FakeGh:
             return self.create_url + "\n"
         if args[:2] == ["issue", "comment"]:
             return ""
+        if args[:2] == ["label", "create"]:
+            return ""
         raise AssertionError(f"unexpected gh invocation: {args}")
 
 
@@ -64,6 +66,28 @@ def test_no_open_ticket_and_red_opens_a_new_one(monkeypatch, scope):
     label_value = create_call[create_call.index("--label") + 1]
     assert "qa-ticket" in label_value
     assert "dataset:birth-registrations" in label_value
+
+
+def test_opening_a_ticket_ensures_both_real_labels_exist_first(monkeypatch, scope):
+    """Real bug, 2026-09-18 (plans/qa-pipeline.md item 79): `gh issue
+    create --label` fails outright if the label isn't already a real
+    repo label - unlike `gh issue list --label`, which just silently
+    matches nothing. The very first real push-triggered run hit this
+    for real (neither qa-ticket nor any dataset:<id> label had ever
+    been created)."""
+    fake = FakeGh(list_response=[])
+    monkeypatch.setattr(ticket_sync, "_run_gh", fake)
+
+    ticket_sync.open_ticket("o", "r", scope)
+
+    label_create_calls = [c for c in fake.calls if c[:2] == ["label", "create"]]
+    created_names = {c[2] for c in label_create_calls}
+    assert created_names == {"qa-ticket", "dataset:birth-registrations"}
+    for call in label_create_calls:
+        assert "--force" in call
+    # both labels must exist before the issue is actually created
+    create_index = fake.calls.index(next(c for c in fake.calls if c[:2] == ["issue", "create"]))
+    assert all(fake.calls.index(c) < create_index for c in label_create_calls)
 
 
 def test_no_open_ticket_and_not_red_does_nothing(monkeypatch, scope):

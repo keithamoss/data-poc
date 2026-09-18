@@ -116,7 +116,28 @@ def find_open_ticket(owner: str, repo: str, dataset_id: str) -> int | None:
     return issues[0]["number"] if issues else None
 
 
+def _ensure_label(owner: str, repo: str, name: str, description: str) -> None:
+    """`gh issue create --label` needs the label to already exist as a
+    real repo label - unlike `gh issue list --label` (a search filter,
+    silently matches nothing for a label that doesn't exist yet),
+    creating an issue with a label that isn't real fails outright. Real
+    bug hit 2026-09-18 (plans/qa-pipeline.md item 79): the very first
+    real push-triggered run failed here, since neither `qa-ticket` nor
+    any `dataset:<id>` label had ever been created on the real repo -
+    the earlier manual capability check (a plain untagged test issue)
+    never exercised this path. `--force` makes this idempotent (create
+    or update, never errors on an already-existing label) - safe to
+    call on every real run, not just the first."""
+    _run_gh([
+        "label", "create", name, "--repo", f"{owner}/{repo}",
+        "--description", description, "--color", "d73a4a", "--force",
+    ])
+
+
 def open_ticket(owner: str, repo: str, scope: DatasetScope) -> int:
+    _ensure_label(owner, repo, TICKET_LABEL, "Opened automatically by this project's real QA pipeline")
+    _ensure_label(owner, repo, _dataset_label(scope.id), f"Real QA tickets for {scope.name}")
+
     body = (
         f"**{scope.name}** (`{scope.id}`) is currently reading **red** - "
         f"the worst status among its own real checks across every column.\n\n"
