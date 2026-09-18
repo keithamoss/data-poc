@@ -103,6 +103,18 @@ name: Build, validate, and publish the dashboard
 # the full `uv sync` environment (already synced for the real rebuild
 # above), not a separate `--no-project` stdlib-only install - no longer
 # worth keeping that split now this job installs everything anyway.
+#
+# Item 76's UI-integration follow-up (plans/qa-pipeline.md, 2026-09-18,
+# scoped via AskUserQuestion): also fetches every currently-open real
+# GitHub Issue the ticketing MVP (qa_tools/common/ticket_sync.py,
+# .github/workflows/ticket-sync.yml - a SEPARATE, write-permitted
+# workflow) has opened, via a real, read-only `gh issue list` call, and
+# writes it to reports/open_tickets.json for dashboard/embed_dashboard_
+# data.py to embed as TICKET_STATUS (a small badge on each dataset's own
+# tile). Needs `issues: read` below (new) - still never `contents:
+# write`, this job doesn't write to git either way. A real external
+# read, not "data" in CLAUDE.md's hard-rule sense (that rule is about
+# data/*, never about calling GitHub's own API for issue state).
 
 on:
   push:
@@ -125,6 +137,7 @@ on:
 
 permissions:
   contents: read # back to read-only, 2026-09-16 - see the "stop committing" note above; this job no longer writes to git at all
+  issues: read # item 76's UI-integration follow-up - real gh issue list, never a write
   pages: write
   id-token: write
 
@@ -162,6 +175,13 @@ jobs:
         run: |
           uv run python3 -m pipeline.build_dashboard_data
           uv run python3 -m pipeline.build_cp_dashboard_data
+
+      - name: Fetch open QA tickets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue list --repo "$GITHUB_REPOSITORY" --label qa-ticket --state open \
+            --json number,title,url,labels,updatedAt --limit 100 > reports/open_tickets.json
 
       - name: Embed real data into the dashboard
         run: uv run python3 -m dashboard.embed_dashboard_data

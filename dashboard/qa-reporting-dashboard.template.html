@@ -129,7 +129,7 @@ button{font:inherit; color:inherit;}
 /* ============ Status pill (never color alone: icon + label always) ======= */
 .pill{
   display:inline-flex; align-items:center; gap:6px; padding:4px 10px 4px 8px; border-radius:999px;
-  font-size:12.5px; font-weight:700; letter-spacing:.01em; white-space:nowrap;
+  font-size:12.5px; font-weight:700; letter-spacing:.01em; white-space:nowrap; text-decoration:none;
 }
 .pill .ico{width:9px; height:9px; border-radius:50%; flex:none;}
 .pill.green{background:var(--good-soft); color:var(--good);}
@@ -748,6 +748,18 @@ function checkStatus(check){ if(check.current>check.fail) return "red"; if(check
    built output" treatment as RELEASE_NOTES above. Shape: a plain list
    of {id, title, story, moscow, status, acceptance_criteria,
    linked_tests}, in the file's own top-to-bottom order.
+
+   TICKET_STATUS — item 76's UI-integration follow-up (plans/qa-
+   pipeline.md, 2026-09-18, scoped via AskUserQuestion): real, currently-
+   open GitHub Issues the ticketing MVP (qa_tools/common/ticket_sync.py)
+   has opened, one per dataset that's read red on a recent run. Shape: a
+   plain object, dataset_id -> {number, url, title, updated_at} - see
+   ticketBadge() below for how each dataset's own tile uses this.
+   Embedded by dashboard/embed_dashboard_data.py from a real `gh issue
+   list` call only .github/workflows/deploy-pages.yml can make (needs a
+   real token) - empty {} on a local ./run_pipeline.sh build, same
+   graceful-degradation treatment as every other embedded feed here when
+   its real source isn't available.
 ========================================================================= */
 const REAL_BIRTH_REG_DATA = null;
 const REAL_CP_DATA = null;
@@ -755,6 +767,7 @@ const SNAPSHOT_MANIFEST = [];
 const CHANGELOG_FEED = [];
 const RELEASE_NOTES = {intro:[], entries:[]};
 const REQUIREMENTS = [];
+const TICKET_STATUS = {};
 
 // Shared by Birth Registrations (a single dataset) and Child Protection
 // (6 datasets, one per table) - both are reshaped server-side into this
@@ -1735,6 +1748,21 @@ function wireChart(id, history, warn, fail, unit, xs, ys, W, padL, padR, onPoint
    5. RENDER: pill / breadcrumb / views
 ========================================================================= */
 function pill(status, size){ return `<span class="pill ${status} ${size||""}"><span class="ico"></span>${STATUS_LABEL[status]}</span>`; }
+// Item 76's UI-integration follow-up (plans/qa-pipeline.md, 2026-09-18) -
+// a small badge next to a dataset's own status pill linking straight to
+// its real, currently-open GitHub Issue (TICKET_STATUS, embedded by
+// dashboard/embed_dashboard_data.py - see that const's own doc comment
+// above). Empty string when this dataset has no open ticket - the
+// overwhelmingly common case, so nothing shows rather than a "no ticket"
+// placeholder cluttering every row. Opens in a new tab (real external
+// navigation, not an in-app view) - stopPropagation so clicking the
+// badge inside a Tier 2 table row doesn't also trigger that row's own
+// navigate-to-dataset click handler.
+function ticketBadge(datasetId, size){
+  const t = TICKET_STATUS[datasetId];
+  if(!t) return "";
+  return `<a href="${t.url}" target="_blank" rel="noopener" class="pill tag ${size||""}" title="${t.title}" onclick="event.stopPropagation()"><span class="ico"></span>#${t.number} open</a>`;
+}
 
 function setRail(items){
   const rail = document.getElementById("rail");
@@ -1869,7 +1897,7 @@ function renderAgency(view, agencyId){
           if(ds.noDataAsOf){
             return `<tr data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
               <td><div class="dataset-name">${ds.name}</div><div class="dataset-provider">${ds.provider}</div></td>
-              <td>${pill(ds.status,"sm")}</td>
+              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
               <td colspan="4" style="color:var(--ink-faint); font-size:12.5px;">No QA run within tolerance as of the selected date</td>
             </tr>`;
           }
@@ -1881,7 +1909,7 @@ function renderAgency(view, agencyId){
           const dsSpark = aggregateSparkline(ds.columns);
           return `<tr data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td><div class="dataset-name">${ds.name}${ds.isReal?` <span class="pill tag sm"><span class="ico"></span>Real pipeline data</span>`:""}</div><div class="dataset-provider">${ds.provider}</div></td>
-            <td>${pill(ds.status,"sm")}</td>
+            <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
             <td>${arrivalPillHtml} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${fmtArrival(ds.lastArrival)}</span></td>
             <td class="mono">${fmtInt(ds.rowCount)}</td>
             <td class="mono" style="color:var(--ink-muted);">${fmtDate(ds.lastArrival.date)}</td>
@@ -2003,7 +2031,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     view.innerHTML = `
       <div class="view-head">
         <div>
-          <h2>${ds.name} ${pill("nodata")}</h2>
+          <h2>${ds.name} ${pill("nodata")} ${ticketBadge(ds.id)}</h2>
           <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}</div>
         </div>
       </div>
@@ -2022,7 +2050,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <h2>${ds.name}${ds.isReal?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:` <span class="pill illustrative"><span class="ico"></span>Illustrative mock data</span>`}</h2>
         <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${ds.isReal?" · figures below are computed by real dbt/Soda/datacontract-cli/Evidently tools against real generated runs — not fabricated in the browser.":""}</div>
       </div>
-      ${pill(ds.status)}
+      ${pill(ds.status)} ${ticketBadge(ds.id)}
     </div>
     ${ds.noDataAsOf ? `
     <div style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:64ch;">

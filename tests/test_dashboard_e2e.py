@@ -186,3 +186,57 @@ class TestRequirementsPanel:
         assert any(label in rows_text for label in ("Must", "Should", "Could"))
         assert any(label in rows_text for label in ("Built", "In progress", "Not started"))
         assert "tests/" in rows_text or "tests-js/" in rows_text
+
+
+@pytest.fixture
+def dashboard_html_with_ticket(built_dashboard_html, tmp_path, monkeypatch) -> Path:
+    """Item 76's UI-integration follow-up (plans/qa-pipeline.md,
+    2026-09-18): a second built HTML, alongside the shared built_
+    dashboard_html fixture, with a real (fake-for-the-test) open ticket
+    injected via OPEN_TICKETS_JSON - the file only deploy-pages.yml's
+    own real `gh issue list` step ever writes for real, so this test
+    can't rely on the shared fixture's own build (no real GH token
+    locally, same as every other local build - see embed_dashboard_
+    data.py's own OPEN_TICKETS_JSON docstring). Reuses the already-built
+    reports/*.json from built_dashboard_html (an explicit dependency
+    above, ensuring those files exist first) rather than re-running the
+    whole build chain - dashboard.embed_dashboard_data.embed() is the
+    only step that actually needs to re-run."""
+    from dashboard import embed_dashboard_data as edd
+
+    tickets_path = tmp_path / "open_tickets.json"
+    tickets_path.write_text(json.dumps([{
+        "number": 999, "title": "Birth Registrations is red",
+        "url": "https://github.com/keithamoss/data-poc/issues/999",
+        "labels": [{"name": "qa-ticket"}, {"name": "dataset:birth-registrations"}],
+        "updatedAt": "2026-09-18T00:00:00Z",
+    }]))
+    out_html = tmp_path / "dashboard_with_ticket.html"
+    monkeypatch.setattr(edd, "OPEN_TICKETS_JSON", tickets_path)
+    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
+    edd.embed()
+    return out_html
+
+
+class TestTicketBadge:
+    def test_an_open_ticket_shows_a_linked_badge_at_tier2_and_tier3(self, clean_page, dashboard_html_with_ticket):
+        badge_selector = "a.pill.tag[href='https://github.com/keithamoss/data-poc/issues/999']"
+
+        _goto(clean_page, dashboard_html_with_ticket, state={"tier": "agency", "agencyId": "registry-services"})
+        tier2_badge = clean_page.locator(badge_selector)
+        assert tier2_badge.count() > 0, "no ticket badge rendered in the Tier 2 dataset table"
+        assert "#999" in tier2_badge.first.inner_text()
+
+        _goto(
+            clean_page, dashboard_html_with_ticket,
+            state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "birth-registrations"},
+        )
+        tier3_badge = clean_page.locator(badge_selector)
+        assert tier3_badge.count() > 0, "no ticket badge rendered on the Tier 3 dataset page"
+
+    def test_a_dataset_with_no_open_ticket_shows_no_badge(self, clean_page, dashboard_html_with_ticket):
+        _goto(
+            clean_page, dashboard_html_with_ticket,
+            state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "death-registrations"},
+        )
+        assert clean_page.locator("a.pill.tag[href*='github.com'][href*='issues']").count() == 0

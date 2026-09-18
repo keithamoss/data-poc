@@ -60,7 +60,23 @@ here, unlike CHANGELOG.md's. Parsed by dashboard/requirements_yaml.py's
 parse_requirements(); schema/linkage enforcement is a SEPARATE CI gate
 (qa_tools/common/validate_requirements.py), not this script's job.
 
-This only replaces those six consts - the rest of the dashboard (its
+And `const TICKET_STATUS` (item 76's UI-integration follow-up,
+plans/qa-pipeline.md, 2026-09-18, scoped via AskUserQuestion) - a
+dataset_id -> {number, url, title, updated_at} mapping for every
+currently-open real GitHub Issue the ticketing MVP (qa_tools/common/
+ticket_sync.py) has opened, shown as a small badge on each dataset's own
+tile. Unlike every other const above, this one's real source data is
+NOT a file this script reads directly - it's a real `gh issue list`
+call only `.github/workflows/deploy-pages.yml` can make (a real GitHub
+API call needs a real token; this script has no token of its own and
+must stay callable locally with none). That workflow writes the raw `gh`
+JSON to OPEN_TICKETS_JSON below before calling this script; qa_tools/
+common/ticket_status.py's parse_open_tickets() (a pure function, no
+`gh`/network access here either) reshapes it. Locally (./run_pipeline.sh,
+no real token, no such file) this embeds an empty {} rather than
+failing - graceful degradation, not a hard requirement for every build.
+
+This only replaces those seven consts - the rest of the dashboard (its
 CSS, the rendering code, the other 14 illustrative datasets, and the
 separate SNAPSHOT_MANIFEST const dashboard/snapshot_dashboard.py owns)
 is copied through unchanged from the template.
@@ -73,12 +89,14 @@ import re
 from dashboard.changelog_md import parse_changelog
 from dashboard.requirements_yaml import parse_requirements
 from qa_tools.common.changelog import build_changelog
+from qa_tools.common.ticket_status import parse_open_tickets
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 TEMPLATE_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.template.html")
 DASHBOARD_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.html")
 CHANGELOG_MD = os.path.join(ROOT, "CHANGELOG.md")
 REQUIREMENTS_YAML = os.path.join(ROOT, "requirements.yaml")
+OPEN_TICKETS_JSON = os.path.join(ROOT, "reports", "open_tickets.json")
 
 TARGETS = [
     ("REAL_BIRTH_REG_DATA", os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")),
@@ -155,6 +173,16 @@ def embed() -> None:
     requirements = parse_requirements(REQUIREMENTS_YAML)
     html = _replace_const(html, "REQUIREMENTS", json.dumps(requirements, separators=(",", ":")))
     print(f"Re-embedded REQUIREMENTS = {len(requirements)} requirements")
+
+    if os.path.exists(OPEN_TICKETS_JSON):
+        with open(OPEN_TICKETS_JSON) as f:
+            raw_issues = json.load(f)
+    else:
+        raw_issues = []
+    ticket_status = parse_open_tickets(raw_issues)
+    html = _replace_const(html, "TICKET_STATUS", json.dumps(ticket_status, separators=(",", ":")))
+    print(f"Re-embedded TICKET_STATUS = {len(ticket_status)} open ticket(s)"
+          + ("" if os.path.exists(OPEN_TICKETS_JSON) else " (no reports/open_tickets.json - local build, embedding empty)"))
 
     with open(DASHBOARD_HTML, "w") as f:
         f.write(html)
