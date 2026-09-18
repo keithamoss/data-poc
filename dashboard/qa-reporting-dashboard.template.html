@@ -758,9 +758,14 @@ function checkStatus(check){ if(check.current>check.fail) return "red"; if(check
    by dashboard/embed_dashboard_data.py - same "placeholder here, real
    data only in the built output" treatment as everything else on this
    page. Shape: {intro: [string, ...], entries: [{date, sections:
-   [{category, items: [string, ...]}, ...]}, ...]} - entries in the
-   file's own top-to-bottom order (Keep a Changelog convention: newest
-   first), never re-sorted here.
+   [{category, items: [{time, headline, components, text}, ...]}, ...]},
+   ...]} - entries in the file's own top-to-bottom order (Keep a
+   Changelog convention: newest first), never re-sorted here. headline/
+   components are the 2026-09-18 evening retrofit (Keith's own ask: a
+   bold label leading each entry, iconography, and the component(s)
+   shown alongside, on the same 7-tag taxonomy plans/*.md items use) -
+   both `None`/`[]` on any entry that predates it, same optionality as
+   `time` above.
 
    A prior generation of this pipeline also ran four hand-written
    equivalent check engines (engines/*.py, built when the original
@@ -2930,6 +2935,24 @@ document.getElementById("activity-panel-close").addEventListener("click", closeP
 // swap to <code> is enough; no need for a real markdown parser just for
 // this one inline form.
 function mdInlineCode(s){ return s.replace(/`([^`]+)`/g, "<code>$1</code>"); }
+// Headline/component retrofit (2026-09-18 evening, Keith's own ask: a
+// bold label leading each entry, iconography, and the component(s)
+// shown alongside) - one emoji per plans/*.md component, the same 7-tag
+// taxonomy used there, so a reader learns one icon vocabulary across
+// both surfaces rather than two.
+const COMPONENT_ICON = {
+  "Data generation": "🧬",
+  "QA checks & contract": "🔍",
+  "Pipeline & publishing": "🔄",
+  "Dashboard UI": "📊",
+  "GitHub workflow & people": "🎟️",
+  "Testing & dev tooling": "🧰",
+  "Docs & process": "📝",
+};
+function componentIcon(c){ return COMPONENT_ICON[c] || "🔧"; }
+function componentBadge(c){
+  return `<span class="pill tag sm" style="gap:5px;"><span aria-hidden="true">${componentIcon(c)}</span>${c}</span>`;
+}
 function renderChangelogPanel(){
   const body = document.getElementById("changelog-panel-body");
   if(!RELEASE_NOTES.entries.length){
@@ -2946,8 +2969,18 @@ function renderChangelogPanel(){
     const sections = e.sections.map(s=> `
       <div class="drawer-section" style="margin-bottom:14px;">
         <h4>${s.category}</h4>
-        <ul style="margin:0; padding-left:18px; font-size:13px; line-height:1.55;">
-          ${s.items.map(item=>`<li style="margin-bottom:4px;">${item.time ? `<span class="mono" style="color:var(--ink-faint); font-size:11.5px; margin-right:6px;">${item.time}</span>` : ""}${mdInlineCode(item.text)}</li>`).join("")}
+        <ul style="margin:0; padding-left:0; list-style:none; font-size:13px; line-height:1.55;">
+          ${s.items.map(item=>{
+            const time = item.time ? `<span class="mono" style="color:var(--ink-faint); font-size:11.5px; margin-right:7px;">${item.time}</span>` : "";
+            const icon = item.components.length ? `<span aria-hidden="true" style="margin-right:5px;">${componentIcon(item.components[0])}</span>` : "";
+            const headline = item.headline ? `<strong>${item.headline}</strong>` : "";
+            const badges = item.components.map(componentBadge).join(" ");
+            return `<li style="margin-bottom:12px;">
+              <div style="margin-bottom:4px;">${time}${icon}${headline}</div>
+              ${badges ? `<div style="margin-bottom:5px; display:flex; gap:5px; flex-wrap:wrap;">${badges}</div>` : ""}
+              <div>${mdInlineCode(item.text)}</div>
+            </li>`;
+          }).join("")}
         </ul>
       </div>`
     ).join("");

@@ -554,3 +554,41 @@ common/check_lifecycle.py`'s own `check_id` convention.
    publishing-and-history.md` Thread B exists) for an arbitrary date
    someone picks. How the two UI entry points should relate to each
    other is flagged as not yet designed there.
+
+6. **[done, 2026-09-18]** **[Dashboard UI]** Release Notes panel
+   redesign, at Keith's own direct request. Scoped via `AskUserQuestion`
+   (Keith consistently picked the fuller-scope option each round, same
+   pattern as item #10's `plans/*.md` retrofit the same evening): a full
+   retrofit of all 46 existing `CHANGELOG.md` entries (not forward-only),
+   detailed technical prose kept but tightened for a punchier/friendlier
+   read (not reduced to a bare headline), `CHANGELOG.md` itself rewritten
+   as the one source of truth (not a dashboard-only rendering transform),
+   and a unique short headline per entry (not a fixed vocabulary reused
+   from the Added/Fixed/Changed category headings).
+
+   **Built**: every `CHANGELOG.md` bullet now leads with a bold,
+   unique 2-4 word headline and one or more `**[Component]**` tags -
+   the same 7-part taxonomy `plans/*.md` items use (`plans/running-
+   thoughts.md` #10's own component list, confirmed identical here per
+   Keith's original mid-scoping ask that both history feeds share one
+   vocabulary). `dashboard/changelog_md.py`'s `parse_changelog()`
+   extracts both as real structured fields (`headline`/`components`,
+   both optional - `None`/`[]` - on any entry that predates the
+   retrofit, same backward-compatible design as the existing `time`
+   field). `renderChangelogPanel()` (the template's own inline JS) now
+   renders a matching emoji icon per component (`COMPONENT_ICON`, one
+   glyph per taxonomy entry) alongside the bold headline and a row of
+   component badges, ahead of the entry's own text - not just plain
+   prose in a bullet list, the same "icon + label" convention this
+   page's own status pills already use elsewhere (`.pill.tag`).
+
+   Verified: 14 parser tests (`tests/test_changelog_md.py`, 5 new -
+   headline parsing, multiple components, headline with no component,
+   component with no headline, and the disambiguation regex itself)
+   plus the 5 updated existing tests (each now asserts the new
+   `headline`/`components` keys). All 46 real entries parse cleanly with
+   both fields populated, no unexplained word-count swing, ruff clean,
+   71 `npm test` JS tests unaffected. Rebuilt the real dashboard and
+   confirmed with Playwright (zero console errors, correct icon/
+   headline/badge/text rendering in the actual Release Notes panel, not
+   just the parser's own output).

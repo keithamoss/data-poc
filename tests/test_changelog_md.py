@@ -29,8 +29,8 @@ def test_parses_a_single_entry_with_one_section(tmp_path):
     entry = result["entries"][0]
     assert entry["date"] == "2026-01-01"
     assert entry["sections"] == [{"category": "Added", "items": [
-        {"time": None, "text": "First feature"},
-        {"time": None, "text": "Second feature"},
+        {"time": None, "headline": None, "components": [], "text": "First feature"},
+        {"time": None, "headline": None, "components": [], "text": "Second feature"},
     ]}]
 
 
@@ -49,8 +49,8 @@ def test_parses_an_item_leading_timestamp_and_strips_it_from_the_text(tmp_path):
 """)
     items = parse_changelog(path)["entries"][0]["sections"][0]["items"]
     assert items == [
-        {"time": "6:12am", "text": "First feature"},
-        {"time": "12:24pm", "text": "Second feature"},
+        {"time": "6:12am", "headline": None, "components": [], "text": "First feature"},
+        {"time": "12:24pm", "headline": None, "components": [], "text": "Second feature"},
     ]
 
 
@@ -63,7 +63,7 @@ def test_an_item_with_no_leading_timestamp_still_parses_with_a_none_time(tmp_pat
 - No timestamp on this one
 """)
     items = parse_changelog(path)["entries"][0]["sections"][0]["items"]
-    assert items == [{"time": None, "text": "No timestamp on this one"}]
+    assert items == [{"time": None, "headline": None, "components": [], "text": "No timestamp on this one"}]
 
 
 def test_parses_multiple_entries_in_file_order(tmp_path):
@@ -98,8 +98,8 @@ def test_parses_multiple_sections_within_one_entry(tmp_path):
 """)
     entry = parse_changelog(path)["entries"][0]
     assert [s["category"] for s in entry["sections"]] == ["Added", "Fixed"]
-    assert entry["sections"][0]["items"] == [{"time": None, "text": "A new thing"}]
-    assert entry["sections"][1]["items"] == [{"time": None, "text": "A bug"}]
+    assert entry["sections"][0]["items"] == [{"time": None, "headline": None, "components": [], "text": "A new thing"}]
+    assert entry["sections"][1]["items"] == [{"time": None, "headline": None, "components": [], "text": "A bug"}]
 
 
 def test_joins_a_soft_wrapped_bullet_across_multiple_lines(tmp_path):
@@ -115,8 +115,9 @@ def test_joins_a_soft_wrapped_bullet_across_multiple_lines(tmp_path):
 """)
     items = parse_changelog(path)["entries"][0]["sections"][0]["items"]
     assert items == [
-        {"time": None, "text": "A long entry that wraps across multiple lines in the markdown source, same paragraph."},
-        {"time": None, "text": "A second, unrelated entry"},
+        {"time": None, "headline": None, "components": [],
+         "text": "A long entry that wraps across multiple lines in the markdown source, same paragraph."},
+        {"time": None, "headline": None, "components": [], "text": "A second, unrelated entry"},
     ]
 
 
@@ -131,8 +132,77 @@ def test_joins_a_soft_wrapped_bullet_that_starts_with_a_timestamp(tmp_path):
 """)
     items = parse_changelog(path)["entries"][0]["sections"][0]["items"]
     assert items == [
-        {"time": "6:12am", "text": "A long entry that wraps across multiple lines in the markdown source."},
+        {"time": "6:12am", "headline": None, "components": [],
+         "text": "A long entry that wraps across multiple lines in the markdown source."},
     ]
+
+
+def test_parses_a_headline_and_single_component_after_the_timestamp(tmp_path):
+    """The 2026-09-18 evening headline/component retrofit (plans/qa-
+    pipeline.md, Keith's ask for a bold label, iconography, and the
+    component(s) shown alongside each release note)."""
+    path = _write(tmp_path, """# Changelog
+
+## 2026-01-01
+
+### Added
+- **6:12am** — **Leaderboard Streaks** **[Dashboard UI]** A real leaderboard.
+""")
+    items = parse_changelog(path)["entries"][0]["sections"][0]["items"]
+    assert items == [{
+        "time": "6:12am", "headline": "Leaderboard Streaks",
+        "components": ["Dashboard UI"], "text": "A real leaderboard.",
+    }]
+
+
+def test_parses_multiple_components_on_one_item(tmp_path):
+    path = _write(tmp_path, """# Changelog
+
+## 2026-01-01
+
+### Added
+- **Cross-Cutting Fix** **[QA checks & contract]** **[Pipeline & publishing]** Two things at once.
+""")
+    items = parse_changelog(path)["entries"][0]["sections"][0]["items"]
+    assert items == [{
+        "time": None, "headline": "Cross-Cutting Fix",
+        "components": ["QA checks & contract", "Pipeline & publishing"],
+        "text": "Two things at once.",
+    }]
+
+
+def test_headline_with_no_component_tag_still_parses(tmp_path):
+    path = _write(tmp_path, """# Changelog
+
+## 2026-01-01
+
+### Added
+- **Just A Headline** No component here.
+""")
+    items = parse_changelog(path)["entries"][0]["sections"][0]["items"]
+    assert items == [{
+        "time": None, "headline": "Just A Headline",
+        "components": [], "text": "No component here.",
+    }]
+
+
+def test_a_bracket_tag_with_no_preceding_headline_is_not_mistaken_for_one(tmp_path):
+    """A `**[Component]**` tag never gets swallowed as the headline itself
+    - the headline regex explicitly excludes a leading `[`, so an item
+    that (unusually) opens straight with a component tag and no headline
+    still parses that tag as a real component, not bogus headline text."""
+    path = _write(tmp_path, """# Changelog
+
+## 2026-01-01
+
+### Added
+- **[Docs & process]** No headline on this one.
+""")
+    items = parse_changelog(path)["entries"][0]["sections"][0]["items"]
+    assert items == [{
+        "time": None, "headline": None,
+        "components": ["Docs & process"], "text": "No headline on this one.",
+    }]
 
 
 def test_captures_intro_paragraphs_before_the_first_heading(tmp_path):

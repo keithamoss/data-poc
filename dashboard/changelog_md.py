@@ -18,11 +18,12 @@ Expected shape (see CHANGELOG.md itself for the real, current file):
     ## <date>
 
     ### <category>
-    - **<time>** — <entry, possibly wrapped across multiple indented lines>
-    - **<time>** — <entry>
+    - **<time>** — **<Headline>** **[Component]** <entry, possibly wrapped
+      across multiple indented lines>
+    - **<time>** — **<Headline>** **[Component]** **[Component]** <entry>
 
     ### <category>
-    - **<time>** — <entry>
+    - **<time>** — **<Headline>** **[Component]** <entry>
 
     ## <date>
     ...
@@ -32,6 +33,20 @@ time, same convention as the date headings above it) is optional - a
 bullet with no timestamp parses fine, just with `"time": None` - so
 this stays backward compatible with any entry that predates the
 2026-09-18 timestamp retrofit.
+
+An item can also lead (after the time, if present) with a bold
+headline - a short, unique-per-item title, e.g. `**Leaderboard
+Streaks**` - followed by zero or more `**[Component]**` tags from the
+same 7-item taxonomy `plans/*.md` items use (Data generation, QA
+checks & contract, Pipeline & publishing, Dashboard UI, GitHub workflow
+& people, Testing & dev tooling, Docs & process). Both are optional,
+same reasoning as `time` above - parse fine as `None`/`[]` on an entry
+that predates the 2026-09-18 evening headline/component retrofit
+(Keith's own ask: a bold label to lead each entry, iconography, and the
+component(s) shown alongside, in service of a punchier, friendlier,
+still-technical page). The headline is deliberately NOT drawn from a
+closed vocabulary (unlike `status` in `plans/*.md` items) - it's a
+one-off mini-title per entry, not a category.
 
 Deliberately narrow: no full CommonMark support (no nested lists, no
 inline links, no code fences) - this file's own style is simple by
@@ -44,13 +59,30 @@ import re
 from pathlib import Path
 
 _ITEM_TIME_RE = re.compile(r"^\*\*(\d{1,2}:\d{2}(?:am|pm))\*\* — (.*)$")
+# A bold span that doesn't itself start with "[" - so a **[Component]**
+# tag is never mistaken for the headline that precedes it.
+_ITEM_HEADLINE_RE = re.compile(r"^\*\*([^*\[][^*]*)\*\*\s*(.*)$")
+_ITEM_COMPONENT_RE = re.compile(r"^\*\*\[([^\]]+)\]\*\*\s*")
 
 
 def _parse_item(text: str) -> dict:
     match = _ITEM_TIME_RE.match(text)
-    if match:
-        return {"time": match.group(1), "text": match.group(2)}
-    return {"time": None, "text": text}
+    time, rest = (match.group(1), match.group(2)) if match else (None, text)
+
+    headline = None
+    hmatch = _ITEM_HEADLINE_RE.match(rest)
+    if hmatch:
+        headline, rest = hmatch.group(1), hmatch.group(2)
+
+    components = []
+    while True:
+        cmatch = _ITEM_COMPONENT_RE.match(rest)
+        if not cmatch:
+            break
+        components.append(cmatch.group(1))
+        rest = rest[cmatch.end():]
+
+    return {"time": time, "headline": headline, "components": components, "text": rest}
 
 
 def parse_changelog(path: str | Path) -> dict:
