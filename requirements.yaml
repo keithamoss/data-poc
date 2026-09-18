@@ -1,0 +1,386 @@
+# Live requirements register for this PoC - real user stories, not a
+# design doc. Built 2026-09-18 (plans/qa-pipeline.md item 75), at
+# Keith's own request ("having like actual requirements... user
+# stories, requirements, and acceptance criteria... track MoSCoW
+# status... have we implemented them yet... tie them back to the actual
+# tests"), scoped via three rounds of AskUserQuestion before building
+# (see that item's own writeup for the fork options not taken and why):
+# structured YAML with typed fields (not hand-prose like CHANGELOG.md),
+# high-level user-story granularity (not a 1:1 mirror of every numbered
+# item in plans/qa-pipeline.md/wider.md), and REAL enforced linkage to
+# tests (qa_tools/common/validate_requirements.py fails CI if a
+# `linked_tests` entry doesn't resolve to a real file/test, or if a
+# `built` requirement has none at all).
+#
+# Schema per entry (validate_requirements.py enforces every rule below,
+# it isn't just documentation):
+#   id:                 "REQ-NNN", globally unique, zero-padded 3 digits.
+#   title:              short, human title.
+#   story:              "As a <role>, I want <capability>, so that
+#                        <benefit>." - free text, not force-parsed, but
+#                        should actually read as a real user story.
+#   moscow:              must | should | could | wont
+#   status:               not_started | in_progress | built
+#   acceptance_criteria: list of real, checkable statements - at least 1.
+#   linked_tests:        list of real pytest node ids ("tests/test_x.py"
+#                        or "tests/test_x.py::TestClass::test_method" or
+#                        "tests/test_x.py::test_function") or real
+#                        tests-js/*.js file paths - each one is verified
+#                        to actually exist (validate_requirements.py
+#                        parses the referenced Python file's own AST to
+#                        confirm a `::`-qualified name genuinely exists
+#                        as a test, not just that the file exists).
+#                        Required (at least 1) once status is "built" -
+#                        a requirement can't claim to be built with
+#                        nothing real verifying it. May be empty for
+#                        not_started/in_progress.
+#
+# This describes the PRODUCT (the QA dashboard/pipeline this PoC
+# delivers), not this project's own working process - things like "a
+# running-thoughts capture buffer" or "write CHANGELOG entries per push"
+# are real, but they're conventions for HOW this gets built, not
+# requirements of what gets delivered, so they're deliberately not here.
+
+requirements:
+  - id: REQ-001
+    title: Real multi-tool QA checks against Birth Registrations
+    story: >
+      As a data steward, I want Birth Registrations run through real
+      dbt-core, Soda Core, datacontract-cli, and Evidently AI checks
+      against real generated data, so that the QA results I see are
+      genuinely computed, not fabricated for a demo.
+    moscow: must
+    status: built
+    acceptance_criteria:
+      - Every check result traces back to a real tool run against a
+        real generated CSV, never a hand-written stand-in.
+      - All four tools' checks are reconciled into one dashboard view
+        per column.
+    linked_tests:
+      - tests/test_run_dbt_bdm.py
+      - tests/test_run_soda_bdm.py
+      - tests/test_run_datacontract_bdm.py
+      - tests/test_run_evidently_bdm.py
+
+  - id: REQ-002
+    title: Real multi-tool QA checks against Child Protection
+    story: >
+      As a data steward, I want the Child Protection collection (all 6
+      tables, including cross-table business rules) run through the
+      same four real tools, so that a multi-table collection gets the
+      same real QA rigor as a single-table feed.
+    moscow: must
+    status: built
+    acceptance_criteria:
+      - Cross-table checks (referential integrity, business rules that
+        span more than one table) run for real, not just per-table
+        column checks.
+    linked_tests:
+      - tests/test_run_dbt_cp.py
+      - tests/test_run_soda_cp.py
+      - tests/test_run_datacontract_cp.py
+      - tests/test_run_evidently_cp_real.py
+
+  - id: REQ-003
+    title: Drill-down status rollup (Agency -> Collection -> Dataset -> Column)
+    story: >
+      As an executive, I want a single red/amber/green rollup per
+      agency that I can drill into down to individual columns, so that
+      I can go from "is anything wrong" to "exactly what's wrong"
+      without leaving the page.
+    moscow: must
+    status: built
+    acceptance_criteria:
+      - A dataset's own status is the worst status among its columns;
+        a column's is the worst among its own real checks.
+      - Every tier is clickable through to the next.
+    linked_tests:
+      - tests-js/status-rollups.test.js
+      - tests-js/navigation.test.js
+
+  - id: REQ-004
+    title: Committed, permanent QA history
+    story: >
+      As a data steward, I want every real QA run's raw tool output
+      committed and preserved permanently, so that history survives a
+      check's own definition changing or being retired, potentially for
+      years.
+    moscow: must
+    status: built
+    acceptance_criteria:
+      - qa_results/ is committed to git, never gitignored or pruned.
+      - The dashboard can be rebuilt purely from that committed history,
+        with no live tool re-run required.
+    linked_tests:
+      - tests/test_qa_results_writer.py
+      - tests/test_qa_results_reader.py
+      - tests/test_build_results_from_history.py
+
+  - id: REQ-005
+    title: CI-gated publish, no manual publish path
+    story: >
+      As a data steward, I want the published dashboard to only ever
+      come from an automated, gated CI build, so that nobody can push a
+      dashboard build that skipped validation.
+    moscow: must
+    status: built
+    acceptance_criteria:
+      - There is no local "publish" command - only CI can deploy.
+      - A structurally invalid or check-lifecycle-violating build never
+        reaches the published site.
+    linked_tests:
+      - tests/test_check_dashboard_renders.py
+      - tests/test_dashboard_e2e.py::TestBuiltDashboardRenders
+
+  - id: REQ-006
+    title: Check lifecycle - retirement without losing history
+    story: >
+      As a data steward, I want a check's history preserved even after
+      it's formally retired or its definition changes, so that
+      "retired" never means "forgotten."
+    moscow: must
+    status: built
+    acceptance_criteria:
+      - Every real check across all 4 tools carries a globally-unique,
+        permanent check_id.
+      - A definition change with no accompanying changelog entry fails
+        CI.
+      - A retired check still shows its full real history behind a
+        toggle, never as a hard status.
+    linked_tests:
+      - tests/test_check_lifecycle.py
+      - tests/test_validate_check_lifecycle.py
+
+  - id: REQ-007
+    title: Cadence-aware "as of" viewing
+    story: >
+      As a data steward, I want to pick any date and see the data asset
+      exactly as it stood then, so that I can answer "what did we know
+      as of this date" for a daily or a quarterly dataset alike.
+    moscow: should
+    status: built
+    acceptance_criteria:
+      - Staleness is computed from each dataset's own real cadence
+        (daily/weekly/quarterly), not one flat day-count for everything.
+      - A date before any real history shows "no data," never a
+        misleading blank or stale-but-colored view.
+    linked_tests:
+      - tests/test_cadence.py
+      - tests/test_dashboard_e2e.py::TestAsOfDatePicking::test_a_date_before_any_real_history_shows_no_data
+
+  - id: REQ-008
+    title: Resupply chains derived from real, observable signals
+    story: >
+      As a data steward, I want a resupply chain identified purely from
+      real cadence timing and each arrival's own real pass/fail status,
+      not from internal generator bookkeeping about which delivery a
+      resupply was "for," so that the model matches what a real
+      production feed could actually tell us (a resupply never arrives
+      labelled as such).
+    moscow: should
+    status: built
+    acceptance_criteria:
+      - A red arrival starts or continues a chain; the first amber or
+        green arrival after it closes the chain.
+      - Every supply/resupply row shows its own real aggregate
+        red/amber/green status.
+    linked_tests:
+      - tests-js/supply-history.test.js
+
+  - id: REQ-009
+    title: "Recent activity: who published what QA, when"
+    story: >
+      As a manager, I want a feed of who ran and published QA results
+      for which dataset and when, so that I can see real publish
+      activity across the whole data asset at a glance.
+    moscow: should
+    status: built
+    acceptance_criteria:
+      - Every entry resolves a real committer, a real commit SHA, and a
+        real run timestamp - never a placeholder.
+    linked_tests:
+      - tests/test_changelog.py
+
+  - id: REQ-010
+    title: "Release notes: the tool's own development history"
+    story: >
+      As anyone evaluating this PoC, I want a real, curated changelog of
+      what changed about the tool itself over time, so that I don't
+      have to read raw git log to understand how it evolved.
+    moscow: could
+    status: built
+    acceptance_criteria:
+      - Entries are real, dated, and categorized (Added/Fixed/Changed),
+        not a mechanical commit dump.
+    linked_tests:
+      - tests/test_changelog_md.py
+
+  - id: REQ-011
+    title: Real automated test coverage with an enforced floor
+    story: >
+      As a data steward relying on this pipeline, I want its own
+      correctness verified by a real, continuously-enforced test suite
+      (unit, real-tool integration, dashboard JS, and real-browser
+      end-to-end), so that a regression can't silently ship.
+    moscow: must
+    status: built
+    acceptance_criteria:
+      - CI runs the full suite, including real dbt-core/Soda Core/
+        datacontract-cli/Evidently integration tests, on every push.
+      - A measured code-coverage floor is enforced, not just a vague
+        aspiration.
+    linked_tests:
+      - tests/test_dashboard_e2e.py::TestBuiltDashboardRenders::test_renders_with_zero_console_errors_and_a_populated_view
+
+  - id: REQ-012
+    title: Dark mode
+    story: >
+      As a viewer, I want a persistent dark mode toggle, so that I can
+      use the dashboard comfortably regardless of lighting or personal
+      preference.
+    moscow: could
+    status: built
+    acceptance_criteria:
+      - The choice persists across a reload.
+    linked_tests:
+      - tests/test_dashboard_e2e.py::TestDarkModeToggle::test_toggling_dark_mode_persists_across_a_reload
+
+  - id: REQ-013
+    title: "Time travel: point-in-time dashboard snapshots"
+    story: >
+      As a data steward, I want fully self-contained, gzip-archived
+      snapshots of the dashboard at points in time, so that "what did
+      the whole page look like on this date" is answerable years later
+      with nothing but a browser.
+    moscow: could
+    status: built
+    acceptance_criteria:
+      - Each snapshot opens standalone, with no dependency on the live
+        site or any other file.
+    linked_tests:
+      - tests/test_snapshot_dashboard.py
+
+  - id: REQ-014
+    title: A live requirements register, tied to real tests
+    story: >
+      As a product owner, I want real user stories tracked with MoSCoW
+      priority, implementation status, and a real (not decorative) tie
+      back to the tests that verify them, so that I have a genuine,
+      trustworthy view of what's actually been delivered.
+    moscow: should
+    status: built
+    acceptance_criteria:
+      - Every requirement's linked_tests are validated to actually
+        exist in CI, not just asserted in prose.
+      - A "built" requirement can't ship with zero real linked tests.
+    linked_tests:
+      - tests/test_validate_requirements.py
+      - tests/test_requirements_yaml.py
+
+  - id: REQ-015
+    title: GitHub Issues as the QA remediation ticketing system
+    story: >
+      As a QA analyst, I want a real ticket opened automatically when a
+      dataset needs follow-up, so that remediation work is tracked
+      somewhere real rather than living only in someone's head.
+    moscow: should
+    status: not_started
+    acceptance_criteria:
+      - A real GitHub Issue is opened/updated/commented on accurately
+        by the pipeline for real QA events.
+    linked_tests: []
+
+  - id: REQ-016
+    title: Data-asset-level people and roles config
+    story: >
+      As a manager, I want a config of who works on this data asset
+      (name, email, role - QA/peer review/manager) and what they're
+      assigned to, so that remediation tickets can be routed to the
+      right person automatically.
+    moscow: should
+    status: not_started
+    acceptance_criteria:
+      - A real config file lists people, roles, and assignments.
+    linked_tests: []
+
+  - id: REQ-017
+    title: An accept/reject decision workflow for amber-status supplies
+    story: >
+      As a data steward, I want a real, recorded decision on a
+      persistently-amber dataset (accept it, or reject it and treat it
+      as effectively red), so that "amber" doesn't sit ambiguous
+      forever.
+    moscow: should
+    status: not_started
+    acceptance_criteria:
+      - A human decision on an amber result is recorded somewhere real
+        and reflected back in the dashboard's own status.
+    linked_tests: []
+
+  - id: REQ-018
+    title: An AWS MVP reacting to real S3 delivery events
+    story: >
+      As a data steward, I want the pipeline to run automatically when
+      a real file lands in S3, so that QA happens as part of the actual
+      delivery workflow, not a manually-kicked-off local script.
+    moscow: should
+    status: not_started
+    acceptance_criteria:
+      - A real S3 event triggers a real pipeline run with no manual
+        step.
+      - Child Protection's own cross-table checks only run once all 6
+        tables for that snapshot have actually landed and been QA'd
+        individually.
+    linked_tests: []
+
+  - id: REQ-019
+    title: Realistic Child Protection resupply simulation
+    story: >
+      As a data steward, I want Child Protection's synthetic data to
+      simulate realistic resupplies too (today only Birth Registrations
+      does), so that the resupply-chain model has real, varied data to
+      demonstrate against for a periodic, multi-table collection.
+    moscow: could
+    status: not_started
+    acceptance_criteria:
+      - Child Protection's generator can produce a red-then-recovered
+        sequence across its own quarterly cadence.
+    linked_tests: []
+
+  - id: REQ-020
+    title: Human-friendlier dashboard URLs
+    story: >
+      As a viewer, I want a shareable link to a specific dataset/column
+      view that's actually readable, so that I don't have to share an
+      opaque URL-encoded JSON blob.
+    moscow: could
+    status: not_started
+    acceptance_criteria:
+      - A dataset-level URL reads as a real path, not encoded JSON.
+    linked_tests: []
+
+  - id: REQ-021
+    title: Expose this project's own planning memory in the dashboard
+    story: >
+      As a product owner, I want to browse the plans/*.md planning
+      files (with real statuses, not just prose) from inside the
+      dashboard, so that I don't have to leave it to see what's done,
+      parked, or still open.
+    moscow: could
+    status: not_started
+    acceptance_criteria:
+      - Each planning file's own items are browsable with a real status
+        indicator, not just raw markdown text.
+    linked_tests: []
+
+  - id: REQ-022
+    title: Dashboard gamification for QA turnaround
+    story: >
+      As a manager, I want staff who turn QA around quickly or
+      consistently produce clean data celebrated somehow on the
+      dashboard, so that good QA practice is visibly recognized.
+    moscow: could
+    status: not_started
+    acceptance_criteria:
+      - Not yet scoped - shape (leaderboard, badges, streaks) undecided.
+    linked_tests: []

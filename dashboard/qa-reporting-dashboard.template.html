@@ -384,9 +384,9 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
   .drawer{width:100%;}
   /* Item 63: trims each header button down before they wrap onto more
      rows than the screen has room for - real content (dark mode label,
-     the as-of date, "Recent activity"/"Release notes"/"Past snapshots")
-     stays intact, just tighter, rather than truncating or icon-only
-     collapsing any of it away. */
+     the as-of date, "Recent activity"/"Release notes"/"Requirements"/
+     "Past snapshots") stays intact, just tighter, rather than
+     truncating or icon-only collapsing any of it away. */
   .snapshots-btn{padding:6px 11px; font-size:11.5px;}
   .live{font-size:11.5px; padding:5px 10px 5px 8px;}
 }
@@ -407,6 +407,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
       <button class="snapshots-btn" id="asof-btn" type="button">📅 As of: <span id="asof-btn-label">…</span></button>
       <button class="snapshots-btn" id="activity-btn" type="button">📋 Recent activity</button>
       <button class="snapshots-btn" id="changelog-btn" type="button">🗒 Release notes</button>
+      <button class="snapshots-btn" id="requirements-btn" type="button">📐 Requirements</button>
       <button class="snapshots-btn" id="snapshots-btn" type="button">🕐 Past snapshots</button>
       <div class="live"><span class="dot"></span><span id="clock-text">Live · updated moments ago</span></div>
     </div>
@@ -536,6 +537,22 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
     <button class="drawer-close" id="changelog-panel-close" aria-label="Close">✕</button>
   </div>
   <div class="drawer-body" id="changelog-panel-body"></div>
+</aside>
+
+<!-- Item 75 (plans/qa-pipeline.md, 2026-09-18) - real user stories with
+     MoSCoW priority, implementation status, and CI-enforced test
+     linkage. Same interaction pattern as every other header-button
+     panel, reused deliberately. -->
+<div class="backdrop" id="requirements-backdrop"></div>
+<aside class="drawer" id="requirements-panel" aria-hidden="true">
+  <div class="drawer-head">
+    <div>
+      <div class="legend-key" style="margin:0 0 4px;">Live requirements register</div>
+      <h3>Requirements</h3>
+    </div>
+    <button class="drawer-close" id="requirements-panel-close" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body" id="requirements-panel-body"></div>
 </aside>
 
 <script>
@@ -718,12 +735,26 @@ function checkStatus(check){ if(check.current>check.fail) return "red"; if(check
    equivalents had drifted out of sync with newer checks. See
    plans/wider.md's repo-tidy-up entries for the full history; git
    history holds the actual code if it's ever needed again.
+
+   REQUIREMENTS — item 75's "📐 Requirements" panel (plans/qa-
+   pipeline.md, 2026-09-18, scoped via AskUserQuestion at Keith's own
+   request): real user stories tracked with MoSCoW priority,
+   implementation status, and real, CI-enforced linkage to the tests
+   that verify them - a live register, not a design doc. Hand-
+   maintained ../requirements.yaml (repo root, see its own top-of-file
+   comment for the full schema), parsed by dashboard/requirements_
+   yaml.py's parse_requirements() and embedded by dashboard/embed_
+   dashboard_data.py - same "placeholder here, real data only in the
+   built output" treatment as RELEASE_NOTES above. Shape: a plain list
+   of {id, title, story, moscow, status, acceptance_criteria,
+   linked_tests}, in the file's own top-to-bottom order.
 ========================================================================= */
 const REAL_BIRTH_REG_DATA = null;
 const REAL_CP_DATA = null;
 const SNAPSHOT_MANIFEST = [];
 const CHANGELOG_FEED = [];
 const RELEASE_NOTES = {intro:[], entries:[]};
+const REQUIREMENTS = [];
 
 // Shared by Birth Registrations (a single dataset) and Child Protection
 // (6 datasets, one per table) - both are reshaped server-side into this
@@ -2707,6 +2738,68 @@ function closeChangelogPanel(){
 document.getElementById("changelog-btn").addEventListener("click", openChangelogPanel);
 document.getElementById("changelog-backdrop").addEventListener("click", closeChangelogPanel);
 document.getElementById("changelog-panel-close").addEventListener("click", closeChangelogPanel);
+
+// Item 75 (plans/qa-pipeline.md, 2026-09-18) - "Requirements": renders
+// REQUIREMENTS (requirements.yaml, parsed by dashboard/requirements_
+// yaml.py's parse_requirements()) as a real, readable page, same side-
+// panel mechanism as every other header button. moscowLabel()/
+// moscowClass() and statusLabel()/statusClass() are small, separately
+// testable helpers (tests-js/requirements.test.js) rather than inlined
+// into the render function, matching this file's own convention
+// elsewhere (arrivalStatusLabel()/arrivalPill(), statusForValue()) of
+// keeping the "what does this value mean" logic separate from the
+// markup that displays it.
+const MOSCOW_LABEL = {must:"Must", should:"Should", could:"Could", wont:"Won't"};
+const MOSCOW_CLASS = {must:"red", should:"amber", could:"green", wont:"nodata"};
+function moscowLabel(m){ return MOSCOW_LABEL[m] || m; }
+function moscowPill(m){ return `<span class="pill ${MOSCOW_CLASS[m]||"nodata"} sm"><span class="ico"></span>${moscowLabel(m)}</span>`; }
+const REQ_STATUS_LABEL = {built:"Built", in_progress:"In progress", not_started:"Not started"};
+const REQ_STATUS_CLASS = {built:"green", in_progress:"amber", not_started:"nodata"};
+function requirementStatusLabel(s){ return REQ_STATUS_LABEL[s] || s; }
+function requirementStatusPill(s){ return `<span class="pill ${REQ_STATUS_CLASS[s]||"nodata"} sm"><span class="ico"></span>${requirementStatusLabel(s)}</span>`; }
+function renderRequirementsPanel(){
+  const body = document.getElementById("requirements-panel-body");
+  if(!REQUIREMENTS.length){
+    body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
+      No requirements yet — this page renders the repo's own committed
+      <code>requirements.yaml</code>, hand-maintained alongside real work.
+    </div>`;
+    return;
+  }
+  body.innerHTML = REQUIREMENTS.map(r=>{
+    const criteria = (r.acceptance_criteria||[]).map(c=>`<li style="margin-bottom:4px;">${c}</li>`).join("");
+    const tests = (r.linked_tests||[]).length
+      ? `<div style="margin-top:10px; font-size:12px; color:var(--ink-muted);">
+          Verified by: ${r.linked_tests.map(t=>`<code>${t}</code>`).join(", ")}
+        </div>`
+      : `<div style="margin-top:10px; font-size:12px; color:var(--ink-faint);">No linked tests yet.</div>`;
+    return `
+      <div style="margin-bottom:22px; padding-bottom:18px; border-bottom:1px solid var(--line);">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
+          <span class="mono" style="font-size:11.5px; color:var(--ink-faint);">${r.id}</span>
+          <b style="font-size:14px;">${r.title}</b>
+        </div>
+        <div style="display:flex; gap:6px; margin-bottom:8px;">${moscowPill(r.moscow)}${requirementStatusPill(r.status)}</div>
+        <div style="font-size:13px; color:var(--ink-muted); margin-bottom:10px;">${r.story}</div>
+        <ul style="margin:0; padding-left:18px; font-size:12.5px; line-height:1.5;">${criteria}</ul>
+        ${tests}
+      </div>`;
+  }).join("");
+}
+function openRequirementsPanel(){
+  renderRequirementsPanel();
+  document.getElementById("requirements-backdrop").classList.add("open");
+  document.getElementById("requirements-panel").classList.add("open");
+  document.getElementById("requirements-panel").setAttribute("aria-hidden","false");
+}
+function closeRequirementsPanel(){
+  document.getElementById("requirements-backdrop").classList.remove("open");
+  document.getElementById("requirements-panel").classList.remove("open");
+  document.getElementById("requirements-panel").setAttribute("aria-hidden","true");
+}
+document.getElementById("requirements-btn").addEventListener("click", openRequirementsPanel);
+document.getElementById("requirements-backdrop").addEventListener("click", closeRequirementsPanel);
+document.getElementById("requirements-panel-close").addEventListener("click", closeRequirementsPanel);
 
 // Thread C - as-of date picker. rebuildData() throws the current DATA
 // away and rebuilds it from scratch against the new date (see buildData()

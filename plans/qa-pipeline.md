@@ -4058,6 +4058,75 @@ relative, not a schedule — this is weeks of work, not months.
     accurate computation given that input, not a bug in the new
     derivation logic itself.
 
+75. **[built, 2026-09-18]** A live requirements register - Keith's own
+    request, one of the ideas parked in `plans/running-thoughts.md`
+    item #7: "actual requirements... user stories, requirements, and
+    acceptance criteria... track MoSCoW status... have we implemented
+    them yet... tie them back to the actual tests." Scoped via a real
+    round of `AskUserQuestion` before building anything (this project's
+    own standing convention for a decision with real forks), covering
+    the three genuinely open questions: **source format** - structured
+    YAML with typed fields per requirement (Keith's choice, NOT the
+    hand-prose `CHANGELOG.md` pattern this session's own recommendation
+    leaned toward - a deliberate, explicit departure); **granularity** -
+    high-level user stories (~10-30), not a 1:1 mirror of every
+    fine-grained item already logged in this file/`wider.md`; **test
+    tie-back** - real, CI-ENFORCED linkage (Keith's choice again, not
+    the lighter "soft manual reference" MVP default this session
+    recommended), not decorative text.
+
+    Built: `requirements.yaml` (repo root) - 22 seeded requirements (14
+    `built`, 8 `not_started`), covering the real major shipped
+    capabilities (drawn from `CHANGELOG.md`'s own already-curated
+    history) plus the concrete near-term ideas already scoped in
+    `plans/running-thoughts.md` (GitHub Issues ticketing, the people/
+    roles config, the amber accept/reject decision, the AWS S3-event
+    MVP, CP resupply simulation, human-friendlier URLs, exposing
+    `plans/*.md` in the dashboard, gamification) - real, not invented
+    for this entry. `dashboard/requirements_yaml.py`'s `parse_
+    requirements()` (mirrors `changelog_md.py`'s role, but far less
+    interpretation needed - the YAML's own shape already IS the
+    rendered shape). `qa_tools/common/validate_requirements.py` is the
+    real enforcement: schema/enum checks, globally-unique `id`s, a
+    `built` requirement can't ship with zero `linked_tests`, and -
+    the actual point of choosing "enforced" over "soft" - every
+    `linked_tests` entry is checked against a REAL file, with a real
+    Python AST parse (never a regex/string match, which a comment or a
+    docstring could fool) confirming a `path.py::Class::method` /
+    `path.py::function` / bare `path.py::Class` reference genuinely
+    exists as a test, not just that the file does. Wired as a new CI
+    gate in `deploy-pages.yml` (`requirements.yaml` added to the
+    trigger paths too), same "broken output never reaches Pages"
+    treatment as the check-lifecycle gate. A new "📐 Requirements"
+    header button/side panel (`REQUIREMENTS` const, same "placeholder
+    in the template, real data only in the built output" pattern as
+    `RELEASE_NOTES`) - id, title, story, MoSCoW pill, status pill,
+    acceptance criteria, and the real linked-test paths, per
+    requirement.
+
+    This describes the PRODUCT (the QA dashboard/pipeline itself), not
+    this project's own working process - deliberately excludes things
+    like "a running-thoughts capture buffer" or "write CHANGELOG
+    entries per push," which are real but are conventions for HOW this
+    gets built, not requirements of what gets delivered (see
+    `requirements.yaml`'s own top comment).
+
+    Tests: `tests/test_requirements_yaml.py` (parser, fixture-based,
+    mirrors `test_changelog_md.py`'s own style), `tests/test_validate_
+    requirements.py` (every real failure mode - bad id, duplicate id,
+    missing title/story, invalid moscow/status, empty acceptance
+    criteria, a `built` requirement with no linked tests, a linked test
+    naming a real file but a fake function - PLUS the existence checks
+    run against this repo's own real, stable test files, not more
+    fixtures, since the whole point is confirming something real
+    exists), `tests-js/requirements.test.js` (the moscow/status label
+    and pill helpers), and a new `TestRequirementsPanel` class in
+    `tests/test_dashboard_e2e.py` (opens the real panel against the
+    real built dashboard, confirms real content renders, zero console
+    errors). Full `uv run pytest`, `uv run ruff check .`, and
+    `npm test` all clean; visually verified with a real Playwright
+    screenshot of the built panel.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

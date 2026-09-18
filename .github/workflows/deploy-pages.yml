@@ -85,12 +85,15 @@ name: Build, validate, and publish the dashboard
 # dependency group to sync instead) - a known, accepted inefficiency,
 # not a correctness problem.
 #
-# The gate (structural + check-lifecycle + real-browser render) runs
-# BEFORE the deploy steps - broken output never reaches Pages. "Old" for
-# the check-lifecycle diff is the immediately-previous commit on this
-# branch (Keith's call, 2026-09-16 - see qa_tools/common/
+# The gate (structural + check-lifecycle + requirements + real-browser
+# render) runs BEFORE the deploy steps - broken output never reaches
+# Pages. "Old" for the check-lifecycle diff is the immediately-previous
+# commit on this branch (Keith's call, 2026-09-16 - see qa_tools/common/
 # validate_check_lifecycle.py's own docstring for why), which is why this
-# checks out 2 commits of history, not 1.
+# checks out 2 commits of history, not 1. The requirements gate (item
+# 75, qa_tools/common/validate_requirements.py) has no old-vs-new diff
+# of its own - it only ever validates requirements.yaml against the
+# CURRENT working tree's test files.
 #
 # Also still decompresses every dashboard/snapshots/*.html.gz into
 # _site/snapshots/*.html at deploy time - plans/wider.md #26's "time
@@ -116,6 +119,7 @@ on:
       - "pipeline/**"
       - "dashboard/**"
       - "CHANGELOG.md" # item 62's "Release notes" panel embeds this file's own content at build time
+      - "requirements.yaml" # item 75's "Requirements" panel embeds this file's own content at build time
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 
@@ -164,6 +168,9 @@ jobs:
 
       - name: Gate - check-lifecycle validation (Thread D)
         run: uv run python3 -m qa_tools.common.validate_check_lifecycle
+
+      - name: Gate - requirements validation (item 75)
+        run: uv run python3 -m qa_tools.common.validate_requirements
 
       - name: Gate - dashboard structural + real-browser render check
         run: uv run python3 -m dashboard.check_dashboard_renders

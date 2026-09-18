@@ -28,6 +28,11 @@ tool's own server-side UTC clock.
   a dataset's supply history - the worst status among every check
   across every column for that specific delivery - and a genuine "N
   days since the previous supply" counter on resupply attempts.
+- A live requirements register: real user stories with MoSCoW priority
+  and implementation status, each one's completion backed by a real,
+  CI-enforced link to the test that actually verifies it - a claimed
+  "built" requirement with no real test behind it now fails CI, not
+  just a documentation exercise.
 
 ### Fixed
 - A resupply-history grouping bug: a resupply landing weeks late used

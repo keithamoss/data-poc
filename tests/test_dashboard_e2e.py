@@ -167,3 +167,22 @@ class TestDarkModeToggle:
 
         assert after_reload == after_click
         assert clean_page.evaluate("localStorage.getItem('theme')") == after_click
+
+
+class TestRequirementsPanel:
+    def test_opening_it_shows_real_requirements_with_badges_and_linked_tests(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+
+        clean_page.locator("#requirements-btn").click()
+        body = clean_page.locator("#requirements-panel-body")
+        rows_text = body.inner_text()
+
+        # Real, committed requirements.yaml content - not asserting on
+        # every entry, just that a real requirement genuinely rendered
+        # (id, MoSCoW label, status label, and a real linked test path),
+        # not the empty-state fallback.
+        assert "REQ-001" in rows_text
+        assert "No requirements yet" not in rows_text
+        assert any(label in rows_text for label in ("Must", "Should", "Could"))
+        assert any(label in rows_text for label in ("Built", "In progress", "Not started"))
+        assert "tests/" in rows_text or "tests-js/" in rows_text

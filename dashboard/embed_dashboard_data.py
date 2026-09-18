@@ -50,7 +50,17 @@ something renderable (dashboard/changelog_md.py's parse_changelog()) -
 same "placeholder here, real data only in the built output" treatment
 as everything else on this page.
 
-This only replaces those five consts - the rest of the dashboard (its
+And `const REQUIREMENTS` (item 75, plans/qa-pipeline.md - 2026-09-18) -
+a live requirements register (real user stories, MoSCoW priority,
+implementation status, real CI-enforced test linkage), scoped via
+AskUserQuestion at Keith's own request. Same hand-maintained-file
+pattern as RELEASE_NOTES, but structured YAML (../requirements.yaml,
+repo root) rather than prose markdown - Keith's own explicit choice
+here, unlike CHANGELOG.md's. Parsed by dashboard/requirements_yaml.py's
+parse_requirements(); schema/linkage enforcement is a SEPARATE CI gate
+(qa_tools/common/validate_requirements.py), not this script's job.
+
+This only replaces those six consts - the rest of the dashboard (its
 CSS, the rendering code, the other 14 illustrative datasets, and the
 separate SNAPSHOT_MANIFEST const dashboard/snapshot_dashboard.py owns)
 is copied through unchanged from the template.
@@ -61,12 +71,14 @@ import os
 import re
 
 from dashboard.changelog_md import parse_changelog
+from dashboard.requirements_yaml import parse_requirements
 from qa_tools.common.changelog import build_changelog
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 TEMPLATE_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.template.html")
 DASHBOARD_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.html")
 CHANGELOG_MD = os.path.join(ROOT, "CHANGELOG.md")
+REQUIREMENTS_YAML = os.path.join(ROOT, "requirements.yaml")
 
 TARGETS = [
     ("REAL_BIRTH_REG_DATA", os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")),
@@ -139,6 +151,10 @@ def embed() -> None:
     release_notes = parse_changelog(CHANGELOG_MD)
     html = _replace_const(html, "RELEASE_NOTES", json.dumps(release_notes, separators=(",", ":")))
     print(f"Re-embedded RELEASE_NOTES = {len(release_notes['entries'])} dated entries")
+
+    requirements = parse_requirements(REQUIREMENTS_YAML)
+    html = _replace_const(html, "REQUIREMENTS", json.dumps(requirements, separators=(",", ":")))
+    print(f"Re-embedded REQUIREMENTS = {len(requirements)} requirements")
 
     with open(DASHBOARD_HTML, "w") as f:
         f.write(html)

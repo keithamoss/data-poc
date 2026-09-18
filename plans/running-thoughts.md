@@ -179,6 +179,20 @@ new feature (a real live data model for requirements, not just static
 text) - needs scoping like anything else, "today" is Keith's own
 enthusiasm, not a commitment already made.
 
+**Scoped and built, 2026-09-18 (plans/qa-pipeline.md item 75)** -
+Keith's own explicit "go do a bit of work" pickup. Scoped via a real
+round of `AskUserQuestion` first, per this project's own standing
+convention, rather than guessed: structured YAML with typed fields
+(his own choice - a deliberate departure from the hand-prose
+`CHANGELOG.md` pattern this session recommended), high-level user-story
+granularity (~10-30, not a 1:1 mirror of this file's own numbered
+items), and real CI-ENFORCED test linkage (his choice again, stronger
+than the "soft manual reference" MVP default recommended) - a
+requirement claiming `built` status with no real, AST-verified test
+behind it now fails CI. See item 75's own writeup for the full build
+(schema, validator, panel UI, tests) - this entry stays as the
+original ask for context, not duplicated there.
+
 ### 8. Deep links from the dashboard back into GitHub
 
 Two related, smaller asks:
