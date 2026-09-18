@@ -4463,6 +4463,98 @@ relative, not a schedule — this is weeks of work, not months.
     rendering timestamps ahead of each entry, newest-first within each
     subsection, via the same Playwright check.
 
+81. **[built, 2026-09-18]** CP resupply simulation - queued in
+    `plans/running-thoughts.md` ("Child Protection resupplies... once
+    you're done with this loop"), picked up once that loop (Phase 6/7,
+    the ticketing MVP, item 74's fix, the timestamp retrofit) wrapped.
+    `generator/generate_cp_runs.py` had zero resupply-chain concept
+    before this - a red quarterly delivery just stayed red forever
+    (exactly what item 79 found as a real true positive). Scoped via
+    AskUserQuestion (3 real forks): (1) CP's own resupply delay curve -
+    "2-4 weeks, mostly 1-2" (Keith's own calibration), a genuinely
+    slower/wider curve than BDM's 1-10 business days (mostly 1-3) -
+    a full quarterly collection re-extract realistically takes longer
+    to correct than a single day's file; (2) add 1-2 earlier red
+    deliveries, not just the always-red final one, so there's a real
+    RESOLVED chain to look at too - matches BDM's own precedent
+    exactly (that RUN_PLAN's own comment: "bumped from a single red to
+    2... to demonstrate variability"); (3) whether to reuse `generator/
+    resupply.py`'s generic chain-orchestration engine (BDM's own) or
+    fork CP-specific logic - reuse won, which meant genericizing that
+    module first (below).
+
+    **`generator/resupply.py` genericized.** `DatasetProvider`/
+    `Attempt`/`run_delivery_chain` were hardcoded to a single
+    `pd.DataFrame` payload (Birth Registrations' shape) - CP's own
+    payload is a whole delivery's worth of tables at once
+    (`dict[str, pd.DataFrame]`). Made generic over a TypeVar `T`
+    instead of forking the module - the chain-walking loop never
+    inspected payload internals to begin with, so this was a type-hint-
+    only change (`Attempt.df` renamed to `Attempt.payload`, every call
+    site updated). `delay_days`/`delay_weights` also became real,
+    optional parameters (defaulting to BDM's own existing curve, so
+    BDM's own call site needed zero changes) instead of hardcoded
+    module constants. Verified behaviour-preserving for BDM by
+    regenerating and md5-diffing `data/raw/manifest.json` plus sample
+    CSVs before/after - byte-identical.
+
+    **`ChildProtectionProvider`** (generate_cp_runs.py) - `generate()`
+    returns a copy of the real base tables (population + casework,
+    built once from a fixed seed) with `extract_timestamp` stamped
+    once; `dirty()` reuses the exact same 6 `apply_cp_*_presets` calls
+    `main()` used to make inline, now callable per-attempt, still
+    referencing `base_tables` (never the current attempt's own,
+    possibly-churned payload) for the dangling-FK injectors' exclusion
+    sets - consistent with a resupply's own "the same underlying
+    collection, corrected" framing (plans/conceptual-design.md Thread
+    A), not a fresh random draw each attempt; `churn()` is a small-rate
+    `extract_timestamp` nudge on the 3 "activity" tables
+    (cp_notifications/cp_investigations/cp_placements) - cp_clients/
+    cp_carers/cp_case_workers pass through unchanged as comparatively
+    stable reference entities over a resupply's short window.
+
+    **Real bug found and fixed the same day, before this shipped**:
+    churn()'s first draft ALSO independently removed ~1% of rows from
+    each activity table - real output caught it immediately (a resupply
+    attempt whose own `dirty_severity` was genuinely `null` still read
+    RED on the dashboard's real aggregate-status pill). Root cause:
+    child_protection.py's own generation keeps every cross-table
+    business rule (escalation completeness, placement/carer approval,
+    closed-case hygiene) clean BY CONSTRUCTION on a clean run (this
+    file's own top docstring) - independently dropping rows from
+    cp_notifications and cp_investigations broke escalation
+    completeness for real (an "Investigation opened" notification whose
+    matching investigation got independently removed). Fixed by
+    dropping the remove step entirely - churn stays modify-only, which
+    can never break a cross-table rule since it never changes which
+    rows exist. Caught by actually looking at the real rebuilt
+    dashboard's own supply-history UI before calling this done, not
+    just trusting the generator's own "clean" label - same discipline
+    item 74's own wider-bug investigation established.
+
+    **Verified**: full `uv run pytest` (344 tests, +6 new: 4 in
+    `tests/test_generate_cp_runs.py` mirroring `test_generate_runs.py`'s
+    own manifest-shape assertions, 2 in `tests/test_resupply.py`
+    covering the generic dict-payload path and a custom delay curve),
+    `uv run ruff check .`, `npm test` (unaffected) all green. Real CP
+    data regenerated end to end (`generator.generate_cp_runs` ->
+    `qa_tools.cp.orchestrate_cp` -> committed `qa_results/` -> rebuilt
+    dashboard) and confirmed via a real Playwright check against the
+    built dashboard's own `cp-notifications` supply-history table: both
+    red deliveries (`cp_run_13`, `cp_run_15`) show real resupply
+    attempts with a real business-day-computed "N days since previous"
+    counter, both resolving to green - plus a real illustration of the
+    chain model's own documented behaviour (plans/conceptual-design.md
+    Thread A): a chain isn't restricted to a single delivery's own
+    official resupply attempts - `cp_run_08` (amber-severity, but reads
+    red on `cp_notifications`' own real checks) chains straight into
+    `cp_run_09` (the next SCHEDULED quarterly delivery, no synthetic
+    resupply relationship at all) as "attempt 2," purely because that's
+    what the real, consecutive per-run status says - exactly the
+    "derive from real observable facts, not synthetic bookkeeping"
+    design this whole redesign was built around, now visibly true for a
+    second dataset, not just claimed for one.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

@@ -226,7 +226,7 @@ def _manifest_entries_for_delivery(attempts: list, i: int, delivery_id: str, del
             "run_date": attempt.arrived_date.isoformat(),  # the date this attempt's file was actually received
             "is_resupply": attempt.is_resupply,
             "supersedes_run_id": previous_run_id,
-            "n_rows_generated": int(len(attempt.df)),
+            "n_rows_generated": int(len(attempt.payload)),
             "dirty_severity": attempt.severity,  # None | "amber" | "red" - this ATTEMPT's own outcome
             "id_offset": id_offset,
             "seed": seed,
@@ -259,17 +259,17 @@ def main() -> None:
 
         for attempt, entry in zip(attempts, entries):
             out_path = os.path.join(OUT_DIR, entry["file"])
-            attempt.df.to_csv(out_path, index=False)
+            attempt.payload.to_csv(out_path, index=False)
             tag = f"DIRTY({attempt.severity})" if attempt.severity else "clean"
             resupply_tag = (f"  [resupply attempt {attempt.attempt_number - 1}, "
                              f"arrived {attempt.arrived_date.isoformat()}]") if attempt.attempt_number > 1 else ""
-            print(f"{entry['run_id']}: {len(attempt.df):5d} rows  [{tag}]{resupply_tag}  -> {out_path}")
+            print(f"{entry['run_id']}: {len(attempt.payload):5d} rows  [{tag}]{resupply_tag}  -> {out_path}")
             if attempt.severity == "red" and attempt.attempt_number >= MAX_ATTEMPTS:
                 print(f"  -> still red after {attempt.attempt_number} attempts - "
                       f"giving up (hit MAX_ATTEMPTS={MAX_ATTEMPTS})")
 
         manifest.extend(entries)
-        previous_row_count = len(attempts[-1].df)  # this delivery's final (resolved-or-abandoned) row count
+        previous_row_count = len(attempts[-1].payload)  # this delivery's final (resolved-or-abandoned) row count
 
     manifest_path = os.path.join(OUT_DIR, "manifest.json")
     with open(manifest_path, "w") as f:

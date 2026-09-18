@@ -1,16 +1,22 @@
 {
-  "run_timestamp": "2026-09-17T15:25:27.461075+00:00",
+  "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
   "run_by": "fpycnkgvmt@privaterelay.appleid.com",
   "raw_output": {
     "manifest_entry": {
       "run_id": "cp_run_13_2026-02-01",
       "run_index": 13,
+      "delivery_id": "cp_delivery_13",
+      "delivery_date": "2026-02-01",
+      "attempt_number": 1,
+      "arrived_date": "2026-02-01",
       "run_date": "2026-02-01",
-      "dirty_severity": "amber",
+      "is_resupply": false,
+      "supersedes_run_id": null,
+      "dirty_severity": "red",
       "seed": 5013,
       "row_counts": {
         "cp_clients": 527,
-        "cp_notifications": 1001,
+        "cp_notifications": 1036,
         "cp_investigations": 181,
         "cp_placements": 242,
         "cp_carers": 289,
@@ -21,11 +27,11 @@
       "concern_type": [
         [
           "Neglect",
-          379
+          380
         ],
         [
           "Physical abuse",
-          114
+          115
         ],
         [
           "Emotional abuse",
@@ -33,15 +39,15 @@
         ],
         [
           "Sexual abuse",
-          35
+          37
         ],
         [
           "Domestic violence exposure",
-          137
+          138
         ],
         [
           "Parental substance use",
-          71
+          72
         ],
         [
           "Parental mental health concern",
@@ -49,7 +55,7 @@
         ],
         [
           "(invalid code)",
-          12
+          41
         ]
       ]
     },
@@ -57,14 +63,26 @@
       "cp_clients.postcode": {
         "type": "categorical",
         "suppressed": false,
-        "total_invalid": 3,
+        "total_invalid": 18,
         "values": [
           {
-            "value": "9999",
-            "count": 2
+            "value": "6000X",
+            "count": 5
+          },
+          {
+            "value": "TBC",
+            "count": 5
+          },
+          {
+            "value": "0000",
+            "count": 4
           },
           {
             "value": "XXXX",
+            "count": 3
+          },
+          {
+            "value": "9999",
             "count": 1
           }
         ]
@@ -72,62 +90,62 @@
       "cp_clients.date_of_birth": {
         "type": "numeric_date",
         "suppressed": false,
-        "total_invalid": 11,
+        "total_invalid": 32,
         "min": "1750-01-01",
         "max": "1899-01-01",
         "values": [
           {
-            "value": "1820-11-30",
-            "count": 3
-          },
-          {
-            "value": "1850-06-15",
-            "count": 3
+            "value": "1750-01-01",
+            "count": 10
           },
           {
             "value": "1899-01-01",
-            "count": 3
+            "count": 10
           },
           {
-            "value": "1750-01-01",
-            "count": 2
+            "value": "1820-11-30",
+            "count": 6
+          },
+          {
+            "value": "1850-06-15",
+            "count": 6
           }
         ],
         "histogram": [
           {
             "bucket": "1750-01-01 to 1774-11-01",
-            "count": 2
+            "count": 10
           },
           {
             "bucket": "1799-09-01 to 1824-07-02",
-            "count": 3
+            "count": 6
           },
           {
             "bucket": "1849-05-02 to 1874-03-02",
-            "count": 3
+            "count": 6
           },
           {
             "bucket": "1874-03-02 to 1899-01-01",
-            "count": 3
+            "count": 10
           }
         ]
       },
       "cp_notifications.concern_type": {
         "type": "categorical",
         "suppressed": false,
-        "total_invalid": 12,
+        "total_invalid": 41,
         "values": [
           {
+            "value": "Code 9",
+            "count": 14
+          },
+          {
             "value": "Unspecified",
-            "count": 6
+            "count": 14
           },
           {
             "value": "Pending classification",
-            "count": 5
-          },
-          {
-            "value": "Code 9",
-            "count": 1
+            "count": 13
           }
         ]
       }

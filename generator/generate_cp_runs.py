@@ -58,6 +58,28 @@ extract_timestamp isn't a column child_protection.py produces (unlike
 agency_datasets.py's birth_registrations, which has one) - added here per
 snapshot instead, since "when was this extract pulled" is a property of
 the QA-pipeline scenario, not the core generator.
+
+RESUPPLY SIMULATION (2026-09-18, item 80/plans/qa-pipeline.md - "CP
+resupply simulation," queued in plans/running-thoughts.md since the
+Phase 7 resupply-chain redesign found CP had zero resupply concept at
+all). Reuses generate_runs.py's own generic chain-orchestration engine
+(generator/resupply.py) - a scheduled quarterly delivery that rolls red
+now gets a real resupply attempt some working days later, possibly
+still red, exactly like Birth Registrations' daily feed - rather than
+CP forking its own parallel chain-walking logic. The one real
+architectural wrinkle: resupply.py's DatasetProvider used to assume a
+single pd.DataFrame payload (Birth Registrations' shape); CP's own
+payload is a whole delivery's worth of tables at once. Generalized
+(same 2026-09-18 change) to a generic `T` instead of forking the
+module - see resupply.py's own docstring for the full account.
+ChildProtectionProvider below is the CP-specific plug-in;
+generate_runs.py's BirthRegistrationsProvider remains the BDM one,
+unchanged. The dashboard-side supply-history UI needed NO changes for
+this - Phase 7's own resupply-chain redesign (plans/conceptual-
+design.md Thread A) already derives chain membership purely from real
+per-run aggregate status, dataset-agnostic by construction ("nothing
+about the model assumes BDM-only" - that file's own words, written
+before this was actually built).
 """
 from __future__ import annotations
 import json
@@ -69,6 +91,7 @@ import pandas as pd
 
 from generator.anchor_date import get_anchor_date
 from generator import dirty as dirty_mod
+from generator.resupply import MAX_ATTEMPTS, DatasetProvider, run_delivery_chain
 from synthetic_data_generator.population import generate_population
 from synthetic_data_generator.child_protection import generate_child_protection_collection
 
@@ -81,6 +104,18 @@ N_CASE_WORKERS = 60
 BASE_SEED = 5000  # distinct range from generate_runs.py's 1000s and generate.py's demo seeds
 
 TABLES = ["cp_clients", "cp_notifications", "cp_investigations", "cp_placements", "cp_carers", "cp_case_workers"]
+
+# Resupply timing - deliberately NOT Birth Registrations' own curve
+# (mostly 1-3 business days, tailing to 10): a corrected full quarterly
+# collection re-extract is a bigger real turnaround than a single day's
+# file. Keith's own calibration (2026-09-18, AskUserQuestion): "2-4
+# weeks, mostly 1-2." Geometric decay per business day over a 5-20 day
+# (1-4 week) range lands ~76% of the mass within the first 10 business
+# days (2 weeks), tailing to 20 (4 weeks) - matches that framing without
+# claiming false precision on the exact shape.
+_CP_DELAY_DAYS = np.arange(5, 21)
+_CP_DELAY_WEIGHTS = 0.8 ** (_CP_DELAY_DAYS - 5)
+_CP_DELAY_WEIGHTS = _CP_DELAY_WEIGHTS / _CP_DELAY_WEIGHTS.sum()
 
 # (quarter offset from run 1, dirty severity or None) - 15 quarterly
 # snapshots spanning ~4 years, Feb/May/Aug/Nov-anchored (re-anchored
@@ -109,8 +144,16 @@ N_QUARTERS = 15
 def _build_run_plan(n: int, seed: int) -> list[tuple[int, str | None]]:
     rng = np.random.default_rng(seed)
     n_amber = max(1, round(n * 0.25))  # ~matches the original plan's 2/10 ratio
-    n_clean_middle = n - 2 - n_amber  # first (clean) & last (red) carved out separately
-    middle = [None] * n_clean_middle + ["amber"] * n_amber
+    # One extra RED delivery in the middle, besides the always-red last
+    # one (2026-09-18, CP resupply simulation) - matches Birth
+    # Registrations' own precedent exactly (RUN_PLAN's own comment in
+    # generate_runs.py: "bumped from a single red to 2 so the resupply-
+    # chain simulation... had more than one independent example to
+    # demonstrate variability") - one resupply chain that's already
+    # resolved by the time history ends, not just the currently-open one.
+    n_red_middle = 1
+    n_clean_middle = n - 2 - n_amber - n_red_middle  # first (clean) & last (red) carved out separately
+    middle = [None] * n_clean_middle + ["amber"] * n_amber + ["red"] * n_red_middle
     rng.shuffle(middle)
     return list(enumerate([None] + list(middle) + ["red"]))
 
@@ -167,6 +210,140 @@ def _add_extract_timestamp(df: pd.DataFrame, snapshot_date: date, date_col: str 
     return out
 
 
+# Churn (resupply attempt N -> N+1) touches only these three "activity"
+# tables - cp_clients/cp_carers/cp_case_workers are comparatively stable
+# reference entities that don't meaningfully move within a resupply's
+# short (weeks, not months) window, so they pass through unchanged
+# rather than getting a token, meaningless nudge. Deliberately no REMOVE
+# step (unlike Birth Registrations' own churn()), found the hard way
+# 2026-09-18: independently dropping ~1% of rows from cp_notifications
+# and cp_investigations broke the escalation-completeness business rule
+# for real (an "Investigation opened" notification whose matching
+# investigation got independently removed) on what should have been a
+# genuinely clean resupply attempt - a real bug, caught by the
+# aggregate-status pill reading red on a dirty_severity:null run, not
+# assumed away. child_protection.py's own generation keeps every cross-
+# table business rule clean BY CONSTRUCTION (this file's own top
+# docstring); an uncoordinated per-table remove breaks that invariant,
+# so churn stays modify-only - real drift (a timestamp nudge) without
+# ever risking a spurious cross-table violation.
+_CHURN_TABLES = ["cp_notifications", "cp_investigations", "cp_placements"]
+_CHURN_MODIFY_RATE = 0.02
+
+
+class ChildProtectionProvider:
+    """The DatasetProvider (generator/resupply.py) for Child Protection -
+    payload is a dict[str, pd.DataFrame], one entry per real table
+    (TABLES), not a single DataFrame like Birth Registrations' own
+    provider - see resupply.py's own docstring for why that module is
+    now generic over this. Reference tables passed to the dangling-FK
+    injectors and cp_investigations' closed-case eligibility filter
+    stay pinned to `self.base_tables` (the true, never-dirtied source)
+    for every attempt in a chain, not whatever a given attempt's own
+    (possibly churned) payload happens to look like - a deliberate
+    simplification consistent with a resupply's own "the same
+    underlying collection, corrected" framing (plans/conceptual-
+    design.md Thread A's whole redesign rationale), not a fresh random
+    draw of the population each attempt."""
+
+    def __init__(self, base_tables: dict[str, pd.DataFrame]):
+        self.base_tables = base_tables
+
+    def generate(self, run_date: date, seed: int, n_rows: int, id_offset: int) -> dict[str, pd.DataFrame]:
+        # extract_timestamp is set exactly once, here, before any dirty()/
+        # churn() - a row dirty() later duplicates (e.g. cp_notifications'
+        # near-duplicate-submission injector) inherits its source row's
+        # timestamp rather than a fresh independent draw - a real but
+        # minor imprecision (a genuine double-submission would usually
+        # arrive at a distinct moment) that no real check here actually
+        # depends on (nothing validates extract_timestamp variance across
+        # near-duplicate rows, and the MIN/MAX arrival-lag stats are
+        # unaffected by a duplicate sharing an already-present value).
+        return {name: _add_extract_timestamp(self.base_tables[name], run_date, None, seed=seed + 5000)
+                for name in TABLES}
+
+    def dirty(self, payload: dict[str, pd.DataFrame], severity: str, seed: int,
+              previous_row_count: int | None) -> dict[str, pd.DataFrame]:
+        tables = dict(payload)
+        base = self.base_tables
+        tables["cp_notifications"] = dirty_mod.apply_cp_notifications_presets(
+            tables["cp_notifications"], base["cp_clients"], base["cp_case_workers"],
+            severity, seed=seed + 100)
+        tables["cp_placements"] = dirty_mod.apply_cp_placements_presets(
+            tables["cp_placements"], tables["cp_carers"], base["cp_clients"],
+            severity, seed=seed + 200)
+        tables["cp_investigations"] = dirty_mod.apply_cp_investigations_presets(
+            tables["cp_investigations"], base["cp_clients"], base["cp_notifications"],
+            base["cp_case_workers"], severity, seed=seed + 300)
+        tables["cp_clients"] = dirty_mod.apply_cp_clients_presets(
+            tables["cp_clients"], severity, seed=seed + 400)
+        tables["cp_carers"] = dirty_mod.apply_cp_carers_presets(
+            tables["cp_carers"], severity, seed=seed + 500)
+        tables["cp_case_workers"] = dirty_mod.apply_cp_case_workers_presets(
+            tables["cp_case_workers"], severity, seed=seed + 600)
+        return tables
+
+    def churn(self, payload: dict[str, pd.DataFrame], seed: int, run_date: date,
+              id_offset: int) -> dict[str, pd.DataFrame]:
+        """Between one attempt and the next, the underlying casework
+        hasn't frozen either - a small-rate extract_timestamp nudge on
+        the three "activity" tables, as if a few records were re-pulled
+        slightly later in the same re-extract. Deliberately NO add or
+        remove step (unlike Birth Registrations' own churn(), which does
+        add/modify/remove): CP's population and casework are built ONCE
+        from a fixed seed, so adding rows would mean running the
+        population-linked generator further - a documented
+        simplification, not an oversight - and independently REMOVING
+        rows from related tables real-broke a real cross-table business
+        rule (see _CHURN_TABLES' own comment above) - the modify-only
+        version can never do that, since it never changes which rows
+        exist, only when they were extracted."""
+        rng = np.random.default_rng(seed)
+        out = dict(payload)
+        for table in _CHURN_TABLES:
+            df = out[table].copy()
+            modify_mask = rng.random(len(df)) < _CHURN_MODIFY_RATE
+            modify_idx = np.where(modify_mask)[0]
+            if len(modify_idx):
+                shift = pd.to_timedelta(rng.integers(1, 6, size=len(modify_idx)), unit="h")
+                df.loc[df.index[modify_idx], "extract_timestamp"] = (
+                    pd.to_datetime(df.loc[df.index[modify_idx], "extract_timestamp"]) + shift
+                )
+            out[table] = df
+        return out
+
+
+def _cp_manifest_entries_for_delivery(attempts: list, i: int, delivery_id: str, delivery_date: date,
+                                       run_index_start: int, seed: int) -> list[dict]:
+    """Pure manifest-entry construction for one delivery's full attempt
+    chain - the CP counterpart to generate_runs.py's own
+    _manifest_entries_for_delivery(), same run_id/supersedes_run_id
+    chaining convention, but `row_counts` (one count per real table)
+    instead of a single `n_rows_generated`/`file` (CP writes one
+    directory of 6 CSVs per attempt, not one CSV)."""
+    entries = []
+    previous_run_id = None
+    for attempt in attempts:
+        suffix = "" if attempt.attempt_number == 1 else f"_resupply{attempt.attempt_number - 1}"
+        run_id = f"cp_run_{i:02d}_{attempt.arrived_date.isoformat()}{suffix}"
+        entries.append({
+            "run_id": run_id,
+            "run_index": run_index_start + len(entries) + 1,
+            "delivery_id": delivery_id,
+            "delivery_date": delivery_date.isoformat(),
+            "attempt_number": attempt.attempt_number,
+            "arrived_date": attempt.arrived_date.isoformat(),
+            "run_date": attempt.arrived_date.isoformat(),  # the date this attempt's extract was actually received
+            "is_resupply": attempt.is_resupply,
+            "supersedes_run_id": previous_run_id,
+            "dirty_severity": attempt.severity,  # None | "amber" | "red" - this ATTEMPT's own outcome
+            "seed": seed,
+            "row_counts": {name: int(len(attempt.payload[name])) for name in TABLES},
+        })
+        previous_run_id = run_id
+    return entries
+
+
 def main() -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -176,63 +353,45 @@ def main() -> None:
     for name in TABLES:
         print(f"  {name}: {len(base_tables[name]):,} rows")
 
+    provider: DatasetProvider = ChildProtectionProvider(base_tables)
     manifest = []
     for i, (quarter_offset, severity) in enumerate(RUN_PLAN, start=1):
         snapshot_date = _add_quarters(START_DATE, quarter_offset)
-        run_id = f"cp_run_{i:02d}_{snapshot_date.isoformat()}"
-        run_dir = os.path.join(OUT_DIR, run_id)
-        os.makedirs(run_dir, exist_ok=True)
+        delivery_id = f"cp_delivery_{i:02d}"
+        seed = BASE_SEED + i
 
-        tables = {name: base_tables[name].copy() for name in TABLES}
-        if severity:
-            # Reference tables passed to the dangling-FK injectors
-            # (existing_ids exclusion sets, and cp_investigations' own
-            # closed-case eligibility filter) are base_tables - the real,
-            # never-dirtied source - not this run's own `tables` dict,
-            # so a preset applied earlier in this block (e.g. cp_clients'
-            # own PK-duplication further down) can never change what
-            # another preset considers a "real" ID (duplication only ever
-            # adds rows, never removes the original, so this is belt-and-
-            # braces rather than a live bug either way - but base_tables
-            # is the unambiguously correct thing to point at).
-            tables["cp_notifications"] = dirty_mod.apply_cp_notifications_presets(
-                tables["cp_notifications"], base_tables["cp_clients"], base_tables["cp_case_workers"],
-                severity, seed=BASE_SEED + 4100 + i)
-            tables["cp_placements"] = dirty_mod.apply_cp_placements_presets(
-                tables["cp_placements"], tables["cp_carers"], base_tables["cp_clients"],
-                severity, seed=BASE_SEED + 4200 + i)
-            tables["cp_investigations"] = dirty_mod.apply_cp_investigations_presets(
-                tables["cp_investigations"], tables["cp_clients"], base_tables["cp_notifications"],
-                base_tables["cp_case_workers"], severity, seed=BASE_SEED + 4300 + i)
-            tables["cp_clients"] = dirty_mod.apply_cp_clients_presets(
-                tables["cp_clients"], severity, seed=BASE_SEED + 4400 + i)
-            tables["cp_carers"] = dirty_mod.apply_cp_carers_presets(
-                tables["cp_carers"], severity, seed=BASE_SEED + 4500 + i)
-            tables["cp_case_workers"] = dirty_mod.apply_cp_case_workers_presets(
-                tables["cp_case_workers"], severity, seed=BASE_SEED + 4600 + i)
+        attempts = list(run_delivery_chain(
+            provider, snapshot_date, seed, id_offset=0, n_rows=0,
+            first_severity=severity, previous_row_count=None,
+            delay_days=_CP_DELAY_DAYS, delay_weights=_CP_DELAY_WEIGHTS,
+        ))
+        entries = _cp_manifest_entries_for_delivery(attempts, i, delivery_id, snapshot_date, len(manifest), seed)
 
-        row_counts = {}
-        for name in TABLES:
-            df = _add_extract_timestamp(tables[name], snapshot_date, None, seed=BASE_SEED + 5000 + i)
-            cols = [c for c in df.columns if not c.startswith("_")]
-            df[cols].to_csv(os.path.join(run_dir, f"{name}.csv"), index=False)
-            row_counts[name] = int(len(df))
+        for attempt, entry in zip(attempts, entries):
+            run_dir = os.path.join(OUT_DIR, entry["run_id"])
+            os.makedirs(run_dir, exist_ok=True)
+            for name in TABLES:
+                df = attempt.payload[name]
+                cols = [c for c in df.columns if not c.startswith("_")]
+                df[cols].to_csv(os.path.join(run_dir, f"{name}.csv"), index=False)
+            tag = f"DIRTY({attempt.severity})" if attempt.severity else "clean"
+            resupply_tag = (f"  [resupply attempt {attempt.attempt_number - 1}, "
+                             f"arrived {attempt.arrived_date.isoformat()}]") if attempt.attempt_number > 1 else ""
+            print(f"{entry['run_id']}: {entry['row_counts']['cp_notifications']:5d} notifications  "
+                  f"[{tag}]{resupply_tag}  -> {run_dir}")
+            if attempt.severity == "red" and attempt.attempt_number >= MAX_ATTEMPTS:
+                print(f"  -> still red after {attempt.attempt_number} attempts - "
+                      f"giving up (hit MAX_ATTEMPTS={MAX_ATTEMPTS})")
 
-        manifest.append({
-            "run_id": run_id,
-            "run_index": i,
-            "run_date": snapshot_date.isoformat(),
-            "dirty_severity": severity,
-            "seed": BASE_SEED + i,
-            "row_counts": row_counts,
-        })
-        tag = f"DIRTY({severity})" if severity else "clean"
-        print(f"{run_id}: {row_counts['cp_notifications']:5d} notifications  [{tag}]  -> {run_dir}")
+        manifest.extend(entries)
 
     manifest_path = os.path.join(OUT_DIR, "manifest.json")
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
-    print(f"\nWrote {len(manifest)} snapshot runs + manifest.json to {os.path.abspath(OUT_DIR)}")
+    n_red_deliveries = sum(1 for _, sev in RUN_PLAN if sev == "red")
+    print(f"\nWrote {len(manifest)} attempts across {len(RUN_PLAN)} scheduled deliveries "
+          f"({n_red_deliveries} of which went red and triggered a resupply chain) + manifest.json "
+          f"to {os.path.abspath(OUT_DIR)}")
 
 
 if __name__ == "__main__":

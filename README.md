@@ -147,7 +147,10 @@ generator/                   a real package (generator/__init__.py) - `python3 -
                                driven by a DatasetProvider protocol - knows nothing about how
                                a dataset's rows are actually made, see the file's own docstring
   generate_cp_runs.py          orchestrates 15 quarterly Child Protection snapshots (Feb/May/Aug/Nov
-                               anchor, ~4 years) into data/cp_raw/
+                               anchor, ~4 years) into data/cp_raw/ - a red one also drives resupply.py's
+                               resupply-chain simulation, on a slower delay curve than BDM's own (a
+                               full collection re-extract, not a single day's file), so slightly more
+                               than 15 manifest entries actually land
   names_au.py, presentation.py, dirty.py   the canonical copies - synthetic_data_generator/
                                imports these from here rather than keeping its own duplicates
                                (see "Relationship to the synthetic_data_generator package" below)

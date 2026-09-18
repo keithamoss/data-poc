@@ -1,11 +1,17 @@
 {
-  "run_timestamp": "2026-09-17T15:25:27.461075+00:00",
+  "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
   "run_by": "fpycnkgvmt@privaterelay.appleid.com",
   "raw_output": {
     "manifest_entry": {
       "run_id": "cp_run_06_2024-05-01",
       "run_index": 6,
+      "delivery_id": "cp_delivery_06",
+      "delivery_date": "2024-05-01",
+      "attempt_number": 1,
+      "arrived_date": "2024-05-01",
       "run_date": "2024-05-01",
+      "is_resupply": false,
+      "supersedes_run_id": null,
       "dirty_severity": "amber",
       "seed": 5006,
       "row_counts": {
@@ -21,11 +27,11 @@
       "concern_type": [
         [
           "Neglect",
-          382
+          383
         ],
         [
           "Physical abuse",
-          119
+          115
         ],
         [
           "Emotional abuse",
@@ -33,15 +39,15 @@
         ],
         [
           "Sexual abuse",
-          36
+          35
         ],
         [
           "Domestic violence exposure",
-          136
+          134
         ],
         [
           "Parental substance use",
-          70
+          69
         ],
         [
           "Parental mental health concern",
@@ -49,7 +55,7 @@
         ],
         [
           "(invalid code)",
-          10
+          17
         ]
       ]
     },
@@ -57,22 +63,14 @@
       "cp_clients.postcode": {
         "type": "categorical",
         "suppressed": false,
-        "total_invalid": 5,
+        "total_invalid": 3,
         "values": [
           {
             "value": "6000X",
             "count": 2
           },
           {
-            "value": "TBC",
-            "count": 1
-          },
-          {
-            "value": "0000",
-            "count": 1
-          },
-          {
-            "value": "XXXX",
+            "value": "9999",
             "count": 1
           }
         ]
@@ -80,50 +78,42 @@
       "cp_clients.date_of_birth": {
         "type": "numeric_date",
         "suppressed": false,
-        "total_invalid": 6,
+        "total_invalid": 4,
         "min": "1750-01-01",
-        "max": "1899-01-01",
+        "max": "1850-06-15",
         "values": [
           {
-            "value": "1899-01-01",
+            "value": "1750-01-01",
             "count": 3
           },
           {
             "value": "1850-06-15",
-            "count": 2
-          },
-          {
-            "value": "1750-01-01",
             "count": 1
           }
         ],
         "histogram": [
           {
-            "bucket": "1750-01-01 to 1774-11-01",
-            "count": 1
-          },
-          {
-            "bucket": "1849-05-02 to 1874-03-02",
-            "count": 2
-          },
-          {
-            "bucket": "1874-03-02 to 1899-01-01",
+            "bucket": "1750-01-01 to 1766-09-28",
             "count": 3
+          },
+          {
+            "bucket": "1833-09-17 to 1850-06-15",
+            "count": 1
           }
         ]
       },
       "cp_notifications.concern_type": {
         "type": "categorical",
         "suppressed": false,
-        "total_invalid": 10,
+        "total_invalid": 17,
         "values": [
           {
             "value": "Pending classification",
-            "count": 6
+            "count": 10
           },
           {
             "value": "Unspecified",
-            "count": 2
+            "count": 5
           },
           {
             "value": "Code 9",

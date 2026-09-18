@@ -19,15 +19,34 @@ not here, since it touches dataset-specific columns and calls the
 dataset's own generator to manufacture "rows that should have been in the
 original file"; Birth Registrations is still the only provider - this
 module is deliberately generic but not yet exercised by a second dataset.
+
+GENERICIZED 2026-09-18 (item 80/CP resupply simulation, plans/qa-
+pipeline.md) once a second provider actually arrived: `DatasetProvider`/
+`Attempt`/`run_delivery_chain` are now generic over a payload type `T`
+instead of hardcoding `pd.DataFrame` - Birth Registrations' payload is
+still a single DataFrame, but Child Protection's is a whole delivery's
+worth of tables at once (`dict[str, pd.DataFrame]`, one entry per real
+table). The chain-walking loop itself never inspects payload internals -
+it only calls the three provider methods and threads whatever they
+return back into the next call - so this was a type-hint-only change,
+not a behaviour change; `Attempt.df` renamed to `Attempt.payload` since
+it's no longer always a DataFrame (every call site updated alongside).
+`delay_days`/`delay_weights` also became real parameters (still
+defaulting to the exact BDM curve below, so BDM's own call site needed
+no changes) rather than hardcoded module constants, so a second provider
+with a genuinely different real-world turnaround (CP's slower full-
+collection re-extract) can supply its own curve without forking this
+module - see generate_cp_runs.py's own `_CP_DELAY_DAYS`/
+`_CP_DELAY_WEIGHTS` for that curve and Keith's own calibration call
+behind it.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Iterator, Optional, Protocol
+from typing import Generic, Iterator, Optional, Protocol, TypeVar
 
 import numpy as np
-import pandas as pd
 
 MAX_ATTEMPTS = 8  # a hard ceiling so a pathological chain can't run forever
 STILL_RED_PROB = 0.60  # per-attempt chance a resupply is ALSO red - a chain
@@ -39,27 +58,33 @@ STILL_RED_PROB = 0.60  # per-attempt chance a resupply is ALSO red - a chain
 # fast, geometrically decaying so days 1-3 carry ~79% of the probability
 # mass and the remaining ~21% tails off out to day 10 - "most suppliers
 # land either the next day or within three days, with a longish tail
-# going out to around 10 working days" (Keith's own calibration).
+# going out to around 10 working days" (Keith's own calibration). Birth
+# Registrations' own curve - the default every call site gets unless it
+# passes its own (see generate_cp_runs.py for the one dataset that does).
 _DELAY_DAYS = np.arange(1, 11)
 _DELAY_WEIGHTS = 0.6 ** (_DELAY_DAYS - 1)
 _DELAY_WEIGHTS = _DELAY_WEIGHTS / _DELAY_WEIGHTS.sum()
 
+T = TypeVar("T")  # a delivery's own payload shape - one DataFrame (BDM) or
+# a dict of them, one per real table (CP) - see this module's own
+# docstring for why this became generic.
 
-class DatasetProvider(Protocol):
+
+class DatasetProvider(Protocol[T]):
     """What resupply orchestration needs from a dataset - nothing else.
     A future replacement for daily_batch.py/dirty.py only needs to
     implement this to plug into the exact same chain logic."""
 
-    def generate(self, run_date: date, seed: int, n_rows: int, id_offset: int) -> pd.DataFrame:
-        """This delivery's first-attempt rows."""
+    def generate(self, run_date: date, seed: int, n_rows: int, id_offset: int) -> T:
+        """This delivery's first-attempt payload."""
         ...
 
-    def dirty(self, df: pd.DataFrame, severity: str, seed: int,
-              previous_row_count: Optional[int]) -> pd.DataFrame:
+    def dirty(self, payload: T, severity: str, seed: int,
+              previous_row_count: Optional[int]) -> T:
         """Apply this dataset's failure-injection presets at the given severity."""
         ...
 
-    def churn(self, df: pd.DataFrame, seed: int, run_date: date, id_offset: int) -> pd.DataFrame:
+    def churn(self, payload: T, seed: int, run_date: date, id_offset: int) -> T:
         """Small, dataset-specific add/modify/remove drift between one
         attempt and the next - the source system hasn't been frozen while
         we waited for a resupply."""
@@ -80,50 +105,56 @@ def _add_business_days(start: date, n: int) -> date:
 
 
 @dataclass
-class Attempt:
+class Attempt(Generic[T]):
     attempt_number: int
     arrived_date: date
     is_resupply: bool
     severity: Optional[str]  # this attempt's own outcome: None | "amber" | "red"
-    df: pd.DataFrame
+    payload: T
 
 
-def run_delivery_chain(provider: DatasetProvider, delivery_date: date, seed: int,
+def run_delivery_chain(provider: DatasetProvider[T], delivery_date: date, seed: int,
                         id_offset: int, n_rows: int, first_severity: Optional[str],
-                        previous_row_count: Optional[int]) -> Iterator[Attempt]:
+                        previous_row_count: Optional[int],
+                        delay_days: np.ndarray = _DELAY_DAYS,
+                        delay_weights: np.ndarray = _DELAY_WEIGHTS) -> Iterator[Attempt[T]]:
     """Walks one delivery through its full attempt chain, yielding each
     attempt in order. Stops as soon as an attempt isn't red, or after
     MAX_ATTEMPTS. The caller owns everything about *identity* (run_id,
     delivery_id, supersedes_run_id, manifest/file writing) - this only
-    knows attempt numbers and dates.
+    knows attempt numbers and dates. `delay_days`/`delay_weights` default
+    to Birth Registrations' own curve above; a provider whose real-world
+    turnaround differs (see generate_cp_runs.py) passes its own.
 
     Tracks two lineages, not one (real bug found and fixed 2026-09-15 -
-    see plans/qa-pipeline.md #31): `clean_df` is churned forward every
-    attempt and NEVER has dirty() applied to it directly; each attempt's
-    own yielded `df` is a fresh `dirty(clean_df, ...)` call when that
-    attempt rolls red, or `clean_df` itself when it resolves. Previously
-    `df` was reused and mutated in place across the whole loop, so a
-    resolved attempt silently inherited whatever dirty() had already
-    baked into a prior red attempt, and a still-red attempt accumulated
-    dirt on top of dirt rather than getting one fresh roll at that
-    severity - confirmed via real output (two "clean" resupply attempts
-    with ~78-89% facility nulls and invalid sex codes, matching RED-
-    severity injection, not a clean run). Keeping `clean_df` separate
-    fixes both: a resolved attempt is genuinely clean, and every red
-    attempt (first or Nth in a row) gets one fresh dirty() roll against
-    the current (churned-forward, never-dirtied) lineage - still not "a
-    fresh random draw" (churn() still evolves the same underlying rows
-    attempt to attempt, per plans/wider.md #12's own design intent), just
-    never carrying forward another attempt's injected defects."""
-    clean_df = provider.generate(delivery_date, seed, n_rows, id_offset)
-    df = provider.dirty(clean_df, first_severity, seed + 500, previous_row_count) if first_severity else clean_df
+    see plans/qa-pipeline.md #31): `clean_payload` is churned forward
+    every attempt and NEVER has dirty() applied to it directly; each
+    attempt's own yielded `payload` is a fresh `dirty(clean_payload, ...)`
+    call when that attempt rolls red, or `clean_payload` itself when it
+    resolves. Previously the payload was reused and mutated in place
+    across the whole loop, so a resolved attempt silently inherited
+    whatever dirty() had already baked into a prior red attempt, and a
+    still-red attempt accumulated dirt on top of dirt rather than getting
+    one fresh roll at that severity - confirmed via real output (two
+    "clean" resupply attempts with ~78-89% facility nulls and invalid sex
+    codes, matching RED-severity injection, not a clean run). Keeping
+    `clean_payload` separate fixes both: a resolved attempt is genuinely
+    clean, and every red attempt (first or Nth in a row) gets one fresh
+    dirty() roll against the current (churned-forward, never-dirtied)
+    lineage - still not "a fresh random draw" (churn() still evolves the
+    same underlying rows attempt to attempt, per plans/wider.md #12's own
+    design intent), just never carrying forward another attempt's
+    injected defects."""
+    clean_payload = provider.generate(delivery_date, seed, n_rows, id_offset)
+    payload = (provider.dirty(clean_payload, first_severity, seed + 500, previous_row_count)
+               if first_severity else clean_payload)
 
     attempt_number = 1
     arrived_date = delivery_date
     severity = first_severity
 
     while True:
-        yield Attempt(attempt_number, arrived_date, attempt_number > 1, severity, df)
+        yield Attempt(attempt_number, arrived_date, attempt_number > 1, severity, payload)
 
         if severity != "red":
             return  # resolved (or was never red to begin with)
@@ -131,15 +162,15 @@ def run_delivery_chain(provider: DatasetProvider, delivery_date: date, seed: int
             return  # giving up - hit the hard ceiling
 
         resupply_rng = np.random.default_rng(seed + 700 + attempt_number)
-        delay_days = int(resupply_rng.choice(_DELAY_DAYS, p=_DELAY_WEIGHTS))
-        arrived_date = _add_business_days(arrived_date, delay_days)
+        chosen_delay_days = int(resupply_rng.choice(delay_days, p=delay_weights))
+        arrived_date = _add_business_days(arrived_date, chosen_delay_days)
         attempt_number += 1
 
-        clean_df = provider.churn(clean_df, seed + 800 + attempt_number, delivery_date,
-                                   id_offset + 50_000 + attempt_number * 100)
+        clean_payload = provider.churn(clean_payload, seed + 800 + attempt_number, delivery_date,
+                                        id_offset + 50_000 + attempt_number * 100)
         if resupply_rng.random() < STILL_RED_PROB:
-            df = provider.dirty(clean_df, "red", seed + 900 + attempt_number, previous_row_count)
+            payload = provider.dirty(clean_payload, "red", seed + 900 + attempt_number, previous_row_count)
             severity = "red"
         else:
-            df = clean_df
+            payload = clean_payload
             severity = None

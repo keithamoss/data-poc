@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import date
 
+import numpy as np
 import pandas as pd
 
 import generator.resupply as resupply
@@ -128,10 +129,68 @@ def test_resolved_attempt_carries_no_dirty_marker(monkeypatch):
     ))
     assert len(attempts) == 2
     assert attempts[0].severity == "red"
-    assert _is_dirtied(attempts[0].df)
+    assert _is_dirtied(attempts[0].payload)
     assert attempts[1].severity is None
-    assert not _is_dirtied(attempts[1].df), \
+    assert not _is_dirtied(attempts[1].payload), \
         "resolved attempt still carries a dirty marker from the earlier red attempt"
+
+
+class DictPayloadStubProvider:
+    """A payload shaped like Child Protection's own (dict[str, DataFrame],
+    one entry per real table) rather than Birth Registrations' bare
+    DataFrame - real coverage for resupply.py's 2026-09-18 genericization
+    (DatasetProvider/Attempt/run_delivery_chain over T), not just
+    inferred from generate_cp_runs.py's own integration test."""
+
+    def generate(self, run_date, seed, n_rows, id_offset):
+        return {"a": pd.DataFrame({"id": range(n_rows)}), "b": pd.DataFrame({"id": range(n_rows)})}
+
+    def dirty(self, payload, severity, seed, previous_row_count):
+        out = dict(payload)
+        for name, df in out.items():
+            marked = df.copy()
+            marked["dirtied"] = True
+            out[name] = marked
+        return out
+
+    def churn(self, payload, seed, run_date, id_offset):
+        return {name: df.copy() for name, df in payload.items()}
+
+
+def test_run_delivery_chain_works_with_a_dict_of_tables_payload(monkeypatch):
+    monkeypatch.setattr(resupply, "STILL_RED_PROB", 0.0)
+    attempts = list(run_delivery_chain(
+        DictPayloadStubProvider(), date(2026, 9, 1), seed=1, id_offset=0,
+        n_rows=10, first_severity="red", previous_row_count=None,
+    ))
+    assert len(attempts) == 2
+    assert set(attempts[0].payload.keys()) == {"a", "b"}
+    assert "dirtied" in attempts[0].payload["a"].columns
+    assert "dirtied" not in attempts[1].payload["a"].columns, \
+        "resolved attempt still carries a dirty marker from the earlier red attempt"
+
+
+def test_run_delivery_chain_accepts_a_custom_delay_curve():
+    # A curve entirely OUTSIDE resupply.py's own default 1-10 day range -
+    # if the custom delay_days/delay_weights weren't actually threaded
+    # through, every arrived_date would still land within that default
+    # range, which this test would never observe over enough seeds.
+    custom_days = np.array([15, 20])
+    custom_weights = np.array([0.5, 0.5])
+    delivery_date = date(2026, 9, 1)
+
+    saw_a_custom_range_delay = False
+    for seed in range(30):
+        attempts = list(run_delivery_chain(
+            StubProvider(), delivery_date, seed=seed, id_offset=0,
+            n_rows=10, first_severity="red", previous_row_count=None,
+            delay_days=custom_days, delay_weights=custom_weights,
+        ))
+        if len(attempts) > 1:
+            gap = (attempts[1].arrived_date - delivery_date).days
+            assert gap >= 15, f"seed={seed}: resupply arrived after only {gap} calendar days, outside the custom curve"
+            saw_a_custom_range_delay = True
+    assert saw_a_custom_range_delay, "no seed in this range produced a resupply to actually check the custom curve"
 
 
 def test_always_red_chain_terminates_at_max_attempts(monkeypatch):
@@ -163,7 +222,7 @@ def test_same_seed_produces_identical_chain():
         assert a.arrived_date == b.arrived_date
         assert a.is_resupply == b.is_resupply
         assert a.severity == b.severity
-        pd.testing.assert_frame_equal(a.df.reset_index(drop=True), b.df.reset_index(drop=True))
+        pd.testing.assert_frame_equal(a.payload.reset_index(drop=True), b.payload.reset_index(drop=True))
 
 
 def _fake_attempt(attempt_number, arrived_date, is_resupply, severity, n_rows=5):

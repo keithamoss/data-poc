@@ -228,13 +228,16 @@ things move) before building.
 ## Also flagged, queued separately (not part of the "running thoughts"
 batch above, but landed in the same conversation)
 
-- **Child Protection resupplies**: CP's generator has zero resupply-
-  chain concept today (confirmed while building item 73's redesign,
-  `generator/generate_cp_runs.py` - pure periodic full-collection
-  snapshots, no resupply simulation at all - see
-  `plans/conceptual-design.md` Thread A). Keith wants to add realistic
-  CP resupplies too. Explicitly sequenced: "once you're done with this
-  loop" - not urgent, but real, queued work, not just an idea.
+- **Child Protection resupplies** - **[built, 2026-09-18]** CP's
+  generator had zero resupply-chain concept (confirmed while building
+  item 73's redesign, `generator/generate_cp_runs.py` - pure periodic
+  full-collection snapshots, no resupply simulation at all - see
+  `plans/conceptual-design.md` Thread A). Picked up once the loop this
+  was sequenced after actually wrapped. See `plans/qa-pipeline.md` item
+  81 for the full build (CP-specific delay curve, an extra earlier red
+  delivery, `generator/resupply.py` genericized to a multi-table
+  payload, a real churn bug found and fixed the same day) - real CP
+  resupply chains now visible in the live dashboard's supply-history UI.
 - **CI monitoring shouldn't block the loop**: amended in CLAUDE.md's own
   standing convention (the "check real CI" bullet) rather than logged
   here - a process fix, not a project idea.

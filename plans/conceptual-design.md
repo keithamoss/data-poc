@@ -77,13 +77,24 @@ from real, publicly-observable facts (when did a file arrive, was it
 red/amber/green), the same two facts a real production dashboard would
 actually have.
 
-Applies equally to Child Protection, which has zero resupply-chain
-concept in its generator today (`generator/generate_cp_runs.py` - pure
-periodic full-collection snapshots, no resupply simulation at all) - the
-new model needs nothing dataset-specific to work there: it would just
-never find an open chain to continue, since CP's synthetic runs don't
-currently simulate a red-then-refixed sequence. Nothing about the model
-assumes BDM-only.
+Applies equally to Child Protection - confirmed for real, not just in
+principle, once CP actually got its own resupply simulation
+(2026-09-18, plans/qa-pipeline.md item 80/queued in plans/running-
+thoughts.md as "CP resupply simulation"): `generator/generate_cp_runs.py`
+now drives a real red quarterly delivery through `generator/resupply.py`'s
+same generic chain-orchestration engine BDM uses (genericized that same
+day to a `dict[str, pd.DataFrame]` payload, since CP's delivery is a
+whole collection's worth of tables at once, not one DataFrame), on its
+own slower delay curve (a full collection re-extract realistically
+takes longer to correct than a single day's file - Keith's own
+calibration: "2-4 weeks, mostly 1-2," vs BDM's 1-10 business days). The
+dashboard-side model above needed literally zero changes to pick this
+up - exactly the "nothing about the model assumes BDM-only" claim this
+paragraph made before it was actually exercised by a second dataset,
+now verified against real committed CP history (a real chain opens at
+`cp_run_13`/closes at its resupply, another at `cp_run_15`/its own
+resupply, both visible in the real supply-history UI with a real "N
+days since previous" counter).
 
 **Parked, NOT blocking the above.** How should a PERSISTENTLY amber
 dataset be handled? Keith's own words, thinking out loud, ended without
