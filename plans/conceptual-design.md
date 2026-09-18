@@ -14,6 +14,8 @@ it in chat history or force a decision before it's ready.
 
 ## Thread A: resupply-chain modeling (2026-09-17)
 
+**Status:** done (2026-09-17) · **Category:** QA checks & contract
+
 **The tension.** The original resupply-history UI
 (`buildSupplyHistory()` in `dashboard/qa-reporting-dashboard.template.
 html`, plans/qa-pipeline.md items 29/71) grouped a dataset's real run

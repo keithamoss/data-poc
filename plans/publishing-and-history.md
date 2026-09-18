@@ -47,6 +47,8 @@ cadence, some quarterly. Two real problems surfaced:
 
 ## Thread B - committed per-run tool-output files (build first)
 
+**Status:** done (2026-09-16) · **Category:** Pipeline & publishing
+
 **Decision:** each QA run's raw tool output - one file per tool per
 dataset per run (a real dbt run-results file, a real Soda scan result, a
 real Evidently report, etc.) - gets committed to the repo, as-is in each
@@ -114,6 +116,8 @@ stale directory removed. Full account, including the regression tests,
 in `plans/qa-pipeline.md` item 50 - not re-derived here.
 
 ## Thread D - check lifecycle: retirement + definition changes (build together with B)
+
+**Status:** done (2026-09-16) · **Category:** QA checks & contract
 
 Originally item 27 (parked), pulled forward once Keith realised the
 committed-per-run format in Thread B needs to already accommodate this -
@@ -372,6 +376,8 @@ CHECK_LIFECYCLE = {
 
 ## Thread A - publishing (build after B/D's data format exists)
 
+**Status:** done (2026-09-16) · **Category:** Pipeline & publishing
+
 **Decision: no manual "publish from local" path, in any form** - not a
 routine mechanism, and not even as a break-glass fallback for CI being
 down (Keith's explicit call: "gone entirely - CI is the only path").
@@ -468,6 +474,8 @@ had been specified but not where/how it's actually shown:**
   needs to go further back than this feed shows.
 
 ## Thread C - cadence-aware "as of" viewing (build last - depends on B/D)
+
+**Status:** done (2026-09-17) · **Category:** Pipeline & publishing
 
 Daily and quarterly datasets need different framing. Showing "today's"
 dashboard state right after a quarterly refresh would look identical to
@@ -831,6 +839,8 @@ was verified against real regenerated data: `plans/qa-pipeline.md`
 item 65 - not repeated here.
 
 ## Build order
+
+**Status:** done (2026-09-18) · **Category:** Pipeline & publishing
 
 Renumbered/reorganized 2026-09-16 (Keith's own call, for ease of
 reasoning/talking about this work) - each phase still names which
