@@ -1,9 +1,9 @@
 """Tests for dashboard/snapshot_dashboard.py - the "time travel" archiving
-mechanism (plans/wider.md, scoped 2026-09-16). Real requirements this
+mechanism (plans/dashboard.md #5, scoped 2026-09-16). Real requirements this
 covers, per that scoping: a snapshot must be byte-for-byte recoverable
 (gzip round-trip integrity - the whole point is a self-contained artifact
 someone can trust years from now), its filename must be safe on Windows
-(plans/wider.md #25's own flag that this needs to run on Windows EC2s
+(plans/wider.md #8's own flag that this needs to run on Windows EC2s
 eventually - no colons), and the SNAPSHOT_DASHBOARD=1 gate must actually
 gate (off by default, since this PoC has no real "scheduled run" vs.
 "developer iterating" distinction to key off automatically)."""

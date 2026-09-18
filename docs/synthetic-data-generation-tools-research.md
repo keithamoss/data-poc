@@ -1,7 +1,7 @@
 # Research: tools for realistic, population-scale, multi-decade synthetic data
 
-Research pass done in response to Keith digging into `plans/wider.md`'s
-synthetic-data-realism item — specifically the question "are there
+Research pass done in response to Keith digging into `plans/data-
+generation.md` #4 — specifically the question "are there
 existing Python (or other-language) libraries genuinely built for
 population-scale, multi-decade synthetic data generation, rather than
 what this project's `synthetic_data_generator/` hand-rolled?"
@@ -18,8 +18,8 @@ comments claim is "lifelong" can structurally never reach an adult.
 ## A genuinely useful side-discovery first
 
 `generator/names_au.py`'s own docstring (imported by `synthetic_data_generator/`
-from there, not a separate copy - see `plans/wider.md`'s package-layout
-entry) says the name/geo pools were hand-authored because there was "no
+from there, not a separate copy - see `plans/publishing-and-history.md`
+#3) says the name/geo pools were hand-authored because there was "no
 Faker/pip access in this environment" at the time of the original build.
 **That constraint no longer holds** — this session has full PyPI access (confirmed installing
 dbt-core, Soda Core, datacontract-cli, Evidently earlier in this

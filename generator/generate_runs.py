@@ -26,7 +26,7 @@ generic and knowing nothing about how a dataset's rows are made. This
 module only supplies the Birth-Registrations-specific half: a
 DatasetProvider wrapping daily_batch.py/dirty.py, plus this dataset's own
 churn (small add/modify/remove drift between attempts). See
-plans/wider.md #13 for why this split exists - the anticipated future
+plans/publishing-and-history.md #2 for why this split exists - the anticipated future
 replacement of daily_batch.py (per
 docs/synthetic-data-generation-tools-research.md) only has to implement a
 new DatasetProvider, not touch the resupply logic at all.
@@ -35,7 +35,7 @@ Scope, deliberately: this is a GENERATOR-LAYER change only.
 qa_tools/*/*.py, both dashboard builders, and the dashboard UI all still
 assume "one manifest entry = one calendar day" and have NOT been updated
 to understand attempt chains - that mismatch is intentional (see
-plans/wider.md's synthetic-data-realism item), left as the concrete input
+plans/data-generation.md #4), left as the concrete input
 for designing what the reporting UI actually needs once delivery timing
 has no fixed rate, rather than guessed at up front.
 
@@ -71,7 +71,7 @@ ID_BLOCK = 100_000  # per-delivery id_offset spacing - well above any single del
 # the default view. 120 gives genuine margin beyond the 60-day offset,
 # not just enough to scrape by - Keith's own words: "this will mean an
 # occasional regeneration, but that's fine." Originally deepened from
-# ~10 to 60 deliveries on 2026-09-16 too - see plans/wider.md's
+# ~10 to 60 deliveries on 2026-09-16 too - see plans/dashboard.md #5's
 # "deepening simulated history" follow-up, done together with widening
 # Child Protection's cadence to quarterly since the two were explicitly
 # parked as one piece of work) - same ~60/20/20 clean/amber/red ratio as

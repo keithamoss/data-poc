@@ -61,7 +61,7 @@ name: Build, validate, and publish the dashboard
 # is now a rebuild-from-qa_results/ exercise (deterministic, same
 # pipeline this job itself runs) or a look at Pages' own deployment
 # history, not a `git log -p` on this file. dashboard/snapshots/*.html.gz
-# (plans/wider.md #26) is unaffected either way - a separate, deliberate
+# (plans/dashboard.md #5) is unaffected either way - a separate, deliberate
 # point-in-time archive mechanism, not sourced from this decision at all.
 #
 # This job touches ONLY committed files - no data of any kind, real or
@@ -96,7 +96,7 @@ name: Build, validate, and publish the dashboard
 # CURRENT working tree's test files.
 #
 # Also still decompresses every dashboard/snapshots/*.html.gz into
-# _site/snapshots/*.html at deploy time - plans/wider.md #26's "time
+# _site/snapshots/*.html at deploy time - plans/dashboard.md #5's "time
 # travel" picker - via dashboard/snapshot_dashboard.py --prepare-site,
 # the same code local developers run (sync_local_snapshots(), wired
 # into every ./run_pipeline.sh). Unlike before, this now runs through

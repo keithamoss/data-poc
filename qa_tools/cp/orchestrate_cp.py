@@ -17,7 +17,7 @@ exists - run that first if it doesn't. Builds data/cp_duckdb_runs/ itself
 via build_cp_warehouses.build_all().
 
 Run as `python3 -m qa_tools.cp.orchestrate_cp` (this is a package
-now, not a flat script directory - see plans/wider.md #20).
+now, not a flat script directory - see plans/qa-pipeline.md #84).
 """
 from __future__ import annotations
 import json

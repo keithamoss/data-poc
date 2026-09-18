@@ -3,7 +3,7 @@
 Synthetic data generation for this PoC - `generator/` (Birth
 Registrations, event-flow, daily deliveries) and `synthetic_data_
 generator/` (a separate, population-scale, cross-agency-identity-linked
-generator, not currently wired into the pipeline - see `plans/wider.md`).
+generator, not currently wired into the pipeline - see item #3 below).
 Split out of `plans/wider.md` 2026-09-18 (that file had become an
 undifferentiated 32-item dump spanning unrelated topics; see `plans/
 wider.md`'s own intro for the full account of the split and `plans/

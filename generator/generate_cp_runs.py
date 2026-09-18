@@ -4,7 +4,7 @@ data/cp_raw/ - the "whole collection" counterpart to generate_runs.py's
 daily birth-registrations feed.
 
 Deliberately a different generation model from generate_runs.py, by design
-(see plans/wider.md action 2 and the AskUserQuestion decisions that shaped
+(see plans/dashboard.md #1 and the AskUserQuestion decisions that shaped
 this): Child Protection isn't a daily event feed, it's a periodic full
 extract of the same underlying casework collection - the population and
 the Child Protection tables are built ONCE (fixed seed), then re-extracted
@@ -123,7 +123,7 @@ _CP_DELAY_WEIGHTS = _CP_DELAY_WEIGHTS / _CP_DELAY_WEIGHTS.sum()
 # discussion: "1 February being the expected date of supply, then
 # working forwards in three month increments from there" - replacing
 # the previous CALENDAR-quarter anchor, Jan/Apr/Jul/Oct 1, set
-# 2026-09-16 - see plans/wider.md's cadence-widening notes for that
+# 2026-09-16 - see plans/dashboard.md #5's cadence-widening notes for that
 # still-accurate earlier history: weekly -> quarterly, 10 -> 16 runs,
 # 3 -> 4 years deep). This is a RE-ANCHOR of an already-quarterly
 # cadence, not a weekly-to-quarterly conversion - only the day-of-quarter

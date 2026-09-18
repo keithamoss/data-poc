@@ -15,7 +15,7 @@ reimplementation of dbt's test logic, this genuinely shells out to the
 parsing are shared with run_dbt_cp.py via
 qa_tools/common/dbt_common.py; everything below is genuinely
 dataset-specific (which tests exist, what they mean, a real dbt-duckdb
-reliability workaround this dataset needed) - see plans/wider.md #20.
+reliability workaround this dataset needed) - see plans/qa-pipeline.md #84.
 
 A REAL, confirmed dbt-core reliability problem, not assumed - and, as of
 2026-09-15, actually root-caused (see plans/qa-pipeline.md #34 for the

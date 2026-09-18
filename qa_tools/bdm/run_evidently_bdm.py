@@ -7,7 +7,7 @@ not a reimplementation of PSI. PSI computation itself is shared with
 run_evidently_cp.py via qa_tools/common/evidently_common.py - the
 row-count-growth check below is birth-registrations-specific (Child
 Protection's periodic-snapshot extract doesn't have the same "should
-mostly grow" expectation an event feed does) - see plans/wider.md #20.
+mostly grow" expectation an event feed does) - see plans/qa-pipeline.md #84.
 
 Genuine finding from running the real tool, not assumed: Evidently's PSI
 computation treats every DISTINCT VALUE actually observed in the column as

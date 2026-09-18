@@ -10,7 +10,7 @@ Run once per run against its own per-run CP DuckDB file
 (qa_tools/cp/build_cp_warehouses.py) - same rationale as
 run_soda_bdm.py. Threshold parsing and failing-row sample capture
 (CaptureSampler - see soda_common.py and run_soda_bdm.py's own docstring)
-shared via qa_tools/common/soda_common.py - see plans/wider.md #20.
+shared via qa_tools/common/soda_common.py - see plans/qa-pipeline.md #84.
 """
 from __future__ import annotations
 import os

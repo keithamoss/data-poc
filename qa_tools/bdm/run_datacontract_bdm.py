@@ -7,7 +7,7 @@ per-run DuckDB file is needed here the way dbt/Soda needed one.
 
 The "local_test" server construction and DataContract.test() call are
 shared with run_datacontract_cp.py via
-qa_tools/common/datacontract_common.py - see plans/wider.md #20.
+qa_tools/common/datacontract_common.py - see plans/qa-pipeline.md #84.
 
 Getting this contract to lint/test at all required fixing real, structural
 mismatches between the original contract and actual ODCS v3, only visible

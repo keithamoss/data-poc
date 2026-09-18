@@ -1,8 +1,8 @@
 """
 Archives the fully-embedded dashboard/qa-reporting-dashboard.html as a
 gzipped, timestamped, self-contained snapshot in dashboard/snapshots/ -
-the "time travel" build (plans/wider.md, scoped 2026-09-16 across several
-rounds of AskUserQuestion with Keith before any code was written).
+the "time travel" build (plans/dashboard.md #5, scoped 2026-09-16 across
+several rounds of AskUserQuestion with Keith before any code was written).
 
 Scoping recap, since the design choices here aren't obvious from the code
 alone:
@@ -116,7 +116,7 @@ def take_snapshot(html_path: Path = DASHBOARD_HTML, snapshots_dir: Path = SNAPSH
     data already baked in by embed_dashboard_data.py) into `snapshots_dir`,
     named `<UTC timestamp>_<git short sha>.html.gz`. The timestamp format
     (`%Y%m%dT%H%M%SZ` - no colons) is deliberately Windows-filesystem-safe,
-    given plans/wider.md #25's own flag that this needs to run on Windows
+    given plans/wider.md #8's own flag that this needs to run on Windows
     EC2s eventually - a colon-bearing ISO-8601 timestamp would work today
     (Linux) but silently become a real problem there.
 

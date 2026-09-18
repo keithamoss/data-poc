@@ -315,7 +315,7 @@ button{font:inherit; color:inherit;}
 
 /* Snapshots ("time travel") panel - opened from the header, independent
    of the column/check drawers above, so it sits above both if any
-   happen to already be open (plans/wider.md #26's picker follow-up). */
+   happen to already be open (plans/dashboard.md #5's picker follow-up). */
 #snapshots-backdrop{z-index:44;}
 #snapshots-panel{z-index:45;}
 .snapshots-btn{background:var(--surface-alt); border:1px solid var(--line); border-radius:999px; padding:6px 14px; font:600 12.5px "Public Sans",sans-serif; color:var(--ink); cursor:pointer; white-space:nowrap;}
@@ -712,7 +712,7 @@ function checkStatus(check){ if(check.current>check.fail) return "red"; if(check
    Family Support > Child Protection), 6 datasets. Computed by
    qa_tools/cp/orchestrate_cp.py against the same four real tools,
    including this collection's cross-table FK/business-rule checks - see
-   plans/wider.md action 2 and plans/qa-pipeline.md for the fuller account.
+   plans/dashboard.md #1 and plans/qa-pipeline.md for the fuller account.
 
    SNAPSHOT_MANIFEST — the "time travel" picker's own bookkeeping
    (dashboard/snapshot_dashboard.py), re-embedded from the real,
@@ -767,7 +767,7 @@ function checkStatus(check){ if(check.current>check.fail) return "red"; if(check
    session had no PyPI access) and merged their output with the real
    tools' - removed once that constraint no longer applied and the
    equivalents had drifted out of sync with newer checks. See
-   plans/wider.md's repo-tidy-up entries for the full history; git
+   plans/wider.md #3 for the full history; git
    history holds the actual code if it's ever needed again.
 
    REQUIREMENTS — item 75's "📐 Requirements" panel (plans/qa-
@@ -2773,7 +2773,7 @@ document.getElementById("check-panel-close").addEventListener("click", closeChec
 // _site/snapshots/ at deploy time specifically for this), but will 404
 // if this dashboard is opened locally via file:// straight from a clone,
 // since dashboard/snapshots/ only ever holds the gzipped originals -
-// known, accepted: this picker's own scoping (plans/wider.md #26) was
+// known, accepted: this picker's own scoping (plans/dashboard.md #5) was
 // explicitly "needs to work on the live public site now", not local
 // convenience: `gunzip dashboard/snapshots/<file>.html.gz` still works
 // for that, same as before this panel existed.
@@ -2782,7 +2782,7 @@ function renderSnapshotsPanel(){
   if(!SNAPSHOT_MANIFEST.length){
     body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
       No snapshots yet — run <code>SNAPSHOT_DASHBOARD=1 ./run_pipeline.sh</code>
-      to archive one (see plans/wider.md's time-travel entry).
+      to archive one (see plans/dashboard.md #5).
     </div>`;
     return;
   }

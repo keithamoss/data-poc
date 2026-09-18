@@ -13,7 +13,7 @@ schema object becomes a real view/table on one shared duckdb connection,
 so a rule on one model can genuinely join to another by its literal name.
 The "local_test" server construction and DataContract.test() call are
 shared with run_datacontract_bdm.py via
-qa_tools/common/datacontract_common.py - see plans/wider.md #20.
+qa_tools/common/datacontract_common.py - see plans/qa-pipeline.md #84.
 
 Each check result's dataset_id comes straight from `c.model` -
 datacontract-cli's own check objects already know which schema object

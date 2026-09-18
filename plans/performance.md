@@ -173,9 +173,9 @@ separate subprocess calls (`dbt run` then `dbt test`).
 
 BDM's manifest grew from 15 to 85 entries (60 scheduled deliveries, up
 from 10) and CP's from 10 to 16 (quarterly instead of weekly - see
-plans/wider.md's history-depth entry). Both real orchestrators were run
-successfully end to end against the new scale (verified in
-plans/wider.md), but no fresh sequential-vs-parallel timing comparison
+plans/dashboard.md #5's history-depth entry). Both real orchestrators
+were run successfully end to end against the new scale (verified in
+plans/dashboard.md #5), but no fresh sequential-vs-parallel timing comparison
 was taken - the #4 parallelism numbers above (45s/36s) are from the
 original, smaller manifests and shouldn't be read as current. Worth a
 real re-measurement if runtime becomes a live concern again at this

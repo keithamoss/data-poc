@@ -1,7 +1,7 @@
 """
 Generic resupply-chain orchestration - the delay/retry/chaining behaviour
 of "a delivery that fails QA gets a resupply some working days later,
-which might itself still be broken" (see plans/wider.md #12 for the
+which might itself still be broken" (see plans/data-generation.md #5 for the
 original scoping, #13 for why this got pulled out of generate_runs.py).
 
 Deliberately knows NOTHING about how a dataset's rows are made. It drives
@@ -142,7 +142,7 @@ def run_delivery_chain(provider: DatasetProvider[T], delivery_date: date, seed: 
     clean, and every red attempt (first or Nth in a row) gets one fresh
     dirty() roll against the current (churned-forward, never-dirtied)
     lineage - still not "a fresh random draw" (churn() still evolves the
-    same underlying rows attempt to attempt, per plans/wider.md #12's own
+    same underlying rows attempt to attempt, per plans/data-generation.md #5's own
     design intent), just never carrying forward another attempt's
     injected defects."""
     clean_payload = provider.generate(delivery_date, seed, n_rows, id_offset)

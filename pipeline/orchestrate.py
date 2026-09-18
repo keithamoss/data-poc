@@ -8,8 +8,7 @@ engines/*.py, built when the original session had no PyPI access. That
 constraint is gone and those engines had already drifted out of sync with
 newer checks (Child Protection, the row-count-growth/freshness checks)
 that were only ever built real-tools-only - so they were removed rather
-than kept half-maintained. See plans/wider.md's repo-tidy-up entries for
-the full history.
+than kept half-maintained. See plans/wider.md #3 for the full history.
 
 What's left here is still a real prerequisite, not a leftover: this
 combined warehouse (one `birth_registrations` table, tagged by run_id) is

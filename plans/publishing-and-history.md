@@ -10,16 +10,17 @@ yet - this file is the scoping record plus an implementation order,
 written because Keith wants to start building against it soon.
 
 This supersedes/extends parts of `plans/wider.md`:
-- Action 25's "how checks output/results get stored in a multi-user
-  environment" parked bullet - this file is the real answer.
-- Item 26's "time travel" snapshot mechanism stays as built (freezing
-  the whole rendered dashboard page) - genuinely different from this
-  file's "as of" viewing (Thread C below), which queries real
-  accumulated history rather than replaying a frozen page. Both are
-  staying in the design; see Thread C for how they relate.
-- Item 27 (check versioning, parked) - folded into this file's Thread D,
-  built together with Thread B rather than as a separate later round,
-  per Keith's own call once the storage format was in scope anyway.
+- `plans/wider.md` #8's "how checks output/results get stored in a
+  multi-user environment" parked bullet - this file is the real answer.
+- `plans/dashboard.md` #5's "time travel" snapshot mechanism stays as
+  built (freezing the whole rendered dashboard page) - genuinely
+  different from this file's "as of" viewing (Thread C below), which
+  queries real accumulated history rather than replaying a frozen page.
+  Both are staying in the design; see Thread C for how they relate.
+- This file's own item #4 (check versioning, superseded) - folded into
+  this file's Thread D, built together with Thread B rather than as a
+  separate later round, per Keith's own call once the storage format was
+  in scope anyway.
 
 ## Why this changes things
 
@@ -518,7 +519,7 @@ intertwined) first.
 below:**
 - **Offset value: 60 days for Child Protection**, Keith's call - set
   now that CP's own real generated cadence is genuinely quarterly (see
-  plans/wider.md's history-depth entry), not picked to paper over the
+  plans/dashboard.md #5's history-depth entry), not picked to paper over the
   old weekly-labeled-as-quarterly mismatch. No offset for Birth
   Registrations (daily asset, always shows the absolute latest, by
   design - unchanged).
@@ -1669,8 +1670,8 @@ removing the commit-back step entirely:**
   `actions/deploy-pages` path truly has no way to avoid a shared-branch
   commit-back step at all, rather than taking that as given - per this
   project's own standing lesson against asserting unverified external
-  facts (see the `astral-sh/setup-uv@v10` pin incident, `plans/wider.md`
-  #29). Researched for real (WebSearch + WebFetch on
+  facts (see the `astral-sh/setup-uv@v10` pin incident, this file's own
+  item #5). Researched for real (WebSearch + WebFetch on
   `github.com/actions/deploy-pages`, since `docs.github.com` is blocked
   by this environment's network proxy): **the earlier framing was
   wrong** - `deploy-pages` is already artifact-based and branch-
@@ -2216,7 +2217,7 @@ single answer):
   tests just to hit it (if picked before knowing what's realistic).
 - **`synthetic_data_generator/` stays OUT of scope** - real gap (zero
   coverage), but also currently entirely unused/not wired into the real
-  pipeline (see `plans/wider.md` action 20's own history) - covering
+  pipeline (see `plans/qa-pipeline.md` #84's own history) - covering
   dormant code isn't a good use of this phase. Revisit noted separately
   (see below) rather than silently dropped.
 - **New backend coverage, Keith's own explicit order:**
@@ -2282,7 +2283,7 @@ assuming this order is fixed.
 **Separately parked, not part of Phase 6 itself**: `synthetic_data_
 generator/` test coverage - Keith's own words, "when we come back to
 it, have a note that we should consider adding tests for it." See
-`plans/wider.md`'s own action-items list for the actual parked entry
+`plans/data-generation.md` #8 for the actual parked entry
 (added alongside this scoping pass) rather than duplicating it here.
 
 **Build progress, 2026-09-18** - Keith's own authorization to "keep
@@ -2475,8 +2476,8 @@ plowing through... do all of phase six" without further check-ins:
 **All of Phase 6 is now DONE** (steps 1-6, plus the scoping pass
 itself) - see each step's own write-up above for what was built. What's
 left, if ever revisited: `synthetic_data_generator/` test coverage
-(deliberately parked, not part of Phase 6 - `plans/wider.md`'s own
-action item), and the "deliberately NOT done" `check_dashboard_renders.py`
+(deliberately parked, not part of Phase 6 - `plans/data-generation.md`
+#8), and the "deliberately NOT done" `check_dashboard_renders.py`
 folding question just above.
 
 **Real gap found after the fact, 2026-09-18 (Phase 7) - Keith's own

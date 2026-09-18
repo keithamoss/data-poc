@@ -9,7 +9,7 @@ qa_tools/bdm/run_evidently_bdm.py.
 Same real evidently.Report + evidently.presets.DataDriftPreset API, same
 per-distinct-observed-value PSI binning behaviour documented there. PSI
 computation shared via qa_tools/common/evidently_common.py - see
-plans/wider.md #20.
+plans/qa-pipeline.md #84.
 """
 from __future__ import annotations
 import os

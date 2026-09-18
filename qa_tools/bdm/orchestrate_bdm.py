@@ -20,7 +20,7 @@ file's docstring for why it's still needed) and data/duckdb_runs/*.duckdb
 already exist - run ./run_pipeline.sh first if they don't.
 
 Run as `python3 -m qa_tools.bdm.orchestrate_bdm` (this is a package
-now, not a flat script directory - see plans/wider.md #20).
+now, not a flat script directory - see plans/qa-pipeline.md #84).
 """
 from __future__ import annotations
 import json

@@ -24,7 +24,7 @@ relative, not a schedule — this is weeks of work, not months.
    percentage, plus independent re-verification in
    `qa_tools/bdm/run_dbt_bdm.py`. **Follow-up:** build a minimal standalone
    repro (no dbt project, just the SQL pattern) and file it upstream
-   against `duckdb-labs/dbt-duckdb`; `plans/wider.md` #3/#4 (CI, Postgres)
+   against `duckdb-labs/dbt-duckdb`; `plans/publishing-and-history.md` #1/`plans/wider.md` #1 (CI, Postgres)
    might also shed light on this without extra effort.
 
 2. **[open, medium]** `soda-core-duckdb`'s `duckdb<1.1.0` pin isn't a
@@ -66,7 +66,7 @@ relative, not a schedule — this is weeks of work, not months.
    `evidently_engine.py` collapsed everything outside {M,F,X} into one
    `_other` bucket. Both were valid; documented, never reconciled - moot
    now that `engines/*.py` (including `evidently_engine.py`) was removed
-   entirely (see `plans/wider.md` action 18) and there's no more
+   entirely (see item #83 above) and there's no more
    equivalent to reconcile against. Left here as historical record, not
    an active item.
 
@@ -74,13 +74,13 @@ relative, not a schedule — this is weeks of work, not months.
    `type: sql` rule handling (added when the contract was rewritten to
    real ODCS vocabulary) used a temp-view + string-replace to scope each
    SQL rule to one run's rows - worked, but was fragile, equivalent-only
-   tech debt. Moot now that the file itself is gone (see `plans/wider.md`
-   action 18). Left here as historical record, not an active item.
+   tech debt. Moot now that the file itself is gone (see item #83
+   above). Left here as historical record, not an active item.
 
 6. **[open, low]** The two-step `pip install` requirement is only half
    fixed: `uv sync --dev` now resolves everything in one step
-   (`pyproject.toml`'s `[tool.uv] override-dependencies`, see action 19 in
-   `plans/wider.md`), but a plain `pip install .` still needs the old
+   (`pyproject.toml`'s `[tool.uv] override-dependencies`, see `plans/
+   wider.md` #6), but a plain `pip install .` still needs the old
    two-step dance (`pip` has no equivalent override mechanism) - see
    README's install note. Worth a periodic recheck as
    `dbt-duckdb`/`soda-core-duckdb`/`datacontract-cli` release new
@@ -112,7 +112,7 @@ relative, not a schedule — this is weeks of work, not months.
    controlled violation — confirmed for real and triangulated again across
    all three tools: 0 clean / 3 amber / 17 red (placement/carer) and
    0 clean / 1-3 amber / 6 red (closed-case hygiene). `data/cp_raw/` was
-   regenerated; `plans/wider.md` #2's row-count calibration in the
+   regenerated; `plans/dashboard.md` #1's row-count calibration in the
    contract was rechecked and didn't need changes (row counts are
    unaffected by the fix, only which values land in `carer_id`/
    `case_status`/`end_date`).
@@ -424,7 +424,7 @@ relative, not a schedule — this is weeks of work, not months.
     already identifies the real mechanism for this: Great Expectations'
     `unexpected_index_list` (or a Pandera boolean mask) gives real
     row-level output, but GX isn't currently one of this pipeline's wired
-    tools. See `plans/wider.md` #14 - worth pursuing together: if GX gets
+    tools. See item #82 below - worth pursuing together: if GX gets
     evaluated as a comparison tool, its row-level output is the concrete
     reason to actually wire it in rather than just compare it on paper,
     and would let the check-detail panel (item 14 above) show real
@@ -454,7 +454,7 @@ relative, not a schedule — this is weeks of work, not months.
       row-level concept (unexpected_index, failed_rows, row ids) and
       found nothing, consistent with its actual role here (drift/
       row-count-growth, not per-column validity).
-    This meaningfully changes GX's case in `plans/wider.md` #14 - GX's
+    This meaningfully changes GX's case in item #82 below - GX's
     `unexpected_index_list` is no longer the only path to this, which was
     its main selling point for this specific use case; downgraded there
     accordingly.
@@ -675,8 +675,8 @@ relative, not a schedule — this is weeks of work, not months.
       `pipeline/`, and `synthetic-data-generator/` (hyphens renamed -
       that turned out to be *why* the hacks existed, not just untidiness)
       are now real Python packages with real absolute imports and zero
-      `sys.path` manipulation anywhere - see `plans/wider.md`'s
-      package-layout entry (action 21) for the full change, including a
+      `sys.path` manipulation anywhere - see `plans/publishing-and-
+      history.md` #3 for the full change, including a
       second, undrifted duplicate (`names_au.py`/`presentation.py`) this
       surfaced along the way. Caught loud this time (the new
       `apply_cp_clients_presets` function simply didn't exist in the
@@ -1063,8 +1063,8 @@ relative, not a schedule — this is weeks of work, not months.
     for this PoC going forward, independent of whether ODCS/datacontract-
     cli specifically is what this project ends up standardising on.
     Keith's call, 2026-09-15: keep this as a first-class requirement of
-    the PoC itself - if ODCS gets dropped or replaced later (see item 22
-    of `plans/wider.md`, the ODCS-bridge-tooling question, and the
+    the PoC itself - if ODCS gets dropped or replaced later (see item #85
+    below, the ODCS-bridge-tooling question, and the
     17%-SQL-escape-hatch concern in item 20 above), whatever replaces it
     still needs a real per-column sensitivity tag and the same
     "suppress values, keep counts" behaviour this project already built
@@ -1659,7 +1659,7 @@ relative, not a schedule — this is weeks of work, not months.
     raw/manifest.json`, yet their actual CSVs have ~78-89% `place_of_
     birth_facility` nulls and invalid `sex` codes (`U`/`O`/`9`) - numbers
     that match RED-severity injection, not a clean run. This directly
-    contradicts `plans/wider.md` action 12's own account of the
+    contradicts `plans/data-generation.md` #5's own account of the
     resupply-chain feature ("the corrected... resupply arrives"; "a real
     per-attempt retry chance rather than 'one resupply always fixes
     it'" - the design intent is clearly that a resolved attempt IS
@@ -1682,7 +1682,7 @@ relative, not a schedule — this is weeks of work, not months.
     attempt's already-dirtied dataframe. This was the recommended option
     over "regenerate a genuinely fresh clean draw via `provider.
     generate()` again on resolution" specifically because it preserves
-    `plans/wider.md` action 12's own design intent ("largely the same
+    `plans/data-generation.md` #5's own design intent ("largely the same
     rows... not a fresh random draw") while still fixing the defect-
     carryover bug - churn() still evolves the same underlying rows
     attempt to attempt, it just never inherits another attempt's
@@ -2441,7 +2441,7 @@ relative, not a schedule — this is weeks of work, not months.
     dashboard.html` - Playwright end-to-end tests and/or frontend unit
     tests - Keith's own framing: "if we stay with our hand-rolled
     reporting solution, we'd definitely want" this. Explicitly
-    conditional on `plans/wider.md` action 9's still-open question
+    conditional on `plans/dashboard.md` #3's still-open question
     (hand-rolled dashboard vs. Streamlit/Power BI/etc.) resolving toward
     "keep hand-rolling it" - not worth building against a UI that might
     get replaced.

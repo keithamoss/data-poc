@@ -8,7 +8,7 @@ contract file and which local CSV path get used differs.
 DIMENSION_BY_METRIC/LABEL_BY_METRIC happen to be identical across both
 existing datasets too (the same ODCS metric names mean the same thing
 everywhere) - shared for that reason, not because they're subprocess/API
-plumbing like the rest of this module. See plans/wider.md #20.
+plumbing like the rest of this module. See plans/qa-pipeline.md #84.
 """
 from __future__ import annotations
 import copy

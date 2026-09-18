@@ -14,7 +14,7 @@ data/cp_duckdb_runs/ (qa_tools/cp/build_cp_warehouses.py) - same
 per-run-warehouse rationale as run_dbt_bdm.py's docstring.
 Subprocess invocation and manifest parsing are shared with
 run_dbt_bdm.py via qa_tools/common/dbt_common.py - see
-plans/wider.md #20.
+plans/qa-pipeline.md #84.
 
 Which of the 6 CP tables a test result belongs to (for the dashboard's
 dataset_id) comes from dbt's own `attached_node` on the test's manifest

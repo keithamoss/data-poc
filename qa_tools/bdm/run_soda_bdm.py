@@ -9,7 +9,7 @@ Run once per run against its own per-run DuckDB file (same rationale as
 qa_tools/bdm/run_dbt_bdm.py - the checks file has no run_id-scoped
 `where`, so the daily-batch reality is one file per day, one scan per
 day). Threshold parsing shared with run_soda_cp.py via
-qa_tools/common/soda_common.py - see plans/wider.md #20.
+qa_tools/common/soda_common.py - see plans/qa-pipeline.md #84.
 
 Genuine, real finding from actually running this (documented in README.md,
 not "fixed" away): the `filter birth_registrations [recent]: where:

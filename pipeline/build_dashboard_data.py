@@ -18,8 +18,8 @@ original session had no PyPI access. Those engines were removed once that
 constraint no longer applied and they'd drifted out of sync with newer
 checks that were only ever built real-tools-only - results_bdm.json
 alone is now a complete superset (824 checks vs. the old equivalent
-path's 630), so the merge logic is gone too. See plans/wider.md's
-repo-tidy-up entries for the full history.
+path's 630), so the merge logic is gone too. See plans/wider.md #3
+for the full history.
 
 Output: reports/birth_registrations_dashboard.json, embedded into the HTML
 by embed_dashboard_data.py as a JS const.
@@ -47,7 +47,7 @@ ENGINE_SHORT = {
     # Same short-name convention as build_cp_dashboard_data.py's own
     # ENGINE_SHORT for these 4 tags. No "(real)" suffix on the tag itself
     # any more - there's nothing left to distinguish it from since
-    # engines/*.py was removed (see plans/wider.md #20's follow-up).
+    # engines/*.py was removed (see plans/qa-pipeline.md #84's follow-up).
     "dbt-core 1.12 + dbt-duckdb": "dbt-core",
     "Soda Core 3.5": "Soda Core",
     "datacontract-cli 1.2.0": "datacontract-cli",

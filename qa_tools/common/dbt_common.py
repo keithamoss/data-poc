@@ -8,7 +8,7 @@ dataset's own file - only the subprocess invocation and
 manifest.json/run_results.json parsing plumbing that's identical across
 datasets lives here. Split out once a second dataset (Child Protection)
 confirmed the same ~30-40 lines really were identical, rather than
-guessed in advance - see plans/wider.md #20.
+guessed in advance - see plans/qa-pipeline.md #84.
 """
 from __future__ import annotations
 import os

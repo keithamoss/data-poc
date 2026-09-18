@@ -74,7 +74,7 @@ dashboard as a self-contained "time travel" snapshot
 (`dashboard/snapshots/<UTC timestamp>_<git short sha>.html.gz`) — a real,
 independently-openable-with-just-a-browser copy of the whole dashboard as
 it looked at that moment, for later audit/incident-debugging purposes
-(`plans/wider.md`). Off by default: `./run_pipeline.sh` doubles as both a
+(`plans/dashboard.md` #5). Off by default: `./run_pipeline.sh` doubles as both a
 genuine data-refresh run and a developer iterating on the dashboard's own
 code, and only the former should get archived — see
 `dashboard/snapshot_dashboard.py`'s own docstring for the full scoping
@@ -129,7 +129,7 @@ could find (see "Known simplifications and honest disagreements" below).
 `engines/*.py` was kept for a while as a documented, dependency-free
 fallback, but it had already drifted out of sync with newer checks (Child
 Protection, several checks built real-tools-only) by the time it was
-removed — see `plans/wider.md`'s repo-tidy-up entries for the full history.
+removed — see `plans/wider.md` #3 for the full history.
 Git history holds the actual code if it's ever needed again as a reference.
 
 ## Layout
@@ -274,7 +274,7 @@ picker's default view landed one day before this dataset's own
 earliest real run - see `plans/publishing-and-history.md` Thread C and
 `plans/qa-pipeline.md` item 55 for the full account; deepened from an
 original 10-delivery/~10-day plan on 2026-09-16 before that - see
-`plans/wider.md`'s history-depth entry): seventy-two clean, twenty-four
+`plans/dashboard.md` #5's history-depth entry): seventy-two clean, twenty-four
 deliberately "amber", twenty-four deliberately "red", using `dirty.py`'s
 `apply_birth_registrations_presets()` — calibrated to land exactly inside
 the Soda checks file's own warn/fail bands, not arbitrary noise. The exact
@@ -297,7 +297,7 @@ Keith's team's real practice of requesting a resupply when a file has a
 red failing check, with no single fixed turnaround time. Each subsequent
 attempt gets a business-day-aware delay, a chance of still being red, and
 small organic churn versus a fresh random draw (see that module's own
-docstring and `plans/wider.md` #12/#13 for the full design). The
+docstring and `plans/data-generation.md` #5 / `plans/publishing-and-history.md` #2 for the full design). The
 twenty-four red deliveries going red is what pushes the actual row count
 in `data/raw/` and `manifest.json` from 120 to **176 entries** — each
 attempt gets its own CSV and its own `run_id`, zero-padded to 3 digits
@@ -393,7 +393,7 @@ it end to end rather than assumed:
   column to live on**, so they're grouped under a synthetic
   `(table-level checks)` pseudo-column per dataset rather than a new
   dashboard UI section — a deliberate scope trade-off, see
-  `plans/wider.md` action 2.
+  `plans/dashboard.md` #1.
 
 ## Known simplifications and honest disagreements
 
@@ -539,7 +539,7 @@ held from the original equivalent-only build.
 
 `synthetic_data_generator/` is a separate, larger generator vendored into
 this repo (population-scale, cross-agency identity-linked) - not
-currently wired into the QA pipeline itself (see `plans/wider.md`).
+currently wired into the QA pipeline itself (see `plans/data-generation.md` #3).
 `generator/` (what the pipeline actually uses) doesn't reuse
 `population.py`'s whole-population household model — `generator/
 daily_batch.py` is a purpose-built event-flow generator instead, because a
@@ -559,8 +559,8 @@ that overlapped. That's exactly as fragile as it sounds: `dirty.py`'s two
 copies quietly drifted apart, and Python's own import resolution (both
 directories used to add themselves to `sys.path` with plain `import
 dirty`) picked whichever one happened to be earlier on the path - not
-necessarily the one being edited. See `plans/wider.md`'s package-layout
-entry for the real bug this caused and how it's fixed now: `generator/`,
+necessarily the one being edited. See `plans/publishing-and-history.md`
+#3 for the real bug this caused and how it's fixed now: `generator/`,
 `pipeline/`, and `synthetic_data_generator/` are all real Python packages
 (each has an `__init__.py`), imported with real absolute imports
 (`from generator import dirty`) - no `sys.path` manipulation anywhere in

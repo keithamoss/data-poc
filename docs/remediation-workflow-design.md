@@ -131,7 +131,7 @@ authenticated portal, email-threaded notification with no login, or some
 hybrid. Not really an either/or in practice (most real platforms support
 both at once); the real open variable is how much back-and-forth a
 typical resupply conversation actually needs. Left for the
-project-context walkthrough (`plans/wider.md` #16) to settle, since it's
+project-context walkthrough (`plans/wider.md` #4) to settle, since it's
 a real-world-process question rather than a technical one.
 
 ## What's NOT decided here

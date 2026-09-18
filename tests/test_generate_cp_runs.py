@@ -16,8 +16,8 @@ fix wasn't a smarter sys.path ordering (an earlier attempt at that
 didn't hold up); it was making generator/ and synthetic_data_generator/
 (hyphens renamed to be a real, importable package name) both proper
 Python packages with real absolute imports, and deleting the duplicate
-dirty.py/names_au.py/presentation.py entirely - see plans/wider.md's
-package-layout entry. This test can no longer catch the original bug
+dirty.py/names_au.py/presentation.py entirely - see plans/publishing-
+and-history.md #3. This test can no longer catch the original bug
 (there's only one dirty.py to resolve to now), but still guards against
 the pattern recurring.
 

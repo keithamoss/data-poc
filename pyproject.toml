@@ -42,9 +42,9 @@ override-dependencies = ["duckdb>=1.5"]
 testpaths = ["tests"]
 # Just the repo root - generator/, pipeline/, and synthetic_data_generator/
 # are real packages now (each has an __init__.py), same as qa_tools/ always
-# was (plans/wider.md #20), so everything imports as e.g.
+# was (plans/qa-pipeline.md #84), so everything imports as e.g.
 # `from generator import dirty` / `qa_tools.common.parallel_orchestrate`,
-# not as flat bare-module names. See plans/wider.md's package-layout entry
+# not as flat bare-module names. See plans/publishing-and-history.md #3
 # for why the old per-directory pythonpath entries (and every script's own
 # sys.path.insert hack) are gone.
 pythonpath = ["."]
@@ -52,8 +52,8 @@ pythonpath = ["."]
 [tool.coverage.run]
 # Just the real pipeline source - not tests/ itself, not dbt_project/
 # (dbt-generated), not synthetic_data_generator/ (deliberately out of
-# Phase 6's scope - plans/publishing-and-history.md/plans/wider.md
-# action 32 - dormant/unwired code, not worth a coverage floor yet).
+# Phase 6's scope - plans/publishing-and-history.md/plans/data-
+# generation.md #8 - dormant/unwired code, not worth a coverage floor yet).
 source = ["qa_tools", "pipeline", "generator", "dashboard"]
 
 [tool.coverage.report]

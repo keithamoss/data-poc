@@ -13,7 +13,7 @@ none of those are about a single column; the 7 FK checks land on their own
 FK column instead (e.g. cp_client_id) since "this column's values must
 reference another table" genuinely is a statement about that column. This
 reuses the dashboard's existing column-tile/drawer UI as-is rather than
-adding a new "table-level checks" section - see plans/wider.md action 2
+adding a new "table-level checks" section - see plans/dashboard.md #1
 for why that trade-off was made.
 
 row_count checks (from both Soda and datacontract-cli) are excluded from
