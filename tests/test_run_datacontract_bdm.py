@@ -42,6 +42,20 @@ def test_dirty_run_produces_a_real_failure(monkeypatch, bdm_raw_dir):
     assert failing, "a real red-severity dirty run produced no datacontract-cli failures at all"
 
 
+def test_place_of_birth_facility_keeps_its_real_configured_fail_threshold(monkeypatch, bdm_raw_dir):
+    """Regression test for item 74's Bug B (plans/qa-pipeline.md, found
+    2026-09-18): this check's real rule is `mustBeLessThan: 35` with
+    `severity: error` - the code used to collapse every severity:error
+    rule's fail_threshold to a blanket 0, discarding the real 35%
+    tolerance and making a genuinely passing ~2% null rate read as a
+    dashboard failure on almost every run."""
+    results = _run(monkeypatch, bdm_raw_dir, _REF_RUN_ID, f"{_REF_RUN_ID}.csv", "2026-01-01T06:30:00Z")
+    check = next(r for r in results if r["column_name"] == "place_of_birth_facility"
+                 and r["check_name"] == "datacontract:missing_count")
+    assert check["fail_threshold"] == 35
+    assert check["status"] == "pass"
+
+
 def test_custom_sql_rules_get_their_shared_label(monkeypatch, bdm_raw_dir):
     """3 of the real custom_sql rules (sibling match, timestamp
     ordering, freshness) are the same real-world checks as their dbt/

@@ -33,6 +33,7 @@ import os
 from qa_tools.common.datacontract_common import (
     ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
     run_against_local_server, failing_sample_keys, check_id_from_quality_definition,
+    fail_threshold_from_quality_definition,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
 
@@ -109,7 +110,7 @@ def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str
             "metric_value": value,
             "unit": "%" if is_pct else "count",
             "warn_threshold": None,  # ODCS severity is single-tier - see README.md's known-disagreements section
-            "fail_threshold": 0 if diag.get("severity") == "error" else None,
+            "fail_threshold": fail_threshold_from_quality_definition(c.qualityDefinition, diag.get("severity")),
             "status": {"passed": "pass", "failed": "fail", "warning": "warn"}.get(c.result.value, c.result.value),
             "on_fail_action": "quarantine" if diag.get("severity") == "error" else "flag",
             "row_count_total": row_count_total,

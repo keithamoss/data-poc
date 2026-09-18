@@ -143,21 +143,31 @@ checks for birth_registrations:
   # than "worth a look" to escalate it to).
   - missing_percent(registering_parent_1_name):
       warn: when > 5%
+      fail: when > 15%
       samples limit: 5
       attributes:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.missing_percent_soda
         introduced_date: "2026-01-15"
-        description: "Parent 1's name is expected on most registrations, tolerated null up to ~5%."
-        changelog: []
+        description: "Parent 1's name is expected on most registrations, tolerated null up to ~5%; a rate this high (real observed range: 0.9-3.3%) signals a genuine upstream problem, not normal variation."
+        changelog:
+          - date: "2026-09-18T00:00:00Z"
+            description: "Added a real fail threshold (>15%) - previously warn-only (item 74, plans/qa-pipeline.md): a missing fail threshold silently defaulted to 0 in the dashboard-build code, making this check read red on almost every run despite never being designed to fail at all."
+            author: "Keith Moss"
+            breaking: true
 
   - missing_percent(registering_parent_2_name):
       warn: when > 30%
+      fail: when > 50%
       samples limit: 5
       attributes:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.missing_percent_soda
         introduced_date: "2026-01-15"
-        description: "Parent 2's name is optional - single-parent registrations are common - tolerated null up to ~30%."
-        changelog: []
+        description: "Parent 2's name is optional - single-parent registrations are common - tolerated null up to ~30%; a rate this high (real observed range: 24.8-30.7%) would mean half of all registrations have no second parent recorded, a genuine anomaly, not normal variation."
+        changelog:
+          - date: "2026-09-18T00:00:00Z"
+            description: "Added a real fail threshold (>50%) - previously warn-only (item 74, plans/qa-pipeline.md): a missing fail threshold silently defaulted to 0 in the dashboard-build code, making this check read red on almost every run despite never being designed to fail at all."
+            author: "Keith Moss"
+            breaking: true
 
   # --- The traffic-light example you asked for: sex -----------------------
   # A closed value set that downstream systems depend on. Red/amber here
