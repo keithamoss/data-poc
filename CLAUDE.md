@@ -153,10 +153,24 @@ Rough layout:
   Soda Core/datacontract-cli/Evidently integration tests
   (`tests/test_run_*_{bdm,cp}.py`, against small real fixtures built by
   `tests/conftest.py`'s own session-scoped fixtures) alongside the
-  original fixture-based ones, so the full suite now takes ~2-3 minutes
-  (270 tests as of that pass), not seconds - `pytest-xdist` (parallel
-  test execution) is worth revisiting now that this has actually
-  happened, not just flagged for someday. CI (`.github/workflows/
+  original fixture-based ones, so the full suite takes real minutes now
+  (~2 minutes, 302 tests as of the requirements-register work,
+  2026-09-18 - down from ~2m43s/163s the same day, once `tests/
+  test_generate_runs.py`'s own 6 tests were found - via a real
+  `pytest --durations` profile, Keith's own question about local
+  runtime - to each independently call the real generator fresh
+  (~9s each, ~52s total for identical, deterministic output); now a
+  single `scope="module"` fixture, real ~43s saved for zero coverage
+  loss), not seconds - `pytest-xdist` (parallel test execution) is
+  worth revisiting now that this has actually happened, not just
+  flagged for someday (checked 2026-09-18: not yet installed - the
+  real-tool integration fixtures in `tests/conftest.py` already use
+  per-session `tmp_path_factory` dirs, but whether the real dbt
+  subprocess calls those fixtures make would collide across PARALLEL
+  workers - dbt's own shared `dbt_project/target/` default, the same
+  class of problem `qa_tools/common/parallel_orchestrate.py` had to fix
+  with a `--target-path` per run - hasn't been checked). CI
+  (`.github/workflows/
   test.yml`) runs the full suite with `pytest-cov` on every push and
   enforces `pyproject.toml`'s `[tool.coverage.report] fail_under` - a
   real, measured threshold (not a guessed one - see

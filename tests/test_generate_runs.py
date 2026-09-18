@@ -1,12 +1,25 @@
 """Smoke test for generator/generate_runs.py: runs the real generator (it's
 fast, seeded, and this repo's convention throughout has been to verify by
 actually running things rather than mocking) and checks the resulting
-manifest has the shape everything downstream depends on."""
+manifest has the shape everything downstream depends on.
+
+The real generation itself (generate_runs.main() - writes BDM's full real
+120-delivery/176-run manifest + every real CSV to data/raw/) happens ONCE
+per test session (`manifest` fixture below, module-scoped - deliberately
+NOT a plain module-level call, since pytest needs a real fixture to share
+one real generation run across every test function in this file rather
+than each one triggering its own ~9s regeneration of identical,
+deterministic output - a real, measured ~43s/test-session win found
+2026-09-18 while investigating why the local suite felt slow, not a
+theoretical one). Every test below reads that one shared, real result -
+none of them mutate it, so sharing is safe."""
 from __future__ import annotations
 
 import json
 import os
 from datetime import datetime
+
+import pytest
 
 from generator import generate_runs
 
@@ -14,28 +27,26 @@ RAW_DIR = generate_runs.OUT_DIR
 MANIFEST_PATH = os.path.join(RAW_DIR, "manifest.json")
 
 
-def _generate():
+@pytest.fixture(scope="module")
+def manifest():
     generate_runs.main()
     with open(MANIFEST_PATH) as f:
         return json.load(f)
 
 
-def test_manifest_has_one_entry_per_scheduled_delivery_at_minimum():
-    manifest = _generate()
+def test_manifest_has_one_entry_per_scheduled_delivery_at_minimum(manifest):
     delivery_ids = {e["delivery_id"] for e in manifest}
     assert len(delivery_ids) == len(generate_runs.RUN_PLAN)
 
 
-def test_every_manifest_entry_has_a_real_file_on_disk():
-    manifest = _generate()
+def test_every_manifest_entry_has_a_real_file_on_disk(manifest):
     for entry in manifest:
         path = os.path.join(RAW_DIR, entry["file"])
         assert os.path.exists(path), f"{entry['run_id']}: {path} missing"
         assert os.path.getsize(path) > 0
 
 
-def test_severity_counts_match_run_plan():
-    manifest = _generate()
+def test_severity_counts_match_run_plan(manifest):
     first_attempts = [e for e in manifest if e["attempt_number"] == 1]
     assert len(first_attempts) == len(generate_runs.RUN_PLAN)
 
@@ -51,8 +62,7 @@ def test_severity_counts_match_run_plan():
     assert actual == expected
 
 
-def test_resupply_attempts_only_follow_red_first_attempts():
-    manifest = _generate()
+def test_resupply_attempts_only_follow_red_first_attempts(manifest):
     by_delivery: dict[str, list[dict]] = {}
     for e in manifest:
         by_delivery.setdefault(e["delivery_id"], []).append(e)
@@ -67,16 +77,14 @@ def test_resupply_attempts_only_follow_red_first_attempts():
                 f"{delivery_id} attempt {attempt['attempt_number']} isn't red but chain continued"
 
 
-def test_resupply_arrival_dates_always_fall_on_weekdays():
-    manifest = _generate()
+def test_resupply_arrival_dates_always_fall_on_weekdays(manifest):
     for e in manifest:
         if e["is_resupply"]:
             arrived = datetime.fromisoformat(e["arrived_date"]).date()
             assert arrived.weekday() < 5, f"{e['run_id']} arrived on a weekend: {arrived}"
 
 
-def test_supersedes_chain_is_well_formed():
-    manifest = _generate()
+def test_supersedes_chain_is_well_formed(manifest):
     by_run_id = {e["run_id"]: e for e in manifest}
     for e in manifest:
         if e["supersedes_run_id"] is not None:
