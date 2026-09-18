@@ -2546,5 +2546,318 @@ things neither `pytest` nor `ruff` would ever catch.
   per-run files exist - don't let the two contradict silently.
 - `CLAUDE.md`'s own "read this first" list - add this file alongside
   `plans/wider.md`/`plans/qa-pipeline.md`.
-- `plans/wider.md` items 25/26/27 - short pointers added to this file
-  rather than duplicating the design there.
+- `plans/wider.md` #8 (was #25) and `plans/dashboard.md` #5 (was #26) -
+  short pointers added to this file rather than duplicating the design
+  there. (Old #27 itself moved fully into this file - see #4 below.)
+
+## Related open items
+
+Redistributed from `plans/wider.md` as part of that file's 2026-09-18
+split (see that file's own intro for the full account, and `plans/
+running-thoughts.md` item #10 for the status/category schema these
+items' tags follow) - pipeline/publishing concerns that had accumulated
+there rather than being scoped here from the start. Status values:
+`todo` / `investigate` / `in-progress` / `parked` / `done` /
+`superseded`. Every item also carries a Component tag - see `plans/
+running-thoughts.md` item #10 for the shared taxonomy this and
+`CHANGELOG.md` both use. IDs (`publishing-and-history-N`, referenced
+elsewhere as `plans/publishing-and-history.md #N`) are permanent once
+assigned - never renumbered or reused, even if an item is later
+retired, matching `qa_tools/common/check_lifecycle.py`'s own `check_id`
+convention. Numbered independently from this file's own Thread/Phase
+structure above - these are discrete open questions, not part of any
+one Thread's narrative.
+
+1. **[todo, medium]** **[Pipeline & publishing]** No CI. Nothing re-runs
+   `qa_tools/bdm/orchestrate_bdm.py` against upstream tool releases, so a
+   `dbt-core`/`soda-core-duckdb`/`datacontract-cli`/`evidently` update
+   could silently break this and we wouldn't know. A scheduled job (even
+   a simple cron/GitHub Action) that runs the real pipeline and diffs
+   against `reports/results_real.json` would catch regressions early —
+   including possibly resolving or changing the dbt-duckdb bug
+   (`plans/qa-pipeline.md` #1) on its own. If this happens, revisit
+   `plans/performance.md` #4/#5 (parallelizing the ~2.5min runs) — worth
+   the complexity for something that runs on a schedule in a way it
+   isn't for an occasional manual run.
+
+2. **[done, 2026-09-14]** **[Data generation]** Separate "resupply
+   orchestration" from "synthetic data creation per dataset" as a
+   distinct architectural concern. Raised by Keith right after `plans/
+   data-generation.md` #5 landed, prompted by two things landing at
+   once: `generate_runs.py`'s new attempt-chain loop (`plans/data-
+   generation.md` #5) is currently entangled directly with
+   `daily_batch.py`'s specific generation API (`main()` calls
+   `generate_daily_batch()` and `apply_birth_registrations_presets()`
+   directly; `_churn_rows()` itself calls `generate_daily_batch()` again
+   to manufacture "missing rows that should have been in the original
+   file"), and `plans/data-generation.md` #4's research doc (`docs/
+   synthetic-data-generation-tools-research.md`) makes a real case that
+   the underlying generator (`daily_batch.py`, and/or `population.py`'s
+   wider household model) may itself get replaced later (Faker/Mimesis
+   name pools, ABS-calibrated IPF structure, possibly a real dynamic
+   microsimulation engine like `neworder`/LIAM2). If the resupply-chain
+   logic (delay distribution, retry/still-red probability, MAX_ATTEMPTS,
+   manifest bookkeeping, delivery/attempt ID scheme) stays welded to
+   `daily_batch.py`'s specific function signatures, swapping the
+   generator later means rewriting the resupply logic too, not just the
+   generation calls.
+
+   **Draft architecture sketch** (not agreed, not built — the actual
+   design should follow from the questions below): the orchestration
+   loop in `generate_runs.py` doesn't actually need to know anything
+   about *how* a dataset's rows are made — it only needs three
+   operations to exist for whatever dataset it's driving: (1) generate
+   an initial attempt's rows for a given date/seed/row-count/id-offset,
+   optionally dirtied to a severity; (2) churn an existing attempt's
+   rows forward (small add/modify/remove deltas) to produce the next
+   attempt's starting point; (3) (re-)apply a dirty preset at a given
+   severity to an existing attempt's rows. That's close to a `Protocol`/
+   duck-typed "dataset provider" shape — e.g. `generate(date, seed,
+   n_rows, id_offset) -> DataFrame`, `churn(df, seed, run_date,
+   id_offset) -> DataFrame`, `dirty(df, severity, seed,
+   previous_row_count) -> DataFrame` — with `daily_batch.py` +
+   `dirty.py`'s existing Birth-Registrations-specific functions becoming
+   the first (and for now, only) implementation plugged into it.
+   Everything that's genuinely about *resupply behaviour* rather than
+   *row content* (the business-day delay curve, STILL_RED_PROB,
+   MAX_ATTEMPTS, the delivery_id/attempt_number/supersedes_run_id
+   manifest shape) would move to a module that takes a provider as a
+   parameter, rather than living inside a birth-registrations-specific
+   script. Genuinely open, not yet decided: whether "churn" is really a
+   resupply-orchestration-level concept at all (same shape for every
+   dataset) or a dataset-specific concern that belongs behind the
+   provider interface too — churn was designed once, for Birth
+   Registrations' specific columns (`extract_timestamp` nudging), and
+   may not generalise as-is.
+
+   **Scoped via 4 questions, then built** (all recommended answers): do
+   the split now as prep rather than waiting for a second generator to
+   exist; churn stays behind the provider (it's dataset-specific column
+   knowledge, not resupply scheduling); Birth Registrations only for
+   now, not designed around Child Protection too; lands in a new shared
+   module rather than staying inline in `generate_runs.py`.
+
+   `generator/resupply.py` (new) now owns everything that's genuinely
+   about resupply *behaviour*: `MAX_ATTEMPTS`, `STILL_RED_PROB`, the
+   business-day delay distribution, `_add_business_days`, and
+   `run_delivery_chain()` - a generator that walks one delivery through
+   its full attempt chain and yields each `Attempt` (number, arrival
+   date, severity, rows), knowing nothing about how those rows were
+   made. It's driven by a `DatasetProvider` protocol - `generate()`,
+   `dirty()`, `churn()` - three operations any dataset's generator needs
+   to support to get resupply simulation "for free." `generator/
+   generate_runs.py` is now a thin script: a `BirthRegistrationsProvider`
+   class wrapping `daily_batch.py`'s `generate_daily_batch()` and
+   `dirty.py`'s `apply_birth_registrations_presets()` (churn's
+   implementation moved here unchanged, since it's
+   Birth-Registrations-specific - `extract_timestamp` nudging, calling
+   `generate_daily_batch()` for "missing" rows), plus a `main()` that
+   just writes CSVs/builds manifest entries from what
+   `run_delivery_chain()` yields. A future replacement generator (per
+   `plans/data-generation.md` #4's research doc) only has to write a new
+   provider class: `resupply.py` and its chain logic don't change.
+
+   **Verified, not assumed**: regenerated the full 10-delivery/
+   15-attempt batch after the refactor and diffed `manifest.json`
+   against the pre-refactor version byte-for-byte - identical (same
+   delivery_06 3-attempt and delivery_09 4-attempt chains, same arrival
+   dates, same row counts), confirming the split is behaviour-preserving,
+   not just a plausible-looking rewrite.
+
+3. **[done]** **[Pipeline & publishing]** `generator/`, `pipeline/`, and
+   `synthetic_data_generator/` got the same treatment `plans/qa-
+   pipeline.md` #84 gave `real_tools/` -> `qa_tools/`: real Python
+   packages (an `__init__.py` each, `-m` invocation, real absolute
+   imports), not `sys.path.insert()` hacks. Keith asked directly why
+   these three still had the hacks qa_tools/ had already been cleaned
+   out of, and picked the full fix over a smaller "one shared bootstrap
+   helper" alternative he was also offered.
+
+   Triggered by tracing the actual root cause of the dual-`dirty.py`
+   import bug (`plans/qa-pipeline.md` #17): `synthetic-data-generator/`
+   has a hyphen in its name, which makes it impossible to `import` as a
+   real Python package at all - the sys.path hacks in `population.py`,
+   `pipeline/orchestrate.py`, `pipeline/build_cp_dashboard_data.py`, and
+   `generator/generate_cp_runs.py` existed because of that constraint,
+   not just because nobody had cleaned them up yet.
+
+   Surfaced a second, related problem while surveying the damage:
+   `names_au.py` and `presentation.py` were ALSO duplicated between
+   `generator/` and `synthetic-data-generator/` (kept in sync by hand,
+   like `dirty.py` was) - just hadn't drifted apart yet, purely by luck.
+   Fixed at the root rather than just renamed: `generator/` now holds
+   the one canonical copy of `dirty.py`/`names_au.py`/`presentation.py`;
+   `synthetic_data_generator/` imports them from there
+   (`from generator.dirty import ...`) instead of keeping duplicates.
+   Nothing left in the repo to silently drift apart a second time.
+
+   What changed:
+   - `synthetic-data-generator/` -> `synthetic_data_generator/` (`git
+     mv`) - the only reason for the whole exercise: hyphens aren't valid
+     in a Python package/module name.
+   - `generator/__init__.py`, `pipeline/__init__.py`,
+     `synthetic_data_generator/__init__.py` added
+     (`reference/__init__.py` already existed but the directory it
+     marked is gone now - see below); every cross-directory `sys.path.
+     insert()` call site (4 files) removed, replaced with real absolute
+     imports.
+   - Deleted `synthetic_data_generator/dirty.py`,
+     `synthetic_data_generator/presentation.py`,
+     `synthetic_data_generator/reference/names_au.py` (and the now-empty
+     `reference/` directory) - all three were exact or near-duplicates
+     of files already canonical in `generator/`. The 6 places that
+     imported the local copies (`generate.py`, `population.py`,
+     `child_protection.py` x3, `agency_datasets.py`) now import from
+     `generator` instead.
+   - Every entry-point script that crosses a package boundary now runs
+     as `python3 -m <package>.<module>` (`generator.generate_cp_runs`,
+     `pipeline.orchestrate`, `pipeline.build_dashboard_data`,
+     `pipeline.build_cp_dashboard_data`,
+     `synthetic_data_generator.generate`) instead of a bare script path -
+     `-m` invocation is what makes the repo root importable at all,
+     which absolute imports across packages need and a bare `python3
+     generator/foo.py` can't provide (Python only auto-adds the
+     script's OWN directory to `sys.path`, not the repo root). `run_
+     pipeline.sh`, README, and CLAUDE.md all updated; `run_pipeline.sh`
+     also switched every step from a bare `python3` to `uv run python3`
+     while this was already being touched (part of the same session's
+     `uv`-only cleanup - the two changes landed together since they
+     touched the same lines). `dashboard/embed_dashboard_data.py` is the
+     one script left alone - it has no cross-package imports at all, so
+     a bare script path still works fine and changing it would've been
+     pure churn.
+   - `pyproject.toml`'s pytest `pythonpath` swapped `["generator",
+     "pipeline", "."]` for just `["."]`; every test file that used to
+     `import generate_runs`/`import dirty`/etc. now does `from generator
+     import generate_runs` etc.
+
+   Verified behaviour-preserving: full pipeline re-run end to end for
+   both datasets post-restructure (839 BDM / 1000 CP check results),
+   identical pass/warn/fail counts to pre-restructure;
+   `synthetic_data_generator.generate` re-run directly and produces the
+   same cross-agency-identity output shape. `uv run pytest` (28 tests)
+   and `uv run ruff check .` both clean.
+
+   Also part of the same session: Playwright browser verification (used
+   throughout `plans/qa-pipeline.md`'s dashboard work) had only ever
+   been run through the sandbox's system Python, which happened to have
+   `playwright` installed - never through `uv`'s own venv. Added as a
+   real `uv` dev dependency instead (`uv run playwright install
+   chromium` once, then `uv run python3 ...` drives a real browser) -
+   the same "don't depend on something that merely happens to be
+   present outside `.venv`" principle as the package-import fixes
+   above, for the same reason: this repo is meant to be checked out and
+   run by other people evaluating the PoC, on their own machines, not
+   just the one it was built on.
+
+4. **[superseded]** **[Pipeline & publishing]** Versioning the checks
+   themselves, with that version flowing through to the results/data
+   each check run captures - Keith's own framing, raised right after
+   `plans/dashboard.md` #5's time-travel build: "a useful thing to have
+   as a baseline concept we could hook into later," because checks will
+   inevitably change ("there will be breaks in checks and changes to
+   checks"), and not every change means the same thing for someone
+   reading the history.
+
+   The core idea, as he framed it: some check changes are a genuine
+   **break in the series** (a threshold moved, the underlying logic
+   changed what's actually being measured - the run before and the run
+   after aren't really comparable anymore) and some aren't (a label
+   reworded, a cosmetic tweak, a bug fix that doesn't change what
+   passes/fails). At the time, nothing in this project distinguished the
+   two - a check was identified purely by its name/column, with no
+   version number or change history of its own, and every real check
+   result this project produced was tagged with which RUN it came from
+   but never with which VERSION of the check produced it. The trend
+   chart (`trendChart()`, `dashboard/qa-reporting-dashboard.html`) drew
+   one continuous line across a check's whole `history` regardless - a
+   silent threshold change would show up as an unexplained kink in the
+   line, not a flagged discontinuity a reader would understand as "the
+   check itself changed here, don't read this as organic drift."
+
+   Real connections to what already existed at the time, worth keeping
+   in view: `plans/dashboard.md` #5's time-travel snapshots already
+   capture a check's `warn`/`fail` thresholds as they stood at that
+   moment (each snapshot is self-consistent), so versioning would mostly
+   be about making that fact EXPLICIT and queryable rather than an
+   accidental side effect of how snapshots happen to work; `plans/
+   qa-pipeline.md` #43 (surfacing a check's real SQL/YAML definition in
+   the dashboard) is the natural place a version identifier would also
+   want to show up.
+
+   **Superseded, same day (2026-09-16)**: picked back up and scoped for
+   real - see this file's own Thread D above. Every "not yet scoped"
+   question this item originally raised now has a real, built answer
+   there (explicit declaration rather than inferred-from-absence, folded
+   into Thread B's committed per-run file design). Kept here as the
+   original framing/history, not duplicated into Thread D.
+
+5. **[parked, 2026-09-16]** **[Pipeline & publishing]** Root cause of the
+   `astral-sh/setup-uv@v10` CI failure (`plans/dashboard.md` #5's
+   addendum) - not the specific broken pin itself (already fixed), but
+   the pattern that produced it: an external fact needed for a config
+   file (a GitHub Action's valid tag format) got asserted from a single
+   WebFetch-summarized page rather than checked against the primitive
+   source, and the wrong answer went straight into a committed workflow
+   file. It then took an actual CI failure - Keith checking the run
+   rather than assuming green - to catch it. Worth a real "how do we
+   stop this happening again" discussion, because the specific fix (look
+   at the tags list, not a summarized release page) doesn't generalize
+   on its own to whatever the next instance of this pattern looks like.
+
+   Not scoped yet - open questions to work through together: is this
+   narrowly about external version pins in CI/infra config (a smaller,
+   more tractable problem - e.g. always resolve a third-party GitHub
+   Action ref against its real tags/releases before writing it, never
+   from a single fetched page), or does it point at a wider category of
+   "asserted external fact, not independently verified, landed in
+   something committed" that could show up in other places too (a
+   library API's actual signature, a tool's actual CLI flag, a claimed
+   default behaviour)? And practically: does addressing it mean a
+   written convention (a CLAUDE.md rule, similar in spirit to the
+   existing bug-fix-gets-a-test convention), something checked
+   mechanically (e.g. a CI step that validates action refs actually
+   resolve, catching this class of mistake before merge rather than
+   after), both, or something else entirely. Deliberately not conflating
+   "log the specific mistake" (done, `plans/dashboard.md` #5's addendum)
+   with "fix the pattern" (this item).
+
+6. **[parked]** **[Pipeline & publishing]** Revisit the per-dataset file
+   architecture across `qa_tools/`/`pipeline/` - flagged by Keith right
+   after Phase 2 landed, near-future not now: "I don't really want a
+   separate file for each individual dataset/agency, but I am open to it
+   if needs be." Explicitly a discussion/brainstorm to have later, not a
+   decision made here - this entry just records the concern and its
+   context, no proposed solution.
+
+   Related to, but a reopening of, `plans/qa-pipeline.md` #84 rather
+   than the same question: `plans/qa-pipeline.md` #84 confirmed the same
+   "one file pair per tool per dataset" pattern back when there were
+   only 2 datasets (BDM, Child Protection), found it wasn't false-DRY
+   (the per-dataset half is genuinely different check-to-dashboard-field
+   logic, not copy-paste boilerplate), extracted the confirmed-shared
+   ~30-40 lines/pair into `qa_tools/common/`, and left the per-dataset
+   split itself in place - explicitly flagging even then that "every new
+   dataset currently means copy-pasting a whole file." That trade-off
+   made sense at 2 datasets. The project's own stated target is ~30, and
+   Phase 1/2 above have since added MORE per-dataset file pairs on top
+   of the original 4 tool-runners (`build_results_from_history.py`,
+   `evidently_check_lifecycle.py`, the per-dataset warehouse builders,
+   the two `build_*dashboard_data.py` scripts) - the pattern `plans/
+   qa-pipeline.md` #84 already named as a real (if partial) cost is now
+   multiplying, not just persisting.
+
+   Nothing about `plans/qa-pipeline.md` #84's actual finding is being
+   second-guessed - the per-dataset LOGIC (which tests exist, what they
+   mean, dataset-specific reliability workarounds) is still genuinely
+   different per dataset and shouldn't be forced into one shared
+   abstraction just to reduce file count. What's worth a real
+   conversation is the file-per-dataset-per-concern SHAPE itself at ~30x
+   today's scale - e.g. whether tool-runner logic could be data-driven
+   off each dataset's own config/check definitions inside fewer files,
+   whether a plugin/registry pattern per tool (not per dataset) reads
+   better, or whether the current shape is still fine and it's
+   specifically the Phase 1/2 additions (which are more mechanical/
+   generic than the original 4 tool-runners) that should collapse first.
+   Not scoped - the point of this entry is to not lose the concern
+   before that conversation happens.

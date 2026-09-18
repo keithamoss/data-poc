@@ -4569,6 +4569,303 @@ relative, not a schedule — this is weeks of work, not months.
     run). Regenerated + re-verified via Playwright the same way as the
     initial build above.
 
+82. **[investigate, 2026-09-18]** **[QA checks & contract]** Great
+    Expectations (GX Core) as a genuine comparison tool alongside
+    dbt/Soda/datacontract-cli/Evidently in `real_tools/`. `docs/data-
+    contract-engines-landscape.md`'s own worked example noted GX "isn't
+    pip-installable in this environment" at the time it was written -
+    that's no longer true (confirmed via `pip index versions great-
+    expectations`: 1.23.0 available), the same kind of stale-constraint
+    discovery as Faker/Mimesis in `docs/synthetic-data-generation-tools-
+    research.md`. Worth revisiting IF research holds up that it adds
+    something the current four tools don't. **Rationale downgraded**:
+    the original candidate reason was GX's `unexpected_index_list` as
+    the way to get real per-row failing-record samples - but item #15's
+    follow-up research (reading the actual installed source of all four
+    current tools, not docs) found THREE of the four already do this
+    natively: `datacontract-cli` via `include_failed_samples=True` (a
+    one-line change to what `run_datacontract_real.py` already calls),
+    Soda Core via SodaCL's `samples limit:` + a custom `Sampler` class,
+    and dbt via `store_failures: true` - none currently turned on, but
+    none need a new tool either. Evidently genuinely doesn't (confirmed -
+    no such concept in its source), consistent with its role here being
+    drift/row-growth, not validity. So GX is no longer motivated by that
+    specific gap. Not yet scoped whether it's worth evaluating for any
+    other reason (pure feature/API comparison, maturity, ecosystem) -
+    Compare, don't assume, before wiring anything in.
+
+    (Moved here from `plans/wider.md` #14 as part of that file's
+    2026-09-18 split - a QA-checks-and-contract concern, not a
+    whole-of-project one.)
+
+83. **[done, 2026-09-14]** **[QA checks & contract]** Removed
+    `engines/*.py` entirely, superseding `plans/wider.md` #3's earlier
+    "rename for consistency" pass. Follow-up to Keith's own question
+    ("do we still need the old equivalent engine code given that's
+    legacy from when we couldn't install packages?") - scoped via
+    questions first (framework/scope for the smoke-tests work landing
+    alongside this, uv adoption), with the engines/ decision itself
+    answered directly: remove it, real internet access isn't going away
+    and it had already drifted out of sync (Child Protection, the
+    row-count-growth/freshness/text-format checks were all built
+    real-tools-only, never backfilled).
+
+    Confirmed safe first: `reports/results_real.json` (real_tools/
+    orchestrate_real.py's output) is a strict superset of the old
+    equivalent path (824 checks vs. 630) - no coverage gap from dropping
+    the merge.
+
+    What changed, beyond deleting `engines/*.py` and the now-dead
+    `real_tools/compare_real_vs_equivalent.py`:
+    - `pipeline/orchestrate.py` trimmed to just its real remaining job -
+      generate + load the combined warehouse (`data/warehouse.duckdb`) -
+      dropping the "run 4 equivalent engines -> reports/results.json"
+      half entirely. The combined warehouse itself is still needed:
+      `build_dashboard_data.py`'s own direct DuckDB queries (e.g. the sex
+      value-count chart) run against it; `real_tools/orchestrate_real.py`
+      builds its own separate per-run warehouses for dbt/Soda.
+    - `pipeline/build_dashboard_data.py` rewritten to source solely from
+      `results_real.json` - removed the `_REAL_ONLY_CHECK_KEYS` allowlist
+      and `_merge_real_only_checks()` merge logic entirely (there's no
+      more "base" equivalent result to merge real-only checks into), and
+      simplified `ENGINE_SHORT` to the 4 real tags only.
+    - `run_pipeline.sh` rewritten to run the actual real-tools pipeline
+      end to end (generate+load -> real_tools/orchestrate_real.py ->
+      build_dashboard_data.py -> embed) rather than the old
+      equivalent-only path - there's only one path now.
+    - README.md's whole "two generations" framing rewritten - the intro,
+      quick-start, tool table, Layout section, and "The Child Protection
+      collection"/"Known simplifications" sections all updated. The
+      debugging narrative in "Known simplifications" (the real ODCS
+      validation fixes, the dbt-core %-syntax bug, the dbt-duckdb
+      reliability bug, the Soda wall-clock finding, the PSI binning
+      difference) was kept, not deleted - it's genuine technical history
+      - just reframed as "found by comparing against the equivalent that
+      existed at the time" (past tense) rather than describing an
+      ongoing dual-source dashboard, since there's only one source now.
+    - Swept every other file for stray references to the deleted module
+      names/paths and fixed them in place rather than leaving dangling
+      pointers: `real_tools/*.py` docstrings/comments, `contract/
+      bdm-birth-registrations-contract.yaml`, `dbt_project/dbt_project.yml`
+      and `schema.yml`, and the dashboard HTML (a visible footer line, a
+      JS block comment, and a drawer subtitle template string) - plus one
+      unrelated stale `HANDOFF.md` reference found along the way (that
+      file was deleted earlier this session; missed at the time).
+
+    **Verified end to end, not assumed**: full `./run_pipeline.sh` run
+    after the rewrite succeeded with no `engines/` dependency anywhere;
+    confirmed the rebuilt dashboard JSON has zero stale "equiv" wording
+    and every check's `engine` field is one of the four real tags. This
+    file's own historical entries (bug-hunt narrative naming
+    `contract_engine.py`/`soda_engine.py`/etc.) were deliberately left
+    untouched - that's a development log of what happened and when, not
+    a description of current state, so it stays historically accurate
+    as originally written.
+
+    (Moved here from `plans/wider.md` #18 as part of that file's
+    2026-09-18 split - a QA-checks-and-contract concern, not a
+    whole-of-project one.)
+
+84. **[done, 2026-09-14]** **[QA checks & contract]** Code duplication
+    across `real_tools/*_real.py` (BDM) vs `real_tools/*_real_cp.py`
+    (Child Protection) file pairs - asked because more datasets are
+    coming. Confirmed: yes, one file pair per tool, 8 files / 1392 lines
+    total for 2 datasets (dbt 258+181, Soda 200+140, datacontract-cli
+    154+177, Evidently 185+97).
+
+    Diffed the dbt pair (and spot-checked the Soda pair) in full. Same
+    split both times:
+    - **Genuinely shared/generic** (~30-40 lines/pair): subprocess/API
+      invocation boilerplate (`_run_dbt`'s `subprocess.run` call shape,
+      `--target-path` handling), `_parse_threshold`/`_NUM_RE`, path
+      constants, `ENGINE_TAG` pattern, the per-run-warehouse-file
+      convention.
+    - **Genuinely dataset-specific** (the rest): test-name -> dimension/
+      label mapping dicts (different tests exist per dataset), BDM's
+      `_VERIFY_COUNT_SQL` dbt-duckdb reliability workaround (Child
+      Protection has never hit that bug), CP's `_table_for_test()`
+      multi-table attribution (BDM is single-table, doesn't need it).
+      This half isn't boilerplate - it's the actual check-to-dashboard-
+      field mapping logic per dataset, and forcing it into one shared
+      abstraction would fight the grain of "each dataset's tests are
+      genuinely different."
+
+    Not a false-DRY situation, but not nothing either: ~150-260 lines/
+    file with a real (if partial) shared layer inside it, and every new
+    dataset currently means copy-pasting a whole file and manually
+    picking apart which parts to keep.
+
+    **Built** (2026-09-14), scoped via questions first (naming suffix,
+    folder structure, import style, and what to do with an unrelated
+    stray file the restructure surfaced):
+    - **Renamed the BDM/birth-registrations files to match the CP
+      convention** - `run_dbt_real.py` -> `run_dbt_real_bdm.py` etc.
+      (`_bdm`, not `_births` - matches the existing `contract/
+      bdm-birth-registrations-*` naming and "BDM" used as the dataset's
+      short name everywhere else in the repo). Previously birth
+      registrations had no suffix at all (it was the only dataset when
+      these files were written) while CP got `_cp` when it was added
+      later - fine with one dataset implied by "no suffix," not fine
+      with more coming.
+    - **Extracted the confirmed-shared ~30-40 lines/tool-pair** into
+      `real_tools/common/{dbt,soda,datacontract,evidently}_common.py` -
+      exactly the boilerplate identified above (subprocess/API
+      invocation, `--target-path` handling, threshold parsing,
+      `ENGINE_TAG`), plus two extra bits datacontract-cli's and
+      evidently's pairs turned out to also share byte-for-byte once
+      written side by side (the "local_test" server + `DataContract
+      .test()` construction; the PSI-via-DataDriftPreset computation) -
+      found while doing the extraction, not predicted in advance. Left
+      genuinely dataset-specific: test-name/metric mapping dicts, BDM's
+      `_VERIFY_COUNT_SQL` workaround, CP's `_table_for_test()`, BDM's
+      row-count-growth check (CP has no equivalent).
+    - **Split into per-dataset subfolders** - `real_tools/bdm/`,
+      `real_tools/cp/`, `real_tools/common/` - rather than a flat
+      directory of 16 files that only reads as organized by tool-name
+      prefix. `dbt_profiles/` stays directly under `real_tools/` (one
+      shared dbt project, can't be split by dataset).
+    - **`real_tools` became a proper Python package** (`__init__.py`
+      throughout, dotted imports - `from real_tools.common import
+      dbt_common`, `from . import cp_common`) rather than extending the
+      old per-script `sys.path.insert(0, dirname(__file__))` hack across
+      subfolders - Keith's own call between the two options asked about.
+      Scripts now run as `python3 -m real_tools.bdm.orchestrate_real_bdm`
+      (not a bare file path) - `run_pipeline.sh`, README, and CLAUDE.md
+      all updated. `pyproject.toml`'s pytest `pythonpath` swapped
+      `"real_tools"` for `"."` accordingly.
+    - **Deleted `real_tools/soda_configuration.yml`** (Keith's call, once
+      established it wasn't used by any code - a static reference doc
+      for running the `soda` CLI directly, hardcoded to one BDM run file,
+      superseded by the Python Scan API `run_soda_real_bdm.py` actually
+      uses). Git history holds it if ever needed.
+
+    Verified behaviour-preserving, not just refactored: both orchestration
+    scripts re-run end to end post-restructure and diffed byte-for-byte
+    identical (modulo `run_timestamp`) against pre-restructure
+    `results_real.json`/`results_real_cp.json` - 824 and 950 check
+    results respectively, zero differences. `uv run pytest` (19 tests,
+    `tests/test_parallel_orchestrate.py`'s import updated to the new
+    module path) and `uv run ruff check .` both clean.
+
+    **Follow-up, same day: dropped `_real` everywhere.** Keith noticed the
+    `_real` qualifier throughout (`real_tools/` itself,
+    `run_dbt_real_bdm.py`, `results_real.json`, the `ENGINE_TAG` values'
+    `"(real)"` suffix) only ever meant "genuinely ran the tool, not the
+    `engines/*.py` hand-written equivalent" - and that distinction has had
+    nothing to contrast against since `engines/*.py` was removed (item
+    #83 above). Confirmed before touching anything: the dashboard's
+    *separate* `REAL_BIRTH_REG_DATA`/`REAL_CP_DATA`/"Real pipeline data"
+    naming is a different "real" (genuinely-computed rows vs. the
+    illustrative mock data still covering most of the dashboard) and was
+    deliberately left alone - not part of this cleanup.
+
+    Scoped via questions (dropping `ENGINE_TAG`'s `"(real)"` is
+    dashboard-visible - each check's note text - so worth confirming
+    before regenerating reports/re-embedding the dashboard; renaming
+    `real_tools/` itself is bigger again, since it touches the import
+    paths just built): both yes. Keith left the new package name to be
+    picked - went with `qa_tools/` (matches "QA reporting dashboard"/
+    "QA pipeline" language used throughout the docs already; avoids
+    `checks/`, which would collide in spirit with the existing
+    `contract/*-soda-checks.yml` naming).
+
+    What changed: `real_tools/` -> `qa_tools/`; every `_real_bdm.py`/
+    `_real_cp.py` file -> `_bdm.py`/`_cp.py` (`run_dbt_bdm.py`,
+    `orchestrate_cp.py`, etc.); every `evaluate_*_real_bdm`/
+    `run_real_pipeline` function -> `evaluate_*_bdm`/`run_pipeline`
+    (same pattern for `_cp`); `reports/results_real.json`/
+    `results_real_cp.json` -> `results_bdm.json`/`results_cp.json`; all
+    four `ENGINE_TAG` values lost their `"(real)"` suffix (`"dbt-core
+    1.12 + dbt-duckdb"` etc.) - which meant updating `ENGINE_SHORT`'s
+    dict keys in both `build_dashboard_data.py`/`build_cp_dashboard_data
+    .py` to match, and regenerating `reports/*.json` + re-embedding the
+    dashboard HTML so the new tag text actually reaches it. Also fixed:
+    `build_cp_dashboard_data.py`'s `sys.path.insert(..., "real_tools")`
+    + flat `import cp_common` (would have broken outright once
+    `real_tools/` stopped existing) now does `from qa_tools.cp import
+    cp_common` instead; a couple of stale `real_tools/soda_configuration
+    .yml` mentions left behind in `contract/child-protection-soda-checks
+    .yml`'s usage comment from that file's earlier deletion (this item's
+    own first round, above) were also caught and fixed here, not before.
+
+    Verified the same way as the first round: both orchestration scripts
+    re-run end to end, this time diffed against the pre-rename output
+    with an explicit exception for the field that was *supposed* to
+    change - every `engine` string (and the `note` text
+    `build_dashboard_data.py`/`build_cp_dashboard_data.py` derive from
+    it) lost its `"(real)"` suffix, confirmed as the *only* difference;
+    every other field, byte-for-byte identical. `uv run pytest`/
+    `uv run ruff check .` both clean.
+
+    (Moved here from `plans/wider.md` #20 as part of that file's
+    2026-09-18 split - a QA-checks-and-contract concern, not a
+    whole-of-project one.)
+
+85. **[investigate]** **[QA checks & contract]** A real, currently-unused
+    way to make the ODCS contract the actual single source of truth for
+    dbt's and Soda's own check files too - not just something the
+    dashboard/datacontract-cli read. Keith asked for this to be flagged
+    as an architectural consideration, not built. Same underlying pain
+    as `plans/data-generation.md` #6 (the generator hand-duplicating the
+    contract's column definitions), just hitting `dbt_project/models/
+    staging/schema.yml` and `contract/*-soda-checks.yml` instead of
+    `generator/daily_batch.py`: all three of these files independently
+    hand-encode the same quality rules the ODCS contract already states,
+    with nothing connecting them today - add or change a rule in the
+    contract and the dbt/Soda check files silently don't follow, the
+    same drift risk `plans/data-generation.md` #6 already named for the
+    generator.
+
+    Both tools have real bridge tooling for this (verified with actual
+    research, not assumed - full detail and sources in item #19): `data
+    contract-cli`'s own `dbt sync` command (already installed in this
+    project) and the third-party `dbt-contracts` package both read an
+    ODCS file and **write real `schema.yml`/model files to disk** -
+    `dbt sync` specifically tags the sections it manages so a re-run
+    won't clobber hand-added tests. Soda's `soda ai` (shipped inside
+    `soda-core` itself, no extra install) translates an ODCS contract
+    into Soda's own Contract Language, with a review-and-approve step
+    before it saves a real file. **Neither is a live runtime bridge** -
+    dbt and Soda always execute against whatever file is sitting on
+    disk, with zero awareness of where it came from or whether it's
+    stale relative to the contract.
+
+    The pipeline shape this would actually enable, if adopted:
+    ```
+    contract/*.yaml (hand-edited, the only thing a human touches)
+            |
+            |  CI step, triggered on contract changes (or run manually)
+            v
+    `datacontract dbt sync ...`  /  `soda ai` (translate, review, approve)
+            |
+            v
+    dbt_project/.../schema.yml (generated + meta-tagged)
+    a generated Soda Contract Language file (replaces *-soda-checks.yml)
+            |
+            v
+    `dbt build` / `soda scan` - run completely normally, no ODCS involved
+    ```
+    Real, currently-unresolved tradeoffs, not yet scoped: `soda ai` is
+    explicitly experimental with no published GA date (see item #19
+    above) - a real dependency to take on for a PoC, not a stable
+    foundation yet. `dbt-contracts` is an unofficial third-party
+    package, not from dbt Labs. And this project's own check design
+    leans on things that might not survive a generated round-trip - the
+    dbt-duckdb `fail_calc` reliability workaround (`schema.yml`'s own
+    header comment), the count-based (not percentage) `warn_if`/
+    `error_if` bands calibrated per check, the custom `failed rows`/
+    `fail query:` pattern used where Soda's ordinary metric checks don't
+    fit - would need verifying whether `dbt sync`/`soda ai`'s generated
+    output can even express these, not just whether the happy path
+    works. Not scoped further; revisit alongside `plans/data-
+    generation.md` #6, not in isolation - same root question (should the
+    contract generate its downstream check files, or stay read-only
+    reference material) applied to a different pair of files.
+
+    (Moved here from `plans/wider.md` #22 as part of that file's
+    2026-09-18 split - a QA-checks-and-contract concern, not a
+    whole-of-project one.)
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
