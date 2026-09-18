@@ -28,6 +28,15 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-18
 
 ### Added
+- **11:25pm** — **Plans Tab** **[Dashboard UI]** **[Docs & process]** A real "Plans" page inside the dashboard - browse, search, and filter this
+  project's own `plans/*.md` planning memory (status/component tags on
+  every item and Thread) without leaving the live site. A genuinely new
+  top-level page, not another header side-panel - the real content
+  volume (124 entries) needed room a cramped drawer couldn't give it.
+  Every plan-file item and Thread/Phase section now carries a closed
+  status and the same component taxonomy `CHANGELOG.md` entries do,
+  fixing 17 items that had quietly slipped through an earlier retrofit
+  pass with no real date.
 - **11:07pm** — **Friendlier Release Notes** **[Dashboard UI]** **[Docs & process]** Every entry on this page now leads with a bold headline, an icon, and
   the real component(s) it touches - not just a wall of technical
   prose. All 46 prior entries retrofitted to the new format (a full

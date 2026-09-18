@@ -141,7 +141,16 @@ public-page privacy rule as ASSIGNMENTS: only people with a real
 contract/people.yaml entry ever appear, by name/nickname - resolved by
 real GitHub LOGIN now (whoever closed the ticket), not by email.
 
-This only replaces those eleven consts - the rest of the dashboard (its
+And `const PLANS` (running-thoughts.md #10, "Plans" tab, 2026-09-18) -
+`{items: [...], threads: [...], notes: [...]}`, this project's own
+plans/*.md planning memory, parsed by dashboard/plans_md.py's
+parse_plans() straight from the committed plans/ directory - same
+"placeholder here, real data only in the built output" treatment as
+RELEASE_NOTES/REQUIREMENTS above, and the same CI-safe, no-live-data
+status as everything else this script embeds (plans/*.md are real,
+committed markdown files, no `gh`/DuckDB access needed).
+
+This only replaces those twelve consts - the rest of the dashboard (its
 CSS, the rendering code, the other 14 illustrative datasets, and the
 separate SNAPSHOT_MANIFEST const dashboard/snapshot_dashboard.py owns)
 is copied through unchanged from the template.
@@ -152,6 +161,7 @@ import os
 import re
 
 from dashboard.changelog_md import parse_changelog
+from dashboard.plans_md import parse_plans
 from dashboard.requirements_yaml import parse_requirements
 from qa_tools.common.acceptance_sync import build_acceptances
 from qa_tools.common.changelog import build_changelog
@@ -165,6 +175,7 @@ ROOT = os.path.join(os.path.dirname(__file__), "..")
 TEMPLATE_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.template.html")
 DASHBOARD_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.html")
 CHANGELOG_MD = os.path.join(ROOT, "CHANGELOG.md")
+PLANS_DIR = os.path.join(ROOT, "plans")
 REQUIREMENTS_YAML = os.path.join(ROOT, "requirements.yaml")
 OPEN_TICKETS_JSON = os.path.join(ROOT, "reports", "open_tickets.json")
 QA_COMMENTS_JSON = os.path.join(ROOT, "reports", "qa_comments.json")
@@ -296,6 +307,11 @@ def embed() -> None:
     html = _replace_const(html, "LEADERBOARD", json.dumps(leaderboard_rows, separators=(",", ":")))
     print(f"Re-embedded LEADERBOARD = {len(leaderboard_rows)} real streak row(s)"
           + ("" if os.path.exists(TICKET_RESOLUTIONS_JSON) else " (no reports/ticket_resolutions.json - local build, embedding empty)"))
+
+    plans = parse_plans(PLANS_DIR)
+    html = _replace_const(html, "PLANS", json.dumps(plans, separators=(",", ":")))
+    print(f"Re-embedded PLANS = {len(plans['items'])} items, {len(plans['threads'])} threads, "
+          f"{len(plans['notes'])} notes")
 
     with open(DASHBOARD_HTML, "w") as f:
         f.write(html)

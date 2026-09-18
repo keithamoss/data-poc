@@ -743,12 +743,53 @@ the scoping above:
    own call, given the real volume here (~113 items + 5 Threads, tens of
    thousands of words) doesn't fit a cramped panel.
 
-Still not started: the actual parser (mirroring `dashboard/
-changelog_md.py`'s narrow line-based style, for both the numbered-item
-format and the Thread/Phase-level format), the `changelog_md.py`
-extension + retrofit of CHANGELOG.md's own existing entries with
-component tags, and the dashboard UI build itself. Large enough to be
-its own multi-session build, not a single sitting.
+**Built, same night.** The 17-item date-normalization gap the parser's
+own real output surfaced (7 `wider.md`/4 `dashboard.md`/5 `data-
+generation.md`/1 `qa-pipeline.md` item never got a real date - or, for
+one item, carried an invalid `decided` status word - during the earlier
+retrofit passes, because those files were split before the "always
+attach a date" convention had fully solidified) got fixed at the source
+first, not worked around in the parser, matching the same "no permissive
+fallback" stance fork 8 above already established.
+
+- `dashboard/plans_md.py` - the parser (mirrors `dashboard/
+  changelog_md.py`'s narrow line-based style): `_parse_numbered_items()`
+  for `wider.md`/`qa-pipeline.md`/`dashboard.md`/`data-generation.md`,
+  `_parse_threads()` for `publishing-and-history.md`/`conceptual-
+  design.md`'s Thread/Phase tag lines, `_parse_notes()` for running-
+  thoughts.md's own untagged `### N. Title` shape. 15 tests
+  (`tests/test_plans_md.py`), all passing against both fixtures and the
+  real committed files (106 items, 6 threads, 12 notes - matches every
+  real file's own item count exactly, confirmed by hand before trusting
+  the parser).
+- The "Plans" tab itself: a genuine new top-level page
+  (`STATE.tier==="plans"`, a real `/plans` URL, not a side panel) with
+  search, status/component/file filter chips, and an accordion per
+  entry (click to expand the full body, rendered through a small new
+  markdown-lite-to-HTML pass - paragraphs, bold, inline code, and real
+  bullet lists this time, richer than changelog_md's inline-only
+  version since plans/*.md bodies are genuine multi-paragraph prose).
+  `dashboard/embed_dashboard_data.py` wires `parse_plans()`'s output
+  into a new `const PLANS`.
+- 26 new JS tests (`tests-js/plans.test.js`) plus a real fix mid-build:
+  the status-filter chip's click handler read `PLANS_FILTER[kind + "s"]`
+  - "status" + "s" = "statuss", not the real "statuses" key - caught by
+  the tests themselves (not by staring at the code), fixed with an
+  explicit `{status:"statuses", component:"components", file:"files"}`
+  lookup instead of string concatenation.
+- Verified: full local `uv run pytest` (411 passed, only the pre-
+  existing, unrelated Playwright browser-binary gap already documented
+  elsewhere), `npm test` (97 passed), ruff clean, and a real Playwright
+  check of the actual built dashboard's Plans tab (search, chip filters,
+  and expand/collapse all behave correctly, zero console errors).
+
+Not yet built - real, deliberately deferred follow-ups, not oversights:
+deep-linking to one specific expanded entry (today's URL is just
+`/plans`, the same as every other tier's own list view before a
+drill-down); the `changelog_md.py`-adjacent CHANGELOG.md component
+retrofit was actually done SEPARATELY the same night (see `plans/
+dashboard.md` #6) once Keith's own release-notes redesign ask
+converged with this taxonomy.
 
 ### 11. Switch pytest-cov from line/statement coverage to branch coverage
 

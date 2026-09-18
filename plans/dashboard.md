@@ -19,7 +19,7 @@ Status values: `todo` / `investigate` / `in-progress` / `parked` /
 or reused, even if an item is later retired, matching `qa_tools/
 common/check_lifecycle.py`'s own `check_id` convention.
 
-1. **[done]** **[Dashboard UI]** Wired the Child Protection collection (6
+1. **[done, 2026-09-18]** **[Dashboard UI]** Wired the Child Protection collection (6
    tables, real FKs) into the QA dashboard end to end, across 4 phased
    pushes: (1) periodic snapshot generation + per-table ODCS contract,
    (2) the 7 `relationships` checks + 3 cross-table business rules
@@ -38,7 +38,7 @@ common/check_lifecycle.py`'s own `check_id` convention.
    pipeline's approach generalizes rather than being a one-off, and was
    the highest-value item on `plans/wider.md`'s original list.
 
-2. **[done]** **[Dashboard UI]** The old claude.ai Artifact copy is no
+2. **[done, 2026-09-18]** **[Dashboard UI]** The old claude.ai Artifact copy is no
    longer a concern — decided to stop maintaining it; this repo's HTML
    is the sole source of truth going forward. **Public hosting live**:
    the repo itself is now public (Keith's call, given the data involved
@@ -64,7 +64,7 @@ common/check_lifecycle.py`'s own `check_id` convention.
    public dashboard is still wanted at that point — may turn out not to
    be needed at all.
 
-3. **[todo, low]** **[Dashboard UI]** Explore alternative dashboard
+3. **[todo, 2026-09-18]** **[Dashboard UI]** Explore alternative dashboard
    output types/tools — Streamlit and Power BI named specifically — as
    alternatives or complements to the current hand-rolled static HTML
    dashboard. Not yet scoped: worth comparing what each would actually
@@ -77,7 +77,7 @@ common/check_lifecycle.py`'s own `check_id` convention.
    dashboard-readability entries). Decide replace vs. supplement before
    committing to either.
 
-4. **[todo]** **[Dashboard UI]** Secure/authenticated hosting for the
+4. **[todo, 2026-09-18]** **[Dashboard UI]** Secure/authenticated hosting for the
    dashboard - Cloudflare Access or equivalent - near-term work Keith
    flagged, not scoped yet. Directly relevant to item #2 above: the
    dashboard is currently public with zero access control at all
@@ -592,3 +592,39 @@ common/check_lifecycle.py`'s own `check_id` convention.
    confirmed with Playwright (zero console errors, correct icon/
    headline/badge/text rendering in the actual Release Notes panel, not
    just the parser's own output).
+
+7. **[done, 2026-09-18]** **[Dashboard UI]** The "Plans" tab -
+   `plans/running-thoughts.md` #10's real build (that item's own write-
+   up holds the full design/verification account, not repeated here): a
+   genuine new top-level page (`STATE.tier==="plans"`, a real `/plans`
+   URL) browsing this project's own `plans/*.md` planning memory -
+   search, status/component/file filter chips, and an accordion per
+   entry - not a header side-panel like Requirements/Leaderboard/
+   Release Notes/Recent activity, Keith's own explicit call
+   (`AskUserQuestion`) given the real content volume (124 entries: 106
+   numbered items, 6 Threads, 12 running-thoughts.md notes) doesn't fit
+   a cramped drawer.
+
+   A real, genuinely-necessary source-data fix came first: `dashboard/
+   plans_md.py`'s own real output against the committed files surfaced
+   17 items across `wider.md`/`dashboard.md`/`data-generation.md`/
+   `qa-pipeline.md` that never got a real date (or, one item, an invalid
+   `decided` status word) during earlier retrofit passes - fixed at the
+   source, not worked around in the parser, matching the "no permissive
+   fallback" stance already set earlier that same night. New module:
+   `dashboard/plans_md.py` (parses both the numbered-item and Thread/
+   Phase tag formats, plus running-thoughts.md's own untagged shape),
+   15 Python tests, 26 JS tests (`tests-js/plans.test.js` - including
+   one real bug the tests themselves caught: the status chip's click
+   handler read `PLANS_FILTER["status" + "s"]`, i.e. the literal string
+   "statuss", not "statuses" - fixed with an explicit key map). Verified
+   with a real Playwright pass against the built dashboard (search,
+   filters, and expand/collapse all correct, zero console errors) and a
+   full local `uv run pytest` run (411 passed, only the pre-existing,
+   unrelated Playwright browser-binary gap already documented
+   elsewhere).
+
+   **Not yet built**: deep-linking to one specific expanded entry
+   (today's URL is just `/plans`, same as every other tier's list view
+   before a drill-down) - a real, deliberately deferred follow-up, not
+   an oversight.

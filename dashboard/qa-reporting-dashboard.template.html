@@ -156,6 +156,34 @@ button{font:inherit; color:inherit;}
 .legend-key i{width:8px;height:8px;border-radius:50%;display:inline-block;}
 .legend-key i.green{background:var(--good);} .legend-key i.amber{background:var(--warn-fill);} .legend-key i.red{background:var(--bad);}
 
+/* ============ Plans tab (running-thoughts.md #10) ============ */
+.plans-filterbar{margin-top:16px; padding:14px; background:var(--surface-alt); border:1px solid var(--line); border-radius:var(--radius-md);}
+.plans-filterbar input[type=search]{
+  width:100%; padding:9px 12px; border:1px solid var(--line-strong); border-radius:999px;
+  background:var(--surface); color:var(--ink); font-size:13.5px; margin-bottom:10px;
+}
+.plans-chip-row{display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:6px;}
+.plans-chip-label{font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint); font-weight:700; margin-right:4px;}
+.plans-chip{
+  display:inline-flex; align-items:center; gap:4px; padding:5px 11px; border-radius:999px; font-size:12px; font-weight:600;
+  background:var(--surface); border:1px solid var(--line-strong); color:var(--ink-muted); cursor:pointer;
+}
+.plans-chip:hover{border-color:var(--accent);}
+.plans-chip.active{background:var(--accent-soft); border-color:var(--accent-soft-line); color:var(--accent-ink);}
+.plans-count{font-size:12px; color:var(--ink-faint); margin:14px 0 8px;}
+.plans-entry{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); margin-bottom:10px; overflow:hidden;}
+.plans-entry-head{width:100%; text-align:left; padding:14px 16px; background:none; border:none; cursor:pointer; display:block;}
+.plans-entry-head:hover{background:var(--surface-alt);}
+.plans-entry-head-top{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;}
+.plans-entry-title{font-size:14.5px; font-weight:600;}
+.plans-entry-badges{display:flex; gap:5px; flex-wrap:wrap; margin-top:6px;}
+.plans-entry-preview{padding:0 16px 14px; font-size:13px; color:var(--ink-muted); line-height:1.5;}
+.plans-entry-body{padding:0 16px 16px; font-size:13.5px; line-height:1.6; border-top:1px solid var(--line); margin-top:2px; padding-top:12px;}
+.plans-entry-body p{margin:0 0 10px;}
+.plans-entry-body p:last-child{margin-bottom:0;}
+.plans-entry-body ul{margin:0 0 10px; padding-left:20px;}
+.plans-entry-body li{margin-bottom:4px;}
+
 /* ============ Grid / cards ============ */
 .grid{display:grid; gap:14px; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); margin-block:8px 32px;}
 .card{
@@ -409,6 +437,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
       <button class="snapshots-btn" id="changelog-btn" type="button">🗒 Release notes</button>
       <button class="snapshots-btn" id="requirements-btn" type="button">📐 Requirements</button>
       <button class="snapshots-btn" id="leaderboard-btn" type="button">🏆 Leaderboard</button>
+      <button class="snapshots-btn" id="plans-btn" type="button">🗂 Plans</button>
       <button class="snapshots-btn" id="snapshots-btn" type="button">🕐 Past snapshots</button>
       <div class="live"><span class="dot"></span><span id="clock-text">Live · updated moments ago</span></div>
     </div>
@@ -811,6 +840,25 @@ const GITHUB_LINKS = {checks:{}, agencies:{}, datasets:{}};
 const ACCEPTANCES = {};
 const ASSIGNMENTS = {agencies:{}, datasets:{}};
 const LEADERBOARD = [];
+// PLANS — running-thoughts.md #10's "Plans" tab: the project's own
+// plans/*.md planning memory (CLAUDE.md's own orientation section),
+// browsable/filterable/searchable inside the dashboard, not just on
+// GitHub/locally. Parsed by dashboard/plans_md.py's parse_plans() and
+// embedded by dashboard/embed_dashboard_data.py, same "placeholder here,
+// real data only in the built output" treatment as every other const
+// above. Shape: {items: [{file, number, status, date, components,
+// section, text}, ...], threads: [{file, heading, status, date,
+// category, body}, ...], notes: [{number, title, body}, ...]} - items
+// come from the 4 numbered-item files (wider/qa-pipeline/dashboard/
+// data-generation.md), threads from the 2 Thread/Phase essay files
+// (publishing-and-history/conceptual-design.md), notes from running-
+// thoughts.md (deliberately untagged - Keith's own call, "just a looser
+// feed the dashboard shows as-is"). Unlike every other const here, this
+// is its OWN top-level tier (STATE.tier==="plans"), not a header side-
+// panel - Keith's explicit choice (AskUserQuestion) given the real
+// content volume (100+ items/threads/notes) doesn't fit a cramped
+// drawer.
+const PLANS = {items:[], threads:[], notes:[]};
 
 // Shared by Birth Registrations (a single dataset) and Child Protection
 // (6 datasets, one per table) - both are reshaped server-side into this
@@ -1880,6 +1928,7 @@ function setRail(items){
 function pathSegment(s){ return encodeURIComponent(s); }
 function stateToPath(state){
   if(!state || state.tier==="exec") return "/";
+  if(state.tier==="plans") return "/plans";
   if(state.tier==="agency") return `/agency/${pathSegment(state.agencyId)}`;
   if(state.tier==="dataset"){
     let p = `/agency/${pathSegment(state.agencyId)}/collection/${pathSegment(state.collectionId)}/dataset/${pathSegment(state.datasetId)}`;
@@ -1894,6 +1943,7 @@ function stateToPath(state){
 function pathToState(raw){
   const parts = raw.split("/").filter(Boolean).map(decodeURIComponent);
   if(parts.length===0) return {tier:"exec"};
+  if(parts[0]==="plans") return {tier:"plans"};
   if(parts[0]!=="agency" || !parts[1]) return null;
   const state = {tier:"agency", agencyId:parts[1]};
   if(parts[2]==="collection" && parts[3] && parts[4]==="dataset" && parts[5]){
@@ -1989,6 +2039,7 @@ window.addEventListener("popstate", (e)=>{
 function render(){
   const view = document.getElementById("view");
   if(STATE.tier==="exec") return renderExec(view);
+  if(STATE.tier==="plans") return renderPlans(view);
   if(STATE.tier==="agency") return renderAgency(view, STATE.agencyId);
   if(STATE.tier==="dataset") return renderDataset(view, STATE.agencyId, STATE.collectionId, STATE.datasetId);
 }
@@ -3090,6 +3141,199 @@ function renderLeaderboardPanel(){
 document.getElementById("leaderboard-btn").addEventListener("click", ()=> openPanel("leaderboard"));
 document.getElementById("leaderboard-backdrop").addEventListener("click", closePanel);
 document.getElementById("leaderboard-panel-close").addEventListener("click", closePanel);
+
+// running-thoughts.md #10 - "Plans" tab: browses this project's own
+// planning memory (plans/*.md, PLANS.items/threads/notes - dashboard/
+// plans_md.py's parse_plans() output) as a real top-level page
+// (STATE.tier==="plans"), not a header side-panel like everything else
+// above - Keith's explicit call (AskUserQuestion) given the real content
+// volume (100+ entries) doesn't fit a cramped drawer. Client-side search/
+// filter only (PLANS is already fully embedded, no server round-trip),
+// an accordion list (click a row to expand its full body) rather than a
+// separate detail page/URL for v1 - deep-linking to one specific entry
+// is a real, deliberately deferred follow-up (plans/dashboard.md #6's
+// own note), same "large enough to be its own multi-session build" this
+// whole feature was scoped as.
+const PLANS_STATUS_LABEL = {
+  done:"Done", "in-progress":"In progress", investigate:"Investigate",
+  todo:"To do", parked:"Parked", superseded:"Superseded",
+};
+const PLANS_STATUS_CLASS = {
+  done:"green", "in-progress":"amber", investigate:"amber",
+  todo:"tag", parked:"nodata", superseded:"nodata",
+};
+function plansStatusLabel(s){ return PLANS_STATUS_LABEL[s] || s; }
+function plansStatusPill(s){ return `<span class="pill ${PLANS_STATUS_CLASS[s]||"nodata"} sm"><span class="ico"></span>${plansStatusLabel(s)}</span>`; }
+
+const PLANS_FILE_LABEL = {
+  wider:"wider.md", "qa-pipeline":"qa-pipeline.md", dashboard:"dashboard.md",
+  "data-generation":"data-generation.md", "publishing-and-history":"publishing-and-history.md",
+  "conceptual-design":"conceptual-design.md", "running-thoughts":"running-thoughts.md",
+};
+
+// Light markdown-to-HTML for a plans/*.md body: blank-line-separated
+// paragraphs, **bold**, `inline code`, and a whole block of consecutive
+// `- `/`* ` lines rendered as one real <ul> - deliberately still not
+// full CommonMark (no nested lists, no links, no tables), same "narrow,
+// predictable" philosophy as changelog_md.py's own inline-only version,
+// just extended to handle real multi-paragraph/list content since
+// plans/*.md bodies are genuine long-form prose, not one-liners.
+function inlinePlansMd(s){
+  return mdInlineCode(s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>"));
+}
+function renderPlansMarkdown(md){
+  if(!md) return "";
+  return md.split(/\n\n+/).map(block=>{
+    const lines = block.split("\n");
+    if(lines.length && lines.every(l=>/^[-*]\s+/.test(l))){
+      return `<ul>${lines.map(l=>`<li>${inlinePlansMd(l.replace(/^[-*]\s+/,""))}</li>`).join("")}</ul>`;
+    }
+    return `<p>${inlinePlansMd(lines.join(" "))}</p>`;
+  }).join("");
+}
+
+// Reshapes PLANS' 3 separate arrays (items/threads/notes - each file
+// format's own real shape, dashboard/plans_md.py's own docstring) into
+// one flat, uniform list the rest of this section works with - computed
+// once at load (PLANS never changes after the page loads), not per-render.
+const PLANS_ENTRIES = (function(){
+  const items = PLANS.items.map(i => ({
+    id:`${i.file}-${i.number}`, kind:"item", file:i.file,
+    title:`${PLANS_FILE_LABEL[i.file]||i.file} #${i.number}`,
+    status:i.status, date:i.date, components:i.components, body:i.text,
+  }));
+  const threads = PLANS.threads.map(t => ({
+    id:`${t.file}::${t.heading}`, kind:"thread", file:t.file,
+    title:t.heading, status:t.status, date:t.date,
+    components:[t.category], body:t.body,
+  }));
+  const notes = PLANS.notes.map(n => ({
+    id:`running-thoughts-${n.number!=null?n.number:n.title}`, kind:"note",
+    file:"running-thoughts",
+    title: n.number!=null ? `#${n.number} — ${n.title}` : n.title,
+    status:null, date:null, components:[], body:n.body,
+  }));
+  return [...items, ...threads, ...notes];
+})();
+
+const PLANS_ALL_STATUSES = ["done","in-progress","investigate","todo","parked","superseded"];
+const PLANS_ALL_COMPONENTS = ["Data generation","QA checks & contract","Pipeline & publishing",
+  "Dashboard UI","GitHub workflow & people","Testing & dev tooling","Docs & process"];
+const PLANS_ALL_FILES = ["wider","qa-pipeline","dashboard","data-generation",
+  "publishing-and-history","conceptual-design","running-thoughts"];
+
+// Chip filters narrow results (select one/more to filter down); an empty
+// Set for a given dimension means "no filter on that dimension" (show
+// all), not "show none" - the more intuitive default for a fresh page
+// load with nothing selected yet.
+let PLANS_FILTER = {query:"", statuses:new Set(), components:new Set(), files:new Set()};
+const PLANS_EXPANDED = new Set();
+
+function plansEntryMatchesFilter(e){
+  if(PLANS_FILTER.statuses.size && !PLANS_FILTER.statuses.has(e.status)) return false;
+  if(PLANS_FILTER.components.size && !e.components.some(c=>PLANS_FILTER.components.has(c))) return false;
+  if(PLANS_FILTER.files.size && !PLANS_FILTER.files.has(e.file)) return false;
+  if(PLANS_FILTER.query){
+    const q = PLANS_FILTER.query.toLowerCase();
+    if(!e.title.toLowerCase().includes(q) && !e.body.toLowerCase().includes(q)) return false;
+  }
+  return true;
+}
+
+function renderPlansFilterBar(){
+  const statusChips = PLANS_ALL_STATUSES.map(s=>
+    `<button type="button" class="plans-chip${PLANS_FILTER.statuses.has(s)?" active":""}" data-kind="status" data-value="${s}">${plansStatusLabel(s)}</button>`
+  ).join("");
+  const componentChips = PLANS_ALL_COMPONENTS.map(c=>
+    `<button type="button" class="plans-chip${PLANS_FILTER.components.has(c)?" active":""}" data-kind="component" data-value="${c}"><span aria-hidden="true">${componentIcon(c)}</span> ${c}</button>`
+  ).join("");
+  const fileChips = PLANS_ALL_FILES.map(f=>
+    `<button type="button" class="plans-chip${PLANS_FILTER.files.has(f)?" active":""}" data-kind="file" data-value="${f}">${PLANS_FILE_LABEL[f]}</button>`
+  ).join("");
+  const hasActiveFilter = PLANS_FILTER.statuses.size || PLANS_FILTER.components.size || PLANS_FILTER.files.size || PLANS_FILTER.query;
+  return `
+    <div class="plans-filterbar">
+      <input type="search" id="plans-search" placeholder="Search plans…" value="${PLANS_FILTER.query.replace(/"/g,"&quot;")}" />
+      <div class="plans-chip-row"><span class="plans-chip-label">Status</span>${statusChips}</div>
+      <div class="plans-chip-row"><span class="plans-chip-label">Component</span>${componentChips}</div>
+      <div class="plans-chip-row"><span class="plans-chip-label">File</span>${fileChips}</div>
+      ${hasActiveFilter ? `<button type="button" id="plans-clear-filters" class="plans-chip">✕ Clear filters</button>` : ""}
+    </div>`;
+}
+
+function renderPlansEntry(e){
+  const expanded = PLANS_EXPANDED.has(e.id);
+  const statusPill = e.status ? plansStatusPill(e.status) : "";
+  const badges = e.components.map(componentBadge).join(" ");
+  const dateLabel = e.date ? `<span class="mono" style="color:var(--ink-faint); font-size:11px;">${e.date}</span>` : "";
+  const preview = !expanded ? `<div class="plans-entry-preview">${inlinePlansMd(e.body.slice(0,180))}${e.body.length>180?"…":""}</div>` : "";
+  const full = expanded ? `<div class="plans-entry-body">${renderPlansMarkdown(e.body)}</div>` : "";
+  return `
+    <div class="plans-entry" data-id="${e.id}">
+      <button type="button" class="plans-entry-head" data-toggle="${e.id}">
+        <div class="plans-entry-head-top">
+          ${statusPill}${dateLabel}
+          <span class="mono" style="color:var(--ink-faint); font-size:11px;">${PLANS_FILE_LABEL[e.file]||e.file}</span>
+        </div>
+        <div class="plans-entry-title">${e.title}</div>
+        ${badges ? `<div class="plans-entry-badges">${badges}</div>` : ""}
+      </button>
+      ${preview}
+      ${full}
+    </div>`;
+}
+
+function renderPlansList(){
+  const listEl = document.getElementById("plans-list");
+  if(!listEl) return;
+  const visible = PLANS_ENTRIES.filter(plansEntryMatchesFilter);
+  document.getElementById("plans-count").textContent =
+    `${fmtInt(visible.length)} of ${fmtInt(PLANS_ENTRIES.length)} ${pluralize(PLANS_ENTRIES.length,"entry","entries")}`;
+  listEl.innerHTML = visible.length
+    ? visible.map(renderPlansEntry).join("")
+    : `<div style="font-size:13px; color:var(--ink-muted); padding:20px 0;">No plans entries match the current filters.</div>`;
+  listEl.querySelectorAll("[data-toggle]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const id = btn.dataset.toggle;
+      if(PLANS_EXPANDED.has(id)) PLANS_EXPANDED.delete(id); else PLANS_EXPANDED.add(id);
+      renderPlansList();
+    });
+  });
+}
+
+function renderPlans(view){
+  setRail([{tier:"Tier 1", label:"Plans", nav:{tier:"plans"}}]);
+  view.innerHTML = `
+    <div class="view-head">
+      <div>
+        <h2>Plans</h2>
+        <div class="view-sub">This project's own planning memory (<code>plans/*.md</code>) - real design decisions, open questions, and build history, browsable here instead of only on GitHub.</div>
+      </div>
+    </div>
+    ${renderPlansFilterBar()}
+    <div id="plans-count" class="plans-count"></div>
+    <div id="plans-list"></div>
+  `;
+  document.getElementById("plans-search").addEventListener("input", (e)=>{
+    PLANS_FILTER.query = e.target.value;
+    renderPlansList();
+  });
+  const PLANS_FILTER_KEY = {status:"statuses", component:"components", file:"files"};
+  view.querySelectorAll(".plans-chip[data-kind]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const set = PLANS_FILTER[PLANS_FILTER_KEY[btn.dataset.kind]];
+      if(set.has(btn.dataset.value)) set.delete(btn.dataset.value); else set.add(btn.dataset.value);
+      renderPlans(view);
+    });
+  });
+  const clearBtn = document.getElementById("plans-clear-filters");
+  if(clearBtn) clearBtn.addEventListener("click", ()=>{
+    PLANS_FILTER = {query:"", statuses:new Set(), components:new Set(), files:new Set()};
+    renderPlans(view);
+  });
+  renderPlansList();
+}
+document.getElementById("plans-btn").addEventListener("click", ()=> navigate({tier:"plans"}));
 
 // Thread C - as-of date picker. rebuildData() throws the current DATA
 // away and rebuilds it from scratch against the new date (see buildData()
