@@ -717,16 +717,38 @@ of status).** Real forks resolved, in order:
    `qa-pipeline-17` - is already a stable, unique key; no new global ID
    scheme needed, no renumbering required.
 
-**Not yet built** - this is now fully scoped (every real fork resolved)
-but not started: the actual parser, the ~280+-item retrofit across 4
-files (200+ individual items in 2 files, an unknown-but-smaller number
-of Thread/Phase sections in the other 2), the `changelog_md.py`
+**In progress, 2026-09-18 night.** Two more real forks resolved since
+the scoping above:
+
+8. **Data readiness before building the parser**: proposed a permissive
+   parser (handle the new schema where present, fall back to plain-
+   prose rendering for anything still untagged) so the UI could ship
+   without waiting for the full retrofit. **Rejected outright** - Keith's
+   own words: "Um, no, because I want to handle the untagged things by
+   tagging. I want everything in the same structure." Full retrofit is a
+   hard prerequisite, not an optional nice-to-have alongside a fallback
+   path. Real scale, measured before starting: `qa-pipeline.md` - 85
+   items, 81 still in the old `**[status]**`-only format (no date, no
+   component), 40,730 words total; `publishing-and-history.md` - 4
+   Thread sections with zero Thread-level tags, 24,184 words;
+   `conceptual-design.md` - 1 Thread section untagged, 1,159 words. Two
+   background agents dispatched to do this retrofit in parallel (purely
+   additive tag-insertion, no renumbering, so genuinely independent of
+   each other and of the earlier wider.md split's file-move risk) -
+   qa-pipeline.md's 81 items in one, the 5 Thread/Phase sections across
+   the other two files in the other. Verification and a real diff review
+   still to happen once both land.
+9. **UI shape**: a dedicated tab/view alongside the existing BDM/CP
+   dashboard views (not a side panel/drawer off existing nav) - Keith's
+   own call, given the real volume here (~113 items + 5 Threads, tens of
+   thousands of words) doesn't fit a cramped panel.
+
+Still not started: the actual parser (mirroring `dashboard/
+changelog_md.py`'s narrow line-based style, for both the numbered-item
+format and the Thread/Phase-level format), the `changelog_md.py`
 extension + retrofit of CHANGELOG.md's own existing entries with
-component tags, and the dashboard UI surface itself (shape not yet
-decided - a 6th header panel like Requirements/Leaderboard, or
-something bigger given the real volume of content, hasn't been asked
-yet). Large enough to be its own multi-session build, not a single
-sitting.
+component tags, and the dashboard UI build itself. Large enough to be
+its own multi-session build, not a single sitting.
 
 ### 11. Switch pytest-cov from line/statement coverage to branch coverage
 
