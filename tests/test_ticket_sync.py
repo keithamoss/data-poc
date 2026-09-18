@@ -55,7 +55,7 @@ def _amber_dataset():
 
 @pytest.fixture
 def scope():
-    return DatasetScope(id="birth-registrations", name="Birth Registrations")
+    return DatasetScope(id="birth-registrations", name="Birth Registrations", agency_id="registry-services")
 
 
 def test_no_open_ticket_and_red_opens_a_new_one(monkeypatch, scope):
@@ -88,6 +88,36 @@ def test_no_open_ticket_and_amber_opens_a_new_one(monkeypatch, scope):
     assert title == "Birth Registrations is amber"
     body = create_call[create_call.index("--body") + 1]
     assert "/accept" in body
+
+
+def test_opening_a_ticket_with_a_real_assignee_passes_gh_assignee(monkeypatch, scope):
+    """running-thoughts.md #2, 2026-09-18: a dataset with real people
+    assigned (contract/people.yaml, via qa_tools/common/people.py's own
+    dataset-then-agency resolution) gets a real GitHub --assignee on
+    the ticket it opens."""
+    fake = FakeGh(list_response=[])
+    monkeypatch.setattr(ticket_sync, "_run_gh", fake)
+    people_config = {
+        "people": {},
+        "agency_assignments": {"registry-services": [{"email": "keith@example.com", "github": "keithamoss", "role": "qa"}]},
+        "dataset_assignments": {},
+    }
+
+    ticket_sync.sync_dataset("o", "r", scope, _red_dataset(), people_config)
+
+    create_call = next(c for c in fake.calls if c[:2] == ["issue", "create"])
+    assert "--assignee" in create_call
+    assert create_call[create_call.index("--assignee") + 1] == "keithamoss"
+
+
+def test_opening_a_ticket_with_no_people_configured_omits_assignee_entirely(monkeypatch, scope):
+    fake = FakeGh(list_response=[])
+    monkeypatch.setattr(ticket_sync, "_run_gh", fake)
+
+    ticket_sync.sync_dataset("o", "r", scope, _red_dataset())
+
+    create_call = next(c for c in fake.calls if c[:2] == ["issue", "create"])
+    assert "--assignee" not in create_call
 
 
 def test_opening_a_ticket_ensures_both_real_labels_exist_first(monkeypatch, scope):

@@ -786,6 +786,7 @@ const REQUIREMENTS = [];
 const TICKET_STATUS = {};
 const GITHUB_LINKS = {checks:{}, agencies:{}, datasets:{}};
 const ACCEPTANCES = {};
+const ASSIGNMENTS = {agencies:{}, datasets:{}};
 
 // Shared by Birth Registrations (a single dataset) and Child Protection
 // (6 datasets, one per table) - both are reshaped server-side into this
@@ -1799,6 +1800,24 @@ function githubFolderLink(kind, id){
   if(!url) return "";
   return `<a href="${url}" target="_blank" rel="noopener" class="pill tag sm" title="View this ${kind==='agencies'?'agency':'dataset'}'s real QA code on GitHub" onclick="event.stopPropagation()"><span class="ico"></span>View on GitHub</a>`;
 }
+// running-thoughts.md #2 ("data-asset-level people/roles config",
+// 2026-09-18, scoped via AskUserQuestion) - real people assigned to
+// this agency/dataset (contract/people.yaml, qa_tools/common/people.py's
+// own dataset-then-agency resolution - ASSIGNMENTS.datasets already
+// only ever carries an entry when that resolution actually found
+// someone, so no separate fallback logic is needed here). Emails are
+// deliberately never embedded (dashboard/embed_dashboard_data.py's own
+// docstring on why) - only name/nickname/github/role ever reach this
+// page.
+function assignmentBadge(kind, id){
+  const records = (ASSIGNMENTS[kind] && ASSIGNMENTS[kind][id]) || [];
+  if(!records.length) return "";
+  const names = records.map(r => {
+    const label = r.nickname || r.name || r.github || "someone";
+    return r.role ? `${label} (${r.role})` : label;
+  }).join(", ");
+  return `<span class="pill tag sm" title="Real people assigned via contract/people.yaml"><span class="ico"></span>Owned by ${names}</span>`;
+}
 
 function setRail(items){
   const rail = document.getElementById("rail");
@@ -1992,7 +2011,7 @@ function renderAgency(view, agencyId){
         <h2>${ag.name}</h2>
         <div class="view-sub">Real-time QA state across ${ag.name}'s data collections — for internal data teams and this agency's own data providers.</div>
       </div>
-      <div style="display:flex; align-items:center; gap:8px;">${pill(ag.status)}${githubFolderLink("agencies", ag.id)}</div>
+      <div style="display:flex; align-items:center; gap:8px;">${pill(ag.status)}${githubFolderLink("agencies", ag.id)}${assignmentBadge("agencies", ag.id)}</div>
     </div>
     <div id="collections"></div>
   `;
@@ -2161,7 +2180,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     view.innerHTML = `
       <div class="view-head">
         <div>
-          <h2>${ds.name} ${pill("nodata")} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)}</h2>
+          <h2>${ds.name} ${pill("nodata")} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</h2>
           <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}</div>
         </div>
       </div>
@@ -2180,7 +2199,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <h2>${ds.name}${ds.isReal?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:` <span class="pill illustrative"><span class="ico"></span>Illustrative mock data</span>`}</h2>
         <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${ds.isReal?" · figures below are computed by real dbt/Soda/datacontract-cli/Evidently tools against real generated runs — not fabricated in the browser.":""}</div>
       </div>
-      <div style="display:flex; align-items:center; gap:8px;">${pill(ds.status)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)}</div>
+      <div style="display:flex; align-items:center; gap:8px;">${pill(ds.status)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
     </div>
     ${ds.noDataAsOf ? `
     <div style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:64ch;">

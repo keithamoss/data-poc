@@ -1,0 +1,56 @@
+# Real people who work on this data asset, and which real datasets/
+# agencies they're responsible for - running-thoughts.md #2 ("data-
+# asset-level people/roles config"), scoped via AskUserQuestion with
+# Keith, 2026-09-18: drives real GitHub ticket assignment
+# (qa_tools/common/ticket_sync.py's `--assignee`, qa_tools/common/
+# people.py's own resolver) and a small "Owned by" indicator on the
+# dashboard's agency/dataset headers. Sits alongside contract/data-
+# asset.yaml, but this file is genuinely per-dataset/agency-capable
+# (that one is deliberately data-asset-wide only, one value for the
+# whole system - Thread C's own correction, see that file's header) -
+# both real, deliberate forks, resolved with Keith before building.
+#
+# Deliberately shipped EMPTY here, not seeded with real names/emails -
+# this session doesn't know Keith's real email or full name and won't
+# guess at personal details, even small ones. Fill in real people
+# below; every consumer of this file (ticket_sync.py, the dashboard's
+# own "Owned by" badge) degrades to "no assignee" gracefully when a
+# scope has no matching entry, same treatment every other optional
+# embedded feed on this page already gets.
+#
+# Schema:
+#
+# people:
+#   - email: keith@example.com   # the same real identity qa_tools/common/git_identity.py's
+#                                 # get_run_by() already stamps into every real QA run as
+#                                 # `run_by` - this is the stable key `assignments:` below
+#                                 # references a person by, not a separate made-up id.
+#     name: Keith Amoss          # a real display name.
+#     nickname: Keith            # optional - shown in the dashboard's own "Owned by" badge
+#                                 # instead of the full name when set.
+#     github: keithamoss         # a real GitHub username - required for real ticket
+#                                 # assignment (`gh issue create --assignee`), optional
+#                                 # otherwise (a person can be listed/shown without ever
+#                                 # being assignable to a ticket).
+#     roles: [qa, manager]       # one or more roles - not a closed/exhaustive list (Keith's
+#                                 # own framing when this was first raised): qa, peer_review,
+#                                 # and manager have been mentioned so far, but a new role is
+#                                 # just a new string, no schema change needed.
+#
+# assignments:
+#   - agency: registry-services  # EITHER `agency:` (an agencyId) OR `dataset:` (a datasetId)
+#     person: keith@example.com  # - never both on the same entry. `person` references a
+#     role: qa                   # real people[].email above.
+#   - dataset: cp-clients        # A dataset-level entry OVERRIDES its whole agency's entries
+#     person: keith@example.com  # outright for that one dataset (never merged with the
+#     role: peer_review          # agency-level list) - qa_tools/common/people.py's own
+#                                 # assignees_for() docstring has the full reasoning.
+#
+# Multiple people can be assigned to the same scope, in different (or
+# the same) roles - a real ticket gets assigned to everyone currently
+# responsible for that dataset/agency, not just one arbitrarily-picked
+# role.
+
+people: []
+
+assignments: []

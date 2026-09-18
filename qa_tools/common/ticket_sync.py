@@ -22,6 +22,14 @@ provider access - all real pieces of the original design (docs/
 remediation-workflow-design.md) explicitly deferred past this MVP, not
 overlooked.
 
+A newly-opened ticket now also gets a real `--assignee` when
+contract/people.yaml has anyone real assigned to that dataset/agency
+(running-thoughts.md #2, "data-asset-level people/roles config",
+2026-09-18, scoped via AskUserQuestion) - qa_tools/common/people.py's
+own dataset-then-agency resolution, omitted entirely when nobody's
+configured yet (this repo's own committed people.yaml ships empty -
+real names are Keith's to fill in).
+
 Runs via the real `gh` CLI (subprocess - same convention this project
 already uses for dbt/soda/datacontract-cli) - authenticates via
 GITHUB_TOKEN, already set automatically inside a GitHub Actions job (no
@@ -65,6 +73,7 @@ import subprocess
 from dataclasses import dataclass
 
 from qa_tools.common.dataset_status import dataset_status
+from qa_tools.common.people import PEOPLE_YAML, github_usernames_for, parse_people_config
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 BDM_DASHBOARD_JSON = os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")
@@ -77,11 +86,32 @@ CP_DASHBOARD_JSON = os.path.join(ROOT, "reports", "child_protection_dashboard.js
 # any other issue a human might open on this repo for unrelated reasons.
 TICKET_LABEL = "qa-ticket"
 
+# Real, currently-static dataset -> agency mapping (running-thoughts.md
+# #2, 2026-09-18) - needed here so open_ticket() can resolve real ticket
+# assignees (qa_tools/common/people.py's own dataset-then-agency
+# fallback). A plain dict, not derived from anything dynamic, same "just
+# add the new entry" convention already used twice elsewhere for this
+# exact same real mapping (qa_tools/common/github_links.py's
+# AGENCY_QA_FOLDER/DATASET_QA_FOLDER, qa_tools/common/acceptance_sync.py's
+# QA_RESULTS_SCOPE_FOR_DATASET) - not consolidated into one shared
+# module in this pass (a real, deliberate scope call, not an oversight -
+# worth doing if a 4th copy is ever needed).
+DATASET_AGENCY = {
+    "birth-registrations": "registry-services",
+    "cp-clients": "child-protection-family-support",
+    "cp-notifications": "child-protection-family-support",
+    "cp-investigations": "child-protection-family-support",
+    "cp-placements": "child-protection-family-support",
+    "cp-carers": "child-protection-family-support",
+    "cp-case-workers": "child-protection-family-support",
+}
+
 
 @dataclass
 class DatasetScope:
     id: str
     name: str
+    agency_id: str
 
 
 def _load_scopes() -> list[tuple[DatasetScope, dict]]:
@@ -92,12 +122,12 @@ def _load_scopes() -> list[tuple[DatasetScope, dict]]:
     scopes: list[tuple[DatasetScope, dict]] = []
     with open(BDM_DASHBOARD_JSON) as f:
         bdm = json.load(f)
-    scopes.append((DatasetScope(id=bdm["id"], name=bdm["name"]), bdm))
+    scopes.append((DatasetScope(id=bdm["id"], name=bdm["name"], agency_id=DATASET_AGENCY[bdm["id"]]), bdm))
 
     with open(CP_DASHBOARD_JSON) as f:
         cp = json.load(f)
     for ds in cp["datasets"]:
-        scopes.append((DatasetScope(id=ds["id"], name=ds["name"]), ds))
+        scopes.append((DatasetScope(id=ds["id"], name=ds["name"], agency_id=DATASET_AGENCY[ds["id"]]), ds))
     return scopes
 
 
@@ -142,9 +172,23 @@ def _ensure_label(owner: str, repo: str, name: str, description: str) -> None:
     ])
 
 
-def open_ticket(owner: str, repo: str, scope: DatasetScope, status: str) -> int:
+_EMPTY_PEOPLE_CONFIG = {"people": {}, "agency_assignments": {}, "dataset_assignments": {}}
+
+
+def open_ticket(owner: str, repo: str, scope: DatasetScope, status: str, people_config: dict | None = None) -> int:
     _ensure_label(owner, repo, TICKET_LABEL, "Opened automatically by this project's real QA pipeline")
     _ensure_label(owner, repo, _dataset_label(scope.id), f"Real QA tickets for {scope.name}")
+
+    # running-thoughts.md #2 (2026-09-18, scoped via AskUserQuestion):
+    # real ticket assignment, resolved from contract/people.yaml -
+    # dataset-level assignments win outright over agency-level ones
+    # (people.py's own assignees_for() docstring). No real people
+    # configured yet (contract/people.yaml ships empty - real names/
+    # emails are Keith's to fill in, not fabricated) means an empty
+    # list here, same graceful degradation every other optional
+    # embedded feed in this project already gets - `gh issue create`
+    # without `--assignee` at all, not an error.
+    usernames = github_usernames_for(scope.id, scope.agency_id, people_config or _EMPTY_PEOPLE_CONFIG)
 
     body = (
         f"**{scope.name}** (`{scope.id}`) is currently reading **{status}** - "
@@ -164,12 +208,15 @@ def open_ticket(owner: str, repo: str, scope: DatasetScope, status: str) -> int:
             if status == "amber" else ""
         )
     )
-    out = _run_gh([
+    args = [
         "issue", "create", "--repo", f"{owner}/{repo}",
         "--title", f"{scope.name} is {status}",
         "--body", body,
         "--label", f"{TICKET_LABEL},{_dataset_label(scope.id)}",
-    ])
+    ]
+    if usernames:
+        args += ["--assignee", ",".join(usernames)]
+    out = _run_gh(args)
     # `gh issue create` (non-interactive, --title/--body given) prints
     # exactly the new issue's real URL to stdout and nothing else.
     return int(out.strip().rsplit("/", 1)[-1])
@@ -179,7 +226,7 @@ def comment(owner: str, repo: str, issue_number: int, body: str) -> None:
     _run_gh(["issue", "comment", str(issue_number), "--repo", f"{owner}/{repo}", "--body", body])
 
 
-def sync_dataset(owner: str, repo: str, scope: DatasetScope, dataset: dict) -> str:
+def sync_dataset(owner: str, repo: str, scope: DatasetScope, dataset: dict, people_config: dict | None = None) -> str:
     """Returns a short, real description of the action actually taken
     (or genuinely 'nothing to do') - for the caller's own log, never a
     guess about what would happen."""
@@ -188,7 +235,7 @@ def sync_dataset(owner: str, repo: str, scope: DatasetScope, dataset: dict) -> s
 
     if existing is None:
         if status in ("red", "amber"):
-            issue_number = open_ticket(owner, repo, scope, status)
+            issue_number = open_ticket(owner, repo, scope, status, people_config)
             return f"{scope.id}: opened #{issue_number} ({status})"
         return f"{scope.id}: {status}, no open ticket - nothing to do"
 
@@ -204,13 +251,14 @@ def sync_dataset(owner: str, repo: str, scope: DatasetScope, dataset: dict) -> s
     return f"{scope.id}: #{existing} resolved to {status}, commented (not closed)"
 
 
-def sync_all(owner: str, repo: str) -> list[str]:
-    return [sync_dataset(owner, repo, scope, dataset) for scope, dataset in _load_scopes()]
+def sync_all(owner: str, repo: str, people_config: dict | None = None) -> list[str]:
+    return [sync_dataset(owner, repo, scope, dataset, people_config) for scope, dataset in _load_scopes()]
 
 
 def main() -> None:
     owner, repo = os.environ["GITHUB_REPOSITORY"].split("/", 1)
-    for line in sync_all(owner, repo):
+    people_config = parse_people_config(PEOPLE_YAML)
+    for line in sync_all(owner, repo, people_config):
         print(line)
 
 

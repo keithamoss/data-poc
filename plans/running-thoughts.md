@@ -91,6 +91,37 @@ ticket gets assigned to, and probably who's allowed to do what (e.g.
 peer review vs. the original QA-er). Explicitly tied to idea #1, not a
 standalone piece - scope together.
 
+**Built, 2026-09-18 evening.** Scoped via one `AskUserQuestion` round:
+drives real GitHub ticket assignment (not gating who may `/accept` -
+explicitly left for a later pass); per-dataset/agency assignment, not
+one flat data-asset-wide list; and shown in the dashboard too, not
+backend-only.
+
+New `contract/people.yaml` (real schema documented in its own header
+comment) + `qa_tools/common/people.py` (pure parse/resolve, mirroring
+`ticket_status.py`'s own real-parse/real-write split). Dataset-level
+assignments win OUTRIGHT over agency-level ones - never merged, so
+"who's assigned to this dataset" always has exactly one real source.
+Wired into `ticket_sync.py`'s `open_ticket()` (`--assignee`, omitted
+entirely when nobody's configured) and into the dashboard as a new
+`ASSIGNMENTS` const with a real "Owned by" badge on the agency/dataset
+headers - verified end to end with fake fixture people (agency-level,
+a dataset-level override, and the agency-level fallback for a sibling
+dataset with no override of its own, each behaving exactly as
+designed).
+
+**Deliberately shipped with `contract/people.yaml` still empty** - this
+session doesn't know Keith's real email or full name and won't guess at
+personal details, even small ones; every consumer already degrades
+gracefully to "nobody assigned" (no real committed entries yet, same
+treatment every other optional embedded feed here gets). Real people
+are Keith's to add.
+
+Real GitHub emails are never embedded into the publicly-deployed
+dashboard (this repo is public) - only name/nickname/github/role ever
+reach the built page; `embed_dashboard_data.py` strips `email` at embed
+time.
+
 ### 3. Gamification MVP on the reporting dashboard
 
 A small MVP that celebrates staff turning QA around fast, or

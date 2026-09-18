@@ -107,7 +107,21 @@ acceptance_sync.build_acceptances() (pure, no `gh`/network here either)
 to turn it into the final embed. Empty {} locally with no such file,
 same graceful degradation as TICKET_STATUS.
 
-This only replaces those nine consts - the rest of the dashboard (its
+And `const ASSIGNMENTS` (running-thoughts.md #2, "data-asset-level
+people/roles config", 2026-09-18, scoped via AskUserQuestion) -
+`{agencies: {agencyId: [...]}, datasets: {datasetId: [...]}}`, real
+people assigned to each real scope (qa_tools/common/people.py's own
+dataset-then-agency resolution - contract/people.yaml is a real,
+committed file this script CAN read directly, unlike OPEN_TICKETS_JSON/
+QA_COMMENTS_JSON - no `gh`/token needed, so no CI-only raw-fetch step
+for this one). Each record's real `email` field
+(people.py's own richer shape, needed by ticket_sync.py's `--assignee`
+resolution) is stripped before embedding - this repo is public (Keith's
+own call, CLAUDE.md), and a person's email has no reason to be baked
+into a publicly-deployed static page just because their name/GitHub
+username already is.
+
+This only replaces those ten consts - the rest of the dashboard (its
 CSS, the rendering code, the other 14 illustrative datasets, and the
 separate SNAPSHOT_MANIFEST const dashboard/snapshot_dashboard.py owns)
 is copied through unchanged from the template.
@@ -122,7 +136,9 @@ from dashboard.requirements_yaml import parse_requirements
 from qa_tools.common.acceptance_sync import build_acceptances
 from qa_tools.common.changelog import build_changelog
 from qa_tools.common.github_links import build_check_source_links, build_folder_links, current_commit_sha
+from qa_tools.common.people import PEOPLE_YAML, assignees_for, parse_people_config
 from qa_tools.common.ticket_status import parse_open_tickets
+from qa_tools.common.ticket_sync import DATASET_AGENCY
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 TEMPLATE_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.template.html")
@@ -232,6 +248,22 @@ def embed() -> None:
     html = _replace_const(html, "ACCEPTANCES", json.dumps(acceptances, separators=(",", ":")))
     print(f"Re-embedded ACCEPTANCES = {sum(len(v) for v in acceptances.values())} accepted run(s) across {len(acceptances)} dataset(s)"
           + ("" if os.path.exists(QA_COMMENTS_JSON) else " (no reports/qa_comments.json - local build, embedding empty)"))
+
+    def _public(record: dict) -> dict:
+        return {k: v for k, v in record.items() if k != "email"}
+
+    people_config = parse_people_config(PEOPLE_YAML)
+    dataset_assignments = {}
+    for dataset_id, agency_id in DATASET_AGENCY.items():
+        records = assignees_for(dataset_id, agency_id, people_config)
+        if records:
+            dataset_assignments[dataset_id] = [_public(r) for r in records]
+    assignments = {
+        "agencies": {agency_id: [_public(r) for r in records] for agency_id, records in people_config["agency_assignments"].items()},
+        "datasets": dataset_assignments,
+    }
+    html = _replace_const(html, "ASSIGNMENTS", json.dumps(assignments, separators=(",", ":")))
+    print(f"Re-embedded ASSIGNMENTS = {len(assignments['agencies'])} agency/{len(assignments['datasets'])} dataset assignment(s)")
 
     with open(DASHBOARD_HTML, "w") as f:
         f.write(html)
