@@ -18,14 +18,14 @@ as `plans/data-generation.md #N`) are permanent once assigned - never
 renumbered or reused, even if an item is later retired, matching `qa_
 tools/common/check_lifecycle.py`'s own `check_id` convention.
 
-1. **[done]** **[Data generation]** Pull `synthetic-data-generator/` and
+1. **[done, 2026-09-18]** **[Data generation]** Pull `synthetic-data-generator/` and
    `docs/` into this repo. The sibling repo never existed on GitHub —
    only inside claude.ai chat sessions — so this was a zip merge, not a
    git remote add. Deliberately left out a stale, pre-real-tools
    snapshot of the pipeline files bundled in the same upload. Commit
    `8a1028f`.
 
-2. **[todo, low]** **[Data generation]** Decide the long-term home for
+2. **[todo, 2026-09-18]** **[Data generation]** Decide the long-term home for
    `synthetic_data_generator/`. It's a subdirectory here for now
    (simplest, since it never had its own GitHub repo); worth revisiting
    once cleanup starts — does it stay merged into this repo, or get
@@ -38,7 +38,7 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
    actual installable dependency, not just delete the sys.path hack that
    used to paper over this.
 
-3. **[todo, low]** **[Data generation]** Birth Registrations and Child
+3. **[todo, 2026-09-14]** **[Data generation]** Birth Registrations and Child
    Protection currently come from two separate, unlinked synthetic
    populations — no cross-agency identity linkage is actually exercised
    in this pipeline, despite the machinery existing.
@@ -112,7 +112,7 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
      `has_child_protection_history` children get birthdates placed inside
      the rolling window vs. left at their existing 0-17-year spread.
 
-4. **[todo, low]** **[Data generation]** Document/explain how the
+4. **[todo, 2026-09-18]** **[Data generation]** Document/explain how the
    synthetic data population is generated and how `dirty.py`'s failure
    injection reflects real government data quality issues — Keith wants
    to understand the current approach's realism, not just confirm that
@@ -239,7 +239,7 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
    this was structurally impossible - a genuinely new problem this
    feature introduced, not a pre-existing one just now noticed.
 
-6. **[investigate]** **[Data generation]** Data generation currently
+6. **[investigate, 2026-09-18]** **[Data generation]** Data generation currently
    duplicates the contract's column definitions rather than reading from
    them - a real pain point Keith flagged. Confirmed by reading the
    code, not assumed: `contract/bdm-birth-registrations-contract.yaml`'s

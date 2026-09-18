@@ -75,13 +75,13 @@ check_lifecycle.py`'s own `check_id` convention.
 
 ## Action items
 
-1. **[todo, low]** **[Pipeline & publishing]** Try Postgres as the
+1. **[todo, 2026-09-18]** **[Pipeline & publishing]** Try Postgres as the
    warehouse instead of DuckDB (the original HANDOFF suggested it as an
    alternative). Would tell us whether the dbt-duckdb reliability bug is
    DuckDB-specific or a more general dbt-core issue — useful signal for
    `plans/qa-pipeline.md` #1 even if Postgres itself isn't adopted.
 
-2. **[investigate]** **[Pipeline & publishing]** Data pipeline
+2. **[investigate, 2026-09-18]** **[Pipeline & publishing]** Data pipeline
    observability — flagged as a tangent, not yet scoped. Distinct from
    what's already built: the QA dashboard/real-tools pipeline checks
    *data quality* at a point in time; this would be about the health of
@@ -172,14 +172,14 @@ check_lifecycle.py`'s own `check_id` convention.
      than it's worth right now, revisit only if it becomes a real pain
      point.
 
-4. **[parked]** **[Docs & process]** Keith wants to give a dedicated
+4. **[parked, 2026-09-18]** **[Docs & process]** Keith wants to give a dedicated
    walkthrough of *why* this project exists and its actual goals, once
    the current loop of smaller follow-ups winds down - explicitly so
    future analysis/recommendations here are better informed by that
    context rather than inferred piecemeal from individual requests.
    Nothing to do yet - revisit when he raises it.
 
-5. **[decided, 2026-09-14]** **[Docs & process]** Project codename:
+5. **[done, 2026-09-14]** **[Docs & process]** Project codename:
    **Mothman**. Chosen over "data-poc" - scoped via a few rounds: single
    or two words max, playful/punny or a backronym, tied to the wider
    government-data-asset angle rather than narrowly to birth
@@ -262,7 +262,7 @@ check_lifecycle.py`'s own `check_id` convention.
 
    **Decision (2026-09-14): Mothman.**
 
-6. **[done]** **[Testing & dev tooling]** Development tooling: `uv`,
+6. **[done, 2026-09-18]** **[Testing & dev tooling]** Development tooling: `uv`,
    `ruff`, and `pytest` smoke tests - Keith asked "is there anything you
    want to do now to set us up well for [adding more code]," scoped via
    questions before building each piece.
@@ -310,7 +310,7 @@ check_lifecycle.py`'s own `check_id` convention.
      pip installs (no equivalent override mechanism) - documented as
      such in README.
 
-7. **[parked]** **[Testing & dev tooling]** A real CLI for running this
+7. **[parked, 2026-09-18]** **[Testing & dev tooling]** A real CLI for running this
    PoC, built on Python's `click` library - Keith's own framing: "the
    goal is to give humans a user-friendly tool to use to run this PoC on
    real and fake data." Today's actual entry points, confirmed against
@@ -334,7 +334,7 @@ check_lifecycle.py`'s own `check_id` convention.
    source exists anywhere in this project today - see item #8 below for
    what that would actually take).
 
-8. **[parked, medium-term]** **[Pipeline & publishing]** What this repo
+8. **[parked, 2026-09-16]** **[Pipeline & publishing]** What this repo
    would need to change to run against real data in production, not
    just this PoC's synthetic fixtures - Keith's own list of concerns,
    not yet scoped or investigated against the actual codebase the way
@@ -374,7 +374,7 @@ check_lifecycle.py`'s own `check_id` convention.
    CI-gated publishing with no manual local-publish path, and a build
    order.
 
-9. **[parked, big think-piece]** **[QA checks & contract]** Generalizing
+9. **[parked, 2026-09-18]** **[QA checks & contract]** Generalizing
    this whole architecture (ODCS contract schema, Soda checks, dbt
    generic tests, and the dashboard's own rendering model) to work on
    different SHAPES of data asset, not just the one it's built around

@@ -4784,7 +4784,7 @@ relative, not a schedule — this is weeks of work, not months.
     2026-09-18 split - a QA-checks-and-contract concern, not a
     whole-of-project one.)
 
-85. **[investigate]** **[QA checks & contract]** A real, currently-unused
+85. **[investigate, 2026-09-18]** **[QA checks & contract]** A real, currently-unused
     way to make the ODCS contract the actual single source of truth for
     dbt's and Soda's own check files too - not just something the
     dashboard/datacontract-cli read. Keith asked for this to be flagged
