@@ -39,11 +39,12 @@ tool's own server-side UTC clock.
   separately) the moment that dataset's worst-of-every-check status
   goes red, and keeps commenting with its live status on every
   subsequent run - still red, or resolved - without ever auto-closing
-  the ticket, since closing stays a human decision. Manually triggered
-  for now rather than on every push: all seven real datasets currently
-  read red because of the known threshold-encoding bug tracked
-  separately, and turning the automatic trigger on before that's fixed
-  would open seven tickets that don't reflect a genuine problem.
+  the ticket, since closing stays a human decision. Runs automatically
+  on every relevant push - confirmed live: all seven real tickets
+  opened for real once turned on, each reflecting a genuine finding
+  (a real sibling-record mismatch for Birth Registrations, a real
+  dirty synthetic delivery for Child Protection's six tables), not a
+  false alarm.
 - A small badge on each dataset's own tile linking straight to its
   real, currently-open GitHub Issue (when one exists) - embedded at
   dashboard build time from a real, read-only GitHub API call, same
@@ -66,6 +67,9 @@ tool's own server-side UTC clock.
 - A local build failure: re-running the real check tools without first
   refreshing the combined warehouse left one column's arrival stats
   looking up a run that wasn't there yet.
+- The GitHub Issues ticketing MVP's very first live run: opening a
+  ticket needs its labels to already exist on the repo, which neither
+  did yet - now created automatically the first time they're needed.
 
 ### Changed
 - A real YAML syntax mistake in a hand-edited contract file went
