@@ -133,6 +133,14 @@ first.
   arrive on the same calendar day.
 
 ### Changed
+- **9:37pm** — Redesigned the leaderboard to celebrate resolving a dataset from red
+  back to green, not just running QA on it - a real person's own streak
+  of GitHub QA tickets closed in a row without being reopened, tracked
+  via a real GitHub API call rather than committed QA-run history. The
+  earlier "current not-red run streak" design (shipped 9:12pm the same
+  day) had nothing left to credit once QA running itself becomes
+  automated, since closing a ticket stays the one action in this system
+  that's always a human decision.
 - **7:08pm** — Child Protection's resupply simulation, calibrated further: a dirty
   delivery now only fails 2-3 of its 6 real tables, not all of them,
   and the most recent delivery is no longer forced red - both random,
