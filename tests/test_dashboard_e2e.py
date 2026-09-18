@@ -23,6 +23,7 @@ built once, reused by every test in this module.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import urllib.parse
@@ -186,6 +187,26 @@ class TestRequirementsPanel:
         assert any(label in rows_text for label in ("Must", "Should", "Could"))
         assert any(label in rows_text for label in ("Built", "In progress", "Not started"))
         assert "tests/" in rows_text or "tests-js/" in rows_text
+
+
+class TestReleaseNotesPanel:
+    def test_opening_it_shows_real_entries_with_a_leading_timestamp(self, clean_page, built_dashboard_html):
+        """The 2026-09-18 CHANGELOG.md timestamp retrofit (plans/qa-
+        pipeline.md): every entry now carries a real AWST commit time,
+        parsed by dashboard/changelog_md.py and rendered by
+        renderChangelogPanel() ahead of the entry's own text - assert a
+        real `H:MMam`/`H:MMpm` timestamp actually renders, not just that
+        the panel has content (which the pre-timestamp version already
+        passed)."""
+        _goto(clean_page, built_dashboard_html)
+
+        clean_page.locator("#changelog-btn").click()
+        body = clean_page.locator("#changelog-panel-body")
+        rows_text = body.inner_text()
+
+        assert "No release notes yet" not in rows_text
+        assert re.search(r"\b\d{1,2}:\d{2}(am|pm)\b", rows_text), \
+            f"no real timestamp rendered in the release notes panel: {rows_text[:200]!r}"
 
 
 @pytest.fixture

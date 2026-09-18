@@ -18,14 +18,20 @@ Expected shape (see CHANGELOG.md itself for the real, current file):
     ## <date>
 
     ### <category>
-    - <entry, possibly wrapped across multiple indented lines>
-    - <entry>
+    - **<time>** — <entry, possibly wrapped across multiple indented lines>
+    - **<time>** — <entry>
 
     ### <category>
-    - <entry>
+    - **<time>** — <entry>
 
     ## <date>
     ...
+
+An item's leading `**<time>**` (e.g. `**6:12am**`, real AWST git-commit
+time, same convention as the date headings above it) is optional - a
+bullet with no timestamp parses fine, just with `"time": None` - so
+this stays backward compatible with any entry that predates the
+2026-09-18 timestamp retrofit.
 
 Deliberately narrow: no full CommonMark support (no nested lists, no
 inline links, no code fences) - this file's own style is simple by
@@ -34,14 +40,25 @@ to reason about and test than pulling in a real markdown library for a
 shape this constrained.
 """
 from __future__ import annotations
+import re
 from pathlib import Path
+
+_ITEM_TIME_RE = re.compile(r"^\*\*(\d{1,2}:\d{2}(?:am|pm))\*\* — (.*)$")
+
+
+def _parse_item(text: str) -> dict:
+    match = _ITEM_TIME_RE.match(text)
+    if match:
+        return {"time": match.group(1), "text": match.group(2)}
+    return {"time": None, "text": text}
 
 
 def parse_changelog(path: str | Path) -> dict:
     """Returns {"intro": [str, ...], "entries": [{"date": str, "sections":
-    [{"category": str, "items": [str, ...]}, ...]}, ...]} - entries in
-    the file's own top-to-bottom order (Keep a Changelog convention:
-    newest first, so the file's own ordering is never re-sorted here)."""
+    [{"category": str, "items": [{"time": str | None, "text": str}, ...]},
+    ...]}, ...]} - entries in the file's own top-to-bottom order (Keep a
+    Changelog convention: newest first, so the file's own ordering is
+    never re-sorted here)."""
     intro_paragraphs: list[str] = []
     entries: list[dict] = []
     current_entry: dict | None = None
@@ -73,7 +90,7 @@ def parse_changelog(path: str | Path) -> dict:
                 current_entry["sections"].append(current_section)
                 continue
             if line.startswith("- ") and current_section is not None:
-                current_section["items"].append(stripped[2:])
+                current_section["items"].append(_parse_item(stripped[2:]))
                 continue
             if not seen_first_heading:
                 # preamble before the first "## " heading - the page's own
@@ -87,7 +104,7 @@ def parse_changelog(path: str | Path) -> dict:
             # section with at least one item already - a soft-wrapped
             # continuation of that item's own markdown source line
             if stripped and current_section is not None and current_section["items"]:
-                current_section["items"][-1] += " " + stripped
+                current_section["items"][-1]["text"] += " " + stripped
 
     flush_para()
     return {"intro": intro_paragraphs, "entries": entries}

@@ -28,7 +28,42 @@ def test_parses_a_single_entry_with_one_section(tmp_path):
     assert len(result["entries"]) == 1
     entry = result["entries"][0]
     assert entry["date"] == "2026-01-01"
-    assert entry["sections"] == [{"category": "Added", "items": ["First feature", "Second feature"]}]
+    assert entry["sections"] == [{"category": "Added", "items": [
+        {"time": None, "text": "First feature"},
+        {"time": None, "text": "Second feature"},
+    ]}]
+
+
+def test_parses_an_item_leading_timestamp_and_strips_it_from_the_text(tmp_path):
+    """Real convention since the 2026-09-18 timestamp retrofit
+    (plans/qa-pipeline.md): `- **<time>** — <text>`, real AWST git-commit
+    time. Optional - see the next test for the no-timestamp case, which
+    must keep working for any entry that predates the retrofit."""
+    path = _write(tmp_path, """# Changelog
+
+## 2026-01-01
+
+### Added
+- **6:12am** — First feature
+- **12:24pm** — Second feature
+""")
+    items = parse_changelog(path)["entries"][0]["sections"][0]["items"]
+    assert items == [
+        {"time": "6:12am", "text": "First feature"},
+        {"time": "12:24pm", "text": "Second feature"},
+    ]
+
+
+def test_an_item_with_no_leading_timestamp_still_parses_with_a_none_time(tmp_path):
+    path = _write(tmp_path, """# Changelog
+
+## 2026-01-01
+
+### Added
+- No timestamp on this one
+""")
+    items = parse_changelog(path)["entries"][0]["sections"][0]["items"]
+    assert items == [{"time": None, "text": "No timestamp on this one"}]
 
 
 def test_parses_multiple_entries_in_file_order(tmp_path):
@@ -63,8 +98,8 @@ def test_parses_multiple_sections_within_one_entry(tmp_path):
 """)
     entry = parse_changelog(path)["entries"][0]
     assert [s["category"] for s in entry["sections"]] == ["Added", "Fixed"]
-    assert entry["sections"][0]["items"] == ["A new thing"]
-    assert entry["sections"][1]["items"] == ["A bug"]
+    assert entry["sections"][0]["items"] == [{"time": None, "text": "A new thing"}]
+    assert entry["sections"][1]["items"] == [{"time": None, "text": "A bug"}]
 
 
 def test_joins_a_soft_wrapped_bullet_across_multiple_lines(tmp_path):
@@ -80,8 +115,23 @@ def test_joins_a_soft_wrapped_bullet_across_multiple_lines(tmp_path):
 """)
     items = parse_changelog(path)["entries"][0]["sections"][0]["items"]
     assert items == [
-        "A long entry that wraps across multiple lines in the markdown source, same paragraph.",
-        "A second, unrelated entry",
+        {"time": None, "text": "A long entry that wraps across multiple lines in the markdown source, same paragraph."},
+        {"time": None, "text": "A second, unrelated entry"},
+    ]
+
+
+def test_joins_a_soft_wrapped_bullet_that_starts_with_a_timestamp(tmp_path):
+    path = _write(tmp_path, """# Changelog
+
+## 2026-01-01
+
+### Fixed
+- **6:12am** — A long entry that wraps across
+  multiple lines in the markdown source.
+""")
+    items = parse_changelog(path)["entries"][0]["sections"][0]["items"]
+    assert items == [
+        {"time": "6:12am", "text": "A long entry that wraps across multiple lines in the markdown source."},
     ]
 
 

@@ -2740,7 +2740,7 @@ function renderChangelogPanel(){
       <div class="drawer-section" style="margin-bottom:14px;">
         <h4>${s.category}</h4>
         <ul style="margin:0; padding-left:18px; font-size:13px; line-height:1.55;">
-          ${s.items.map(item=>`<li style="margin-bottom:4px;">${mdInlineCode(item)}</li>`).join("")}
+          ${s.items.map(item=>`<li style="margin-bottom:4px;">${item.time ? `<span class="mono" style="color:var(--ink-faint); font-size:11.5px; margin-right:6px;">${item.time}</span>` : ""}${mdInlineCode(item.text)}</li>`).join("")}
         </ul>
       </div>`
     ).join("");

@@ -4410,6 +4410,59 @@ relative, not a schedule — this is weeks of work, not months.
     sibling-mismatch, all 6 CP tables for the real dirty-severity
     delivery) both reflect genuine findings, not noise.
 
+80. **[built, 2026-09-18]** Keith's own follow-up on `CHANGELOG.md`
+    (dictated): a real timestamp against every entry ("10 a.m., 10:15
+    a.m."-style), sorted newest-first within each date's own
+    `### <category>` subsection, so the newest thing is always at the
+    top - not just newest-date-first, which the file's Keep-a-Changelog
+    convention already gave it. Scoped via AskUserQuestion: retrofit
+    **all 6** existing date sections (not just today's); use **real git
+    commit timestamps**, converted to AWST (`TZ=Australia/Perth git log
+    --date=format-local:'%Y-%m-%d %H:%M' --pretty=format:'%h|%ad|%s'
+    --reverse`), never fabricated/approximate ones; also show these
+    timestamps in the dashboard's own Release Notes panel, not just the
+    markdown file. An entry whose work spanned several commits gets the
+    latest one's real time (Keith's own rule). Matching every existing
+    bullet's exact wording to its real underlying commit(s) surfaced 3
+    bullets filed under the wrong date relative to their real commits -
+    moved to the correct section rather than left mis-dated with a
+    fabricated-precision timestamp bolted on: resupply-chain simulation
+    (13th -> 14th, its real commit is `2026-09-14 07:44`), the
+    status-pill/run-picker/comparison-panel bullet (15th -> 16th, real
+    commit `2026-09-16 07:33`), and the cadence-aware as-of date picker
+    (16th -> 17th, real commit `2026-09-17 07:42`).
+
+    Format: `- **<H:MMam/pm>** — <original bullet text, unchanged>`.
+    `dashboard/changelog_md.py`'s `parse_changelog()` extended to parse
+    this optional leading `**<time>**` marker - each section's `items`
+    changed shape from a bare `list[str]` to `list[{"time": str | None,
+    "text": str}]` (`"time": None` for any entry predating this
+    convention, so the parser stays backward compatible rather than
+    requiring every historical entry to carry one); the soft-wrapped-
+    continuation-line join logic updated to append to the new `"text"`
+    field. `dashboard/qa-reporting-dashboard.template.html`'s
+    `renderChangelogPanel()` updated to render that time (when present)
+    ahead of each item's own text, styled with the page's existing
+    `.mono`/`--ink-faint` convention (same treatment `arrivalStatusLabel()`-
+    adjacent timestamps elsewhere on the page already get) - no visible
+    change for a `"time": None` item, so nothing regresses for any future
+    entry someone adds without one. `tests/test_changelog_md.py`'s
+    existing item-shape assertions updated to the new dict shape, plus 3
+    new tests (leading-timestamp parsing, no-timestamp backward
+    compatibility, a wrapped bullet that starts with a timestamp).
+    `tests/test_dashboard_e2e.py` gained `TestReleaseNotesPanel` - opens
+    the real built dashboard's Release Notes panel and asserts a real
+    `H:MMam`/`H:MMpm` timestamp actually renders, not just that the
+    panel has content (which it already did before this change) - run
+    against the real, CI-safe build chain via the shared
+    `built_dashboard_html` fixture, same as the other e2e test classes.
+    Verified: `uv run pytest` (full suite, including the new e2e test),
+    `uv run ruff check .`, `npm test` (Vitest, unaffected - no JS test
+    currently exercises the changelog panel directly) all green; the
+    real built dashboard's Release Notes panel visually confirmed
+    rendering timestamps ahead of each entry, newest-first within each
+    subsection, via the same Playwright check.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
