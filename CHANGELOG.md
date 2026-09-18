@@ -67,6 +67,15 @@ first.
   push, not just a speed-focused smoke-test suite.
 
 ### Fixed
+- **7:37pm** — The BDM/CP generator test suites shared their output directory with real
+  production data: running `tests/test_generate_runs.py`/`tests/
+  test_generate_cp_runs.py` wrote straight into `data/raw/`/`data/
+  cp_raw/`, the same directories `./run_pipeline.sh` and the real
+  orchestrators read from and write to - harmless in outcome (generation
+  is fully deterministic) but a real coupling between test execution and
+  production state that shouldn't have existed. Both test files now
+  point the generator at an isolated temp directory for the duration of
+  the run.
 - **7:22pm** — A real git-history-walking performance bug: building the "who
   published QA results, when" changelog feed used to spawn one real
   `git show` subprocess per commit that ever touched a dataset's
