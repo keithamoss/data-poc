@@ -632,6 +632,102 @@ infrastructure once both exist, but are two separate asks with two
 separate scoping conversations - don't conflate them when either comes
 up for real.
 
+**Scoped, 2026-09-18 evening, via several real `AskUserQuestion` rounds
+(Keith consistently picked the non-recommended, bigger-scope option each
+time - full retrofit, not forward-only; a real component taxonomy on top
+of status).** Real forks resolved, in order:
+
+1. **Direction**: restructure how these files get authored going
+   forward (not just parse today's free text as-is) - a stricter,
+   closed status vocabulary. Concretely: `todo` / `investigate` /
+   `in-progress` / `parked` / `done` / `superseded`, collapsing today's
+   loose variants (`done`/`DONE`/`built`/`complete`/`decided`/`fixed`/
+   `resolved` all become `done`, with the specific nuance staying in the
+   prose that already follows - not lost, just not a separate status
+   keyword).
+2. **File scope**: all 5 `plans/*.md` files - but `running-thoughts.md`
+   keeps its own simpler shape (no forced status field; it's explicitly
+   Keith's raw, not-yet-scoped capture buffer, "not yet scoped" isn't
+   really a status), just a looser feed the dashboard shows as-is.
+3. **Migration scope**: a FULL retrofit, not forward-only - all ~200+
+   existing items across `wider.md`/`qa-pipeline.md`/`publishing-and-
+   history.md`/`conceptual-design.md` get rewritten into the new format,
+   not just new items from here on. Real cost/risk, explicitly accepted:
+   a large, careful rewrite of real project memory, not a small change.
+4. **A real category/component field, added mid-scoping (Keith's own
+   follow-up, not originally asked)**: every item ALSO gets a component
+   tag, and - his own explicit ask - the SAME taxonomy should apply to
+   `CHANGELOG.md`'s release notes too, not just this new surface, so
+   both history feeds share one consistent "what part of the system did
+   this touch" vocabulary. Draft taxonomy, confirmed as-is: **Data
+   generation** (`generator/`, `synthetic_data_generator/`) · **QA
+   checks & contract** (`qa_tools/bdm`, `qa_tools/cp`, `contract/`) ·
+   **Pipeline & publishing** (`pipeline/`, `qa_results/` history shape,
+   `.github/workflows/`) · **Dashboard UI** (`dashboard/`) · **GitHub
+   workflow & people** (ticketing, acceptance, people/roles, leaderboard,
+   deep links - the human-process layer on top of QA results, real
+   enough to be its own bucket even though it renders inside
+   `dashboard/` too) · **Testing & dev tooling** (`tests/`, `tests-js/`,
+   coverage, ruff/uv/playwright setup) · **Docs & process** (`plans/
+   *.md`, `CLAUDE.md`, `README.md`, `docs/`).
+5. **Format**: stays markdown - explicitly NOT switching to YAML/JSON
+   (Keith invited the case to be made either way: "I'm happy to make
+   these not markdown files if it's genuinely easier... you would need
+   to not complicate other things"). The case made and accepted: the
+   real problem motivating "restructure" was disambiguation (today's
+   inline `[...]` status tags collide with unrelated code/issue
+   references elsewhere in the same prose - confirmed for real via a
+   `grep` across all 4 files turning up `[tool.uv]`, `[str,
+   pd.DataFrame]`, `[dbt-labs/dbt-core#11312]` alongside genuine status
+   tags), and a disciplined tag PLACEMENT convention (below) already
+   fixes that completely - a format switch buys no extra reliability on
+   top of it, while costing real prose-readability for the audience
+   these files actually serve (a human and every future Claude session
+   reading top-to-bottom as "the actual persistent memory of the
+   project," not a database client) and would introduce a THIRD
+   authoring convention in the repo alongside CHANGELOG.md's own working
+   narrative-markdown pattern and `requirements.yaml`'s genuinely
+   tabular one.
+6. **Structural placement - real finding mid-scoping, not assumed**:
+   checked the actual heading structure of all 4 files (`grep -nE
+   '^#{2,4} '` plus a numbered-item-count check) before committing to a
+   placement, rather than assuming one shape fits all. Found a real
+   split: `wider.md`/`qa-pipeline.md` (32 + 81 items) already use plain
+   numbered markdown list items with a bracket tag as the item's own
+   FIRST token (`N. **[status]** Title. Body...`) - no heading per item
+   at all; `publishing-and-history.md`/`conceptual-design.md` have ZERO
+   such items (confirmed via the same grep, 0 and 0) - they're organized
+   as long-form Thread/Phase essays with bold sub-headers instead, no
+   per-item status tags anywhere. Forcing the second pair into fake
+   discrete items was explicitly rejected (Keith's own call, below) -
+   they already carry status at the THREAD/PHASE level in their existing
+   prose ("Phases 1-4 are BUILT... Phase 5/6 still open"), so the new
+   schema applies at that coarser granularity for those two files only,
+   not per-item.
+
+   Resulting placement: for `wider.md`/`qa-pipeline.md`, two bracket
+   groups right after each item's own number (before any body prose,
+   so never ambiguous with an inline code/issue reference later in the
+   same item) - `N. **[status, YYYY-MM-DD]** **[Component]** Title...`.
+   For `publishing-and-history.md`/`conceptual-design.md`, a bold
+   `**Status:** value (date) · **Category:** Component` line at the top
+   of each `## Thread X`/`## Phase N` section, before its own prose
+   begins.
+7. **Link key**: `(file, item-number)` - e.g. `wider-42`,
+   `qa-pipeline-17` - is already a stable, unique key; no new global ID
+   scheme needed, no renumbering required.
+
+**Not yet built** - this is now fully scoped (every real fork resolved)
+but not started: the actual parser, the ~280+-item retrofit across 4
+files (200+ individual items in 2 files, an unknown-but-smaller number
+of Thread/Phase sections in the other 2), the `changelog_md.py`
+extension + retrofit of CHANGELOG.md's own existing entries with
+component tags, and the dashboard UI surface itself (shape not yet
+decided - a 6th header panel like Requirements/Leaderboard, or
+something bigger given the real volume of content, hasn't been asked
+yet). Large enough to be its own multi-session build, not a single
+sitting.
+
 ### 11. Switch pytest-cov from line/statement coverage to branch coverage
 
 Keith's own follow-up question after the requirements-register work
