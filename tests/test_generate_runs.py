@@ -4,33 +4,54 @@ actually running things rather than mocking) and checks the resulting
 manifest has the shape everything downstream depends on.
 
 The real generation itself (generate_runs.main() - writes BDM's full real
-120-delivery/176-run manifest + every real CSV to data/raw/) happens ONCE
-per test session (`manifest` fixture below, module-scoped - deliberately
+120-delivery/176-run manifest + every real CSV to a real directory) happens
+ONCE per test session (`manifest` fixture below, module-scoped - deliberately
 NOT a plain module-level call, since pytest needs a real fixture to share
 one real generation run across every test function in this file rather
 than each one triggering its own ~9s regeneration of identical,
 deterministic output - a real, measured ~43s/test-session win found
 2026-09-18 while investigating why the local suite felt slow, not a
 theoretical one). Every test below reads that one shared, real result -
-none of them mutate it, so sharing is safe."""
+none of them mutate it, so sharing is safe.
+
+Isolated from the real production data/raw/ since 2026-09-18 (Keith's own
+explicit call: "fix the issue where tests and production share an output
+directory") - see the `raw_dir` fixture's own docstring."""
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime
 
 import pytest
 
 from generator import generate_runs
 
-RAW_DIR = generate_runs.OUT_DIR
-MANIFEST_PATH = os.path.join(RAW_DIR, "manifest.json")
+
+@pytest.fixture(scope="module")
+def raw_dir(tmp_path_factory):
+    """Points generate_runs.OUT_DIR at a real tmp dir for the duration of
+    this module's tests, instead of the repo's own data/raw/ - running
+    this test file used to mutate the SAME directory ./run_pipeline.sh
+    and qa_tools.bdm.orchestrate_bdm read from/write to for real, purely
+    as a side effect of testing (harmless in outcome, since generation
+    is fully deterministic, but a real coupling between test execution
+    and production state that shouldn't exist). OUT_DIR is a plain
+    module global generate_runs.main() reads at call time (not captured
+    into a default arg), so reassigning it here works - module-scoped,
+    not the standard function-scoped `monkeypatch` fixture, which can't
+    be depended on from a module-scoped fixture (a real ScopeMismatch),
+    hence the manual save/restore instead."""
+    original = generate_runs.OUT_DIR
+    path = tmp_path_factory.mktemp("bdm_raw")
+    generate_runs.OUT_DIR = str(path)
+    yield path
+    generate_runs.OUT_DIR = original
 
 
 @pytest.fixture(scope="module")
-def manifest():
+def manifest(raw_dir):
     generate_runs.main()
-    with open(MANIFEST_PATH) as f:
+    with open(raw_dir / "manifest.json") as f:
         return json.load(f)
 
 
@@ -39,11 +60,11 @@ def test_manifest_has_one_entry_per_scheduled_delivery_at_minimum(manifest):
     assert len(delivery_ids) == len(generate_runs.RUN_PLAN)
 
 
-def test_every_manifest_entry_has_a_real_file_on_disk(manifest):
+def test_every_manifest_entry_has_a_real_file_on_disk(manifest, raw_dir):
     for entry in manifest:
-        path = os.path.join(RAW_DIR, entry["file"])
-        assert os.path.exists(path), f"{entry['run_id']}: {path} missing"
-        assert os.path.getsize(path) > 0
+        path = raw_dir / entry["file"]
+        assert path.exists(), f"{entry['run_id']}: {path} missing"
+        assert path.stat().st_size > 0
 
 
 def test_severity_counts_match_run_plan(manifest):

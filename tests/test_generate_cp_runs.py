@@ -19,7 +19,13 @@ Python packages with real absolute imports, and deleting the duplicate
 dirty.py/names_au.py/presentation.py entirely - see plans/wider.md's
 package-layout entry. This test can no longer catch the original bug
 (there's only one dirty.py to resolve to now), but still guards against
-the pattern recurring."""
+the pattern recurring.
+
+Isolated from the real production data/cp_raw/ since 2026-09-18 (Keith's
+own explicit call: "fix the issue where tests and production share an
+output directory") - see the `raw_dir` fixture's own docstring
+(tests/test_generate_runs.py's own identical fixture, BDM's
+counterpart, has the full account)."""
 from __future__ import annotations
 
 import json
@@ -31,14 +37,20 @@ import pytest
 from generator import generate_cp_runs
 from generator.generate_cp_runs import TABLES, _pick_dirty_tables
 
-RAW_DIR = generate_cp_runs.OUT_DIR
-MANIFEST_PATH = os.path.join(RAW_DIR, "manifest.json")
+
+@pytest.fixture(scope="module")
+def raw_dir(tmp_path_factory):
+    original = generate_cp_runs.OUT_DIR
+    path = tmp_path_factory.mktemp("cp_raw")
+    generate_cp_runs.OUT_DIR = str(path)
+    yield path
+    generate_cp_runs.OUT_DIR = original
 
 
 @pytest.fixture(scope="module")
-def manifest():
+def manifest(raw_dir):
     generate_cp_runs.main()
-    with open(MANIFEST_PATH) as f:
+    with open(raw_dir / "manifest.json") as f:
         return json.load(f)
 
 
@@ -53,13 +65,13 @@ def test_manifest_has_one_entry_per_scheduled_delivery_at_minimum(manifest):
     assert len(delivery_ids) == len(generate_cp_runs.RUN_PLAN)
 
 
-def test_every_manifest_entry_has_real_files_on_disk(manifest):
+def test_every_manifest_entry_has_real_files_on_disk(manifest, raw_dir):
     for entry in manifest:
-        run_dir = os.path.join(RAW_DIR, entry["run_id"])
+        run_dir = raw_dir / entry["run_id"]
         for table in generate_cp_runs.TABLES:
-            path = os.path.join(run_dir, f"{table}.csv")
-            assert os.path.exists(path), f"{entry['run_id']}: {path} missing"
-            assert os.path.getsize(path) > 0
+            path = run_dir / f"{table}.csv"
+            assert path.exists(), f"{entry['run_id']}: {path} missing"
+            assert path.stat().st_size > 0
 
 
 def test_severity_counts_match_run_plan(manifest):
@@ -104,7 +116,7 @@ def test_supersedes_chain_is_well_formed(manifest):
             assert prior["attempt_number"] == e["attempt_number"] - 1
 
 
-def test_clean_runs_never_have_bad_cp_clients_values(manifest):
+def test_clean_runs_never_have_bad_cp_clients_values(manifest, raw_dir):
     """A clean delivery must never carry the out-of-range date_of_birth
     injector's marker - unlike a dirty one, which now only fails 2-3 of
     the 6 real tables (Keith's own call, 2026-09-18 dictated feedback:
@@ -115,8 +127,8 @@ def test_clean_runs_never_have_bad_cp_clients_values(manifest):
     for entry in manifest:
         if entry["dirty_severity"] is not None:
             continue
-        run_dir = os.path.join(RAW_DIR, entry["run_id"])
-        with open(os.path.join(run_dir, "cp_clients.csv")) as f:
+        run_dir = raw_dir / entry["run_id"]
+        with open(run_dir / "cp_clients.csv") as f:
             lines = f.read().splitlines()
         header = lines[0].split(",")
         dob_idx = header.index("date_of_birth")
@@ -124,13 +136,13 @@ def test_clean_runs_never_have_bad_cp_clients_values(manifest):
         assert n_bad_dob == 0, f"{entry['run_id']} is clean but has out-of-range dates of birth"
 
 
-def test_some_dirty_runs_inject_bad_cp_clients_values(manifest):
+def test_some_dirty_runs_inject_bad_cp_clients_values(manifest, raw_dir):
     n_bad_runs = 0
     for entry in manifest:
         if entry["dirty_severity"] is None:
             continue
-        run_dir = os.path.join(RAW_DIR, entry["run_id"])
-        with open(os.path.join(run_dir, "cp_clients.csv")) as f:
+        run_dir = raw_dir / entry["run_id"]
+        with open(run_dir / "cp_clients.csv") as f:
             lines = f.read().splitlines()
         header = lines[0].split(",")
         dob_idx = header.index("date_of_birth")
