@@ -22,6 +22,11 @@ first.
 ## 2026-09-18
 
 ### Added
+- **8:51pm** — A real people/roles config: real GitHub tickets now get assigned to
+  whoever's actually responsible for that dataset (or its whole
+  agency, as a fallback) once real people are added, and the dashboard
+  shows an "Owned by" badge on the agency/dataset pages. Ships with no
+  real people in it yet - a config for Keith to fill in, not guessed.
 - **8:39pm** — A real way to accept an amber supply: commenting `/accept` on that
   dataset's own GitHub QA ticket now records a real acknowledgment
   against the exact supply that was current at the time - no ID to
