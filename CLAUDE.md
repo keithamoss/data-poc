@@ -147,7 +147,13 @@ Rough layout:
   not dbt-core itself, so `dbt build` won't compile without it. Run
   `uv run pytest` and `uv run ruff check .` (a deliberately lean rule
   set - real bugs only, not style) before considering a change done.
-  `pre-commit install` wires ruff into `git commit` automatically. The
+  `pre-commit install` wires ruff into `git commit` automatically -
+  plus, since 2026-09-18, a real `check-yaml` hook (pre-commit-hooks'
+  own, `yaml.safe_load` against every staged `*.yml`/`*.yaml`) added
+  after a real incident: a hand-edited `contract/*.yaml` changelog
+  entry got shell-escape-style quoting instead of real YAML quote-
+  doubling, still committable since ruff only checks Python, not caught
+  until the next real tool run parsed the file. The
   suite is no longer just fast fixture-based smoke tests - Phase 6 of
   `plans/publishing-and-history.md` (2026-09-18) added real dbt-core/
   Soda Core/datacontract-cli/Evidently integration tests

@@ -4,3 +4,17 @@ repos:
     hooks:
       - id: ruff
         args: [--fix]
+  # Real incident, 2026-09-18: a hand-edited contract/*.yaml changelog
+  # entry (a JSON string embedded in a YAML single-quoted scalar) got
+  # shell-escape-style quoting (\"'\"'\") instead of real YAML quote-
+  # doubling ('') - still committable, since ruff only checks Python,
+  # and the breakage wasn't caught until the next real tool run parsed
+  # the file. check-yaml (a real, standard pre-commit-hooks check - just
+  # yaml.safe_load against every staged *.yml/*.yaml) catches this
+  # class of mistake at commit time instead, for the four real check/
+  # contract YAML files this project's own checks live in as much as
+  # any other YAML here.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml
