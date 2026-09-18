@@ -33,6 +33,17 @@ tool's own server-side UTC clock.
   CI-enforced link to the test that actually verifies it - a claimed
   "built" requirement with no real test behind it now fails CI, not
   just a documentation exercise.
+- A GitHub Issues ticketing MVP: a new, separate write-permitted
+  workflow that opens a real GitHub Issue per real dataset (birth
+  registrations, and each of Child Protection's six real tables
+  separately) the moment that dataset's worst-of-every-check status
+  goes red, and keeps commenting with its live status on every
+  subsequent run - still red, or resolved - without ever auto-closing
+  the ticket, since closing stays a human decision. Manually triggered
+  for now rather than on every push: all seven real datasets currently
+  read red because of the known threshold-encoding bug tracked
+  separately, and turning the automatic trigger on before that's fixed
+  would open seven tickets that don't reflect a genuine problem.
 
 ### Fixed
 - A resupply-history grouping bug: a resupply landing weeks late used

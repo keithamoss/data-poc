@@ -66,6 +66,19 @@ platform/technical) was relayed to Keith directly rather than
 duplicated here - see chat history for the complete text if needed
 again.
 
+**Built, 2026-09-18 (plans/qa-pipeline.md item 76).** Real write access
+verified with a real test issue (created, commented, closed). MVP
+scope resolved via a second AskUserQuestion round: dataset-level
+tickets (not column-level), creation + live status-update comments (no
+escalation/suppression yet), a new separate write-permitted GitHub
+Action (never deploy-pages.yml), internal-only, red-only. See item 76's
+own full writeup - including a real, load-bearing finding surfaced
+while building: all 7 real datasets currently read red due to item
+74's own already-known threshold-encoding bug, so the workflow ships
+WITHOUT its automatic push trigger yet (`workflow_dispatch` only) -
+Keith's own call needed on fixing item 74 first vs. accepting the
+noise before flipping it on for real.
+
 ### 2. Data-asset-level people/roles config
 
 A new config file (alongside `contract/data-asset.yaml`'s existing

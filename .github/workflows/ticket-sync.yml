@@ -1,0 +1,82 @@
+name: Sync QA status to GitHub Issues
+
+# Item 76 (plans/qa-pipeline.md) - the GitHub Issues ticketing MVP.
+# Scoped via AskUserQuestion with Keith, 2026-09-18: one real ticket per
+# real DATASET (birth-registrations, plus each of Child Protection's 6
+# real tables separately - not one combined CP ticket, not per-column),
+# keyed off each dataset's own current real aggregate status
+# (qa_tools/common/dataset_status.py, the same worst-of-every-check
+# rollup the dashboard itself already uses). Red-only for this MVP
+# (amber sidestepped - plans/conceptual-design.md Thread A's own
+# governance question stays parked); no escalation, no suppression, no
+# external provider access - explicitly deferred past this MVP.
+#
+# Deliberately its OWN, separate, write-permitted workflow - never
+# folded into deploy-pages.yml. That workflow's whole design is built
+# around staying read-only against everything except the Pages deploy
+# itself (see its own top-of-file comment); opening/commenting on a
+# real GitHub Issue is a genuinely different kind of action (an
+# external write with real visibility to anyone watching this repo)
+# than deploy-pages.yml's own deterministic, side-effect-free rebuild.
+# Keith's own explicit call when scoping this.
+#
+# Reads ONLY the same CI-safe, committed-history-only build chain
+# deploy-pages.yml already runs (qa_tools.{bdm,cp}.build_results_from_
+# history -> pipeline.build_{,cp_}dashboard_data) - never data/, never
+# a live DuckDB connection, per CLAUDE.md's hard rule. No dashboard
+# embed step needed here (that's HTML-specific, this workflow never
+# touches the dashboard itself), and no Playwright/Chromium install
+# either (nothing in this job renders a browser).
+#
+# Uses the `gh` CLI (pre-installed on GitHub-hosted runners),
+# authenticated via the job's own automatic GITHUB_TOKEN - no new
+# secret needed, scoped down to exactly `issues: write` below (this
+# job never needs `contents: write` - it changes nothing in this repo's
+# own git history, only real GitHub Issues).
+
+# NOT triggered on push yet, deliberately - see plans/qa-pipeline.md
+# item 74 (still open, found 2026-09-17): a real, pre-existing
+# threshold-encoding bug currently makes every one of this project's 7
+# real datasets read red on every run (confirmed again while building
+# this - qa_tools.common.dataset_status.dataset_status() against
+# today's real, committed history returns "red" for all 7). Turning the
+# push trigger on before that's fixed would open 7 real, permanently-
+# visible GitHub Issues immediately, none of them reflecting a genuine
+# problem. Manually triggerable (workflow_dispatch) so it's real and
+# testable now; Keith's own call on when to add the push trigger back -
+# either after item 74's fixed, or explicitly accepting the current
+# noise.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync-tickets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Sync dependencies
+        run: uv sync --dev
+
+      - name: Rebuild check results from committed qa_results/ history
+        run: |
+          uv run python3 -m qa_tools.bdm.build_results_from_history
+          uv run python3 -m qa_tools.cp.build_results_from_history
+
+      - name: Reshape into dashboard JSON
+        run: |
+          uv run python3 -m pipeline.build_dashboard_data
+          uv run python3 -m pipeline.build_cp_dashboard_data
+
+      - name: Sync GitHub Issues to each dataset's current real status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: uv run python3 -m qa_tools.common.ticket_sync

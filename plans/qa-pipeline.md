@@ -4127,6 +4127,88 @@ relative, not a schedule — this is weeks of work, not months.
     `npm test` all clean; visually verified with a real Playwright
     screenshot of the built panel.
 
+76. **[built, 2026-09-18 - GitHub Issues ticketing MVP, `plans/running-
+    thoughts.md` item #1]** Scoped via two real rounds of
+    `AskUserQuestion` before building (this project's own standing
+    convention): first a business-analyst subagent pass confirming real
+    GitHub Issues access and surfacing real fit gaps against `docs/
+    remediation-workflow-design.md` (the original design, settled
+    2026-09-14 - notably BEFORE GitHub Issues was even a platform
+    candidate; only Jira Service Management vs. Microsoft-stack tooling
+    were on the table then, deliberately deferred), then a second round
+    resolving the concrete MVP's own real forks: **granularity** -
+    dataset-level (matching the dashboard's own Tier 3 unit - Birth
+    Registrations, plus each of Child Protection's 6 real tables
+    separately, not one combined CP ticket - Keith's own explicit
+    override of this session's column-level suggestion), **scope** -
+    creation plus live automatic status-update comments, escalation
+    explicitly deferred ("circle back on the escalation stuff"),
+    **automation location** - a new, separate, write-permitted GitHub
+    Actions workflow, never folded into `deploy-pages.yml` (that
+    workflow's own design is built around staying read-only against
+    everything except the Pages deploy itself; opening a real GitHub
+    Issue is a genuinely different kind of action), **provider access**
+    - internal-only for v1, and **amber handling** - sidestepped
+    entirely for v1 (tickets only ever key off red; the amber-
+    governance question in `plans/conceptual-design.md` Thread A stays
+    parked, not blocking this).
+
+    Real capability check done first, not assumed: created, commented
+    on, and closed a real issue on this repo
+    (`github.com/keithamoss/data-poc/issues/1`) to confirm actual write
+    access, not just the earlier read-only `list_issues` check.
+
+    Built: `qa_tools/common/dataset_status.py` - a dataset's current
+    real aggregate status (worst-of every real, non-retired check's own
+    current value across every column), a direct Python
+    reimplementation of the dashboard's own client-side
+    `worstOf()`/`checkStatus()` (necessary since the GitHub Action this
+    feeds has no JS/browser runtime - same client/server split
+    `pipeline/cadence.py`'s own docstring already explains for a
+    different piece of logic). `qa_tools/common/ticket_sync.py` - the
+    real create/dedup/update decision logic: at most one open GitHub
+    Issue per dataset (found via a `dataset:<id>` label search); no
+    ticket + red -> open one; ticket + still red -> a real "still red"
+    comment (the original design's own "even non-transitions post"
+    principle); ticket + resolved to amber/green -> a real "resolved"
+    comment that never auto-closes (closing stays human-only, unchanged
+    from the original design); no ticket + not red -> nothing happens.
+    Runs via the real `gh` CLI (subprocess, matching this project's own
+    established convention for invoking real external tools),
+    authenticated by the job's own automatic `GITHUB_TOKEN` inside
+    Actions. New workflow: `.github/workflows/ticket-sync.yml` - reads
+    only the same CI-safe, committed-`qa_results/`-history-only build
+    chain `deploy-pages.yml` already runs (no dashboard embed step, no
+    Playwright - neither is needed here), `permissions: issues: write`,
+    `contents: read` only (this job changes nothing in this repo's own
+    git history).
+
+    **Real, load-bearing finding while building, not shipped blind**:
+    running `dataset_status()` against today's real, committed history
+    confirms all 7 real datasets currently read red - item 74's own
+    already-documented, still-open threshold-encoding bug (a warn-only
+    check's unconfigured fail silently defaulting to 0; datacontract-
+    cli's `severity: error` rules discarding their own real
+    `mustBeLessThan` threshold), not a new bug introduced here. Turning
+    on this workflow's push trigger before item 74's fixed would
+    immediately open 7 real, permanently-visible GitHub Issues, none of
+    them reflecting a genuine problem. **Deliberately shipped with NO
+    automatic trigger** - `workflow_dispatch` only, real and manually
+    testable right now, but not "live" - Keith's own call needed on
+    whether to fix item 74 first or accept the noise before adding the
+    push trigger back.
+
+    Tests: `tests/test_dataset_status.py` (fixture-based rollup logic -
+    worst-of-any-column, retired checks excluded, band boundaries) and
+    `tests/test_ticket_sync.py` (every real decision branch, via a fake
+    at the module's own single `_run_gh` subprocess boundary -
+    deliberately never invokes a real `gh` CLI call or touches a real
+    repo in the test suite, unlike dbt/Soda/datacontract-cli which are
+    all safe to actually re-run locally; opening/commenting on a real
+    GitHub Issue is a genuine external side effect a test suite must
+    never actually cause). 316 tests passing (up from 302), `uv run
+    ruff check .` clean.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
