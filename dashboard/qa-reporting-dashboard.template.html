@@ -444,6 +444,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
       <div style="display:flex; align-items:center; gap:9px;">
         <h3 id="check-panel-title">Check</h3>
         <span id="check-panel-status"></span>
+        <span id="check-panel-source-link"></span>
       </div>
     </div>
     <button class="drawer-close" id="check-panel-close" aria-label="Close">✕</button>
@@ -783,6 +784,7 @@ const CHANGELOG_FEED = [];
 const RELEASE_NOTES = {intro:[], entries:[]};
 const REQUIREMENTS = [];
 const TICKET_STATUS = {};
+const GITHUB_LINKS = {checks:{}, agencies:{}, datasets:{}};
 
 // Shared by Birth Registrations (a single dataset) and Child Protection
 // (6 datasets, one per table) - both are reshaped server-side into this
@@ -1779,6 +1781,24 @@ function ticketBadge(datasetId, size){
   return `<a href="${t.url}" target="_blank" rel="noopener" class="pill tag ${size||""}" title="${t.title}" onclick="event.stopPropagation()"><span class="ico"></span>#${t.number} open</a>`;
 }
 
+// running-thoughts.md #8 ("deep links from the dashboard back into
+// GitHub", 2026-09-18) - same real-link-or-nothing treatment as
+// ticketBadge() above: GITHUB_LINKS is only ever non-empty on the real
+// built dashboard (embedded by dashboard/embed_dashboard_data.py from
+// qa_tools/common/github_links.py), so this degrades to a no-op against
+// the raw template's own illustrative mock data, same as every other
+// embedded-const-backed feature on this page.
+function githubCheckLink(check){
+  const url = GITHUB_LINKS.checks && GITHUB_LINKS.checks[check.check_id];
+  if(!url) return "";
+  return `<a href="${url}" target="_blank" rel="noopener" class="pill tag sm" title="View this check's real source on GitHub"><span class="ico"></span>View source</a>`;
+}
+function githubFolderLink(kind, id){
+  const url = GITHUB_LINKS[kind] && GITHUB_LINKS[kind][id];
+  if(!url) return "";
+  return `<a href="${url}" target="_blank" rel="noopener" class="pill tag sm" title="View this ${kind==='agencies'?'agency':'dataset'}'s real QA code on GitHub" onclick="event.stopPropagation()"><span class="ico"></span>View on GitHub</a>`;
+}
+
 function setRail(items){
   const rail = document.getElementById("rail");
   rail.innerHTML = items.map((it,i)=>{
@@ -1971,7 +1991,7 @@ function renderAgency(view, agencyId){
         <h2>${ag.name}</h2>
         <div class="view-sub">Real-time QA state across ${ag.name}'s data collections — for internal data teams and this agency's own data providers.</div>
       </div>
-      ${pill(ag.status)}
+      <div style="display:flex; align-items:center; gap:8px;">${pill(ag.status)}${githubFolderLink("agencies", ag.id)}</div>
     </div>
     <div id="collections"></div>
   `;
@@ -2121,7 +2141,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     view.innerHTML = `
       <div class="view-head">
         <div>
-          <h2>${ds.name} ${pill("nodata")} ${ticketBadge(ds.id)}</h2>
+          <h2>${ds.name} ${pill("nodata")} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)}</h2>
           <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}</div>
         </div>
       </div>
@@ -2140,7 +2160,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <h2>${ds.name}${ds.isReal?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:` <span class="pill illustrative"><span class="ico"></span>Illustrative mock data</span>`}</h2>
         <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${ds.isReal?" · figures below are computed by real dbt/Soda/datacontract-cli/Evidently tools against real generated runs — not fabricated in the browser.":""}</div>
       </div>
-      ${pill(ds.status)} ${ticketBadge(ds.id)}
+      <div style="display:flex; align-items:center; gap:8px;">${pill(ds.status)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)}</div>
     </div>
     ${ds.noDataAsOf ? `
     <div style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:64ch;">
@@ -2437,6 +2457,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   document.getElementById("check-panel-status").innerHTML = check.retired
     ? `<span class="pill retired sm" title="Retired ${fmtDate(check.retiredAsOf)}${check.retiredReason?': '+check.retiredReason:''}"><span class="ico"></span>Retired</span>`
     : pill(checkStatus(check), "sm");
+  document.getElementById("check-panel-source-link").innerHTML = githubCheckLink(check);
   const body = document.getElementById("check-panel-body");
 
   // #45: which run is "current" is fixed (always the latest); which run

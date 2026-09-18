@@ -76,7 +76,21 @@ common/ticket_status.py's parse_open_tickets() (a pure function, no
 no real token, no such file) this embeds an empty {} rather than
 failing - graceful degradation, not a hard requirement for every build.
 
-This only replaces those seven consts - the rest of the dashboard (its
+And `const GITHUB_LINKS` (running-thoughts.md #8, "deep links from the
+dashboard back into GitHub", 2026-09-18, scoped via AskUserQuestion) -
+`{checks: {check_id: url}, agencies: {agencyId: url}, datasets:
+{datasetId: url}}`, built by qa_tools/common/github_links.py (a check's
+own real source file + line, found by a plain text scan for its
+check_id's own literal value - verified against all 3 real check-
+definition formats this repo uses; a dataset/agency's own qa_tools/
+<bdm|cp>/ folder). Every link is pinned to THIS build's own commit SHA
+(qa_tools.common.github_links.current_commit_sha() - GITHUB_SHA in a
+real Actions run, `git rev-parse HEAD` locally) rather than a moving
+branch, so it always shows exactly what a check looked like when this
+dashboard was published, same reproducibility stance as everything else
+this script embeds.
+
+This only replaces those eight consts - the rest of the dashboard (its
 CSS, the rendering code, the other 14 illustrative datasets, and the
 separate SNAPSHOT_MANIFEST const dashboard/snapshot_dashboard.py owns)
 is copied through unchanged from the template.
@@ -89,6 +103,7 @@ import re
 from dashboard.changelog_md import parse_changelog
 from dashboard.requirements_yaml import parse_requirements
 from qa_tools.common.changelog import build_changelog
+from qa_tools.common.github_links import build_check_source_links, build_folder_links, current_commit_sha
 from qa_tools.common.ticket_status import parse_open_tickets
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -183,6 +198,11 @@ def embed() -> None:
     html = _replace_const(html, "TICKET_STATUS", json.dumps(ticket_status, separators=(",", ":")))
     print(f"Re-embedded TICKET_STATUS = {len(ticket_status)} open ticket(s)"
           + ("" if os.path.exists(OPEN_TICKETS_JSON) else " (no reports/open_tickets.json - local build, embedding empty)"))
+
+    sha = current_commit_sha()
+    github_links = {"checks": build_check_source_links(sha=sha), **build_folder_links(sha=sha)}
+    html = _replace_const(html, "GITHUB_LINKS", json.dumps(github_links, separators=(",", ":")))
+    print(f"Re-embedded GITHUB_LINKS = {len(github_links['checks'])} check link(s) at commit {sha[:12]}")
 
     with open(DASHBOARD_HTML, "w") as f:
         f.write(html)

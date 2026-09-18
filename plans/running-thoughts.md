@@ -225,6 +225,49 @@ win once scoped, but still needs a real "how" pass (a generated mapping
 from check_id/dataset/agency to a real GitHub URL, kept in sync as
 things move) before building.
 
+**Built, 2026-09-18 evening.** Scoped via one `AskUserQuestion` round
+first (three real forks, all resolved to the recommended option): links
+pin to the exact commit the dashboard was built from, not a moving
+branch (`GITHUB_SHA` in CI, `git rev-parse HEAD` locally - matches this
+project's existing reproducibility stance, qa_results/ and snapshots);
+a dataset/agency link points at its real `qa_tools/<bdm|cp>/` folder
+(this repo's already-established one-folder-per-dataset convention),
+doubling as the agency link too since each real agency maps to exactly
+one dataset/collection today; and a check link gets a real `#L<line>`
+anchor, not just the file.
+
+New module `qa_tools/common/github_links.py` - `build_check_source_
+links()` reuses `validate_check_lifecycle.collect_checks(None)` (the
+same source-file list check-lifecycle CI validation already walks, so
+never drifts out of sync with it) and finds each check's real line via
+a plain text scan for its own check_id's literal value - deliberately
+not a per-tool YAML/AST parse, since check_id is already guaranteed
+globally unique and appears as a distinctive literal string in all 3
+real formats checks are authored in (dbt/soda's `check_id: <value>`,
+the ODCS contract's `value: <value>` under a `- property: check_id`
+customProperty, Evidently's `SOME_CHECK_ID = "<value>"` constant) -
+verified against real file content for all 3 before writing it, not
+assumed. `build_folder_links()` maps the small, real, currently-1:1
+agency/dataset -> qa_tools folder table.
+
+Wired into `dashboard/embed_dashboard_data.py` as a new `GITHUB_LINKS`
+const (`{checks, agencies, datasets}`), same embed-at-build-time pattern
+as every other real feed on the page - CI-safe, no live data touched.
+UI: a small "View source" link in the check-detail panel header
+(`check.check_id` was already threaded all the way through to the
+frontend, so this needed no new data plumbing beyond the link map
+itself), and a "View on GitHub" link on the agency (Tier 2) and dataset
+(Tier 3) page headers, reusing `ticketBadge()`'s own real-link-or-
+nothing pattern.
+
+Verified: `tests/test_github_links.py` (7 tests, against this repo's
+own real committed check-definition files, not a fixture - a fixture-
+based test would only prove the line-finding algorithm works on data
+written to match it), full JS suite (71 passed), `tests/test_dashboard_
+e2e.py`/`test_check_dashboard_renders.py` (22 passed), ruff clean, plus
+a manual real-browser walkthrough confirming all 3 link types resolve
+to the exact right file/line/folder with zero console errors.
+
 ## Also flagged, queued separately (not part of the "running thoughts"
 batch above, but landed in the same conversation)
 
