@@ -299,8 +299,38 @@ Keith's own follow-up question after the requirements-register work
 side of an `if`/`else` was ever actually exercised. Switching to real
 branch coverage is a small config change, but re-baselining
 `fail_under` needs a full `uv run pytest --cov=...` run to measure the
-new (likely lower) real number first - the full suite takes ~3.5
-minutes (302 tests as of the requirements-register work), which is
-exactly why this got deferred rather than done on the spot: **explicitly
-parked, not declined** - pick it up when there's room for another full
-run, not urgent.
+new (likely lower) real number first - the full suite takes ~2 minutes
+(302 tests, after item #12's own speedup below), which is exactly why
+this got deferred rather than done on the spot: **explicitly parked,
+not declined** - Keith's own call (2026-09-18): park this specific
+question, along with anything else testing-related that comes up in the
+meantime, for a dedicated planning loop on the weekend rather than
+picking pieces of it off one at a time mid-session.
+
+### 12. Local pytest/Playwright runtime - real profiling done, more possible
+
+Keith's own follow-up question (2026-09-18): "it's taking a while to
+run pytest and Playwright locally, is there anything we can do to speed
+that up." Real `pytest --durations=25` profile found `tests/
+test_generate_runs.py` alone cost ~52s (32% of the then-163s suite) -
+all 6 of its tests independently called the real generator fresh for
+identical, deterministic output. Fixed (2026-09-18): a single
+`scope="module"` fixture generates once, all 6 tests read it - real
+~43s saved, full suite now 163s -> a measured 120s, zero coverage lost.
+
+Still open, not yet done - explicitly grouped with item #11 above for
+the same weekend planning loop, not picked off individually:
+- `pytest-xdist` (parallel test workers) - flagged as worth revisiting
+  once the real-tool integration tests actually landed (CLAUDE.md's own
+  note); not yet installed. Real open question before adopting it: do
+  the real dbt subprocess calls different test FILES make collide on
+  dbt's shared `dbt_project/target/` default when run in PARALLEL
+  workers, the same class of problem `qa_tools/common/
+  parallel_orchestrate.py` had to fix with a `--target-path` per run for
+  the real orchestration scripts - not yet checked for the test suite's
+  own dbt-based tests.
+- The remaining ~70s of real dbt-core/datacontract-cli integration test
+  cost is closer to the genuine floor (actually invoking real tools,
+  not mocked) - xdist parallelism is the more promising lever here than
+  further fixture restructuring, once the collision question above is
+  answered.
