@@ -22,6 +22,11 @@ first.
 ## 2026-09-18
 
 ### Added
+- **9:12pm** — A real leaderboard: whoever's kept a dataset out of the red the
+  longest, per dataset, gets a real streak count (amber doesn't break
+  it, only a real red run does). Shows real people by name once added
+  to `contract/people.yaml` - a bare email is never shown on this
+  public page.
 - **8:51pm** — A real people/roles config: real GitHub tickets now get assigned to
   whoever's actually responsible for that dataset (or its whole
   agency, as a fallback) once real people are added, and the dashboard
