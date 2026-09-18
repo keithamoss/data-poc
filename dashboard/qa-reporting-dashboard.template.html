@@ -566,6 +566,15 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
       unset), which is deliberate - the CSS's prefers-color-scheme rule
       stays in charge until the user actually picks a theme, rather than
       this defaulting to "light" the moment the button renders.
+
+      2026-09-18 (running-thoughts.md #9): the toggle also mirrors the
+      current theme into a ?theme= query param now - display/bookmark
+      only, scoped with Keith via AskUserQuestion specifically to NOT
+      also make it forcing: a shared link's ?theme= is never read back
+      on load (currentTheme() below is untouched), so opening someone
+      else's link never overrides your own localStorage preference. The
+      param exists purely so the address bar shows what a screenshot/
+      shared link was actually looking at.
 ========================================================================= */
 function currentTheme(){
   let stored = null;
@@ -577,11 +586,17 @@ function applyTheme(t){
   document.documentElement.setAttribute("data-theme", t);
   document.getElementById("theme-btn").textContent = t==="dark" ? "☀️ Light mode" : "🌙 Dark mode";
 }
+function setThemeInUrl(theme){
+  const url = new URL(location.href);
+  url.searchParams.set("theme", theme);
+  history.replaceState(STATE, "", url.pathname + url.search + location.hash);
+}
 applyTheme(currentTheme());
 document.getElementById("theme-btn").addEventListener("click", ()=>{
   const next = currentTheme()==="dark" ? "light" : "dark";
   try{ localStorage.setItem("theme", next); }catch(e){}
   applyTheme(next);
+  setThemeInUrl(next);
 });
 
 /* =========================================================================
@@ -1777,25 +1792,98 @@ function setRail(items){
 
 // Browser back/forward support: STATE is a plain, JSON-serializable object
 // (the same shape already used for {tier, agencyId, collectionId,
-// datasetId}, plus an optional columnName when the drawer is open) that's
-// pushed onto the real browser history via history.pushState and mirrored
-// into location.hash - so a reload or a shared link also lands on the
-// right view, not just the back/forward buttons.
-function stateToHash(state){ return "#" + encodeURIComponent(JSON.stringify(state)); }
+// datasetId}, plus an optional columnName/checkKey when a drawer/panel is
+// open) that's pushed onto the real browser history via history.pushState
+// and mirrored into a real, human-readable URL - so a reload or a shared
+// link also lands on the right view, not just the back/forward buttons.
+//
+// Human-friendlier URLs (running-thoughts.md #9, 2026-09-18 follow-up):
+// used to be an opaque `#` + encodeURIComponent(JSON.stringify(state)) -
+// e.g. #%7B%22tier%22%3A%22dataset%22...%7D, unreadable and unshareable
+// as a plain link. Now split across two real URL parts, scoped with
+// Keith via AskUserQuestion before building:
+//   - the HASH is a real path: #/agency/<id>/collection/<id>/dataset/<id>
+//     [/column/<name>[/check/<key>]] - the drill-down "page" someone is
+//     on, kept explicit (agency+collection+dataset all present, not
+//     re-derived) so a link never needs a lookup to resolve.
+//   - the QUERY STRING (location.search, same real params asof= already
+//     used) carries orthogonal, non-navigational state: cmp= (which run
+//     a check is compared against - setCompareIdx() below), panel=
+//     (which of the 4 header side-panels is open - openPanel() below).
+//     theme= is written but deliberately never read back on load (see
+//     that toggle's own comment) - localStorage stays the one source of
+//     truth for which theme actually renders.
+function pathSegment(s){ return encodeURIComponent(s); }
+function stateToPath(state){
+  if(!state || state.tier==="exec") return "/";
+  if(state.tier==="agency") return `/agency/${pathSegment(state.agencyId)}`;
+  if(state.tier==="dataset"){
+    let p = `/agency/${pathSegment(state.agencyId)}/collection/${pathSegment(state.collectionId)}/dataset/${pathSegment(state.datasetId)}`;
+    if(state.columnName){
+      p += `/column/${pathSegment(state.columnName)}`;
+      if(state.checkKey) p += `/check/${pathSegment(state.checkKey)}`;
+    }
+    return p;
+  }
+  return "/";
+}
+function pathToState(raw){
+  const parts = raw.split("/").filter(Boolean).map(decodeURIComponent);
+  if(parts.length===0) return {tier:"exec"};
+  if(parts[0]!=="agency" || !parts[1]) return null;
+  const state = {tier:"agency", agencyId:parts[1]};
+  if(parts[2]==="collection" && parts[3] && parts[4]==="dataset" && parts[5]){
+    state.tier = "dataset";
+    state.collectionId = parts[3];
+    state.datasetId = parts[5];
+    if(parts[6]==="column" && parts[7]){
+      state.columnName = parts[7];
+      if(parts[8]==="check" && parts[9]) state.checkKey = parts[9];
+    }
+  }
+  return state;
+}
+function stateToHash(state){ return "#" + stateToPath(state); }
 function hashToState(){
   try {
     const raw = location.hash.slice(1);
     if(!raw) return null;
-    return JSON.parse(decodeURIComponent(raw));
+    return pathToState(raw);
   } catch(e){ return null; }
 }
 
-let STATE = hashToState() || {tier:"exec"};
+// panel=/cmp= (see comment above): read from location.search, same
+// URLSearchParams pattern asOfFromUrl() already established.
+const SIDE_PANELS = ["activity","changelog","requirements","snapshots"];
+function panelFromUrl(){
+  const v = new URLSearchParams(location.search).get("panel");
+  return SIDE_PANELS.includes(v) ? v : undefined;
+}
+function cmpFromUrl(){
+  const v = new URLSearchParams(location.search).get("cmp");
+  const n = Number(v);
+  return (v!=null && Number.isInteger(n) && n>=0) ? n : undefined;
+}
+// Combines the hash (base drill-down state) with the query string's
+// orthogonal panel/cmp state - used for initial load and as the popstate
+// fallback when a history entry has no real e.state (its own comment
+// below). Not used on every popstate: e.state, when present, already IS
+// the full correct STATE object (including panel/compareIdx), since
+// every pushState call below constructs STATE completely before pushing.
+function stateFromLocation(){
+  const base = hashToState() || {tier:"exec"};
+  const panel = panelFromUrl();
+  const cmp = cmpFromUrl();
+  return {...base, ...(panel!==undefined ? {panel} : {}), ...(cmp!==undefined ? {compareIdx:cmp} : {})};
+}
+
+let STATE = stateFromLocation();
 
 function navigate(next){
   STATE = next;
   hideCheckPanel();
   hideDrawer();
+  hideAllPanelsDom();
   render();
   history.pushState(STATE, "", stateToHash(STATE));
   window.scrollTo({top:0, behavior:"smooth"});
@@ -1811,7 +1899,7 @@ function resolveContext(state){
 
 // Renders whatever STATE currently points at - shared by popstate handling
 // and the initial page load, so both take exactly the same path (including
-// reopening the drawer if the state being restored had one open).
+// reopening the drawer/panel if the state being restored had one open).
 function renderFromState(){
   render();
   const ctx = STATE.columnName && resolveContext(STATE);
@@ -1825,10 +1913,12 @@ function renderFromState(){
     hideDrawer();
     hideCheckPanel();
   }
+  if(STATE.panel) openPanel(STATE.panel, {pushHistory:false});
+  else hideAllPanelsDom();
 }
 
 window.addEventListener("popstate", (e)=>{
-  STATE = e.state || hashToState() || {tier:"exec"};
+  STATE = e.state || stateFromLocation();
   renderFromState();
 });
 
@@ -2555,9 +2645,22 @@ function openCheckPanel(ag, col, ds, column, check, opts){
 // no longer creates a new history entry to step through - (X) now
 // always closes the panel in exactly one click, however many
 // comparisons were picked along the way.
+//
+// 2026-09-18 (human-friendlier URLs, running-thoughts.md #9): compareIdx
+// moved out of the hash's own JSON blob (now a readable path, no room
+// for an arbitrary extra field) into a real ?cmp= query param instead -
+// same replaceState-not-pushState behaviour as before, just a different
+// part of the URL. Omitted entirely when it equals this check's own
+// default comparison (the immediately-previous run) - same "don't
+// clutter the URL with the default" convention setAsOfInUrl() already
+// established, recomputed here rather than threaded through as an arg.
 function setCompareIdx(ag, col, ds, column, check, idx){
   STATE = {...STATE, compareIdx: idx};
-  history.replaceState(STATE, "", stateToHash(STATE));
+  const defaultCompareIdx = Math.max(0, check.history.length-2);
+  const url = new URL(location.href);
+  if(idx === defaultCompareIdx) url.searchParams.delete("cmp");
+  else url.searchParams.set("cmp", String(idx));
+  history.replaceState(STATE, "", url.pathname + url.search + location.hash);
   openCheckPanel(ag, col, ds, column, check, {pushHistory:false});
 }
 function hideCheckPanel(){
@@ -2577,11 +2680,13 @@ document.getElementById("check-panel-close").addEventListener("click", closeChec
 // re-embeds it every time a snapshot is taken), not fetched at runtime -
 // fetch('manifest.json') would silently fail under file:// (CORS),
 // breaking this for exactly the offline/local-open workflow the rest of
-// this dashboard already supports. Deliberately a simple, standalone
-// list/open panel, not wired into STATE/back-forward navigation the way
-// the column/check drawers are - opening a past snapshot is a jump
-// OUTSIDE the live app (each link opens in a new tab), not a state
-// someone would want "back" to step through.
+// this dashboard already supports. The panel's OWN open/close state now
+// is wired into STATE/back-forward navigation (2026-09-18, running-
+// thoughts.md #9 - openPanel()/closePanel() below, shared with the other
+// 3 header panels) - but a snapshot LINK itself still isn't: opening a
+// past snapshot is a jump OUTSIDE the live app (each link opens in a new
+// tab, to a separate static file), not a state this app's own back
+// button would ever step through.
 //
 // Each link points at a plain, relative `snapshots/<name>.html` path -
 // resolves correctly on the published GitHub Pages site (.github/
@@ -2621,20 +2726,54 @@ function renderSnapshotsPanel(){
   }).join("");
   body.innerHTML = intro + rows;
 }
-function openSnapshotsPanel(){
-  renderSnapshotsPanel();
-  document.getElementById("snapshots-backdrop").classList.add("open");
-  document.getElementById("snapshots-panel").classList.add("open");
-  document.getElementById("snapshots-panel").setAttribute("aria-hidden","false");
+// Shared by all 4 header side-panels (snapshots/activity/changelog/
+// requirements) - 2026-09-18, running-thoughts.md #9. Each panel used to
+// carry its own independent open()/close() pair and its own DOM-class
+// toggling, entirely outside STATE/URL. Unified here so opening one is a
+// real navigation: pushes STATE.panel + a ?panel=<name> query param (a
+// real back-button-closes-it history entry, scoped with Keith via
+// AskUserQuestion), and only one panel is ever open at a time (opening a
+// second one while the first is still open now closes the first rather
+// than stacking both visually, a latent bug in the old independent-pairs
+// version that this unification incidentally fixes). asof-panel is
+// deliberately NOT one of these 4 - it keeps its own separate, no-
+// history-entry behaviour (openAsOfPanel()/closeAsOfPanel() below,
+// unchanged) since Thread C's own design already settled that.
+const PANEL_RENDER = {activity:renderActivityPanel, changelog:renderChangelogPanel, requirements:renderRequirementsPanel, snapshots:renderSnapshotsPanel};
+function showPanelDom(name){
+  document.getElementById(`${name}-backdrop`).classList.add("open");
+  document.getElementById(`${name}-panel`).classList.add("open");
+  document.getElementById(`${name}-panel`).setAttribute("aria-hidden","false");
 }
-function closeSnapshotsPanel(){
-  document.getElementById("snapshots-backdrop").classList.remove("open");
-  document.getElementById("snapshots-panel").classList.remove("open");
-  document.getElementById("snapshots-panel").setAttribute("aria-hidden","true");
+function hidePanelDom(name){
+  document.getElementById(`${name}-backdrop`).classList.remove("open");
+  document.getElementById(`${name}-panel`).classList.remove("open");
+  document.getElementById(`${name}-panel`).setAttribute("aria-hidden","true");
 }
-document.getElementById("snapshots-btn").addEventListener("click", openSnapshotsPanel);
-document.getElementById("snapshots-backdrop").addEventListener("click", closeSnapshotsPanel);
-document.getElementById("snapshots-panel-close").addEventListener("click", closeSnapshotsPanel);
+function hideAllPanelsDom(){ SIDE_PANELS.forEach(hidePanelDom); }
+function openPanel(name, opts){
+  const pushHistory = !opts || opts.pushHistory !== false;
+  PANEL_RENDER[name]();
+  hideAllPanelsDom();
+  showPanelDom(name);
+  if(pushHistory){
+    STATE = {...STATE, panel:name};
+    const url = new URL(location.href);
+    url.searchParams.set("panel", name);
+    history.pushState(STATE, "", url.pathname + url.search + location.hash);
+  }
+}
+// User-initiated close (X, backdrop, Escape): same back()-not-hide()
+// pattern closeDrawer()/closeCheckPanel() already use, for the same
+// reason - keeps forward/back symmetric instead of accumulating extra
+// "closed" entries.
+function closePanel(){
+  if(STATE && STATE.panel) history.back();
+  else hideAllPanelsDom();
+}
+document.getElementById("snapshots-btn").addEventListener("click", ()=> openPanel("snapshots"));
+document.getElementById("snapshots-backdrop").addEventListener("click", closePanel);
+document.getElementById("snapshots-panel-close").addEventListener("click", closePanel);
 
 // Phase 5a (Thread A) - the "Recent activity" publish-history feed.
 // CHANGELOG_FEED is already sorted newest-committed-first and capped
@@ -2695,20 +2834,9 @@ function renderActivityPanel(){
   }).join("");
   body.innerHTML = intro + rows;
 }
-function openActivityPanel(){
-  renderActivityPanel();
-  document.getElementById("activity-backdrop").classList.add("open");
-  document.getElementById("activity-panel").classList.add("open");
-  document.getElementById("activity-panel").setAttribute("aria-hidden","false");
-}
-function closeActivityPanel(){
-  document.getElementById("activity-backdrop").classList.remove("open");
-  document.getElementById("activity-panel").classList.remove("open");
-  document.getElementById("activity-panel").setAttribute("aria-hidden","true");
-}
-document.getElementById("activity-btn").addEventListener("click", openActivityPanel);
-document.getElementById("activity-backdrop").addEventListener("click", closeActivityPanel);
-document.getElementById("activity-panel-close").addEventListener("click", closeActivityPanel);
+document.getElementById("activity-btn").addEventListener("click", ()=> openPanel("activity"));
+document.getElementById("activity-backdrop").addEventListener("click", closePanel);
+document.getElementById("activity-panel-close").addEventListener("click", closePanel);
 
 // Item 62 (plans/qa-pipeline.md, Phase 5h) - "Release notes": renders
 // RELEASE_NOTES' own {intro, entries} shape (dashboard/changelog_md.py's
@@ -2752,20 +2880,9 @@ function renderChangelogPanel(){
   }).join("");
   body.innerHTML = `<div style="margin-bottom:18px;">${intro}</div>${entries}`;
 }
-function openChangelogPanel(){
-  renderChangelogPanel();
-  document.getElementById("changelog-backdrop").classList.add("open");
-  document.getElementById("changelog-panel").classList.add("open");
-  document.getElementById("changelog-panel").setAttribute("aria-hidden","false");
-}
-function closeChangelogPanel(){
-  document.getElementById("changelog-backdrop").classList.remove("open");
-  document.getElementById("changelog-panel").classList.remove("open");
-  document.getElementById("changelog-panel").setAttribute("aria-hidden","true");
-}
-document.getElementById("changelog-btn").addEventListener("click", openChangelogPanel);
-document.getElementById("changelog-backdrop").addEventListener("click", closeChangelogPanel);
-document.getElementById("changelog-panel-close").addEventListener("click", closeChangelogPanel);
+document.getElementById("changelog-btn").addEventListener("click", ()=> openPanel("changelog"));
+document.getElementById("changelog-backdrop").addEventListener("click", closePanel);
+document.getElementById("changelog-panel-close").addEventListener("click", closePanel);
 
 // Item 75 (plans/qa-pipeline.md, 2026-09-18) - "Requirements": renders
 // REQUIREMENTS (requirements.yaml, parsed by dashboard/requirements_
@@ -2814,20 +2931,9 @@ function renderRequirementsPanel(){
       </div>`;
   }).join("");
 }
-function openRequirementsPanel(){
-  renderRequirementsPanel();
-  document.getElementById("requirements-backdrop").classList.add("open");
-  document.getElementById("requirements-panel").classList.add("open");
-  document.getElementById("requirements-panel").setAttribute("aria-hidden","false");
-}
-function closeRequirementsPanel(){
-  document.getElementById("requirements-backdrop").classList.remove("open");
-  document.getElementById("requirements-panel").classList.remove("open");
-  document.getElementById("requirements-panel").setAttribute("aria-hidden","true");
-}
-document.getElementById("requirements-btn").addEventListener("click", openRequirementsPanel);
-document.getElementById("requirements-backdrop").addEventListener("click", closeRequirementsPanel);
-document.getElementById("requirements-panel-close").addEventListener("click", closeRequirementsPanel);
+document.getElementById("requirements-btn").addEventListener("click", ()=> openPanel("requirements"));
+document.getElementById("requirements-backdrop").addEventListener("click", closePanel);
+document.getElementById("requirements-panel-close").addEventListener("click", closePanel);
 
 // Thread C - as-of date picker. rebuildData() throws the current DATA
 // away and rebuilds it from scratch against the new date (see buildData()
@@ -2871,11 +2977,17 @@ updateAsOfButtonLabel();
 
 document.getElementById("backdrop").addEventListener("click", closeDrawer);
 document.getElementById("drawer-close").addEventListener("click", closeDrawer);
+// 2026-09-18 (running-thoughts.md #9): used to check each of the 4 side
+// panels' own DOM class individually (only ever covered snapshots/
+// activity - changelog/requirements had no Escape handling at all, a
+// latent gap this generalization also closes). Now a single STATE.panel
+// check, same unification openPanel()/closePanel() above already did.
+// asof-panel stays its own explicit check - deliberately outside
+// STATE/history, per that panel's own unchanged design.
 document.addEventListener("keydown", (e)=>{
   if(e.key!=="Escape") return;
-  if(document.getElementById("snapshots-panel").classList.contains("open")) closeSnapshotsPanel();
-  else if(document.getElementById("asof-panel").classList.contains("open")) closeAsOfPanel();
-  else if(document.getElementById("activity-panel").classList.contains("open")) closeActivityPanel();
+  if(document.getElementById("asof-panel").classList.contains("open")) closeAsOfPanel();
+  else if(STATE && STATE.panel) closePanel();
   else if(STATE && STATE.checkKey) closeCheckPanel();
   else closeDrawer();
 });

@@ -242,30 +242,52 @@ batch above, but landed in the same conversation)
   standing convention (the "check real CI" bullet) rather than logged
   here - a process fix, not a project idea.
 
-### 9. Human-friendlier URLs (small, follow up later today)
+### 9. Human-friendlier URLs
 
-Keith's own words: "improve the human friendliness of the URLs, so we
-don't have to rely on hash URLs so much." Real, current state: the
-dashboard's whole routing (`stateToHash()`/`hashToState()`,
-`dashboard/qa-reporting-dashboard.template.html`) encodes the entire
-`STATE` object as URL-encoded JSON in the fragment - e.g. navigating to
-a dataset produces something like
-`#%7B%22tier%22%3A%22dataset%22%2C%22agencyId%22%3A%22registry-services%22...%7D`,
-completely opaque to a human reading/sharing the link. Framed as small
-and explicitly deferred ("follow up in later today," not now) - not
-scoped further than that yet. Worth noting when it IS picked up: this
-is a genuinely static, single-file HTML page with no server-side
-routing, deployed to GitHub Pages - real path segments (no `#`) would
-need either a SPA-redirect trick (a `404.html` that redirects back to
-`index.html`, preserving the intended path) or staying hash-based but
-switching from an opaque encoded-JSON blob to a readable path-like
-scheme (e.g. `#/agency/registry-services/dataset/birth-registrations`),
-parsed back into the same `STATE` shape - the second is the smaller,
-lower-risk change and probably the right first cut. The existing
-`asof=` query param (`setAsOfInUrl()`) already shows the app mixing
-real query-string params with the hash - whatever scheme is chosen
-should keep that working too, not just the tier/agency/dataset
-navigation.
+**Built, 2026-09-18 evening.** Keith's own words: "improve the human
+friendliness of the URLs, so we don't have to rely on hash URLs so
+much." Scoped via two real `AskUserQuestion` rounds before building
+(collection segment explicit vs. re-derived; column/check as path
+segments vs. query params; compareIdx kept vs. dropped; panel/theme
+scope in vs. out; panel history-entry behavior; theme URL-forcing
+question) - real forks, not guessed.
+
+Stayed hash-based (confirmed viable on GitHub Pages - the hash fragment
+never reaches the server either way, so no deploy-side change needed
+either way), but replaced the opaque `#` + `encodeURIComponent(JSON.
+stringify(state))` blob with a real, readable path:
+`#/agency/<id>/collection/<id>/dataset/<id>[/column/<name>[/check/
+<key>]]` - agency+collection+dataset all kept explicit (not re-derived
+from a shorter path) so a link never needs a lookup to resolve, and
+column/check drill-down became further path segments rather than query
+params, per Keith's own choices.
+
+Two other real forks landed alongside the path itself: the check-panel's
+run-comparison index (`STATE.compareIdx`) moved out of the old JSON
+blob into a real `?cmp=` query param (kept, not dropped - Keith's call),
+and the 4 header side panels (Recent activity/Release notes/
+Requirements/Past snapshots), previously independent DOM-only open/
+close pairs entirely outside STATE/URL, are now unified under
+`STATE.panel`/`?panel=` with a real history entry per open (Back closes
+it, same as the column/check drawers already did) - both explicitly
+brought into scope by Keith's own answer, not assumed. Dark mode also
+now mirrors into `?theme=` for display/bookmark purposes, but
+deliberately never overrides localStorage on load (Keith's own choice -
+a shared link never forces the recipient's theme).
+
+Implementation: `dashboard/qa-reporting-dashboard.template.html`'s
+`stateToPath()`/`pathToState()` (per-segment `encodeURIComponent`/
+`decodeURIComponent`, verified against real check names containing
+spaces/colons/parens via a real browser walkthrough), `openPanel()`/
+`closePanel()` (replacing the 4 independent pairs), `setThemeInUrl()`.
+Test coverage: `tests-js/navigation.test.js` (path round-trip including
+column+check, panel push/close-one-at-a-time, navigate() clearing an
+open panel), `tests/test_dashboard_e2e.py` (`_goto()`'s own Python
+mirror of `stateToPath()`, a real back-button-closes-a-panel assertion,
+a real theme-never-forced-by-URL assertion) - npm test (71 passed),
+`uv run pytest tests/test_dashboard_e2e.py` (11 passed, real Chromium),
+`uv run ruff check .` all clean, plus a manual real-browser walkthrough
+confirming zero console errors end to end.
 
 ### 10. Expose the planning markdown files in the dashboard (MVP)
 

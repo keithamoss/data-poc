@@ -68,10 +68,29 @@ def clean_page(page):
     assert errors == [], f"real console errors during this test: {errors}"
 
 
+def _state_to_path(state: dict) -> str:
+    """Python mirror of the template's own stateToPath() (dashboard/qa-
+    reporting-dashboard.template.html) - kept in sync by hand since this
+    is test-only code building a URL the real JS then parses, not a
+    shared module. Only needs the shapes this test module actually
+    drives (agency/dataset tiers - see 2026-09-18's running-thoughts.md
+    #9 human-friendlier-URLs rework, which replaced the previous opaque
+    `#` + encodeURIComponent(JSON.stringify(state)) encoding this used
+    to build here)."""
+    if not state or state.get("tier") == "exec":
+        return "/"
+    quoted = {k: urllib.parse.quote(str(v), safe="") for k, v in state.items()}
+    if state["tier"] == "agency":
+        return f"/agency/{quoted['agencyId']}"
+    if state["tier"] == "dataset":
+        return f"/agency/{quoted['agencyId']}/collection/{quoted['collectionId']}/dataset/{quoted['datasetId']}"
+    return "/"
+
+
 def _goto(page, html_path: Path, state: dict | None = None, as_of: str | None = None):
     url = f"file://{html_path.resolve()}"
     query = f"?asof={as_of}" if as_of else ""
-    fragment = f"#{urllib.parse.quote(json.dumps(state))}" if state else ""
+    fragment = f"#{_state_to_path(state)}" if state else ""
     page.goto(url + query + fragment)
     page.wait_for_timeout(500)
 
@@ -169,6 +188,21 @@ class TestDarkModeToggle:
         assert after_reload == after_click
         assert clean_page.evaluate("localStorage.getItem('theme')") == after_click
 
+    def test_a_theme_url_param_never_overrides_localstorage_on_load(self, clean_page, built_dashboard_html):
+        """Human-friendlier URLs (2026-09-18, running-thoughts.md #9) added
+        a ?theme= query param the toggle writes for display/bookmark
+        purposes - explicitly scoped via AskUserQuestion to NOT also make
+        a shared link force the visitor's theme: localStorage stays the
+        one source of truth for what actually renders on load."""
+        url = f"file://{built_dashboard_html.resolve()}"
+        clean_page.goto(url)
+        clean_page.evaluate("localStorage.setItem('theme', 'light')")
+
+        clean_page.goto(url + "?theme=dark")
+        clean_page.wait_for_timeout(300)
+
+        assert clean_page.evaluate("document.documentElement.getAttribute('data-theme')") == "light"
+
 
 class TestRequirementsPanel:
     def test_opening_it_shows_real_requirements_with_badges_and_linked_tests(self, clean_page, built_dashboard_html):
@@ -187,6 +221,23 @@ class TestRequirementsPanel:
         assert any(label in rows_text for label in ("Must", "Should", "Could"))
         assert any(label in rows_text for label in ("Built", "In progress", "Not started"))
         assert "tests/" in rows_text or "tests-js/" in rows_text
+
+    def test_opening_it_is_a_real_history_entry_that_the_back_button_closes(self, clean_page, built_dashboard_html):
+        """The 4 header side panels used to be DOM-only, outside browser
+        history entirely - now unified under STATE.panel/?panel= (2026-09-18,
+        running-thoughts.md #9, scoped via AskUserQuestion: Back should
+        close a panel, same as the column/check drawers already do)."""
+        _goto(clean_page, built_dashboard_html)
+
+        clean_page.locator("#requirements-btn").click()
+        assert "panel=requirements" in clean_page.url
+        assert clean_page.locator("#requirements-panel").get_attribute("aria-hidden") == "false"
+
+        clean_page.go_back()
+        clean_page.wait_for_timeout(300)
+
+        assert "panel=requirements" not in clean_page.url
+        assert clean_page.locator("#requirements-panel").get_attribute("aria-hidden") == "true"
 
 
 class TestReleaseNotesPanel:
