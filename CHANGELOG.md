@@ -67,6 +67,13 @@ first.
   push, not just a speed-focused smoke-test suite.
 
 ### Fixed
+- **7:22pm** — A real git-history-walking performance bug: building the "who
+  published QA results, when" changelog feed used to spawn one real
+  `git show` subprocess per commit that ever touched a dataset's
+  `qa_results/` history, diffing that commit's entire changed tree -
+  cost that grew with real repo history, measured at several seconds
+  and a real, noticeable chunk of the test suite's own runtime once
+  enough of that history had built up. Down to a fraction of a second.
 - **12:24pm** — The GitHub Issues ticketing MVP's very first live run: opening a
   ticket needs its labels to already exist on the repo, which neither
   did yet - now created automatically the first time they're needed.
