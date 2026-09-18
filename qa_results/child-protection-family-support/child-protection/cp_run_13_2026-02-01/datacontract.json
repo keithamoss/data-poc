@@ -1,8 +1,8 @@
 {
-  "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+  "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
   "run_by": null,
   "raw_output": {
-    "runId": "b9b55a3c-3631-4f71-b52a-24c474975474",
+    "runId": "ea64ac93-8891-4370-aa97-a47a0bd05d33",
     "datacontractCliVersion": "1.2.0",
     "dataContractId": "child-protection-casework",
     "dataContractVersion": "1.0.0",
@@ -10,13 +10,13 @@
     "outputPortId": null,
     "server": "local_test",
     "filters": null,
-    "timestampStart": "2026-09-18 10:51:41.207542+00:00",
-    "timestampEnd": "2026-09-18 10:51:48.510215+00:00",
-    "result": "failed",
+    "timestampStart": "2026-09-18 11:07:49.671318+00:00",
+    "timestampEnd": "2026-09-18 11:07:57.111984+00:00",
+    "result": "passed",
     "dryRun": false,
     "checks": [
       {
-        "id": "e2db7323-8740-43e0-b2c1-e523e55a745d",
+        "id": "5550f761-f1c8-43a6-9150-a711cf246573",
         "key": "cp_clients__cp_client_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -40,7 +40,7 @@
         "failedSamples": null
       },
       {
-        "id": "aa77d2d4-8f2c-45c3-82a0-5abefa08c93a",
+        "id": "a32bb731-b4b4-42b8-9d04-331cc9c13e34",
         "key": "cp_clients__cp_client_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -67,7 +67,7 @@
         "failedSamples": null
       },
       {
-        "id": "40dda2d4-e699-4b2e-a899-720714159fef",
+        "id": "e0b4a1a5-4621-426d-9b8d-8ab91beb5343",
         "key": "cp_clients__cp_client_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -81,63 +81,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"cp_client_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_clients\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
-        "result": "failed",
-        "reason": "Actual duplicate_count(cp_client_id) was 11, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "duplicate_count",
           "field": "cp_client_id",
-          "value": 11,
+          "value": 0,
           "threshold": "= 0",
           "row_count": 527,
-          "failed_rows": 22
+          "failed_rows": 0
         },
-        "failedSamples": [
-          {
-            "cp_client_id": "CPS-365359102",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-754392161",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-898413175",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-841927893",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-964290692",
-            "duplicate_count": 2
-          }
-        ],
-        "failed_samples": [
-          {
-            "cp_client_id": "CPS-365359102",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-754392161",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-898413175",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-841927893",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-964290692",
-            "duplicate_count": 2
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "c63337b8-b9d4-4105-b2f7-bb23c8ffc9d5",
+        "id": "a235d3e1-898c-4923-b2ac-148a211f2ca6",
         "key": "cp_clients__cp_client_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -165,7 +122,7 @@
         "failedSamples": null
       },
       {
-        "id": "503e8182-c4df-4743-8ac8-451030a4b4f0",
+        "id": "dee04551-964e-4d76-af9b-89f8dba535d0",
         "key": "cp_clients__cp_client_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -179,64 +136,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"cp_client_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_clients\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
-        "result": "failed",
-        "reason": "Actual duplicate_count(cp_client_id) was 11, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "duplicate_count",
           "field": "cp_client_id",
-          "value": 11,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 527,
-          "failed_rows": 22
+          "failed_rows": 0
         },
-        "failedSamples": [
-          {
-            "cp_client_id": "CPS-365359102",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-754392161",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-898413175",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-841927893",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-964290692",
-            "duplicate_count": 2
-          }
-        ],
-        "failed_samples": [
-          {
-            "cp_client_id": "CPS-365359102",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-754392161",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-898413175",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-841927893",
-            "duplicate_count": 2
-          },
-          {
-            "cp_client_id": "CPS-964290692",
-            "duplicate_count": 2
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "a517b334-4034-4b0e-960b-480468b87636",
+        "id": "a461c33e-0658-4d96-84a7-8e02e4a579a4",
         "key": "cp_clients__given_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -260,7 +174,7 @@
         "failedSamples": null
       },
       {
-        "id": "f9cee71e-fa8f-4175-9eab-41db093dc75e",
+        "id": "fe3997d1-bc40-4a81-ad97-c21c526d5592",
         "key": "cp_clients__given_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -274,53 +188,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"given_name\" IS NULL THEN 1 ELSE 0 END) AS \"cp_clients__given_name__field_required\"\nFROM \"cp_clients\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(given_name) was 10, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "given_name",
-          "value": 10,
+          "value": 0,
           "threshold": "= 0",
           "row_count": 527,
-          "failed_fraction": 0.018975
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "cp_client_id": "CPS-659715330"
-          },
-          {
-            "cp_client_id": "CPS-938461271"
-          },
-          {
-            "cp_client_id": "CPS-713861371"
-          },
-          {
-            "cp_client_id": "CPS-066828399"
-          },
-          {
-            "cp_client_id": "CPS-112828695"
-          }
-        ],
-        "failed_samples": [
-          {
-            "cp_client_id": "CPS-659715330"
-          },
-          {
-            "cp_client_id": "CPS-938461271"
-          },
-          {
-            "cp_client_id": "CPS-713861371"
-          },
-          {
-            "cp_client_id": "CPS-066828399"
-          },
-          {
-            "cp_client_id": "CPS-112828695"
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "eeb9f54e-d389-4150-bd77-f13467cf7713",
+        "id": "f3847652-48e6-4419-b943-33214b60d60d",
         "key": "cp_clients__given_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -334,54 +215,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"given_name\" IS NULL THEN 1 ELSE 0 END) AS \"cp_clients__given_name__field_null_values\"\nFROM \"cp_clients\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(given_name) was 10, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "given_name",
-          "value": 10,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 527,
-          "failed_fraction": 0.018975
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "cp_client_id": "CPS-659715330"
-          },
-          {
-            "cp_client_id": "CPS-938461271"
-          },
-          {
-            "cp_client_id": "CPS-713861371"
-          },
-          {
-            "cp_client_id": "CPS-066828399"
-          },
-          {
-            "cp_client_id": "CPS-112828695"
-          }
-        ],
-        "failed_samples": [
-          {
-            "cp_client_id": "CPS-659715330"
-          },
-          {
-            "cp_client_id": "CPS-938461271"
-          },
-          {
-            "cp_client_id": "CPS-713861371"
-          },
-          {
-            "cp_client_id": "CPS-066828399"
-          },
-          {
-            "cp_client_id": "CPS-112828695"
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "9c836c6f-825a-4e64-ae8b-e3dc00363477",
+        "id": "b297b84c-1949-43a1-8a97-c0ed9d63b1b3",
         "key": "cp_clients__family_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -405,7 +253,7 @@
         "failedSamples": null
       },
       {
-        "id": "bbed1181-1d05-43af-8c83-c3fe8b0f74a8",
+        "id": "5a0ecfd2-3ac1-4635-a1c9-3c36db84d6e8",
         "key": "cp_clients__family_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -419,53 +267,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"family_name\" IS NULL THEN 1 ELSE 0 END) AS \"cp_clients__family_name__field_required\"\nFROM \"cp_clients\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(family_name) was 8, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "family_name",
-          "value": 8,
+          "value": 0,
           "threshold": "= 0",
           "row_count": 527,
-          "failed_fraction": 0.01518
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "cp_client_id": "CPS-254756704"
-          },
-          {
-            "cp_client_id": "CPS-777330919"
-          },
-          {
-            "cp_client_id": "CPS-588211074"
-          },
-          {
-            "cp_client_id": "CPS-029942109"
-          },
-          {
-            "cp_client_id": "CPS-157025587"
-          }
-        ],
-        "failed_samples": [
-          {
-            "cp_client_id": "CPS-254756704"
-          },
-          {
-            "cp_client_id": "CPS-777330919"
-          },
-          {
-            "cp_client_id": "CPS-588211074"
-          },
-          {
-            "cp_client_id": "CPS-029942109"
-          },
-          {
-            "cp_client_id": "CPS-157025587"
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "44dc0a61-354c-495b-a798-218a95226044",
+        "id": "b17da6d4-45c1-4c2a-a1ea-b03e3d92b82f",
         "key": "cp_clients__family_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -479,54 +294,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"family_name\" IS NULL THEN 1 ELSE 0 END) AS \"cp_clients__family_name__field_null_values\"\nFROM \"cp_clients\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(family_name) was 8, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "family_name",
-          "value": 8,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 527,
-          "failed_fraction": 0.01518
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "cp_client_id": "CPS-254756704"
-          },
-          {
-            "cp_client_id": "CPS-777330919"
-          },
-          {
-            "cp_client_id": "CPS-588211074"
-          },
-          {
-            "cp_client_id": "CPS-029942109"
-          },
-          {
-            "cp_client_id": "CPS-157025587"
-          }
-        ],
-        "failed_samples": [
-          {
-            "cp_client_id": "CPS-254756704"
-          },
-          {
-            "cp_client_id": "CPS-777330919"
-          },
-          {
-            "cp_client_id": "CPS-588211074"
-          },
-          {
-            "cp_client_id": "CPS-029942109"
-          },
-          {
-            "cp_client_id": "CPS-157025587"
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "9e8859d4-b66b-4bab-beeb-dde590865fc1",
+        "id": "d8c6db99-d12e-4828-aa17-b2812ed0b6f3",
         "key": "cp_clients__date_of_birth__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -550,7 +332,7 @@
         "failedSamples": null
       },
       {
-        "id": "97e9f7f8-63c4-47e6-b9d6-0ec075d5d7e2",
+        "id": "1b69267b-bdad-4968-84ca-eff1ef34f4f4",
         "key": "cp_clients__date_of_birth__field_required",
         "category": "schema",
         "type": "field_required",
@@ -564,63 +346,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"date_of_birth\" IS NULL THEN 1 ELSE 0 END) AS \"cp_clients__date_of_birth__field_required\"\nFROM \"cp_clients\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(date_of_birth) was 10, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "date_of_birth",
-          "value": 10,
+          "value": 0,
           "threshold": "= 0",
           "row_count": 527,
-          "failed_fraction": 0.018975
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "cp_client_id": "CPS-130258003",
-            "date_of_birth": null
-          },
-          {
-            "cp_client_id": "CPS-890847881",
-            "date_of_birth": null
-          },
-          {
-            "cp_client_id": "CPS-229602682",
-            "date_of_birth": null
-          },
-          {
-            "cp_client_id": "CPS-192065247",
-            "date_of_birth": null
-          },
-          {
-            "cp_client_id": "CPS-873267915",
-            "date_of_birth": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "cp_client_id": "CPS-130258003",
-            "date_of_birth": null
-          },
-          {
-            "cp_client_id": "CPS-890847881",
-            "date_of_birth": null
-          },
-          {
-            "cp_client_id": "CPS-229602682",
-            "date_of_birth": null
-          },
-          {
-            "cp_client_id": "CPS-192065247",
-            "date_of_birth": null
-          },
-          {
-            "cp_client_id": "CPS-873267915",
-            "date_of_birth": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "0378def6-294a-4e52-b3c8-3ecda1d55d1b",
+        "id": "6007040c-ad4d-416c-b6df-2385555ca10d",
         "key": "cp_clients__date_of_birth__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -634,64 +373,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"date_of_birth\" IS NULL THEN 1 ELSE 0 END) AS \"cp_clients__date_of_birth__field_null_values\"\nFROM \"cp_clients\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(date_of_birth) was 10, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "date_of_birth",
-          "value": 10,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 527,
-          "failed_fraction": 0.018975
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "cp_client_id": "CPS-130258003",
-            "date_of_birth": null
-          },
-          {
-            "cp_client_id": "CPS-890847881",
-            "date_of_birth": null
-          },
-          {
-            "cp_client_id": "CPS-229602682",
-            "date_of_birth": null
-          },
-          {
-            "cp_client_id": "CPS-192065247",
-            "date_of_birth": null
-          },
-          {
-            "cp_client_id": "CPS-873267915",
-            "date_of_birth": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "cp_client_id": "CPS-130258003",
-            "date_of_birth": null
-          },
-          {
-            "cp_client_id": "CPS-890847881",
-            "date_of_birth": null
-          },
-          {
-            "cp_client_id": "CPS-229602682",
-            "date_of_birth": null
-          },
-          {
-            "cp_client_id": "CPS-192065247",
-            "date_of_birth": null
-          },
-          {
-            "cp_client_id": "CPS-873267915",
-            "date_of_birth": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "44174ac1-2d4a-48bd-b5d0-0a7e2d7e797a",
+        "id": "66b65a7c-ea19-4900-babd-96b7a2463ca0",
         "key": "cp_clients__date_of_birth__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -705,19 +401,19 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT COUNT(*) FROM cp_clients WHERE date_of_birth < DATE '1900-01-01'",
-        "result": "failed",
-        "reason": "Actual custom_sql(date_of_birth) was 32, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "custom_sql",
           "field": "date_of_birth",
-          "value": 32,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0"
         },
         "failedSamples": null
       },
       {
-        "id": "a8e28e83-709f-458f-b563-23829e120b15",
+        "id": "49736603-5d2b-45e1-badd-5b6c6aa9f2dc",
         "key": "cp_clients__sex__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -741,7 +437,7 @@
         "failedSamples": null
       },
       {
-        "id": "90a3f5fa-107a-4a2a-b0cf-8185190748aa",
+        "id": "2e1c7e68-5236-4cb2-8d75-0ec20f538798",
         "key": "cp_clients__sex__field_required",
         "category": "schema",
         "type": "field_required",
@@ -768,7 +464,7 @@
         "failedSamples": null
       },
       {
-        "id": "62bcd723-9a83-4122-b8a6-8755384f9428",
+        "id": "d428e42b-0d2b-42bf-bb18-e7e3451e72ba",
         "key": "cp_clients__sex__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -782,16 +478,16 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"sex\" IS NULL\n      ) AND NOT (\n        \"t0\".\"sex\" IN ('M', 'F', 'X')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_clients__sex__field_invalid_values\"\nFROM \"cp_clients\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual invalid_count(sex) was 13, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "invalid_count",
           "field": "sex",
-          "value": 13,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 527,
-          "failed_fraction": 0.024668,
+          "failed_fraction": 0.0,
           "constraint": {
             "valid_values": [
               "M",
@@ -800,53 +496,10 @@
             ]
           }
         },
-        "failedSamples": [
-          {
-            "cp_client_id": "CPS-888241141",
-            "sex": "9"
-          },
-          {
-            "cp_client_id": "CPS-300563830",
-            "sex": "9"
-          },
-          {
-            "cp_client_id": "CPS-287545275",
-            "sex": "O"
-          },
-          {
-            "cp_client_id": "CPS-492830891",
-            "sex": "O"
-          },
-          {
-            "cp_client_id": "CPS-399153377",
-            "sex": "O"
-          }
-        ],
-        "failed_samples": [
-          {
-            "cp_client_id": "CPS-888241141",
-            "sex": "9"
-          },
-          {
-            "cp_client_id": "CPS-300563830",
-            "sex": "9"
-          },
-          {
-            "cp_client_id": "CPS-287545275",
-            "sex": "O"
-          },
-          {
-            "cp_client_id": "CPS-492830891",
-            "sex": "O"
-          },
-          {
-            "cp_client_id": "CPS-399153377",
-            "sex": "O"
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "14509f93-2b4a-45b3-ac17-75a02c489164",
+        "id": "a2059adc-ab7e-4ce1-a615-763b6cb9f8e1",
         "key": "cp_clients__suburb__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -870,7 +523,7 @@
         "failedSamples": null
       },
       {
-        "id": "c33be1a0-683c-49e7-a189-7345404c7990",
+        "id": "832c32d9-c3eb-42f8-ad1d-db8418c24aeb",
         "key": "cp_clients__suburb__field_required",
         "category": "schema",
         "type": "field_required",
@@ -884,63 +537,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"suburb\" IS NULL THEN 1 ELSE 0 END) AS \"cp_clients__suburb__field_required\"\nFROM \"cp_clients\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(suburb) was 9, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "suburb",
-          "value": 9,
+          "value": 0,
           "threshold": "= 0",
           "row_count": 527,
-          "failed_fraction": 0.017078
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "cp_client_id": "CPS-423579988",
-            "suburb": null
-          },
-          {
-            "cp_client_id": "CPS-406623054",
-            "suburb": null
-          },
-          {
-            "cp_client_id": "CPS-185587991",
-            "suburb": null
-          },
-          {
-            "cp_client_id": "CPS-344420064",
-            "suburb": null
-          },
-          {
-            "cp_client_id": "CPS-754392161",
-            "suburb": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "cp_client_id": "CPS-423579988",
-            "suburb": null
-          },
-          {
-            "cp_client_id": "CPS-406623054",
-            "suburb": null
-          },
-          {
-            "cp_client_id": "CPS-185587991",
-            "suburb": null
-          },
-          {
-            "cp_client_id": "CPS-344420064",
-            "suburb": null
-          },
-          {
-            "cp_client_id": "CPS-754392161",
-            "suburb": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "97a73098-c5ef-4512-ba66-0064668c69eb",
+        "id": "e981d595-48be-4406-b1ca-c528dd068921",
         "key": "cp_clients__suburb__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -954,64 +564,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"suburb\" IS NULL THEN 1 ELSE 0 END) AS \"cp_clients__suburb__field_null_values\"\nFROM \"cp_clients\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(suburb) was 9, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "suburb",
-          "value": 9,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 527,
-          "failed_fraction": 0.017078
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "cp_client_id": "CPS-423579988",
-            "suburb": null
-          },
-          {
-            "cp_client_id": "CPS-406623054",
-            "suburb": null
-          },
-          {
-            "cp_client_id": "CPS-185587991",
-            "suburb": null
-          },
-          {
-            "cp_client_id": "CPS-344420064",
-            "suburb": null
-          },
-          {
-            "cp_client_id": "CPS-754392161",
-            "suburb": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "cp_client_id": "CPS-423579988",
-            "suburb": null
-          },
-          {
-            "cp_client_id": "CPS-406623054",
-            "suburb": null
-          },
-          {
-            "cp_client_id": "CPS-185587991",
-            "suburb": null
-          },
-          {
-            "cp_client_id": "CPS-344420064",
-            "suburb": null
-          },
-          {
-            "cp_client_id": "CPS-754392161",
-            "suburb": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "a658b8f5-191e-4476-8c91-a0cdc3d4988b",
+        "id": "765a5376-71cf-47e8-b9ed-608d1bd5b436",
         "key": "cp_clients__postcode__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1035,7 +602,7 @@
         "failedSamples": null
       },
       {
-        "id": "e660e179-204f-42a7-a425-03c6c46b7041",
+        "id": "a2c50e7c-af94-408b-9956-c465d88b0af3",
         "key": "cp_clients__postcode__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1062,7 +629,7 @@
         "failedSamples": null
       },
       {
-        "id": "cad6d7bb-5254-4507-9bf2-6198971a95b1",
+        "id": "bfadef12-c7a0-4ae3-83bb-6494d0ab5666",
         "key": "cp_clients__postcode__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1090,7 +657,7 @@
         "failedSamples": null
       },
       {
-        "id": "9d505e55-bbc2-4a63-99b7-48520f7087a6",
+        "id": "27f5c4a9-e708-4952-a3d1-e12a227beca5",
         "key": "cp_clients__postcode__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1104,16 +671,16 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"postcode\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"postcode\" IN (\n          '6007',\n          '6008',\n          '6014',\n          '6018',\n          '6019',\n          '6027',\n          '6028',\n          '6030',\n          '6035',\n          '6036',\n          '6050',\n          '6056',\n          '6061',\n          '6062',\n          '6064',\n          '6069',\n          '6100',\n          '6102',\n          '6107',\n          '6109',\n          '6110',\n          '6112',\n          '6122',\n          '6148',\n          '6151',\n          '6155',\n          '6160',\n          '6162',\n          '6163',\n          '6164',\n          '6167',\n          '6168',\n          '6171',\n          '6210',\n          '6215',\n          '6225',\n          '6230',\n          '6258',\n          '6280',\n          '6285',\n          '6312',\n          '6330',\n          '6401',\n          '6430',\n          '6450',\n          '6530',\n          '6714',\n          '6721',\n          '6725'\n        )\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_clients__postcode__field_invalid_values\"\nFROM \"cp_clients\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual invalid_count(postcode) was 18, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "invalid_count",
           "field": "postcode",
-          "value": 18,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 527,
-          "failed_fraction": 0.034156,
+          "failed_fraction": 0.0,
           "constraint": {
             "valid_values": [
               "6007",
@@ -1168,53 +735,10 @@
             ]
           }
         },
-        "failedSamples": [
-          {
-            "cp_client_id": "CPS-525949263",
-            "postcode": "TBC"
-          },
-          {
-            "cp_client_id": "CPS-339500672",
-            "postcode": "XXXX"
-          },
-          {
-            "cp_client_id": "CPS-832330963",
-            "postcode": "TBC"
-          },
-          {
-            "cp_client_id": "CPS-267272133",
-            "postcode": "TBC"
-          },
-          {
-            "cp_client_id": "CPS-244965474",
-            "postcode": "0000"
-          }
-        ],
-        "failed_samples": [
-          {
-            "cp_client_id": "CPS-525949263",
-            "postcode": "TBC"
-          },
-          {
-            "cp_client_id": "CPS-339500672",
-            "postcode": "XXXX"
-          },
-          {
-            "cp_client_id": "CPS-832330963",
-            "postcode": "TBC"
-          },
-          {
-            "cp_client_id": "CPS-267272133",
-            "postcode": "TBC"
-          },
-          {
-            "cp_client_id": "CPS-244965474",
-            "postcode": "0000"
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "ad57ee01-9f4d-440a-80d4-7f91c9873424",
+        "id": "442b05ea-de58-464e-998d-cce57db4cc92",
         "key": "cp_clients__case_opened_date__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1238,7 +762,7 @@
         "failedSamples": null
       },
       {
-        "id": "c3d07f48-7b50-4d79-aaaf-a83716e69f6b",
+        "id": "0681a453-1dc5-4e87-ad20-808d3a1d187c",
         "key": "cp_clients__case_opened_date__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1252,63 +776,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"case_opened_date\" IS NULL THEN 1 ELSE 0 END) AS \"cp_clients__case_opened_date__field_required\"\nFROM \"cp_clients\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(case_opened_date) was 15, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "case_opened_date",
-          "value": 15,
+          "value": 0,
           "threshold": "= 0",
           "row_count": 527,
-          "failed_fraction": 0.028463
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "cp_client_id": "CPS-605414391",
-            "case_opened_date": null
-          },
-          {
-            "cp_client_id": "CPS-410396910",
-            "case_opened_date": null
-          },
-          {
-            "cp_client_id": "CPS-236508614",
-            "case_opened_date": null
-          },
-          {
-            "cp_client_id": "CPS-146548189",
-            "case_opened_date": null
-          },
-          {
-            "cp_client_id": "CPS-995362758",
-            "case_opened_date": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "cp_client_id": "CPS-605414391",
-            "case_opened_date": null
-          },
-          {
-            "cp_client_id": "CPS-410396910",
-            "case_opened_date": null
-          },
-          {
-            "cp_client_id": "CPS-236508614",
-            "case_opened_date": null
-          },
-          {
-            "cp_client_id": "CPS-146548189",
-            "case_opened_date": null
-          },
-          {
-            "cp_client_id": "CPS-995362758",
-            "case_opened_date": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "d166ab1b-2b36-4685-9f6c-988527f29df8",
+        "id": "22af0c59-699e-4020-85fb-20495e0037f4",
         "key": "cp_clients__case_opened_date__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1322,64 +803,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"case_opened_date\" IS NULL THEN 1 ELSE 0 END) AS \"cp_clients__case_opened_date__field_null_values\"\nFROM \"cp_clients\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(case_opened_date) was 15, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "case_opened_date",
-          "value": 15,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 527,
-          "failed_fraction": 0.028463
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "cp_client_id": "CPS-605414391",
-            "case_opened_date": null
-          },
-          {
-            "cp_client_id": "CPS-410396910",
-            "case_opened_date": null
-          },
-          {
-            "cp_client_id": "CPS-236508614",
-            "case_opened_date": null
-          },
-          {
-            "cp_client_id": "CPS-146548189",
-            "case_opened_date": null
-          },
-          {
-            "cp_client_id": "CPS-995362758",
-            "case_opened_date": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "cp_client_id": "CPS-605414391",
-            "case_opened_date": null
-          },
-          {
-            "cp_client_id": "CPS-410396910",
-            "case_opened_date": null
-          },
-          {
-            "cp_client_id": "CPS-236508614",
-            "case_opened_date": null
-          },
-          {
-            "cp_client_id": "CPS-146548189",
-            "case_opened_date": null
-          },
-          {
-            "cp_client_id": "CPS-995362758",
-            "case_opened_date": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "c89f626f-c54e-4cc1-94f8-27d3129195cf",
+        "id": "077fe6b8-69f7-48cc-a16d-513db434fac0",
         "key": "cp_clients__case_status__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1403,7 +841,7 @@
         "failedSamples": null
       },
       {
-        "id": "23bb1baf-def7-4964-96ca-900b25bd9908",
+        "id": "f8cd32e5-f67b-4dae-97ab-e80ea5304059",
         "key": "cp_clients__case_status__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1430,7 +868,7 @@
         "failedSamples": null
       },
       {
-        "id": "2de210d0-bebf-4010-9f28-4aa59fe03058",
+        "id": "6d7b1a31-b8d3-40c1-9611-10ed30621608",
         "key": "cp_clients__case_status__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1464,7 +902,7 @@
         "failedSamples": null
       },
       {
-        "id": "9d96da1c-b39c-4d7c-92d1-34d851c789ee",
+        "id": "61df0ccc-0d82-4af4-b98e-d08520e2af14",
         "key": "cp_clients__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1488,7 +926,7 @@
         "failedSamples": null
       },
       {
-        "id": "75d623c9-a10c-4edb-9668-1c78064a0436",
+        "id": "bd7a6e41-e276-4e46-8457-392348635d37",
         "key": "cp_clients__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1515,7 +953,7 @@
         "failedSamples": null
       },
       {
-        "id": "a4f50d28-f02a-4ad9-9a2c-8e253917491b",
+        "id": "8da02278-142e-46ea-ab9a-6ca6fad0f57b",
         "key": "cp_clients__row_count",
         "category": "quality",
         "type": "row_count",
@@ -1541,7 +979,7 @@
         "failedSamples": null
       },
       {
-        "id": "1d0bd6a4-cfc0-4d15-844f-b2b4001c40bd",
+        "id": "1105c290-e71d-4c21-b40c-c8488dc8741a",
         "key": "cp_notifications__notification_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1565,7 +1003,7 @@
         "failedSamples": null
       },
       {
-        "id": "829ffbdc-0cb6-4cec-b56e-64d79bad50b8",
+        "id": "d6b46e73-da63-407a-a6d0-75de68cc5480",
         "key": "cp_notifications__notification_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1586,13 +1024,13 @@
           "field": "notification_id",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 1036,
+          "row_count": 987,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "70f87b37-881d-4235-ab11-9a6e18031963",
+        "id": "a8629799-0c1f-4f6d-a14f-75cb3c26edfa",
         "key": "cp_notifications__notification_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -1606,63 +1044,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"notification_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_notifications\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
-        "result": "failed",
-        "reason": "Actual duplicate_count(notification_id) was 17, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "duplicate_count",
           "field": "notification_id",
-          "value": 17,
+          "value": 0,
           "threshold": "= 0",
-          "row_count": 1036,
-          "failed_rows": 34
+          "row_count": 987,
+          "failed_rows": 0
         },
-        "failedSamples": [
-          {
-            "notification_id": "NOTIF-00000026",
-            "duplicate_count": 2
-          },
-          {
-            "notification_id": "NOTIF-00000341",
-            "duplicate_count": 2
-          },
-          {
-            "notification_id": "NOTIF-00000491",
-            "duplicate_count": 2
-          },
-          {
-            "notification_id": "NOTIF-00000763",
-            "duplicate_count": 2
-          },
-          {
-            "notification_id": "NOTIF-00000049",
-            "duplicate_count": 2
-          }
-        ],
-        "failed_samples": [
-          {
-            "notification_id": "NOTIF-00000026",
-            "duplicate_count": 2
-          },
-          {
-            "notification_id": "NOTIF-00000341",
-            "duplicate_count": 2
-          },
-          {
-            "notification_id": "NOTIF-00000491",
-            "duplicate_count": 2
-          },
-          {
-            "notification_id": "NOTIF-00000763",
-            "duplicate_count": 2
-          },
-          {
-            "notification_id": "NOTIF-00000049",
-            "duplicate_count": 2
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "4808f9e9-1a16-4d10-91d9-4a9cb00ecd80",
+        "id": "3aa15ef9-8b44-49b0-b267-b2f486c1400c",
         "key": "cp_notifications__notification_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1684,13 +1079,13 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1036,
+          "row_count": 987,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "0ccf1411-221e-40dc-9ff8-71b60f0d8bc0",
+        "id": "0bd541c5-b4bb-4a42-b65f-73946d7b3bae",
         "key": "cp_notifications__notification_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -1704,64 +1099,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"notification_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_notifications\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
-        "result": "failed",
-        "reason": "Actual duplicate_count(notification_id) was 17, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "duplicate_count",
           "field": "notification_id",
-          "value": 17,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1036,
-          "failed_rows": 34
+          "row_count": 987,
+          "failed_rows": 0
         },
-        "failedSamples": [
-          {
-            "notification_id": "NOTIF-00000026",
-            "duplicate_count": 2
-          },
-          {
-            "notification_id": "NOTIF-00000341",
-            "duplicate_count": 2
-          },
-          {
-            "notification_id": "NOTIF-00000491",
-            "duplicate_count": 2
-          },
-          {
-            "notification_id": "NOTIF-00000763",
-            "duplicate_count": 2
-          },
-          {
-            "notification_id": "NOTIF-00000049",
-            "duplicate_count": 2
-          }
-        ],
-        "failed_samples": [
-          {
-            "notification_id": "NOTIF-00000026",
-            "duplicate_count": 2
-          },
-          {
-            "notification_id": "NOTIF-00000341",
-            "duplicate_count": 2
-          },
-          {
-            "notification_id": "NOTIF-00000491",
-            "duplicate_count": 2
-          },
-          {
-            "notification_id": "NOTIF-00000763",
-            "duplicate_count": 2
-          },
-          {
-            "notification_id": "NOTIF-00000049",
-            "duplicate_count": 2
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "c5702869-7215-4395-97e8-dd97f2d1f625",
+        "id": "2fc6a7d9-c15d-4aab-ac5b-6d3253d1251c",
         "key": "cp_notifications__cp_client_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1785,7 +1137,7 @@
         "failedSamples": null
       },
       {
-        "id": "6b1b731d-dfdd-4a5f-9d2b-a4b5e6758682",
+        "id": "981325e6-510d-4d0d-9c77-ae622d5ae022",
         "key": "cp_notifications__cp_client_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1799,63 +1151,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"cp_client_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_notifications__cp_client_id__field_required\"\nFROM \"cp_notifications\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(cp_client_id) was 19, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "cp_client_id",
-          "value": 19,
+          "value": 0,
           "threshold": "= 0",
-          "row_count": 1036,
-          "failed_fraction": 0.01834
+          "row_count": 987,
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "notification_id": "NOTIF-00000002",
-            "cp_client_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000069",
-            "cp_client_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000087",
-            "cp_client_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000109",
-            "cp_client_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000121",
-            "cp_client_id": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "notification_id": "NOTIF-00000002",
-            "cp_client_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000069",
-            "cp_client_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000087",
-            "cp_client_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000109",
-            "cp_client_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000121",
-            "cp_client_id": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "eb97a7d4-0af2-4ccd-a092-83e0cfdb8fa7",
+        "id": "b18afdb1-2e9c-417e-91a3-063529444eb2",
         "key": "cp_notifications__cp_client_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1869,64 +1178,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"cp_client_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_notifications__cp_client_id__field_null_values\"\nFROM \"cp_notifications\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(cp_client_id) was 19, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "cp_client_id",
-          "value": 19,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1036,
-          "failed_fraction": 0.01834
+          "row_count": 987,
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "notification_id": "NOTIF-00000002",
-            "cp_client_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000069",
-            "cp_client_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000087",
-            "cp_client_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000109",
-            "cp_client_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000121",
-            "cp_client_id": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "notification_id": "NOTIF-00000002",
-            "cp_client_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000069",
-            "cp_client_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000087",
-            "cp_client_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000109",
-            "cp_client_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000121",
-            "cp_client_id": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "a0914909-d4df-4326-ab71-8c4243311aae",
+        "id": "8c1d7323-5c74-42c5-80c6-f4b9acc57eeb",
         "key": "cp_notifications__notification_date__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1950,7 +1216,7 @@
         "failedSamples": null
       },
       {
-        "id": "4638e41f-b8af-4017-8d5f-86189eab86d4",
+        "id": "650ca26b-995e-49f9-a10d-62cbbbc5c171",
         "key": "cp_notifications__notification_date__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1971,13 +1237,13 @@
           "field": "notification_date",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 1036,
+          "row_count": 987,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "32034e80-4a0d-4092-b3a4-3ddcd337977c",
+        "id": "8c5e218c-1021-46ce-bd7a-67e7ef95a553",
         "key": "cp_notifications__notification_date__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1999,13 +1265,13 @@
           "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1036,
+          "row_count": 987,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "c06860e1-9caa-4b4f-9a2e-860d008a21d3",
+        "id": "7c0911bd-5ffb-4292-a452-ca6af721e01d",
         "key": "cp_notifications__source_type__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2029,7 +1295,7 @@
         "failedSamples": null
       },
       {
-        "id": "f92053ca-a317-4feb-9fe4-92bb426ff3ce",
+        "id": "62fb36f0-72fa-4c9d-94ea-0b8dcd199ef3",
         "key": "cp_notifications__source_type__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2050,13 +1316,13 @@
           "field": "source_type",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 1036,
+          "row_count": 987,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "0609bb25-3bc5-44e8-8c54-13c6d1dabf6f",
+        "id": "08931054-2a41-4a7f-bdec-e6dca7b84ea9",
         "key": "cp_notifications__source_type__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -2070,16 +1336,16 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"source_type\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"source_type\" IN (\n          'School',\n          'Police',\n          'Health service',\n          'Family member',\n          'Neighbour',\n          'Anonymous',\n          'Self-report'\n        )\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_notifications__source_type__field_invalid_values\"\nFROM \"cp_notifications\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual invalid_count(source_type) was 37, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "invalid_count",
           "field": "source_type",
-          "value": 37,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1036,
-          "failed_fraction": 0.035714,
+          "row_count": 987,
+          "failed_fraction": 0.0,
           "constraint": {
             "valid_values": [
               "School",
@@ -2092,53 +1358,10 @@
             ]
           }
         },
-        "failedSamples": [
-          {
-            "notification_id": "NOTIF-00000002",
-            "source_type": "Court"
-          },
-          {
-            "notification_id": "NOTIF-00000028",
-            "source_type": "Court"
-          },
-          {
-            "notification_id": "NOTIF-00000119",
-            "source_type": "Media report"
-          },
-          {
-            "notification_id": "NOTIF-00000124",
-            "source_type": "Court"
-          },
-          {
-            "notification_id": "NOTIF-00000125",
-            "source_type": "Court"
-          }
-        ],
-        "failed_samples": [
-          {
-            "notification_id": "NOTIF-00000002",
-            "source_type": "Court"
-          },
-          {
-            "notification_id": "NOTIF-00000028",
-            "source_type": "Court"
-          },
-          {
-            "notification_id": "NOTIF-00000119",
-            "source_type": "Media report"
-          },
-          {
-            "notification_id": "NOTIF-00000124",
-            "source_type": "Court"
-          },
-          {
-            "notification_id": "NOTIF-00000125",
-            "source_type": "Court"
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "2f050359-f348-4f55-a37c-eac746f75d95",
+        "id": "e0842bbc-f431-484b-9e58-8a02ed0e2f94",
         "key": "cp_notifications__concern_type__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2162,7 +1385,7 @@
         "failedSamples": null
       },
       {
-        "id": "56b1f63d-9002-4985-9959-b2b13c6ebedb",
+        "id": "461f8fcc-1f3f-4c06-9f96-c51f265ffea6",
         "key": "cp_notifications__concern_type__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2183,13 +1406,13 @@
           "field": "concern_type",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 1036,
+          "row_count": 987,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "f72bfbbf-f69f-4685-982d-8d9b3cfab487",
+        "id": "c978b640-1bad-4406-9062-b329e9229204",
         "key": "cp_notifications__concern_type__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -2203,16 +1426,16 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"concern_type\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"concern_type\" IN (\n          'Neglect',\n          'Physical abuse',\n          'Emotional abuse',\n          'Sexual abuse',\n          'Domestic violence exposure',\n          'Parental substance use',\n          'Parental mental health concern'\n        )\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_notifications__concern_type__field_invalid_values\"\nFROM \"cp_notifications\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual invalid_count(concern_type) was 41, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "invalid_count",
           "field": "concern_type",
-          "value": 41,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1036,
-          "failed_fraction": 0.039575,
+          "row_count": 987,
+          "failed_fraction": 0.0,
           "constraint": {
             "valid_values": [
               "Neglect",
@@ -2225,53 +1448,10 @@
             ]
           }
         },
-        "failedSamples": [
-          {
-            "notification_id": "NOTIF-00000018",
-            "concern_type": "Pending classification"
-          },
-          {
-            "notification_id": "NOTIF-00000031",
-            "concern_type": "Pending classification"
-          },
-          {
-            "notification_id": "NOTIF-00000033",
-            "concern_type": "Code 9"
-          },
-          {
-            "notification_id": "NOTIF-00000075",
-            "concern_type": "Unspecified"
-          },
-          {
-            "notification_id": "NOTIF-00000155",
-            "concern_type": "Code 9"
-          }
-        ],
-        "failed_samples": [
-          {
-            "notification_id": "NOTIF-00000018",
-            "concern_type": "Pending classification"
-          },
-          {
-            "notification_id": "NOTIF-00000031",
-            "concern_type": "Pending classification"
-          },
-          {
-            "notification_id": "NOTIF-00000033",
-            "concern_type": "Code 9"
-          },
-          {
-            "notification_id": "NOTIF-00000075",
-            "concern_type": "Unspecified"
-          },
-          {
-            "notification_id": "NOTIF-00000155",
-            "concern_type": "Code 9"
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "74e39bf0-4f92-4fe0-acfe-47a5ea448bc2",
+        "id": "f14769ce-ae26-4180-88d2-ec5a8813892b",
         "key": "cp_notifications__risk_rating__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2295,7 +1475,7 @@
         "failedSamples": null
       },
       {
-        "id": "f8b29cca-651b-4b86-b8af-b6b71c2c0ed4",
+        "id": "95a69362-fdf0-47f5-8b83-7dcc571b0e64",
         "key": "cp_notifications__risk_rating__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2316,13 +1496,13 @@
           "field": "risk_rating",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 1036,
+          "row_count": 987,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "dbedf502-fc37-459e-b131-cb006a81bd7f",
+        "id": "9c3fa943-ffd2-483d-9ca1-8fc19f1b7e4e",
         "key": "cp_notifications__risk_rating__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -2336,16 +1516,16 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"risk_rating\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"risk_rating\" IN ('Low', 'Medium', 'High', 'Critical')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_notifications__risk_rating__field_invalid_values\"\nFROM \"cp_notifications\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual invalid_count(risk_rating) was 41, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "invalid_count",
           "field": "risk_rating",
-          "value": 41,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1036,
-          "failed_fraction": 0.039575,
+          "row_count": 987,
+          "failed_fraction": 0.0,
           "constraint": {
             "valid_values": [
               "Low",
@@ -2355,53 +1535,10 @@
             ]
           }
         },
-        "failedSamples": [
-          {
-            "notification_id": "NOTIF-00000050",
-            "risk_rating": "TBC"
-          },
-          {
-            "notification_id": "NOTIF-00000084",
-            "risk_rating": "Unrated"
-          },
-          {
-            "notification_id": "NOTIF-00000135",
-            "risk_rating": "Unrated"
-          },
-          {
-            "notification_id": "NOTIF-00000143",
-            "risk_rating": "Unrated"
-          },
-          {
-            "notification_id": "NOTIF-00000146",
-            "risk_rating": "Severe"
-          }
-        ],
-        "failed_samples": [
-          {
-            "notification_id": "NOTIF-00000050",
-            "risk_rating": "TBC"
-          },
-          {
-            "notification_id": "NOTIF-00000084",
-            "risk_rating": "Unrated"
-          },
-          {
-            "notification_id": "NOTIF-00000135",
-            "risk_rating": "Unrated"
-          },
-          {
-            "notification_id": "NOTIF-00000143",
-            "risk_rating": "Unrated"
-          },
-          {
-            "notification_id": "NOTIF-00000146",
-            "risk_rating": "Severe"
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "0548094e-6e9f-478b-b554-622e66a3ae76",
+        "id": "0c463915-748a-4494-a916-f3007f913c26",
         "key": "cp_notifications__assigned_worker_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2425,7 +1562,7 @@
         "failedSamples": null
       },
       {
-        "id": "1331fb09-dec1-481a-ac53-6e85b75f5253",
+        "id": "dfac7915-e014-40c4-90f6-558e00039011",
         "key": "cp_notifications__assigned_worker_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2439,63 +1576,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"assigned_worker_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_notifications__assigned_worker_id__field_required\"\nFROM \"cp_notifications\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(assigned_worker_id) was 10, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "assigned_worker_id",
-          "value": 10,
+          "value": 0,
           "threshold": "= 0",
-          "row_count": 1036,
-          "failed_fraction": 0.009653
+          "row_count": 987,
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "notification_id": "NOTIF-00000058",
-            "assigned_worker_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000109",
-            "assigned_worker_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000350",
-            "assigned_worker_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000355",
-            "assigned_worker_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000379",
-            "assigned_worker_id": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "notification_id": "NOTIF-00000058",
-            "assigned_worker_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000109",
-            "assigned_worker_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000350",
-            "assigned_worker_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000355",
-            "assigned_worker_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000379",
-            "assigned_worker_id": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "230541c6-75f6-4820-b28b-588893dcf641",
+        "id": "fa63a7c3-fc6f-4f6a-8b74-71a228f3957f",
         "key": "cp_notifications__assigned_worker_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2509,64 +1603,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"assigned_worker_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_notifications__assigned_worker_id__field_null_values\"\nFROM \"cp_notifications\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(assigned_worker_id) was 10, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "assigned_worker_id",
-          "value": 10,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1036,
-          "failed_fraction": 0.009653
+          "row_count": 987,
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "notification_id": "NOTIF-00000058",
-            "assigned_worker_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000109",
-            "assigned_worker_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000350",
-            "assigned_worker_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000355",
-            "assigned_worker_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000379",
-            "assigned_worker_id": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "notification_id": "NOTIF-00000058",
-            "assigned_worker_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000109",
-            "assigned_worker_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000350",
-            "assigned_worker_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000355",
-            "assigned_worker_id": null
-          },
-          {
-            "notification_id": "NOTIF-00000379",
-            "assigned_worker_id": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "8b3a61f1-1fb7-4bf7-b09d-93152fb6a3cc",
+        "id": "653c59b9-2249-43ac-a133-e133234c227c",
         "key": "cp_notifications__outcome__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2590,7 +1641,7 @@
         "failedSamples": null
       },
       {
-        "id": "3a47a6d1-2128-41d8-b7d3-04bacf549325",
+        "id": "01d1737d-86cd-4d26-83ea-b0f267d7b2a7",
         "key": "cp_notifications__outcome__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2611,13 +1662,13 @@
           "field": "outcome",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 1036,
+          "row_count": 987,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "89e012fd-49ec-4a87-935b-1857cb2ea243",
+        "id": "c0327646-348d-4f83-b3b4-1524d7f9ef61",
         "key": "cp_notifications__outcome__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -2631,16 +1682,16 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"outcome\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"outcome\" IN ('No further action', 'Referred to family support', 'Investigation opened')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_notifications__outcome__field_invalid_values\"\nFROM \"cp_notifications\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual invalid_count(outcome) was 42, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "invalid_count",
           "field": "outcome",
-          "value": 42,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
-          "row_count": 1036,
-          "failed_fraction": 0.040541,
+          "row_count": 987,
+          "failed_fraction": 0.0,
           "constraint": {
             "valid_values": [
               "No further action",
@@ -2649,53 +1700,10 @@
             ]
           }
         },
-        "failedSamples": [
-          {
-            "notification_id": "NOTIF-00000003",
-            "outcome": "Escalated externally"
-          },
-          {
-            "notification_id": "NOTIF-00000013",
-            "outcome": "Pending review"
-          },
-          {
-            "notification_id": "NOTIF-00000026",
-            "outcome": "Escalated externally"
-          },
-          {
-            "notification_id": "NOTIF-00000080",
-            "outcome": "Escalated externally"
-          },
-          {
-            "notification_id": "NOTIF-00000095",
-            "outcome": "Pending review"
-          }
-        ],
-        "failed_samples": [
-          {
-            "notification_id": "NOTIF-00000003",
-            "outcome": "Escalated externally"
-          },
-          {
-            "notification_id": "NOTIF-00000013",
-            "outcome": "Pending review"
-          },
-          {
-            "notification_id": "NOTIF-00000026",
-            "outcome": "Escalated externally"
-          },
-          {
-            "notification_id": "NOTIF-00000080",
-            "outcome": "Escalated externally"
-          },
-          {
-            "notification_id": "NOTIF-00000095",
-            "outcome": "Pending review"
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "c2983bcf-d354-4107-becb-616b5842b298",
+        "id": "114d8294-e907-4dc3-985e-151cc170b929",
         "key": "cp_notifications__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2719,7 +1727,7 @@
         "failedSamples": null
       },
       {
-        "id": "9d8014f4-bea5-465d-9af4-74ca61c607df",
+        "id": "8a3e8e69-a650-4dbe-8982-552215044b95",
         "key": "cp_notifications__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2740,13 +1748,13 @@
           "field": "extract_timestamp",
           "value": 0,
           "threshold": "= 0",
-          "row_count": 1036,
+          "row_count": 987,
           "failed_fraction": 0.0
         },
         "failedSamples": null
       },
       {
-        "id": "679fab1c-4953-462c-80fe-bed95f63e59b",
+        "id": "b0e19237-a693-480d-8094-00bd99154498",
         "key": "cp_notifications__row_count",
         "category": "quality",
         "type": "row_count",
@@ -2764,15 +1772,15 @@
         "reason": null,
         "diagnostics": {
           "metric": "row_count",
-          "value": 1036,
+          "value": 987,
           "severity": "warning",
           "threshold": "between 600 and 1600",
-          "row_count": 1036
+          "row_count": 987
         },
         "failedSamples": null
       },
       {
-        "id": "521a928f-fc49-4017-a436-6c0a80475b7f",
+        "id": "7ba1b164-8c6a-4ab4-84a0-a6e16f71b4ce",
         "key": "cp_notifications__quality_sql_1",
         "category": "quality",
         "type": "model_quality_sql",
@@ -2786,18 +1794,18 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT COUNT(*) FROM cp_notifications n LEFT JOIN cp_clients c ON n.cp_client_id = c.cp_client_id WHERE c.cp_client_id IS NULL",
-        "result": "failed",
-        "reason": "Actual custom_sql(cp_notifications) was 43, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "custom_sql",
-          "value": 43,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0"
         },
         "failedSamples": null
       },
       {
-        "id": "da2047ba-3033-49ad-90be-9b3bd8bd6477",
+        "id": "142202d0-ece4-4e2b-a090-398cf458507c",
         "key": "cp_notifications__quality_sql_2",
         "category": "quality",
         "type": "model_quality_sql",
@@ -2811,18 +1819,18 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT COUNT(*) FROM cp_notifications n LEFT JOIN cp_case_workers w ON n.assigned_worker_id = w.worker_id WHERE w.worker_id IS NULL",
-        "result": "failed",
-        "reason": "Actual custom_sql(cp_notifications) was 63, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "custom_sql",
-          "value": 63,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0"
         },
         "failedSamples": null
       },
       {
-        "id": "be97cd7d-9af1-496d-b261-4391f7831685",
+        "id": "15468c20-cd71-471f-b58d-4b3b0b41e16f",
         "key": "cp_notifications__quality_sql_3",
         "category": "quality",
         "type": "model_quality_sql",
@@ -2836,18 +1844,18 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT COUNT(*) FROM cp_notifications n LEFT JOIN cp_investigations i ON n.notification_id = i.notification_id WHERE n.outcome = 'Investigation opened' AND i.investigation_id IS NULL",
-        "result": "failed",
-        "reason": "Actual custom_sql(cp_notifications) was 7, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "custom_sql",
-          "value": 7,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0"
         },
         "failedSamples": null
       },
       {
-        "id": "e93fc6d3-1210-4cfb-bc67-f4c3f03b0de8",
+        "id": "0f436be1-7f2f-428c-9575-a0d01df39ccd",
         "key": "cp_investigations__investigation_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2871,7 +1879,7 @@
         "failedSamples": null
       },
       {
-        "id": "3e564c29-d54b-48c4-b21c-9205db6d39ae",
+        "id": "2feeab30-c273-4482-bf27-d5e5097fe0b6",
         "key": "cp_investigations__investigation_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2898,7 +1906,7 @@
         "failedSamples": null
       },
       {
-        "id": "ee3a5754-643a-4167-813f-178df8cbc022",
+        "id": "07c82be5-4935-4b17-8248-c06b5e503866",
         "key": "cp_investigations__investigation_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -2912,63 +1920,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"investigation_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_investigations\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
-        "result": "failed",
-        "reason": "Actual duplicate_count(investigation_id) was 7, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "duplicate_count",
           "field": "investigation_id",
-          "value": 7,
+          "value": 0,
           "threshold": "= 0",
           "row_count": 181,
-          "failed_rows": 14
+          "failed_rows": 0
         },
-        "failedSamples": [
-          {
-            "investigation_id": "INV-00000169",
-            "duplicate_count": 2
-          },
-          {
-            "investigation_id": "INV-00000044",
-            "duplicate_count": 2
-          },
-          {
-            "investigation_id": "INV-00000035",
-            "duplicate_count": 2
-          },
-          {
-            "investigation_id": "INV-00000085",
-            "duplicate_count": 2
-          },
-          {
-            "investigation_id": "INV-00000155",
-            "duplicate_count": 2
-          }
-        ],
-        "failed_samples": [
-          {
-            "investigation_id": "INV-00000169",
-            "duplicate_count": 2
-          },
-          {
-            "investigation_id": "INV-00000044",
-            "duplicate_count": 2
-          },
-          {
-            "investigation_id": "INV-00000035",
-            "duplicate_count": 2
-          },
-          {
-            "investigation_id": "INV-00000085",
-            "duplicate_count": 2
-          },
-          {
-            "investigation_id": "INV-00000155",
-            "duplicate_count": 2
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "37a2b6b9-eac9-491f-8b07-ab569a9cbe6e",
+        "id": "8cbaf25c-9eb5-45d0-88ba-a53de25b71a6",
         "key": "cp_investigations__investigation_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2996,7 +1961,7 @@
         "failedSamples": null
       },
       {
-        "id": "7d2a4c3c-d012-4327-8b51-ec651998f49b",
+        "id": "787b8d2f-ea63-41ae-9bbe-b394ba8314fe",
         "key": "cp_investigations__investigation_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -3010,64 +1975,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"investigation_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_investigations\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
-        "result": "failed",
-        "reason": "Actual duplicate_count(investigation_id) was 7, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "duplicate_count",
           "field": "investigation_id",
-          "value": 7,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 181,
-          "failed_rows": 14
+          "failed_rows": 0
         },
-        "failedSamples": [
-          {
-            "investigation_id": "INV-00000169",
-            "duplicate_count": 2
-          },
-          {
-            "investigation_id": "INV-00000044",
-            "duplicate_count": 2
-          },
-          {
-            "investigation_id": "INV-00000035",
-            "duplicate_count": 2
-          },
-          {
-            "investigation_id": "INV-00000085",
-            "duplicate_count": 2
-          },
-          {
-            "investigation_id": "INV-00000155",
-            "duplicate_count": 2
-          }
-        ],
-        "failed_samples": [
-          {
-            "investigation_id": "INV-00000169",
-            "duplicate_count": 2
-          },
-          {
-            "investigation_id": "INV-00000044",
-            "duplicate_count": 2
-          },
-          {
-            "investigation_id": "INV-00000035",
-            "duplicate_count": 2
-          },
-          {
-            "investigation_id": "INV-00000085",
-            "duplicate_count": 2
-          },
-          {
-            "investigation_id": "INV-00000155",
-            "duplicate_count": 2
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "8df043dc-ed7b-4fde-877c-8cfdd1e76edb",
+        "id": "33bbede5-7c2c-4ea4-a66e-ef249ac4c867",
         "key": "cp_investigations__notification_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3091,7 +2013,7 @@
         "failedSamples": null
       },
       {
-        "id": "23e68668-cb55-47c8-ad6e-3cdaaee0485e",
+        "id": "bf68d5a0-f578-4ea8-9352-240a7e82fb5f",
         "key": "cp_investigations__notification_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3118,7 +2040,7 @@
         "failedSamples": null
       },
       {
-        "id": "96c521f0-33cc-42e6-86f9-e4b706190af1",
+        "id": "7f9a5e61-1cdf-4478-b6c9-5a25b324ba73",
         "key": "cp_investigations__notification_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3146,7 +2068,7 @@
         "failedSamples": null
       },
       {
-        "id": "34a10f36-f9ce-4128-ae9f-ec2a9567f941",
+        "id": "f56647e2-2ab8-4577-899f-2733bbe2b319",
         "key": "cp_investigations__cp_client_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3170,7 +2092,7 @@
         "failedSamples": null
       },
       {
-        "id": "4965e257-4de0-43c6-bf61-cdfea10755a7",
+        "id": "7d96becc-0f20-44b8-8749-e543f8bfe131",
         "key": "cp_investigations__cp_client_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3197,7 +2119,7 @@
         "failedSamples": null
       },
       {
-        "id": "fb3b64da-1857-4eb5-ba5c-63ab70a63e26",
+        "id": "a23a344f-7795-4592-8dd7-77963abc36ae",
         "key": "cp_investigations__cp_client_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3225,7 +2147,7 @@
         "failedSamples": null
       },
       {
-        "id": "21971dc5-ab5c-4cb4-a825-1954d344c0fe",
+        "id": "91af6053-a86d-4c40-a186-1877d375bf3b",
         "key": "cp_investigations__start_date__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3249,7 +2171,7 @@
         "failedSamples": null
       },
       {
-        "id": "2f00de60-e224-41f0-95ec-7e9d3b68563f",
+        "id": "698a9de9-e662-4234-b9bb-513c8287996e",
         "key": "cp_investigations__start_date__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3263,63 +2185,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"start_date\" IS NULL THEN 1 ELSE 0 END) AS \"cp_investigations__start_date__field_required\"\nFROM \"cp_investigations\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(start_date) was 12, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "start_date",
-          "value": 12,
+          "value": 0,
           "threshold": "= 0",
           "row_count": 181,
-          "failed_fraction": 0.066298
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "investigation_id": "INV-00000169",
-            "start_date": null
-          },
-          {
-            "investigation_id": "INV-00000035",
-            "start_date": null
-          },
-          {
-            "investigation_id": "INV-00000050",
-            "start_date": null
-          },
-          {
-            "investigation_id": "INV-00000052",
-            "start_date": null
-          },
-          {
-            "investigation_id": "INV-00000067",
-            "start_date": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "investigation_id": "INV-00000169",
-            "start_date": null
-          },
-          {
-            "investigation_id": "INV-00000035",
-            "start_date": null
-          },
-          {
-            "investigation_id": "INV-00000050",
-            "start_date": null
-          },
-          {
-            "investigation_id": "INV-00000052",
-            "start_date": null
-          },
-          {
-            "investigation_id": "INV-00000067",
-            "start_date": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "5faefd93-bff2-4fc0-9bd2-66a563e30e36",
+        "id": "efcf5e78-3c13-443b-b8fc-85ba889b7cf0",
         "key": "cp_investigations__start_date__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3333,64 +2212,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"start_date\" IS NULL THEN 1 ELSE 0 END) AS \"cp_investigations__start_date__field_null_values\"\nFROM \"cp_investigations\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(start_date) was 12, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "start_date",
-          "value": 12,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 181,
-          "failed_fraction": 0.066298
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "investigation_id": "INV-00000169",
-            "start_date": null
-          },
-          {
-            "investigation_id": "INV-00000035",
-            "start_date": null
-          },
-          {
-            "investigation_id": "INV-00000050",
-            "start_date": null
-          },
-          {
-            "investigation_id": "INV-00000052",
-            "start_date": null
-          },
-          {
-            "investigation_id": "INV-00000067",
-            "start_date": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "investigation_id": "INV-00000169",
-            "start_date": null
-          },
-          {
-            "investigation_id": "INV-00000035",
-            "start_date": null
-          },
-          {
-            "investigation_id": "INV-00000050",
-            "start_date": null
-          },
-          {
-            "investigation_id": "INV-00000052",
-            "start_date": null
-          },
-          {
-            "investigation_id": "INV-00000067",
-            "start_date": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "2fb703b2-9cd8-432b-b603-2d0db7c12d2f",
+        "id": "34e9831c-f7d2-4248-86d5-da4989be408e",
         "key": "cp_investigations__end_date__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3414,7 +2250,7 @@
         "failedSamples": null
       },
       {
-        "id": "6635bf48-2d31-45f6-9021-2faecd01ef5b",
+        "id": "5803dee2-2ba4-4be5-b225-ed2bbf7f644d",
         "key": "cp_investigations__substantiated__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3438,7 +2274,7 @@
         "failedSamples": null
       },
       {
-        "id": "5f453a84-c07d-4cf1-8ce4-62d8c81ea8aa",
+        "id": "09e4f56b-04b1-4441-b3fc-1848527c2b40",
         "key": "cp_investigations__substantiated__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3465,7 +2301,7 @@
         "failedSamples": null
       },
       {
-        "id": "ac8c11af-1494-4af0-97f6-fe0151348b95",
+        "id": "6352e3a6-02a5-4429-b089-92cdeedf1a0d",
         "key": "cp_investigations__substantiated__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -3500,7 +2336,7 @@
         "failedSamples": null
       },
       {
-        "id": "0b925bf7-2dd5-436c-b19a-97d180dcf60a",
+        "id": "c5ea83a2-3e6a-422a-8622-af81341b7a9c",
         "key": "cp_investigations__lead_worker_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3524,7 +2360,7 @@
         "failedSamples": null
       },
       {
-        "id": "4b9124a7-217c-4bf0-acad-144e8ed483de",
+        "id": "207cf2c5-1886-4b4a-8854-2a444f358559",
         "key": "cp_investigations__lead_worker_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3538,63 +2374,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"lead_worker_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_investigations__lead_worker_id__field_required\"\nFROM \"cp_investigations\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(lead_worker_id) was 12, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "lead_worker_id",
-          "value": 12,
+          "value": 0,
           "threshold": "= 0",
           "row_count": 181,
-          "failed_fraction": 0.066298
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "investigation_id": "INV-00000169",
-            "lead_worker_id": null
-          },
-          {
-            "investigation_id": "INV-00000020",
-            "lead_worker_id": null
-          },
-          {
-            "investigation_id": "INV-00000030",
-            "lead_worker_id": null
-          },
-          {
-            "investigation_id": "INV-00000043",
-            "lead_worker_id": null
-          },
-          {
-            "investigation_id": "INV-00000057",
-            "lead_worker_id": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "investigation_id": "INV-00000169",
-            "lead_worker_id": null
-          },
-          {
-            "investigation_id": "INV-00000020",
-            "lead_worker_id": null
-          },
-          {
-            "investigation_id": "INV-00000030",
-            "lead_worker_id": null
-          },
-          {
-            "investigation_id": "INV-00000043",
-            "lead_worker_id": null
-          },
-          {
-            "investigation_id": "INV-00000057",
-            "lead_worker_id": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "f7076577-d4b3-4285-a293-c3034c6c6a34",
+        "id": "378f494a-8a5a-46e6-b293-7ee08d232f84",
         "key": "cp_investigations__lead_worker_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3608,64 +2401,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"lead_worker_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_investigations__lead_worker_id__field_null_values\"\nFROM \"cp_investigations\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(lead_worker_id) was 12, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "lead_worker_id",
-          "value": 12,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 181,
-          "failed_fraction": 0.066298
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "investigation_id": "INV-00000169",
-            "lead_worker_id": null
-          },
-          {
-            "investigation_id": "INV-00000020",
-            "lead_worker_id": null
-          },
-          {
-            "investigation_id": "INV-00000030",
-            "lead_worker_id": null
-          },
-          {
-            "investigation_id": "INV-00000043",
-            "lead_worker_id": null
-          },
-          {
-            "investigation_id": "INV-00000057",
-            "lead_worker_id": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "investigation_id": "INV-00000169",
-            "lead_worker_id": null
-          },
-          {
-            "investigation_id": "INV-00000020",
-            "lead_worker_id": null
-          },
-          {
-            "investigation_id": "INV-00000030",
-            "lead_worker_id": null
-          },
-          {
-            "investigation_id": "INV-00000043",
-            "lead_worker_id": null
-          },
-          {
-            "investigation_id": "INV-00000057",
-            "lead_worker_id": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "1ca582b9-5754-4e07-ad3e-bf523376be34",
+        "id": "f91b9109-de23-4492-8ce8-65f02ba6ed7c",
         "key": "cp_investigations__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3689,7 +2439,7 @@
         "failedSamples": null
       },
       {
-        "id": "a15da452-af10-469d-bf7e-8328c2ec8f80",
+        "id": "fdbdd866-11f0-45c0-bfa4-0705eda60d72",
         "key": "cp_investigations__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3716,7 +2466,7 @@
         "failedSamples": null
       },
       {
-        "id": "b48d9551-14c4-4d7e-979e-3d93d49fab4f",
+        "id": "98ab2f1e-8d48-468f-9731-08d2ab4f1dda",
         "key": "cp_investigations__row_count",
         "category": "quality",
         "type": "row_count",
@@ -3742,7 +2492,7 @@
         "failedSamples": null
       },
       {
-        "id": "05b2ccac-02fd-4d69-a77f-f843794a147a",
+        "id": "4a3921c8-a9c6-4803-87e3-653cb00c5c72",
         "key": "cp_investigations__quality_sql_1",
         "category": "quality",
         "type": "model_quality_sql",
@@ -3756,18 +2506,18 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT COUNT(*) FROM cp_investigations i LEFT JOIN cp_notifications n ON i.notification_id = n.notification_id WHERE n.notification_id IS NULL",
-        "result": "failed",
-        "reason": "Actual custom_sql(cp_investigations) was 3, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "custom_sql",
-          "value": 3,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0"
         },
         "failedSamples": null
       },
       {
-        "id": "0f723239-ca00-4748-a88d-a989ee1658e5",
+        "id": "037f2c3c-9744-4de5-acb9-671720d75d17",
         "key": "cp_investigations__quality_sql_2",
         "category": "quality",
         "type": "model_quality_sql",
@@ -3781,18 +2531,18 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT COUNT(*) FROM cp_investigations i LEFT JOIN cp_clients c ON i.cp_client_id = c.cp_client_id WHERE c.cp_client_id IS NULL",
-        "result": "failed",
-        "reason": "Actual custom_sql(cp_investigations) was 17, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "custom_sql",
-          "value": 17,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0"
         },
         "failedSamples": null
       },
       {
-        "id": "11788341-712d-4f94-94d6-1a6044639c6e",
+        "id": "562a3008-9c99-4fe6-ad50-87143cf21322",
         "key": "cp_investigations__quality_sql_3",
         "category": "quality",
         "type": "model_quality_sql",
@@ -3806,18 +2556,18 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT COUNT(*) FROM cp_investigations i LEFT JOIN cp_case_workers w ON i.lead_worker_id = w.worker_id WHERE w.worker_id IS NULL",
-        "result": "failed",
-        "reason": "Actual custom_sql(cp_investigations) was 22, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "custom_sql",
-          "value": 22,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0"
         },
         "failedSamples": null
       },
       {
-        "id": "b69903cb-26c5-44e6-b12d-fa0af32537ca",
+        "id": "cbfa9079-b64f-4c61-8605-3cb9be6a2647",
         "key": "cp_investigations__quality_sql_4",
         "category": "quality",
         "type": "model_quality_sql",
@@ -3831,18 +2581,18 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT COUNT(*) FROM cp_investigations i JOIN cp_clients c ON i.cp_client_id = c.cp_client_id WHERE c.case_status = 'Closed' AND i.end_date IS NULL",
-        "result": "failed",
-        "reason": "Actual custom_sql(cp_investigations) was 8, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "custom_sql",
-          "value": 8,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0"
         },
         "failedSamples": null
       },
       {
-        "id": "749a3353-0cd6-4e3d-b7b4-9c85429ebe09",
+        "id": "762991a3-6f26-4573-9f5f-3238cb32cdc1",
         "key": "cp_placements__placement_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3866,7 +2616,7 @@
         "failedSamples": null
       },
       {
-        "id": "dfe28cf6-1af2-4a28-8b2a-417794ae675b",
+        "id": "3fb285fd-3242-4e1b-aea4-f4fb26d0bac4",
         "key": "cp_placements__placement_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3893,7 +2643,7 @@
         "failedSamples": null
       },
       {
-        "id": "884bc308-fd78-42c5-85f6-a7c73d3661f2",
+        "id": "2c02f2e5-6a68-4436-9761-802579047219",
         "key": "cp_placements__placement_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -3907,63 +2657,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"placement_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_placements\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
-        "result": "failed",
-        "reason": "Actual duplicate_count(placement_id) was 9, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "duplicate_count",
           "field": "placement_id",
-          "value": 9,
+          "value": 0,
           "threshold": "= 0",
           "row_count": 242,
-          "failed_rows": 18
+          "failed_rows": 0
         },
-        "failedSamples": [
-          {
-            "placement_id": "PLACE-0000000",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000066",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000196",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000083",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000118",
-            "duplicate_count": 2
-          }
-        ],
-        "failed_samples": [
-          {
-            "placement_id": "PLACE-0000000",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000066",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000196",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000083",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000118",
-            "duplicate_count": 2
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "8165ecbd-4bb0-45fc-8890-02b8f35c6061",
+        "id": "b285573b-6a9d-488f-aa47-0eafb1e9f377",
         "key": "cp_placements__placement_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3991,7 +2698,7 @@
         "failedSamples": null
       },
       {
-        "id": "21771484-e898-46b5-aa1f-7138a97025ac",
+        "id": "29fa1724-76cb-4f65-92ef-1ca176cdeb69",
         "key": "cp_placements__placement_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -4005,64 +2712,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"placement_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_placements\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
-        "result": "failed",
-        "reason": "Actual duplicate_count(placement_id) was 9, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "duplicate_count",
           "field": "placement_id",
-          "value": 9,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 242,
-          "failed_rows": 18
+          "failed_rows": 0
         },
-        "failedSamples": [
-          {
-            "placement_id": "PLACE-0000000",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000066",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000196",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000083",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000118",
-            "duplicate_count": 2
-          }
-        ],
-        "failed_samples": [
-          {
-            "placement_id": "PLACE-0000000",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000066",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000196",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000083",
-            "duplicate_count": 2
-          },
-          {
-            "placement_id": "PLACE-0000118",
-            "duplicate_count": 2
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "7d0fe6dc-b71f-49ca-b202-f189dda7f106",
+        "id": "edd7af2c-8ee3-48b8-8bdd-8375f71440b2",
         "key": "cp_placements__cp_client_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4086,7 +2750,7 @@
         "failedSamples": null
       },
       {
-        "id": "5f1160ff-cef3-46a5-8972-c0579368ad3f",
+        "id": "795bc11f-3635-43b1-96a7-3b7355bc1f2b",
         "key": "cp_placements__cp_client_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4100,63 +2764,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"cp_client_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_placements__cp_client_id__field_required\"\nFROM \"cp_placements\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(cp_client_id) was 11, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "cp_client_id",
-          "value": 11,
+          "value": 0,
           "threshold": "= 0",
           "row_count": 242,
-          "failed_fraction": 0.045455
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "placement_id": "PLACE-0000023",
-            "cp_client_id": null
-          },
-          {
-            "placement_id": "PLACE-0000056",
-            "cp_client_id": null
-          },
-          {
-            "placement_id": "PLACE-0000062",
-            "cp_client_id": null
-          },
-          {
-            "placement_id": "PLACE-0000087",
-            "cp_client_id": null
-          },
-          {
-            "placement_id": "PLACE-0000096",
-            "cp_client_id": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "placement_id": "PLACE-0000023",
-            "cp_client_id": null
-          },
-          {
-            "placement_id": "PLACE-0000056",
-            "cp_client_id": null
-          },
-          {
-            "placement_id": "PLACE-0000062",
-            "cp_client_id": null
-          },
-          {
-            "placement_id": "PLACE-0000087",
-            "cp_client_id": null
-          },
-          {
-            "placement_id": "PLACE-0000096",
-            "cp_client_id": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "74a8ef9c-3519-4840-8046-4d7c31f18586",
+        "id": "f27291c9-da7f-4cca-a3a7-62d72abec15c",
         "key": "cp_placements__cp_client_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -4170,64 +2791,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"cp_client_id\" IS NULL THEN 1 ELSE 0 END) AS \"cp_placements__cp_client_id__field_null_values\"\nFROM \"cp_placements\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(cp_client_id) was 11, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "cp_client_id",
-          "value": 11,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 242,
-          "failed_fraction": 0.045455
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "placement_id": "PLACE-0000023",
-            "cp_client_id": null
-          },
-          {
-            "placement_id": "PLACE-0000056",
-            "cp_client_id": null
-          },
-          {
-            "placement_id": "PLACE-0000062",
-            "cp_client_id": null
-          },
-          {
-            "placement_id": "PLACE-0000087",
-            "cp_client_id": null
-          },
-          {
-            "placement_id": "PLACE-0000096",
-            "cp_client_id": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "placement_id": "PLACE-0000023",
-            "cp_client_id": null
-          },
-          {
-            "placement_id": "PLACE-0000056",
-            "cp_client_id": null
-          },
-          {
-            "placement_id": "PLACE-0000062",
-            "cp_client_id": null
-          },
-          {
-            "placement_id": "PLACE-0000087",
-            "cp_client_id": null
-          },
-          {
-            "placement_id": "PLACE-0000096",
-            "cp_client_id": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "5769548d-324f-4c3b-8996-14644cefb7e4",
+        "id": "00a62ffd-cb39-4999-8486-c69f9f3bef60",
         "key": "cp_placements__placement_type__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4251,7 +2829,7 @@
         "failedSamples": null
       },
       {
-        "id": "acf252cd-d400-4d26-8420-054b5d19c0a2",
+        "id": "525d79a0-7881-4afc-8b58-cc99e827d18d",
         "key": "cp_placements__placement_type__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4278,7 +2856,7 @@
         "failedSamples": null
       },
       {
-        "id": "8de5317d-b824-4fb2-8595-daf7d88c337d",
+        "id": "3786c788-9f85-4224-a861-7de341499a48",
         "key": "cp_placements__placement_type__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -4292,16 +2870,16 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"placement_type\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"placement_type\" IN ('Kinship care', 'Foster care', 'Residential care', 'Family group home')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"cp_placements__placement_type__field_invalid_values\"\nFROM \"cp_placements\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual invalid_count(placement_type) was 18, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "invalid_count",
           "field": "placement_type",
-          "value": 18,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 242,
-          "failed_fraction": 0.07438,
+          "failed_fraction": 0.0,
           "constraint": {
             "valid_values": [
               "Kinship care",
@@ -4311,53 +2889,10 @@
             ]
           }
         },
-        "failedSamples": [
-          {
-            "placement_id": "PLACE-0000024",
-            "placement_type": "Independent living"
-          },
-          {
-            "placement_id": "PLACE-0000054",
-            "placement_type": "Independent living"
-          },
-          {
-            "placement_id": "PLACE-0000058",
-            "placement_type": "Independent living"
-          },
-          {
-            "placement_id": "PLACE-0000059",
-            "placement_type": "Independent living"
-          },
-          {
-            "placement_id": "PLACE-0000072",
-            "placement_type": "Group home"
-          }
-        ],
-        "failed_samples": [
-          {
-            "placement_id": "PLACE-0000024",
-            "placement_type": "Independent living"
-          },
-          {
-            "placement_id": "PLACE-0000054",
-            "placement_type": "Independent living"
-          },
-          {
-            "placement_id": "PLACE-0000058",
-            "placement_type": "Independent living"
-          },
-          {
-            "placement_id": "PLACE-0000059",
-            "placement_type": "Independent living"
-          },
-          {
-            "placement_id": "PLACE-0000072",
-            "placement_type": "Group home"
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "01e2a5af-cd84-4623-b818-4661e54098bd",
+        "id": "d5121f85-51b8-4fa0-bd6d-6c87c0e0979c",
         "key": "cp_placements__carer_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4381,7 +2916,7 @@
         "failedSamples": null
       },
       {
-        "id": "4dfd128c-c666-497c-8374-06f3740fafb2",
+        "id": "9609a1f2-96c9-413a-9a7d-0538ee813a50",
         "key": "cp_placements__carer_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4408,7 +2943,7 @@
         "failedSamples": null
       },
       {
-        "id": "879f569f-754b-447f-96a7-86ae8b1c4ba4",
+        "id": "1f516b51-6a0c-4e56-979a-2820eb106866",
         "key": "cp_placements__carer_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -4436,7 +2971,7 @@
         "failedSamples": null
       },
       {
-        "id": "923f7563-de6b-4a36-aaa2-59a1a824a32f",
+        "id": "f9f15d81-d362-4084-9b5c-c420aa9c08a8",
         "key": "cp_placements__placement_start__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4460,7 +2995,7 @@
         "failedSamples": null
       },
       {
-        "id": "03f25b2a-3632-4dc2-9264-708b17ef93ab",
+        "id": "629909b6-e7ee-4332-a11d-2a69a84ab29b",
         "key": "cp_placements__placement_start__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4474,63 +3009,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"placement_start\" IS NULL THEN 1 ELSE 0 END) AS \"cp_placements__placement_start__field_required\"\nFROM \"cp_placements\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(placement_start) was 9, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "placement_start",
-          "value": 9,
+          "value": 0,
           "threshold": "= 0",
           "row_count": 242,
-          "failed_fraction": 0.03719
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "placement_id": "PLACE-0000008",
-            "placement_start": null
-          },
-          {
-            "placement_id": "PLACE-0000042",
-            "placement_start": null
-          },
-          {
-            "placement_id": "PLACE-0000070",
-            "placement_start": null
-          },
-          {
-            "placement_id": "PLACE-0000072",
-            "placement_start": null
-          },
-          {
-            "placement_id": "PLACE-0000005",
-            "placement_start": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "placement_id": "PLACE-0000008",
-            "placement_start": null
-          },
-          {
-            "placement_id": "PLACE-0000042",
-            "placement_start": null
-          },
-          {
-            "placement_id": "PLACE-0000070",
-            "placement_start": null
-          },
-          {
-            "placement_id": "PLACE-0000072",
-            "placement_start": null
-          },
-          {
-            "placement_id": "PLACE-0000005",
-            "placement_start": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "0c8b1bbb-11dd-476a-9b2c-59c4282e2976",
+        "id": "c5d1e534-d8a5-456b-bf94-14a64ebc9a3d",
         "key": "cp_placements__placement_start__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -4544,64 +3036,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"placement_start\" IS NULL THEN 1 ELSE 0 END) AS \"cp_placements__placement_start__field_null_values\"\nFROM \"cp_placements\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(placement_start) was 9, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "placement_start",
-          "value": 9,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 242,
-          "failed_fraction": 0.03719
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "placement_id": "PLACE-0000008",
-            "placement_start": null
-          },
-          {
-            "placement_id": "PLACE-0000042",
-            "placement_start": null
-          },
-          {
-            "placement_id": "PLACE-0000070",
-            "placement_start": null
-          },
-          {
-            "placement_id": "PLACE-0000072",
-            "placement_start": null
-          },
-          {
-            "placement_id": "PLACE-0000005",
-            "placement_start": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "placement_id": "PLACE-0000008",
-            "placement_start": null
-          },
-          {
-            "placement_id": "PLACE-0000042",
-            "placement_start": null
-          },
-          {
-            "placement_id": "PLACE-0000070",
-            "placement_start": null
-          },
-          {
-            "placement_id": "PLACE-0000072",
-            "placement_start": null
-          },
-          {
-            "placement_id": "PLACE-0000005",
-            "placement_start": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "5783e4b6-7593-4258-937d-e463cc62dc37",
+        "id": "55fe062c-52e9-4c1d-9ab3-e563896bbe03",
         "key": "cp_placements__placement_end__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4625,7 +3074,7 @@
         "failedSamples": null
       },
       {
-        "id": "79a3c7d1-754a-45d5-88c6-3741e98243b8",
+        "id": "b7114619-f9e4-44c5-afb7-8c2b432b4036",
         "key": "cp_placements__placement_suburb__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4649,7 +3098,7 @@
         "failedSamples": null
       },
       {
-        "id": "8f6c172b-2a66-4544-af42-81a7afc9d433",
+        "id": "3bfabdc6-ed5a-446c-8f93-e637fc078181",
         "key": "cp_placements__placement_suburb__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4663,63 +3112,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"placement_suburb\" IS NULL THEN 1 ELSE 0 END) AS \"cp_placements__placement_suburb__field_required\"\nFROM \"cp_placements\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(placement_suburb) was 10, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "placement_suburb",
-          "value": 10,
+          "value": 0,
           "threshold": "= 0",
           "row_count": 242,
-          "failed_fraction": 0.041322
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "placement_id": "PLACE-0000009",
-            "placement_suburb": null
-          },
-          {
-            "placement_id": "PLACE-0000011",
-            "placement_suburb": null
-          },
-          {
-            "placement_id": "PLACE-0000017",
-            "placement_suburb": null
-          },
-          {
-            "placement_id": "PLACE-0000105",
-            "placement_suburb": null
-          },
-          {
-            "placement_id": "PLACE-0000110",
-            "placement_suburb": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "placement_id": "PLACE-0000009",
-            "placement_suburb": null
-          },
-          {
-            "placement_id": "PLACE-0000011",
-            "placement_suburb": null
-          },
-          {
-            "placement_id": "PLACE-0000017",
-            "placement_suburb": null
-          },
-          {
-            "placement_id": "PLACE-0000105",
-            "placement_suburb": null
-          },
-          {
-            "placement_id": "PLACE-0000110",
-            "placement_suburb": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "ea2bf4aa-73af-4444-94b0-be3545aa5939",
+        "id": "19172a2a-bd92-4c37-b662-e3314b43ce25",
         "key": "cp_placements__placement_suburb__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -4733,64 +3139,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"placement_suburb\" IS NULL THEN 1 ELSE 0 END) AS \"cp_placements__placement_suburb__field_null_values\"\nFROM \"cp_placements\" AS \"t0\"",
-        "result": "failed",
-        "reason": "Actual missing_count(placement_suburb) was 10, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "missing_count",
           "field": "placement_suburb",
-          "value": 10,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 242,
-          "failed_fraction": 0.041322
+          "failed_fraction": 0.0
         },
-        "failedSamples": [
-          {
-            "placement_id": "PLACE-0000009",
-            "placement_suburb": null
-          },
-          {
-            "placement_id": "PLACE-0000011",
-            "placement_suburb": null
-          },
-          {
-            "placement_id": "PLACE-0000017",
-            "placement_suburb": null
-          },
-          {
-            "placement_id": "PLACE-0000105",
-            "placement_suburb": null
-          },
-          {
-            "placement_id": "PLACE-0000110",
-            "placement_suburb": null
-          }
-        ],
-        "failed_samples": [
-          {
-            "placement_id": "PLACE-0000009",
-            "placement_suburb": null
-          },
-          {
-            "placement_id": "PLACE-0000011",
-            "placement_suburb": null
-          },
-          {
-            "placement_id": "PLACE-0000017",
-            "placement_suburb": null
-          },
-          {
-            "placement_id": "PLACE-0000105",
-            "placement_suburb": null
-          },
-          {
-            "placement_id": "PLACE-0000110",
-            "placement_suburb": null
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "b1b247e0-4582-4c5c-8d65-b799b54d71e3",
+        "id": "02a70024-c336-434d-b8e1-738d39f49f94",
         "key": "cp_placements__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4814,7 +3177,7 @@
         "failedSamples": null
       },
       {
-        "id": "ffd9e469-7633-429c-bfde-e2e2f75eeb80",
+        "id": "0b3ecd86-8593-4680-b34b-10f56b399c86",
         "key": "cp_placements__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4841,7 +3204,7 @@
         "failedSamples": null
       },
       {
-        "id": "97548f67-4ced-4026-a6ee-80fc57ccfedf",
+        "id": "1a4941ad-66c9-4a35-b470-8ca0c473a6cc",
         "key": "cp_placements__row_count",
         "category": "quality",
         "type": "row_count",
@@ -4867,7 +3230,7 @@
         "failedSamples": null
       },
       {
-        "id": "e596c433-0358-4f45-a4de-402e095da64d",
+        "id": "49ddea8a-4d82-45ad-9391-f5f7d17625ba",
         "key": "cp_placements__quality_sql_1",
         "category": "quality",
         "type": "model_quality_sql",
@@ -4881,18 +3244,18 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT COUNT(*) FROM cp_placements p LEFT JOIN cp_clients c ON p.cp_client_id = c.cp_client_id WHERE c.cp_client_id IS NULL",
-        "result": "failed",
-        "reason": "Actual custom_sql(cp_placements) was 23, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "custom_sql",
-          "value": 23,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0"
         },
         "failedSamples": null
       },
       {
-        "id": "20fed486-9fad-4619-ae2e-a56718f6eacb",
+        "id": "725f5a9e-7898-40df-b5ac-e3cc52d966c0",
         "key": "cp_placements__quality_sql_2",
         "category": "quality",
         "type": "model_quality_sql",
@@ -4906,18 +3269,18 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT COUNT(*) FROM cp_placements p LEFT JOIN cp_carers c ON p.carer_id = c.carer_id WHERE c.carer_id IS NULL",
-        "result": "failed",
-        "reason": "Actual custom_sql(cp_placements) was 13, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "custom_sql",
-          "value": 13,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0"
         },
         "failedSamples": null
       },
       {
-        "id": "e26dfb2f-a5d4-4a23-90b5-f0a0ceee7112",
+        "id": "aadaca8c-693a-4079-b7a5-053fc31befad",
         "key": "cp_placements__quality_sql_3",
         "category": "quality",
         "type": "model_quality_sql",
@@ -4931,18 +3294,18 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT COUNT(*) FROM cp_placements p JOIN cp_carers c ON p.carer_id = c.carer_id WHERE c.approval_status != 'Approved'",
-        "result": "failed",
-        "reason": "Actual custom_sql(cp_placements) was 22, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "custom_sql",
-          "value": 22,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0"
         },
         "failedSamples": null
       },
       {
-        "id": "2d706fbd-e9c8-41c0-a8df-e6269519b7e0",
+        "id": "7e06b291-eb20-49f5-830a-5783bacfca0c",
         "key": "cp_carers__carer_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4966,7 +3329,7 @@
         "failedSamples": null
       },
       {
-        "id": "01d0dd5b-fbc5-4477-884f-aa27f338839b",
+        "id": "5792d0a7-3ec6-4040-85a9-7749d3122fb4",
         "key": "cp_carers__carer_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4993,7 +3356,7 @@
         "failedSamples": null
       },
       {
-        "id": "1e6bbe0d-e227-41de-bbb7-7e329f69dce7",
+        "id": "986d8daf-d2a7-4113-a7a6-df2ec98bef0c",
         "key": "cp_carers__carer_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -5007,63 +3370,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"carer_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_carers\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
-        "result": "failed",
-        "reason": "Actual duplicate_count(carer_id) was 8, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "duplicate_count",
           "field": "carer_id",
-          "value": 8,
+          "value": 0,
           "threshold": "= 0",
           "row_count": 289,
-          "failed_rows": 16
+          "failed_rows": 0
         },
-        "failedSamples": [
-          {
-            "carer_id": "CARER-000145",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000271",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000034",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000215",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000079",
-            "duplicate_count": 2
-          }
-        ],
-        "failed_samples": [
-          {
-            "carer_id": "CARER-000145",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000271",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000034",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000215",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000079",
-            "duplicate_count": 2
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "fefac86e-67c3-4b33-9c32-656e19db00f9",
+        "id": "6f53f30c-520f-4072-9d08-0d8c1571646f",
         "key": "cp_carers__carer_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -5091,7 +3411,7 @@
         "failedSamples": null
       },
       {
-        "id": "7d422ab8-ca61-4c9d-82f9-293727181dea",
+        "id": "5253275f-0398-4b64-a49d-912331cc6bac",
         "key": "cp_carers__carer_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -5105,64 +3425,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"carer_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_carers\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
-        "result": "failed",
-        "reason": "Actual duplicate_count(carer_id) was 8, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "duplicate_count",
           "field": "carer_id",
-          "value": 8,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 289,
-          "failed_rows": 16
+          "failed_rows": 0
         },
-        "failedSamples": [
-          {
-            "carer_id": "CARER-000145",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000271",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000034",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000215",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000079",
-            "duplicate_count": 2
-          }
-        ],
-        "failed_samples": [
-          {
-            "carer_id": "CARER-000145",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000271",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000034",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000215",
-            "duplicate_count": 2
-          },
-          {
-            "carer_id": "CARER-000079",
-            "duplicate_count": 2
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "73f32d3f-61e8-49c7-86e8-3d9e6b04d136",
+        "id": "ac2a1b66-934a-4f7c-b9ba-65ce71028ddf",
         "key": "cp_carers__given_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5186,7 +3463,7 @@
         "failedSamples": null
       },
       {
-        "id": "a711ed45-4b8f-4be0-b0ed-eb3f32f1ed4a",
+        "id": "ffc49a49-4d28-42df-b5d1-effc33f8ab74",
         "key": "cp_carers__given_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5213,7 +3490,7 @@
         "failedSamples": null
       },
       {
-        "id": "8ce2c5b3-bd67-4bd4-895c-4cecb6706bfa",
+        "id": "3619a9ab-6e0d-46b6-a799-36116093e06a",
         "key": "cp_carers__given_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -5241,7 +3518,7 @@
         "failedSamples": null
       },
       {
-        "id": "d69393f6-8171-4379-85a8-01d4f7b0e189",
+        "id": "2752abe7-3a90-44d7-8804-666f8796a6fc",
         "key": "cp_carers__family_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5265,7 +3542,7 @@
         "failedSamples": null
       },
       {
-        "id": "b7cd4f7e-b8a9-4b3c-ab3d-07d0bb4291d9",
+        "id": "fbea37dd-0612-4901-a4ff-a99a20a8d910",
         "key": "cp_carers__family_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5292,7 +3569,7 @@
         "failedSamples": null
       },
       {
-        "id": "f8d7b0ca-85e5-4083-a4d7-ea26bca404ee",
+        "id": "2ef03a66-c683-4a88-a70f-f878e2c8574b",
         "key": "cp_carers__family_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -5320,7 +3597,7 @@
         "failedSamples": null
       },
       {
-        "id": "d0d8e87a-a9f8-414d-9644-3fcab6acd9a0",
+        "id": "930b40c0-9203-4f15-8a06-1293a37c0842",
         "key": "cp_carers__carer_type__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5344,7 +3621,7 @@
         "failedSamples": null
       },
       {
-        "id": "f719fed3-ed78-43c9-905d-8a16903f0933",
+        "id": "936b3446-428b-443c-b0a3-165e42d129c4",
         "key": "cp_carers__carer_type__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5371,7 +3648,7 @@
         "failedSamples": null
       },
       {
-        "id": "1a0ad2bd-537c-4c9b-8a44-6939fe286049",
+        "id": "3d958798-c96d-492a-adf4-586ec2788150",
         "key": "cp_carers__carer_type__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -5406,7 +3683,7 @@
         "failedSamples": null
       },
       {
-        "id": "9f6644ea-b92f-4016-bb10-6cc892af34de",
+        "id": "578a5d98-6fa0-4bf9-9735-8398c498e07b",
         "key": "cp_carers__approval_status__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5430,7 +3707,7 @@
         "failedSamples": null
       },
       {
-        "id": "4135336e-a4a1-4624-b3f5-797eacfd5a8e",
+        "id": "16b105ee-5250-40ad-a4ec-5cb9ef8180bd",
         "key": "cp_carers__approval_status__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5457,7 +3734,7 @@
         "failedSamples": null
       },
       {
-        "id": "56d581b4-bb21-45fb-8f53-596f41f3e309",
+        "id": "ae88d441-21d2-4874-8937-e4563f0fd5de",
         "key": "cp_carers__approval_status__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -5492,7 +3769,7 @@
         "failedSamples": null
       },
       {
-        "id": "40be2478-454b-4840-899d-66f16af24b75",
+        "id": "39a12ed3-c5d4-478e-82cf-698bbe61dfc9",
         "key": "cp_carers__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5516,7 +3793,7 @@
         "failedSamples": null
       },
       {
-        "id": "237b16a4-5039-4d6a-8e3e-1f8363359f83",
+        "id": "a7444db3-47cc-4f25-a549-f56e22a71d8b",
         "key": "cp_carers__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5543,7 +3820,7 @@
         "failedSamples": null
       },
       {
-        "id": "16c7576d-8e9b-4a25-80d0-1aa16f2361a0",
+        "id": "a5b41d29-0317-4ec3-9b98-4b6b81070007",
         "key": "cp_carers__row_count",
         "category": "quality",
         "type": "row_count",
@@ -5569,7 +3846,7 @@
         "failedSamples": null
       },
       {
-        "id": "2310bbdb-1669-41ac-8674-f24b40c4befd",
+        "id": "5d46d8ed-f557-442f-90b0-ecaced5df640",
         "key": "cp_case_workers__worker_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5593,7 +3870,7 @@
         "failedSamples": null
       },
       {
-        "id": "237b7b39-9bf1-4dfe-b5fb-1aca904e1012",
+        "id": "49ed18e9-d571-4a7a-b76d-5d2ebd44f2ff",
         "key": "cp_case_workers__worker_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5620,7 +3897,7 @@
         "failedSamples": null
       },
       {
-        "id": "c5388646-c100-4755-ab94-3385988d47e0",
+        "id": "3647e5d6-5d61-4159-ab24-2e05c25303ac",
         "key": "cp_case_workers__worker_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -5634,47 +3911,20 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"worker_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_case_workers\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
-        "result": "failed",
-        "reason": "Actual duplicate_count(worker_id) was 3, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "duplicate_count",
           "field": "worker_id",
-          "value": 3,
+          "value": 0,
           "threshold": "= 0",
           "row_count": 60,
-          "failed_rows": 6
+          "failed_rows": 0
         },
-        "failedSamples": [
-          {
-            "worker_id": "CPS-STAFF-00012",
-            "duplicate_count": 2
-          },
-          {
-            "worker_id": "CPS-STAFF-00026",
-            "duplicate_count": 2
-          },
-          {
-            "worker_id": "CPS-STAFF-00052",
-            "duplicate_count": 2
-          }
-        ],
-        "failed_samples": [
-          {
-            "worker_id": "CPS-STAFF-00012",
-            "duplicate_count": 2
-          },
-          {
-            "worker_id": "CPS-STAFF-00026",
-            "duplicate_count": 2
-          },
-          {
-            "worker_id": "CPS-STAFF-00052",
-            "duplicate_count": 2
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "a657e6cf-8370-42ee-a889-1c87bf5ebb2c",
+        "id": "bb6b456d-e708-47c4-b77b-530ddf75df22",
         "key": "cp_case_workers__worker_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -5702,7 +3952,7 @@
         "failedSamples": null
       },
       {
-        "id": "6e638da4-d782-46e7-ab1b-5ad8099cafca",
+        "id": "d4067f06-ce8b-4e42-bf23-b7d479dee48e",
         "key": "cp_case_workers__worker_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -5716,48 +3966,21 @@
         "engine": "datacontract-cli",
         "language": "sql",
         "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"worker_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"cp_case_workers\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
-        "result": "failed",
-        "reason": "Actual duplicate_count(worker_id) was 3, expected = 0",
+        "result": "passed",
+        "reason": null,
         "diagnostics": {
           "metric": "duplicate_count",
           "field": "worker_id",
-          "value": 3,
+          "value": 0,
           "severity": "error",
           "threshold": "= 0",
           "row_count": 60,
-          "failed_rows": 6
+          "failed_rows": 0
         },
-        "failedSamples": [
-          {
-            "worker_id": "CPS-STAFF-00012",
-            "duplicate_count": 2
-          },
-          {
-            "worker_id": "CPS-STAFF-00052",
-            "duplicate_count": 2
-          },
-          {
-            "worker_id": "CPS-STAFF-00026",
-            "duplicate_count": 2
-          }
-        ],
-        "failed_samples": [
-          {
-            "worker_id": "CPS-STAFF-00012",
-            "duplicate_count": 2
-          },
-          {
-            "worker_id": "CPS-STAFF-00052",
-            "duplicate_count": 2
-          },
-          {
-            "worker_id": "CPS-STAFF-00026",
-            "duplicate_count": 2
-          }
-        ]
+        "failedSamples": null
       },
       {
-        "id": "9e6c5efb-41f3-4775-8384-2190bc6c2288",
+        "id": "196f713b-48c8-4a5c-ad25-dd39a8cfba7f",
         "key": "cp_case_workers__given_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5781,7 +4004,7 @@
         "failedSamples": null
       },
       {
-        "id": "e2a33d94-a0df-4432-b2c1-d213a607f52e",
+        "id": "1a16b7a0-440a-4410-be74-2988ceacc092",
         "key": "cp_case_workers__given_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5808,7 +4031,7 @@
         "failedSamples": null
       },
       {
-        "id": "9e824d71-b5fa-43e1-8148-dae6b2c0c18a",
+        "id": "fe3527ec-d90d-490c-ba11-2195d7ed717f",
         "key": "cp_case_workers__given_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -5836,7 +4059,7 @@
         "failedSamples": null
       },
       {
-        "id": "cccba762-2e4e-46c2-8f1a-3594d15ac81f",
+        "id": "a99d41cb-dbe8-4a54-9191-f9135cafd11b",
         "key": "cp_case_workers__family_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5860,7 +4083,7 @@
         "failedSamples": null
       },
       {
-        "id": "82921f6d-bbd3-4a23-8d2f-0dc56194a51e",
+        "id": "6d5e5baa-b922-429d-945f-94d0993fa413",
         "key": "cp_case_workers__family_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5887,7 +4110,7 @@
         "failedSamples": null
       },
       {
-        "id": "672887a1-464e-4c0c-9e71-d9eaa4412487",
+        "id": "44f002f1-4314-47da-9335-df788342e79e",
         "key": "cp_case_workers__family_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -5915,7 +4138,7 @@
         "failedSamples": null
       },
       {
-        "id": "e285c1d6-17d6-40b8-8b8b-5a494f76a9b9",
+        "id": "3f53101b-c349-4218-9e79-2148f4511911",
         "key": "cp_case_workers__team_region__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -5939,7 +4162,7 @@
         "failedSamples": null
       },
       {
-        "id": "e01bc34e-b19b-4c05-b6aa-d223e2a9f67e",
+        "id": "178f44af-dadc-4687-a099-dc25f48d6bbf",
         "key": "cp_case_workers__team_region__field_required",
         "category": "schema",
         "type": "field_required",
@@ -5966,7 +4189,7 @@
         "failedSamples": null
       },
       {
-        "id": "6bc27bf6-3489-4235-8836-f07fa0ad458f",
+        "id": "fb4eb264-e039-48fc-bb7b-01ffb67d5a2b",
         "key": "cp_case_workers__team_region__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -6008,7 +4231,7 @@
         "failedSamples": null
       },
       {
-        "id": "34103ca7-12f7-4173-9551-26359b45ca89",
+        "id": "cf4ae756-c745-4ac8-9402-f741056d2df7",
         "key": "cp_case_workers__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -6032,7 +4255,7 @@
         "failedSamples": null
       },
       {
-        "id": "9e4dac96-9715-445e-8349-8a293ebe512f",
+        "id": "025653f6-994a-41dd-b9a2-858047cfc617",
         "key": "cp_case_workers__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -6059,7 +4282,7 @@
         "failedSamples": null
       },
       {
-        "id": "68e2393a-058e-4c2b-8c3c-a29931842782",
+        "id": "0c4ca450-e309-4e10-86e4-ea3796621b15",
         "key": "cp_case_workers__row_count",
         "category": "quality",
         "type": "row_count",
@@ -6089,87 +4312,87 @@
       {
         "level": "INFO",
         "message": "Testing data contract",
-        "timestamp": "2026-09-18 10:51:41.207694+00:00"
+        "timestamp": "2026-09-18 11:07:49.671373+00:00"
       },
       {
         "level": "INFO",
         "message": "Data Contract CLI 1.2.0 running as CLI locally",
-        "timestamp": "2026-09-18 10:51:41.209042+00:00"
+        "timestamp": "2026-09-18 11:07:49.672686+00:00"
       },
       {
         "level": "INFO",
         "message": "Running tests for data contract child-protection-casework with server local_test",
-        "timestamp": "2026-09-18 10:51:41.629932+00:00"
+        "timestamp": "2026-09-18 11:07:50.082218+00:00"
       },
       {
         "level": "INFO",
         "message": "Running checks with ibis",
-        "timestamp": "2026-09-18 10:51:41.697835+00:00"
+        "timestamp": "2026-09-18 11:07:50.139308+00:00"
       },
       {
         "level": "INFO",
         "message": "Connecting to local csv via duckdb",
-        "timestamp": "2026-09-18 10:51:41.697863+00:00"
+        "timestamp": "2026-09-18 11:07:50.139337+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_clients for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_13_2026-02-01/cp_clients.csv",
-        "timestamp": "2026-09-18 10:51:41.715398+00:00"
+        "timestamp": "2026-09-18 11:07:50.156977+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'cp_client_id', 'VARCHAR', False, None, False), (1, 'given_name', 'VARCHAR', False, None, False), (2, 'family_name', 'VARCHAR', False, None, False), (3, 'date_of_birth', 'DATE', False, None, False), (4, 'sex', 'VARCHAR', False, None, False), (5, 'suburb', 'VARCHAR', False, None, False), (6, 'postcode', 'VARCHAR', False, None, False), (7, 'case_opened_date', 'DATE', False, None, False), (8, 'case_status', 'VARCHAR', False, None, False), (9, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-18 10:51:42.072458+00:00"
+        "timestamp": "2026-09-18 11:07:50.469530+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_notifications for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_13_2026-02-01/cp_notifications.csv",
-        "timestamp": "2026-09-18 10:51:42.072492+00:00"
+        "timestamp": "2026-09-18 11:07:50.469577+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'notification_id', 'VARCHAR', False, None, False), (1, 'cp_client_id', 'VARCHAR', False, None, False), (2, 'notification_date', 'DATE', False, None, False), (3, 'source_type', 'VARCHAR', False, None, False), (4, 'concern_type', 'VARCHAR', False, None, False), (5, 'risk_rating', 'VARCHAR', False, None, False), (6, 'assigned_worker_id', 'VARCHAR', False, None, False), (7, 'outcome', 'VARCHAR', False, None, False), (8, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-18 10:51:42.565396+00:00"
+        "timestamp": "2026-09-18 11:07:51.011991+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_investigations for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_13_2026-02-01/cp_investigations.csv",
-        "timestamp": "2026-09-18 10:51:42.565435+00:00"
+        "timestamp": "2026-09-18 11:07:51.012038+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'investigation_id', 'VARCHAR', False, None, False), (1, 'notification_id', 'VARCHAR', False, None, False), (2, 'cp_client_id', 'VARCHAR', False, None, False), (3, 'start_date', 'DATE', False, None, False), (4, 'end_date', 'DATE', False, None, False), (5, 'substantiated', 'VARCHAR', False, None, False), (6, 'lead_worker_id', 'VARCHAR', False, None, False), (7, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-18 10:51:42.701904+00:00"
+        "timestamp": "2026-09-18 11:07:51.125532+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_placements for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_13_2026-02-01/cp_placements.csv",
-        "timestamp": "2026-09-18 10:51:42.701953+00:00"
+        "timestamp": "2026-09-18 11:07:51.125582+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'placement_id', 'VARCHAR', False, None, False), (1, 'cp_client_id', 'VARCHAR', False, None, False), (2, 'placement_type', 'VARCHAR', False, None, False), (3, 'carer_id', 'VARCHAR', False, None, False), (4, 'placement_start', 'DATE', False, None, False), (5, 'placement_end', 'DATE', False, None, False), (6, 'placement_suburb', 'VARCHAR', False, None, False), (7, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-18 10:51:42.839746+00:00"
+        "timestamp": "2026-09-18 11:07:51.275341+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_carers for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_13_2026-02-01/cp_carers.csv",
-        "timestamp": "2026-09-18 10:51:42.839792+00:00"
+        "timestamp": "2026-09-18 11:07:51.275394+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'carer_id', 'VARCHAR', False, None, False), (1, 'given_name', 'VARCHAR', False, None, False), (2, 'family_name', 'VARCHAR', False, None, False), (3, 'carer_type', 'VARCHAR', False, None, False), (4, 'approval_status', 'VARCHAR', False, None, False), (5, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-18 10:51:42.945885+00:00"
+        "timestamp": "2026-09-18 11:07:51.395915+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_case_workers for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_13_2026-02-01/cp_case_workers.csv",
-        "timestamp": "2026-09-18 10:51:42.945930+00:00"
+        "timestamp": "2026-09-18 11:07:51.395958+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'worker_id', 'VARCHAR', False, None, False), (1, 'given_name', 'VARCHAR', False, None, False), (2, 'family_name', 'VARCHAR', False, None, False), (3, 'team_region', 'VARCHAR', False, None, False), (4, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-18 10:51:42.985080+00:00"
+        "timestamp": "2026-09-18 11:07:51.432481+00:00"
       }
     ]
   },
@@ -6184,7 +4407,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -6206,22 +4429,16 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 11,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 527,
-      "row_count_invalid": 11,
-      "failing_sample_keys": [
-        "CPS-365359102",
-        "CPS-754392161",
-        "CPS-898413175",
-        "CPS-841927893",
-        "CPS-964290692"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -6234,22 +4451,16 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 10,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 527,
-      "row_count_invalid": 10,
-      "failing_sample_keys": [
-        "CPS-659715330",
-        "CPS-938461271",
-        "CPS-713861371",
-        "CPS-066828399",
-        "CPS-112828695"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -6262,22 +4473,16 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 8,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 527,
-      "row_count_invalid": 8,
-      "failing_sample_keys": [
-        "CPS-254756704",
-        "CPS-777330919",
-        "CPS-588211074",
-        "CPS-029942109",
-        "CPS-157025587"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -6290,22 +4495,16 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 10,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 527,
-      "row_count_invalid": 10,
-      "failing_sample_keys": [
-        "CPS-130258003",
-        "CPS-890847881",
-        "CPS-229602682",
-        "CPS-192065247",
-        "CPS-873267915"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -6318,15 +4517,15 @@
       "dimension": "conformity",
       "label": "Referential integrity",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 32,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": null,
-      "row_count_invalid": 32,
+      "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -6340,22 +4539,16 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 13,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 527,
-      "row_count_invalid": 13,
-      "failing_sample_keys": [
-        "CPS-888241141",
-        "CPS-300563830",
-        "CPS-287545275",
-        "CPS-492830891",
-        "CPS-399153377"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -6368,22 +4561,16 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 9,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 527,
-      "row_count_invalid": 9,
-      "failing_sample_keys": [
-        "CPS-423579988",
-        "CPS-406623054",
-        "CPS-185587991",
-        "CPS-344420064",
-        "CPS-754392161"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -6396,7 +4583,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -6418,22 +4605,16 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 18,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 527,
-      "row_count_invalid": 18,
-      "failing_sample_keys": [
-        "CPS-525949263",
-        "CPS-339500672",
-        "CPS-832330963",
-        "CPS-267272133",
-        "CPS-244965474"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -6446,22 +4627,16 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 15,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 527,
-      "row_count_invalid": 15,
-      "failing_sample_keys": [
-        "CPS-605414391",
-        "CPS-410396910",
-        "CPS-236508614",
-        "CPS-146548189",
-        "CPS-995362758"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -6474,7 +4649,7 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -6496,7 +4671,7 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 527,
       "unit": "count",
       "warn_threshold": null,
@@ -6518,14 +4693,14 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 1036,
+      "row_count_total": 987,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -6540,22 +4715,16 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 17,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 1036,
-      "row_count_invalid": 17,
-      "failing_sample_keys": [
-        "NOTIF-00000026",
-        "NOTIF-00000341",
-        "NOTIF-00000491",
-        "NOTIF-00000763",
-        "NOTIF-00000049"
-      ],
+      "row_count_total": 987,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -6568,22 +4737,16 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 19,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 1036,
-      "row_count_invalid": 19,
-      "failing_sample_keys": [
-        "NOTIF-00000002",
-        "NOTIF-00000069",
-        "NOTIF-00000087",
-        "NOTIF-00000109",
-        "NOTIF-00000121"
-      ],
+      "row_count_total": 987,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -6596,14 +4759,14 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
       "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 1036,
+      "row_count_total": 987,
       "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -6618,22 +4781,16 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 37,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 1036,
-      "row_count_invalid": 37,
-      "failing_sample_keys": [
-        "NOTIF-00000002",
-        "NOTIF-00000028",
-        "NOTIF-00000119",
-        "NOTIF-00000124",
-        "NOTIF-00000125"
-      ],
+      "row_count_total": 987,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -6646,22 +4803,16 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 41,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 1036,
-      "row_count_invalid": 41,
-      "failing_sample_keys": [
-        "NOTIF-00000018",
-        "NOTIF-00000031",
-        "NOTIF-00000033",
-        "NOTIF-00000075",
-        "NOTIF-00000155"
-      ],
+      "row_count_total": 987,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -6674,22 +4825,16 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 41,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 1036,
-      "row_count_invalid": 41,
-      "failing_sample_keys": [
-        "NOTIF-00000050",
-        "NOTIF-00000084",
-        "NOTIF-00000135",
-        "NOTIF-00000143",
-        "NOTIF-00000146"
-      ],
+      "row_count_total": 987,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -6702,22 +4847,16 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 10,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 1036,
-      "row_count_invalid": 10,
-      "failing_sample_keys": [
-        "NOTIF-00000058",
-        "NOTIF-00000109",
-        "NOTIF-00000350",
-        "NOTIF-00000355",
-        "NOTIF-00000379"
-      ],
+      "row_count_total": 987,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -6730,22 +4869,16 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 42,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
-      "row_count_total": 1036,
-      "row_count_invalid": 42,
-      "failing_sample_keys": [
-        "NOTIF-00000003",
-        "NOTIF-00000013",
-        "NOTIF-00000026",
-        "NOTIF-00000080",
-        "NOTIF-00000095"
-      ],
+      "row_count_total": 987,
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -6758,14 +4891,14 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 1036,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 987,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": null,
       "status": "pass",
       "on_fail_action": "flag",
-      "row_count_total": 1036,
+      "row_count_total": 987,
       "row_count_invalid": null,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
@@ -6780,15 +4913,15 @@
       "dimension": "consistency",
       "label": "Referential integrity",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 43,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": null,
-      "row_count_invalid": 43,
+      "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -6802,15 +4935,15 @@
       "dimension": "consistency",
       "label": "Referential integrity",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 63,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": null,
-      "row_count_invalid": 63,
+      "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -6824,15 +4957,15 @@
       "dimension": "completeness",
       "label": null,
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 7,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": null,
-      "row_count_invalid": 7,
+      "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -6846,7 +4979,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -6868,22 +5001,16 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 7,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 181,
-      "row_count_invalid": 7,
-      "failing_sample_keys": [
-        "INV-00000169",
-        "INV-00000044",
-        "INV-00000035",
-        "INV-00000085",
-        "INV-00000155"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -6896,7 +5023,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -6918,7 +5045,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -6940,22 +5067,16 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 12,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 181,
-      "row_count_invalid": 12,
-      "failing_sample_keys": [
-        "INV-00000169",
-        "INV-00000035",
-        "INV-00000050",
-        "INV-00000052",
-        "INV-00000067"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -6968,7 +5089,7 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -6990,22 +5111,16 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 12,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 181,
-      "row_count_invalid": 12,
-      "failing_sample_keys": [
-        "INV-00000169",
-        "INV-00000020",
-        "INV-00000030",
-        "INV-00000043",
-        "INV-00000057"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -7018,7 +5133,7 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 181,
       "unit": "count",
       "warn_threshold": null,
@@ -7040,15 +5155,15 @@
       "dimension": "consistency",
       "label": "Referential integrity",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 3,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": null,
-      "row_count_invalid": 3,
+      "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -7062,15 +5177,15 @@
       "dimension": "consistency",
       "label": "Referential integrity",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 17,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": null,
-      "row_count_invalid": 17,
+      "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -7084,15 +5199,15 @@
       "dimension": "consistency",
       "label": "Referential integrity",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 22,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": null,
-      "row_count_invalid": 22,
+      "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -7106,15 +5221,15 @@
       "dimension": "consistency",
       "label": null,
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 8,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": null,
-      "row_count_invalid": 8,
+      "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -7128,7 +5243,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -7150,22 +5265,16 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 9,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 242,
-      "row_count_invalid": 9,
-      "failing_sample_keys": [
-        "PLACE-0000000",
-        "PLACE-0000066",
-        "PLACE-0000196",
-        "PLACE-0000083",
-        "PLACE-0000118"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -7178,22 +5287,16 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 11,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 242,
-      "row_count_invalid": 11,
-      "failing_sample_keys": [
-        "PLACE-0000023",
-        "PLACE-0000056",
-        "PLACE-0000062",
-        "PLACE-0000087",
-        "PLACE-0000096"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -7206,22 +5309,16 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 18,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 242,
-      "row_count_invalid": 18,
-      "failing_sample_keys": [
-        "PLACE-0000024",
-        "PLACE-0000054",
-        "PLACE-0000058",
-        "PLACE-0000059",
-        "PLACE-0000072"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -7234,7 +5331,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -7256,22 +5353,16 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 9,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 242,
-      "row_count_invalid": 9,
-      "failing_sample_keys": [
-        "PLACE-0000008",
-        "PLACE-0000042",
-        "PLACE-0000070",
-        "PLACE-0000072",
-        "PLACE-0000005"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -7284,22 +5375,16 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 10,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 242,
-      "row_count_invalid": 10,
-      "failing_sample_keys": [
-        "PLACE-0000009",
-        "PLACE-0000011",
-        "PLACE-0000017",
-        "PLACE-0000105",
-        "PLACE-0000110"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -7312,7 +5397,7 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 242,
       "unit": "count",
       "warn_threshold": null,
@@ -7334,15 +5419,15 @@
       "dimension": "consistency",
       "label": "Referential integrity",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 23,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": null,
-      "row_count_invalid": 23,
+      "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -7356,15 +5441,15 @@
       "dimension": "consistency",
       "label": "Referential integrity",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 13,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": null,
-      "row_count_invalid": 13,
+      "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -7378,15 +5463,15 @@
       "dimension": "consistency",
       "label": null,
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 22,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": null,
-      "row_count_invalid": 22,
+      "row_count_invalid": 0,
       "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
@@ -7400,7 +5485,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -7422,22 +5507,16 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 8,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 289,
-      "row_count_invalid": 8,
-      "failing_sample_keys": [
-        "CARER-000145",
-        "CARER-000271",
-        "CARER-000034",
-        "CARER-000215",
-        "CARER-000079"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -7450,7 +5529,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -7472,7 +5551,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -7494,7 +5573,7 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -7516,7 +5595,7 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -7538,7 +5617,7 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 289,
       "unit": "count",
       "warn_threshold": null,
@@ -7560,7 +5639,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -7582,20 +5661,16 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
-      "metric_value": 3,
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
       "fail_threshold": 0,
-      "status": "fail",
+      "status": "pass",
       "on_fail_action": "quarantine",
       "row_count_total": 60,
-      "row_count_invalid": 3,
-      "failing_sample_keys": [
-        "CPS-STAFF-00012",
-        "CPS-STAFF-00052",
-        "CPS-STAFF-00026"
-      ],
+      "row_count_invalid": 0,
+      "failing_sample_keys": [],
       "engine": "datacontract-cli 1.2.0"
     },
     {
@@ -7608,7 +5683,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -7630,7 +5705,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -7652,7 +5727,7 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -7674,7 +5749,7 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "cp_run_13_2026-02-01",
-      "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 60,
       "unit": "count",
       "warn_threshold": null,

@@ -29,6 +29,7 @@ from datetime import datetime
 import pytest
 
 from generator import generate_cp_runs
+from generator.generate_cp_runs import TABLES, _pick_dirty_tables
 
 RAW_DIR = generate_cp_runs.OUT_DIR
 MANIFEST_PATH = os.path.join(RAW_DIR, "manifest.json")
@@ -103,15 +104,52 @@ def test_supersedes_chain_is_well_formed(manifest):
             assert prior["attempt_number"] == e["attempt_number"] - 1
 
 
-def test_amber_and_red_runs_inject_bad_cp_clients_values(manifest):
+def test_clean_runs_never_have_bad_cp_clients_values(manifest):
+    """A clean delivery must never carry the out-of-range date_of_birth
+    injector's marker - unlike a dirty one, which now only fails 2-3 of
+    the 6 real tables (Keith's own call, 2026-09-18 dictated feedback:
+    "only some tables... two or three could fail, and the rest could be
+    fine"), so cp_clients specifically isn't guaranteed to be one of
+    them on any given dirty run - see test_some_dirty_runs_inject_bad_
+    cp_clients_values below for the positive case."""
     for entry in manifest:
+        if entry["dirty_severity"] is not None:
+            continue
         run_dir = os.path.join(RAW_DIR, entry["run_id"])
         with open(os.path.join(run_dir, "cp_clients.csv")) as f:
             lines = f.read().splitlines()
         header = lines[0].split(",")
         dob_idx = header.index("date_of_birth")
         n_bad_dob = sum(1 for line in lines[1:] if line.split(",")[dob_idx] < "1900-01-01")
+        assert n_bad_dob == 0, f"{entry['run_id']} is clean but has out-of-range dates of birth"
+
+
+def test_some_dirty_runs_inject_bad_cp_clients_values(manifest):
+    n_bad_runs = 0
+    for entry in manifest:
         if entry["dirty_severity"] is None:
-            assert n_bad_dob == 0, f"{entry['run_id']} is clean but has out-of-range dates of birth"
-        else:
-            assert n_bad_dob > 0, f"{entry['run_id']} is dirty but has no injected out-of-range dates of birth"
+            continue
+        run_dir = os.path.join(RAW_DIR, entry["run_id"])
+        with open(os.path.join(run_dir, "cp_clients.csv")) as f:
+            lines = f.read().splitlines()
+        header = lines[0].split(",")
+        dob_idx = header.index("date_of_birth")
+        n_bad_dob = sum(1 for line in lines[1:] if line.split(",")[dob_idx] < "1900-01-01")
+        if n_bad_dob > 0:
+            n_bad_runs += 1
+    assert n_bad_runs > 0, "no dirty run across the whole real manifest ever touched cp_clients"
+
+
+def test_dirty_only_picks_2_or_3_of_the_6_tables():
+    """Direct unit coverage of the actual mechanism
+    (_pick_dirty_tables(), which dirty() defers to) - real, load-bearing
+    invariant: never 0/1 (that's not really "dirty"), never all 6
+    (Keith's own call)."""
+    saw_2 = saw_3 = False
+    for seed in range(200):
+        picked = _pick_dirty_tables(seed)
+        assert picked <= set(TABLES)
+        assert len(picked) in (2, 3), f"seed={seed}: picked {len(picked)} tables, expected 2 or 3"
+        saw_2 |= len(picked) == 2
+        saw_3 |= len(picked) == 3
+    assert saw_2 and saw_3, "expected both 2-table and 3-table draws across 200 seeds"

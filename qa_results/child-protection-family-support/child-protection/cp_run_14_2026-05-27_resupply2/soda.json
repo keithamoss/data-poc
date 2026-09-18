@@ -4,9 +4,9 @@
   "raw_output": {
     "definitionName": null,
     "defaultDataSource": "cp_collection",
-    "dataTimestamp": "2026-09-18T11:07:33+00:00",
-    "scanStartTimestamp": "2026-09-18T11:07:33+00:00",
-    "scanEndTimestamp": "2026-09-18T11:07:33+00:00",
+    "dataTimestamp": "2026-09-18T11:08:03+00:00",
+    "scanStartTimestamp": "2026-09-18T11:08:03+00:00",
+    "scanEndTimestamp": "2026-09-18T11:08:03+00:00",
     "hasErrors": false,
     "hasWarnings": false,
     "hasFailures": false,
@@ -3369,27 +3369,27 @@
     ],
     "queries": [
       {
-        "name": "47.cp_collection.cp_clients.aggregation[0]",
+        "name": "93.cp_collection.cp_clients.aggregation[0]",
         "dataSource": "cp_collection",
         "table": "cp_clients",
         "partition": null,
         "column": null,
         "sql": "SELECT \n  COUNT(*),\n  COUNT(CASE WHEN cp_client_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN given_name IS NULL THEN 1 END),\n  COUNT(CASE WHEN family_name IS NULL THEN 1 END),\n  COUNT(CASE WHEN date_of_birth IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (sex IS NULL) AND NOT (sex IN ('M','F','X')) THEN 1 END),\n  COUNT(CASE WHEN suburb IS NULL THEN 1 END),\n  COUNT(CASE WHEN case_opened_date IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (postcode IS NULL) AND NOT (postcode IN ('6007','6008','6014','6018','6019','6027','6028','6030','6035','6036','6050','6056','6061','6062','6064','6069','6100','6102','6107','6109','6110','6112','6122','6148','6151','6155','6160','6162','6163','6164','6167','6168','6171','6210','6215','6225','6230','6258','6280','6285','6312','6330','6401','6430','6450','6530','6714','6721','6725')) THEN 1 END),\n  COUNT(CASE WHEN postcode IS NULL THEN 1 END) \nFROM cp_clients",
         "exception": null,
-        "duration": "0:00:00.004182"
+        "duration": "0:00:00.004389"
       },
       {
-        "name": "49.cp_collection.cp_clients.cp_client_id.duplicate_count",
+        "name": "95.cp_collection.cp_clients.cp_client_id.duplicate_count",
         "dataSource": "cp_collection",
         "table": "cp_clients",
         "partition": null,
         "column": "cp_client_id",
         "sql": "\nWITH frequencies AS (\n    SELECT COUNT(*) AS frequency\n    FROM cp_clients\n    WHERE cp_client_id IS NOT NULL\n    GROUP BY cp_client_id)\nSELECT COUNT(*)\nFROM frequencies\nWHERE frequency > 1",
         "exception": null,
-        "duration": "0:00:00.002090"
+        "duration": "0:00:00.002460"
       },
       {
-        "name": "49.cp_collection.cp_clients.cp_client_id.duplicate_count.failing_sql",
+        "name": "95.cp_collection.cp_clients.cp_client_id.duplicate_count.failing_sql",
         "dataSource": "cp_collection",
         "table": "cp_clients",
         "partition": null,
@@ -3399,7 +3399,7 @@
         "duration": null
       },
       {
-        "name": "49.cp_collection.cp_clients.cp_client_id.duplicate_count.passing_sql",
+        "name": "95.cp_collection.cp_clients.cp_client_id.duplicate_count.passing_sql",
         "dataSource": "cp_collection",
         "table": "cp_clients",
         "partition": null,
@@ -3409,27 +3409,27 @@
         "duration": null
       },
       {
-        "name": "50.cp_collection.cp_notifications.aggregation[0]",
+        "name": "96.cp_collection.cp_notifications.aggregation[0]",
         "dataSource": "cp_collection",
         "table": "cp_notifications",
         "partition": null,
         "column": null,
         "sql": "SELECT \n  COUNT(*),\n  COUNT(CASE WHEN notification_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN cp_client_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN notification_date IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (source_type IS NULL) AND NOT (source_type IN ('School','Police','Health service','Family member','Neighbour','Anonymous','Self-report')) THEN 1 END),\n  COUNT(CASE WHEN NOT (concern_type IS NULL) AND NOT (concern_type IN ('Neglect','Physical abuse','Emotional abuse','Sexual abuse','Domestic violence exposure','Parental substance use','Parental mental health concern')) THEN 1 END),\n  COUNT(CASE WHEN NOT (risk_rating IS NULL) AND NOT (risk_rating IN ('Low','Medium','High','Critical')) THEN 1 END),\n  COUNT(CASE WHEN assigned_worker_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (outcome IS NULL) AND NOT (outcome IN ('No further action','Referred to family support','Investigation opened')) THEN 1 END) \nFROM cp_notifications",
         "exception": null,
-        "duration": "0:00:00.002513"
+        "duration": "0:00:00.002914"
       },
       {
-        "name": "54.cp_collection.cp_notifications.notification_id.duplicate_count",
+        "name": "100.cp_collection.cp_notifications.notification_id.duplicate_count",
         "dataSource": "cp_collection",
         "table": "cp_notifications",
         "partition": null,
         "column": "notification_id",
         "sql": "\nWITH frequencies AS (\n    SELECT COUNT(*) AS frequency\n    FROM cp_notifications\n    WHERE notification_id IS NOT NULL\n    GROUP BY notification_id)\nSELECT COUNT(*)\nFROM frequencies\nWHERE frequency > 1",
         "exception": null,
-        "duration": "0:00:00.001820"
+        "duration": "0:00:00.001852"
       },
       {
-        "name": "54.cp_collection.cp_notifications.notification_id.duplicate_count.failing_sql",
+        "name": "100.cp_collection.cp_notifications.notification_id.duplicate_count.failing_sql",
         "dataSource": "cp_collection",
         "table": "cp_notifications",
         "partition": null,
@@ -3439,7 +3439,7 @@
         "duration": null
       },
       {
-        "name": "54.cp_collection.cp_notifications.notification_id.duplicate_count.passing_sql",
+        "name": "100.cp_collection.cp_notifications.notification_id.duplicate_count.passing_sql",
         "dataSource": "cp_collection",
         "table": "cp_notifications",
         "partition": null,
@@ -3449,27 +3449,27 @@
         "duration": null
       },
       {
-        "name": "59.cp_collection.cp_investigations.aggregation[0]",
+        "name": "105.cp_collection.cp_investigations.aggregation[0]",
         "dataSource": "cp_collection",
         "table": "cp_investigations",
         "partition": null,
         "column": null,
         "sql": "SELECT \n  COUNT(CASE WHEN investigation_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN notification_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN cp_client_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN lead_worker_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN start_date IS NULL THEN 1 END),\n  COUNT(*),\n  COUNT(CASE WHEN NOT (substantiated IS NULL) AND NOT (substantiated IN ('Substantiated','Not substantiated','Inconclusive')) THEN 1 END) \nFROM cp_investigations",
         "exception": null,
-        "duration": "0:00:00.001900"
+        "duration": "0:00:00.001664"
       },
       {
-        "name": "60.cp_collection.cp_investigations.investigation_id.duplicate_count",
+        "name": "106.cp_collection.cp_investigations.investigation_id.duplicate_count",
         "dataSource": "cp_collection",
         "table": "cp_investigations",
         "partition": null,
         "column": "investigation_id",
         "sql": "\nWITH frequencies AS (\n    SELECT COUNT(*) AS frequency\n    FROM cp_investigations\n    WHERE investigation_id IS NOT NULL\n    GROUP BY investigation_id)\nSELECT COUNT(*)\nFROM frequencies\nWHERE frequency > 1",
         "exception": null,
-        "duration": "0:00:00.003711"
+        "duration": "0:00:00.001685"
       },
       {
-        "name": "60.cp_collection.cp_investigations.investigation_id.duplicate_count.failing_sql",
+        "name": "106.cp_collection.cp_investigations.investigation_id.duplicate_count.failing_sql",
         "dataSource": "cp_collection",
         "table": "cp_investigations",
         "partition": null,
@@ -3479,7 +3479,7 @@
         "duration": null
       },
       {
-        "name": "60.cp_collection.cp_investigations.investigation_id.duplicate_count.passing_sql",
+        "name": "106.cp_collection.cp_investigations.investigation_id.duplicate_count.passing_sql",
         "dataSource": "cp_collection",
         "table": "cp_investigations",
         "partition": null,
@@ -3489,27 +3489,27 @@
         "duration": null
       },
       {
-        "name": "64.cp_collection.cp_placements.aggregation[0]",
+        "name": "110.cp_collection.cp_placements.aggregation[0]",
         "dataSource": "cp_collection",
         "table": "cp_placements",
         "partition": null,
         "column": null,
         "sql": "SELECT \n  COUNT(CASE WHEN placement_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN cp_client_id IS NULL THEN 1 END),\n  COUNT(*),\n  COUNT(CASE WHEN NOT (placement_type IS NULL) AND NOT (placement_type IN ('Kinship care','Foster care','Residential care','Family group home')) THEN 1 END),\n  COUNT(CASE WHEN carer_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN placement_start IS NULL THEN 1 END),\n  COUNT(CASE WHEN placement_suburb IS NULL THEN 1 END) \nFROM cp_placements",
         "exception": null,
-        "duration": "0:00:00.001586"
+        "duration": "0:00:00.001599"
       },
       {
-        "name": "65.cp_collection.cp_placements.placement_id.duplicate_count",
+        "name": "111.cp_collection.cp_placements.placement_id.duplicate_count",
         "dataSource": "cp_collection",
         "table": "cp_placements",
         "partition": null,
         "column": "placement_id",
         "sql": "\nWITH frequencies AS (\n    SELECT COUNT(*) AS frequency\n    FROM cp_placements\n    WHERE placement_id IS NOT NULL\n    GROUP BY placement_id)\nSELECT COUNT(*)\nFROM frequencies\nWHERE frequency > 1",
         "exception": null,
-        "duration": "0:00:00.001464"
+        "duration": "0:00:00.001894"
       },
       {
-        "name": "65.cp_collection.cp_placements.placement_id.duplicate_count.failing_sql",
+        "name": "111.cp_collection.cp_placements.placement_id.duplicate_count.failing_sql",
         "dataSource": "cp_collection",
         "table": "cp_placements",
         "partition": null,
@@ -3519,7 +3519,7 @@
         "duration": null
       },
       {
-        "name": "65.cp_collection.cp_placements.placement_id.duplicate_count.passing_sql",
+        "name": "111.cp_collection.cp_placements.placement_id.duplicate_count.passing_sql",
         "dataSource": "cp_collection",
         "table": "cp_placements",
         "partition": null,
@@ -3529,27 +3529,27 @@
         "duration": null
       },
       {
-        "name": "66.cp_collection.cp_carers.aggregation[0]",
+        "name": "112.cp_collection.cp_carers.aggregation[0]",
         "dataSource": "cp_collection",
         "table": "cp_carers",
         "partition": null,
         "column": null,
         "sql": "SELECT \n  COUNT(*),\n  COUNT(CASE WHEN carer_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN given_name IS NULL THEN 1 END),\n  COUNT(CASE WHEN family_name IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (carer_type IS NULL) AND NOT (carer_type IN ('Kinship','Foster','Residential-staff')) THEN 1 END),\n  COUNT(CASE WHEN NOT (approval_status IS NULL) AND NOT (approval_status IN ('Approved','Provisional','Under review')) THEN 1 END) \nFROM cp_carers",
         "exception": null,
-        "duration": "0:00:00.001464"
+        "duration": "0:00:00.001622"
       },
       {
-        "name": "67.cp_collection.cp_carers.carer_id.duplicate_count",
+        "name": "113.cp_collection.cp_carers.carer_id.duplicate_count",
         "dataSource": "cp_collection",
         "table": "cp_carers",
         "partition": null,
         "column": "carer_id",
         "sql": "\nWITH frequencies AS (\n    SELECT COUNT(*) AS frequency\n    FROM cp_carers\n    WHERE carer_id IS NOT NULL\n    GROUP BY carer_id)\nSELECT COUNT(*)\nFROM frequencies\nWHERE frequency > 1",
         "exception": null,
-        "duration": "0:00:00.001621"
+        "duration": "0:00:00.001539"
       },
       {
-        "name": "67.cp_collection.cp_carers.carer_id.duplicate_count.failing_sql",
+        "name": "113.cp_collection.cp_carers.carer_id.duplicate_count.failing_sql",
         "dataSource": "cp_collection",
         "table": "cp_carers",
         "partition": null,
@@ -3559,7 +3559,7 @@
         "duration": null
       },
       {
-        "name": "67.cp_collection.cp_carers.carer_id.duplicate_count.passing_sql",
+        "name": "113.cp_collection.cp_carers.carer_id.duplicate_count.passing_sql",
         "dataSource": "cp_collection",
         "table": "cp_carers",
         "partition": null,
@@ -3569,27 +3569,27 @@
         "duration": null
       },
       {
-        "name": "68.cp_collection.cp_case_workers.aggregation[0]",
+        "name": "114.cp_collection.cp_case_workers.aggregation[0]",
         "dataSource": "cp_collection",
         "table": "cp_case_workers",
         "partition": null,
         "column": null,
         "sql": "SELECT \n  COUNT(*),\n  COUNT(CASE WHEN worker_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN given_name IS NULL THEN 1 END),\n  COUNT(CASE WHEN family_name IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (team_region IS NULL) AND NOT (team_region IN ('Metro North','Metro South','Metro East','South West','Great Southern','Goldfields','Kimberley','Pilbara','Wheatbelt','Midwest-Gascoyne')) THEN 1 END) \nFROM cp_case_workers",
         "exception": null,
-        "duration": "0:00:00.001341"
+        "duration": "0:00:00.001597"
       },
       {
-        "name": "69.cp_collection.cp_case_workers.worker_id.duplicate_count",
+        "name": "115.cp_collection.cp_case_workers.worker_id.duplicate_count",
         "dataSource": "cp_collection",
         "table": "cp_case_workers",
         "partition": null,
         "column": "worker_id",
         "sql": "\nWITH frequencies AS (\n    SELECT COUNT(*) AS frequency\n    FROM cp_case_workers\n    WHERE worker_id IS NOT NULL\n    GROUP BY worker_id)\nSELECT COUNT(*)\nFROM frequencies\nWHERE frequency > 1",
         "exception": null,
-        "duration": "0:00:00.003733"
+        "duration": "0:00:00.001441"
       },
       {
-        "name": "69.cp_collection.cp_case_workers.worker_id.duplicate_count.failing_sql",
+        "name": "115.cp_collection.cp_case_workers.worker_id.duplicate_count.failing_sql",
         "dataSource": "cp_collection",
         "table": "cp_case_workers",
         "partition": null,
@@ -3599,7 +3599,7 @@
         "duration": null
       },
       {
-        "name": "69.cp_collection.cp_case_workers.worker_id.duplicate_count.passing_sql",
+        "name": "115.cp_collection.cp_case_workers.worker_id.duplicate_count.passing_sql",
         "dataSource": "cp_collection",
         "table": "cp_case_workers",
         "partition": null,
@@ -3609,27 +3609,27 @@
         "duration": null
       },
       {
-        "name": "48.cp_collection.cp_clients.failed_rows[failed rows]",
+        "name": "94.cp_collection.cp_clients.failed_rows[failed rows]",
         "dataSource": "cp_collection",
         "table": "cp_clients",
         "partition": null,
         "column": null,
         "sql": "SELECT cp_client_id FROM cp_clients WHERE date_of_birth < DATE '1900-01-01'",
         "exception": null,
-        "duration": "0:00:00.001636"
+        "duration": "0:00:00.001725"
       },
       {
-        "name": "51.cp_collection.cp_notifications.reference[cp_client_id]",
+        "name": "97.cp_collection.cp_notifications.reference[cp_client_id]",
         "dataSource": "cp_collection",
         "table": "cp_notifications",
         "partition": null,
         "column": null,
         "sql": "\nSELECT COUNT(*)\n    FROM cp_notifications  SOURCE\n    LEFT JOIN cp_clients TARGET on SOURCE.cp_client_id = TARGET.cp_client_id\nWHERE (SOURCE.cp_client_id IS NOT NULL AND TARGET.cp_client_id IS  NULL)",
         "exception": null,
-        "duration": "0:00:00.001822"
+        "duration": "0:00:00.002062"
       },
       {
-        "name": "51.cp_collection.cp_notifications.reference[cp_client_id].failing_sql",
+        "name": "97.cp_collection.cp_notifications.reference[cp_client_id].failing_sql",
         "dataSource": "cp_collection",
         "table": "cp_notifications",
         "partition": null,
@@ -3639,7 +3639,7 @@
         "duration": null
       },
       {
-        "name": "51.cp_collection.cp_notifications.reference[cp_client_id].passing_sql",
+        "name": "97.cp_collection.cp_notifications.reference[cp_client_id].passing_sql",
         "dataSource": "cp_collection",
         "table": "cp_notifications",
         "partition": null,
@@ -3649,17 +3649,17 @@
         "duration": null
       },
       {
-        "name": "52.cp_collection.cp_notifications.reference[assigned_worker_id]",
+        "name": "98.cp_collection.cp_notifications.reference[assigned_worker_id]",
         "dataSource": "cp_collection",
         "table": "cp_notifications",
         "partition": null,
         "column": null,
         "sql": "\nSELECT COUNT(*)\n    FROM cp_notifications  SOURCE\n    LEFT JOIN cp_case_workers TARGET on SOURCE.assigned_worker_id = TARGET.worker_id\nWHERE (SOURCE.assigned_worker_id IS NOT NULL AND TARGET.worker_id IS  NULL)",
         "exception": null,
-        "duration": "0:00:00.001400"
+        "duration": "0:00:00.001812"
       },
       {
-        "name": "52.cp_collection.cp_notifications.reference[assigned_worker_id].failing_sql",
+        "name": "98.cp_collection.cp_notifications.reference[assigned_worker_id].failing_sql",
         "dataSource": "cp_collection",
         "table": "cp_notifications",
         "partition": null,
@@ -3669,7 +3669,7 @@
         "duration": null
       },
       {
-        "name": "52.cp_collection.cp_notifications.reference[assigned_worker_id].passing_sql",
+        "name": "98.cp_collection.cp_notifications.reference[assigned_worker_id].passing_sql",
         "dataSource": "cp_collection",
         "table": "cp_notifications",
         "partition": null,
@@ -3679,27 +3679,27 @@
         "duration": null
       },
       {
-        "name": "53.cp_collection.cp_notifications.failed_rows[failed rows]",
+        "name": "99.cp_collection.cp_notifications.failed_rows[failed rows]",
         "dataSource": "cp_collection",
         "table": "cp_notifications",
         "partition": null,
         "column": null,
         "sql": "SELECT n.notification_id\nFROM cp_notifications n\nLEFT JOIN cp_investigations i ON n.notification_id = i.notification_id\nWHERE n.outcome = 'Investigation opened' AND i.investigation_id IS NULL",
         "exception": null,
-        "duration": "0:00:00.005401"
+        "duration": "0:00:00.004779"
       },
       {
-        "name": "55.cp_collection.cp_investigations.reference[notification_id]",
+        "name": "101.cp_collection.cp_investigations.reference[notification_id]",
         "dataSource": "cp_collection",
         "table": "cp_investigations",
         "partition": null,
         "column": null,
         "sql": "\nSELECT COUNT(*)\n    FROM cp_investigations  SOURCE\n    LEFT JOIN cp_notifications TARGET on SOURCE.notification_id = TARGET.notification_id\nWHERE (SOURCE.notification_id IS NOT NULL AND TARGET.notification_id IS  NULL)",
         "exception": null,
-        "duration": "0:00:00.001399"
+        "duration": "0:00:00.001858"
       },
       {
-        "name": "55.cp_collection.cp_investigations.reference[notification_id].failing_sql",
+        "name": "101.cp_collection.cp_investigations.reference[notification_id].failing_sql",
         "dataSource": "cp_collection",
         "table": "cp_investigations",
         "partition": null,
@@ -3709,7 +3709,7 @@
         "duration": null
       },
       {
-        "name": "55.cp_collection.cp_investigations.reference[notification_id].passing_sql",
+        "name": "101.cp_collection.cp_investigations.reference[notification_id].passing_sql",
         "dataSource": "cp_collection",
         "table": "cp_investigations",
         "partition": null,
@@ -3719,17 +3719,17 @@
         "duration": null
       },
       {
-        "name": "56.cp_collection.cp_investigations.reference[cp_client_id]",
+        "name": "102.cp_collection.cp_investigations.reference[cp_client_id]",
         "dataSource": "cp_collection",
         "table": "cp_investigations",
         "partition": null,
         "column": null,
         "sql": "\nSELECT COUNT(*)\n    FROM cp_investigations  SOURCE\n    LEFT JOIN cp_clients TARGET on SOURCE.cp_client_id = TARGET.cp_client_id\nWHERE (SOURCE.cp_client_id IS NOT NULL AND TARGET.cp_client_id IS  NULL)",
         "exception": null,
-        "duration": "0:00:00.001564"
+        "duration": "0:00:00.002065"
       },
       {
-        "name": "56.cp_collection.cp_investigations.reference[cp_client_id].failing_sql",
+        "name": "102.cp_collection.cp_investigations.reference[cp_client_id].failing_sql",
         "dataSource": "cp_collection",
         "table": "cp_investigations",
         "partition": null,
@@ -3739,7 +3739,7 @@
         "duration": null
       },
       {
-        "name": "56.cp_collection.cp_investigations.reference[cp_client_id].passing_sql",
+        "name": "102.cp_collection.cp_investigations.reference[cp_client_id].passing_sql",
         "dataSource": "cp_collection",
         "table": "cp_investigations",
         "partition": null,
@@ -3749,17 +3749,17 @@
         "duration": null
       },
       {
-        "name": "57.cp_collection.cp_investigations.reference[lead_worker_id]",
+        "name": "103.cp_collection.cp_investigations.reference[lead_worker_id]",
         "dataSource": "cp_collection",
         "table": "cp_investigations",
         "partition": null,
         "column": null,
         "sql": "\nSELECT COUNT(*)\n    FROM cp_investigations  SOURCE\n    LEFT JOIN cp_case_workers TARGET on SOURCE.lead_worker_id = TARGET.worker_id\nWHERE (SOURCE.lead_worker_id IS NOT NULL AND TARGET.worker_id IS  NULL)",
         "exception": null,
-        "duration": "0:00:00.002468"
+        "duration": "0:00:00.001713"
       },
       {
-        "name": "57.cp_collection.cp_investigations.reference[lead_worker_id].failing_sql",
+        "name": "103.cp_collection.cp_investigations.reference[lead_worker_id].failing_sql",
         "dataSource": "cp_collection",
         "table": "cp_investigations",
         "partition": null,
@@ -3769,7 +3769,7 @@
         "duration": null
       },
       {
-        "name": "57.cp_collection.cp_investigations.reference[lead_worker_id].passing_sql",
+        "name": "103.cp_collection.cp_investigations.reference[lead_worker_id].passing_sql",
         "dataSource": "cp_collection",
         "table": "cp_investigations",
         "partition": null,
@@ -3779,27 +3779,27 @@
         "duration": null
       },
       {
-        "name": "58.cp_collection.cp_investigations.failed_rows[failed rows]",
+        "name": "104.cp_collection.cp_investigations.failed_rows[failed rows]",
         "dataSource": "cp_collection",
         "table": "cp_investigations",
         "partition": null,
         "column": null,
         "sql": "SELECT i.investigation_id\nFROM cp_investigations i\nJOIN cp_clients c ON i.cp_client_id = c.cp_client_id\nWHERE c.case_status = 'Closed' AND i.end_date IS NULL",
         "exception": null,
-        "duration": "0:00:00.008309"
+        "duration": "0:00:00.004048"
       },
       {
-        "name": "61.cp_collection.cp_placements.reference[cp_client_id]",
+        "name": "107.cp_collection.cp_placements.reference[cp_client_id]",
         "dataSource": "cp_collection",
         "table": "cp_placements",
         "partition": null,
         "column": null,
         "sql": "\nSELECT COUNT(*)\n    FROM cp_placements  SOURCE\n    LEFT JOIN cp_clients TARGET on SOURCE.cp_client_id = TARGET.cp_client_id\nWHERE (SOURCE.cp_client_id IS NOT NULL AND TARGET.cp_client_id IS  NULL)",
         "exception": null,
-        "duration": "0:00:00.001285"
+        "duration": "0:00:00.002076"
       },
       {
-        "name": "61.cp_collection.cp_placements.reference[cp_client_id].failing_sql",
+        "name": "107.cp_collection.cp_placements.reference[cp_client_id].failing_sql",
         "dataSource": "cp_collection",
         "table": "cp_placements",
         "partition": null,
@@ -3809,7 +3809,7 @@
         "duration": null
       },
       {
-        "name": "61.cp_collection.cp_placements.reference[cp_client_id].passing_sql",
+        "name": "107.cp_collection.cp_placements.reference[cp_client_id].passing_sql",
         "dataSource": "cp_collection",
         "table": "cp_placements",
         "partition": null,
@@ -3819,17 +3819,17 @@
         "duration": null
       },
       {
-        "name": "62.cp_collection.cp_placements.reference[carer_id]",
+        "name": "108.cp_collection.cp_placements.reference[carer_id]",
         "dataSource": "cp_collection",
         "table": "cp_placements",
         "partition": null,
         "column": null,
         "sql": "\nSELECT COUNT(*)\n    FROM cp_placements  SOURCE\n    LEFT JOIN cp_carers TARGET on SOURCE.carer_id = TARGET.carer_id\nWHERE (SOURCE.carer_id IS NOT NULL AND TARGET.carer_id IS  NULL)",
         "exception": null,
-        "duration": "0:00:00.001351"
+        "duration": "0:00:00.001929"
       },
       {
-        "name": "62.cp_collection.cp_placements.reference[carer_id].failing_sql",
+        "name": "108.cp_collection.cp_placements.reference[carer_id].failing_sql",
         "dataSource": "cp_collection",
         "table": "cp_placements",
         "partition": null,
@@ -3839,7 +3839,7 @@
         "duration": null
       },
       {
-        "name": "62.cp_collection.cp_placements.reference[carer_id].passing_sql",
+        "name": "108.cp_collection.cp_placements.reference[carer_id].passing_sql",
         "dataSource": "cp_collection",
         "table": "cp_placements",
         "partition": null,
@@ -3849,14 +3849,14 @@
         "duration": null
       },
       {
-        "name": "63.cp_collection.cp_placements.failed_rows[failed rows]",
+        "name": "109.cp_collection.cp_placements.failed_rows[failed rows]",
         "dataSource": "cp_collection",
         "table": "cp_placements",
         "partition": null,
         "column": null,
         "sql": "SELECT p.placement_id\nFROM cp_placements p\nJOIN cp_carers c ON p.carer_id = c.carer_id\nWHERE c.approval_status != 'Approved'",
         "exception": null,
-        "duration": "0:00:00.003049"
+        "duration": "0:00:00.003516"
       }
     ],
     "automatedMonitoringChecks": [],
@@ -3866,552 +3866,552 @@
       {
         "level": "INFO",
         "message": "Soda Core 3.5.6",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 139,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 277,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "Scan summary:",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 140,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 278,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "59/59 checks PASSED: ",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 141,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 279,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "    cp_clients in cp_collection",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 142,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 280,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      row_count warn when < 300 fail when < 100 when > 2000 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 143,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 281,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      date_of_birth out of range [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 144,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 282,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(cp_client_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 145,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 283,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      duplicate_count(cp_client_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 146,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 284,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(given_name) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 147,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 285,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(family_name) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 148,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 286,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(date_of_birth) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 149,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 287,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(sex) warn when > 0% fail when > 2% [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 150,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 288,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(suburb) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 151,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 289,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(case_opened_date) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 152,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 290,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(postcode) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 153,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 291,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(postcode) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 154,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 292,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "    cp_notifications in cp_collection",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 155,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 293,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      row_count warn when < 600 fail when < 200 when > 3000 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 156,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 294,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      values in (cp_client_id) must exist in cp_clients (cp_client_id) [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 157,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 295,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      values in (assigned_worker_id) must exist in cp_case_workers (worker_id) [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 158,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 296,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      Escalation completeness [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 159,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 297,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(notification_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 160,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 298,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      duplicate_count(notification_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 161,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 299,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(cp_client_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 162,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 300,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(notification_date) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 163,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 301,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(source_type) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 164,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 302,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(concern_type) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 165,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 303,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(risk_rating) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 166,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 304,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(assigned_worker_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 167,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 305,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(outcome) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 168,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 306,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "    cp_investigations in cp_collection",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 169,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 307,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      values in (notification_id) must exist in cp_notifications (notification_id) [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 170,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 308,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      values in (cp_client_id) must exist in cp_clients (cp_client_id) [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 171,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 309,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      values in (lead_worker_id) must exist in cp_case_workers (worker_id) [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 172,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 310,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      Closed-case investigation hygiene [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 173,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 311,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(investigation_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 174,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 312,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      duplicate_count(investigation_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 175,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 313,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(notification_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 176,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 314,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(cp_client_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 177,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 315,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(lead_worker_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 178,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 316,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(start_date) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 179,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 317,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(substantiated) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 180,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 318,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "    cp_placements in cp_collection",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 181,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 319,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      values in (cp_client_id) must exist in cp_clients (cp_client_id) [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 182,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 320,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      values in (carer_id) must exist in cp_carers (carer_id) [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 183,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 321,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      Placement/carer approval compliance [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 184,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 322,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(placement_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 185,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 323,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      duplicate_count(placement_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 186,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 324,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(cp_client_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 187,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 325,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(placement_type) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 188,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 326,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(carer_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 189,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 327,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(placement_start) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 190,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 328,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(placement_suburb) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 191,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 329,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "    cp_carers in cp_collection",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 192,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 330,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      row_count warn when < 150 fail when < 50 when > 1000 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 193,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 331,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(carer_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 194,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 332,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      duplicate_count(carer_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 195,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 333,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(given_name) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 196,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 334,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(family_name) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 197,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 335,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(carer_type) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 198,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 336,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(approval_status) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 199,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 337,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "    cp_case_workers in cp_collection",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 200,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 338,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      row_count warn when < 40 fail when < 15 when > 200 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 201,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 339,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(worker_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 202,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 340,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      duplicate_count(worker_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 203,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 341,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(given_name) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 204,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 342,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      missing_count(family_name) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 205,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 343,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "      invalid_percent(team_region) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 206,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 344,
         "doc": null,
         "location": null
       },
       {
         "level": "INFO",
         "message": "All is good. No failures. No warnings. No errors.",
-        "timestamp": "2026-09-18T11:07:33+00:00",
-        "index": 207,
+        "timestamp": "2026-09-18T11:08:03+00:00",
+        "index": 345,
         "doc": null,
         "location": null
       }
@@ -4427,7 +4427,7 @@
       "check_name": "row_count",
       "dimension": "completeness",
       "label": "Row count",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 527,
       "unit": "count",
@@ -4449,7 +4449,7 @@
       "check_name": "date_of_birth out of range",
       "dimension": "conformity",
       "label": null,
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4471,7 +4471,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4493,7 +4493,7 @@
       "check_name": "duplicate_count",
       "dimension": "",
       "label": "Duplicate rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4515,7 +4515,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4537,7 +4537,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4559,7 +4559,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4581,7 +4581,7 @@
       "check_name": "invalid_percent",
       "dimension": "",
       "label": "Invalid values",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0.0,
       "unit": "%",
@@ -4603,7 +4603,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4625,7 +4625,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4647,7 +4647,7 @@
       "check_name": "invalid_percent",
       "dimension": "",
       "label": "Invalid values",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0.0,
       "unit": "%",
@@ -4669,7 +4669,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4691,7 +4691,7 @@
       "check_name": "row_count",
       "dimension": "completeness",
       "label": "Row count",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 987,
       "unit": "count",
@@ -4713,7 +4713,7 @@
       "check_name": "values in (cp_client_id) must exist in cp_clients (cp_client_id)",
       "dimension": "",
       "label": null,
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4735,7 +4735,7 @@
       "check_name": "values in (assigned_worker_id) must exist in cp_case_workers (worker_id)",
       "dimension": "",
       "label": null,
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4757,7 +4757,7 @@
       "check_name": "Escalation completeness",
       "dimension": "completeness",
       "label": null,
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4779,7 +4779,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4801,7 +4801,7 @@
       "check_name": "duplicate_count",
       "dimension": "",
       "label": "Duplicate rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4823,7 +4823,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4845,7 +4845,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4867,7 +4867,7 @@
       "check_name": "invalid_percent",
       "dimension": "",
       "label": "Invalid values",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0.0,
       "unit": "%",
@@ -4889,7 +4889,7 @@
       "check_name": "invalid_percent",
       "dimension": "",
       "label": "Invalid values",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0.0,
       "unit": "%",
@@ -4911,7 +4911,7 @@
       "check_name": "invalid_percent",
       "dimension": "",
       "label": "Invalid values",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0.0,
       "unit": "%",
@@ -4933,7 +4933,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4955,7 +4955,7 @@
       "check_name": "invalid_percent",
       "dimension": "",
       "label": "Invalid values",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0.0,
       "unit": "%",
@@ -4977,7 +4977,7 @@
       "check_name": "values in (notification_id) must exist in cp_notifications (notification_id)",
       "dimension": "",
       "label": null,
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -4999,7 +4999,7 @@
       "check_name": "values in (cp_client_id) must exist in cp_clients (cp_client_id)",
       "dimension": "",
       "label": null,
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5021,7 +5021,7 @@
       "check_name": "values in (lead_worker_id) must exist in cp_case_workers (worker_id)",
       "dimension": "",
       "label": null,
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5043,7 +5043,7 @@
       "check_name": "Closed-case investigation hygiene",
       "dimension": "consistency",
       "label": null,
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5065,7 +5065,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5087,7 +5087,7 @@
       "check_name": "duplicate_count",
       "dimension": "",
       "label": "Duplicate rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5109,7 +5109,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5131,7 +5131,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5153,7 +5153,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5175,7 +5175,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5197,7 +5197,7 @@
       "check_name": "invalid_percent",
       "dimension": "",
       "label": "Invalid values",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0.0,
       "unit": "%",
@@ -5219,7 +5219,7 @@
       "check_name": "values in (cp_client_id) must exist in cp_clients (cp_client_id)",
       "dimension": "",
       "label": null,
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5241,7 +5241,7 @@
       "check_name": "values in (carer_id) must exist in cp_carers (carer_id)",
       "dimension": "",
       "label": null,
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5263,7 +5263,7 @@
       "check_name": "Placement/carer approval compliance",
       "dimension": "consistency",
       "label": null,
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5285,7 +5285,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5307,7 +5307,7 @@
       "check_name": "duplicate_count",
       "dimension": "",
       "label": "Duplicate rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5329,7 +5329,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5351,7 +5351,7 @@
       "check_name": "invalid_percent",
       "dimension": "",
       "label": "Invalid values",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0.0,
       "unit": "%",
@@ -5373,7 +5373,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5395,7 +5395,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5417,7 +5417,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5439,7 +5439,7 @@
       "check_name": "row_count",
       "dimension": "completeness",
       "label": "Row count",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 289,
       "unit": "count",
@@ -5461,7 +5461,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5483,7 +5483,7 @@
       "check_name": "duplicate_count",
       "dimension": "",
       "label": "Duplicate rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5505,7 +5505,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5527,7 +5527,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5549,7 +5549,7 @@
       "check_name": "invalid_percent",
       "dimension": "",
       "label": "Invalid values",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0.0,
       "unit": "%",
@@ -5571,7 +5571,7 @@
       "check_name": "invalid_percent",
       "dimension": "",
       "label": "Invalid values",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0.0,
       "unit": "%",
@@ -5593,7 +5593,7 @@
       "check_name": "row_count",
       "dimension": "completeness",
       "label": "Row count",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 60,
       "unit": "count",
@@ -5615,7 +5615,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5637,7 +5637,7 @@
       "check_name": "duplicate_count",
       "dimension": "",
       "label": "Duplicate rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5659,7 +5659,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5681,7 +5681,7 @@
       "check_name": "missing_count",
       "dimension": "",
       "label": "Null rate",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0,
       "unit": "count",
@@ -5703,7 +5703,7 @@
       "check_name": "invalid_percent",
       "dimension": "",
       "label": "Invalid values",
-      "run_id": "cp_run_08_2024-11-01",
+      "run_id": "cp_run_14_2026-05-27_resupply2",
       "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
       "metric_value": 0.0,
       "unit": "%",

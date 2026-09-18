@@ -1,10 +1,10 @@
 {
-  "run_timestamp": "2026-09-18T10:50:45.705473+00:00",
+  "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
   "run_by": "fpycnkgvmt@privaterelay.appleid.com",
   "raw_output": {
     "manifest_entry": {
       "run_id": "cp_run_09_2025-02-01",
-      "run_index": 9,
+      "run_index": 10,
       "delivery_id": "cp_delivery_09",
       "delivery_date": "2025-02-01",
       "attempt_number": 1,
@@ -12,11 +12,11 @@
       "run_date": "2025-02-01",
       "is_resupply": false,
       "supersedes_run_id": null,
-      "dirty_severity": null,
+      "dirty_severity": "amber",
       "seed": 5009,
       "row_counts": {
         "cp_clients": 527,
-        "cp_notifications": 987,
+        "cp_notifications": 1001,
         "cp_investigations": 181,
         "cp_placements": 242,
         "cp_carers": 289,
@@ -27,15 +27,15 @@
       "concern_type": [
         [
           "Neglect",
-          379
+          382
         ],
         [
           "Physical abuse",
-          117
+          119
         ],
         [
           "Emotional abuse",
-          211
+          210
         ],
         [
           "Sexual abuse",
@@ -47,11 +47,15 @@
         ],
         [
           "Parental substance use",
-          70
+          71
         ],
         [
           "Parental mental health concern",
           38
+        ],
+        [
+          "(invalid code)",
+          9
         ]
       ]
     },
@@ -74,8 +78,21 @@
       "cp_notifications.concern_type": {
         "type": "categorical",
         "suppressed": false,
-        "total_invalid": 0,
-        "values": []
+        "total_invalid": 9,
+        "values": [
+          {
+            "value": "Unspecified",
+            "count": 4
+          },
+          {
+            "value": "Code 9",
+            "count": 3
+          },
+          {
+            "value": "Pending classification",
+            "count": 2
+          }
+        ]
       }
     },
     "arrival": {

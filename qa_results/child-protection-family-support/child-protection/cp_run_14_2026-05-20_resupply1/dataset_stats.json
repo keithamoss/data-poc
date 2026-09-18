@@ -3,20 +3,20 @@
   "run_by": "fpycnkgvmt@privaterelay.appleid.com",
   "raw_output": {
     "manifest_entry": {
-      "run_id": "cp_run_14_2026-05-01",
-      "run_index": 15,
+      "run_id": "cp_run_14_2026-05-20_resupply1",
+      "run_index": 16,
       "delivery_id": "cp_delivery_14",
       "delivery_date": "2026-05-01",
-      "attempt_number": 1,
-      "arrived_date": "2026-05-01",
-      "run_date": "2026-05-01",
-      "is_resupply": false,
-      "supersedes_run_id": null,
+      "attempt_number": 2,
+      "arrived_date": "2026-05-20",
+      "run_date": "2026-05-20",
+      "is_resupply": true,
+      "supersedes_run_id": "cp_run_14_2026-05-01",
       "dirty_severity": "red",
       "seed": 5014,
       "row_counts": {
         "cp_clients": 527,
-        "cp_notifications": 987,
+        "cp_notifications": 1036,
         "cp_investigations": 181,
         "cp_placements": 242,
         "cp_carers": 289,
@@ -27,31 +27,35 @@
       "concern_type": [
         [
           "Neglect",
-          379
+          374
         ],
         [
           "Physical abuse",
-          117
+          115
         ],
         [
           "Emotional abuse",
-          211
+          212
         ],
         [
           "Sexual abuse",
-          35
+          33
         ],
         [
           "Domestic violence exposure",
-          137
+          140
         ],
         [
           "Parental substance use",
-          70
+          69
         ],
         [
           "Parental mental health concern",
-          38
+          35
+        ],
+        [
+          "(invalid code)",
+          58
         ]
       ]
     },
@@ -59,26 +63,26 @@
       "cp_clients.postcode": {
         "type": "categorical",
         "suppressed": false,
-        "total_invalid": 15,
+        "total_invalid": 17,
         "values": [
           {
-            "value": "XXXX",
+            "value": "6000X",
             "count": 6
           },
           {
-            "value": "0000",
+            "value": "XXXX",
             "count": 4
           },
           {
-            "value": "6000X",
-            "count": 2
-          },
-          {
             "value": "TBC",
-            "count": 2
+            "count": 4
           },
           {
             "value": "9999",
+            "count": 2
+          },
+          {
+            "value": "0000",
             "count": 1
           }
         ]
@@ -86,76 +90,89 @@
       "cp_clients.date_of_birth": {
         "type": "numeric_date",
         "suppressed": false,
-        "total_invalid": 28,
+        "total_invalid": 25,
         "min": "1750-01-01",
         "max": "1899-01-01",
         "values": [
           {
-            "value": "1750-01-01",
-            "count": 10
-          },
-          {
-            "value": "1899-01-01",
-            "count": 9
-          },
-          {
             "value": "1820-11-30",
+            "count": 8
+          },
+          {
+            "value": "1750-01-01",
             "count": 7
           },
           {
             "value": "1850-06-15",
-            "count": 2
+            "count": 6
+          },
+          {
+            "value": "1899-01-01",
+            "count": 4
           }
         ],
         "histogram": [
           {
             "bucket": "1750-01-01 to 1774-11-01",
-            "count": 10
-          },
-          {
-            "bucket": "1799-09-01 to 1824-07-02",
             "count": 7
           },
           {
+            "bucket": "1799-09-01 to 1824-07-02",
+            "count": 8
+          },
+          {
             "bucket": "1849-05-02 to 1874-03-02",
-            "count": 2
+            "count": 6
           },
           {
             "bucket": "1874-03-02 to 1899-01-01",
-            "count": 9
+            "count": 4
           }
         ]
       },
       "cp_notifications.concern_type": {
         "type": "categorical",
         "suppressed": false,
-        "total_invalid": 0,
-        "values": []
+        "total_invalid": 58,
+        "values": [
+          {
+            "value": "Unspecified",
+            "count": 26
+          },
+          {
+            "value": "Pending classification",
+            "count": 19
+          },
+          {
+            "value": "Code 9",
+            "count": 13
+          }
+        ]
       }
     },
     "arrival": {
       "cp_clients": {
-        "max_lag_hours": 7.0,
+        "max_lag_hours": -449.0,
         "earliest_extract": "2026-05-01 01:00:00"
       },
       "cp_notifications": {
-        "max_lag_hours": 7.0,
+        "max_lag_hours": -446.0,
         "earliest_extract": "2026-05-01 01:00:00"
       },
       "cp_investigations": {
-        "max_lag_hours": 7.0,
+        "max_lag_hours": -446.0,
         "earliest_extract": "2026-05-01 01:00:00"
       },
       "cp_placements": {
-        "max_lag_hours": 7.0,
+        "max_lag_hours": -445.0,
         "earliest_extract": "2026-05-01 01:00:00"
       },
       "cp_carers": {
-        "max_lag_hours": 7.0,
+        "max_lag_hours": -449.0,
         "earliest_extract": "2026-05-01 01:00:00"
       },
       "cp_case_workers": {
-        "max_lag_hours": 7.0,
+        "max_lag_hours": -449.0,
         "earliest_extract": "2026-05-01 01:00:00"
       }
     }

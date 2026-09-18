@@ -144,18 +144,22 @@ N_QUARTERS = 15
 def _build_run_plan(n: int, seed: int) -> list[tuple[int, str | None]]:
     rng = np.random.default_rng(seed)
     n_amber = max(1, round(n * 0.25))  # ~matches the original plan's 2/10 ratio
-    # One extra RED delivery in the middle, besides the always-red last
-    # one (2026-09-18, CP resupply simulation) - matches Birth
-    # Registrations' own precedent exactly (RUN_PLAN's own comment in
-    # generate_runs.py: "bumped from a single red to 2 so the resupply-
-    # chain simulation... had more than one independent example to
-    # demonstrate variability") - one resupply chain that's already
-    # resolved by the time history ends, not just the currently-open one.
-    n_red_middle = 1
-    n_clean_middle = n - 2 - n_amber - n_red_middle  # first (clean) & last (red) carved out separately
-    middle = [None] * n_clean_middle + ["amber"] * n_amber + ["red"] * n_red_middle
-    rng.shuffle(middle)
-    return list(enumerate([None] + list(middle) + ["red"]))
+    # Two RED deliveries at a random position among every NON-FIRST slot
+    # (2026-09-18, CP resupply simulation) - matches Birth Registrations'
+    # own precedent (RUN_PLAN's own comment in generate_runs.py: "bumped
+    # from a single red to 2 so the resupply-chain simulation... had more
+    # than one independent example to demonstrate variability") - one
+    # resupply chain that's already resolved by the time history ends,
+    # not just the currently-open one. The LAST delivery is no longer
+    # forced red (Keith's own call, 2026-09-18: "no need for the latest
+    # one to always fail... happy for it to be random") - only the FIRST
+    # stays forced clean, a real technical need (orchestrate_cp.py's own
+    # Evidently reference run), not just a framing choice.
+    n_red = 2
+    n_clean_rest = (n - 1) - n_amber - n_red  # only the first is carved out separately
+    rest = [None] * n_clean_rest + ["amber"] * n_amber + ["red"] * n_red
+    rng.shuffle(rest)
+    return list(enumerate([None] + rest))
 
 
 RUN_PLAN = _build_run_plan(N_QUARTERS, _RUN_PLAN_SEED)
@@ -208,6 +212,25 @@ def _add_extract_timestamp(df: pd.DataFrame, snapshot_date: date, date_col: str 
     base = pd.Timestamp(snapshot_date)
     out["extract_timestamp"] = base + pd.to_timedelta(rng.integers(1, 8, size=len(out)), unit="h")
     return out
+
+
+def _pick_dirty_tables(seed: int) -> set[str]:
+    """Which 2-3 of the 6 real tables actually fail on a given dirty
+    delivery/attempt - not all of them (Keith's own call, 2026-09-18
+    dictated feedback: "it should be possible for only some tables in
+    CP to fail... two or three could fail, and the rest could be
+    fine") - a real data-quality incident rarely touches every table in
+    a collection at once. Picked fresh per dirty() call (so a resupply
+    attempt that's still red can plausibly fail a DIFFERENT subset than
+    its first attempt did, not the same one every time), seeded off
+    that call's own `seed` so it stays reproducible. A separate,
+    directly-testable pure function rather than inlined into dirty()
+    itself, so this real invariant (never 0/1, never all 6) can be unit
+    tested without needing realistic fake table content just to satisfy
+    the real per-table preset functions' own column requirements."""
+    rng = np.random.default_rng(seed)
+    n_dirty = int(rng.integers(2, 4))  # 2 or 3 tables
+    return set(rng.choice(TABLES, size=n_dirty, replace=False))
 
 
 # Churn (resupply attempt N -> N+1) touches only these three "activity"
@@ -264,23 +287,30 @@ class ChildProtectionProvider:
 
     def dirty(self, payload: dict[str, pd.DataFrame], severity: str, seed: int,
               previous_row_count: int | None) -> dict[str, pd.DataFrame]:
+        dirty_tables = _pick_dirty_tables(seed)
         tables = dict(payload)
         base = self.base_tables
-        tables["cp_notifications"] = dirty_mod.apply_cp_notifications_presets(
-            tables["cp_notifications"], base["cp_clients"], base["cp_case_workers"],
-            severity, seed=seed + 100)
-        tables["cp_placements"] = dirty_mod.apply_cp_placements_presets(
-            tables["cp_placements"], tables["cp_carers"], base["cp_clients"],
-            severity, seed=seed + 200)
-        tables["cp_investigations"] = dirty_mod.apply_cp_investigations_presets(
-            tables["cp_investigations"], base["cp_clients"], base["cp_notifications"],
-            base["cp_case_workers"], severity, seed=seed + 300)
-        tables["cp_clients"] = dirty_mod.apply_cp_clients_presets(
-            tables["cp_clients"], severity, seed=seed + 400)
-        tables["cp_carers"] = dirty_mod.apply_cp_carers_presets(
-            tables["cp_carers"], severity, seed=seed + 500)
-        tables["cp_case_workers"] = dirty_mod.apply_cp_case_workers_presets(
-            tables["cp_case_workers"], severity, seed=seed + 600)
+        if "cp_notifications" in dirty_tables:
+            tables["cp_notifications"] = dirty_mod.apply_cp_notifications_presets(
+                tables["cp_notifications"], base["cp_clients"], base["cp_case_workers"],
+                severity, seed=seed + 100)
+        if "cp_placements" in dirty_tables:
+            tables["cp_placements"] = dirty_mod.apply_cp_placements_presets(
+                tables["cp_placements"], tables["cp_carers"], base["cp_clients"],
+                severity, seed=seed + 200)
+        if "cp_investigations" in dirty_tables:
+            tables["cp_investigations"] = dirty_mod.apply_cp_investigations_presets(
+                tables["cp_investigations"], base["cp_clients"], base["cp_notifications"],
+                base["cp_case_workers"], severity, seed=seed + 300)
+        if "cp_clients" in dirty_tables:
+            tables["cp_clients"] = dirty_mod.apply_cp_clients_presets(
+                tables["cp_clients"], severity, seed=seed + 400)
+        if "cp_carers" in dirty_tables:
+            tables["cp_carers"] = dirty_mod.apply_cp_carers_presets(
+                tables["cp_carers"], severity, seed=seed + 500)
+        if "cp_case_workers" in dirty_tables:
+            tables["cp_case_workers"] = dirty_mod.apply_cp_case_workers_presets(
+                tables["cp_case_workers"], severity, seed=seed + 600)
         return tables
 
     def churn(self, payload: dict[str, pd.DataFrame], seed: int, run_date: date,
