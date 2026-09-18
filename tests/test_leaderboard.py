@@ -8,11 +8,45 @@ tests/test_acceptance_sync.py's own pure functions already get - no
 real `gh`/network here at all."""
 from __future__ import annotations
 
+import json
+
 from qa_tools.common import leaderboard as lb
 
 
 def _event(event, actor, created_at):
     return {"event": event, "actor": actor, "created_at": created_at}
+
+
+class TestFetchTicketResolutionGhInvocation:
+    """Real bug found on this project's first live `gh api` run
+    (2026-09-18, CI run for commit 48b89a7): `gh api` silently switches
+    an otherwise-GET request to POST the moment ANY `-f`/`-F` param is
+    given (unless `-X GET` is also passed explicitly) - POSTing to the
+    real, read-only Issue Events endpoint fails with a real 415.
+    Confirmed directly against this repo's own real issue #8 while
+    diagnosing: the same call via `-f per_page=100` returns 415, a plain
+    GET with `?per_page=100` in the URL returns 200. Fixed by moving
+    `per_page` into the URL's own query string, never via `-f`/`-F` -
+    this test locks that in by asserting the real `gh` invocation never
+    reaches for `-f`/`-F` again, without needing a real `gh`/network
+    call itself."""
+
+    def test_the_events_api_call_never_uses_f_flags(self, monkeypatch):
+        calls = []
+
+        def fake_run_gh(args):
+            calls.append(args)
+            if args[:2] == ["issue", "view"]:
+                return json.dumps({"number": 1, "labels": []})
+            return json.dumps([])
+
+        monkeypatch.setattr(lb, "_run_gh", fake_run_gh)
+        lb.fetch_ticket_resolution("owner", "repo", 1)
+
+        events_call = next(c for c in calls if c[0] == "api")
+        assert "-f" not in events_call
+        assert "-F" not in events_call
+        assert "per_page=100" in events_call[1]
 
 
 class TestBuildResolutionEpisodes:

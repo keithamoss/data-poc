@@ -87,14 +87,24 @@ def fetch_ticket_resolution(owner: str, repo: str, issue_number: int) -> dict:
     just the fields build_resolution_episodes() actually needs
     (`event`, the real actor login, `created_at`) - the raw payload
     carries a lot more (full user objects, commit refs, label colors)
-    that has no use here."""
+    that has no use here.
+
+    Real bug hit on this project's own first live `gh api` run
+    (2026-09-18): `per_page` MUST be passed as a query string on the
+    path, never via `-f`/`-F` - `gh api` silently switches an otherwise-
+    GET request to POST the moment any `-f`/`-F` param is given (unless
+    `-X GET` is also passed explicitly), and POSTing to this read-only
+    endpoint fails with a real 415. Confirmed directly against this
+    repo's own real issue #8 while diagnosing (a plain GET with
+    `?per_page=100` in the URL returns 200; the same call via `-f`
+    returns 415) - see `tests/test_leaderboard.py`'s own regression test
+    for this exact real gh CLI gotcha."""
     meta = json.loads(_run_gh([
         "issue", "view", str(issue_number), "--repo", f"{owner}/{repo}",
         "--json", "number,labels",
     ]))
     raw_events = json.loads(_run_gh([
-        "api", f"repos/{owner}/{repo}/issues/{issue_number}/events",
-        "-f", "per_page=100",
+        "api", f"repos/{owner}/{repo}/issues/{issue_number}/events?per_page=100",
     ]))
     meta["events"] = [
         {
