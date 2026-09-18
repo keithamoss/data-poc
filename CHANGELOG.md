@@ -22,6 +22,15 @@ first.
 ## 2026-09-18
 
 ### Added
+- **6:52pm** — Real resupply-chain simulation for Child Protection: a red quarterly
+  delivery now gets a real, later resupply attempt (a genuinely slower
+  turnaround than Birth Registrations' own daily-feed curve - a full
+  collection re-extract realistically takes longer to correct), the
+  same chain-orchestration engine Birth Registrations already uses,
+  generalized to a whole delivery's worth of tables at once rather than
+  a single file. Visible in the live dashboard's own supply-history
+  view with no changes to that view at all - it already derived chains
+  purely from real, observable status, dataset-agnostic by design.
 - **1:02pm** — A real timestamp against every entry on this very page (real AWST
   git-commit time, never fabricated), sorted newest-first within each
   date's own category - also shown in the dashboard's own Release
