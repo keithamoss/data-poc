@@ -22,6 +22,12 @@ first.
 ## 2026-09-18
 
 ### Added
+- **8:11pm** — Real deep links from the dashboard back into GitHub: clicking a check
+  now opens its actual source (the real dbt test/Soda check/datacontract
+  rule/Evidently preset that defines it, at the exact line), and clicking
+  a dataset or agency opens its real QA code folder - both pinned to the
+  exact commit the dashboard was built from, so a link always shows
+  exactly what was true when that page was published.
 - **8:00pm** — Human-readable dashboard URLs: the address bar now shows a real path
   (`#/agency/.../dataset/.../column/.../check/...`) instead of an opaque
   block of URL-encoded JSON - every drill-down level, the 4 header side
