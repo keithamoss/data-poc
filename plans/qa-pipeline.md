@@ -3758,7 +3758,7 @@ relative, not a schedule — this is weeks of work, not months.
     category needs to be to match how he actually talks about the
     work), not the other way around.
 
-69. **[decided + built, 2026-09-17 (Phase 7)]** Whether `arrivalStatus`
+69. **[decided + built, 2026-09-18 (Phase 7)]** Whether `arrivalStatus`
     (early/onTime/late) is even a meaningful concept for RESUPPLY
     attempts, or whether it should only ever apply to a delivery's
     original supply. Direct follow-up to item 67's own flagged
@@ -3787,7 +3787,7 @@ relative, not a schedule — this is weeks of work, not months.
     status and the new counter (including chaining through 2+ resupply
     attempts).
 
-    **Superseded, 2026-09-17 (item 73)**: the "is this entry a resupply"
+    **Superseded, 2026-09-18 (item 73)**: the "is this entry a resupply"
     question this item answers is still correct, but WHICH entries count
     as a resupply is no longer read from `is_resupply`/
     `supersedes_run_id` at all - see item 73 and
@@ -3795,7 +3795,7 @@ relative, not a schedule — this is weeks of work, not months.
     unchanged in behaviour, just recomputed from real chain position
     instead of a `supersedes_run_id` lookup.
 
-70. **[investigated + defensive fix applied, 2026-09-17 (Phase 7) - the
+70. **[investigated + defensive fix applied, 2026-09-18 (Phase 7) - the
     ORIGINAL "looks like Times New Roman" report could NOT be
     reproduced]** Real investigation, not a guess: loaded the real
     template in a real headless browser (Playwright) and checked
@@ -3826,7 +3826,7 @@ relative, not a schedule — this is weeks of work, not months.
     screenshot or more specific repro steps next time it's seen, rather
     than re-guessing at a cause from here.
 
-71. **[real bug found + fixed, 2026-09-17 (Phase 7) - Keith's own report
+71. **[real bug found + fixed, 2026-09-18 (Phase 7) - Keith's own report
     from the deployed site]** A resupply landing weeks late on some
     OTHER cycle's own delivery day got grouped into THAT cycle's own
     supply-history block, purely by coincidence of arrival date -
@@ -3873,7 +3873,7 @@ relative, not a schedule — this is weeks of work, not months.
     resupplies entirely, or show something else when the latest thing
     IS a resupply, is a real design question, not an obvious bug fix.
 
-    **Superseded, 2026-09-17 (item 73)**: the specific fix here
+    **Superseded, 2026-09-18 (item 73)**: the specific fix here
     (`delivery_date`-based grouping) is replaced outright, not just
     extended - see item 73 and `plans/conceptual-design.md` Thread A.
     Keith's own follow-up critique, prompted by this exact bug: "suppliers
@@ -3883,7 +3883,7 @@ relative, not a schedule — this is weeks of work, not months.
     (`lastArrival`/`latest_status`) is still open and unchanged by item
     73 - explicitly deferred, see that item's own note.
 
-72. **[explained, 2026-09-17 (Phase 7) - Keith's own question: "I can
+72. **[explained, 2026-09-18 (Phase 7) - Keith's own question: "I can
     see there's a little pill with red/amber severity injected... I
     don't understand what that means though"]** The `dirtySeverity`
     pill in the supply-history table (`Red-severity defect injected` /
@@ -3916,12 +3916,12 @@ relative, not a schedule — this is weeks of work, not months.
     reframed/hidden as an implementation detail a real production
     dashboard would never actually have.
 
-    **Resolved, 2026-09-17 (item 73)**: Keith's own follow-up answered
+    **Resolved, 2026-09-18 (item 73)**: Keith's own follow-up answered
     the open question above - "we can drop the dirty severity pill" -
     and it's gone, replaced by a real (not synthetic) aggregate
     red/amber/green status pill. See item 73.
 
-73. **[built, 2026-09-17 (Phase 7) - Keith's own redesign, worked out
+73. **[built, 2026-09-18 (Phase 7) - Keith's own redesign, worked out
     loud over several turns and captured in full in
     `plans/conceptual-design.md` Thread A]** Replaced the resupply-chain
     model entirely. The previous design (items 29/71) grouped a
@@ -3988,7 +3988,7 @@ relative, not a schedule — this is weeks of work, not months.
     day, rather than the old bug of two unrelated things merging purely
     by calendar coincidence).
 
-74. **[found, 2026-09-17 (Phase 7) - surfaced by item 73's own new
+74. **[found, 2026-09-18 (Phase 7) - surfaced by item 73's own new
     aggregate-status pill, NOT fixed here - real, wide blast radius,
     needs Keith's own call, not a unilateral fix]** Item 73's new
     per-run aggregate status made a pre-existing, previously-easy-to-

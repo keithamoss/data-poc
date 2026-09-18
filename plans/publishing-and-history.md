@@ -2285,7 +2285,7 @@ it, have a note that we should consider adding tests for it." See
 `plans/wider.md`'s own action-items list for the actual parked entry
 (added alongside this scoping pass) rather than duplicating it here.
 
-**Build progress, 2026-09-17** - Keith's own authorization to "keep
+**Build progress, 2026-09-18** - Keith's own authorization to "keep
 plowing through... do all of phase six" without further check-ins:
 - **Step 1 (CI wiring) - DONE.** `.github/workflows/test.yml`, a new
   workflow separate from `deploy-pages.yml` (that workflow's own
@@ -2479,7 +2479,7 @@ left, if ever revisited: `synthetic_data_generator/` test coverage
 action item), and the "deliberately NOT done" `check_dashboard_renders.py`
 folding question just above.
 
-**Real gap found after the fact, 2026-09-17 (Phase 7) - Keith's own
+**Real gap found after the fact, 2026-09-18 (Phase 7) - Keith's own
 report: "the last GitHub Actions run failed."** Every single `test.yml`
 ("Run test suite") run had actually been failing since Phase 6 step 2
 landed - TWO genuinely separate real bugs, not one, both invisible
