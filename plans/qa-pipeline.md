@@ -12,7 +12,7 @@ relative, not a schedule — this is weeks of work, not months.
 
 ## Found running the real tools
 
-1. **[workaround shipped, high]** dbt-duckdb reliability bug. dbt-core's
+1. **[done, 2026-09-18]** **[QA checks & contract]** dbt-duckdb reliability bug. dbt-core's
    own reported `failures` count was reproducibly wrong (0 instead of the
    true row count) on some runs for a percentage-based `fail_calc`, while
    the identical compiled SQL run directly via DuckDB's Python API always
@@ -27,7 +27,7 @@ relative, not a schedule — this is weeks of work, not months.
    against `duckdb-labs/dbt-duckdb`; `plans/publishing-and-history.md` #1/`plans/wider.md` #1 (CI, Postgres)
    might also shed light on this without extra effort.
 
-2. **[open, medium]** `soda-core-duckdb`'s `duckdb<1.1.0` pin isn't a
+2. **[todo, 2026-09-18]** **[QA checks & contract]** `soda-core-duckdb`'s `duckdb<1.1.0` pin isn't a
    compatibility ceiling — it pins to a DuckDB version with a published
    CVE (GHSA-w2gf-jxc9-pf2q), patched in 1.1.0. Confirmed via upstream
    issue `sodadata/soda-core#2295`. Currently ignored (we run on 1.5.5,
@@ -37,7 +37,7 @@ relative, not a schedule — this is weeks of work, not months.
    checking whether it's the intended replacement and whether
    `run_soda_bdm.py`'s `Scan` API still exists there before migrating.
 
-3. **[done]** Soda's `[recent]` scoped check (`filter ... where:
+3. **[done, 2026-09-14]** **[QA checks & contract]** Soda's `[recent]` scoped check (`filter ... where:
    extract_timestamp >= CURRENT_DATE - 1`) never got meaningfully
    exercised against real Soda Core — it uses the actual wall-clock date,
    and this fixture's synthetic runs were all in the past by the time
@@ -60,7 +60,7 @@ relative, not a schedule — this is weeks of work, not months.
    its "always a Monday" realism touch by anchoring to the most recent
    Monday on/before the anchor date.
 
-4. **[moot - `engines/*.py` removed]** Evidently's PSI and the equivalent
+4. **[superseded, 2026-09-18]** **[QA checks & contract]** Evidently's PSI and the equivalent
    engine's PSI used to genuinely differ (0.144 vs 0.179 on the red run)
    because Evidently bins by every distinct observed value while
    `evidently_engine.py` collapsed everything outside {M,F,X} into one
@@ -70,14 +70,14 @@ relative, not a schedule — this is weeks of work, not months.
    equivalent to reconcile against. Left here as historical record, not
    an active item.
 
-5. **[moot - `engines/*.py` removed]** `engines/contract_engine.py`'s
+5. **[superseded, 2026-09-18]** **[QA checks & contract]** `engines/contract_engine.py`'s
    `type: sql` rule handling (added when the contract was rewritten to
    real ODCS vocabulary) used a temp-view + string-replace to scope each
    SQL rule to one run's rows - worked, but was fragile, equivalent-only
    tech debt. Moot now that the file itself is gone (see item #83
    above). Left here as historical record, not an active item.
 
-6. **[open, low]** The two-step `pip install` requirement is only half
+6. **[todo, 2026-09-18]** **[Testing & dev tooling]** The two-step `pip install` requirement is only half
    fixed: `uv sync --dev` now resolves everything in one step
    (`pyproject.toml`'s `[tool.uv] override-dependencies`, see `plans/
    wider.md` #6), but a plain `pip install .` still needs the old
@@ -86,7 +86,7 @@ relative, not a schedule — this is weeks of work, not months.
    `dbt-duckdb`/`soda-core-duckdb`/`datacontract-cli` release new
    versions; this could resolve cleanly on its own, or break differently.
 
-9. **[done, medium]** Two of the three Child Protection cross-table
+9. **[done, 2026-09-18]** **[QA checks & contract]** Two of the three Child Protection cross-table
    business rules used to fail on *every* run, dirty or clean, at a stable
    rate: placement/carer approval compliance (37/242 placements, ~15%) and
    closed-case investigation hygiene (16/181 investigations, ~9%).
@@ -117,7 +117,7 @@ relative, not a schedule — this is weeks of work, not months.
    unaffected by the fix, only which values land in `carer_id`/
    `case_status`/`end_date`).
 
-10. **[done, medium]** Dashboard check display was hard for a human reader
+10. **[done, 2026-09-18]** **[Dashboard UI]** Dashboard check display was hard for a human reader
     to make sense of, flagged against a concrete example
     (`notification_id`): its drawer headlined `dbt:not_null` (flat 0,
     "No material change") while the tile itself was Red from a different
@@ -176,7 +176,7 @@ relative, not a schedule — this is weeks of work, not months.
     `notification_id` and `cp_client_id`'s drawers and the executive/
     agency views; no regressions on either real dataset.
 
-11. **[done, medium]** Birth Registrations' QA coverage was thin outside
+11. **[done, 2026-09-18]** **[QA checks & contract]** Birth Registrations' QA coverage was thin outside
     `sex`/`place_of_birth_facility`: two columns (`source_system_record_id`,
     `extract_timestamp`) had no rule at all, five free-text columns only
     had a null check, and there was no cross-record consistency check
@@ -269,7 +269,7 @@ relative, not a schedule — this is weeks of work, not months.
     check's real-tool triangulation (dbt/Soda/datacontract-cli agreeing
     on the same violation counts) visible on the relevant drawers.
 
-12. **[done, medium]** Two more checks Keith asked for directly: a
+12. **[done, 2026-09-18]** **[QA checks & contract]** Two more checks Keith asked for directly: a
     freshness / relative-date check (flag if no record anywhere in a run
     has a `date_of_birth` within the last 7 days of the REAL wall-clock
     date), and a row-count-growth check ("rows should go up, more or less
@@ -336,7 +336,7 @@ relative, not a schedule — this is weeks of work, not months.
     (row-growth) and by genuine date-vs-wall-clock arithmetic (freshness),
     and no regression on any of the existing 13 columns' other checks.
 
-13. **[investigate]** Look more closely at what Evidently AI is actually
+13. **[investigate, 2026-09-18]** **[QA checks & contract]** Look more closely at what Evidently AI is actually
     doing today and consider expanding it - flagged by Keith, not yet
     scoped. Currently exercises exactly two checks for Birth Registrations
     (PSI drift on `sex` against a fixed run_01 baseline; the row-count-
@@ -361,7 +361,7 @@ relative, not a schedule — this is weeks of work, not months.
       cross-run comparison (a fixed baseline for PSI, a rolling previous-
       run comparison for row-growth).
 
-14. **[done, medium]** Dashboard follow-ups from actually using it: a real
+14. **[done, 2026-09-18]** **[Dashboard UI]** Dashboard follow-ups from actually using it: a real
     accessibility bug fix, plus the click-a-check detail view Keith asked
     for (with clarifying questions asked first).
     - **Tooltip dark-mode contrast bug, real and confirmed.** The trend-
@@ -416,7 +416,7 @@ relative, not a schedule — this is weeks of work, not months.
       amber tier - both correct, now visibly disagreeing where they used
       to be hidden behind whichever check happened to be checks[0].
 
-15. **[investigate]** Genuine per-row failing-record samples, revisited.
+15. **[done, 2026-09-14]** **[QA checks & contract]** Genuine per-row failing-record samples, revisited.
     Item 14 above honestly noted that no real tool currently wired into
     this pipeline (dbt, Soda, datacontract-cli, Evidently) captures which
     SPECIFIC rows failed a check - only aggregate counts
@@ -559,7 +559,7 @@ relative, not a schedule — this is weeks of work, not months.
     hand-verified via Playwright throughout, not unit-tested) - noted
     here rather than silently skipped.
 
-16. **[done]** Should the dashboard explain *why* checks on the
+16. **[done, 2026-09-14]** **[QA checks & contract]** Should the dashboard explain *why* checks on the
     same column can legitimately disagree in severity? Item 14's
     all-checks summary surfaced (not created) a real fact: a column can
     show red on an "amber" run because one check has zero tolerance
@@ -612,7 +612,7 @@ relative, not a schedule — this is weeks of work, not months.
     this finding stand as closed records informing that future
     narrowing-down decision, not open items.
 
-17. **[done, one open follow-up]** Aggregate failing-value shapes ("shape 2"), the
+17. **[done, 2026-09-14]** **[QA checks & contract]** Aggregate failing-value shapes ("shape 2"), the
     other half of item 15's "surface more about the nature of the
     failure" idea - item 15 covers WHICH rows failed (PKs only); this
     covers WHAT the actual bad values look like, for closed-value-set/
@@ -809,7 +809,7 @@ relative, not a schedule — this is weeks of work, not months.
     BDM data would need) or simplify it away for this PoC given the
     actual stakes are zero right now - not yet decided either way.
 
-18. **[done]** Explicit, non-magic null handling in every CSV read this
+18. **[done, 2026-09-15]** **[QA checks & contract]** Explicit, non-magic null handling in every CSV read this
     pipeline does - started as a spike Keith asked for after item 17's
     `"N/A"` bug, built out for real on 2026-09-15 once the spike's
     findings were in.
@@ -885,7 +885,7 @@ relative, not a schedule — this is weeks of work, not months.
     swallowed. `uv run pytest` (32 tests, up from 28) and
     `uv run ruff check .` both clean.
 
-19. **[investigate]** What dbt-core/Soda Core natively offer for "inspect
+19. **[investigate, 2026-09-15]** **[QA checks & contract]** What dbt-core/Soda Core natively offer for "inspect
     the actual bad values/rows," and whether either can read an ODCS
     contract - Keith asked for this to be verified with real research
     (not just re-reading this project's own code), since it directly
@@ -943,7 +943,7 @@ relative, not a schedule — this is weeks of work, not months.
     values.py` (or a future dbt-specific optimization) gets revisited,
     not an immediate to-do.
 
-20. **[investigate]** datacontract-cli's failed-samples limitations, and
+20. **[investigate, 2026-09-15]** **[QA checks & contract]** datacontract-cli's failed-samples limitations, and
     whether ODCS's numeric-only threshold operators are a recognized gap
     or a deliberate design choice - three follow-up questions Keith asked
     to be verified with real research, not assumed. Findings, web- and
@@ -1058,7 +1058,7 @@ relative, not a schedule — this is weeks of work, not months.
       of whether this project's specific fixture happens to paper over
       it by also running Soda/dbt.
 
-21. **[decided]** The `classification` concept (a per-column sensitivity
+21. **[done, 2026-09-15]** **[QA checks & contract]** The `classification` concept (a per-column sensitivity
     tag - `pii`, `confidential`, etc., see item 17) is a real requirement
     for this PoC going forward, independent of whether ODCS/datacontract-
     cli specifically is what this project ends up standardising on.
@@ -1072,7 +1072,7 @@ relative, not a schedule — this is weeks of work, not months.
     decision about which tool to use - a decision about what any tool
     or bespoke framework must support.
 
-22. **[todo]** Numeric value-field checks (amber/red thresholds on a
+22. **[todo, 2026-09-18]** **[QA checks & contract]** Numeric value-field checks (amber/red thresholds on a
     genuinely numeric - `integer`/`number` logicalType - column) - near-
     future work, not scoped yet. Confirmed in item 17: neither contract
     has a single numeric field today, every column is `string`/`date`/
@@ -1084,7 +1084,7 @@ relative, not a schedule — this is weeks of work, not months.
     scoped: something like a placement/investigation duration, a case
     count, or an age-derived field - not decided).
 
-23. **[todo]** Capture each real tool's own bad-row/bad-value output as
+23. **[todo, 2026-09-18]** **[QA checks & contract]** Capture each real tool's own bad-row/bad-value output as
     fully as each one natively allows, not the current uniform 5-row-PK-
     only cap, and show each tool's own version on its own check in the
     dashboard rather than one shared sample across all of them - near-
@@ -1107,7 +1107,7 @@ relative, not a schedule — this is weeks of work, not months.
     item 19), and whether "each tool's own version, shown separately" is
     clearer to a viewer than one merged view, or just more UI to parse.
 
-24. **[todo]** Browse back to a specific previous run (or a previous
+24. **[todo, 2026-09-18]** **[Dashboard UI]** Browse back to a specific previous run (or a previous
     resupply attempt) at the check level, and at the column/dataset
     level too, not just the current run - near-future work, not scoped
     yet. Real, currently-missing capability, confirmed by re-reading the
@@ -1128,7 +1128,7 @@ relative, not a schedule — this is weeks of work, not months.
     including resupplies) and Child Protection (10 straightforward
     weekly runs, no resupply concept) the same way.
 
-25. **[todo]** Layperson-friendly, human-readable English explanations of
+25. **[todo, 2026-09-18]** **[QA checks & contract]** Layperson-friendly, human-readable English explanations of
     what each check actually does - recorded on the check (or the
     contract) and surfaced in the dashboard/reporting, not just in
     code/config comments - near-term work Keith flagged, not scoped yet.
@@ -1157,7 +1157,7 @@ relative, not a schedule — this is weeks of work, not months.
     dashboard it surfaces - the check card, the check-detail panel, or
     both.
 
-26. **[open, not yet fixed - Keith's call to revisit]** A real bug found
+26. **[todo, 2026-09-15]** **[QA checks & contract]** A real bug found
     while auditing every check for item 23's "duplicated-logic drift
     risk" question (2026-09-15): `pipeline/build_dashboard_data.py`'s
     `AGGREGATE_SPEC` entry for BDM's `date_of_birth` only encodes
@@ -1193,7 +1193,7 @@ relative, not a schedule — this is weeks of work, not months.
     against the real datacontract-cli condition, not just the aggregate's
     own (currently incomplete) one.
 
-27. **[done, 2026-09-15]** `generator/dirty.py` doesn't inject a failure scenario for a
+27. **[done, 2026-09-15]** **[Data generation]** `generator/dirty.py` doesn't inject a failure scenario for a
     large share of the checks both datasets actually define - found the
     same day as item 26, by cross-referencing every `apply_*_presets`
     function against `bdm-birth-registrations-soda-checks.yml`/`child-
@@ -1363,7 +1363,7 @@ relative, not a schedule — this is weeks of work, not months.
     input contract). 71 tests pass repo-wide; `uv run ruff check .`
     clean.
 
-28. **[decided]** How the dashboard gets row-level detail (PKs and the
+28. **[done, 2026-09-15]** **[QA checks & contract]** How the dashboard gets row-level detail (PKs and the
     values/rows behind a failing check) - the question items 19-23 built
     up to. Resolves the "wire into each tool's output vs. keep an
     independent pipeline-level computation" fork raised in item 23,
@@ -1430,7 +1430,7 @@ relative, not a schedule — this is weeks of work, not months.
        upper bound) and item 23's broader "surface each tool's own
        output" build.
 
-29. **[done]** The same evaluation-lens correction (item 20/28's, and
+29. **[done, 2026-09-15]** **[QA checks & contract]** The same evaluation-lens correction (item 20/28's, and
     `plans/wider.md`'s purpose note) applied to Soda's and Evidently's
     own standalone row-level (PK/value) capability, at Keith's direct
     request after the datacontract-cli correction. Same rule throughout:
@@ -1514,7 +1514,7 @@ relative, not a schedule — this is weeks of work, not months.
     in the evaluation, not just a "different tool, different question"
     aside.
 
-30. **[done]** Full-triplication pass: every check that has a Soda/dbt/
+30. **[done, 2026-09-15]** **[QA checks & contract]** Full-triplication pass: every check that has a Soda/dbt/
     datacontract-cli-implementable shape now exists in all three, not
     just the hand-picked subset each dataset had before. Keith's
     instruction after item 29: "ensure we are implementing each check
@@ -1644,7 +1644,7 @@ relative, not a schedule — this is weeks of work, not months.
     newly-added checks pass on every run today, correctly, for lack of a
     reason to fail rather than for lack of being real.
 
-31. **[fixed 2026-09-15]** A real, independent bug found while verifying item 30's
+31. **[done, 2026-09-15]** **[Data generation]** A real, independent bug found while verifying item 30's
     regenerated pipeline output (2026-09-15): a resupply attempt that
     *resolves* (stops being red) is not actually regenerated clean.
     `generator/resupply.py`'s `run_delivery_chain` (lines ~118-126):
@@ -1739,7 +1739,7 @@ relative, not a schedule — this is weeks of work, not months.
     isolated `generator.generate_runs` regeneration used during
     diagnosis.
 
-32. **[done]** Switched 4 of this project's 8 hand-authored dbt checks
+32. **[done, 2026-09-15]** **[QA checks & contract]** Switched 4 of this project's 8 hand-authored dbt checks
     (found while researching item 29's own "17% SQL escape hatch"
     parallel finding) to `dbt_utils` - the flagship, dbt-Labs-maintained
     package, not a third-party one (confirmed: `dbt-labs/dbt-utils` on
@@ -1836,7 +1836,7 @@ relative, not a schedule — this is weeks of work, not months.
 
     **Queued next**: item 33.
 
-33. **[todo]** Look at the Python `pointblank` library as a fifth
+33. **[todo, 2026-09-18]** **[QA checks & contract]** Look at the Python `pointblank` library as a fifth
     candidate in this evaluation/shootout (see `plans/wider.md`'s purpose
     note) - Keith's call, right after the dbt_utils switch. Not
     researched yet - logged as a near-term item, not scoped. `pointblank`
@@ -1854,7 +1854,7 @@ relative, not a schedule — this is weeks of work, not months.
     running 4 tools per run) rather than assuming it slots in identically
     to the SQL-layer ones.
 
-34. **[done]** Full account of the dbt-duckdb `failures=0` bug item 32
+34. **[done, 2026-09-15]** **[QA checks & contract]** Full account of the dbt-duckdb `failures=0` bug item 32
     found - root cause, upstream status, whether dbt's own ecosystem has
     a better story for exactly the kind of reporting this project builds,
     and other possible fixes - all research-verified 2026-09-15, not
@@ -1968,7 +1968,7 @@ relative, not a schedule — this is weeks of work, not months.
     same risk profile as any other duplicated-logic case this project
     has already flagged. **Fixed same day - see item 35.**
 
-35. **[done]** Fixed item 34's own redline tension: replaced both
+35. **[done, 2026-09-18]** **[QA checks & contract]** Fixed item 34's own redline tension: replaced both
     `run_dbt_bdm.py`/`run_dbt_cp.py`'s narrow, per-check `_VERIFY_
     COUNT_SQL` dicts with a single `_AUDIT_AGGREGATE_SQL` dict, keyed by
     test *type* rather than specific (column, test) combos hand-picked
@@ -2018,7 +2018,7 @@ relative, not a schedule — this is weeks of work, not months.
     pytest` (32/32) and `uv run ruff check .` both clean; dashboard data
     and HTML re-embedded.
 
-36. **[todo]** Dig into Elementary's own data-tests documentation
+36. **[todo, 2026-09-15]** **[QA checks & contract]** Dig into Elementary's own data-tests documentation
     (docs.elementary-data.com/data-tests/introduction) - Keith's call,
     2026-09-15, after item 34 surfaced Elementary as the most popular
     purpose-built dbt-native observability tool but only looked at its
@@ -2040,7 +2040,7 @@ relative, not a schedule — this is weeks of work, not months.
     blocked by this session's own egress proxy - worth confirming this
     one separately, not assuming the same).
 
-37. **[todo]** Flag Elementary's own dashboard/reporting product itself
+37. **[todo, 2026-09-15]** **[Dashboard UI]** Flag Elementary's own dashboard/reporting product itself
     (distinct from item 36's own question about its *test suite*) as a
     comparison point for this project's hand-rolled dashboard
     (`dashboard/qa-reporting-dashboard.html`) - Keith's call, 2026-09-15.
@@ -2075,7 +2075,7 @@ relative, not a schedule — this is weeks of work, not months.
     wrapper - not researched yet, logged here so it isn't lost track of
     separately from the dashboard investigation it was found alongside.
 
-38. **[done - real root cause found, original mystery still open]**
+38. **[done, 2026-09-15]** **[QA checks & contract]**
     Dug further into item 34's "second, still-unexplained nondeterminism"
     (notification_id's `unique` test reporting 0 once, then correctly on
     the very next identical re-run) - Keith's call, 2026-09-15. Real,
@@ -2165,7 +2165,7 @@ relative, not a schedule — this is weeks of work, not months.
     recurrence would let a future dig start from evidence instead of
     guessing at what to reproduce.
 
-39. **[done]** Added a unit-test battery for `generator/dirty.py`'s
+39. **[done, 2026-09-15]** **[Testing & dev tooling]** Added a unit-test battery for `generator/dirty.py`'s
     failure-injection functions themselves (`tests/test_dirty.py`,
     scoped via AskUserQuestion, 2026-09-15) - prompted by asking "do we
     have good coverage of the actually dirty data injection itself?"
@@ -2218,7 +2218,7 @@ relative, not a schedule — this is weeks of work, not months.
     this batch added coverage for existing, working code rather than
     fixing a found defect.
 
-40. **[todo]** Schema-correctness checks: missing columns, unexpected
+40. **[todo, 2026-09-18]** **[QA checks & contract]** Schema-correctness checks: missing columns, unexpected
     (extra) columns. Not yet investigated against what this project's
     tools already do for free vs. what's a real gap - `datacontract
     test`'s ODCS schema validation may already catch some of this (a
@@ -2234,7 +2234,7 @@ relative, not a schedule — this is weeks of work, not months.
     needed to demonstrate this failing for real, same as every other
     check in this project.
 
-41. **[todo]** Data-type checks, particularly given this project's CSV
+41. **[todo, 2026-09-18]** **[QA checks & contract]** Data-type checks, particularly given this project's CSV
     sources. Not yet investigated. The real, live-confirmed risk this
     project already ran into once (`generator/dirty.py`'s own comment on
     `inject_out_of_range_dates`, and `plans/qa-pipeline.md`'s note on it):
@@ -2251,7 +2251,7 @@ relative, not a schedule — this is weeks of work, not months.
     deliberately writes an unparseable value to demonstrate the failure
     mode for real rather than just avoiding it.
 
-42. **[done, 2026-09-15]** Clearer red/amber/green status indicator
+42. **[done, 2026-09-15]** **[Dashboard UI]** Clearer red/amber/green status indicator
     on a check's own detail page in the dashboard. Builds on item 14's
     click-a-check detail panel (`#check-panel` - current-vs-previous
     comparison, trend chart, row-level detail).
@@ -2292,7 +2292,7 @@ relative, not a schedule — this is weeks of work, not months.
     dark mode. `uv run pytest` (71) and `uv run ruff check .` both
     clean (JS/HTML-only change, no Python touched).
 
-43. **[todo]** Visibility of what a check actually IS - its real SQL/
+43. **[todo, 2026-09-16]** **[Dashboard UI]** Visibility of what a check actually IS - its real SQL/
     YAML definition - from within the dashboard/reporting tool itself,
     not just a human-readable label. Today each `qa_tools/*/run_*.py`
     script (e.g. `run_dbt_bdm.py`/`run_dbt_cp.py`'s own `_LABEL_BY_*`
@@ -2323,7 +2323,7 @@ relative, not a schedule — this is weeks of work, not months.
     technical SQL/YAML definition, not a human's explanation of it -
     stays open, unresolved by that work.
 
-44. **[todo]** Checks for expected values that must actually appear -
+44. **[todo, 2026-09-18]** **[QA checks & contract]** Checks for expected values that must actually appear -
     the inverse of an `accepted_values`/`invalid_percent` check (which
     only ever asserts every value IS FROM a closed set), not covered by
     anything in this project today. A closed-value-set column silently
@@ -2346,7 +2346,7 @@ relative, not a schedule — this is weeks of work, not months.
     against the specific closed-value-set columns worth watching this
     way) before the existing injector is worth wiring into a preset.
 
-45. **[done, 2026-09-15]** Choosing which run to compare against, and a
+45. **[done, 2026-09-15]** **[Dashboard UI]** Choosing which run to compare against, and a
     real side-by-side view for that chosen pair - not just the automatic
     "previous run" the check-panel used to hardcode.
 
@@ -2437,7 +2437,7 @@ relative, not a schedule — this is weeks of work, not months.
     confirm the `n>=2` path is unaffected. `uv run pytest` (71) and
     `uv run ruff check .` both clean.
 
-46. **[parked]** A real frontend test suite for `dashboard/qa-reporting-
+46. **[parked, 2026-09-18]** **[Testing & dev tooling]** A real frontend test suite for `dashboard/qa-reporting-
     dashboard.html` - Playwright end-to-end tests and/or frontend unit
     tests - Keith's own framing: "if we stay with our hand-rolled
     reporting solution, we'd definitely want" this. Explicitly
@@ -2472,7 +2472,7 @@ relative, not a schedule — this is weeks of work, not months.
     a change done" convention naturally covers the dashboard too, or
     whether frontend tests get their own separate invocation.
 
-47. **[parked]** Bring the column-level status-dot "pip" row
+47. **[parked, 2026-09-18]** **[Dashboard UI]** Bring the column-level status-dot "pip" row
     (`dashboard/qa-reporting-dashboard.html`'s `.status-dot-row`/
     `.status-dot` - a compact row of small colored squares, one per run,
     shown today only in the column drawer's "Worst status across all
@@ -2491,7 +2491,7 @@ relative, not a schedule — this is weeks of work, not months.
     simpler, since a single check's own `history` already carries a
     status per point via `statusForValue()`) or needs a new helper.
 
-48. **[todo]** Mobile: tapping a trend chart briefly shows the tooltip,
+48. **[todo, 2026-09-16]** **[Dashboard UI]** Mobile: tapping a trend chart briefly shows the tooltip,
     then it disappears - Keith's report, 2026-09-16, with his own
     correct hypothesis about the cause. Root cause, from reading
     `wireChart()` (`dashboard/qa-reporting-dashboard.html`): the
@@ -2512,7 +2512,7 @@ relative, not a schedule — this is weeks of work, not months.
     tooltip, a second tap-while-shown to trigger compare, standard
     mobile chart UX) - logged for later, not investigated further now.
 
-49. **[fixed, 2026-09-16]** A real, pre-existing bug in `check_lifecycle.py`'s
+49. **[done, 2026-09-16]** **[Pipeline & publishing]** A real, pre-existing bug in `check_lifecycle.py`'s
     dbt parser: it only ever walked `models[].tests`/`models[].
     columns[].tests` in `schema.yml`, so dbt SINGULAR tests
     (`dbt_project/tests/*.sql` - `multiple_birth_sibling` on the BDM
@@ -2560,7 +2560,7 @@ relative, not a schedule — this is weeks of work, not months.
     all) before the fix landed, per this repo's own "verify a
     regression test actually fails first" convention.
 
-50. **[fixed, 2026-09-16]** A real bug in `qa_tools/cp/run_evidently_cp.py`:
+50. **[done, 2026-09-16]** **[Pipeline & publishing]** A real bug in `qa_tools/cp/run_evidently_cp.py`:
     it wrote its `qa_results/` output under its own table-scoped dataset
     id (`cp_common.TABLE_DATASET_ID["cp_notifications"]`, i.e.
     `"cp-notifications"`) instead of the collection id
@@ -2606,7 +2606,7 @@ relative, not a schedule — this is weeks of work, not months.
     own_result_with_the_table_dataset_id` (confirms the per-result
     `dataset_id` field is deliberately untouched by the fix).
 
-51. **[fixed, 2026-09-16]** Two real bugs in `check_lifecycle.
+51. **[done, 2026-09-16]** **[Pipeline & publishing]** Two real bugs in `check_lifecycle.
     dbt_check_id_lookup()` (built for item 49, but never actually wired
     into a real result-construction loop until this session's check_id-
     propagation work - both were latent until then), found running the
@@ -2656,7 +2656,7 @@ relative, not a schedule — this is weeks of work, not months.
     during is in `plans/publishing-and-history.md`'s Thread D section
     (search "check_id propagated into every real check RESULT record").
 
-52. **[fixed, 2026-09-17]** The check-detail panel's (X) close button
+52. **[done, 2026-09-17]** **[Dashboard UI]** The check-detail panel's (X) close button
     sometimes needed several clicks before it actually closed - Keith's
     report, 2026-09-16. Root cause, from reading the dashboard's own JS
     (`dashboard/qa-reporting-dashboard.template.html`): `closeCheckPanel()`
@@ -2692,7 +2692,7 @@ relative, not a schedule — this is weeks of work, not months.
     panel was still open, then confirmed exactly ONE click on (X)
     closed it fully.
 
-53. **[done, 2026-09-17]** The actual published (live GitHub Pages)
+53. **[done, 2026-09-17]** **[Pipeline & publishing]** The actual published (live GitHub Pages)
     dashboard needs a handful of real "🕐 Past snapshots" entries to
     browse through - Keith's own instruction, 2026-09-16, right after
     the as-of picker landed: important for demoing the dashboard, so an
@@ -2748,7 +2748,7 @@ relative, not a schedule — this is weeks of work, not months.
     Keith's own call if he wants artificially-spread duplicates anyway
     for raw browsing-count purposes.
 
-54. **[fixed, 2026-09-17]** A real pluralization bug - Keith's report,
+54. **[done, 2026-09-17]** **[Dashboard UI]** A real pluralization bug - Keith's report,
     2026-09-16: on the Executive tier's agency cards, "collections"/
     "datasets" stayed plural even when the count is 1 - and, per real
     data checked while fixing this, not just a hypothetical edge case:
@@ -2767,7 +2767,7 @@ relative, not a schedule — this is weeks of work, not months.
     text for Registry Services confirmed reading "1 collection" (not
     "1 collections") against the real, current data.
 
-55. **[fixed, 2026-09-17]** Two real, linked bugs found live-testing the
+55. **[done, 2026-09-17]** **[Pipeline & publishing]** Two real, linked bugs found live-testing the
     as-of picker, both fixed the same session:
     - **BDM's default as-of view showed "no data".** Root cause: BDM's
       real generation window (`generator/generate_runs.py`'s
@@ -2828,7 +2828,7 @@ relative, not a schedule — this is weeks of work, not months.
       including this file's own now-fixed test) and `uv run ruff check
       .` both clean.
 
-56. **[fixed, 2026-09-17]** A real Executive-tier sparkline bug - Keith's
+56. **[done, 2026-09-17]** **[Dashboard UI]** A real Executive-tier sparkline bug - Keith's
     report: Registry Services' sparkline on the Executive tier flipped
     between a flat line and a real graph as the as-of date moved through
     different days in September. Root cause, confirmed against real
@@ -2884,7 +2884,7 @@ relative, not a schedule — this is weeks of work, not months.
     a flat 2.0-to-2.0 line. Full `uv run pytest` (175 passed) and `uv
     run ruff check .` clean.
 
-57. **[done, 2026-09-17]** Brought the Executive tier's sparkline down
+57. **[done, 2026-09-17]** **[Dashboard UI]** Brought the Executive tier's sparkline down
     into the lower tiers too: Tier 2 (`renderAgency()`, the per-dataset
     table rows - `dashboard/qa-reporting-dashboard.template.html`) and
     Tier 3 (`renderDataset()`, the per-column tile grid) - built exactly
@@ -2920,7 +2920,7 @@ relative, not a schedule — this is weeks of work, not months.
     light and dark). No Python touched - pure frontend addition, `uv run
     pytest` (177 passed, unchanged) and `uv run ruff check .` clean.
 
-58. **[resolved, 2026-09-17 - confirmed intended, not a bug]** Keith's
+58. **[done, 2026-09-17]** **[Pipeline & publishing]** Keith's
     report: picking as-of = real "today" (2026-09-17) for Registry
     Services still shows "a lot of points" on the Executive-tier
     sparkline; expected "no points, or only one." Investigated live
@@ -2942,8 +2942,7 @@ relative, not a schedule — this is weeks of work, not months.
     wants. No code change - confirms the existing behaviour is correct
     as built.
 
-59. **[parked, 2026-09-17 - for a near-term discussion after Phase 5,
-    Keith's own call]** How to model a check for data with a lumpy,
+59. **[parked, 2026-09-17]** **[QA checks & contract]** How to model a check for data with a lumpy,
     calendar-shaped expected pattern: quiet/near-flat for 3 quarters,
     then a real, expected spike once a year at a known time (raised
     for Child Protection's quarterly cadence, but the shape is generic).
@@ -3019,8 +3018,7 @@ relative, not a schedule — this is weeks of work, not months.
     account once it lands.
     Not scoped further yet - pick up after Phase 5 wraps.
 
-60. **[parked, 2026-09-17 - flagged as a separate sub-phase for the end
-    of this phase, Keith's own call]** A real rethink of what the
+60. **[done, 2026-09-17]** **[Dashboard UI]** A real rethink of what the
     Executive-tier sparkline should actually measure, distinct from
     item 56 (which fixed *which single check* gets picked to represent
     a column/dataset) and item 57 (bringing that same per-check
@@ -3094,8 +3092,7 @@ relative, not a schedule — this is weeks of work, not months.
     representative check used to). `uv run pytest` (178) and `uv run
     ruff check .` both clean.
 
-61. **[parked, 2026-09-17 - flagged for the end of this phase, Keith's
-    own call]** Actually fix the root cause behind item 56's "always-1"
+61. **[done, 2026-09-17]** **[QA checks & contract]** Actually fix the root cause behind item 56's "always-1"
     checks, rather than continuing to work around them. Item 56's
     follow-up found three of `date_of_birth`'s red BDM checks - dbt's
     `dbt_utils.recency` test, Soda's matching freshness check, and
@@ -3195,7 +3192,7 @@ relative, not a schedule — this is weeks of work, not months.
     in the date_of_birth column drawer). Full `uv run pytest` (181, up
     from 178) and `uv run ruff check .` both clean.
 
-62. **[parked, 2026-09-17 - for after Phase 5 wraps, Keith's own call]**
+62. **[done, 2026-09-17]** **[Dashboard UI]**
     A dashboard-level changelog/releases page - "what changed about the
     dashboard/tool itself over time," as its own page within the
     dashboard. Explicitly distinct from two things already built this
@@ -3267,8 +3264,7 @@ relative, not a schedule — this is weeks of work, not months.
     7 real inline-code spans), zero console errors. Full `uv run
     pytest` (188, up from 181) and `uv run ruff check .` both clean.
 
-63. **[parked, 2026-09-17 - for after this phase wraps, Keith's own
-    call]** Mobile-responsive pass on the header - "it's getting a bit
+63. **[done, 2026-09-17]** **[Dashboard UI]** Mobile-responsive pass on the header - "it's getting a bit
     crowded." Real, not hypothetical: the header now holds 5 items
     (wordmark, 🌙 Dark mode, 📅 As of, 📋 Recent activity, 🕐 Past
     snapshots, plus the live-updated indicator) after this session's
@@ -3310,7 +3306,7 @@ relative, not a schedule — this is weeks of work, not months.
     Full `uv run pytest` (188, unchanged - a pure CSS change) and `uv
     run ruff check .` both clean.
 
-64. **[built, 2026-09-17 - Phase 5g]** Tier 3's no-data drill-down gap -
+64. **[done, 2026-09-17]** **[Dashboard UI]** Tier 3's no-data drill-down gap -
     found investigating Keith's own two walked-through scenarios ("as of
     1 August I should see red/amber/green; as of 28 July I should see
     no data, but still be able to click through to tier two and see no
@@ -3378,7 +3374,7 @@ relative, not a schedule — this is weeks of work, not months.
     `uv run pytest` (181, unchanged - a pure frontend change) and
     `uv run ruff check .` clean.
 
-65. **[built, 2026-09-17 - Phase 5j]** Replaced `AS_OF_OFFSET_DAYS` (the
+65. **[done, 2026-09-17]** **[Pipeline & publishing]** Replaced `AS_OF_OFFSET_DAYS` (the
     flat global day-count staleness tolerance item 64/`plans/publishing-
     and-history.md` Thread C left open, "CP reads no data for roughly
     two-thirds of every quarter") with real, per-dataset, computable
@@ -3508,9 +3504,7 @@ relative, not a schedule — this is weeks of work, not months.
     `arrivalStatus` is computed from real timestamps, not `max_lag_
     hours`) and `uv run ruff check .` both clean.
 
-66. **[parked, 2026-09-17 - Keith's own call: resume after `plans/
-    publishing-and-history.md`'s Phase 6 (test coverage pass) is done,
-    not before]** Explore the real ODCS contract format more thoroughly
+66. **[parked, 2026-09-17]** **[QA checks & contract]** Explore the real ODCS contract format more thoroughly
     - Keith's own ask, after Phase 5j's `slaProperties:`
     work turned up a mechanism (a real, well-defined SLA property shape)
     neither of us knew was there beforehand: "what else does ODCS have
@@ -3623,7 +3617,7 @@ relative, not a schedule — this is weeks of work, not months.
     case a future "is this whole dataset still supported" view is ever
     wanted, but nothing asks for that today.
 
-67. **[built, 2026-09-17]** BDM real arrival-status calibration (Keith's
+67. **[done, 2026-09-17]** **[Data generation]** BDM real arrival-status calibration (Keith's
     own request: "let's change the data so that BDM arrives on time
     about 80% of the time... early for 5%... late 15%") - which turned
     up two real, unrelated bugs before the actual calibration could be
@@ -3735,8 +3729,7 @@ relative, not a schedule — this is weeks of work, not months.
     classification, and reproducibility) and `uv run ruff check .`
     both clean.
 
-68. **[parked, 2026-09-17 - Keith's own call: resume after Phase 6, same
-    as item 66]** Polish `RELEASE_NOTES` (item 62/Phase 5h's panel,
+68. **[parked, 2026-09-17]** **[Docs & process]** Polish `RELEASE_NOTES` (item 62/Phase 5h's panel,
     `CHANGELOG.md`) - two separate asks. **Categorization**: label/group
     entries by which part of the system they touched (e.g. Dashboard,
     Generator, QA Pipeline/checks, Contracts, Publishing/CI), possibly
@@ -3758,7 +3751,7 @@ relative, not a schedule — this is weeks of work, not months.
     category needs to be to match how he actually talks about the
     work), not the other way around.
 
-69. **[decided + built, 2026-09-18 (Phase 7)]** Whether `arrivalStatus`
+69. **[done, 2026-09-18]** **[Dashboard UI]** Whether `arrivalStatus`
     (early/onTime/late) is even a meaningful concept for RESUPPLY
     attempts, or whether it should only ever apply to a delivery's
     original supply. Direct follow-up to item 67's own flagged
@@ -3795,9 +3788,7 @@ relative, not a schedule — this is weeks of work, not months.
     unchanged in behaviour, just recomputed from real chain position
     instead of a `supersedes_run_id` lookup.
 
-70. **[investigated + defensive fix applied, 2026-09-18 (Phase 7) - the
-    ORIGINAL "looks like Times New Roman" report could NOT be
-    reproduced]** Real investigation, not a guess: loaded the real
+70. **[done, 2026-09-18]** **[Dashboard UI]** Real investigation, not a guess: loaded the real
     template in a real headless browser (Playwright) and checked
     `document.fonts` directly against `.sla-tile .v` (the "SLA"/
     cadence-label and "Delivery format" tiles). The self-hosted
@@ -3826,8 +3817,7 @@ relative, not a schedule — this is weeks of work, not months.
     screenshot or more specific repro steps next time it's seen, rather
     than re-guessing at a cause from here.
 
-71. **[real bug found + fixed, 2026-09-18 (Phase 7) - Keith's own report
-    from the deployed site]** A resupply landing weeks late on some
+71. **[done, 2026-09-18]** **[Dashboard UI]** A resupply landing weeks late on some
     OTHER cycle's own delivery day got grouped into THAT cycle's own
     supply-history block, purely by coincidence of arrival date -
     Keith's own report: "the September 14th resupply for birth data
@@ -3883,9 +3873,7 @@ relative, not a schedule — this is weeks of work, not months.
     (`lastArrival`/`latest_status`) is still open and unchanged by item
     73 - explicitly deferred, see that item's own note.
 
-72. **[explained, 2026-09-18 (Phase 7) - Keith's own question: "I can
-    see there's a little pill with red/amber severity injected... I
-    don't understand what that means though"]** The `dirtySeverity`
+72. **[done, 2026-09-18]** **[Dashboard UI]** The `dirtySeverity`
     pill in the supply-history table (`Red-severity defect injected` /
     `Amber-severity defect injected`) is a synthetic-data-generation
     artifact, not anything a real production pipeline would ever know
@@ -3921,9 +3909,7 @@ relative, not a schedule — this is weeks of work, not months.
     and it's gone, replaced by a real (not synthetic) aggregate
     red/amber/green status pill. See item 73.
 
-73. **[built, 2026-09-18 (Phase 7) - Keith's own redesign, worked out
-    loud over several turns and captured in full in
-    `plans/conceptual-design.md` Thread A]** Replaced the resupply-chain
+73. **[done, 2026-09-18]** **[Dashboard UI]** Replaced the resupply-chain
     model entirely. The previous design (items 29/71) grouped a
     dataset's real run history using synthetic generator bookkeeping
     (`is_resupply`/`delivery_id`/`delivery_date`/`supersedes_run_id`,
@@ -3988,9 +3974,7 @@ relative, not a schedule — this is weeks of work, not months.
     day, rather than the old bug of two unrelated things merging purely
     by calendar coincidence).
 
-74. **[found, 2026-09-18 (Phase 7) - surfaced by item 73's own new
-    aggregate-status pill, NOT fixed here - real, wide blast radius,
-    needs Keith's own call, not a unilateral fix]** Item 73's new
+74. **[todo, 2026-09-18]** **[QA checks & contract]** Item 73's new
     per-run aggregate status made a pre-existing, previously-easy-to-
     miss calibration problem impossible to ignore: `birth-registrations`
     currently shows ONE never-closing resupply chain covering its entire
@@ -4058,7 +4042,7 @@ relative, not a schedule — this is weeks of work, not months.
     accurate computation given that input, not a bug in the new
     derivation logic itself.
 
-75. **[built, 2026-09-18]** A live requirements register - Keith's own
+75. **[done, 2026-09-18]** **[Docs & process]** A live requirements register - Keith's own
     request, one of the ideas parked in `plans/running-thoughts.md`
     item #7: "actual requirements... user stories, requirements, and
     acceptance criteria... track MoSCoW status... have we implemented
@@ -4127,8 +4111,7 @@ relative, not a schedule — this is weeks of work, not months.
     `npm test` all clean; visually verified with a real Playwright
     screenshot of the built panel.
 
-76. **[built, 2026-09-18 - GitHub Issues ticketing MVP, `plans/running-
-    thoughts.md` item #1]** Scoped via two real rounds of
+76. **[done, 2026-09-18]** **[GitHub workflow & people]** Scoped via two real rounds of
     `AskUserQuestion` before building (this project's own standing
     convention): first a business-analyst subagent pass confirming real
     GitHub Issues access and surfacing real fit gaps against `docs/
@@ -4209,7 +4192,7 @@ relative, not a schedule — this is weeks of work, not months.
     never actually cause). 316 tests passing (up from 302), `uv run
     ruff check .` clean.
 
-77. **[fixed and verified against real regenerated data, 2026-09-18]** Item
+77. **[done, 2026-09-18]** **[QA checks & contract]** Item
     74's two threshold-encoding bugs, fixed at Keith's own explicit
     request ("let's fix item 74"), scoped via a second AskUserQuestion
     round rather than assumed:
@@ -4327,7 +4310,7 @@ relative, not a schedule — this is weeks of work, not months.
     the next real tool run parsed the file) - `.pre-commit-config.yaml`,
     verified clean against every YAML file already in the repo.
 
-78. **[built, 2026-09-18, scoped via AskUserQuestion]** GitHub Issues ->
+78. **[done, 2026-09-18]** **[GitHub workflow & people]** GitHub Issues ->
     dashboard integration, at Keith's own request ("integrate the
     GitHub issues with the reporting UI as well"): a small badge on
     each dataset's own tile (Tier 2's dataset table + Tier 3's header,
@@ -4367,7 +4350,7 @@ relative, not a schedule — this is weeks of work, not months.
     locally (full suite, 333 passed) and in real CI. `uv run ruff
     check .` clean.
 
-79. **[investigated, 2026-09-18]** Keith's own follow-up question once
+79. **[done, 2026-09-18]** **[QA checks & contract]** Keith's own follow-up question once
     item 74's fix was verified: why do `child-protection`'s own 6 real
     datasets still read red? Checked properly this time (item 74's own
     write-up above already learned the lesson of not stopping at a
@@ -4410,7 +4393,7 @@ relative, not a schedule — this is weeks of work, not months.
     sibling-mismatch, all 6 CP tables for the real dirty-severity
     delivery) both reflect genuine findings, not noise.
 
-80. **[built, 2026-09-18]** Keith's own follow-up on `CHANGELOG.md`
+80. **[done, 2026-09-18]** **[Docs & process]** Keith's own follow-up on `CHANGELOG.md`
     (dictated): a real timestamp against every entry ("10 a.m., 10:15
     a.m."-style), sorted newest-first within each date's own
     `### <category>` subsection, so the newest thing is always at the
@@ -4463,7 +4446,7 @@ relative, not a schedule — this is weeks of work, not months.
     rendering timestamps ahead of each entry, newest-first within each
     subsection, via the same Playwright check.
 
-81. **[built, 2026-09-18]** CP resupply simulation - queued in
+81. **[done, 2026-09-18]** **[Data generation]** CP resupply simulation - queued in
     `plans/running-thoughts.md` ("Child Protection resupplies... once
     you're done with this loop"), picked up once that loop (Phase 6/7,
     the ticketing MVP, item 74's fix, the timestamp retrofit) wrapped.
