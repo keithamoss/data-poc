@@ -289,3 +289,18 @@ session's own work. They could plausibly share UI/rendering
 infrastructure once both exist, but are two separate asks with two
 separate scoping conversations - don't conflate them when either comes
 up for real.
+
+### 11. Switch pytest-cov from line/statement coverage to branch coverage
+
+Keith's own follow-up question after the requirements-register work
+(2026-09-18): confirmed the current `pytest-cov` setup (`pyproject.toml`
+`[tool.coverage.run]`) measures line/statement coverage only - no
+`branch = true` set - so a line can read "covered" even when only one
+side of an `if`/`else` was ever actually exercised. Switching to real
+branch coverage is a small config change, but re-baselining
+`fail_under` needs a full `uv run pytest --cov=...` run to measure the
+new (likely lower) real number first - the full suite takes ~3.5
+minutes (302 tests as of the requirements-register work), which is
+exactly why this got deferred rather than done on the spot: **explicitly
+parked, not declined** - pick it up when there's room for another full
+run, not urgent.
