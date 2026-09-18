@@ -25,6 +25,31 @@ dashboard's own Release Notes panel with a matching icon per component.
 The text stays real and technical (module names, real numbers), just
 edited for a punchier, friendlier read than a bare commit log.
 
+## 2026-09-19
+
+### Added
+- **12:30am** — **AWS Event-Driven MVP Design** **[Pipeline & publishing]** **[Docs & process]** A real design doc plus real, unit-tested code for
+  triggering this pipeline automatically from S3 file arrivals instead
+  of a manually-kicked-off local script (`docs/aws-event-driven-mvp-
+  design.md`) - built overnight per Keith's own explicit instruction,
+  for his morning review, not yet deployed (no real AWS access exists
+  in this environment). Covers file-arrival pattern matching for
+  individually-arriving, nested-folder, and zip-archive files; Child
+  Protection's explicit-completion-signal design for waiting on all 6
+  tables before running cross-table checks; new single-arrival
+  orchestration entry points (`orchestrate_bdm.run_single()`/
+  `orchestrate_cp.run_single()`) that reuse the existing 4-real-tool
+  evaluation logic unchanged; and a clearly-flagged recommendation (not
+  a silent decision) on how a Lambda-produced result reaches the
+  committed `qa_results/` git history without Lambda ever holding
+  git-write credentials. Two real architectural gaps surfaced and got
+  fixed while writing the integration tests against the real local dbt/
+  Soda/datacontract-cli/Evidently chain - see the design doc's own "Two
+  more real gaps found while actually building this" section. AWS CDK
+  (Python) infra and both Lambda handlers are real, reviewed code,
+  written correctly per their respective documented APIs but genuinely
+  unverified - never `cdk synth`'d, never invoked by a real S3 event.
+
 ## 2026-09-18
 
 ### Added

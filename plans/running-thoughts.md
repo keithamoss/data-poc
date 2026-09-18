@@ -362,6 +362,95 @@ not yet solved:
   question before this thread's AWS MVP is ever actually built, not just
   the leaderboard.
 
+**Thread B built overnight, 2026-09-18/19 - Keith's own explicit
+instruction** ("Crack on with Thread B overnight and we'll pick this all
+up again in the morning"), scoped just beforehand via one more real
+`AskUserQuestion` round (IaC tooling: **AWS CDK, Python**, over SAM/
+Terraform; MVP scope: **both BDM and CP together**, including CP's
+completion-signal wiring, not BDM-only). Thread A stayed blocked on real
+specifics about Keith's actual staff workflow that this session doesn't
+have - not picked up. Full design write-up: `docs/aws-event-driven-mvp-
+design.md` - this entry is a summary, not a duplicate; read that file for
+the real architecture, the flagged trust-boundary recommendation, and the
+full "what's verified vs. not" account.
+
+**No real AWS access exists in this sandbox** (checked directly before
+starting: no `aws` CLI; `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` hold
+the literal string "proxy-injected") - real design + real code, written
+correctly, for Keith's morning review, but genuinely undeployed and
+untested against real AWS. What IS real and tested here: the file-arrival
+pattern matching, the CP completion-tracking logic, the single-run
+orchestration entry points (run against the real local dbt/Soda/
+datacontract-cli/Evidently chain, not stubbed), and the Lambda handlers'
+own event-routing logic (fixture events, mocked boto3).
+
+Built: `qa_tools/common/file_arrival.py` (single_file/nested_folder/
+zip_archive pattern matching for the proposed `arrivalPattern` contract
+extension - a design-doc-only proposal, deliberately NOT applied to the
+real production contract YAML files, since there was no way to verify
+overnight that it wouldn't break real Soda/dbt/datacontract-cli parsing -
+see `CLAUDE.md`'s own YAML-quoting incident for exactly the kind of
+mistake that would be); `qa_tools/cp/completion_tracker.py` (three real
+strategies - `ManifestMarkerCompletionTracker`, the recommended MVP
+default, no state store at all; `DynamoDBCompletionTracker`, the real
+alternative if a source system can't guarantee a marker lands last;
+`InMemoryCompletionTracker` for tests); single-run entry points
+(`orchestrate_bdm.run_single()`/`orchestrate_cp.run_single()`, reusing
+`_run_one()` unchanged, plus `build_per_run_warehouses.build_one()`/
+`build_cp_warehouses.add_table_to_run()` factored out of the existing
+per-manifest-entry loops); `qa_tools/common/results_s3_sink.py` and
+`qa_tools/common/lambda_results_dir.py` (the S3-write half of the
+trust-boundary design, and a real fix for `write_qa_result()`'s default
+output path being unwritable inside a real Lambda); `aws/lambda_handlers/
+bdm_ingest_handler.py`/`cp_ingest_handler.py`; `aws/cdk/app.py`/
+`data_pipeline_stack.py` (built by a background agent, reviewed before
+integrating).
+
+**The `run_by` Lambda-context fix flagged above as a real prerequisite
+got done first**, exactly as flagged: `qa_tools/common/git_identity.py`'s
+`get_run_by()` now checks `AWS_LAMBDA_FUNCTION_NAME` (set only by the
+real Lambda service) before ever shelling out to `git config`, returning
+a real `aws-lambda:<function-name>` service identity - not a placeholder.
+One other real `run_by` consumer audited (the changelog/"Recent activity"
+panel): it'll render an unresolved raw string for a Lambda-attributed run
+(no `contract/people.yaml` match), which is honest, not broken - flagged
+in the design doc as a possible future nicety, not built.
+
+**Two real architectural gaps found live while writing the single-run
+integration tests** (not anticipated when this was first sketched, both
+now fixed, both documented in the design doc's own "Two more real gaps"
+section): the row-count-growth Evidently check needs a manifest to find
+"the previous run," which doesn't exist per-arrival - `run_single()` now
+writes a small synthetic one (optionally two-entry, if a caller ever
+supplies `previous_run_id`/`previous_csv` - nothing does yet, so this
+check is silently skipped for every Lambda-triggered run in this MVP,
+flagged as a real follow-up); and `dataset_stats` computation needs the
+COMBINED warehouse, not a per-run one - fixed by having `build_one()`
+also create a `main.birth_registrations` VIEW over its own per-run table,
+and having `run_single()` point `WAREHOUSE_DB_PATH` at that file for the
+call's duration (a real module-global rebind, safe since one Lambda
+invocation is single-threaded).
+
+**The biggest open decision, clearly flagged for Keith's morning review,
+not silently resolved**: how a Lambda-produced result ever reaches the
+committed `qa_results/` git history without Lambda holding git-write
+credentials. Recommended: Lambda writes to S3 only; a separate, not-yet-
+built GitHub Actions workflow (needs real AWS credentials as a GitHub
+secret - can't create or verify that from this sandbox) pulls from S3 and
+commits, reusing the exact "CI is the only publish path" trust model
+`plans/publishing-and-history.md` Thread A already established for the
+dashboard. Two other options considered and rejected/deferred - see the
+design doc's own "Getting results back into git" section for the full
+tradeoff writeup.
+
+Verified: `uv run pytest` (all new tests pass - `test_file_arrival.py`,
+`test_completion_tracker.py`, `test_results_s3_sink.py`,
+`test_orchestrate_single_run.py`, `test_lambda_handlers.py`,
+`test_lambda_results_dir.py`, plus the existing BDM/CP/orchestrate suite
+re-run for regressions, all green), `uv run ruff check .` clean. Full
+suite + coverage check still to run before this is considered fully
+verified for the morning.
+
 ### 6. Read-only tension: accepting/rejecting Amber supplies
 
 A genuine, not-yet-resolved tension Keith flagged himself, directly

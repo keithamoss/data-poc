@@ -27,11 +27,58 @@ CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-contract.yaml")
 TABLES = ["cp_clients", "cp_notifications", "cp_investigations", "cp_placements", "cp_carers", "cp_case_workers"]
 
 
+def add_table_to_run(run_id: str, table: str, csv_path: str, out_dir: str = OUT_DIR,
+                      raw_dir: str = CP_RAW_DIR, contract_path: str = CONTRACT_PATH) -> str:
+    """Loads exactly one CP table's CSV into that run's DuckDB file - the
+    single-arrival counterpart to build_all()'s per-manifest-entry loop
+    body, called once per arriving CP table file so a delivery's warehouse
+    fills in incrementally as each of the 6 real tables lands, in whatever
+    order they actually arrive (see plans/running-thoughts.md #5 Thread B /
+    docs/aws-event-driven-mvp-design.md - CP's own completion-tracking
+    design lives in qa_tools/cp/completion_tracker.py, not here; this
+    function only ever loads one table, it never decides completeness).
+    Safe to call for the same (run_id, table) more than once - CREATE OR
+    REPLACE, same idempotency build_all() already relied on.
+
+    Also copies csv_path into raw_dir/<run_id>/<table>.csv if it isn't
+    already there - a real constraint discovered while building this:
+    run_datacontract_cp.py/run_evidently_cp.py both read CP's raw CSVs
+    directly off disk under CP_RAW_DIR/<run_id>/, not just the DuckDB
+    warehouse this function also builds (unlike BDM, where the combined
+    warehouse is enough) - so a Lambda-arrived file needs to land in both
+    places for orchestrate_cp.run_single()'s later 4-tool run to find it,
+    same normalization orchestrate_bdm.run_single() does for its own
+    RAW_DIR dependency."""
+    null_values_by_table = load_null_values_by_column(contract_path)
+    os.makedirs(out_dir, exist_ok=True)
+    db_path = os.path.join(out_dir, f"{run_id}.duckdb")
+
+    run_raw_dir = os.path.join(raw_dir, run_id)
+    os.makedirs(run_raw_dir, exist_ok=True)
+    dest_csv = os.path.join(run_raw_dir, f"{table}.csv")
+    if os.path.abspath(csv_path) != os.path.abspath(dest_csv):
+        with open(csv_path, "rb") as src, open(dest_csv, "wb") as dst:
+            dst.write(src.read())
+
+    conn = duckdb.connect(db_path)
+    conn.execute("CREATE SCHEMA IF NOT EXISTS raw")
+    df = read_csv_explicit_nulls(dest_csv, null_values_by_table.get(table, {}))
+    combined_csv = os.path.join(out_dir, f"_{run_id}_{table}.csv")
+    df.to_csv(combined_csv, index=False)
+    conn.execute(
+        f"CREATE OR REPLACE TABLE raw.{table} AS SELECT * FROM read_csv_auto(?, header=true, nullstr=?)",
+        [combined_csv, DUCKDB_NULLSTR],
+    )
+    os.remove(combined_csv)
+    conn.close()
+    print(f"{run_id}: {table} -> {db_path}")
+    return db_path
+
+
 def build_all(raw_dir: str = CP_RAW_DIR, out_dir: str = OUT_DIR) -> list[str]:
     with open(os.path.join(raw_dir, "manifest.json")) as f:
         manifest = json.load(f)
 
-    null_values_by_table = load_null_values_by_column(CONTRACT_PATH)
     os.makedirs(out_dir, exist_ok=True)
     paths = []
     for entry in manifest:
@@ -41,18 +88,8 @@ def build_all(raw_dir: str = CP_RAW_DIR, out_dir: str = OUT_DIR) -> list[str]:
         if os.path.exists(db_path):
             os.remove(db_path)
 
-        conn = duckdb.connect(db_path)
-        conn.execute("CREATE SCHEMA IF NOT EXISTS raw")
         for table in TABLES:
-            df = read_csv_explicit_nulls(os.path.join(run_dir, f"{table}.csv"), null_values_by_table.get(table, {}))
-            combined_csv = os.path.join(out_dir, f"_{run_id}_{table}.csv")
-            df.to_csv(combined_csv, index=False)
-            conn.execute(
-                f"CREATE OR REPLACE TABLE raw.{table} AS SELECT * FROM read_csv_auto(?, header=true, nullstr=?)",
-                [combined_csv, DUCKDB_NULLSTR],
-            )
-            os.remove(combined_csv)
-        conn.close()
+            add_table_to_run(run_id, table, os.path.join(run_dir, f"{table}.csv"), out_dir=out_dir)
         paths.append(db_path)
         print(f"{run_id}: -> {db_path}")
 

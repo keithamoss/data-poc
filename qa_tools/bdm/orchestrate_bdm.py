@@ -80,6 +80,98 @@ def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str
     return results
 
 
+def run_single(run_id: str, csv_path: str, run_date: str, dirty_severity: str, reference_run_id: str,
+               reference_csv: str, run_by: str | None = None, previous_run_id: str | None = None,
+               previous_csv: str | None = None) -> list[dict]:
+    """The single-arrival counterpart to run_pipeline()'s full-manifest
+    batch loop - built for the AWS event-driven MVP (plans/running-
+    thoughts.md #5 Thread B / docs/aws-event-driven-mvp-design.md), called
+    once per file a Lambda handler receives rather than once per whole
+    manifest. Reuses _run_one() completely unchanged - same 4-real-tool
+    evaluation, same dataset_stats computation, same write_qa_result()
+    call - fed a synthetic one-or-two-entry "manifest" instead of a loop,
+    so this never touches reports/results_bdm.json (that file is the
+    full-batch rollup; a single invocation only ever writes this one
+    run's own qa_results/ entry).
+
+    csv_path can be anywhere (e.g. Lambda's own /tmp) - run_datacontract_
+    bdm.evaluate_datacontract_bdm()/run_evidently_bdm.evaluate_evidently_
+    bdm() both resolve their csv_filename argument against the fixed
+    RAW_DIR module constant internally (a real constraint discovered
+    while building this, not something run_pipeline()'s manifest loop
+    ever had to work around, since every manifest entry's file already
+    lives there), so this copies the arrived file into RAW_DIR under
+    "<run_id>.csv" first and uses that relative name for every downstream
+    call - a real, deliberate normalization step, not a workaround for a
+    bug. reference_run_id/reference_csv have no manifest[0] to read here -
+    the caller must supply them, and reference_csv must already be a
+    filename that resolves under RAW_DIR (the design doc's own "open
+    question" on where a production reference run/file actually lives
+    once there's no manifest at all is still open - this assumes it's
+    already present, e.g. bundled with the Lambda deployment or fetched
+    separately before this is called).
+
+    A second, separate real gap found while building this (not the same
+    as the reference-run one above): run_evidently_bdm.evaluate_evidently_
+    bdm()'s row-count-growth check reads RAW_DIR/manifest.json directly to
+    find "the immediately preceding run" - there's no manifest at all in
+    a single-arrival Lambda world, so this writes one, synthetically,
+    containing just [previous_entry (if given), this_entry] - the same
+    two-entry shape _previous_run_file() already knows how to read.
+    Without previous_run_id/previous_csv (the MVP default - no caller
+    passes them yet), the row-count-growth check is silently SKIPPED for
+    every single Lambda-triggered run, exactly as it already is for any
+    genuinely-first run today (_previous_run_file() returns None) - a
+    real, deliberate MVP simplification, not a bug: knowing "what
+    immediately preceded this delivery" needs either a real manifest
+    concept or the caller (a Lambda handler, or whatever tracks recent
+    deliveries) explicitly tracking and passing it, which nothing does
+    yet. Flagged in the design doc as a real open follow-up, not solved
+    here."""
+    run_timestamp = datetime.now(timezone.utc).isoformat()
+    run_by = run_by or get_run_by()
+
+    os.makedirs(build_per_run_warehouses.RAW_DIR, exist_ok=True)
+    csv_filename = f"{run_id}.csv"
+    dest_path = os.path.join(build_per_run_warehouses.RAW_DIR, csv_filename)
+    if os.path.abspath(csv_path) != os.path.abspath(dest_path):
+        with open(csv_path, "rb") as src, open(dest_path, "wb") as dst:
+            dst.write(src.read())
+
+    entry = {"run_id": run_id, "file": csv_filename, "run_date": run_date, "dirty_severity": dirty_severity}
+    synthetic_manifest = []
+    if previous_run_id is not None:
+        synthetic_manifest.append({"run_id": previous_run_id, "file": previous_csv})
+    synthetic_manifest.append(entry)
+    with open(os.path.join(build_per_run_warehouses.RAW_DIR, "manifest.json"), "w") as f:
+        json.dump(synthetic_manifest, f)
+
+    # out_dir passed explicitly, read off the module attribute rather than
+    # relying on build_one()'s own default parameter value - a real bug
+    # caught while writing this function's own test: a default arg is
+    # bound once at module-import time, so a test (or any other caller)
+    # monkeypatching build_per_run_warehouses.OUT_DIR afterwards would be
+    # silently ignored and this would write into the REAL data/duckdb_runs/
+    # instead - reproduced for real (a stray pytest_bdm_dirty.duckdb
+    # actually appeared there) before this fix.
+    db_path = build_per_run_warehouses.build_one(run_id, dest_path, run_date, dirty_severity,
+                                                  out_dir=build_per_run_warehouses.OUT_DIR)
+
+    # _run_one()'s own dataset_stats computation connects to the module-
+    # level WAREHOUSE_DB_PATH global - the combined, all-runs warehouse
+    # (pipeline/load.py) in the batch path, which doesn't exist at all in
+    # a single-arrival Lambda world. Rebound here (global, not a local -
+    # _run_one() reads the module's own global namespace, re-resolved on
+    # every call, not captured at def time) to this run's own per-run
+    # file instead - build_one() above now also creates a
+    # main.birth_registrations VIEW there for exactly this reason (see
+    # its own comment). Safe: a single Lambda invocation is single-
+    # threaded, so there's no concurrent call this could race with.
+    global WAREHOUSE_DB_PATH
+    WAREHOUSE_DB_PATH = db_path
+    return _run_one(entry, run_timestamp, run_by, reference_run_id, reference_csv)
+
+
 def run_pipeline(sequential: bool = False) -> dict:
     build_per_run_warehouses.build_all()
 

@@ -68,6 +68,32 @@ def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str
     return results
 
 
+def run_single(entry: dict, reference_run_id: str, run_by: str | None = None) -> list[dict]:
+    """The single-delivery counterpart to run_pipeline_cp()'s full-manifest
+    batch loop - built for the AWS event-driven MVP (plans/running-
+    thoughts.md #5 Thread B / docs/aws-event-driven-mvp-design.md).
+
+    Unlike orchestrate_bdm.run_single() (one call per arriving file), this
+    is called only ONCE per delivery, after a CP ingest Lambda has already
+    called build_cp_warehouses.add_table_to_run() for all 6 real tables
+    (each one landing its own CSV under data/cp_raw/<run_id>/ and its own
+    table in data/cp_duckdb_runs/<run_id>.duckdb) and confirmed completion
+    via qa_tools/cp/completion_tracker.py - this function has no way to
+    check that itself, since it has no manifest to cross-reference against;
+    calling it before all 6 tables have actually landed produces exactly
+    the kind of incomplete/wrong cross-table-check result the explicit-
+    completion-signal design exists to prevent.
+
+    `entry` is a manifest-entry-shaped dict for this one delivery
+    (run_id/run_date/dirty_severity at minimum - see data/cp_raw/
+    manifest.json's own real shape for the full convention; row_counts
+    isn't required, dataset_stats.compute_dataset_stats() derives its own
+    counts from the live warehouse instead of trusting a passed-in one)."""
+    run_timestamp = datetime.now(timezone.utc).isoformat()
+    run_by = run_by or get_run_by()
+    return _run_one(entry, run_timestamp, run_by, reference_run_id)
+
+
 def run_pipeline_cp(sequential: bool = False) -> dict:
     build_cp_warehouses.build_all()
 

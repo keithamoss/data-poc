@@ -16,6 +16,23 @@ dependencies = [
     "Jinja2>=3.1",
 ]
 
+[project.optional-dependencies]
+# The AWS event-driven MVP (plans/running-thoughts.md #5 Thread B / docs/
+# aws-event-driven-mvp-design.md) - kept out of the core dependency set so
+# nobody not touching that thread pays for it. `uv sync --extra aws` to
+# install. boto3 alone (already a transitive dependency of something else
+# in this project - confirmed importable without this extra) is enough to
+# run/test aws/lambda_handlers/*.py and qa_tools/cp/completion_tracker.py's
+# DynamoDBCompletionTracker; aws-cdk-lib/constructs are only needed to
+# actually `cdk synth`/`cdk deploy` aws/cdk/ - never attempted in this
+# sandbox (no AWS CLI, no CDK CLI, no real credentials - see the design
+# doc's own "What's verified vs. not" section).
+aws = [
+    "boto3>=1.34",
+    "aws-cdk-lib>=2.150",
+    "constructs>=10.0",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",
