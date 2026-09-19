@@ -9,13 +9,22 @@ of those agents: `requirements-ux` checks a new requirement's approach
 against this BEFORE anything is built; `requirements-ux-critic` checks
 the finished, real, running result against it AFTER, in a real browser.
 
-Research sources are all real (see bottom) - this project's own network
-egress proxy blocked several higher-quality primary sources while
-researching this (MDN, web.dev, Wikipedia, two specific blog posts -
-`CLAUDE.md`'s own blocked-domains list has the full account), so this
-leans more on WebSearch-crawled snippets of those and other sources than
-this project's docs usually do. Flag it if anything here reads thin and
-Keith can allow-list the blocked domains to fill the gap for real.
+Research sources are all real (see bottom). First pass (2026-09-19,
+afternoon) leaned on WebSearch-crawled snippets, since this project's own
+network egress proxy blocked 5 higher-quality primary sources at the
+time. Keith allow-listed them the same evening; this doc was then
+re-verified and extended against the real primary-source text of 4 of
+those 5 (`smart-interface-design-patterns.com`, `rakhman.info`, MDN,
+Wikipedia - `web.dev/articles/urls` turned out to be a genuine 404, not
+a proxy issue, once actually reachable). One real, separate finding from
+doing this: even after the network-level block was genuinely lifted
+(confirmed via a raw `curl`, real 200s), the `WebFetch` tool itself kept
+reporting the same `EGRESS_BLOCKED` error for all 5 - a stale, tool-level
+check out of sync with the live proxy policy, not a real ongoing block.
+Worked around by fetching the raw HTML via `curl` and reading it
+directly instead. Worth remembering for any future session: don't treat
+a repeated `WebFetch` failure alone as proof a domain is still blocked
+after an allow-list change - verify with a raw `curl` first.
 
 ## What "SPA" actually means for this project specifically
 
@@ -58,12 +67,28 @@ which real thing you're looking at); `panel`/`cmp`/`asof` are query
 params (you can have any of them, in any combination, without changing
 which dataset/column/check is on screen).
 
-For readability specifically: lowercase, real words over raw IDs/opaque
-strings where a real word is available, no dynamic noise (session IDs,
-cache-busting params) in a URL meant to be shared or bookmarked. This is
-exactly the problem the pre-2026-09-18 version of this dashboard had -
-an opaque `#` + `encodeURIComponent(JSON.stringify(state))` blob - and
-exactly what the current hash-path scheme already fixed.
+For readability specifically (now confirmed against the real primary
+source, `smart-interface-design-patterns.com`'s "UX Guidelines For
+Better URL Design"): lowercase only, hyphens not underscores, real words
+(a "slug" - Wikipedia's term for the human-readable trailing path
+segment) over raw IDs/opaque strings where a real word is available, no
+dynamic noise (session IDs, cache-busting params) in a URL meant to be
+shared or bookmarked. Keep each segment reasonably short - that source's
+own rule of thumb is ~60-75 characters for a whole URL, which doesn't
+map exactly onto this dashboard's real multi-segment drill-down path
+(agency+collection+dataset+column+check IDs strung together will
+usually run longer than that) but the underlying principle still holds:
+prefer the id/slug a data steward would already recognize over a longer
+technically-more-precise one, and don't add segments that don't earn
+their place. Avoid special/reserved characters (`#`, `?`, `&`, `=`, `+`,
+`%`) and accented characters inside a segment - `pathSegment()`'s own
+`encodeURIComponent()` call already handles this correctly (a raw
+special/accented character gets percent-encoded rather than left to
+break the URL, at the cost of that one segment being less readable if
+the underlying id genuinely contains one). This is exactly the problem
+the pre-2026-09-18 version of this dashboard had - an opaque `#` +
+`encodeURIComponent(JSON.stringify(state))` blob - and exactly what the
+current hash-path scheme already fixed.
 
 ## B. History API mechanics
 
@@ -80,6 +105,19 @@ exactly what the current hash-path scheme already fixed.
 - `popstate` never fires for your own `pushState`/`replaceState` calls -
   only for a real user-driven Back/Forward/swipe. Don't expect it to
   double as a "did my own navigation just happen" signal.
+- **Give the very first history entry real state too.** MDN's own
+  History API guide (real primary source, read 2026-09-19 once
+  allow-listed) flags a specific, easy-to-miss gap: the entry the
+  browser creates on initial page load has NO state attached (it wasn't
+  created by your own `pushState`/`replaceState`), so if the user
+  navigates away and then back to that very first entry, a naive
+  `popstate` handler has nothing to restore. MDN's documented fix is to
+  call `replaceState` once on load to attach real state to that initial
+  entry - and this dashboard's own template already does exactly that
+  (`history.replaceState(STATE, "", stateToHash(STATE))` at the bottom
+  of the script, run once on initial load) - real, independent
+  confirmation this dashboard already follows the documented pattern
+  correctly here, not a gap to flag.
 
 ## C. Deep-linking and shareability
 
@@ -92,7 +130,43 @@ panel on initial load too, not just on in-app navigation) -
 `requirements-ux-critic` should actually do this cold-load test, not
 assume it works because in-app clicking does.
 
-## D. Scroll position
+## D. Real `<a href>` links, not just click handlers
+
+A genuinely new point, added 2026-09-19 evening once the real primary
+source became reachable (`rakhman.info`, "Respecting Browser Navigation
+in Single Page Applications"). A plain `onclick`/`addEventListener
+("click", ...)` handler on a non-anchor element (a `<div>`, `<button>`,
+table row, card) can trigger `navigate()` just fine for a normal left
+click, but it breaks every OTHER thing a browser lets you do with a
+link: middle-click or Ctrl/Cmd-click to open in a new tab, right-click
+→ "Copy link address", right-click → "Open in new tab". A real user who
+tries any of those on what looks like a clickable row gets nothing, or
+something confusing - not a "minor" gap, since it's exactly the kind of
+interaction a busy data steward reaches for without thinking about it.
+The fix (per the source's own worked example, and directly applicable
+here): render the real navigational target as a real `<a href="#/...">`
+element - even if a `click` handler still intercepts the plain left
+click to avoid a full page reload - so the browser's own native
+link affordances keep working; reserve a bare `onclick`-only handler for
+navigation that's genuinely a side effect of a different action (the
+source's own example: creating a record and redirecting to its new
+detail view), not for what's actually a real link a user would expect to
+behave like one.
+
+**Real, current gap found while re-verifying this doc (2026-09-19
+evening):** a grep of the template found only 5 real `<a href>`
+elements in the whole file, all of them EXTERNAL links (GitHub source/
+ticket links, the snapshot archive) - every INTERNAL drill-down
+navigation (breadcrumb crumbs, dataset/check table rows, cards, the
+Plans/Demo/home-wordmark header buttons) is wired through a plain
+`addEventListener("click", ...)` on a non-anchor element instead (39
+such call sites), calling `navigate()` directly. None of these support
+middle-click/Ctrl-click/copy-link-address today. Not fixed as part of
+this doc - logged as `plans/dashboard.md` #15 alongside the route-change
+accessibility gap (same "real gap found while grounding this doc in the
+actual template" origin), for real scoping later.
+
+## E. Scroll position
 
 `navigate()` resets scroll to top on a forward drill-down - the right
 call, since a drill-down is conceptually a new "page". There's currently
@@ -102,7 +176,7 @@ which can behave oddly if content renders asynchronously after the
 `popstate` event (it doesn't here - `render()` is synchronous - so this
 is a lower-priority thing to watch for, not a known-broken behavior).
 
-## E. Accessibility on route change
+## F. Accessibility on route change
 
 The part most likely to have a real, currently-unaddressed gap - a
 plain click-through won't surface any of these, only checking for real:
@@ -132,7 +206,7 @@ this doc (out of scope for a guidance-only pass) - logged as
 critic` should actively check for this class of gap on every future
 post-build pass, not just on a dedicated a11y-focused requirement.
 
-## F. Common pitfalls checklist
+## G. Common pitfalls checklist
 
 A literal checklist `requirements-ux-critic` should run through on any
 dashboard-facing requirement that adds or changes a client-side view:
@@ -152,6 +226,10 @@ dashboard-facing requirement that adds or changes a client-side view:
 - [ ] Does a rapid sequence of the same kind of state change (e.g.
       several comparison-run picks in a row) use `replaceState`, not
       leave a trail of `pushState` entries a single Back can't undo?
+- [ ] Does a genuinely navigational element (a row/card/crumb that takes
+      you to a different view) render as a real `<a href="#/...">`, so
+      middle-click/Ctrl-click/copy-link-address work - not just a bare
+      `onclick` handler on a non-anchor element?
 
 `requirements-ux` should walk through the same checklist BEFORE anything
 is built, as a design check against the proposed approach (not a live
@@ -161,12 +239,25 @@ title", not just "does this look consistent with the rest of the page."
 
 ## Sources
 
-Primary sources for this research (MDN, web.dev, Wikipedia, two specific
-blog posts) were blocked by this project's own network egress policy -
-see `CLAUDE.md`'s blocked-domains list. What follows is WebSearch-crawled
-synthesis, not a direct read of any one of these:
+**Read directly, real primary-source text** (2026-09-19 evening, once
+Keith allow-listed the domains a WebSearch-only first pass had to work
+around):
+- MDN, "Working with the History API" (`developer.mozilla.org`) - the
+  `pushState`/`replaceState`/`popstate` mechanics in section B, including
+  the initial-entry-needs-`replaceState`-too point
+- Smart Interface Design Patterns, "UX Guidelines For Better URL Design"
+  (`smart-interface-design-patterns.com`) - the length/character/
+  casing/slug guidance in section A
+- Kirill Rakhman, "Respecting Browser Navigation in Single Page
+  Applications" (`rakhman.info`) - the real-links-vs-click-handlers
+  finding in section D
+- Wikipedia, "Clean URL" (`en.wikipedia.org`) - the slug/query-string
+  terminology in section A
+- `web.dev/articles/urls` - checked directly once allow-listed, turned
+  out to be a genuine 404 (not a proxy issue) - not used as a source
 
-- Wikipedia, "Clean URL" and "Human-readable medium and data" articles
+**WebSearch-crawled synthesis only** (afternoon first pass, not a direct
+read of the primary source):
 - Google Search Central, URL structure guidance
 - Vercel Academy (`params` vs `searchParams`), LogRocket (`useSearchParams`,
   URL-as-state), TanStack Router discussion #1249 (URL-as-state patterns)

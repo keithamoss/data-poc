@@ -39,7 +39,13 @@ deliberately narrow - Keith's own explicit choice, not an oversight:
   convention? Would a fresh, cold-loaded deep link to this new view
   actually reconstruct it? Does a new "page"-like view need its own
   route change (`pushState`) or is it more like a same-page state tweak
-  (`replaceState`)? This is a narrow slice of SPA best practice, not a
+  (`replaceState`)? If this adds a new genuinely-navigational element (a
+  row/card/crumb someone would click to go somewhere else), does the
+  plan render it as a real `<a href>` rather than a bare `onclick`
+  handler, so middle-click/copy-link-address keep working (section D of
+  the guide - a real, already-logged gap across most of today's
+  internal navigation, `plans/dashboard.md` #15)? This is a narrow slice
+  of SPA best practice, not a
   general accessibility review - see the carve-out below.
 
 **Explicitly out of scope, don't drift into these:**

@@ -519,6 +519,21 @@ Rough layout:
     medium and data" articles plus several SEO/UX blog summaries) for
     this research task. Keith offered to allow-list these on request,
     2026-09-19.
+
+    **Resolved, same evening**: Keith allow-listed all five. A raw
+    `curl` confirmed real network-level access (genuine 200s/301/302,
+    `web.dev/articles/urls` a genuine 404 rather than a block) - but
+    `WebFetch` itself kept returning the identical `EGRESS_BLOCKED` error
+    for all five even after that, a stale tool-level check out of sync
+    with the live proxy policy (not a real ongoing block - same class of
+    "some config is read once and doesn't dynamically update mid-session"
+    issue this session already hit once with `.mcp.json`). Worked around
+    by fetching the raw HTML via `curl` and reading it directly instead
+    of through `WebFetch`. **Standing lesson for future sessions**: after
+    a domain gets allow-listed mid-session, don't treat a repeated
+    `WebFetch` failure alone as proof it's still blocked - verify with a
+    raw `curl` first, and fall back to `curl` + direct reading if
+    `WebFetch` still won't cooperate.
 - **Periodically check the `.claude/agents/*.md` combined description-
   field token budget** (2026-09-19, Keith's own ask - make this a
   standing periodic check, same treatment as the pytest-runtime log

@@ -872,8 +872,23 @@ common/check_lifecycle.py`'s own `check_id` convention.
     needed (how much of this the single-file, no-framework template can
     take on cleanly, whether it's one change or several). `requirements-
     ux-critic` should now actively check for this class of gap on every
-    future post-build pass (`docs/spa-best-practices.md` section E), not
+    future post-build pass (`docs/spa-best-practices.md` section F), not
     just when a requirement is explicitly about accessibility.
+
+    **Second real gap, same item, found 2026-09-19 evening** once the
+    guide's own research sources got allow-listed and re-verified
+    against real primary-source text: only 5 `<a href>` elements exist
+    anywhere in the template, all of them EXTERNAL links (GitHub source/
+    ticket links, the snapshot archive) - every INTERNAL drill-down
+    navigation (breadcrumb crumbs, dataset/check table rows, cards, the
+    Plans/Demo/home-wordmark header buttons - 39 real call sites) is
+    wired through a plain `addEventListener("click", ...)` on a
+    non-anchor element instead, calling `navigate()` directly. None of
+    these support middle-click/Ctrl-click-to-open-in-a-new-tab or
+    right-click-to-copy-link-address today - real, sourced from
+    `rakhman.info`'s own SPA-navigation writeup
+    (`docs/spa-best-practices.md` section D). Same "not fixed here,
+    logged for real scoping" treatment as the accessibility gap above.
 
     Also found the same day: `requirements.yaml`'s `REQ-DASH-020`
     ("Human-friendlier dashboard URLs") still reads `status:

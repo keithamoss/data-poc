@@ -28,6 +28,26 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
+- **6:28pm** — **SPA Guide Re-Verified Against Real Sources; a Real Navigation Gap Found** **[Docs & process]** **[Dashboard UI]**
+  Keith allow-listed the 5 domains blocked while writing
+  `docs/spa-best-practices.md` earlier that evening - re-verified the
+  guide against the real primary-source text once reachable (MDN,
+  `smart-interface-design-patterns.com`, `rakhman.info`, Wikipedia;
+  `web.dev/articles/urls` turned out to be a genuine 404, not a proxy
+  issue). Found `WebFetch` itself kept reporting `EGRESS_BLOCKED` even
+  after a raw `curl` confirmed the domains were genuinely reachable - a
+  stale tool-level check, worked around by fetching HTML directly.
+  Refined the URL-design section with real character/length/slug
+  guidance and confirmed this dashboard's own initial-load
+  `history.replaceState` already matches MDN's documented pattern. Also
+  surfaced a new, real gap: only 5 of the template's real `<a href>`
+  elements exist, all external - every internal drill-down navigation
+  (39 real call sites - breadcrumbs, table rows, cards, header buttons)
+  is a plain `onclick` handler on a non-anchor element, so middle-click/
+  Ctrl-click-new-tab/copy-link-address don't work on any of it. Logged
+  in `plans/dashboard.md` #15 alongside the earlier route-change
+  accessibility gap, not fixed; both `requirements-ux`/`requirements-
+  ux-critic` updated to check for it going forward.
 - **6:22pm** — **A Real SPA Best-Practice Guide for the UX Review Pair** **[Docs & process]** **[Dashboard UI]**
   Keith's own ask: "care about clean, human-readable URLs... and embody
   single page application best practice" more broadly, not just URLs.

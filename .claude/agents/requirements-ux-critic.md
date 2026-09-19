@@ -138,6 +138,17 @@ it.
     query string (optional/combinable view state), matching this
     dashboard's own real split - not a raw encoded blob, not baked into
     the path when it's actually optional/combinable.
+  - **Real links, not just click handlers.** `browser_snapshot` to check
+    whether a genuinely navigational element (a row/card/crumb) is a
+    real `<a href="#/...">` - if it is, its accessibility-tree role will
+    read as `link`, not `generic`/`button`. If it's a real link, actually
+    try a middle-click (or check the rendered `href` attribute directly
+    via `browser_evaluate`) - does it point at the real destination? A
+    known, already-logged gap exists here too (`plans/dashboard.md` #15
+    - almost all internal drill-down navigation today is a plain
+    `onclick` handler on a non-anchor element, not a real link) - same
+    "confirm, don't assume already fixed" rule as the accessibility gap
+    above.
 
 Take real evidence (`browser_snapshot`/`browser_take_screenshot`) for
 every real finding - don't describe from reading the template's source

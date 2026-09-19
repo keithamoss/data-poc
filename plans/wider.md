@@ -1179,3 +1179,30 @@ check_lifecycle.py`'s own `check_id` convention.
     work shipped outside the formal requirements pipeline, so nothing
     ever flipped the status field. Both flagged to Keith rather than
     corrected unilaterally.
+
+    **Follow-up, same evening**: Keith allow-listed the 5 blocked
+    domains and asked for the research to be redone against them, then
+    to report back what changed. Real, network-level access confirmed
+    via a raw `curl` (genuine 200s/301/302 - `web.dev/articles/urls` a
+    genuine 404, not a block) - but `WebFetch` itself kept returning
+    `EGRESS_BLOCKED` for all five even after that, a stale tool-level
+    check out of sync with the live proxy policy (`CLAUDE.md`'s own
+    blocked-domains entry now has the standing lesson: verify with a raw
+    `curl` before trusting a repeated `WebFetch` failure post-allow-
+    list). Worked around by `curl`-ing the raw HTML and reading it
+    directly. Re-verified and extended `docs/spa-best-practices.md`
+    against the real primary-source text (MDN, `smart-interface-design-
+    patterns.com`, `rakhman.info`, Wikipedia) - refined the URL-design
+    section with real length/character/slug guidance, confirmed this
+    dashboard's own initial-load `replaceState` already matches MDN's
+    documented pattern, and added a genuinely new section (D) grounded
+    in `rakhman.info`'s own writeup: real `<a href>` elements vs. bare
+    `onclick` handlers for internal navigation, so middle-click/Ctrl-
+    click/copy-link-address keep working. Grounding that new section
+    against the real template surfaced a real, previously-unflagged gap
+    - only 5 real `<a href>` elements exist anywhere in the file, all
+    external; all 39 internal drill-down navigation call sites use a
+    bare `onclick` handler on a non-anchor element instead - logged in
+    `plans/dashboard.md` #15 alongside the earlier accessibility gap,
+    not fixed. Both `requirements-ux`/`requirements-ux-critic` updated
+    to check for this class of gap going forward.
