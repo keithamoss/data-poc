@@ -857,8 +857,9 @@ common/check_lifecycle.py`'s own `check_id` convention.
     rather than build now. Not yet scoped: parsing the code back out of
     a real id (a small real regex against `_COMPONENT_CODES`' own key
     set, or a matching JS-side lookup keyed the same way) and where
+    exactly in the existing card layout the badge should sit.
 
-15. **[todo, 2026-09-19]** **[Dashboard UI]** Three real, currently-
+15. **[parked, 2026-09-19]** **[Dashboard UI]** Three real, currently-
     unaddressed accessibility gaps in the dashboard's own client-side
     routing, found while writing `docs/spa-best-practices.md` (Keith's
     own ask, `plans/wider.md` #10) - a grep of the template's own inline
@@ -900,4 +901,3 @@ common/check_lifecycle.py`'s own `check_id` convention.
     field. Flagged to Keith, not corrected unilaterally - his call
     whether to mark it `done` outright or run a real `requirements-
     reviewer` pass against it first.
-    exactly in the existing card layout the badge should sit.
