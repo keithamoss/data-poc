@@ -783,7 +783,7 @@ common/check_lifecycle.py`'s own `check_id` convention.
     beyond that - explicitly NOT to be fixed now, just flagged.
 
     **Confirmed and substantially deepened, same day**: used as the
-    first real, standalone, zero-hints test of `requirements-reviewer`'s
+    first real, standalone, zero-hints test of `delivery-critic`'s
     post-build UX pass (`plans/wider.md` #10's own write-up has the
     full account of the test itself) - a general-purpose agent adopting
     that role's real instructions, pointed at the real built Requirements
@@ -896,14 +896,14 @@ common/check_lifecycle.py`'s own `check_id` convention.
     not_started`, but its own acceptance criterion ("a dataset-level URL
     reads as a real path, not encoded JSON") was actually satisfied by
     `plans/running-thoughts.md` #9's 2026-09-18 hash-path rework - the
-    work shipped outside the formal `requirements-scoper`/
-    `requirements-reviewer` pipeline, so nothing ever flipped the status
+    work shipped outside the formal `delivery-scoper`/
+    `delivery-critic` pipeline, so nothing ever flipped the status
     field. Flagged to Keith, not corrected unilaterally - his call
     whether to mark it `done` outright or run a real `requirements-
     reviewer` pass against it first.
 
 16. **[todo, 2026-09-19]** **[Dashboard UI]** Three more real visual-
-    polish findings, from `requirements-visual-critic`'s first genuine
+    polish findings, from `delivery-dashboard-visual-critic`'s first genuine
     end-to-end run (`claude/playwright-mcp-verify-b2t4nb`, verifying the
     whole HTTPS-serving/port-collision-fix chain for real) - each
     independently verified in the real template source afterwards, not

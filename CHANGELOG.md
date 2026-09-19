@@ -27,6 +27,26 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Changed
+- **7:25pm** — **The 8 requirements-analysis Subagents Renamed to delivery-\*** **[Docs & process]**
+  Keith's own call, scoped over a few rounds: the `requirements-` prefix
+  undersold what these agents actually cover (scoping through to
+  post-build critique, not just requirements documents), and two real
+  naming inconsistencies got fixed along the way - `requirements-ux`
+  didn't say "dashboard" the way `requirements-cli-ux` said "cli"
+  (now `delivery-dashboard-ux`/`delivery-dashboard-ux-critic`/
+  `delivery-dashboard-visual-critic`), and `requirements-reviewer` was
+  the only post-build checker not called "critic" (now
+  `delivery-critic`). Every cross-reference across `.claude/agents/`,
+  `docs/`, and `plans/*.md` updated to match - `CHANGELOG.md`'s own
+  historical entries deliberately left alone, since they're an accurate
+  record of what these agents were actually called at the time. New
+  `docs/agent-orchestration.md` - the real pipeline sequence, what each
+  stage needs as input, parallelism rules (the two dashboard critics
+  share one Playwright MCP browser and must run sequentially, not
+  concurrently - real evidence from the verification session's own
+  report), and how Keith can invoke it.
+
 ### Fixed
 - **7:12pm** — **3 Real Papercuts Found by the Full Verification Pass, Fixed** **[Dashboard UI]** **[Testing & dev tooling]**
   `claude/playwright-mcp-verify-b2t4nb` picked up this branch and ran

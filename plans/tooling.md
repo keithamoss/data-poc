@@ -843,7 +843,7 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
 
 3. **[todo, 2026-09-19]** **[Testing & dev tooling]** A real code-
    reviewer agent (or agents) - genuinely distinct from
-   `requirements-reviewer` (`plans/wider.md` #10), which only ever
+   `delivery-critic` (`plans/wider.md` #10), which only ever
    checks finished work against one specific requirement's own
    acceptance criteria. This would be a general-purpose code-review
    capability, not tied to a requirement. Flagged by Keith alongside
@@ -856,7 +856,7 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
    exactly this kind of domain split - `dev.to`'s "How I Split Code
    Review Across Five Claude Code Subagents", `VoltAgent/awesome-claude-
    code-subagents`' own `code-reviewer.md`). Not yet scoped: whether
-   this reuses/extends `requirements-architect`'s own code-quality/
+   this reuses/extends `delivery-architect`'s own code-quality/
    security checks (which already exist but only run pre-build, on a
    drafted requirement, never against already-merged code generally) or
    is a genuinely separate capability; what triggers it (a manual
@@ -974,8 +974,8 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
 6. **[todo, 2026-09-19]** **[Testing & dev tooling]** A real, dedicated
    MCP server wrapping `mothman` (via `uv run`), so the requirements-
    analysis agents that currently use `Bash` only to run `uv run
-   mothman dashboard rebuild` (`requirements-reviewer`/
-   `requirements-ux-critic`/`requirements-visual-critic`) could get a
+   mothman dashboard rebuild` (`delivery-critic`/
+   `delivery-dashboard-ux-critic`/`delivery-dashboard-visual-critic`) could get a
    single narrow, purpose-built tool instead of open shell access -
    real, buildable (a small Python MCP server, `mcp.server.fastmcp` or
    the official `modelcontextprotocol` SDK, matching this project's own
@@ -1018,12 +1018,12 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
 
    **Real, concrete relevance**: Lighthouse's accessibility category is
    genuine, real prior art for a gap this project has already
-   identified and left open - `requirements-ux`/`requirements-ux-
-   critic`/`requirements-visual-critic` all explicitly declare
+   identified and left open - `delivery-dashboard-ux`/`delivery-dashboard-ux-
+   critic`/`delivery-dashboard-visual-critic` all explicitly declare
    accessibility out of scope today, so nothing currently checks it at
    all. Not yet scoped: which agent this belongs to (a new dedicated
    accessibility-focused pass, or folded into
-   `requirements-visual-critic`'s existing remit), whether to run the
+   `delivery-dashboard-visual-critic`'s existing remit), whether to run the
    full Lighthouse suite (performance/best-practices/SEO too, several
    of which may not even apply meaningfully to a single-file static
    dashboard with no build pipeline, no server-side rendering, no SPA
@@ -1058,7 +1058,7 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
    docstring (and `path_prompt()`'s) claims "Returns None if the
    operator picked Back or hit Ctrl-C/Esc" - but a real, live test via
    the new `scripts/dev/tui_drive.py` (built the same day for
-   `requirements-cli-ux-critic`, `plans/wider.md` #10) found `Escape`
+   `delivery-cli-ux-critic`, `plans/wider.md` #10) found `Escape`
    does NOT actually back out of a real `questionary.select()` prompt
    (confirmed twice, including with a full extra second to rule out a
    timing artifact) - only Ctrl-C genuinely triggers the "go back a

@@ -41,7 +41,7 @@ spreadsheet or a mocked-up dashboard with fabricated numbers.
 ## Who this is for, and what each of them actually wants
 
 Real roles, not just names - added 2026-09-19 at Keith's own explicit
-request, specifically so `requirements-ux` (and any other agent
+request, specifically so `delivery-dashboard-ux` (and any other agent
 reasoning about how a real person would experience this tool) has real
 motivations and perspectives to check against, not just a label.
 
@@ -104,7 +104,7 @@ need is in scope now.
 
 ## What's real vs illustrative
 
-This matters a lot for the requirements-reviewer agent specifically:
+This matters a lot for the delivery-critic agent specifically:
 **only some of what the dashboard shows is backed by real computation.**
 Registry Services → Civil Registration → Birth Registrations, and the
 Department for Child Protection and Family Support → Child Protection
@@ -131,13 +131,13 @@ for the full, current, authoritative breakdown)
 | `qa_results/` | The permanent, committed history of every real QA run - never regenerated away. |
 | `dashboard/` | The single-file static reporting dashboard, built from a real hand-authored template plus real embedded data. |
 | `plans/*.md` | This project's own living design memory - real decisions, real open questions, real status per item. |
-| `requirements.yaml` | The live, structured requirements register (MoSCoW, acceptance criteria, real CI-enforced test linkage) - this is what the requirements-scoper/reviewer agents write into. |
+| `requirements.yaml` | The live, structured requirements register (MoSCoW, acceptance criteria, real CI-enforced test linkage) - this is what the delivery-scoper/reviewer agents write into. |
 | `mothman` (`cli/`) | The one and only programmatic entry point to every script in this repo - nothing outside it should be invoked directly. |
 
 **`docs/components.md` has the full write-up of this project's own
 7-part component taxonomy** (`GEN`/`QAC`/`PIPE`/`DASH`/`GHUB`/`TEST`/
 `DOCS`) - names, scope, real file/directory ownership, and the
-in/out-of-scope boundary against each neighbour. `requirements-scoper`
+in/out-of-scope boundary against each neighbour. `delivery-scoper`
 needs this specifically to pick the right code for a new requirement's
 `id` (`REQ-<CODE>-NNN`) - read it before drafting one.
 
@@ -149,10 +149,10 @@ needs this specifically to pick the right code for a new requirement's
   live connection runs once, at real pipeline-run time, never deferred
   to a later read.
 - **A real bug found gets a regression test, confirmed failing before
-  the fix** - the same standard a requirements-reviewer agent should
+  the fix** - the same standard a delivery-critic agent should
   hold newly-reviewed work to.
 - **Real design forks get scoped with Keith via clarifying questions
-  before building** - the requirements-scoper agent's own "ask, don't
+  before building** - the delivery-scoper agent's own "ask, don't
   guess" behaviour is this same convention, generalized.
 - **`plans/*.md` is the project's real memory, not this chat history** -
   a scoper agent proposing a new idea should check there first for

@@ -1,6 +1,6 @@
 """
 Dev-only tool: a persistent, addressable interactive TUI-driving session
-for real post-build CLI/TUI review (`requirements-cli-ux-critic`,
+for real post-build CLI/TUI review (`delivery-cli-ux-critic`,
 `plans/wider.md` #10's deferred HCI/psychology-grounding work,
 2026-09-19). Spawns a real command in a real pty and exposes it over a
 local Unix domain socket so an agent can drive it step by step across

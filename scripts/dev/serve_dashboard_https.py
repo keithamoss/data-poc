@@ -3,8 +3,8 @@ Dev-only tool: serve the real, already-built dashboard
 (`dashboard/qa-reporting-dashboard.html`) over local HTTPS, with a real
 throwaway self-signed certificate. Built 2026-09-19 for the
 requirements-analysis agents' own post-build UX/visual critique pass
-(`requirements-reviewer`/`requirements-ux-critic`/
-`requirements-visual-critic`, `plans/wider.md` #10) - Keith's own
+(`delivery-critic`/`delivery-dashboard-ux-critic`/
+`delivery-dashboard-visual-critic`, `plans/wider.md` #10) - Keith's own
 explicit call, after a real bug was found: the project's Playwright MCP
 server (`.mcp.json`) blocks the `file://` protocol outright by default,
 so those agents could never actually open
@@ -42,8 +42,8 @@ port is more convenient than reading it back.
 Real gap this fixes (2026-09-19, Keith's own explicit follow-up after
 approving the HTTPS-serving mechanism itself): the original version
 always bound a fixed default port (8743) - fine for one agent at a time,
-but `requirements-reviewer`/`requirements-ux-critic`/
-`requirements-visual-critic` can in principle run concurrently (nothing
+but `delivery-critic`/`delivery-dashboard-ux-critic`/
+`delivery-dashboard-visual-critic` can in principle run concurrently (nothing
 stops a caller invoking more than one in parallel), and a second
 `serve_dashboard_https.py` on the same fixed port would fail outright
 with "address already in use" rather than degrade gracefully.

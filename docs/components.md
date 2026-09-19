@@ -8,7 +8,7 @@ request, 2026-09-19: it existed informally as a set of tags before this,
 but nothing spelled out what each one actually covers, what its short
 code is, or where its real boundaries sit against its neighbours - this
 file is that single reference, for humans and for the requirements-
-analysis agents alike (`requirements-scoper` especially needs this to
+analysis agents alike (`delivery-scoper` especially needs this to
 pick the right code when drafting a new requirement's id).
 
 **The single source of truth for the CODE itself** (the exact string,
@@ -34,7 +34,7 @@ keep parsing it - don't reformat a heading without knowing that.
 A requirement, a `plans/*.md` item, or a `CHANGELOG.md` entry can
 legitimately touch more than one component (most real features do) -
 `plans/*.md`/`CHANGELOG.md` tag with as many as genuinely apply, but a
-requirement's own `id` can only carry one code, so `requirements-scoper`
+requirement's own `id` can only carry one code, so `delivery-scoper`
 has to make a single best-fit call (see each requirement's own judgement
 call precedent in `requirements.yaml`'s 22 pre-2026-09-19 entries,
 migrated 2026-09-19 - `plans/wider.md` #10 has the full migration note).

@@ -2,11 +2,11 @@
 
 A real reference guide for reviewing this dashboard's own client-side
 routing and navigation UX - written 2026-09-19 at Keith's own ask, after
-he asked for the `requirements-ux`/`requirements-ux-critic` subagents to
+he asked for the `delivery-dashboard-ux`/`delivery-dashboard-ux-critic` subagents to
 "care about clean, human-readable URLs" and "embody single page
 application best practice" more generally (not just URLs). Read by both
-of those agents: `requirements-ux` checks a new requirement's approach
-against this BEFORE anything is built; `requirements-ux-critic` checks
+of those agents: `delivery-dashboard-ux` checks a new requirement's approach
+against this BEFORE anything is built; `delivery-dashboard-ux-critic` checks
 the finished, real, running result against it AFTER, in a real browser.
 
 Research sources are all real (see bottom). First pass (2026-09-19,
@@ -127,7 +127,7 @@ it reconstruct the exact same view, drawer and panel state included, not
 just "the app loads"? This dashboard's `renderFromState()` is the real
 mechanism meant to guarantee this (it reopens the column drawer/check
 panel on initial load too, not just on in-app navigation) -
-`requirements-ux-critic` should actually do this cold-load test, not
+`delivery-dashboard-ux-critic` should actually do this cold-load test, not
 assume it works because in-app clicking does.
 
 ## D. Real `<a href>` links, not just click handlers
@@ -202,13 +202,13 @@ grep of the template's own inline JS for `document.title`, `.focus(`,
 none of the three mechanisms above exist today, on any of this
 dashboard's many real client-side route changes. Not fixed as part of
 this doc (out of scope for a guidance-only pass) - logged as
-`plans/dashboard.md` #15 for real scoping later, and `requirements-ux-
+`plans/dashboard.md` #15 for real scoping later, and `delivery-dashboard-ux-
 critic` should actively check for this class of gap on every future
 post-build pass, not just on a dedicated a11y-focused requirement.
 
 ## G. Common pitfalls checklist
 
-A literal checklist `requirements-ux-critic` should run through on any
+A literal checklist `delivery-dashboard-ux-critic` should run through on any
 dashboard-facing requirement that adds or changes a client-side view:
 
 - [ ] Cold-load a deep link (with drawer/panel state) in a fresh tab -
@@ -231,7 +231,7 @@ dashboard-facing requirement that adds or changes a client-side view:
       middle-click/Ctrl-click/copy-link-address work - not just a bare
       `onclick` handler on a non-anchor element?
 
-`requirements-ux` should walk through the same checklist BEFORE anything
+`delivery-dashboard-ux` should walk through the same checklist BEFORE anything
 is built, as a design check against the proposed approach (not a live
 test) - e.g. "will this new panel's state live in the query string or
 get baked into the path", "does this new view need its own document

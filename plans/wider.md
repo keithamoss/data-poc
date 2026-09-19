@@ -446,7 +446,7 @@ check_lifecycle.py`'s own `check_id` convention.
       Thomas Jaspers) supplied the real, concrete isolation mechanism
       (`.claudeignore` + `settings.json` permission restrictions +
       separate `CLAUDE.md` files per agent) and three specific prompt
-      instructions now built directly into `requirements-reviewer.md`
+      instructions now built directly into `delivery-critic.md`
       ("report exactly what you observe," "never mark a criterion met
       unless explicitly verified," "don't let one finding bias the
       next"). A UX-focused agent has almost no real precedent in the
@@ -457,10 +457,10 @@ check_lifecycle.py`'s own `check_id` convention.
       precedent**, each a real Keith decision, not a default: `zhsama`'s
       pipeline has no forced human approval step (agent-scored gates
       only); this one does (per this project's own "ask, don't guess"
-      convention, `requirements-scoper` explicitly asks multiple rounds
+      convention, `delivery-scoper` explicitly asks multiple rounds
       of clarifying questions and escalates genuine forks rather than
       resolving them itself). `zhsama`'s reviewer stage directly edits
-      code; this one's `requirements-reviewer` is strictly read-only,
+      code; this one's `delivery-critic` is strictly read-only,
       reporting findings back to the main session (and Keith) to act on.
       Task granularity is deliberately small (Keith: "none of our tasks
       really should be like four to eight hours long... one or two at a
@@ -476,14 +476,14 @@ check_lifecycle.py`'s own `check_id` convention.
     the real enforcement, including a genuine dangling-reference check on
     `dependencies`):
 
-    1. `requirements-scoper` - turns a raw idea into EARS-format
+    1. `delivery-scoper` - turns a raw idea into EARS-format
        requirements, splitting a big idea into several small
        self-contained ones (Keith's own explicit call: "I'm keen for
        requirements to remain pretty small and self-contained") rather
        than one sprawling entry, plus a draft `plans/*.md` entry. Asks as
        many rounds of clarifying questions as it takes - never settles
        for an assumption.
-    2. `requirements-architect` - a genuinely "simple" architect (Keith's
+    2. `delivery-architect` - a genuinely "simple" architect (Keith's
        own framing), NOT full software design: duplication/overlap
        detection against the real codebase (the exact class of problem
        the `generator/`/`synthetic_data_generator/` drift bug already
@@ -492,12 +492,12 @@ check_lifecycle.py`'s own `check_id` convention.
        quality/clean-code expectations for the builder - plus an
        optional lightweight architecture/data-model sketch, only when it
        would genuinely help.
-    3. `requirements-ux` - dashboard-only (not the CLI/TUI, not
+    3. `delivery-dashboard-ux` - dashboard-only (not the CLI/TUI, not
        accessibility - Keith's own explicit scope choices), checking
        consistency with the dashboard's real existing UI patterns and
        workflow/information-architecture fit, advisory only, alongside
        the architect, before anything is built.
-    4. `requirements-reviewer` - merged reviewer + fresh-context QA-
+    4. `delivery-critic` - merged reviewer + fresh-context QA-
        checker into one role (Keith's own explicit simplification,
        accepting the real tradeoff of losing genuine fresh-context
        independence, partly offset by an explicit self-check step built
@@ -530,7 +530,7 @@ check_lifecycle.py`'s own `check_id` convention.
       dashboard UX polished "to the level that Apple goes for their
       products... a UX where you don't even realize it's polished
       because of everything else." Now a real, explicit bar in both
-      `requirements-ux.md` and `requirements-reviewer.md`'s own
+      `delivery-dashboard-ux.md` and `delivery-critic.md`'s own
       instructions, not just implied.
     - **Real role depth in `docs/project-context-for-agents.md`.**
       Keith's own observation: the agents (UX especially) need more than
@@ -545,23 +545,23 @@ check_lifecycle.py`'s own `check_id` convention.
       doesn't) - a real, concrete tension the same dashboard has to serve
       both sides of.
     - **The "banked for later" post-build UX pass pulled forward into
-      `requirements-reviewer` now**, not deferred - Keith explicitly liked
+      `delivery-critic` now**, not deferred - Keith explicitly liked
       the idea flagged during the UX-agent scoping research (a real-
       world precedent, VoltAgent's `ui-ux-tester`: a "frustrated
       end-user" persona doing actual Playwright-driven visual QA) and
       asked for it built into the current reviewer rather than parked.
-      `requirements-reviewer` now does a real, separate visual-QA pass
+      `delivery-critic` now does a real, separate visual-QA pass
       for dashboard-facing requirements only, adopting a busy/moderately-
       attentive data-steward persona, taking real screenshots as
       evidence (spacing, interaction states, dark mode, whether a
       confused click-path is possible), checked against the same
-      Apple-level bar - and, since `requirements-ux`'s own pre-build note
+      Apple-level bar - and, since `delivery-dashboard-ux`'s own pre-build note
       is a real standard to check against (same "not implementation
-      reasoning" treatment `requirements-architect`'s note already gets),
+      reasoning" treatment `delivery-architect`'s note already gets),
       the reviewer is explicitly told it may be given that note too.
 
     **Deliberately not yet done, Keith's own explicit call**: deeper
-    grounding of `requirements-ux`'s own intent in real human-psychology/
+    grounding of `delivery-dashboard-ux`'s own intent in real human-psychology/
     HCI research (not just "consistency + workflow fit"). Revisit once
     this refinement round is in hand, not before.
 
@@ -572,8 +572,8 @@ check_lifecycle.py`'s own `check_id` convention.
 
     **UX-reviewer-agent precedent research, done same day.** Real
     precedent exists, and this project's own design (a genuinely
-    separate `requirements-ux` pre-build agent, plus a post-build
-    visual-QA pass folded into `requirements-reviewer` rather than kept
+    separate `delivery-dashboard-ux` pre-build agent, plus a post-build
+    visual-QA pass folded into `delivery-critic` rather than kept
     as its own third agent) lines up with how others have actually built
     this:
     - `cfisch3r/estimate` PR #91 - a real repo running two SEPARATE
@@ -581,7 +581,7 @@ check_lifecycle.py`'s own `check_id` convention.
       `design-critic-visual` (visual design), both wired to a Playwright
       MCP server for "live screenshot-based UX and visual design review"
       against a running dev server - the same "drive a real browser,
-      don't just read code" mechanism `requirements-reviewer`'s own
+      don't just read code" mechanism `delivery-critic`'s own
       post-build pass uses (via ad hoc `Bash`+Playwright here instead of
       an MCP server, since that's what this environment actually has).
       Real precedent for keeping UX review genuinely separate from code
@@ -593,7 +593,7 @@ check_lifecycle.py`'s own `check_id` convention.
       cite what was actually inspected (a real screenshot, a real
       element), and anything not actually checked goes in a "Not
       assessed" section rather than inflating the finding count -
-      directly validates `requirements-reviewer`'s own "never mark a
+      directly validates `delivery-critic`'s own "never mark a
       criterion as met unless you've explicitly verified it" rule and
       its explicit busy/moderately-attentive-steward persona (though
       punchlist itself deliberately avoids a "frustrated user" archetype
@@ -615,7 +615,7 @@ check_lifecycle.py`'s own `check_id` convention.
     only reachable via a search-engine snippet.)
 
     Still not done, still Keith's to revisit when ready: deeper grounding
-    of `requirements-ux`'s own intent in real human-psychology/HCI
+    of `delivery-dashboard-ux`'s own intent in real human-psychology/HCI
     research - this precedent research answered "does a UX-reviewer role
     exist elsewhere," not "what does the psychology literature say about
     good UX," which is a separate, deliberately deferred question.
@@ -657,7 +657,7 @@ check_lifecycle.py`'s own `check_id` convention.
     noted "two investigated-but-not-fixed findings turned out to be
     false positives" - an honest, real signal this isn't a magic bullet,
     just a real process with a real (imperfect) hit rate, not unlike
-    what `requirements-reviewer`'s own post-build UX pass should expect
+    what `delivery-critic`'s own post-build UX pass should expect
     to produce. Still no raw agent transcript/output published anywhere
     public for either repo, so "why it works" is inferred from real
     fix-list evidence, not directly observed.
@@ -679,15 +679,15 @@ check_lifecycle.py`'s own `check_id` convention.
       it only shows the raw id string (the code is visible but not
       translated) - whether to add a decoded badge there too is a
       separate, not-yet-asked follow-up.
-    - **First standalone capability test of `requirements-reviewer`'s
+    - **First standalone capability test of `delivery-critic`'s
       post-build UX pass**: Keith wants the mobile overflow bug
       (`plans/dashboard.md` #12) used as the real first test case -
       point the agent at the real built
       dashboard's Requirements panel, on a mobile viewport, with
       genuinely zero hints about what's wrong, and see if it finds the
-      bug on its own. Run via the main session (not `requirements-ux`,
+      bug on its own. Run via the main session (not `delivery-dashboard-ux`,
       which never drives a live browser - this is explicitly
-      `requirements-reviewer`'s own post-build visual-QA pass,
+      `delivery-critic`'s own post-build visual-QA pass,
       exercised standalone rather than as part of a full requirement
       review). **Result: it worked, and found real, substantial
       evidence** - see the full new section below, "The standalone test
@@ -709,14 +709,14 @@ check_lifecycle.py`'s own `check_id` convention.
       own ask for a real chronological trail on the register, not just a
       sequential id. Rendered next to each requirement's title in the
       dashboard's own Requirements panel.
-    - **`requirements-scoper` now genuinely asks Keith about non-
+    - **`delivery-scoper` now genuinely asks Keith about non-
       functional requirements**, not just derives them from the
       codebase itself - a real `AskUserQuestion` step added alongside
       the existing "check against this project's own standing rules"
       one, Keith's own explicit call that relying on self-derived NFRs
       alone wasn't enough.
 
-    **Follow-up, same day: `requirements-scoper` now actively coaches
+    **Follow-up, same day: `delivery-scoper` now actively coaches
     Keith through NFRs, not just asks once.** Keith's own words: "I feel
     like I'm not good at doing non-functional requirements... I'd like
     it to prompt me from different angles." The single generic
@@ -739,7 +739,7 @@ check_lifecycle.py`'s own `check_id` convention.
 
     **The standalone test ran, found the bug and much more, and led to
     a real architecture change.** A general-purpose agent, adopting
-    `requirements-reviewer`'s own real instructions (its actual "Post-
+    `delivery-critic`'s own real instructions (its actual "Post-
     build UX / visual QA pass" section, at the time still folded into
     that agent), was pointed at the real built dashboard's Requirements
     panel at a real 390x844 mobile viewport with genuinely zero hints -
@@ -772,7 +772,7 @@ check_lifecycle.py`'s own `check_id` convention.
     (scoped via `AskUserQuestion` before building, per this project's
     own standing convention):
     - **A real Playwright MCP server**, not the ad hoc Bash+throwaway-
-      script mechanism `requirements-reviewer` used for the test above.
+      script mechanism `delivery-critic` used for the test above.
       Explained to Keith in plain terms first (Playwright = real browser
       automation; MCP = a fixed, named "menu" of tools an agent calls
       directly instead of writing its own script each time; "Playwright
@@ -791,27 +791,27 @@ check_lifecycle.py`'s own `check_id` convention.
       hit before on the Python/pytest side), `--headless`, `--no-
       sandbox` (needed in this kind of sandboxed environment),
       `--isolated` (in-memory profile, no leftover state between runs).
-    - **The post-build UX pass pulled OUT of `requirements-reviewer`
+    - **The post-build UX pass pulled OUT of `delivery-critic`
       entirely**, into 2 new, dedicated, Playwright-MCP-driven agents:
-      `requirements-ux-critic` (workflow/navigation/discoverability -
-      does the flow make sense) and `requirements-visual-critic`
+      `delivery-dashboard-ux-critic` (workflow/navigation/discoverability -
+      does the flow make sense) and `delivery-dashboard-visual-critic`
       (spacing/alignment/overflow/dark-mode/interaction-states - does it
       LOOK deliberate), a real domain split mirroring `cfisch3r/
       estimate`'s own `design-critic-ux`/`design-critic-visual` pair.
-      `requirements-reviewer` itself goes back to purely functional/
+      `delivery-critic` itself goes back to purely functional/
       code-quality/security/test-coverage checks - its own "Post-build
       UX / visual QA pass" section is gone, its description/`tools:`
-      frontmatter updated to match. `requirements-ux` (the PRE-build
+      frontmatter updated to match. `delivery-dashboard-ux` (the PRE-build
       agent) had its own "out of scope" pointer updated to name the 2
-      new post-build agents instead of `requirements-reviewer`. Each new
+      new post-build agents instead of `delivery-critic`. Each new
       agent's own real tool list is a genuine, considered subset of
       `@playwright/mcp`'s real ~60-tool surface (verified against the
       real npm package's own README, not guessed) - `browser_navigate`/
       `browser_click`/`browser_resize`/`browser_take_screenshot`/
-      `browser_console_messages`/etc. for `requirements-ux-critic`;
+      `browser_console_messages`/etc. for `delivery-dashboard-ux-critic`;
       those plus `browser_evaluate` (real measured CSS/DOM values, not
       guesswork) and `browser_emulate_media` (real forced dark-mode
-      testing) for `requirements-visual-critic` - deliberately excluding
+      testing) for `delivery-dashboard-visual-critic` - deliberately excluding
       the advanced surface neither needs (tracing, video, storage-state,
       cookies).
 
@@ -824,7 +824,7 @@ check_lifecycle.py`'s own `check_id` convention.
     full account; not repeated here.
 
     Not yet done: neither new agent has been run for real yet (the
-    standalone test above ran under `requirements-reviewer`'s OLD,
+    standalone test above ran under `delivery-critic`'s OLD,
     not-yet-split instructions) - their own first real run is still
     ahead, and the Playwright MCP server, while smoke-tested at the CLI
     level, hasn't yet been exercised through an actual Claude Code
@@ -869,7 +869,7 @@ check_lifecycle.py`'s own `check_id` convention.
       practice." Real, concrete idea neither of our 2 new agents
       currently has explicitly - our dashboard does have its own real
       CSS custom properties (`var(--ink-muted)`, `var(--surface-alt)`,
-      etc. throughout the template) that `requirements-visual-critic`
+      etc. throughout the template) that `delivery-dashboard-visual-critic`
       could be told to read first the same way, not yet added.
     - Their UX critic's own contract explicitly expects to be handed
       "User goal on this screen" / "Target audience" as real structured
@@ -895,7 +895,7 @@ check_lifecycle.py`'s own `check_id` convention.
       from an explicit 12-15-tool list down to a single
       `mcp__playwright` grant.
     - Reading the app's own real design tokens before critiquing -
-      **adopted** - `requirements-visual-critic` now has a real,
+      **adopted** - `delivery-dashboard-visual-critic` now has a real,
       explicit step reading the dashboard template's own `:root{}`
       colour/radius custom properties before judging anything, with an
       honest caveat that there's no formal spacing-scale token to check
@@ -905,7 +905,7 @@ check_lifecycle.py`'s own `check_id` convention.
       **declined** - Keith's own call: keep relying on
       `docs/project-context-for-agents.md`'s general personas instead.
     - The "squint test" visual-hierarchy technique - **adopted** -
-      added as a real, named check in `requirements-visual-critic`'s
+      added as a real, named check in `delivery-dashboard-visual-critic`'s
       own evaluation list.
     - The third, unexplored `doc-quality.md` agent - **not adopted, not
       yet even read** - parked as its own new item,
@@ -924,10 +924,10 @@ check_lifecycle.py`'s own `check_id` convention.
     agent's own tool access is unrestricted (`tools: *`, its own type
     definition). Checked our own 6 agents' real `tools:` frontmatter
     directly (`grep -n "^tools:" .claude/agents/*.md`): none of them
-    list `Skill` - `requirements-architect`/`requirements-scoper`/
-    `requirements-ux` are `Read, Grep, Glob, AskUserQuestion`;
-    `requirements-reviewer` adds `Bash`; `requirements-ux-critic`/
-    `requirements-visual-critic` add `Bash, mcp__playwright`. Since
+    list `Skill` - `delivery-architect`/`delivery-scoper`/
+    `delivery-dashboard-ux` are `Read, Grep, Glob, AskUserQuestion`;
+    `delivery-critic` adds `Bash`; `delivery-dashboard-ux-critic`/
+    `delivery-dashboard-visual-critic` add `Bash, mcp__playwright`. Since
     Claude Code subagent tool restriction is harness-enforced, not just
     prompt-level (confirmed earlier this session, `plans/wider.md`
     itself, the "what is a subagent" 101 thread), the real, current
@@ -937,42 +937,42 @@ check_lifecycle.py`'s own `check_id` convention.
 
     **Fixed the same day, plus a much bigger real finding underneath
     it.** Keith asked 3 more things in one message: does
-    `requirements-ux-critic`/`requirements-visual-critic` still need
-    `Bash` now they have Playwright MCP; fix `requirements-reviewer`'s
+    `delivery-dashboard-ux-critic`/`delivery-dashboard-visual-critic` still need
+    `Bash` now they have Playwright MCP; fix `delivery-critic`'s
     stale pre-split ad hoc Bash+Playwright-script instructions; and
     (his own preferred mechanism, confirmed via the real official docs
     rather than the generic `Skill` tool) scope skill access per agent
     via the real `skills:` frontmatter field instead.
 
     - **Bash**: still needed, but narrowly - confirmed by grepping the
-      real files, not memory. `requirements-ux-critic`/`requirements-
+      real files, not memory. `delivery-dashboard-ux-critic`/`requirements-
       visual-critic` use `Bash` for exactly one thing, running `uv run
       mothman dashboard rebuild` to build the dashboard before
       Playwright can view it - all real browser automation is 100% via
-      Playwright MCP now. `requirements-reviewer` also needs `Bash` for
+      Playwright MCP now. `delivery-critic` also needs `Bash` for
       `pytest --cov` coverage checks, unrelated to Playwright.
-    - **`requirements-reviewer` fixed**: its "Observable UI behaviour"
+    - **`delivery-critic` fixed**: its "Observable UI behaviour"
       section still described the pre-split ad hoc Bash+throwaway-
       script mechanism and had never been granted `mcp__playwright` at
       all. Now uses the same real MCP mechanism as the other two
       agents, with `mcp__playwright` added to `tools:`.
     - **`skills:` wired in, selectively, not blanket-applied**: real,
       reasoned per-agent calls, not "add both skills everywhere since
-      Keith approved it." `requirements-ux` (pre-build, never sees
+      Keith approved it." `delivery-dashboard-ux` (pre-build, never sees
       built code, and whose job - matching EXISTING patterns - is in
       real tension with `frontend-design`'s whole ethos of breaking
-      from templated defaults) gets neither. `requirements-ux-critic`
+      from templated defaults) gets neither. `delivery-dashboard-ux-critic`
       (post-build, reviews real code) gets `web-design-guidelines`
       only - its navigation/forms/content sections are real UX-critic
       territory; `frontend-design`'s aesthetic-distinctiveness guidance
-      isn't its lane. `requirements-visual-critic` gets both - the
+      isn't its lane. `delivery-dashboard-visual-critic` gets both - the
       single best match for `frontend-design`, plus
       `web-design-guidelines`'s visual-adjacent sections (animation,
       typography, dark mode, hover states).
 
     **The much bigger finding, caught by testing the fix rather than
     trusting it**: re-ran the same real diagnostic-subagent test after
-    adding `mcp__playwright` to `requirements-ux-critic` - still ZERO
+    adding `mcp__playwright` to `delivery-dashboard-ux-critic` - still ZERO
     `mcp__playwright__*` tools visible, and the newly-added `skills:`
     field wasn't reflected either. Dug into why rather than assuming
     the docs were wrong: `ps aux` on this session's own real running
@@ -1000,7 +1000,7 @@ check_lifecycle.py`'s own `check_id` convention.
     in a live Claude Code session on this repo** - the mobile-overflow-
     bug test earlier used the old, genuinely-working ad hoc Bash+script
     mechanism, before any of this MCP work existed. Re-run the same
-    diagnostic test (spawn `requirements-ux-critic`, ask it to report
+    diagnostic test (spawn `delivery-dashboard-ux-critic`, ask it to report
     its own visible `mcp__playwright__*` tools) in the next fresh
     session on this repo to actually confirm it, rather than assuming.
     **Keith's own follow-up, same day: a real prompt handed to him to
@@ -1019,12 +1019,12 @@ check_lifecycle.py`'s own `check_id` convention.
     distinguishing a read-only Bash command from a real write one.
     Given that real contradiction between 2 research passes of the same
     document, and the real risk of silently breaking
-    `requirements-reviewer`/`requirements-ux-critic`/`requirements-
+    `delivery-critic`/`delivery-dashboard-ux-critic`/`requirements-
     visual-critic`'s own genuine need to run `uv run mothman dashboard
     rebuild` via `Bash` (a real filesystem write, even though only to a
     gitignored build path), applied `permissionMode: plan` only to the
     3 agents that never use `Bash` at all -
-    `requirements-scoper`/`requirements-architect`/`requirements-ux` -
+    `delivery-scoper`/`delivery-architect`/`delivery-dashboard-ux` -
     where it's unambiguously safe (pure defense-in-depth, no
     functional change, since none of the 3 could ever write a file
     anyway). Deliberately NOT applied to the other 3 yet - a real,
@@ -1061,7 +1061,7 @@ check_lifecycle.py`'s own `check_id` convention.
       what's supplying it, which is exactly the thing that couldn't be
       confirmed before.
     - **The tools reach the subagents, and actually function.** A
-      diagnostic-only `requirements-ux-critic` run (told explicitly not
+      diagnostic-only `delivery-dashboard-ux-critic` run (told explicitly not
       to review anything) reported all 25 `mcp__playwright__browser_*`
       tools visible in its own tool list, and a real
       `mcp__playwright__browser_snapshot` call returned a real, well-
@@ -1076,8 +1076,8 @@ check_lifecycle.py`'s own `check_id` convention.
     fails with a literal `Error: Access to "file:" protocol is blocked`
     - reproduced independently in both the subagent and the main
     session, so it's the server's own default policy, not a one-off.
-    That matters because `requirements-ux-critic.md` (line 58) and
-    `requirements-visual-critic.md` (line 60) both instruct exactly that
+    That matters because `delivery-dashboard-ux-critic.md` (line 58) and
+    `delivery-dashboard-visual-critic.md` (line 60) both instruct exactly that
     `file:///<repo-root>/...` navigation - as written, neither agent can
     currently open the dashboard it's meant to critique. **Verified
     workaround**: serving the repo over a plain local HTTP server and
@@ -1107,7 +1107,7 @@ check_lifecycle.py`'s own `check_id` convention.
     from the coverage gate the same way - not in `[tool.coverage.run]`'s
     own `source` list). `.mcp.json` gained the real `--ignore-https-
     errors` flag. All 3 agents that drive Playwright (`requirements-
-    reviewer`/`requirements-ux-critic`/`requirements-visual-critic`) had
+    reviewer`/`delivery-dashboard-ux-critic`/`delivery-dashboard-visual-critic`) had
     their own `file://` instructions replaced with "run the new script
     via `Bash`, navigate to `https://localhost:8743/...`, stop the
     server when done" - explicitly told **never** to navigate to a
@@ -1123,8 +1123,8 @@ check_lifecycle.py`'s own `check_id` convention.
     browser-driven review can't leave commit-able scratch behind.
 
     Still open, unchanged by this session: whether `permissionMode: plan`
-    would break `requirements-reviewer`/`requirements-ux-critic`/
-    `requirements-visual-critic`'s own `Bash`-driven `mothman dashboard
+    would break `delivery-critic`/`delivery-dashboard-ux-critic`/
+    `delivery-dashboard-visual-critic`'s own `Bash`-driven `mothman dashboard
     rebuild` step - this session verified the MCP wiring only, and
     didn't test that.
 
@@ -1136,8 +1136,8 @@ check_lifecycle.py`'s own `check_id` convention.
     work around either: a new throwaway agent file added mid-session
     isn't registered (`Agent type ... not found` - the same session-
     start-only agent-list read this project has now hit twice, see
-    `requirements-cli-ux-critic`'s own entry above), and editing an
-    EXISTING agent's frontmatter (`requirements-architect`, temporarily
+    `delivery-cli-ux-critic`'s own entry above), and editing an
+    EXISTING agent's frontmatter (`delivery-architect`, temporarily
     adding `Bash`) was denied outright by the harness's own auto-mode
     self-modification guard. So it verified the real, documented
     behaviour from Claude Code's own primary docs instead:
@@ -1163,7 +1163,7 @@ check_lifecycle.py`'s own `check_id` convention.
       the `permissionMode` you set." This project's own sessions run in
       auto mode a meaningful fraction of the time (this one included) -
       in an auto-mode session, the `permissionMode: plan` added to
-      `requirements-scoper`/`requirements-architect`/`requirements-ux`
+      `delivery-scoper`/`delivery-architect`/`delivery-dashboard-ux`
       in `ed6435f` is a real, literal no-op: the subagent just inherits
       auto mode instead. It's still correct, real protection in a
       non-auto session (the original "pure defense-in-depth, no
@@ -1198,11 +1198,11 @@ check_lifecycle.py`'s own `check_id` convention.
       through `.mcp.json` itself, same resolution as every other
       session-start-only-read gap this project keeps hitting.
     - **Both critics ran for real and produced real findings.**
-      `requirements-ux-critic` independently rediscovered `plans/
+      `delivery-dashboard-ux-critic` independently rediscovered `plans/
       dashboard.md` #12 (the mobile overflow bug) with NO hints, and its
       own measured number matched the already-recorded one exactly
       (`maxScrollLeft: 457`, `plans/dashboard.md` #12's own "457px wider
-      than the phone"). `requirements-visual-critic` found 3 further
+      than the phone"). `delivery-dashboard-visual-critic` found 3 further
       real things, each independently verified in source (not taken on
       trust) - logged in `plans/dashboard.md` alongside #15, see that
       file for detail.
@@ -1252,12 +1252,12 @@ check_lifecycle.py`'s own `check_id` convention.
     template's own `stateToPath()`/`pathToState()`/`navigate()`/
     `popstate` handler, not written generically) - covers URL design
     (path vs. query string), History API mechanics, deep-linking,
-    scroll position, and route-change accessibility. `requirements-ux`
-    (pre-build) and `requirements-ux-critic` (post-build) both updated
+    scroll position, and route-change accessibility. `delivery-dashboard-ux`
+    (pre-build) and `delivery-dashboard-ux-critic` (post-build) both updated
     to read it and act on it - the pairing recommended to Keith earlier
     this session, confirmed. One deliberate scope carve-out made without
     a separate round of questions (flagged in both agent files and
-    below for Keith to correct if he disagrees): `requirements-ux`'s
+    below for Keith to correct if he disagrees): `delivery-dashboard-ux`'s
     existing "accessibility - not this agent's job" boundary now
     excludes general a11y but explicitly INCLUDES route-change
     accessibility (title/focus/ARIA-live), since that's structurally
@@ -1302,7 +1302,7 @@ check_lifecycle.py`'s own `check_id` convention.
     external; all 39 internal drill-down navigation call sites use a
     bare `onclick` handler on a non-anchor element instead - logged in
     `plans/dashboard.md` #15 alongside the earlier accessibility gap,
-    not fixed. Both `requirements-ux`/`requirements-ux-critic` updated
+    not fixed. Both `delivery-dashboard-ux`/`delivery-dashboard-ux-critic` updated
     to check for this class of gap going forward.
 
     **The deferred HCI/psychology grounding item, finally revisited,
@@ -1353,13 +1353,13 @@ check_lifecycle.py`'s own `check_id` convention.
     its real GitHub source instead).
 
     Built: `docs/hci-ux-psychology.md` (the real guide); `requirements-
-    ux`/`requirements-ux-critic` updated to read and apply it
+    ux`/`delivery-dashboard-ux-critic` updated to read and apply it
     (context-indexed, not a flat checklist - each agent works out which
     of the 6 contexts a requirement/built result falls into, then checks
     against THAT context's own dominant principles specifically). Two
     real architectural forks resolved with Keith before building
     further (his own explicit choices, both via `AskUserQuestion`): (1)
-    a genuinely NEW sibling pair, `requirements-cli-ux`/`requirements-
+    a genuinely NEW sibling pair, `delivery-cli-ux`/`requirements-
     cli-ux-critic`, rather than widening the dashboard pair - his own
     reasoning matched mine: the post-build mechanism genuinely differs
     (a real pty session vs. Playwright MCP), so keeping each pair's
@@ -1385,7 +1385,7 @@ check_lifecycle.py`'s own `check_id` convention.
     can trigger real, several-seconds-long subprocess runs, and
     replaying from scratch every step would re-trigger that real work
     repeatedly. Verified end to end against the real, live `mothman`
-    wizard before being written into `requirements-cli-ux-critic`'s own
+    wizard before being written into `delivery-cli-ux-critic`'s own
     instructions (this project's own standing discipline, same as
     `serve_dashboard_https.py`'s own pre-verification) - real
     interactive navigation, real screen capture, real wait-for-substring,
@@ -1413,7 +1413,7 @@ check_lifecycle.py`'s own `check_id` convention.
     agent pair actually works when spawned** (the same methodology this
     session used successfully to verify the `mcpServers:` field earlier)
     - the `Agent` tool's own available-agent-type list is read once at
-    session start, so `requirements-cli-ux-critic` (added mid-session)
+    session start, so `delivery-cli-ux-critic` (added mid-session)
     wasn't in this session's own list, `Agent type ... not found`. Same
     category of gap as the earlier `.mcp.json`-read-once-at-start issue
     (`plans/wider.md` #10's own earlier entry, resolved that time by a
@@ -1423,7 +1423,7 @@ check_lifecycle.py`'s own `check_id` convention.
     invocation - real, live end-to-end verification of `tui_drive.py`
     itself happened either way, just not routed through the new agent's
     own instructions text. **Still open**: a real, live spawn of
-    `requirements-cli-ux`/`requirements-cli-ux-critic` needs a fresh
+    `delivery-cli-ux`/`delivery-cli-ux-critic` needs a fresh
     session (or the other already-open one) to confirm the agent files
     themselves - not just the underlying mechanism - actually work as
     written.

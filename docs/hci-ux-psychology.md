@@ -14,8 +14,8 @@ and the guidance below is **context-indexed** (Keith's own explicit
 ask) - different principles get emphasized for different kinds of
 interaction moments, not one flat checklist applied everywhere.
 
-Read by: `requirements-ux`/`requirements-ux-critic` (dashboard, pre-
-and post-build) and `requirements-cli-ux`/`requirements-cli-ux-critic`
+Read by: `delivery-dashboard-ux`/`delivery-dashboard-ux-critic` (dashboard, pre-
+and post-build) and `delivery-cli-ux`/`delivery-cli-ux-critic`
 (CLI/TUI, pre- and post-build).
 
 ## The research (see Sources at the bottom for the real citations)
