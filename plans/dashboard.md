@@ -958,3 +958,54 @@ common/check_lifecycle.py`'s own `check_id` convention.
     sandbox (`dashboard/check_dashboard_renders.py` now auto-detects
     this environment's own `/opt/pw-browsers/chromium` symlink instead
     of requiring `PLAYWRIGHT_CHROMIUM_PATH` set by hand).
+
+17. **[todo, 2026-09-19]** **[Dashboard UI]** `dashboard/changelog_md.py`
+    silently drops a `**[Component]**` tag whenever it doesn't sit on the
+    bullet's own FIRST source line - 3 of 92 real `CHANGELOG.md` entries
+    are affected today, and all 3 render in the live Release Notes panel
+    with no component icon/badge and the raw `**[Docs & process]**`
+    markup showing as literal body text.
+
+    Found 2026-09-19 while renaming the 25 stale `requirements-*`
+    references in `CHANGELOG.md` (Keith's own call, reversing that
+    entry's original "leave history alone" decision) - the rename itself
+    is parse-neutral, verified by diffing the parser's own output
+    before and after (92 entries, same 3 broken, same 7 stray-asterisk
+    texts, identical either way), so this is genuinely pre-existing and
+    not something that rename introduced.
+
+    Real root cause, read from the code rather than inferred:
+    `parse_changelog()` calls `_parse_item()` on the bullet's first line
+    ONLY (`stripped[2:]`), then appends every soft-wrapped continuation
+    line afterwards with a plain `items[-1]["text"] += " " + stripped`.
+    So `_ITEM_COMPONENT_RE` only ever gets a chance to match what fits on
+    line one. Three distinct real instances, two causes:
+    - **Component tag wrapped onto the continuation line** (the 4:27pm
+      "Requirements-Analysis Agents: Real Polish Bar..." entry): the
+      headline fills line one, `**[Docs & process]**` starts line two,
+      never seen.
+    - **Component tag split mid-tag across lines** (the 4:23pm "A
+      Requirements-Analysis Agent System..." entry): the source reads
+      `**[Docs &` / `process]**`, so even a joined-first parser would
+      need `[^\]]+` to span the break.
+    - **A backslash-escaped asterisk in the headline** (the 7:25pm
+      rename entry, `...Renamed to delivery-\*`): `\*` immediately
+      before the closing `**` produces `***`;
+      `_ITEM_HEADLINE_RE`'s `\*\*` consumes two, leaving a stray `*`
+      that then blocks `_ITEM_COMPONENT_RE`. A separate regex problem
+      from the other two, same visible symptom.
+
+    Two real fix directions, not yet chosen - worth Keith's call since
+    they differ in more than effort. **Fix the parser** (join a bullet's
+    full source text first, THEN parse headline/components off the
+    joined string; separately teach the headline regex about `\*`) is
+    the real fix and stops this recurring every time a headline happens
+    to be long enough to push the tag onto line two - which is pure
+    luck today, not a rule anyone follows. **Fix the content** (re-wrap
+    those 3 entries so the tag lands on line one, reword the `\*` one)
+    is a one-minute change but leaves the trap armed for the next long
+    headline. Leaning parser, but not doing it unprompted - it's a real
+    behaviour change to a module with its own test suite
+    (`tests/test_changelog_md.py`, 14 tests) and this project's standing
+    bug convention wants a reproducing test written and confirmed
+    failing first either way.

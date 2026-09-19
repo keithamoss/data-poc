@@ -38,9 +38,16 @@ edited for a punchier, friendlier read than a bare commit log.
   `delivery-dashboard-visual-critic`), and `requirements-reviewer` was
   the only post-build checker not called "critic" (now
   `delivery-critic`). Every cross-reference across `.claude/agents/`,
-  `docs/`, and `plans/*.md` updated to match - `CHANGELOG.md`'s own
-  historical entries deliberately left alone, since they're an accurate
-  record of what these agents were actually called at the time. New
+  `docs/`, and `plans/*.md` updated to match. This entry's own first
+  version also said `CHANGELOG.md`'s historical entries were
+  "deliberately left alone, since they're an accurate record of what
+  these agents were actually called at the time" - Keith reversed that
+  the same evening, once it turned out the practical cost outweighed
+  the principle: 25 references across 16 earlier entries meant grepping
+  the changelog for an agent by its current name found nothing at all.
+  Those are now renamed too; only the four old names in this paragraph
+  survive, because this is the entry that documents the mapping and it
+  would be unreadable without them. New
   `docs/agent-orchestration.md` - the real pipeline sequence, what each
   stage needs as input, parallelism rules (the two dashboard critics
   share one Playwright MCP browser and must run sequentially, not
@@ -83,27 +90,27 @@ edited for a punchier, friendlier read than a bare commit log.
   addressed by run date — which isn't unique, since a resupply shares
   its base run's date. Rows now carry a real `data-run-id` too.
 - **7:12pm** — **3 Real Papercuts Found by the Full Verification Pass, Fixed** **[Dashboard UI]** **[Testing & dev tooling]**
-  `claude/playwright-mcp-verify-b2t4nb` picked up this branch and ran
-  the full HTTPS-serving/port-collision-fix chain end to end, both
-  post-build critics included - real findings, all fixed: `mothman
-  dashboard rebuild` exiting 1 in a genuinely fresh sandbox
+  `claude/playwright-mcp-verify-b2t4nb` picked up this branch and ran the
+  full HTTPS-serving/port-collision-fix chain end to end, both post-build
+  critics included - real findings, all fixed: `mothman dashboard rebuild`
+  exiting 1 in a genuinely fresh sandbox
   (`dashboard/check_dashboard_renders.py` now auto-detects this
   environment's own `/opt/pw-browsers/chromium` symlink rather than
-  needing `PLAYWRIGHT_CHROMIUM_PATH` set by hand, with 3 new unit
-  tests); a latent race in the 3 critics' own `sleep 1` before parsing
-  a server's `PORT=` line (now a real poll loop); and `browser_take_
-  screenshot` resolving a bare filename against the repo root instead
-  of the gitignored `.playwright-mcp/` (both screenshot-taking critics
-  now told explicitly where to save). Also a real, important correction
-  to `plans/wider.md`: Claude Code ignores a subagent's own
-  `permissionMode` entirely when the main session is in auto mode, so
-  the earlier defense-in-depth `permissionMode: plan` addition is a
-  no-op there (still real protection in a non-auto session). Three
-  further real visual findings from `requirements-visual-critic`'s
-  first genuine run (a colour collision between MoSCoW "Could" and
-  "Built" status pills, a drawer missing `overflow-x` handling, a
-  dangling trailing divider) logged in `plans/dashboard.md` #16, not
-  fixed - Keith's call, same treatment as #15.
+  needing `PLAYWRIGHT_CHROMIUM_PATH` set by hand, with 3 new unit tests);
+  a latent race in the 3 critics' own `sleep 1` before parsing a server's
+  `PORT=` line (now a real poll loop); and `browser_take_ screenshot`
+  resolving a bare filename against the repo root instead of the
+  gitignored `.playwright-mcp/` (both screenshot-taking critics now told
+  explicitly where to save). Also a real, important correction to
+  `plans/wider.md`: Claude Code ignores a subagent's own `permissionMode`
+  entirely when the main session is in auto mode, so the earlier
+  defense-in-depth `permissionMode: plan` addition is a no-op there (still
+  real protection in a non-auto session). Three further real visual
+  findings from `delivery-dashboard-visual-critic`'s first genuine run (a
+  colour collision between MoSCoW "Could" and "Built" status pills, a
+  drawer missing `overflow-x` handling, a dangling trailing divider)
+  logged in `plans/dashboard.md` #16, not fixed - Keith's call, same
+  treatment as #15.
 - **7:03pm** — **cli/common.py's Escape-Key Claim Corrected; Misleading Test Names Fixed** **[Testing & dev tooling]**
   Root-caused the real `select()`/`path_prompt()` docstring mismatch
   found while verifying `tui_drive.py` (`plans/tooling.md` #9): grepped
@@ -120,33 +127,33 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ### Added
 - **6:58pm** — **Real HCI/Behavioral-Psychology Grounding for the UX Agents; a New CLI/TUI Review Pair** **[Docs & process]** **[Dashboard UI]** **[Testing & dev tooling]**
-  Keith's own deferred ask, finally revisited: ground `requirements-ux`'s
-  intent in real human-psychology/HCI research, then widened (his own
-  call, scoped via 2 rounds of clarifying questions) to reach the CLI/
-  TUI too, not just the dashboard. New `docs/hci-ux-psychology.md` - a
-  context-indexed guide (6 real interaction moments, from at-a-glance
-  scanning to error/failure states) built on real, cited research
-  (negativity bias, the service-recovery-paradox literature, Lindgaard's
-  real 50ms first-impressions study, Lally's real habit-formation study,
-  `clig.dev`'s own CLI guidelines, Nielsen's heuristics, and more) with
-  an honest, research-backed priority ordering rather than a flat
-  checklist - Keith confirmed the taxonomy and weighting before
-  anything got wired in. `requirements-ux`/`requirements-ux-critic`
-  updated to use it for the dashboard; a genuinely new sibling pair,
-  `requirements-cli-ux`/`requirements-cli-ux-critic`, built for the CLI/
-  TUI (`mothman`) - the post-build critic driven by a new dev tool,
-  `scripts/dev/tui_drive.py`, a persistent, addressable real pty session
-  a subagent can drive step by step across separate `Bash` calls (send a
-  key, read the real on-screen text, wait for real output, close) -
-  built on the same real `pyte` terminal-buffer and CPR-answering logic
+  Keith's own deferred ask, finally revisited: ground
+  `delivery-dashboard-ux`'s intent in real human-psychology/HCI research,
+  then widened (his own call, scoped via 2 rounds of clarifying questions)
+  to reach the CLI/ TUI too, not just the dashboard. New
+  `docs/hci-ux-psychology.md` - a context-indexed guide (6 real
+  interaction moments, from at-a-glance scanning to error/failure states)
+  built on real, cited research (negativity bias, the
+  service-recovery-paradox literature, Lindgaard's real 50ms
+  first-impressions study, Lally's real habit-formation study,
+  `clig.dev`'s own CLI guidelines, Nielsen's heuristics, and more) with an
+  honest, research-backed priority ordering rather than a flat checklist -
+  Keith confirmed the taxonomy and weighting before anything got wired in.
+  `delivery-dashboard-ux`/`delivery-dashboard-ux-critic` updated to use it
+  for the dashboard; a genuinely new sibling pair,
+  `delivery-cli-ux`/`delivery-cli-ux-critic`, built for the CLI/ TUI
+  (`mothman`) - the post-build critic driven by a new dev tool,
+  `scripts/dev/tui_drive.py`, a persistent, addressable real pty session a
+  subagent can drive step by step across separate `Bash` calls (send a
+  key, read the real on-screen text, wait for real output, close) - built
+  on the same real `pyte` terminal-buffer and CPR-answering logic
   `tui_screenshot.py`/`record_cast.py` already use. Verified end to end
   against the real `mothman` wizard before being wired into any agent's
   instructions - and along the way, found a real, previously-unnoticed
   bug: `cli/common.py`'s own docstring claims `select()`/`path_prompt()`
-  return on "Ctrl-C/Esc," but Escape genuinely doesn't back out of a
-  real prompt today (only Ctrl-C does) - logged as `plans/tooling.md`
-  #9, not fixed in this pass, real proof the new mechanism catches
-  genuine gaps.
+  return on "Ctrl-C/Esc," but Escape genuinely doesn't back out of a real
+  prompt today (only Ctrl-C does) - logged as `plans/tooling.md` #9, not
+  fixed in this pass, real proof the new mechanism catches genuine gaps.
 - **6:28pm** — **SPA Guide Re-Verified Against Real Sources; a Real Navigation Gap Found** **[Docs & process]** **[Dashboard UI]**
   Keith allow-listed the 5 domains blocked while writing
   `docs/spa-best-practices.md` earlier that evening - re-verified the
@@ -155,167 +162,169 @@ edited for a punchier, friendlier read than a bare commit log.
   `web.dev/articles/urls` turned out to be a genuine 404, not a proxy
   issue). Found `WebFetch` itself kept reporting `EGRESS_BLOCKED` even
   after a raw `curl` confirmed the domains were genuinely reachable - a
-  stale tool-level check, worked around by fetching HTML directly.
-  Refined the URL-design section with real character/length/slug
-  guidance and confirmed this dashboard's own initial-load
-  `history.replaceState` already matches MDN's documented pattern. Also
-  surfaced a new, real gap: only 5 of the template's real `<a href>`
-  elements exist, all external - every internal drill-down navigation
-  (39 real call sites - breadcrumbs, table rows, cards, header buttons)
-  is a plain `onclick` handler on a non-anchor element, so middle-click/
-  Ctrl-click-new-tab/copy-link-address don't work on any of it. Logged
-  in `plans/dashboard.md` #15 alongside the earlier route-change
-  accessibility gap, not fixed; both `requirements-ux`/`requirements-
-  ux-critic` updated to check for it going forward.
+  stale tool-level check, worked around by fetching HTML directly. Refined
+  the URL-design section with real character/length/slug guidance and
+  confirmed this dashboard's own initial-load `history.replaceState`
+  already matches MDN's documented pattern. Also surfaced a new, real gap:
+  only 5 of the template's real `<a href>` elements exist, all external -
+  every internal drill-down navigation (39 real call sites - breadcrumbs,
+  table rows, cards, header buttons) is a plain `onclick` handler on a
+  non-anchor element, so middle-click/
+  Ctrl-click-new-tab/copy-link-address don't work on any of it. Logged in
+  `plans/dashboard.md` #15 alongside the earlier route-change
+  accessibility gap, not fixed; both
+  `delivery-dashboard-ux`/`delivery-dashboard-ux-critic` updated to check
+  for it going forward.
 - **6:22pm** — **A Real SPA Best-Practice Guide for the UX Review Pair** **[Docs & process]** **[Dashboard UI]**
   Keith's own ask: "care about clean, human-readable URLs... and embody
-  single page application best practice" more broadly, not just URLs.
-  New `docs/spa-best-practices.md`, grounded in this dashboard's own
-  real client-side routing (`stateToPath()`/`pathToState()`, hash-based
-  on purpose since GitHub Pages can't rewrite paths for a single static
-  file) rather than generic advice - covers URL design (path vs. query
-  string), History API mechanics (push vs. replace, this dashboard's own
-  real bug fixed by switching a comparison-picker to `replaceState`),
+  single page application best practice" more broadly, not just URLs. New
+  `docs/spa-best-practices.md`, grounded in this dashboard's own real
+  client-side routing (`stateToPath()`/`pathToState()`, hash-based on
+  purpose since GitHub Pages can't rewrite paths for a single static file)
+  rather than generic advice - covers URL design (path vs. query string),
+  History API mechanics (push vs. replace, this dashboard's own real bug
+  fixed by switching a comparison-picker to `replaceState`),
   deep-linking/cold-load testing, scroll position, and route-change
-  accessibility (title, focus, ARIA live regions). `requirements-ux`
-  (pre-build) and `requirements-ux-critic` (post-build) both updated to
-  read and act on it - a real, narrow carve-out lets `requirements-ux`
-  check route-change accessibility specifically, despite general
-  accessibility staying out of its scope. Found 2 real gaps while
-  writing this: zero route-change accessibility handling anywhere in the
-  template (no `document.title` update, no focus management, no ARIA
-  live region - logged as `plans/dashboard.md` #15) and `REQ-DASH-020`
-  ("Human-friendlier dashboard URLs") still reading `status:
-  not_started` despite its acceptance criterion already being satisfied
-  by the 2026-09-18 hash-path rework - both flagged to Keith, neither
-  fixed as part of this pass.
+  accessibility (title, focus, ARIA live regions). `delivery-dashboard-ux`
+  (pre-build) and `delivery-dashboard-ux-critic` (post-build) both updated
+  to read and act on it - a real, narrow carve-out lets
+  `delivery-dashboard-ux` check route-change accessibility specifically,
+  despite general accessibility staying out of its scope. Found 2 real
+  gaps while writing this: zero route-change accessibility handling
+  anywhere in the template (no `document.title` update, no focus
+  management, no ARIA live region - logged as `plans/dashboard.md` #15)
+  and `REQ-DASH-020` ("Human-friendlier dashboard URLs") still reading
+  `status: not_started` despite its acceptance criterion already being
+  satisfied by the 2026-09-18 hash-path rework - both flagged to Keith,
+  neither fixed as part of this pass.
 
 ### Fixed
 - **6:17pm** — **serve_dashboard_https.py Now Auto-Assigns a Free Port** **[Testing & dev tooling]**
-  Keith's own follow-up after approving the local-HTTPS-serving fix:
-  the script's fixed default port (8743) would've collided if two of
-  `requirements-reviewer`/`requirements-ux-critic`/
-  `requirements-visual-critic` ever ran in parallel, one server failing
-  outright with "address already in use." Now defaults to `--port 0`
-  (an OS-assigned free ephemeral port) and prints it as `PORT=<n>` on
-  its first stdout line; all 3 agents' own instructions updated to
-  capture that output to a file, read the real port back, and kill only
-  their own server by PID rather than a blanket `pkill`. Verified by
-  actually running two instances in parallel and confirming both bind
-  distinct ports and serve real content simultaneously.
+  Keith's own follow-up after approving the local-HTTPS-serving fix: the
+  script's fixed default port (8743) would've collided if two of
+  `delivery-critic`/`delivery-dashboard-ux-critic`/
+  `delivery-dashboard-visual-critic` ever ran in parallel, one server
+  failing outright with "address already in use." Now defaults to `--port
+  0` (an OS-assigned free ephemeral port) and prints it as `PORT=<n>` on
+  its first stdout line; all 3 agents' own instructions updated to capture
+  that output to a file, read the real port back, and kill only their own
+  server by PID rather than a blanket `pkill`. Verified by actually
+  running two instances in parallel and confirming both bind distinct
+  ports and serve real content simultaneously.
 
 ### Fixed
 - **6:04pm** — **Playwright MCP Confirmed Working; the Real file:// Fix Is Local HTTPS** **[Docs & process]** **[Testing & dev tooling]**
-  A fresh session confirmed the Playwright MCP server genuinely
-  connects and works end to end (real process, real tool calls, real
-  responses - `plans/wider.md` #10 has the full 3-way verification) -
-  found along the way that the server blocks the `file://` protocol
-  outright, so `requirements-reviewer`/`requirements-ux-critic`/
-  `requirements-visual-critic` could never actually open the dashboard
-  they're meant to review. Keith's own call: serve it locally over
-  HTTPS rather than allow `file://` at the server (which would've
-  granted access to the whole filesystem, not just this repo) or fall
-  back to plain HTTP. New `scripts/dev/serve_dashboard_https.py` (a
-  real throwaway self-signed cert + Python's stdlib `http.server`
-  wrapped in TLS, verified end to end before being written into any
-  agent's instructions) plus `.mcp.json`'s new `--ignore-https-errors`
-  flag. All 3 agents now explicitly forbidden from navigating to
-  `file://` URLs, pointed at the new script instead.
+  A fresh session confirmed the Playwright MCP server genuinely connects
+  and works end to end (real process, real tool calls, real responses -
+  `plans/wider.md` #10 has the full 3-way verification) - found along the
+  way that the server blocks the `file://` protocol outright, so
+  `delivery-critic`/`delivery-dashboard-ux-critic`/
+  `delivery-dashboard-visual-critic` could never actually open the
+  dashboard they're meant to review. Keith's own call: serve it locally
+  over HTTPS rather than allow `file://` at the server (which would've
+  granted access to the whole filesystem, not just this repo) or fall back
+  to plain HTTP. New `scripts/dev/serve_dashboard_https.py` (a real
+  throwaway self-signed cert + Python's stdlib `http.server` wrapped in
+  TLS, verified end to end before being written into any agent's
+  instructions) plus `.mcp.json`'s new `--ignore-https-errors` flag. All 3
+  agents now explicitly forbidden from navigating to `file://` URLs,
+  pointed at the new script instead.
 
 ### Changed
 - **5:50pm** — **Defense-in-Depth: permissionMode: plan on the 3 Pure-Advisory Agents** **[Docs & process]** **[Testing & dev tooling]**
   Keith's own ask: "defense in depth is important." Added the real,
   harness-enforced `permissionMode: plan` field to
-  `requirements-scoper`/`requirements-architect`/`requirements-ux` -
-  the 3 agents that never use `Bash` at all, so it's unambiguously safe
-  (pure defense-in-depth, no functional change). Deliberately NOT
-  applied to the other 3 (which need `Bash` for `mothman dashboard
-  rebuild`) - real doc ambiguity found between 2 separate research
-  passes on what `plan` mode actually does to Bash execution, flagged
-  rather than guessed at. Also recorded 2 more standing conventions:
-  a periodic check of the combined agent description-field token
-  budget (checked today: ~1,100 tokens, nowhere near the real
-  15,000-token warning threshold), and Claude Code's real spawn-time
-  model-override capability, worth proactively suggesting rather than
-  only used if remembered.
+  `delivery-scoper`/`delivery-architect`/`delivery-dashboard-ux` - the 3
+  agents that never use `Bash` at all, so it's unambiguously safe (pure
+  defense-in-depth, no functional change). Deliberately NOT applied to the
+  other 3 (which need `Bash` for `mothman dashboard rebuild`) - real doc
+  ambiguity found between 2 separate research passes on what `plan` mode
+  actually does to Bash execution, flagged rather than guessed at. Also
+  recorded 2 more standing conventions: a periodic check of the combined
+  agent description-field token budget (checked today: ~1,100 tokens,
+  nowhere near the real 15,000-token warning threshold), and Claude Code's
+  real spawn-time model-override capability, worth proactively suggesting
+  rather than only used if remembered.
 
 ### Fixed
-- **5:43pm** — **requirements-reviewer's Stale Playwright Instructions; a Real MCP Timing Gap Found** **[Docs & process]** **[Testing & dev tooling]**
-  `requirements-reviewer` still described the pre-split ad hoc
+- **5:43pm** — **delivery-critic's Stale Playwright Instructions; a Real MCP Timing Gap Found** **[Docs & process]** **[Testing & dev tooling]**
+  `delivery-critic` still described the pre-split ad hoc
   Bash+throwaway-script Playwright mechanism and had never been granted
-  `mcp__playwright` at all - fixed to match `requirements-ux-critic`/
-  `requirements-visual-critic`. `skills:` wired in selectively per
-  agent, not blanket - `requirements-ux-critic` gets
-  `web-design-guidelines` only, `requirements-visual-critic` gets both,
-  `requirements-ux` gets neither (real reasoning in `plans/wider.md`
-  #10). Re-testing the fix (spawning a real diagnostic subagent, not
-  trusting the docs) found a much bigger thing: this session's own
-  Playwright MCP server has never actually connected, because `ps aux`
-  on the real running `claude` process shows a fixed `--mcp-config`
-  file from before `.mcp.json` existed in this repo - a real,
-  documented, one-time-at-session-start mechanism (confirmed against
-  Claude Code's own cloud-environments docs), not a bug in what was
-  built. The fix is correct and committed, but genuinely unverified
-  from inside this session - needs confirming in a fresh session.
+  `mcp__playwright` at all - fixed to match
+  `delivery-dashboard-ux-critic`/ `delivery-dashboard-visual-critic`.
+  `skills:` wired in selectively per agent, not blanket -
+  `delivery-dashboard-ux-critic` gets `web-design-guidelines` only,
+  `delivery-dashboard-visual-critic` gets both, `delivery-dashboard-ux`
+  gets neither (real reasoning in `plans/wider.md` #10). Re-testing the
+  fix (spawning a real diagnostic subagent, not trusting the docs) found a
+  much bigger thing: this session's own Playwright MCP server has never
+  actually connected, because `ps aux` on the real running `claude`
+  process shows a fixed `--mcp-config` file from before `.mcp.json`
+  existed in this repo - a real, documented, one-time-at-session-start
+  mechanism (confirmed against Claude Code's own cloud-environments docs),
+  not a bug in what was built. The fix is correct and committed, but
+  genuinely unverified from inside this session - needs confirming in a
+  fresh session.
 
 ### Added
 - **5:26pm** — **Two Real Claude Skills: frontend-design and web-design-guidelines** **[Docs & process]** **[Testing & dev tooling]**
-  A genuinely different mechanism from the `requirements-*` subagents -
-  Claude Skills, progressive-disclosure capability packages that
-  activate contextually rather than separate-context-window delegates.
-  Keith found a real Snyk article himself ("Top 8 Claude Skills for
-  UI/UX Engineers"), picked 4 of its 8 real skills to bring in.
-  2 are installed now: Anthropic's own `frontend-design` (vendored
-  verbatim, byte-identical to upstream, confirmed via a real `diff` -
-  pushes Claude away from generic "AI slop" aesthetics) and a real,
-  adapted `web-design-guidelines` (Vercel's own 17-section UI-review
-  ruleset, vendored offline per Keith's own explicit call rather than
-  the upstream skill's live `WebFetch` on every run - same rationale as
-  `dashboard/vendor/`'s own vendored assets). Both read directly from
-  their real sources and reviewed before installing, not installed on
-  the article's word alone. The other 2 (`UI/UX Pro Max`, `AccessLint`)
-  are still pending - both bundle real executable code, mid-review when
-  Keith asked to pause; nothing from that review was installed, and
-  everything downloaded during it was deleted per his own ask.
+  A genuinely different mechanism from the `delivery-*` subagents - Claude
+  Skills, progressive-disclosure capability packages that activate
+  contextually rather than separate-context-window delegates. Keith found
+  a real Snyk article himself ("Top 8 Claude Skills for UI/UX Engineers"),
+  picked 4 of its 8 real skills to bring in. 2 are installed now:
+  Anthropic's own `frontend-design` (vendored verbatim, byte-identical to
+  upstream, confirmed via a real `diff` - pushes Claude away from generic
+  "AI slop" aesthetics) and a real, adapted `web-design-guidelines`
+  (Vercel's own 17-section UI-review ruleset, vendored offline per Keith's
+  own explicit call rather than the upstream skill's live `WebFetch` on
+  every run - same rationale as `dashboard/vendor/`'s own vendored
+  assets). Both read directly from their real sources and reviewed before
+  installing, not installed on the article's word alone. The other 2
+  (`UI/UX Pro Max`, `AccessLint`) are still pending - both bundle real
+  executable code, mid-review when Keith asked to pause; nothing from that
+  review was installed, and everything downloaded during it was deleted
+  per his own ask.
 
 ### Changed
 - **5:15pm** — **UX/Visual Critics Refined Against the Real cfisch3r/estimate Prompts** **[Docs & process]** **[Testing & dev tooling]**
-  Keith asked directly whether `requirements-ux-critic`/
-  `requirements-visual-critic` were copies of `cfisch3r/estimate`'s own
-  real prompts - dug up the real raw files (after a first, HTML-page-
+  Keith asked directly whether `delivery-dashboard-ux-critic`/
+  `delivery-dashboard-visual-critic` were copies of `cfisch3r/estimate`'s
+  own real prompts - dug up the real raw files (after a first, HTML-page-
   based fetch gave contradictory results, flagged in `CLAUDE.md` as
-  unreliable) and adopted 3 of the 5 real differences found: both
-  agents' `tools:` frontmatter simplified from an explicit 12-15-tool
-  list down to a single `mcp__playwright` whole-server grant;
-  `requirements-visual-critic` now reads the dashboard's own real
-  `:root{}` colour/radius custom properties before critiquing, instead
-  of judging against generic best practice; added the "squint test"
+  unreliable) and adopted 3 of the 5 real differences found: both agents'
+  `tools:` frontmatter simplified from an explicit 12-15-tool list down to
+  a single `mcp__playwright` whole-server grant;
+  `delivery-dashboard-visual-critic` now reads the dashboard's own real
+  `:root{}` colour/radius custom properties before critiquing, instead of
+  judging against generic best practice; added the "squint test"
   visual-hierarchy check. Kept `opus` (not `sonnet`) and kept relying on
   `docs/project-context-for-agents.md`'s general personas rather than
-  structured per-review inputs - both Keith's own explicit calls. A
-  third, unexplored agent in that repo, `doc-quality.md`, is parked as
+  structured per-review inputs - both Keith's own explicit calls. A third,
+  unexplored agent in that repo, `doc-quality.md`, is parked as
   `plans/tooling.md` #4.
 
 ### Added
 - **5:05pm** — **A Real Playwright MCP Server, and the UX/Visual Critique Split** **[Docs & process]** **[Testing & dev tooling]**
-  A standalone, zero-hints test of `requirements-reviewer`'s post-build
-  UX pass - pointed at the real built Requirements panel on a real
-  mobile viewport with no mention of what to look for - found the real
-  mobile overflow bug Keith had reported (and much more: it's actually a
-  horizontal-pan bug, confirmed via real touch-event dispatch, with a
-  real traced root cause at two specific template lines - full findings
-  in `plans/dashboard.md` #12). Real, working evidence the isolated
-  "read your own instructions, go in cold" design produces genuine
-  findings. Off the back of that, Keith asked to adopt `cfisch3r/
-  estimate`'s own `design-critic-ux`/`design-critic-visual` split for
-  real: a new `.mcp.json` wires up a real Playwright MCP server
+  A standalone, zero-hints test of `delivery-critic`'s post-build UX pass
+  - pointed at the real built Requirements panel on a real mobile viewport
+  with no mention of what to look for - found the real mobile overflow bug
+  Keith had reported (and much more: it's actually a horizontal-pan bug,
+  confirmed via real touch-event dispatch, with a real traced root cause
+  at two specific template lines - full findings in `plans/dashboard.md`
+  #12). Real, working evidence the isolated "read your own instructions,
+  go in cold" design produces genuine findings. Off the back of that,
+  Keith asked to adopt `cfisch3r/ estimate`'s own
+  `design-critic-ux`/`design-critic-visual` split for real: a new
+  `.mcp.json` wires up a real Playwright MCP server
   (`@playwright/mcp@0.0.82`, pinned, pointed at this sandbox's own
-  pre-installed Chromium, smoke-tested end to end), and the post-build
-  UX pass is pulled entirely out of `requirements-reviewer` into 2 new
-  dedicated agents - `requirements-ux-critic` (workflow/navigation) and
-  `requirements-visual-critic` (spacing/overflow/dark-mode/interaction
-  states) - each with its own real, considered subset of Playwright
-  MCP's tool surface. `requirements-reviewer` itself goes back to purely
+  pre-installed Chromium, smoke-tested end to end), and the post-build UX
+  pass is pulled entirely out of `delivery-critic` into 2 new dedicated
+  agents - `delivery-dashboard-ux-critic` (workflow/navigation) and
+  `delivery-dashboard-visual-critic`
+  (spacing/overflow/dark-mode/interaction states) - each with its own
+  real, considered subset of Playwright MCP's tool surface.
+  `delivery-critic` itself goes back to purely
   functional/code-quality/security/coverage checks.
 
 - **4:52pm** — **A Real CI Test Keeps the Component Taxonomy From Drifting** **[Docs & process]** **[Testing & dev tooling]**
@@ -329,15 +338,15 @@ edited for a punchier, friendlier read than a bare commit log.
   first (confirmed failing), then reverted.
 
 ### Changed
-- **4:49pm** — **requirements-scoper Now Actively Coaches Non-Functional Requirements** **[Docs & process]**
+- **4:49pm** — **delivery-scoper Now Actively Coaches Non-Functional Requirements** **[Docs & process]**
   Keith's own words: "I feel like I'm not good at doing non-functional
   requirements... I'd like it to prompt me from different angles." The
-  single generic non-functional-requirements question was replaced with
-  10 real, concrete angles - adapted from the real ISO/IEC 25010
-  software-quality-characteristics taxonomy, but each one translated
-  into a question grounded in this project's own actual domain rather
-  than left abstract (performance, scalability, reliability, security,
-  privacy/data sensitivity, compatibility/portability, maintainability,
+  single generic non-functional-requirements question was replaced with 10
+  real, concrete angles - adapted from the real ISO/IEC 25010
+  software-quality-characteristics taxonomy, but each one translated into
+  a question grounded in this project's own actual domain rather than left
+  abstract (performance, scalability, reliability, security, privacy/data
+  sensitivity, compatibility/portability, maintainability,
   observability/auditability, compliance/retention, cost - e.g. privacy
   asks "would this requirement's own assumptions still hold if this were
   ever pointed at real production Birth Registrations/Child Protection
@@ -348,103 +357,96 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ### Added
 - **4:44pm** — **A Real Reference Doc For This Project's Own Component Taxonomy** **[Docs & process]**
-  `docs/components.md` - Keith's own ask: the 7-part component
-  taxonomy `plans/*.md`/`CHANGELOG.md`/`requirements.yaml`'s own ids
-  already tag things with had never been written up in one place with
-  real names, codes, scope, and file/directory ownership. Now it is:
-  one section per component (`GEN`/`QAC`/`PIPE`/`DASH`/`GHUB`/`TEST`/
-  `DOCS`), each with what it owns, what's in scope, and - just as
-  important - what's explicitly out of scope against its neighbours
-  (e.g. `QAC` owns check definitions and what red/amber/green means;
-  `PIPE` owns how a run gets committed/published; `DASH` only ever
-  renders what another component already computed). Wired into the
-  requirements-analysis agents that actually need it:
-  `requirements-scoper` reads it to pick a new requirement's id code,
-  `requirements-architect` reads it for its own cross-component
-  blast-radius check, and `docs/project-context-for-agents.md` now
-  points to it.
+  `docs/components.md` - Keith's own ask: the 7-part component taxonomy
+  `plans/*.md`/`CHANGELOG.md`/`requirements.yaml`'s own ids already tag
+  things with had never been written up in one place with real names,
+  codes, scope, and file/directory ownership. Now it is: one section per
+  component (`GEN`/`QAC`/`PIPE`/`DASH`/`GHUB`/`TEST`/ `DOCS`), each with
+  what it owns, what's in scope, and - just as important - what's
+  explicitly out of scope against its neighbours (e.g. `QAC` owns check
+  definitions and what red/amber/green means; `PIPE` owns how a run gets
+  committed/published; `DASH` only ever renders what another component
+  already computed). Wired into the delivery agents that actually need it:
+  `delivery-scoper` reads it to pick a new requirement's id code,
+  `delivery-architect` reads it for its own cross-component blast-radius
+  check, and `docs/project-context-for-agents.md` now points to it.
 
 ### Changed
 - **4:38pm** — **Requirements Register: Component-Coded IDs, Written Dates, Scoper Now Asks About NFRs** **[Docs & process]**
-  Three more real refinements to the requirements
-  register (`requirements.yaml`) and `requirements-scoper`, Keith's own
-  follow-up asks before the agent system's first real run. Every id is
-  now `REQ-<CODE>-NNN`, where `<CODE>` is a real 3-4 letter code
+  Three more real refinements to the requirements register
+  (`requirements.yaml`) and `delivery-scoper`, Keith's own follow-up asks
+  before the agent system's first real run. Every id is now
+  `REQ-<CODE>-NNN`, where `<CODE>` is a real 3-4 letter code
   (`GEN`/`QAC`/`PIPE`/`DASH`/`GHUB`/`TEST`/`DOCS`) for the same 7-part
-  component taxonomy `plans/*.md`/this changelog already tag things
-  with - `qa_tools/common/validate_requirements.py`'s own
-  `_COMPONENT_CODES` is the single source of truth. Keith's explicit
-  follow-up call: drop the old bare `REQ-NNN` shape entirely rather than
-  grandfather it, so all 22 real, pre-existing entries were migrated the
-  same day, each keeping its own original number and picking up
-  whichever real component best matches it (checked against how the
-  equivalent feature is actually tagged elsewhere in this changelog).
-  A new optional `date_written` field (real `YYYY-MM-DD`) gives the
-  register a real chronological trail, rendered next to each
-  requirement's title in the dashboard's own Requirements panel.
-  `requirements-scoper.md` now has a real second, explicit step for
+  component taxonomy `plans/*.md`/this changelog already tag things with -
+  `qa_tools/common/validate_requirements.py`'s own `_COMPONENT_CODES` is
+  the single source of truth. Keith's explicit follow-up call: drop the
+  old bare `REQ-NNN` shape entirely rather than grandfather it, so all 22
+  real, pre-existing entries were migrated the same day, each keeping its
+  own original number and picking up whichever real component best matches
+  it (checked against how the equivalent feature is actually tagged
+  elsewhere in this changelog). A new optional `date_written` field (real
+  `YYYY-MM-DD`) gives the register a real chronological trail, rendered
+  next to each requirement's title in the dashboard's own Requirements
+  panel. `delivery-scoper.md` now has a real second, explicit step for
   non-functional requirements - proposing its own from this project's
   standing conventions, as before, but now also genuinely asking Keith
-  (via `AskUserQuestion`) whether there's anything else only he'd know
-  to raise, rather than relying on its own read of the codebase alone.
+  (via `AskUserQuestion`) whether there's anything else only he'd know to
+  raise, rather than relying on its own read of the codebase alone.
 - **4:27pm** — **Requirements-Analysis Agents: Real Polish Bar, Real Role Depth, Post-Build UX Pass**
-  **[Docs & process]** Three real refinements to the same-day agent
-  system below, before its first real run - Keith held off running it to
-  give more input first. A real, named polish standard now lives in
-  `requirements-ux.md`/`requirements-reviewer.md`: Keith's own words,
+  **[Docs & process]** Three real refinements to the same-day agent system
+  below, before its first real run - Keith held off running it to give
+  more input first. A real, named polish standard now lives in
+  `delivery-dashboard-ux.md`/`delivery-critic.md`: Keith's own words,
   dashboard UX polished "to the level that Apple goes for their
   products... a UX where you don't even realize it's polished because of
-  everything else." `docs/project-context-for-agents.md` gained real
-  role depth (not just labels) - the data steward's real frustration
-  point (noise before reaching what matters), the accountable data
-  owner's real concern (trend/defensibility), the pipeline maintainer's
-  opposite need (wants the raw detail the steward doesn't) - a real
-  tension the same dashboard has to serve both sides of. And the
-  "banked for later" post-build UX pass got pulled forward into
-  `requirements-reviewer` now: a real, separate visual-QA pass for
-  dashboard-facing requirements, a busy/moderately-attentive persona,
-  real screenshots as evidence, checked against the same Apple-level
-  bar.
+  everything else." `docs/project-context-for-agents.md` gained real role
+  depth (not just labels) - the data steward's real frustration point
+  (noise before reaching what matters), the accountable data owner's real
+  concern (trend/defensibility), the pipeline maintainer's opposite need
+  (wants the raw detail the steward doesn't) - a real tension the same
+  dashboard has to serve both sides of. And the "banked for later"
+  post-build UX pass got pulled forward into `delivery-critic` now: a
+  real, separate visual-QA pass for dashboard-facing requirements, a
+  busy/moderately-attentive persona, real screenshots as evidence, checked
+  against the same Apple-level bar.
 - **4:23pm** — **A Requirements-Analysis Agent System, Built With Keith As A Joint Design** **[Docs &
   process]** Four new real Claude Code subagents (`.claude/agents/*.md`):
-  `requirements-scoper` (turns a raw idea into small, self-contained
-  EARS-format requirements plus a draft `plans/*.md` entry, asking as
-  many rounds of clarifying questions as it takes), `requirements-
-  architect` (a deliberately "simple" pre-build check - duplication/
-  overlap against the real codebase, fit within `mothman`'s command
-  structure, cross-component blast radius, security, code-quality
-  expectations for the builder), `requirements-ux` (dashboard-only
-  consistency/workflow-fit review, advisory, alongside the architect),
-  and `requirements-reviewer` (a merged reviewer+QA role checking
-  finished work against both the requirement and the architect's
-  quality bar - reads code, drives a real headless Playwright browser
-  via `Bash`, checks real test coverage, strictly read-only, reports
-  back rather than editing anything itself).
-  Built on real research, not assumed: Claude Code's own published
-  sub-agent guidance and Anthropic's multi-agent architecture patterns,
-  plus real-world precedent (`zhsama/claude-sub-agent`'s 5-stage spec
-  pipeline validated the overall shape and independently confirmed EARS
-  as a real convention; `www.codecentric.de`'s "Don't Let Your AI
-  Cheat" post supplied the real isolation mechanism and three concrete
-  reviewer-prompt instructions now built directly into
-  `requirements-reviewer.md`). Where this design deliberately diverges
-  from that precedent (forced human approval in the loop, a strictly
-  read-only reviewer, no task-planner stage given how small this
-  project keeps its own tasks) was each a real Keith decision, not a
-  default.
-  Also: a new `docs/project-context-for-agents.md` (drafted from
-  existing `CLAUDE.md`/`README.md` content, for Keith to correct rather
-  than dictated from scratch) these four agents read first, and 5 new
-  optional `requirements.yaml` fields (`source`/
+  `delivery-scoper` (turns a raw idea into small, self-contained
+  EARS-format requirements plus a draft `plans/*.md` entry, asking as many
+  rounds of clarifying questions as it takes), `delivery-architect` (a
+  deliberately "simple" pre-build check - duplication/ overlap against the
+  real codebase, fit within `mothman`'s command structure, cross-component
+  blast radius, security, code-quality expectations for the builder),
+  `delivery-dashboard-ux` (dashboard-only consistency/workflow-fit review,
+  advisory, alongside the architect), and `delivery-critic` (a merged
+  reviewer+QA role checking finished work against both the requirement and
+  the architect's quality bar - reads code, drives a real headless
+  Playwright browser via `Bash`, checks real test coverage, strictly
+  read-only, reports back rather than editing anything itself). Built on
+  real research, not assumed: Claude Code's own published sub-agent
+  guidance and Anthropic's multi-agent architecture patterns, plus
+  real-world precedent (`zhsama/claude-sub-agent`'s 5-stage spec pipeline
+  validated the overall shape and independently confirmed EARS as a real
+  convention; `www.codecentric.de`'s "Don't Let Your AI Cheat" post
+  supplied the real isolation mechanism and three concrete reviewer-prompt
+  instructions now built directly into `delivery-critic.md`). Where this
+  design deliberately diverges from that precedent (forced human approval
+  in the loop, a strictly read-only reviewer, no task-planner stage given
+  how small this project keeps its own tasks) was each a real Keith
+  decision, not a default. Also: a new
+  `docs/project-context-for-agents.md` (drafted from existing
+  `CLAUDE.md`/`README.md` content, for Keith to correct rather than
+  dictated from scratch) these four agents read first, and 5 new optional
+  `requirements.yaml` fields (`source`/
   `non_functional_requirements`/`dependencies`/`open_questions`/
   `evidence`) with real CI enforcement, including a genuine
-  dangling-reference check on `dependencies` - found and fixed a real
-  bug live while validating: the parser's own `source: ""` default was
+  dangling-reference check on `dependencies` - found and fixed a real bug
+  live while validating: the parser's own `source: ""` default was
   tripping the new validator check, failing all 22 real committed
-  requirements at once. Regression test added, confirmed failing
-  against the pre-fix code first.
-  Not yet exercised end-to-end on a real feature - see `plans/wider.md`
-  #10 for the full design write-up.
+  requirements at once. Regression test added, confirmed failing against
+  the pre-fix code first. Not yet exercised end-to-end on a real feature -
+  see `plans/wider.md` #10 for the full design write-up.
 
 ### Changed
 - **3:17pm** — **Mothman's Eyes Now Actually Blink** **[Testing & dev tooling]** Keith noticed the CLI/TUI
