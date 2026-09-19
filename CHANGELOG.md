@@ -27,6 +27,20 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Added
+- **10:35am** — **Clickable Header Logo + Mothman SVG Mark** **[Dashboard UI]** Clicking the header logo/
+  wordmark now returns to the homepage, matching the existing header nav
+  buttons' own pattern - the wordmark is a real `<button>` now (keyboard/
+  focus-visible accessible), not a plain, inert div. Also replaced the
+  plain "DA" text badge with a small, friendly Mothman SVG mark - rounded
+  wings, simple antennae, two eyes cut through via `fill-rule="evenodd"`
+  so they show the badge's own accent gradient rather than needing a
+  second hardcoded colour. Drawn in `currentColor`, so it automatically
+  gets the same light/dark theme contrast the text badge already relied
+  on. Iterated visually via real Playwright screenshots (both themes, at
+  the actual 38px production size) before embedding, rather than
+  guessing SVG path coordinates blind.
+
 ### Fixed
 - **10:31am** — **Numbered Lists In Plans Tab** **[Dashboard UI]** Real bug, found from Keith's own
   dashboard report: expanding an item card (e.g. `plans/tooling.md`
