@@ -1234,3 +1234,79 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     the documentation half (read and run setup BEFORE running the
     suite, rather than diagnosing failures backwards) landed as its own
     `CLAUDE.md` convention bullet the same day, at Keith's explicit ask.
+
+12. **[todo, 2026-09-19]** **[Testing & dev tooling]** A real DRY /
+    duplication pass across the whole codebase, to find the rest of what
+    `plans/qa-pipeline.md` item 74 turned up by accident. Keith's own
+    ask, immediately after that: the status logic existed in FOUR places
+    (the dashboard's JS, two Python modules, and a dead rollup in
+    `build_dashboard_data.py`), nobody knew, and the drift between two
+    of them shipped a real `TypeError` to CI and a false GREEN to the
+    rendered page. That was found by chasing one bug, not by looking -
+    so the question is what else is sitting there unfound.
+
+    **The rubric matters more than the findings, and is the part to
+    settle first.** Today's incident is NOT an argument that duplication
+    is bad: `pipeline/cadence.py` duplicates real logic into the
+    dashboard's own JS deliberately and correctly (a static site has no
+    backend, so the browser must re-roll cadence for any as-of date a
+    viewer picks), and it has never drifted - because its own docstring
+    commits both sides to being tested against the same real configs and
+    dates. The status mirror had the same unavoidable split and no such
+    cross-check, and that is the whole difference. So the pass should
+    sort what it finds into: **(a) accidental copies** that should
+    collapse to one implementation; **(b) genuinely unavoidable
+    duplication** (a real client/server or language boundary) that needs
+    a shared-fixture cross-check rather than removal; and **(c)
+    deliberate, justified separation** that should be left alone -
+    `plans/qa-pipeline.md` #84 already established that the per-dataset
+    BDM/CP split is genuinely different check-to-dashboard logic, not
+    copy-paste, and that finding shouldn't be re-litigated by a
+    mechanical duplication scan that can't tell the difference.
+
+    **Real seeds found in a 10-minute reconnaissance while parking this**
+    - concrete starting points, not a guess that duplication exists:
+    - **`_run_gh()` is byte-identical in THREE modules in the same
+      directory** - `qa_tools/common/ticket_sync.py`,
+      `acceptance_sync.py`, `leaderboard.py` each carry a private
+      copy of the same 2-line `subprocess.run(["gh", *args], ...)`
+      helper. Category (a), and about as clear-cut as it gets.
+    - **`cli/bdm.py` and `cli/cp.py` share 19 identically-named
+      functions across 1,067 lines** (`run_check`, `report_table`,
+      `picker_choices`, `load_manifest`, `default_reference`,
+      `_offer_promote`, ...). Needs real judgement rather than a
+      mechanical merge - CP genuinely differs (6 tables vs 1 CSV, no
+      row-count-growth concept) - so this is likely (b) or (c) in
+      places and (a) in others.
+    - **9 mirrored filenames across `qa_tools/bdm/` and `qa_tools/cp/`**
+      (`build_results_from_history.py`, `dataset_stats.py`,
+      `evidently_check_lifecycle.py`, ...). This overlaps
+      `plans/publishing-and-history.md` #6, which already parks the
+      per-dataset file ARCHITECTURE question - deliberately not
+      duplicated here: #6 is "is one file per dataset per concern the
+      right shape at ~30 datasets", this item is the narrower "is the
+      CONTENT of these pairs actually the same code". Resolve #6 first,
+      or at least together; don't let this item quietly re-answer it.
+    - **Known JS<->Python mirrors to audit as a class** (each needs a
+      (b)-style cross-check, not removal): `cadence.py`/
+      `cycleStartDate()` (has one, informally), `dataset_status.py`/
+      `checkStatus()` (now has one, `tests/test_dashboard_e2e.py`'s own
+      `TestStatusMatchesEachToolsOwnVerdict`), and
+      `tests/test_dashboard_e2e.py`'s `_state_to_path()`/`stateToPath()`
+      (test-only, documented as hand-synced - probably fine, worth
+      confirming).
+    - **Dead code specifically, since ruff demonstrably misses it**: the
+      `worst` rollup sat unused in `build_dashboard_data.py` and `F841`
+      never fired, because the variable is read inside its own
+      accumulating loop. `plans/tooling.md` #2 already names `vulture`
+      as a real candidate for exactly this - that item and this one
+      should probably be picked up together, since a real dead-code
+      detector is a mechanical way to find one whole category here.
+
+    Not scoped further: whether this is a one-off manual pass, a
+    `delivery-*`-style agent doing it (cf. #3's code-reviewer agent
+    idea), or a real tool in CI; and how much of it is worth acting on
+    versus just recording. Needs a real conversation with Keith on
+    appetite before anything gets changed - a duplication pass that
+    mechanically collapses everything it finds would actively damage
+    (b) and (c) above.
