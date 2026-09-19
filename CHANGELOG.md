@@ -27,6 +27,24 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Changed
+- **5:15pm** — **UX/Visual Critics Refined Against the Real cfisch3r/estimate Prompts** **[Docs & process]** **[Testing & dev tooling]**
+  Keith asked directly whether `requirements-ux-critic`/
+  `requirements-visual-critic` were copies of `cfisch3r/estimate`'s own
+  real prompts - dug up the real raw files (after a first, HTML-page-
+  based fetch gave contradictory results, flagged in `CLAUDE.md` as
+  unreliable) and adopted 3 of the 5 real differences found: both
+  agents' `tools:` frontmatter simplified from an explicit 12-15-tool
+  list down to a single `mcp__playwright` whole-server grant;
+  `requirements-visual-critic` now reads the dashboard's own real
+  `:root{}` colour/radius custom properties before critiquing, instead
+  of judging against generic best practice; added the "squint test"
+  visual-hierarchy check. Kept `opus` (not `sonnet`) and kept relying on
+  `docs/project-context-for-agents.md`'s general personas rather than
+  structured per-review inputs - both Keith's own explicit calls. A
+  third, unexplored agent in that repo, `doc-quality.md`, is parked as
+  `plans/tooling.md` #4.
+
 ### Added
 - **5:05pm** — **A Real Playwright MCP Server, and the UX/Visual Critique Split** **[Docs & process]** **[Testing & dev tooling]**
   A standalone, zero-hints test of `requirements-reviewer`'s post-build

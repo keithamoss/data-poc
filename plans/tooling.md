@@ -863,3 +863,16 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
    invocation, every PR, every push); how many agents and where the
    language boundary actually falls. Needs a real conversation with
    Keith before anything gets built.
+
+4. **[todo, 2026-09-19]** **[Docs & process]** A documentation-quality
+   agent - a real, adjacent idea found while digging into
+   `cfisch3r/estimate`'s own real agent files for the UX/visual critic
+   split (`plans/wider.md` #10): that repo has a third agent,
+   `.claude/agents/doc-quality.md`, not yet looked at in any depth
+   (found via a real directory listing, content not yet fetched/read).
+   Flagged by Keith to look at later, distinct from item #2 above (that
+   one's about Python CODE quality tooling; this one's about
+   DOCUMENTATION quality specifically - comments, docstrings, README/
+   `plans/*.md` accuracy, or something else entirely, not yet known
+   without actually reading that file). Not yet scoped at all - read the
+   real file first before proposing anything.

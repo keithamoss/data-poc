@@ -888,6 +888,26 @@ check_lifecycle.py`'s own `check_id` convention.
       "documentation quality" specifically, a slightly different angle
       neither of those 2 parked items named yet.
 
-    None of these 5 real differences have been adopted into our own 2
-    agents yet - presented to Keith as real, concrete options, not
-    silently applied.
+    **Keith's own real decision on each of the 5, same day:**
+    - Model (`sonnet` vs `opus`) - **kept `opus`**, no change.
+    - Whole-server `mcp__playwright` grant vs per-tool list -
+      **adopted** - both agents' own `tools:` frontmatter simplified
+      from an explicit 12-15-tool list down to a single
+      `mcp__playwright` grant.
+    - Reading the app's own real design tokens before critiquing -
+      **adopted** - `requirements-visual-critic` now has a real,
+      explicit step reading the dashboard template's own `:root{}`
+      colour/radius custom properties before judging anything, with an
+      honest caveat that there's no formal spacing-scale token to check
+      against (compare against a real, similar existing element
+      instead, same as before).
+    - Structured "user goal/target audience" per-review input -
+      **declined** - Keith's own call: keep relying on
+      `docs/project-context-for-agents.md`'s general personas instead.
+    - The "squint test" visual-hierarchy technique - **adopted** -
+      added as a real, named check in `requirements-visual-critic`'s
+      own evaluation list.
+    - The third, unexplored `doc-quality.md` agent - **not adopted, not
+      yet even read** - parked as its own new item,
+      `plans/tooling.md` #4, distinct from that file's existing #2
+      (Python code-quality tooling generally).
