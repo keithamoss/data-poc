@@ -3555,9 +3555,10 @@ function renderDemo(view){
   AsciinemaPlayer.create(
     {data: DEMO_CAST, parser: "asciicast"},
     container,
-    // speed: 0.5 - Keith's own call (2026-09-19), the real recorded pace
-    // read too fast to follow comfortably on first watch.
-    {cols: 100, rows: 28, fit: "width", controls: true, speed: 0.5, terminalFontFamily: "'IBM Plex Mono', monospace"}
+    // speed: 0.4 - Keith's own call (2026-09-19): 0.5 still read too fast
+    // on the real published page, so 25% slower again (playback duration
+    // *1.25 - speed is an inverse multiplier, so 0.5/1.25 = 0.4).
+    {cols: 100, rows: 28, fit: "width", controls: true, speed: 0.4, terminalFontFamily: "'IBM Plex Mono', monospace"}
   );
 }
 document.getElementById("demo-btn").addEventListener("click", ()=> navigate({tier:"demo"}));

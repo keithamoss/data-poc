@@ -449,3 +449,24 @@ Rough layout:
   resolved; don't re-ask what's already been answered.
 - Commit and push to whatever branch the session was told to develop
   on; don't create a PR unless explicitly asked.
+- **When a real outbound network request gets blocked by this session's
+  own egress policy (a 403/407 from the agent proxy - see `curl -sS
+  "$HTTPS_PROXY/__agentproxy/status"`'s own `recentRelayFailures`), flag
+  the exact blocked domain in this file** (a new bullet here, or append
+  to this one) so Keith can decide whether to allow-list it for future
+  sessions - his own explicit ask, 2026-09-19, after a session couldn't
+  reach `keithamoss.github.io` (GitHub Pages, this project's own live
+  dashboard) to verify a real production issue directly and had to
+  reason from GitHub Actions logs instead. Report it, don't route around
+  it or silently give up on the task - same "report the blocked host,
+  never retry or route around it" rule `/root/.ccr/README.md` already
+  states for this proxy generally, just with a durable place to land so
+  it survives past the one session that hit it. Not every transient
+  proxy failure needs an entry (a one-off Chromium captive-portal ping
+  to `www.google.com` during a Playwright browser launch is noise, not
+  a real blocked need) - only a domain this project's own real work
+  genuinely needed and couldn't reach.
+  - **`keithamoss.github.io`** (2026-09-19) - blocked; would let a
+    session verify the live published dashboard directly (e.g. "is a
+    just-deployed fix actually visible in production") instead of only
+    inferring from GitHub Actions run status/logs.

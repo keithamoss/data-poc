@@ -27,6 +27,12 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Changed
+- **2:49pm** — **Demo Tab: 25% Slower Again** **[Dashboard]** Keith's own follow-up after reloading the
+  real published page: `speed: 0.5` (the earlier half-speed fix) still
+  read too fast. Another 25% slower on top of that (`speed: 0.4` -
+  speed is an inverse multiplier, so `0.5 / 1.25 = 0.4`).
+
 ### Added
 - **2:44pm** — **Leaderboard Now Shows Everyone, Not Just Ticket-Closers** **[Dashboard]** **[QA checks &
   contract]** Keith caught it live on the real published page: the
