@@ -27,6 +27,17 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Added
+- **4:52pm** — **A Real CI Test Keeps the Component Taxonomy From Drifting** **[Docs & process]** **[Testing & dev tooling]**
+  Keith's own question: now that the same 7-part
+  component taxonomy shows up in 3 real places (`docs/components.md`,
+  the dashboard template's own `COMPONENT_ICON`/`PLANS_ALL_COMPONENTS`
+  consts, and `qa_tools/common/validate_requirements.py`'s
+  `_COMPONENT_CODES`), how do we stop them drifting apart? A new
+  `tests/test_component_taxonomy_consistency.py` fails CI if any of the
+  3 ever disagree - verified with a real, deliberately-introduced typo
+  first (confirmed failing), then reverted.
+
 ### Changed
 - **4:49pm** — **requirements-scoper Now Actively Coaches Non-Functional Requirements** **[Docs & process]**
   Keith's own words: "I feel like I'm not good at doing non-functional

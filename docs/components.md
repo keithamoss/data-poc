@@ -20,6 +20,17 @@ everything the dict doesn't: the real scope, the real file/directory
 ownership, and the real in/out-of-scope boundary against each
 neighbouring component.
 
+**Kept in sync with the dashboard UI by a real CI test, not by hand**
+(Keith's own question, 2026-09-19: "how will we ensure this stays in
+sync with what's actually shown in the UI") -
+`tests/test_component_taxonomy_consistency.py` fails if this file's own
+`## \`CODE\` — Full Name` section headers, `_COMPONENT_CODES`, and the
+dashboard template's own `COMPONENT_ICON`/`PLANS_ALL_COMPONENTS` consts
+(what the Plans tab and Release Notes panel actually render) ever
+disagree. A section heading here has to stay EXACTLY `## \`CODE\` —
+Full Name` (the literal em dash, the literal backticks) for that test to
+keep parsing it - don't reformat a heading without knowing that.
+
 A requirement, a `plans/*.md` item, or a `CHANGELOG.md` entry can
 legitimately touch more than one component (most real features do) -
 `plans/*.md`/`CHANGELOG.md` tag with as many as genuinely apply, but a

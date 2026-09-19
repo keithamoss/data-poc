@@ -56,9 +56,13 @@ REQUIREMENTS_YAML = ROOT / "requirements.yaml"
 # same 7-part taxonomy plans/*.md items and CHANGELOG.md entries tag
 # things with (dashboard/qa-reporting-dashboard.template.html's own
 # `COMPONENT_ICON`/`PLANS_ALL_COMPONENTS` consts), just condensed to
-# 3-4 letters for the id. Keep this dict and those two consts in sync
-# by hand if the taxonomy itself ever changes - nothing currently
-# cross-checks them against each other. docs/components.md has the
+# 3-4 letters for the id. Edit this dict when the taxonomy itself
+# changes and nothing else - tests/test_component_taxonomy_consistency.py
+# (2026-09-19, Keith's own question: "how do we keep components.md in
+# sync with the UI") fails CI if this dict, those 2 template consts, and
+# docs/components.md's own section headers ever disagree, so drift here
+# is a real, structural CI failure, not something that has to be
+# remembered by hand any more. docs/components.md has the
 # full write-up of what each one actually covers (real scope, real
 # file/directory ownership, in/out-of-scope boundary against its
 # neighbours) - this dict is deliberately just the bare code mapping.

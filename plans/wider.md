@@ -639,8 +639,34 @@ check_lifecycle.py`'s own `check_id` convention.
     implementation, unlike this one) but wants it parked for now - "put
     that to the side for now and come back to me on this."
 
-    **Requirements-register schema refined further, same day** - three
-    more real follow-up asks, before the agent system's first real run:
+    **Keith's own follow-up: keeping `docs/components.md` in sync with
+    the UI, and the first real standalone test of the reviewer's
+    post-build UX pass.** Two real asks, same day:
+    - **Sync question**: how do we stop `docs/components.md`, the
+      dashboard template's own `COMPONENT_ICON`/`PLANS_ALL_COMPONENTS`
+      consts, and `_COMPONENT_CODES` drifting apart, now that the same
+      taxonomy shows up in 3 real places (the Plans tab, the Release
+      Notes panel, and now every requirement's own id)? Answer: a real
+      CI test, not a rule to remember -
+      `tests/test_component_taxonomy_consistency.py`, which fails if
+      any of the 3 disagree (verified with a real, deliberately-
+      introduced typo in `docs/components.md` first, confirmed failing,
+      then reverted). Note: the Requirements panel itself doesn't
+      currently DECODE a requirement's id into a component name/icon -
+      it only shows the raw id string (the code is visible but not
+      translated) - whether to add a decoded badge there too is a
+      separate, not-yet-asked follow-up.
+    - **First standalone capability test of `requirements-reviewer`'s
+      post-build UX pass**: Keith wants the mobile overflow bug
+      (`plans/dashboard.md` #12) used as the real first test case -
+      point the agent at the real built
+      dashboard's Requirements panel, on a mobile viewport, with
+      genuinely zero hints about what's wrong, and see if it finds the
+      bug on its own. Run via the main session (not `requirements-ux`,
+      which never drives a live browser - this is explicitly
+      `requirements-reviewer`'s own post-build visual-QA pass,
+      exercised standalone rather than as part of a full requirement
+      review). Result recorded below once the run completes.
     - **Component-coded ids.** Every `requirements.yaml` id is now
       `REQ-<CODE>-NNN` (`GEN`/`QAC`/`PIPE`/`DASH`/`GHUB`/`TEST`/`DOCS` -
       `qa_tools/common/validate_requirements.py`'s own
