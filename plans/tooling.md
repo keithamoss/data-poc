@@ -1530,3 +1530,155 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     the Promote prompt on purpose: saying yes there would write a real
     run into the permanent, committed `qa_results/` history as a
     side effect of making a video. Worth knowing when re-recording.
+
+15. **[todo, 2026-09-19]** **[Testing & dev tooling]** **[Docs & process]**
+    **Priority: pick up tomorrow morning (2026-09-19, Keith's own words,
+    after watching a real `delivery-scoper` run take 5+ minutes: "in
+    terms of making the agents run faster, flag all that stuff, and
+    we'll come back to that tomorrow morning").**
+
+    The `delivery-*` subagents are slow, and the cost is real, measured
+    and mostly avoidable. Raised by Keith's own question - "why is it
+    taking so long to run? It doesn't have to do a whole lot, does it?
+    Or is there a large setup cost?" - during the first real end-to-end
+    `delivery-scoper` run (item 25's scoping, `plans/qa-pipeline.md`).
+    There is a large setup cost, and separately the slow part isn't the
+    part that looks slow.
+
+    **Real numbers from that run**, both passes of the same agent:
+
+    | | tokens | tool calls | wall clock |
+    |---|---|---|---|
+    | First pass (cold) | 97,907 | 29 | 5m21s |
+    | Second pass (resumed, answers relayed) | 119,130 | **2** | 3m28s |
+
+    The second pass is the informative one: **2 tool calls, 3.5
+    minutes**. It read essentially nothing and still took most as long
+    as the cold pass, because what dominates is GENERATION over a large
+    context, not file reading. Any fix aimed only at "make it read less"
+    addresses the smaller half. Worth stating plainly before anyone
+    optimises the wrong thing.
+
+    **Where the ~98k of cold context goes** (approximate, `wc -w` x 4/3;
+    the exact read set isn't inspectable without pulling the agent's own
+    transcript into the main session's context, which would cost more
+    than it tells us):
+
+    - **`plans/qa-pipeline.md` - ~58,000 tokens.** 5,180 lines. The
+      single largest item by a wide margin, and the agent had to go
+      there because item 25 lives in it.
+    - **`CLAUDE.md` - ~11,800 tokens**, loaded into every subagent
+      automatically (see below).
+    - Soda checks YAML + `check_lifecycle.py` + `requirements.yaml` -
+      ~12,000.
+    - `docs/components.md` + `docs/project-context-for-agents.md` -
+      ~3,700.
+    - The agent's own prompt - ~2,200.
+
+    **Three real levers, none decided - this is the part to work through
+    with Keith, not to guess at:**
+
+    1. **`plans/qa-pipeline.md` has outgrown a single file.** 5,180
+       lines against `publishing-and-history.md`'s 3,077,
+       `tooling.md`'s 1,532 and `wider.md`'s 1,506. There is direct
+       precedent twice over: `plans/wider.md` was split 2026-09-18 as
+       an "undifferentiated 32-item dump", and this very file was split
+       out of it 2026-09-19 "once that one item had grown far larger
+       than anything else there". `qa-pipeline.md` is now well past
+       where both of those triggered a split, and is nominally scoped
+       to ONE dataset's pipeline while plainly carrying everything.
+       Every agent touching any QA-check question pays the full ~58k to
+       read one item out of it.
+    2. **`omitClaudeMd: true` is a real, documented frontmatter option**
+       (verified against Claude Code's own subagent docs while checking
+       the `AskUserQuestion` question - see #16). A subagent loads
+       "every level of the CLAUDE.md hierarchy the main conversation
+       loads" unless it opts out. **None of the 8 `delivery-*` agents
+       opts out - and all 8 are separately instructed to read
+       `docs/project-context-for-agents.md`, the condensed orientation
+       built precisely so they wouldn't need the full file.** So each
+       agent currently pays ~11,800 tokens for the long version AND
+       ~1,900 for the short version of the same material. That said:
+       `CLAUDE.md` carries real conventions an agent may genuinely need
+       (the "enumerate every consumer" rule, the no-live-data rule, the
+       bug-gets-a-test rule), so this is NOT a free win - the real
+       question is whether `project-context-for-agents.md` should
+       absorb the conventions that actually matter to an agent, and
+       then the full file be dropped. Needs a real read of both before
+       deciding.
+    3. **Point an agent at an item, not a file.** The scoper was told
+       to read "`plans/qa-pipeline.md` item 25 (around line 1131)" and
+       appears to have read the file. A prompt that hands over the
+       relevant extract directly, or names a line range, would sidestep
+       most of the single largest cost without any restructuring at
+       all - the cheapest of the three, and testable immediately.
+
+    **Measure, don't guess** - the same standing lesson the `pytest
+    --durations` profile established for test runtime. A real before/
+    after on one identical scoping task is the way to tell which of the
+    three actually moved the number, rather than doing all three and
+    assuming.
+
+16. **[todo, 2026-09-19]** **[Testing & dev tooling]** **[Docs & process]**
+    All 8 `delivery-*` agents declare a tool that can never work, and
+    `docs/agent-orchestration.md` documents a workflow that cannot
+    happen. Found live during the first real `delivery-scoper` run, and
+    caught by Keith reading the agent's own log rather than by anything
+    here noticing: the agent tried to ask him a question and got
+    `Error: No such tool available: AskUserQuestion`.
+
+    **Verified against Claude Code's own subagent documentation, not
+    left at the error string** - Keith's own explicit ask ("verify
+    through looking at Claude's subagent documentation whether you can
+    give AskUserQuestion to a subagent rather than just assuming").
+    The docs list the tools removed by the first filter, introduced as:
+    *"The first filter removes these tools, even when listed in the
+    `tools` field"* - and `AskUserQuestion` is on it, alongside
+    `EndConversation`, `EnterPlanMode`, `ScheduleWakeup`, `TaskOutput`,
+    `WaitForMcpServers`, `Workflow`, `ExitPlanMode` (unless
+    `permissionMode: plan`) and `Agent` at the depth limit. So this is
+    documented, universal to all subagents, and explicitly NOT
+    fixable by listing it in `tools:`. The runtime error says "in this
+    environment", which is what initially led this session to log it as
+    an environment quirk - the docs are clearer than the error message,
+    and the first write-up here was wrong until Keith pushed for the
+    real source.
+
+    Worth recording HOW that mattered, not just that it was wrong: the
+    whole roster was designed around agents interrogating Keith
+    directly. `delivery-scoper`'s own description is "stress-tests the
+    idea with clarifying questions rather than assuming", it references
+    the tool 3 times in its own body, and the other 7 reference it
+    once or twice each. The premise held for none of them, and nobody
+    noticed until an agent actually tried.
+
+    **The fix, in two parts:**
+
+    - **Strip the dead grant from all 8 agent files** and rewrite the
+      instructions that tell each one to ask directly. They should
+      instead hand questions back in relay-ready shape - which is what
+      `delivery-scoper` improvised on its own when blocked, writing its
+      forks as pre-formed `AskUserQuestion`-shaped sets with 2-4
+      options each, and it worked well enough that the main session
+      relayed them verbatim across 3 rounds.
+    - **Rewrite `docs/agent-orchestration.md`'s flow** into the relay
+      loop, with the doc citation so a future session doesn't
+      re-litigate it. The loop: the agent hands questions back, the
+      main session puts them to Keith with its own `AskUserQuestion`,
+      then `SendMessage`s the answers to the SAME agent, which resumes
+      with its context intact rather than starting over. The docs name
+      resumption as the pattern here: *"When Claude sends a completed
+      subagent a message with the `SendMessage` tool, the subagent
+      resumes in the background without a new `Agent` invocation."*
+      Verified working for real across 3 rounds on item 25's scoping.
+
+    What's genuinely lost, and should be said in the doc rather than
+    glossed: the agent can't adaptively follow up mid-flight without a
+    round trip through the main session, so it has to front-load its
+    questions into batches. That is a real constraint on the design,
+    not just a transport detail - it pushes each agent toward asking
+    everything it might need at once rather than following a thread.
+
+    Also worth a look while in there: `#15`'s own finding that none of
+    the 8 sets `omitClaudeMd`, which is a second frontmatter-level
+    thing nobody has audited since these files were written.
