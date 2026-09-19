@@ -489,3 +489,10 @@ Rough layout:
     reversed from his earlier "I'll research this myself") - a
     real-looking design-review skill writeup only readable via
     search-engine snippets, not the primary source.
+  - **`patch-diff.githubusercontent.com`** (2026-09-19) - blocked; hit
+    trying to fetch `cfisch3r/estimate` PR #91's real `.diff` (Keith's
+    own direct ask: "are you able to access that pull request and see
+    what was actually in their prompts") - worked around it by finding
+    the real file paths another way and fetching them directly from
+    `raw.githubusercontent.com` instead (not blocked), so this one
+    didn't block the actual research, just the first route tried.

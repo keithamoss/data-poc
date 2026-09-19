@@ -829,3 +829,65 @@ check_lifecycle.py`'s own `check_id` convention.
     ahead, and the Playwright MCP server, while smoke-tested at the CLI
     level, hasn't yet been exercised through an actual Claude Code
     subagent session pulling tools from it.
+
+    **Keith asked directly whether the 2 new agents were actually
+    copies of `cfisch3r/estimate`'s own real prompts - they weren't
+    (never had access to them until he asked to go and look), and once
+    real access was found, real, worthwhile differences turned up.**
+    First attempt (fetching the PR's rendered page) gave an internally
+    CONTRADICTORY "verbatim" excerpt for `design-critic-ux.md` on 2
+    separate tries - a real, concrete demonstration that `WebFetch`'s
+    own HTML-rendered-page summarization is not reliable for "what does
+    this file actually say," flagged here so a future session doesn't
+    trust it either. Found the real file paths
+    (`.claude/agents/design-critic-ux.md`/`design-critic-visual.md`,
+    plus a third, not-yet-looked-at `doc-quality.md`) via a real
+    directory listing, then fetched the real raw source directly from
+    `raw.githubusercontent.com` (not the rendered PR page) - internally
+    consistent across 2 separate fetches (each file correctly
+    cross-references the other by name), structured exactly like this
+    project's own real Claude Code agent files (YAML frontmatter +
+    prose), genuinely more trustworthy than the first attempt.
+
+    Real content, real differences from what was already built here:
+    - `model: sonnet` for both of theirs, vs `opus` for both of ours -
+      ours followed this project's own existing convention (every other
+      `requirements-*` agent is `opus`), not copied from them.
+    - `tools: Read, Grep, Glob, mcp__playwright` - a single namespace-
+      level grant for the WHOLE Playwright MCP toolset, not individual
+      tool names. Real, useful discovery: Claude Code does support
+      granting an entire MCP server this way. Our own 2 agents instead
+      list each real `mcp__playwright__browser_*` tool individually (15
+      for UX-critic, 12 for visual-critic) - a deliberate, narrower
+      grant matching this project's own existing minimal-tool-per-agent
+      convention (every other agent here gets only what it needs, not a
+      whole category), not an oversight - but worth Keith knowing the
+      simpler, broader syntax exists as a real alternative.
+    - Their visual critic reads the app's own real, NAMED design-token
+      CSS files (`src/design/nocturne.css`) before critiquing, and
+      judges "against Nocturne's own tokens... not generic best
+      practice." Real, concrete idea neither of our 2 new agents
+      currently has explicitly - our dashboard does have its own real
+      CSS custom properties (`var(--ink-muted)`, `var(--surface-alt)`,
+      etc. throughout the template) that `requirements-visual-critic`
+      could be told to read first the same way, not yet added.
+    - Their UX critic's own contract explicitly expects to be handed
+      "User goal on this screen" / "Target audience" as real structured
+      inputs per review, not just general project context. Ours relies
+      on `docs/project-context-for-agents.md`'s general personas
+      instead - a real, different choice (more general-purpose per
+      review, less tailored per screen), not yet reconsidered.
+    - Their visual critic's own "squint test" (mentally blur the
+      screenshot, can you still tell what's most important) is a
+      concrete, real visual-hierarchy technique ours doesn't currently
+      name.
+    - A third real agent, `doc-quality.md`, exists in that repo -
+      unrelated to UX/visual, not yet looked at, but a real, adjacent
+      data point for Keith's own separately-parked interest in a
+      code-quality tool/reviewer agent (`plans/tooling.md` #2/#3) -
+      "documentation quality" specifically, a slightly different angle
+      neither of those 2 parked items named yet.
+
+    None of these 5 real differences have been adopted into our own 2
+    agents yet - presented to Keith as real, concrete options, not
+    silently applied.
