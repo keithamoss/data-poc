@@ -782,5 +782,48 @@ common/check_lifecycle.py`'s own `check_id` convention.
     file paths is the obvious place to check first). Not yet scoped
     beyond that - explicitly NOT to be fixed now, just flagged.
 
+    **Confirmed and substantially deepened, same day**: used as the
+    first real, standalone, zero-hints test of `requirements-reviewer`'s
+    post-build UX pass (`plans/wider.md` #10's own write-up has the
+    full account of the test itself) - a general-purpose agent adopting
+    that role's real instructions, pointed at the real built Requirements
+    panel at a real 390x844 mobile viewport, with no mention of this
+    item or any hint about what might be wrong. It found the bug
+    unprompted, and found it's worse than "overflows and needs
+    wrapping": the panel's scroll container is 457px wider than the
+    phone and actually PANS horizontally on a real touch swipe (verified
+    via real CDP touch-event dispatch, not just a script setting
+    `scrollLeft`) - swipe left and the content slides off, leaving what
+    reads as a completely blank page under an intact header, not an
+    obviously-just-needs-wrapping issue. Root cause, with real line
+    numbers: `renderRequirementsPanel()`
+    (`dashboard/qa-reporting-dashboard.template.html:3225`) renders each
+    `linked_tests` entry in a bare `<code>` with no break rule (no
+    `code {}` CSS rule exists at all) inside `.drawer-body` (line 285),
+    which sets `overflow-y` only - `overflow-x` computes to `auto` per
+    CSS spec once one axis is non-`visible`, so the overflow becomes a
+    real scrollable/pannable axis instead of being clipped or wrapped.
+    Confirmed present on the Changelog panel too (159px overflow), not
+    just Requirements. Several genuinely new, real findings surfaced
+    alongside it in the same pass (full detail in that agent's own
+    report, kept in this session's transcript) - worth a real look
+    when this gets picked up, not just the original overflow issue:
+    scroll position persisting across close/reopen (compounds the
+    panning bug - reopening can land directly in the broken-looking
+    state), the MoSCoW "Must" pill reusing this dashboard's own
+    red-means-failing colour language, no search/filter on a 22-entry,
+    9+-screen-tall list (unlike the Plans tab's own real search/filter,
+    on structurally similar content), two real stale `not_started`
+    rows for features that are actually built (`REQ-DASH-021`/
+    `REQ-DASH-022` - a `requirements.yaml` data-correction question for
+    Keith, not a template bug), sub-platform-minimum tap targets, and a
+    couple of low-priority a11y gaps (no focus trap/move into the
+    drawer). Also confirmed genuinely working well: zero console errors,
+    Escape-to-close, the close button staying fixed through 9+ screens
+    of scroll, clean dark-mode parity, and good prose typography
+    throughout. Still not fixed - this item stays `[todo]`, now with
+    real, measured findings instead of just Keith's own initial report,
+    ready for whichever agent/session picks it up next.
+
     **Priority: work through today/tomorrow (2026-09-19, Keith's own
     explicit ask).**

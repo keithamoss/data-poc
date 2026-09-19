@@ -28,6 +28,27 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
+- **5:05pm** — **A Real Playwright MCP Server, and the UX/Visual Critique Split** **[Docs & process]** **[Testing & dev tooling]**
+  A standalone, zero-hints test of `requirements-reviewer`'s post-build
+  UX pass - pointed at the real built Requirements panel on a real
+  mobile viewport with no mention of what to look for - found the real
+  mobile overflow bug Keith had reported (and much more: it's actually a
+  horizontal-pan bug, confirmed via real touch-event dispatch, with a
+  real traced root cause at two specific template lines - full findings
+  in `plans/dashboard.md` #12). Real, working evidence the isolated
+  "read your own instructions, go in cold" design produces genuine
+  findings. Off the back of that, Keith asked to adopt `cfisch3r/
+  estimate`'s own `design-critic-ux`/`design-critic-visual` split for
+  real: a new `.mcp.json` wires up a real Playwright MCP server
+  (`@playwright/mcp@0.0.82`, pinned, pointed at this sandbox's own
+  pre-installed Chromium, smoke-tested end to end), and the post-build
+  UX pass is pulled entirely out of `requirements-reviewer` into 2 new
+  dedicated agents - `requirements-ux-critic` (workflow/navigation) and
+  `requirements-visual-critic` (spacing/overflow/dark-mode/interaction
+  states) - each with its own real, considered subset of Playwright
+  MCP's tool surface. `requirements-reviewer` itself goes back to purely
+  functional/code-quality/security/coverage checks.
+
 - **4:52pm** — **A Real CI Test Keeps the Component Taxonomy From Drifting** **[Docs & process]** **[Testing & dev tooling]**
   Keith's own question: now that the same 7-part
   component taxonomy shows up in 3 real places (`docs/components.md`,

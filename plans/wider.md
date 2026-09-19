@@ -689,7 +689,10 @@ check_lifecycle.py`'s own `check_id` convention.
       which never drives a live browser - this is explicitly
       `requirements-reviewer`'s own post-build visual-QA pass,
       exercised standalone rather than as part of a full requirement
-      review). Result recorded below once the run completes.
+      review). **Result: it worked, and found real, substantial
+      evidence** - see the full new section below, "The standalone test
+      ran, found the bug and much more, and led to a real architecture
+      change."
     - **Component-coded ids.** Every `requirements.yaml` id is now
       `REQ-<CODE>-NNN` (`GEN`/`QAC`/`PIPE`/`DASH`/`GHUB`/`TEST`/`DOCS` -
       `qa_tools/common/validate_requirements.py`'s own
@@ -733,3 +736,96 @@ check_lifecycle.py`'s own `check_id` convention.
     Keith about those via batched `AskUserQuestion` calls (up to 4
     questions per call) - genuine active coaching, not a mechanical
     10-question interrogation on every requirement.
+
+    **The standalone test ran, found the bug and much more, and led to
+    a real architecture change.** A general-purpose agent, adopting
+    `requirements-reviewer`'s own real instructions (its actual "Post-
+    build UX / visual QA pass" section, at the time still folded into
+    that agent), was pointed at the real built dashboard's Requirements
+    panel at a real 390x844 mobile viewport with genuinely zero hints -
+    no mention of the mobile overflow bug, no mention of what to look
+    for. It built the real dashboard itself (`mothman dashboard rebuild-
+    results`/`build-data`/`embed`), drove a real headless Chromium via
+    throwaway Playwright scripts (same mechanism the agent's own
+    instructions described), and came back with 9 real, evidenced
+    findings (F1-F9), not a vague pass/fail. Full detail is in
+    `plans/dashboard.md` #12 (the bug it confirmed and substantially
+    deepened) - the short version: it found the overflow bug unprompted,
+    discovered it's actually a real horizontal-PAN bug (confirmed via
+    real CDP touch-event dispatch, not just a script), traced the real
+    root cause to two specific real lines (`renderRequirementsPanel()`
+    at template line 3225, `.drawer-body`'s `overflow-y`-only rule at
+    line 285), found the same bug on the Changelog panel too, and
+    surfaced several more real findings in the same pass (stale
+    `not_started` rows for features that are actually built, a MoSCoW
+    "Must" pill reusing the page's own red-means-failing colour
+    language, no search/filter unlike the structurally similar Plans
+    tab, sub-platform tap targets) - while also honestly reporting what
+    worked well (zero console errors, clean dark-mode parity, Escape-to-
+    close). This is real, working evidence the isolated "read your own
+    instructions, go in cold" design actually produces genuine,
+    specific findings, not generic feedback - the single most direct
+    validation this agent system has had since being built.
+
+    Keith's own reaction: adopt the `cfisch3r/estimate`-style UX/visual
+    split for real, and two real technical decisions came with it
+    (scoped via `AskUserQuestion` before building, per this project's
+    own standing convention):
+    - **A real Playwright MCP server**, not the ad hoc Bash+throwaway-
+      script mechanism `requirements-reviewer` used for the test above.
+      Explained to Keith in plain terms first (Playwright = real browser
+      automation; MCP = a fixed, named "menu" of tools an agent calls
+      directly instead of writing its own script each time; "Playwright
+      MCP" = Microsoft's own real MCP server wrapping Playwright that
+      exact way - what `cfisch3r/estimate`'s own `.mcp.json` wires up).
+      Set up for real: `.mcp.json` at the repo root, running
+      `@playwright/mcp@0.0.82` (pinned, matching this project's own
+      version-pinning convention - `.python-version`, `dbt_utils`) via
+      `npx`, configured with `--executable-path /opt/pw-browsers/
+      chromium` (this sandbox's own real, pre-installed Chromium -
+      confirmed via a real smoke test: launched the server in HTTP mode
+      on a local port, got a real listening banner and a real HTTP
+      response back, proving the browser launches correctly against
+      this environment's own Chromium rather than trying to download a
+      mismatched revision, the same class of problem this project has
+      hit before on the Python/pytest side), `--headless`, `--no-
+      sandbox` (needed in this kind of sandboxed environment),
+      `--isolated` (in-memory profile, no leftover state between runs).
+    - **The post-build UX pass pulled OUT of `requirements-reviewer`
+      entirely**, into 2 new, dedicated, Playwright-MCP-driven agents:
+      `requirements-ux-critic` (workflow/navigation/discoverability -
+      does the flow make sense) and `requirements-visual-critic`
+      (spacing/alignment/overflow/dark-mode/interaction-states - does it
+      LOOK deliberate), a real domain split mirroring `cfisch3r/
+      estimate`'s own `design-critic-ux`/`design-critic-visual` pair.
+      `requirements-reviewer` itself goes back to purely functional/
+      code-quality/security/test-coverage checks - its own "Post-build
+      UX / visual QA pass" section is gone, its description/`tools:`
+      frontmatter updated to match. `requirements-ux` (the PRE-build
+      agent) had its own "out of scope" pointer updated to name the 2
+      new post-build agents instead of `requirements-reviewer`. Each new
+      agent's own real tool list is a genuine, considered subset of
+      `@playwright/mcp`'s real ~60-tool surface (verified against the
+      real npm package's own README, not guessed) - `browser_navigate`/
+      `browser_click`/`browser_resize`/`browser_take_screenshot`/
+      `browser_console_messages`/etc. for `requirements-ux-critic`;
+      those plus `browser_evaluate` (real measured CSS/DOM values, not
+      guesswork) and `browser_emulate_media` (real forced dark-mode
+      testing) for `requirements-visual-critic` - deliberately excluding
+      the advanced surface neither needs (tracing, video, storage-state,
+      cookies).
+
+    Also, same follow-up: Keith asked whether `cfisch3r/estimate` itself
+    has a real basis for the split (not just concrete implementation,
+    which was already confirmed) - see PR #87's real fix list (a
+    heading-scale bug, a design-token misuse, an icon-colour mismatch,
+    real accessibility additions, and an honest "two findings were false
+    positives" note) two entries up in this same file's history for the
+    full account; not repeated here.
+
+    Not yet done: neither new agent has been run for real yet (the
+    standalone test above ran under `requirements-reviewer`'s OLD,
+    not-yet-split instructions) - their own first real run is still
+    ahead, and the Playwright MCP server, while smoke-tested at the CLI
+    level, hasn't yet been exercised through an actual Claude Code
+    subagent session pulling tools from it.
