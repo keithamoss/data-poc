@@ -20,10 +20,26 @@ reused, even if an item is later retired, matching `qa_tools/common/
 check_lifecycle.py`'s own `check_id` convention (same rule `plans/
 wider.md`/`plans/dashboard.md`/etc. already state for their own items).
 
-1. **[in-progress, 2026-09-19]** **[Testing & dev tooling]** A real,
+1. **[done, 2026-09-19]** **[Testing & dev tooling]** A real,
    unified CLI for running this whole PoC - Keith's own framing, this
    session: "my goal is a human only uses the click CLI and not
-   scripts." Superseded from the original `[parked, 2026-09-18]` scoping
+   scripts." All 6 phases below shipped (Phase 6, the recorded demo
+   tab, was the last one in the build order - no further phase is
+   scoped after it). **One real, still-open verification gap, flagged
+   rather than silently left implicit**: `cli/pipeline.py`'s `mothman
+   pipeline run` (Phase 4) - the full-manifest batch mode that
+   regenerates synthetic data and runs all 4 real tools against EVERY
+   run - was never actually executed end to end for real in this
+   session's own sandbox; the one attempt was blocked by the sandbox's
+   own auto-mode classifier as a "shared resources" write (it writes
+   real, permanent `qa_results/` history across the whole manifest).
+   Verified instead via code review plus every function it calls
+   individually already being smoke-tested working correctly - a real,
+   deliberate substitute, not a gap that went unnoticed, but genuinely
+   not the same as having actually run the command. Worth a real run of
+   `mothman pipeline run` (no flags, the default `--dataset all`) at
+   some point to close this out properly. Superseded from the original
+   `[parked, 2026-09-18]` scoping
    below (kept for the original motivation/friction account) by a long,
    multi-round design conversation the same day Thread A (the two
    on-demand `qa_tools/bdm/check_file.py` / `qa_tools/cp/check_delivery.py`
