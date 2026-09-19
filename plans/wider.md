@@ -410,23 +410,115 @@ check_lifecycle.py`'s own `check_id` convention.
    register would need to cover more than one asset shape from the
    start) - worth revisiting together once either gets scoped for real.
 
-10. **[todo, 2026-09-19]** **[Docs & process]** A dedicated requirements-
-    analysis subagent - Keith's own idea (voice-dictated batch): "I think
-    I'd like to work on creating an agent with you to do requirements
-    analysis, and then we can have them go off and do some work while we
-    continue." Genuinely cross-cutting (not tied to one component) - a
-    process/tooling idea about HOW work on this project gets scoped, not
-    a feature of any one part of the system. Not scoped at all yet: what
-    "requirements analysis" means concretely here (triaging/scoping
-    `plans/*.md` items before they're built? analyzing the real
-    `requirements.yaml`/`qa_tools/common/validate_requirements` gate
-    that already exists? something else entirely?), what such an agent
-    would actually read/produce, or how its output would feed back into
-    this project's existing "scope via clarifying questions before
-    building" convention (CLAUDE.md) rather than bypass it. Needs a real
-    scoping conversation with Keith - his own phrasing suggests he wants
-    to build this WITH Claude as a joint design exercise, not have it
-    speced unilaterally.
+10. **[done, 2026-09-19]** **[Docs & process]** A dedicated requirements-
+    analysis subagent system - Keith's own idea (voice-dictated batch):
+    "I think I'd like to work on creating an agent with you to do
+    requirements analysis, and then we can have them go off and do some
+    work while we continue." Genuinely cross-cutting (not tied to one
+    component) - a process/tooling idea about HOW work on this project
+    gets scoped, not a feature of any one part of the system.
 
-    **Priority: work through today/tomorrow (2026-09-19, Keith's own
-    explicit ask).**
+    **Scoped and built the same day, across many real rounds of
+    back-and-forth (not speced unilaterally, per Keith's own explicit
+    ask above)** - real research into Claude Code's own published
+    sub-agent guidance, Anthropic's broader multi-agent architecture
+    patterns, and real-world "BA agent"/spec-driven-development examples
+    in the wild, each round folded into the design before the next:
+
+    - **Real published guidance found first** (`code.claude.com/docs/en/
+      sub-agents.md`, Anthropic's "Building Effective Agents" and
+      multi-agent research system posts): subagent tool access is a real,
+      harness-enforced boundary, not a polite prompt instruction; start
+      with single-purpose agents; 5 real orchestration patterns exist
+      beyond the evaluator-optimizer reviewer loop Keith already had in
+      mind (prompt chaining, parallelization, routing, orchestrator-
+      worker) - of those, prompt chaining and parallelization are real,
+      useful extensions for later (a scoped-then-built-then-reviewed
+      lifecycle chain; batch-reviewing many already-built features at
+      once), not needed for this initial build.
+    - **Real-world precedent researched** (deliberately checked before
+      finalizing the design, not just Anthropic's own docs):
+      `zhsama/claude-sub-agent`'s real 5-stage spec pipeline
+      (spec-analyst/architect/planner/reviewer/validator) validated the
+      overall shape and, independently, that EARS-format acceptance
+      criteria is a real convention others use; `www.codecentric.de`'s
+      "Don't Let Your AI Cheat: Isolated Specification Testing" post (by
+      Thomas Jaspers) supplied the real, concrete isolation mechanism
+      (`.claudeignore` + `settings.json` permission restrictions +
+      separate `CLAUDE.md` files per agent) and three specific prompt
+      instructions now built directly into `requirements-reviewer.md`
+      ("report exactly what you observe," "never mark a criterion met
+      unless explicitly verified," "don't let one finding bias the
+      next"). A UX-focused agent has almost no real precedent in the
+      wild (confirmed via real research, not assumed) - that part of the
+      design is closer to novel than to following an established
+      pattern, flagged as such rather than presented as proven.
+    - **Where this project's own design deliberately diverges from that
+      precedent**, each a real Keith decision, not a default: `zhsama`'s
+      pipeline has no forced human approval step (agent-scored gates
+      only); this one does (per this project's own "ask, don't guess"
+      convention, `requirements-scoper` explicitly asks multiple rounds
+      of clarifying questions and escalates genuine forks rather than
+      resolving them itself). `zhsama`'s reviewer stage directly edits
+      code; this one's `requirements-reviewer` is strictly read-only,
+      reporting findings back to the main session (and Keith) to act on.
+      Task granularity is deliberately small (Keith: "none of our tasks
+      really should be like four to eight hours long... one or two at a
+      time"), so no separate task-planner stage was built at all.
+
+    **Final shape, 4 real subagents** (`.claude/agents/*.md`), plus a new
+    `docs/project-context-for-agents.md` (drafted from what was already
+    in `CLAUDE.md`/`README.md`, per Keith's own explicit call - not
+    dictated from scratch) and 5 new optional `requirements.yaml` fields
+    (`source`/`non_functional_requirements`/`dependencies`/
+    `open_questions`/`evidence` - see that file's own header comment for
+    the full schema, and `qa_tools/common/validate_requirements.py` for
+    the real enforcement, including a genuine dangling-reference check on
+    `dependencies`):
+
+    1. `requirements-scoper` - turns a raw idea into EARS-format
+       requirements, splitting a big idea into several small
+       self-contained ones (Keith's own explicit call: "I'm keen for
+       requirements to remain pretty small and self-contained") rather
+       than one sprawling entry, plus a draft `plans/*.md` entry. Asks as
+       many rounds of clarifying questions as it takes - never settles
+       for an assumption.
+    2. `requirements-architect` - a genuinely "simple" architect (Keith's
+       own framing), NOT full software design: duplication/overlap
+       detection against the real codebase (the exact class of problem
+       the `generator/`/`synthetic_data_generator/` drift bug already
+       demonstrated for real), fit within `mothman`'s existing command
+       structure, cross-component blast radius, security, and code-
+       quality/clean-code expectations for the builder - plus an
+       optional lightweight architecture/data-model sketch, only when it
+       would genuinely help.
+    3. `requirements-ux` - dashboard-only (not the CLI/TUI, not
+       accessibility - Keith's own explicit scope choices), checking
+       consistency with the dashboard's real existing UI patterns and
+       workflow/information-architecture fit, advisory only, alongside
+       the architect, before anything is built.
+    4. `requirements-reviewer` - merged reviewer + fresh-context QA-
+       checker into one role (Keith's own explicit simplification,
+       accepting the real tradeoff of losing genuine fresh-context
+       independence, partly offset by an explicit self-check step built
+       into its own prompt). Checks finished work against the
+       requirement's acceptance criteria AND the architect's quality/
+       security/code-quality expectations, reads real code, drives a
+       real headless Playwright browser via `Bash` (this environment has
+       no dedicated Playwright tool - the same ad hoc
+       `playwright.async_api` script pattern this project's own sessions
+       already use), and checks real test coverage - line coverage for
+       real today, branch coverage flagged as not-yet-measured rather
+       than fabricated (`pyproject.toml`'s `[tool.coverage.run]` doesn't
+       set `branch = true` yet, `plans/running-thoughts.md` #11,
+       deliberately parked). Deliberately isolated from the scoper's/
+       builder's own implementation reasoning - only ever given the
+       requirement, the architect's quality bar, and the finished result
+       - the real "don't teach to the test" principle the codecentric.de
+       research surfaced, agreed explicitly by Keith before building.
+       Strictly read-only; reports back to the main session, never edits
+       anything itself.
+
+    Not yet exercised end-to-end on a real feature - built and reviewed
+    in design, not yet run for real. First real use will be the natural
+    test of whether the design holds up in practice.

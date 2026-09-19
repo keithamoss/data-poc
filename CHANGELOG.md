@@ -27,6 +27,48 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Added
+- **4:23pm** — **A Requirements-Analysis Agent System, Built With Keith As A Joint Design** **[Docs &
+  process]** Four new real Claude Code subagents (`.claude/agents/*.md`):
+  `requirements-scoper` (turns a raw idea into small, self-contained
+  EARS-format requirements plus a draft `plans/*.md` entry, asking as
+  many rounds of clarifying questions as it takes), `requirements-
+  architect` (a deliberately "simple" pre-build check - duplication/
+  overlap against the real codebase, fit within `mothman`'s command
+  structure, cross-component blast radius, security, code-quality
+  expectations for the builder), `requirements-ux` (dashboard-only
+  consistency/workflow-fit review, advisory, alongside the architect),
+  and `requirements-reviewer` (a merged reviewer+QA role checking
+  finished work against both the requirement and the architect's
+  quality bar - reads code, drives a real headless Playwright browser
+  via `Bash`, checks real test coverage, strictly read-only, reports
+  back rather than editing anything itself).
+  Built on real research, not assumed: Claude Code's own published
+  sub-agent guidance and Anthropic's multi-agent architecture patterns,
+  plus real-world precedent (`zhsama/claude-sub-agent`'s 5-stage spec
+  pipeline validated the overall shape and independently confirmed EARS
+  as a real convention; `www.codecentric.de`'s "Don't Let Your AI
+  Cheat" post supplied the real isolation mechanism and three concrete
+  reviewer-prompt instructions now built directly into
+  `requirements-reviewer.md`). Where this design deliberately diverges
+  from that precedent (forced human approval in the loop, a strictly
+  read-only reviewer, no task-planner stage given how small this
+  project keeps its own tasks) was each a real Keith decision, not a
+  default.
+  Also: a new `docs/project-context-for-agents.md` (drafted from
+  existing `CLAUDE.md`/`README.md` content, for Keith to correct rather
+  than dictated from scratch) these four agents read first, and 5 new
+  optional `requirements.yaml` fields (`source`/
+  `non_functional_requirements`/`dependencies`/`open_questions`/
+  `evidence`) with real CI enforcement, including a genuine
+  dangling-reference check on `dependencies` - found and fixed a real
+  bug live while validating: the parser's own `source: ""` default was
+  tripping the new validator check, failing all 22 real committed
+  requirements at once. Regression test added, confirmed failing
+  against the pre-fix code first.
+  Not yet exercised end-to-end on a real feature - see `plans/wider.md`
+  #10 for the full design write-up.
+
 ### Changed
 - **3:17pm** — **Mothman's Eyes Now Actually Blink** **[Testing & dev tooling]** Keith noticed the CLI/TUI
   splash banner's "glowing red eyes" were a static colour, not actually
