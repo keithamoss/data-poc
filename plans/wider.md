@@ -1422,11 +1422,77 @@ check_lifecycle.py`'s own `check_id` convention.
     through the new subagent) rather than the full agent-level
     invocation - real, live end-to-end verification of `tui_drive.py`
     itself happened either way, just not routed through the new agent's
-    own instructions text. **Still open**: a real, live spawn of
+    own instructions text. ~~**Still open**: a real, live spawn of
     `delivery-cli-ux`/`delivery-cli-ux-critic` needs a fresh
     session (or the other already-open one) to confirm the agent files
     themselves - not just the underlying mechanism - actually work as
-    written.
+    written.~~
+
+    **Resolved, 2026-09-19 evening, by the fresh `claude/delivery-
+    subagents-plans-717lrx` session this anticipated** - and it closes
+    the post-rename question too (commit `0e9b634` renamed all 8
+    `requirements-*` agents to `delivery-*`; nothing had confirmed the
+    renamed files were actually spawnable, only that they existed on
+    disk). Verified three independent ways, in a session that cloned
+    the repo with the renamed files already present:
+    - **All 8 appear in this session's own `Agent` tool roster** under
+      their new `delivery-*` names, with their real descriptions - the
+      session-start-only read that caused the original gap above now
+      picks them up correctly.
+    - **3 were genuinely spawned**, not just listed - deliberately
+      chosen to span all 3 tool profiles rather than 3 of a kind:
+      `delivery-architect` (`Read/Grep/Glob/AskUserQuestion`,
+      `permissionMode: plan`), `delivery-cli-ux` (same profile), and
+      `delivery-cli-ux-critic` (adds `Bash`). Each was asked to recite
+      its own role from the instructions it was LOADED with (not from
+      re-reading its own file), and each came back with a real,
+      correct, agent-specific answer - so the renamed files are being
+      parsed and injected as system prompts, not merely resolving as
+      names. `delivery-architect` also confirmed its own frontmatter
+      reads `name: delivery-architect` / `model: opus`.
+    - **Their own internal cross-references survive the rename.**
+      `delivery-cli-ux-critic` grepped `.claude/agents/` for lingering
+      `requirements-` strings: only 2 hits, both in
+      `delivery-critic.md`, both the ordinary English phrase
+      "requirements-check" rather than a stale agent name - no agent
+      file still points at a `requirements-*` sibling that no longer
+      exists. `delivery-cli-ux` separately confirmed both reference
+      docs its instructions name (`docs/project-context-for-agents.md`,
+      `docs/hci-ux-psychology.md`) resolve on disk, and
+      `delivery-cli-ux-critic` confirmed `scripts/dev/tui_drive.py`
+      does too.
+
+    One real, deliberate non-finding worth recording rather than
+    leaving implicit: the 5 agents not spawned here
+    (`delivery-scoper`/`delivery-dashboard-ux`/`delivery-critic`/
+    `delivery-dashboard-ux-critic`/`delivery-dashboard-visual-critic`)
+    are covered by the roster check only, not by a live spawn - the 3
+    chosen cover every distinct `tools:` profile in the set, so a 4th
+    of an already-proven profile would add little, but that's a
+    reasoned sample, not full coverage. The 3 Playwright-MCP-driving
+    agents specifically were verified live in the earlier
+    `claude/playwright-mcp-verify-b2t4nb` session (see this item's own
+    account above), so the only genuinely unexercised files are
+    `delivery-scoper`/`delivery-dashboard-ux`.
+
+    Also still open, unchanged and NOT tested here: whether
+    `permissionMode: plan` would break the 3 `Bash`-using critics'
+    own `mothman dashboard rebuild` step - and note the caveat already
+    recorded above, that in an auto-mode session (this one included)
+    `permissionMode:` is ignored entirely, so this session couldn't
+    have observed it either way.
+
+    **A separate, small finding from the same sweep, flagged not
+    fixed**: a repo-wide grep for stale `requirements-<agentname>`
+    references outside `.claude/agents/` found 25 hits, all in
+    `CHANGELOG.md`. Every one is a historical entry describing what
+    those agents were genuinely called at the time they were built, so
+    leaving them is arguably correct (a changelog records history, it
+    doesn't get retro-edited) - but it does mean a future reader
+    grepping `CHANGELOG.md` for an agent by its current name finds
+    nothing. Keith's call whether that's worth a one-line note at the
+    rename's own CHANGELOG entry; no code or agent file is affected
+    either way.
 
     **Keith's own offer, same evening, not yet acted on**: he offered to
     explain more about who the real users actually are, to sharpen both
