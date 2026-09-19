@@ -1632,8 +1632,8 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     three actually moved the number, rather than doing all three and
     assuming.
 
-16. **[todo, 2026-09-19]** **[Testing & dev tooling]** **[Docs & process]**
-    All 8 `delivery-*` agents declare a tool that can never work, and
+16. **[done, 2026-09-19]** **[Testing & dev tooling]** **[Docs & process]**
+    All 8 `delivery-*` agents declared a tool that can never work, and
     `docs/agent-orchestration.md` documents a workflow that cannot
     happen. Found live during the first real `delivery-scoper` run, and
     caught by Keith reading the agent's own log rather than by anything
@@ -1695,6 +1695,37 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     Also worth a look while in there: `#15`'s own finding that none of
     the 8 sets `omitClaudeMd`, which is a second frontmatter-level
     thing nobody has audited since these files were written.
+
+    **Built the same night.** `AskUserQuestion` stripped from all 8
+    `tools:` lines, and each agent given a real "Asking Keith a
+    question" section instead: it states plainly that the tool is
+    unavailable and why, cites the documentation so a future session
+    doesn't re-litigate it, and specifies the relay shape - batch at
+    most 4 questions with 2-4 real options each, give the trade-off
+    both ways, never offer an "other" option (the tool adds one), and
+    say which parts of the draft are provisional on an answer.
+    `delivery-scoper`'s own step 2 rewritten, since it was the only one
+    whose body actively instructed asking; it now also has to report
+    which angles it judged and answered itself versus ruled out, so a
+    thin pass is visible as one and Keith isn't asked things the
+    codebase already answers.
+
+    `docs/agent-orchestration.md` gained a real section for the loop,
+    with the sequence diagram updated to point at it. Two things in it
+    are worth more than the mechanism: the front-loading constraint
+    (an agent can't follow a thread adaptively, so every follow-up
+    costs a round trip through Keith's attention - which pushes toward
+    broader, less responsive question sets, and that's the design
+    rather than sloppiness), and three practices that made the real
+    item 25 run work - relay the agent's own framing rather than a
+    paraphrase, verify its factual claims at source before putting
+    them to Keith as fact, and answer whatever the codebase or
+    `plans/*.md` already answers rather than spending his attention on
+    it.
+
+    Not done, deliberately: the `omitClaudeMd` audit above stays with
+    #15, since #15's own correction established the lever is much
+    weaker than it first looked.
 
 17. **[todo, 2026-09-19]** **[Docs & process]**
     **Priority: pick up tomorrow morning alongside #15 (2026-09-19,

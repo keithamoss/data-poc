@@ -55,6 +55,26 @@ edited for a punchier, friendlier read than a bare commit log.
   report), and how Keith can invoke it.
 
 ### Fixed
+- **11:34pm** — **Eight Agents Declared a Tool None of Them Could Call** **[Testing & dev tooling]** **[Docs & process]**
+  The whole `delivery-*` subagent roster was designed around agents
+  interrogating Keith directly — `delivery-scoper`'s own description is
+  "stress-tests the idea with clarifying questions" — and not one of
+  them could do it. `AskUserQuestion` is removed from every subagent by
+  Claude Code's own first tool filter, explicitly "even when listed in
+  the `tools` field". Nobody noticed until an agent actually tried it
+  mid-run and Keith spotted the failure in its log. A first write-up
+  called it an environment quirk on the strength of the error text and
+  was wrong; the documentation is clearer than the error. All 8 files
+  now drop the dead grant and carry a real "Asking Keith a question"
+  section instead, and `docs/agent-orchestration.md` documents the
+  relay loop that replaces it — agent hands questions back, the main
+  session asks, `SendMessage` returns the answers to the same agent
+  with its context intact. Verified across three real rounds while
+  scoping the plain-English check explanations. The honest cost is
+  written down too: an agent can't follow a thread adaptively, so it
+  has to front-load its questions.
+
+### Fixed
 - **10:30pm** — **The Demo's Unreadable Orange Flash Was the Recorder Lying About the Cursor** **[Testing & dev tooling]** **[Dashboard UI]**
   Keith spotted "a very brief flash of orange text appearing on the
   first line" through the first few clicks of the published demo, gone

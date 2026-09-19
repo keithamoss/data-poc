@@ -35,6 +35,8 @@ roster doesn't just sit there unexplained.
               \_____________  _____________/
                             \/
               Keith reviews both notes, confirms the approach
+              (questions from any stage reach him via the relay
+               loop below - no agent can ask him directly)
                             |
                     [ the actual build happens -
                       the main session does this directly,
@@ -68,6 +70,70 @@ MCP session, but a functional check, not UX) and `delivery-cli-ux-critic`
 (a completely separate mechanism, a real pty via `tui_drive.py`, not
 Playwright at all) don't share that constraint - either can run
 alongside the dashboard critic pair without contention.
+
+## No agent can ask Keith directly — the relay loop
+
+**`AskUserQuestion` is not available inside any subagent.** Claude Code's
+own subagent documentation is explicit: its first filter "removes these
+tools, even when listed in the `tools` field", and `AskUserQuestion` is
+on that list, alongside `EnterPlanMode`, `ScheduleWakeup`, `Workflow`
+and others. This is universal to all subagents, not a quirk of one
+environment, and it cannot be re-enabled by listing the tool or by any
+setting.
+
+Worth recording how this was found, because the doc said otherwise for a
+while. All 8 agents declared the tool and this file described a
+direct-ask flow; nobody noticed until `delivery-scoper` actually tried
+it mid-run on 2026-09-19 and Keith spotted the failure in the agent's own
+log. A first write-up called it an environment quirk on the strength of
+the runtime error text ("not available inside subagents in this
+environment") and was wrong — the docs are clearer than the error.
+`plans/tooling.md` #16 has the full account.
+
+**The loop that replaces it**, verified working across three real rounds
+on `plans/qa-pipeline.md` item 25's scoping:
+
+```
+    agent hands its questions back, pre-shaped for relay
+                    |
+    main session puts them to Keith with its OWN AskUserQuestion
+                    |
+    main session SendMessages the answers to the SAME agent
+                    |
+    agent resumes WITH ITS CONTEXT INTACT and carries on
+```
+
+The resumption half is documented behaviour, not a workaround: "When
+Claude sends a completed subagent a message with the `SendMessage` tool,
+the subagent resumes in the background without a new `Agent`
+invocation." So the agent is not starting over and should not re-derive
+what it already worked out — and the main session should say so when it
+relays, along with anything the agent couldn't establish for itself (a
+subagent has no shell in some configurations, so things as basic as
+today's real date may need handing to it).
+
+**What this genuinely costs, and it is not just a transport detail:** an
+agent can't follow a thread adaptively. Every follow-up is a full round
+trip through the main session and through Keith's attention, so each
+agent has to front-load — ask everything it might need at once rather
+than what it needs next. That pushes toward broader, less responsive
+question sets than a live conversation would produce. Worth knowing when
+reading an agent's questions: a slightly scattergun set is the design,
+not sloppiness.
+
+**For the main session, three things that made this work in practice:**
+
+- **Relay the agent's own framing, not a paraphrase.** The point of
+  running the agent is its interrogation, not yours. Where it names a
+  trade-off or a caveat on an option, carry that through.
+- **Verify the agent's factual claims before relaying them as fact.**
+  `delivery-scoper` and `delivery-architect` both reported real,
+  correct findings with line numbers on item 25 — and both were checked
+  at source before being put to Keith. That check is cheap and it is the
+  main session's job, not the agent's.
+- **Answer what you can yourself.** The agent may ask something already
+  settled in `plans/*.md` or answerable from the code. Answer it in the
+  `SendMessage` rather than spending Keith's attention on it.
 
 ## What each stage actually needs
 
