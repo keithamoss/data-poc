@@ -1042,3 +1042,70 @@ check_lifecycle.py`'s own `check_id` convention.
     subagent with Opus"), also now a standing `CLAUDE.md` note, since
     Keith wants this proactively suggested when relevant rather than
     only used if he happens to remember it exists.
+
+    **Playwright MCP connection CONFIRMED WORKING, 2026-09-19** - the
+    fresh session the paragraph above anticipated. Background: the
+    session that committed `.mcp.json` (8c04c54) had it added mid-session,
+    after that VM had already cloned the repo, so it never picked the
+    server up and the wiring was unverified. A fresh session clones with
+    `.mcp.json` already present, and it does connect. Real evidence,
+    three independent ways:
+    - **The server process is genuinely running**: `ps aux` shows a real
+      `npm exec @playwright/mcp@0.0.82 --headless --executable-path
+      /opt/pw-browsers/chromium --no-sandbox --isolated` plus its own
+      `node .../playwright-mcp` child, matching `.mcp.json` exactly.
+    - **Loaded from the repo's own `.mcp.json`, not the harness.** This
+      session's `--mcp-config` file (`/tmp/mcp-config-cse_*.json`) lists
+      only `github`/`Claude_Docs`/`Claude_Code_Remote` - `playwright`
+      appears nowhere in it. So the project-scoped `.mcp.json` really is
+      what's supplying it, which is exactly the thing that couldn't be
+      confirmed before.
+    - **The tools reach the subagents, and actually function.** A
+      diagnostic-only `requirements-ux-critic` run (told explicitly not
+      to review anything) reported all 25 `mcp__playwright__browser_*`
+      tools visible in its own tool list, and a real
+      `mcp__playwright__browser_snapshot` call returned a real, well-
+      formed response from a live browser context. Tool access really is
+      the harness-enforced boundary the earlier research said it was -
+      the `mcp__playwright` entry in these agents' own `tools:`
+      frontmatter is what carries it through.
+
+    **One real, newly-found gap, though: the `file:` protocol is
+    BLOCKED by this MCP server.** `browser_navigate` to
+    `file:///home/user/data-poc/dashboard/qa-reporting-dashboard.html`
+    fails with a literal `Error: Access to "file:" protocol is blocked`
+    - reproduced independently in both the subagent and the main
+    session, so it's the server's own default policy, not a one-off.
+    That matters because `requirements-ux-critic.md` (line 58) and
+    `requirements-visual-critic.md` (line 60) both instruct exactly that
+    `file:///<repo-root>/...` navigation - as written, neither agent can
+    currently open the dashboard it's meant to critique. **Verified
+    workaround**: serving the repo over a plain local HTTP server and
+    navigating to `http://127.0.0.1:<port>/dashboard/...` works
+    completely - real page load, real title (`Data Asset QA Register`),
+    real accessibility snapshot, zero page-level console errors (the one
+    error seen was a `favicon.ico` 404 from the ad hoc server itself,
+    not a page bug).
+
+    **[todo]** **[Docs & process]** Decide which fix to take for the
+    `file:` block, then update the 2 agent definitions to match - a real
+    fork, deliberately left for Keith rather than guessed at: (a) allow
+    the protocol at the server (an `--allowed-origins`-style setting in
+    `.mcp.json`), keeping the agents' existing `file://` instruction and
+    the dashboard's own genuinely-supported offline `file://` viewing
+    path under review; or (b) have the agents serve the built dashboard
+    over `http://localhost` first, which works today but means the
+    critics review it over a transport real users don't use. Worth
+    noting (a) keeps the review honest to how the artefact is actually
+    opened, while (b) needs no config change at all.
+
+    Also fixed in passing: `.playwright-mcp/` (page snapshots and
+    console logs the MCP server writes straight into the workspace root)
+    was showing up untracked in `git status` - now gitignored, so a real
+    browser-driven review can't leave commit-able scratch behind.
+
+    Still open, unchanged by this session: whether `permissionMode: plan`
+    would break `requirements-reviewer`/`requirements-ux-critic`/
+    `requirements-visual-critic`'s own `Bash`-driven `mothman dashboard
+    rebuild` step - this session verified the MCP wiring only, and
+    didn't test that.

@@ -22,3 +22,7 @@ dashboard/snapshots/*.html
 dashboard/qa-reporting-dashboard.html
 .coverage
 node_modules/
+
+# Playwright MCP server scratch output - @playwright/mcp writes page snapshots
+# and console logs into the workspace root (see .mcp.json)
+.playwright-mcp/
