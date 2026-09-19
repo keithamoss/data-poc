@@ -71,6 +71,7 @@ import os
 import subprocess
 
 from qa_tools.common.acceptance_sync import list_ticket_numbers
+from qa_tools.common.people import assignees_for
 
 
 def _run_gh(args: list[str]) -> str:
@@ -195,23 +196,68 @@ def compute_resolution_streaks(episodes: list[dict]) -> dict[str, dict]:
     return streaks
 
 
-def build_leaderboard(raw_tickets: list[dict], people_config: dict) -> list[dict]:
+def build_leaderboard(raw_tickets: list[dict], people_config: dict, dataset_agency: dict[str, str]) -> list[dict]:
     """[{dataset_id, name, nickname, github, streak}, ...], sorted by
     streak descending - the real, publicly-embeddable rows dashboard/
     embed_dashboard_data.py's own LEADERBOARD const uses directly.
     `raw_tickets` is fetch_all_ticket_resolutions()'s own real,
-    already-fetched shape. Resolved against contract/people.yaml's
-    `github:` field, never `email:` - a ticket-close event carries a
-    real GitHub login, never an email address. Someone who closes real
-    tickets without a matching people.yaml `github:` entry simply
-    doesn't appear, same graceful degradation as every other optional
-    embedded feed in this project."""
+    already-fetched shape. `dataset_agency` is qa_tools.common.
+    ticket_sync's own real DATASET_AGENCY mapping - the same one
+    dashboard/embed_dashboard_data.py's ASSIGNMENTS embed already
+    resolves against.
+
+    2026-09-19 (Keith's own explicit ask, after seeing an empty
+    leaderboard on a real page with real people already in contract/
+    people.yaml - correct behaviour at the time, since nobody had
+    closed a real ticket yet, but not what he wanted to see): every
+    real person currently ASSIGNED to a dataset (qa_tools.common.
+    people.assignees_for(), same dataset-then-agency resolution the
+    "Owned by" badge already uses) now appears for that dataset at
+    streak=0 if they have no real clean-resolution streak yet, rather
+    than the leaderboard only ever showing people who've already closed
+    at least one ticket. A person with a real streak who ISN'T (or is
+    no longer) assigned to that dataset still appears too, resolved
+    against contract/people.yaml's `github:` field same as before - a
+    real streak someone actually earned doesn't get erased by a later
+    org-chart change, and unlike the roster rows above, still requires
+    a matching people.yaml `github:` entry (a ticket-close event only
+    ever carries a GitHub login, never an email)."""
     github_to_person = {p["github"]: p for p in people_config["people"].values() if p.get("github")}
     by_dataset = build_resolution_episodes(raw_tickets)
 
     rows = []
-    for dataset_id, episodes in by_dataset.items():
-        for github_login, info in compute_resolution_streaks(episodes).items():
+    for dataset_id in sorted(set(dataset_agency) | set(by_dataset)):
+        streaks = compute_resolution_streaks(by_dataset.get(dataset_id, []))
+        roster = assignees_for(dataset_id, dataset_agency.get(dataset_id), people_config)
+        credited = set()
+        roster_seen = set()
+        for assignee in roster:
+            github_login = assignee.get("github")
+            # A person can hold more than one real role on the same
+            # scope (contract/people.yaml: Keith himself is both `qa`
+            # and `manager` for registry-services) - assignees_for()
+            # returns one raw record per role, so without this dedupe
+            # they'd get one leaderboard row per role rather than one
+            # per person. Real bug found live via a Playwright
+            # screenshot of the built leaderboard panel (2026-09-19):
+            # "#1 - K$" and "#2 - K$" both for Birth Registrations.
+            identity = github_login or assignee.get("name")
+            if identity in roster_seen:
+                continue
+            roster_seen.add(identity)
+            streak = streaks.get(github_login, {}).get("streak", 0) if github_login else 0
+            rows.append({
+                "dataset_id": dataset_id,
+                "name": assignee.get("name"),
+                "nickname": assignee.get("nickname"),
+                "github": github_login,
+                "streak": streak,
+            })
+            if github_login:
+                credited.add(github_login)
+        for github_login, info in streaks.items():
+            if github_login in credited:
+                continue
             person = github_to_person.get(github_login)
             if person is None:
                 continue
@@ -219,7 +265,7 @@ def build_leaderboard(raw_tickets: list[dict], people_config: dict) -> list[dict
                 "dataset_id": dataset_id,
                 "name": person.get("name"),
                 "nickname": person.get("nickname"),
-                "github": person.get("github"),
+                "github": github_login,
                 "streak": info["streak"],
             })
     rows.sort(key=lambda r: r["streak"], reverse=True)

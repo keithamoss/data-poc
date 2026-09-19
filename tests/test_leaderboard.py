@@ -153,11 +153,23 @@ class TestBuildLeaderboard:
             "events": [_event("closed", who, at)],
         } for i, (who, at) in enumerate(closes)]
 
-    def test_only_people_with_a_real_people_yaml_github_entry_appear(self):
-        raw_tickets = self._raw("birth-registrations", ("knownperson", "2026-01-01T09:00:00Z"), ("ghost", "2026-01-02T09:00:00Z"))
-        people_config = {"people": {"known@example.com": {"name": "Known Person", "nickname": "KP", "github": "knownperson"}}}
+    def _config(self, people, agency_assignments=None, dataset_assignments=None):
+        """The real 3-key shape qa_tools.common.people.parse_people_config()
+        returns (people/agency_assignments/dataset_assignments) -
+        assignees_for() reads all three directly, so a bare {"people":
+        ...} dict (this file's own pre-2026-09-19 fixture shape) would
+        KeyError now that build_leaderboard() calls it."""
+        return {
+            "people": people,
+            "agency_assignments": agency_assignments or {},
+            "dataset_assignments": dataset_assignments or {},
+        }
 
-        rows = lb.build_leaderboard(raw_tickets, people_config)
+    def test_only_people_with_a_real_people_yaml_github_entry_appear_as_streak_holders(self):
+        raw_tickets = self._raw("birth-registrations", ("knownperson", "2026-01-01T09:00:00Z"), ("ghost", "2026-01-02T09:00:00Z"))
+        people_config = self._config({"known@example.com": {"name": "Known Person", "nickname": "KP", "github": "knownperson"}})
+
+        rows = lb.build_leaderboard(raw_tickets, people_config, {})
 
         assert len(rows) == 1
         assert rows[0]["name"] == "Known Person"
@@ -169,9 +181,9 @@ class TestBuildLeaderboard:
             self._raw("x", ("a", "2026-01-01T09:00:00Z"))
             + self._raw("y", ("a", "2026-01-01T09:00:00Z"), ("a", "2026-01-02T09:00:00Z"))
         )
-        people_config = {"people": {"a@example.com": {"name": "A", "nickname": None, "github": "a"}}}
+        people_config = self._config({"a@example.com": {"name": "A", "nickname": None, "github": "a"}})
 
-        rows = lb.build_leaderboard(raw_tickets, people_config)
+        rows = lb.build_leaderboard(raw_tickets, people_config, {})
 
         assert [r["streak"] for r in rows] == [2, 1]
         assert [r["dataset_id"] for r in rows] == ["y", "x"]
@@ -181,8 +193,101 @@ class TestBuildLeaderboard:
         email - unlike the original run-based design's run_by, there's
         no email to match people.yaml on at all here."""
         raw_tickets = self._raw("birth-registrations", ("knownperson", "2026-01-01T09:00:00Z"))
-        people_config = {"people": {"known@example.com": {"name": "Known Person", "nickname": "KP", "github": "knownperson"}}}
+        people_config = self._config({"known@example.com": {"name": "Known Person", "nickname": "KP", "github": "knownperson"}})
 
-        rows = lb.build_leaderboard(raw_tickets, people_config)
+        rows = lb.build_leaderboard(raw_tickets, people_config, {})
 
         assert rows[0]["github"] == "knownperson"
+
+    def test_a_dataset_assigned_person_with_no_streak_yet_appears_at_zero(self):
+        """Keith's own ask, 2026-09-19: he saw an empty leaderboard on
+        the real page despite real people already being in contract/
+        people.yaml - correct at the time (nobody had closed a real
+        ticket yet), but he wanted to see everyone listed at 0 rather
+        than nobody at all."""
+        people_config = self._config(
+            {"known@example.com": {"name": "Known Person", "nickname": "KP", "github": "knownperson"}},
+            agency_assignments={"registry-services": [
+                {"email": "known@example.com", "name": "Known Person", "nickname": "KP", "github": "knownperson", "role": "qa"},
+            ]},
+        )
+
+        rows = lb.build_leaderboard([], people_config, {"birth-registrations": "registry-services"})
+
+        assert rows == [{
+            "dataset_id": "birth-registrations", "name": "Known Person",
+            "nickname": "KP", "github": "knownperson", "streak": 0,
+        }]
+
+    def test_an_assigned_person_with_no_github_still_appears_at_zero(self):
+        """contract/people.yaml's own fictional placeholder people
+        (Brian/Reg/Arthur) deliberately have no `github:` - they can
+        never be real-assigned to a ticket, but should still show up on
+        the roster at 0, same as the dashboard's existing "Owned by"
+        badge already shows them regardless of github."""
+        people_config = self._config(
+            {"reg@example.com": {"name": "Reg", "nickname": "Reg", "github": None}},
+            agency_assignments={"child-protection-family-support": [
+                {"email": "reg@example.com", "name": "Reg", "nickname": "Reg", "github": None, "role": "peer_review"},
+            ]},
+        )
+
+        rows = lb.build_leaderboard([], people_config, {"cp-clients": "child-protection-family-support"})
+
+        assert rows == [{"dataset_id": "cp-clients", "name": "Reg", "nickname": "Reg", "github": None, "streak": 0}]
+
+    def test_a_real_streak_holder_no_longer_assigned_to_the_dataset_still_appears(self):
+        """A real earned streak isn't erased by a later org-chart
+        change - the roster (assignees_for()) and the real ticket-close
+        history (github_to_person) are two independent sources, unioned
+        together, not one gating the other."""
+        raw_tickets = self._raw("birth-registrations", ("exemployee", "2026-01-01T09:00:00Z"))
+        people_config = self._config(
+            {"ex@example.com": {"name": "Ex Employee", "nickname": None, "github": "exemployee"}},
+            agency_assignments={"registry-services": []},
+        )
+
+        rows = lb.build_leaderboard(raw_tickets, people_config, {"birth-registrations": "registry-services"})
+
+        assert rows == [{
+            "dataset_id": "birth-registrations", "name": "Ex Employee",
+            "nickname": None, "github": "exemployee", "streak": 1,
+        }]
+
+    def test_an_assigned_person_with_a_real_streak_appears_once_not_twice(self):
+        """The roster row and the streak-holder row must be the SAME
+        row for someone who's both assigned AND has a real streak - not
+        a duplicate 0 row plus a separate real-streak row."""
+        raw_tickets = self._raw("birth-registrations", ("knownperson", "2026-01-01T09:00:00Z"))
+        people_config = self._config(
+            {"known@example.com": {"name": "Known Person", "nickname": "KP", "github": "knownperson"}},
+            agency_assignments={"registry-services": [
+                {"email": "known@example.com", "name": "Known Person", "nickname": "KP", "github": "knownperson", "role": "qa"},
+            ]},
+        )
+
+        rows = lb.build_leaderboard(raw_tickets, people_config, {"birth-registrations": "registry-services"})
+
+        assert len(rows) == 1
+        assert rows[0]["streak"] == 1
+
+    def test_a_person_assigned_under_two_roles_to_the_same_dataset_appears_once(self):
+        """Real bug found live, 2026-09-19: contract/people.yaml can
+        assign the same person to the same agency under more than one
+        role (Keith himself: registry-services qa AND manager) -
+        assignees_for() returns one raw record per assignment entry, so
+        without deduping, build_leaderboard() produced two identical
+        rows for the same person/dataset (confirmed live via a real
+        Playwright screenshot of the built dashboard's leaderboard
+        panel: "#1 - K$" and "#2 - K$" both for Birth Registrations)."""
+        people_config = self._config(
+            {"known@example.com": {"name": "Known Person", "nickname": "KP", "github": "knownperson"}},
+            agency_assignments={"registry-services": [
+                {"email": "known@example.com", "name": "Known Person", "nickname": "KP", "github": "knownperson", "role": "qa"},
+                {"email": "known@example.com", "name": "Known Person", "nickname": "KP", "github": "knownperson", "role": "manager"},
+            ]},
+        )
+
+        rows = lb.build_leaderboard([], people_config, {"birth-registrations": "registry-services"})
+
+        assert len(rows) == 1

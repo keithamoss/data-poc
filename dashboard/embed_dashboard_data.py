@@ -316,7 +316,7 @@ def embed() -> None:
             raw_ticket_resolutions = json.load(f)
     else:
         raw_ticket_resolutions = []
-    leaderboard_rows = build_leaderboard(raw_ticket_resolutions, people_config)
+    leaderboard_rows = build_leaderboard(raw_ticket_resolutions, people_config, DATASET_AGENCY)
     html = _replace_const(html, "LEADERBOARD", json.dumps(leaderboard_rows, separators=(",", ":")))
     print(f"Re-embedded LEADERBOARD = {len(leaderboard_rows)} real streak row(s)"
           + ("" if os.path.exists(TICKET_RESOLUTIONS_JSON) else " (no reports/ticket_resolutions.json - local build, embedding empty)"))

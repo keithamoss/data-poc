@@ -28,6 +28,28 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
+- **2:44pm** — **Leaderboard Now Shows Everyone, Not Just Ticket-Closers** **[Dashboard]** **[QA checks &
+  contract]** Keith caught it live on the real published page: the
+  Leaderboard panel showed nobody at all, despite real people already
+  being in `contract/people.yaml` - correct at the time (nobody had
+  closed a real GitHub QA ticket yet, and `build_leaderboard()` only
+  ever showed people with an actual streak), but not what he wanted to
+  see. Every real person currently assigned to a dataset
+  (`qa_tools.common.people.assignees_for()`, the same roster the
+  dashboard's "Owned by" badge already uses) now appears for that
+  dataset at `streak=0` when they have no clean-resolution streak yet,
+  rather than the whole panel silently degrading to empty; a real
+  streak holder no longer assigned to a dataset still appears too (a
+  real earned streak isn't erased by a later org-chart change). Found
+  and fixed a real duplicate-row bug live while verifying this via a
+  real Playwright screenshot of the built panel: Keith himself holds
+  two real roles on Registry Services (`qa` and `manager`), and
+  `assignees_for()` returns one raw record per role, so without
+  deduping he showed up as both "#1" and "#2" for the same dataset.
+  6 new tests (`qa_tools/common/leaderboard.py`'s own
+  `build_leaderboard()`, now also parameterized on the real
+  `DATASET_AGENCY` mapping), one of them a regression test for the
+  duplicate-role bug, confirmed failing against the pre-fix code first.
 - **2:33pm** — **Plans Tab: Filters Now Persist In The URL** **[Dashboard]** The Plans tab's search box and
   status/component/file filter chips now round-trip through
   `location.search` (`q=`/`status=`/`component=`/`file=`, comma-joined

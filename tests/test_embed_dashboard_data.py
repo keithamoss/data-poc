@@ -142,13 +142,21 @@ def _run_embed_and_extract_leaderboard(monkeypatch, tmp_path, raw_ticket_resolut
     return json.loads(match.group(1))
 
 
-def test_embed_defaults_to_empty_leaderboard_when_file_absent(monkeypatch, tmp_path):
+def test_embed_defaults_to_every_assigned_person_at_zero_when_file_absent(monkeypatch, tmp_path):
     """Real scenario, same as TICKET_STATUS/ACCEPTANCES above: a local
-    ./run_pipeline.sh build has no GH token, so .github/workflows/
-    deploy-pages.yml's own TICKET_RESOLUTIONS_JSON-writing step (qa_tools/
-    common/leaderboard.py's own real `gh` boundary) never ran - embed()
-    must degrade to [] rather than crash."""
-    assert _run_embed_and_extract_leaderboard(monkeypatch, tmp_path) == []
+    build has no GH token, so .github/workflows/deploy-pages.yml's own
+    TICKET_RESOLUTIONS_JSON-writing step (qa_tools/common/leaderboard.py's
+    own real `gh` boundary) never ran, so there's no real ticket-close
+    history to compute a streak from - but this no longer means an
+    empty leaderboard (Keith's own 2026-09-19 ask, after seeing exactly
+    this on the real published page despite contract/people.yaml
+    already having real people in it): every real person currently
+    assigned to a dataset still appears, at streak=0, resolved against
+    this repo's own real, committed contract/people.yaml (not mocked
+    here, unlike the next test - this one exercises the real file)."""
+    rows = _run_embed_and_extract_leaderboard(monkeypatch, tmp_path)
+    assert len(rows) > 0
+    assert all(row["streak"] == 0 for row in rows)
 
 
 def test_embed_reads_real_ticket_resolutions_json_when_present(monkeypatch, tmp_path):
