@@ -122,6 +122,16 @@ dashboard (this repo is public) - only name/nickname/github/role ever
 reach the built page; `embed_dashboard_data.py` strips `email` at embed
 time.
 
+**Keith's own offer, 2026-09-19 evening, not yet acted on**: he offered
+to explain more about who the real users are and what each real role
+(QA, peer review, manager) actually looks like day to day - raised
+during the HCI/behavioral-psychology grounding work (`plans/wider.md`
+#10), as something that would sharpen both that work's personas AND
+this item's own roles (today just labels driving ticket assignment/the
+"Owned by" badge, with no real description of what each role actually
+does). Captured here so it survives compaction - ask him for this
+directly next time it's relevant, don't let it quietly drop.
+
 ### 3. Gamification MVP on the reporting dashboard
 
 A small MVP that celebrates staff turning QA around fast, or

@@ -1329,3 +1329,15 @@ check_lifecycle.py`'s own `check_id` convention.
     session (or the other already-open one) to confirm the agent files
     themselves - not just the underlying mechanism - actually work as
     written.
+
+    **Keith's own offer, same evening, not yet acted on**: he offered to
+    explain more about who the real users actually are, to sharpen both
+    this taxonomy/weighting (currently grounded in the generic personas
+    `docs/project-context-for-agents.md` already had - data steward,
+    agency data owner, pipeline maintainer) and `plans/running-
+    thoughts.md` #2's own real roles (QA, peer review, manager - today
+    just labels driving ticket assignment, no real description of what
+    each actually does day to day). Captured here too (and in that
+    file's own item #2) so it survives compaction either way - ask him
+    for this directly next time revisiting either the HCI guide or the
+    roles/ticketing work, don't let it quietly drop.
