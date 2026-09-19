@@ -2872,3 +2872,42 @@ one Thread's narrative.
    generic than the original 4 tool-runners) that should collapse first.
    Not scoped - the point of this entry is to not lose the concern
    before that conversation happens.
+
+7. **[todo, 2026-09-19]** **[Pipeline & publishing]** Both GitHub Actions
+   workflows are pinned to a single, hardcoded session branch name -
+   `on: push: branches: [claude/new-session-en9qen]` in
+   `.github/workflows/test.yml`, and the equivalent in
+   `deploy-pages.yml`. That branch was the working branch of the session
+   that last edited them; every session since gets a different one, so
+   **neither workflow fires at all for the current branch** and CI
+   silently does nothing.
+
+   Found 2026-09-19 while following `CLAUDE.md`'s own standing "a
+   passing local pytest is NOT evidence CI is green - actually check the
+   real run" rule after pushing item 74's fix: there was no run to
+   check. `list_workflow_runs` filtered to this session's own branch
+   returned `total_count: 0`, while the unfiltered list showed 335 runs,
+   every recent one on `claude/new-session-en9qen`.
+
+   Worth noting precisely what this does and doesn't break, because it's
+   easy to over- or under-read: nothing is broken on the branch the pin
+   names, and the last run there (`b0585da`) was genuinely green. The
+   failure mode is subtler and matches the exact incident that rule was
+   written for - CI appearing fine because it isn't running, rather than
+   failing loudly. `workflow_dispatch` is a real workaround (used for
+   item 74's own push, against this branch's ref, and it works), but it
+   depends on someone remembering, which is the same class of thing the
+   rule already says not to rely on.
+
+   Not fixed unprompted - it's a real fork worth a word with Keith, not
+   a mechanical change, and the options differ in more than effort:
+   drop the branch filter entirely (every branch gets CI - simplest,
+   costs runner minutes on throwaway branches); switch to a `claude/**`
+   glob (covers every session branch without naming one); or trigger on
+   pull requests instead of pushes (which would fit the "CI is the only
+   publish path" model already established in Thread A, but changes how
+   this project actually works day to day, since it currently pushes
+   straight to a session branch and never opens a PR). `deploy-pages.yml`
+   deserves its own answer rather than the same one by default - it is
+   the real publish path, so "every branch publishes" is very likely
+   wrong for it even if it's right for `test.yml`.
