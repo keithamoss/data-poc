@@ -789,7 +789,8 @@ function groupChecksByCategory(checks){
    committed, hand-edited UI source; `dashboard/embed_dashboard_data.py`
    reads it and writes the real, viewable `dashboard/qa-reporting-
    dashboard.html` (gitignored - never committed, built fresh by CI on
-   every push and locally by ./run_pipeline.sh for your own preview).
+   every push and locally by `mothman pipeline run`/`mothman dashboard
+   rebuild` for your own preview).
    Edit THIS file for UI/CSS/JS changes; never hand-edit the built
    output, and never commit it even if you build it locally to preview
    a change - see README.md's Development section.
@@ -889,7 +890,7 @@ function groupChecksByCategory(checks){
    ticketBadge() below for how each dataset's own tile uses this.
    Embedded by dashboard/embed_dashboard_data.py from a real `gh issue
    list` call only .github/workflows/deploy-pages.yml can make (needs a
-   real token) - empty {} on a local ./run_pipeline.sh build, same
+   real token) - empty {} on a local `mothman pipeline run` build, same
    graceful-degradation treatment as every other embedded feed here when
    its real source isn't available.
 ========================================================================= */
@@ -2924,7 +2925,7 @@ function renderSnapshotsPanel(){
   const body = document.getElementById("snapshots-panel-body");
   if(!SNAPSHOT_MANIFEST.length){
     body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
-      No snapshots yet — run <code>SNAPSHOT_DASHBOARD=1 ./run_pipeline.sh</code>
+      No snapshots yet — run <code>mothman pipeline run --snapshot</code>
       to archive one (see plans/dashboard.md #5).
     </div>`;
     return;

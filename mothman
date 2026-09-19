@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# The mothman CLI/TUI entry point (plans/tooling.md #1). A real
-# `[project.scripts]` console-script entry exists in pyproject.toml for
-# when this repo is properly packaged/installed - it isn't today (this
-# repo has always relied on CWD-based `python3 -m` invocation, never an
-# installed package, same as every other module here), so this thin
-# wrapper gives a real `./mothman` command today without that packaging
-# risk. Same pattern as ./run_pipeline.sh - not a novel one.
+# The mothman CLI/TUI entry point (plans/tooling.md #1). `uv run mothman
+# ...` (the real `[project.scripts]` console-script entry, pyproject.toml
+# - only actually installed once `tool.uv.package`/`[build-system]` were
+# added, Phase 4, 2026-09-19: `uv sync` was silently skipping entry-point
+# installation before that) already works from anywhere `uv run` does -
+# this wrapper is just a shorter `./mothman` for repo-root use, delegating
+# to the exact same entry point rather than a separate `python3 -m`
+# fallback, so the two invocation styles can't drift.
 #
 # Run from the repo root: ./mothman [command] [options]
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
-exec uv run python3 -m cli.app "$@"
+exec uv run mothman "$@"

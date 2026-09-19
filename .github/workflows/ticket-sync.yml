@@ -78,16 +78,12 @@ jobs:
         run: uv sync --dev
 
       - name: Rebuild check results from committed qa_results/ history
-        run: |
-          uv run python3 -m qa_tools.bdm.build_results_from_history
-          uv run python3 -m qa_tools.cp.build_results_from_history
+        run: uv run mothman dashboard rebuild-results
 
       - name: Reshape into dashboard JSON
-        run: |
-          uv run python3 -m pipeline.build_dashboard_data
-          uv run python3 -m pipeline.build_cp_dashboard_data
+        run: uv run mothman dashboard build-data
 
       - name: Sync GitHub Issues to each dataset's current real status
         env:
           GH_TOKEN: ${{ github.token }}
-        run: uv run python3 -m qa_tools.common.ticket_sync
+        run: uv run mothman github sync-tickets

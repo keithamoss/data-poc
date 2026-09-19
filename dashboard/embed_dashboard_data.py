@@ -7,9 +7,10 @@ the `const REAL_BIRTH_REG_DATA = {...};` and `const REAL_CP_DATA =
 reports/child_protection_dashboard.json (pipeline/build_dashboard_
 data.py's/build_cp_dashboard_data.py's output), and writes the result
 to the real, viewable HTML - gitignored, never committed, rebuilt fresh
-by CI on every push and locally by ./run_pipeline.sh. Run this last,
-after orchestrate.py/orchestrate_cp.py and the two build_*_dashboard_
-data.py scripts, whenever the pipeline is regenerated.
+by CI on every push and locally by `mothman pipeline run`/`mothman
+dashboard rebuild`. Run this last, after orchestrate_bdm.py/
+orchestrate_cp.py and the two build_*_dashboard_data.py scripts,
+whenever the pipeline is regenerated.
 
 `const AS_OF_OFFSET_DAYS` used to be re-embedded here too, from
 `contract/data-asset.yaml` (Thread C, plans/publishing-and-history.md) -
@@ -72,9 +73,10 @@ API call needs a real token; this script has no token of its own and
 must stay callable locally with none). That workflow writes the raw `gh`
 JSON to OPEN_TICKETS_JSON below before calling this script; qa_tools/
 common/ticket_status.py's parse_open_tickets() (a pure function, no
-`gh`/network access here either) reshapes it. Locally (./run_pipeline.sh,
-no real token, no such file) this embeds an empty {} rather than
-failing - graceful degradation, not a hard requirement for every build.
+`gh`/network access here either) reshapes it. Locally (`mothman pipeline
+run`/`mothman dashboard rebuild`, no real token, no such file) this
+embeds an empty {} rather than failing - graceful degradation, not a
+hard requirement for every build.
 
 And `const GITHUB_LINKS` (running-thoughts.md #8, "deep links from the
 dashboard back into GitHub", 2026-09-18, scoped via AskUserQuestion) -

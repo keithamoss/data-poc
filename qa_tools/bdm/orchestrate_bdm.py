@@ -13,14 +13,17 @@ simpler to chase down sequentially). Either way, results come back in
 manifest order, so output stays byte-for-byte reproducible for a given
 manifest.
 
-Assumes data/raw/ (generator output), data/warehouse.duckdb (the combined
-warehouse, still built by pipeline/load.py/orchestrate.py - see that
-file's docstring for why it's still needed) and data/duckdb_runs/*.duckdb
-(per-run real warehouses, qa_tools/bdm/build_per_run_warehouses.py)
-already exist - run ./run_pipeline.sh first if they don't.
+Assumes data/raw/ (generator output) exists - run_pipeline() below builds
+its own data/duckdb_runs/*.duckdb per-run real warehouses itself (via
+build_per_run_warehouses.build_all()), so nothing needs pre-building
+first. `mothman pipeline run` (cli/pipeline.py, Phase 4) wraps this
+function end to end - generates synthetic data, then calls run_pipeline()
+- as the real replacement for the retired ./run_pipeline.sh.
 
-Run as `python3 -m qa_tools.bdm.orchestrate_bdm` (this is a package
-now, not a flat script directory - see plans/qa-pipeline.md #84).
+Run via `mothman pipeline run` or `mothman debug run-dbt`/etc. (single-
+tool debugging) - never invoke this module bare (plans/tooling.md #1
+Phase 4's completeness bar: mothman is the only programmatic access
+point to this repo).
 """
 from __future__ import annotations
 import json

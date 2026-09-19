@@ -43,6 +43,26 @@ aws = [
 [project.scripts]
 mothman = "cli.app:main"
 
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# The `mothman` console script above only actually gets installed if uv
+# treats this project as packaged (plans/tooling.md #1 Phase 4's own real
+# finding, 2026-09-19: `uv run mothman ...` silently failed with "Failed to
+# spawn: mothman" - `uv sync` was printing "Skipping installation of entry
+# points... because this project is not packaged" the whole time, so every
+# `mothman` invocation this session had actually been going through the
+# `uv run python3 -m cli.app` fallback instead). `cli` is the only real,
+# importable package this repo ships as a distributable unit - qa_tools/,
+# pipeline/, generator/, dashboard/, synthetic_data_generator/ are real
+# Python packages too but are never installed/imported as anything other
+# than repo-relative modules (no console entry point needs them on
+# sys.path outside the repo root), so hatchling only needs to know about
+# `cli` here.
+[tool.hatch.build.targets.wheel]
+packages = ["cli"]
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",
@@ -94,8 +114,9 @@ exclude_also = [
     # Never executed under pytest (every qa_tools/*/run_*.py,
     # build_*.py, orchestrate_*.py CLI entrypoint) - not a real gap,
     # just how every one of these scripts is actually invoked
-    # (`python3 -m qa_tools.bdm.orchestrate_bdm`, ./run_pipeline.sh,
-    # etc.), never as an imported function call under test.
+    # (`mothman pipeline run`, `mothman debug run-dbt`, etc. - cli/
+    # pipeline.py/cli/debug.py, Phase 4), never as an imported function
+    # call under test.
     "if __name__ == .__main__.:",
 ]
 # The real, measured floor as of the Phase 6 step 3 coverage pass

@@ -211,14 +211,10 @@ jobs:
         run: uv run playwright install --with-deps chromium
 
       - name: Rebuild check results from committed qa_results/ history
-        run: |
-          uv run python3 -m qa_tools.bdm.build_results_from_history
-          uv run python3 -m qa_tools.cp.build_results_from_history
+        run: uv run mothman dashboard rebuild-results
 
       - name: Reshape into dashboard JSON
-        run: |
-          uv run python3 -m pipeline.build_dashboard_data
-          uv run python3 -m pipeline.build_cp_dashboard_data
+        run: uv run mothman dashboard build-data
 
       - name: Fetch open QA tickets
         env:
@@ -230,27 +226,27 @@ jobs:
       - name: Fetch QA ticket comments (for real /accept matching)
         env:
           GH_TOKEN: ${{ github.token }}
-        run: uv run python3 -m qa_tools.common.acceptance_sync > reports/qa_comments.json
+        run: uv run mothman github sync-acceptances > reports/qa_comments.json
 
       - name: Fetch QA ticket resolution history (for the leaderboard)
         env:
           GH_TOKEN: ${{ github.token }}
-        run: uv run python3 -m qa_tools.common.leaderboard > reports/ticket_resolutions.json
+        run: uv run mothman github sync-leaderboard > reports/ticket_resolutions.json
 
       - name: Embed real data into the dashboard
-        run: uv run python3 -m dashboard.embed_dashboard_data
+        run: uv run mothman dashboard embed
 
       - name: Gate - check-lifecycle validation (Thread D)
-        run: uv run python3 -m qa_tools.common.validate_check_lifecycle
+        run: uv run mothman dashboard validate-check-lifecycle
 
       - name: Gate - requirements validation (item 75)
-        run: uv run python3 -m qa_tools.common.validate_requirements
+        run: uv run mothman dashboard validate-requirements
 
       - name: Gate - dashboard structural + real-browser render check
-        run: uv run python3 -m dashboard.check_dashboard_renders
+        run: uv run mothman dashboard check-renders
 
       - name: Prepare site
-        run: uv run python3 -m dashboard.snapshot_dashboard --prepare-site _site
+        run: uv run mothman dashboard snapshot --prepare-site _site
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

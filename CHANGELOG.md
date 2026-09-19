@@ -28,6 +28,26 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
+- **1:20pm** — **mothman CLI Phase 4: Reorganized Every Remaining Script Into the CLI** **[Testing & dev tooling]**
+  `mothman dashboard`/`mothman github`/`mothman debug`/`mothman pipeline` -
+  4 new command groups replacing the last ~24 bare script entry points
+  (the dashboard rebuild chain, GitHub ticket/acceptance/leaderboard
+  sync, 8 retired per-tool debug scripts folded into 4 dataset-
+  parameterized `debug run-*` commands, and the full real-tool batch
+  pipeline). Rewrote both GitHub Actions workflows that used to call
+  bare `python3 -m` invocations, and retired `run_pipeline.sh` in favour
+  of `mothman pipeline run`. Found and fixed two real gaps along the
+  way: `orchestrate_bdm.py`'s/`orchestrate_cp.py`'s own full-manifest
+  batch functions had never actually been wrapped by any earlier phase
+  despite the plan claiming otherwise (only single-run mode was); and
+  `uv sync` had been silently failing to install the real `mothman`
+  console script this whole project's history (`pyproject.toml` was
+  missing a real `[build-system]`) - every `mothman` invocation before
+  today's fix was quietly falling through to a `python3 -m cli.app`
+  fallback instead. 35 new tests, full local suite + lint + JS tests all
+  clean, and a repo-wide sweep confirms no bare `qa_tools`/`pipeline`/
+  `generator`/`dashboard` invocation is reachable from outside
+  `mothman`'s own implementation any more.
 - **12:45pm** — **mothman CLI Phase 3.5: Single-Table Child Protection QA** **[Testing & dev tooling]** `mothman cp
   qa --table <table> --file <csv>` / `--s3-key <key>` - check a real
   partial resupply (one table re-sent after a fix) without needing the

@@ -34,7 +34,7 @@ alone:
   rolling window, a genuinely different concern from an archived,
   opened-one-at-a-time forensic record.
 - Trigger: gated on the SNAPSHOT_DASHBOARD=1 env var, off by default -
-  not tied to run_pipeline.sh unconditionally, because this PoC has no
+  not tied to `mothman pipeline run` unconditionally, because this PoC has no
   real distinction yet between "a genuine scheduled data-refresh run"
   and "a developer iterating on code" (every regeneration uses the same
   script) - Keith's own call was a manual toggle rather than guessing at
@@ -66,9 +66,10 @@ alone:
   the picker's existing links already point at - so the dashboard's JS/
   markup needed zero changes, locally or on Pages, the same relative
   link now resolves either way. Called unconditionally from `main()`
-  (so a plain `./run_pipeline.sh`, with no `SNAPSHOT_DASHBOARD` flag,
-  still backfills local copies for whatever snapshots already exist in
-  the repo - e.g. right after a fresh clone) and again at the end of
+  (so a plain `mothman pipeline run`/`mothman dashboard snapshot`, with
+  no `SNAPSHOT_DASHBOARD` flag, still backfills local copies for
+  whatever snapshots already exist in the repo - e.g. right after a
+  fresh clone) and again at the end of
   `take_snapshot()` (so a snapshot just taken is immediately locally
   openable too, even if `take_snapshot()` is called directly rather than
   through `main()`). The decompressed `.html` copies are gitignored

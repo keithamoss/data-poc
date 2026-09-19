@@ -260,6 +260,102 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
      untouched afterward (no `--commit` passed). `uv run pytest`
      (539 passing) and `ruff` both clean; the real CI coverage command
      still passes at 94.52%.
+   - **Phase 4 finished 2026-09-19** (Keith's own explicit go-ahead,
+     "crack on w/ phase 4 - you can fix up any CI issues if they come
+     up"): reorganized the remaining real script entry points into 4 new
+     command groups - `mothman dashboard` (`rebuild-results`/`build-data`/
+     `embed`/`validate-check-lifecycle`/`validate-requirements`/
+     `check-renders`/`snapshot`/`rebuild`, wrapping the dashboard rebuild
+     chain), `mothman github` (`sync-tickets`/`sync-acceptances`/
+     `sync-leaderboard`), `mothman debug` (`run-dbt`/`run-soda`/
+     `run-datacontract`/`run-evidently` - one dataset-parameterized
+     command per tool, replacing the 8 retired `run_{dbt,soda,
+     datacontract,evidently}_{bdm,cp}.py` scripts' own hardcoded-3-
+     sample-run-ids `__main__` blocks with real `--dataset`/`--run-id`
+     options - plus `build-warehouses`/`load-warehouse`/`changelog`),
+     and `mothman pipeline` (`run`). Rewrote `.github/workflows/
+     deploy-pages.yml` and `.github/workflows/ticket-sync.yml` to call
+     `mothman` subcommands instead of bare `python3 -m` invocations
+     (`.github/workflows/test.yml` needed no changes - it only ever runs
+     `uv run pytest`/`npm test`, never one of the retiring scripts
+     directly). Retired `run_pipeline.sh`.
+
+     Two real gaps found and fixed along the way, neither in the
+     original plan text above:
+     1. **The "already named in Phases 1-3" claim for `orchestrate_bdm.py`/
+        `orchestrate_cp.py` was wrong.** Only `run_single()` (one run at a
+        time) was reused, by `mothman bdm/cp qa` - the same files' own
+        `run_pipeline()`/`run_pipeline_cp()` (the full-manifest BATCH
+        mode `run_pipeline.sh` step 2 used to call bare: regenerates
+        synthetic data, runs all 4 real tools against EVERY run, writes
+        both `reports/results_*.json` and fresh `qa_results/` history)
+        had no mothman command at all until this phase. New `cli/
+        pipeline.py`'s `mothman pipeline run --dataset {bdm,cp,all}
+        [--sequential] [--snapshot]` wraps it - the real, direct
+        replacement for `run_pipeline.sh`, not a rename of something
+        that already existed.
+     2. **`uv sync` was silently never installing the real `mothman`
+        console script.** `pyproject.toml` already had a
+        `[project.scripts] mothman = "cli.app:main"` entry since Phase
+        1, but `uv sync` printed "Skipping installation of entry points
+        ... because this project is not packaged" on every run - meaning
+        every `uv run mothman ...`/`./mothman ...` invocation anywhere in
+        this project's history had actually been silently falling
+        through to nothing (`Failed to spawn: mothman`), never verified
+        as the real console script working end to end. Fixed by adding a
+        minimal `[build-system]` (hatchling) + `[tool.hatch.build.
+        targets.wheel] packages = ["cli"]` to `pyproject.toml` - `uv
+        sync` now really builds and installs `mothman` as a package, and
+        `uv run mothman ...`/`./mothman ...` (the wrapper simplified to
+        delegate to the real entry point rather than a separate `python3
+        -m cli.app` fallback) were both verified working after the fix.
+
+     Also found, flagged (not acted on, real caution during smoke-
+     testing): `mothman debug run-{dbt,soda,datacontract,evidently}`
+     write to real, committed `qa_results/` history as a side effect
+     (the same `write_qa_result()` call every `evaluate_*()` function
+     already makes for a real orchestrate run - pre-existing behaviour
+     of those functions, not something this CLI wrapper introduced, but
+     a real footgun worth documenting: running one against a run_id that
+     already has committed history OVERWRITES that file with the debug
+     invocation's own fresh timestamp). Discovered by direct experience -
+     smoke-testing these commands against real run_ids left `qa_results/`
+     genuinely modified (`git status` showed 4 changed files + 1 new
+     directory); reverted with `git checkout --`/`rm -rf` before
+     committing anything, and `cli/debug.py`'s own module docstring now
+     carries an explicit CAUTION section about it.
+
+     Verification: every new command manually smoke-tested against real
+     local data (both BDM and CP sides of all 4 `debug run-*` commands,
+     `debug build-warehouses --dataset {bdm,cp}`, `debug load-warehouse`,
+     `debug changelog`, and the full `dashboard` group including a real
+     `dashboard rebuild-results`/`build-data`/`embed` end-to-end run) -
+     all succeeded except `dashboard check-renders`, confirmed via a
+     side-by-side run of the bare script to be the same pre-existing
+     sandbox-only Playwright chromium-binary-mismatch limitation this
+     project's test suite already has (not a regression). `cli/pipeline.
+     run`'s full real-manifest batch mode was NOT executed for real in
+     this sandbox (the auto-mode classifier declined it as a "shared
+     resources" write, reasonably - it writes real, permanent history
+     across the whole manifest) - verified instead via code review plus
+     the fact that every function it calls was already individually
+     smoke-tested working correctly. 35 new tests
+     (`tests/test_cli_{dashboard,github,debug,pipeline}.py`, CliRunner +
+     monkeypatched real-tool seams, same convention as `tests/
+     test_cli_bdm.py`) cover the real dispatch/manifest-lookup logic
+     these commands add on top of each wrapped function (BDM's
+     `csv_filename` lookup, the Evidently reference-run default, the
+     `ctx.invoke()`+`sys.exit()` composition bug's regression coverage
+     on `dashboard rebuild`). `uv run pytest -n auto` (574 passing, same
+     13 pre-existing unrelated Playwright errors), `ruff check .`, and
+     `npm test` (104 passing) all clean. README.md/CLAUDE.md updated
+     throughout (setup instructions, layout table, the standing "only
+     access point" convention bullet) and swept repo-wide for any
+     remaining bare `python3 -m qa_tools.*`/`pipeline.*`/`generator.*`/
+     `dashboard.*` invocation reachable from workflows/README/docs/ -
+     none found outside historical narrative comments (which stay,
+     describing real past events) and this bullet's own "never a bare
+     ... invocation" phrasing.
 
    **Core shape, confirmed:**
    - Organized by dataset (bdm/cp) under a real interactive TUI - not
