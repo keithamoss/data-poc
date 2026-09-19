@@ -25,6 +25,23 @@ rejects a typo'd path before any real tool ever runs, not partway
 through) and a real exit-code contract Click already handles correctly
 under both direct invocation and click.testing.CliRunner (tests/
 test_check_cli.py).
+
+A real bug found via a genuinely red GitHub Actions run (not caught by
+this sandbox's own `uv run pytest`, since this sandbox happens to have
+a configured git identity and a real CI runner checkout does not, per
+CLAUDE.md's own standing "local passing isn't sufficient" incident
+history): run_single() calls git_identity.get_run_by() whenever run_by
+isn't passed explicitly, which raises MissingGitIdentityError on any
+machine with no `git config user.email` set - correct and intentional
+for a --commit run (real attribution genuinely matters once a result
+enters permanent history), but wrong for the default throwaway path,
+where the result is written to a tmp dir and discarded before this
+function even returns - nothing ever reads run_by there. Fixed by only
+requiring a real git identity when --commit is passed; the throwaway
+path gets a real, honest "not persisted" attribution instead (the same
+"real, truthful identity rather than a guessed placeholder" principle
+git_identity.py's own aws-lambda: prefix already established for the
+Lambda-automated case).
 """
 from __future__ import annotations
 import tempfile
@@ -32,6 +49,7 @@ from datetime import datetime, timezone
 
 import click
 
+from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.lambda_results_dir import BDM_MODULES, patch_write_qa_result_for_lambda
 from qa_tools.common.local_check import copy_into, format_report, run_id_from_path
 from . import build_per_run_warehouses, orchestrate_bdm
@@ -59,10 +77,12 @@ def main(csv_path: str, reference_csv: str, run_date: str | None, run_id: str | 
             patch_write_qa_result_for_lambda(BDM_MODULES, tmp_dir)
             results = orchestrate_bdm.run_single(run_id, csv_path, run_date, None,
                                                   reference_run_id=reference_run_id,
-                                                  reference_csv=reference_csv_filename)
+                                                  reference_csv=reference_csv_filename,
+                                                  run_by="local-check:not-persisted")
     else:
         results = orchestrate_bdm.run_single(run_id, csv_path, run_date, None,
-                                              reference_run_id=reference_run_id, reference_csv=reference_csv_filename)
+                                              reference_run_id=reference_run_id, reference_csv=reference_csv_filename,
+                                              run_by=get_run_by())
 
     click.echo(format_report(results, run_id))
     if not commit:

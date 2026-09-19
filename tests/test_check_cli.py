@@ -104,6 +104,47 @@ def test_check_file_cli_rejects_a_reference_csv_that_does_not_exist(bdm_raw_dir)
     assert "does not exist" in result.output.lower()
 
 
+def test_check_file_cli_default_path_never_requires_a_real_git_identity(monkeypatch, tmp_path, bdm_raw_dir):
+    """Real regression test for a real red CI run (test.yml, 2026-09-19):
+    run_single() calls git_identity.get_run_by() whenever run_by isn't
+    passed explicitly, which raises MissingGitIdentityError on any
+    machine with no `git config user.email` set - a real GitHub Actions
+    runner checkout, unlike this session's own sandbox, which happens to
+    have one configured (why `uv run pytest` passed locally but the real
+    CI run didn't). The throwaway (non---commit) path has nothing that
+    ever reads run_by - it's written to a tmp dir and discarded - so it
+    must never require a real git identity at all."""
+    raw_dir = str(tmp_path / "raw")
+    duckdb_dir = str(tmp_path / "duckdb_runs")
+    os.makedirs(raw_dir)
+    _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir)
+
+    from qa_tools.common.git_identity import MissingGitIdentityError
+
+    def _no_git_identity():
+        raise MissingGitIdentityError("git config user.email is not set")
+
+    monkeypatch.setattr(check_file, "get_run_by", _no_git_identity)
+
+    result = _runner.invoke(check_file.main, [
+        os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
+        "--reference-csv", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
+        "--run-date", "2026-01-01",
+    ])
+
+    assert result.exit_code == 0, f"a default (non---commit) run must never require a real git identity: " \
+                                   f"{result.output!r} exc={result.exception!r}"
+
+    result_commit = _runner.invoke(check_file.main, [
+        os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
+        "--reference-csv", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
+        "--run-date", "2026-01-01",
+        "--commit",
+    ])
+    assert isinstance(result_commit.exception, MissingGitIdentityError), \
+        "a --commit run must still fail loudly without a real git identity - that guarantee must not regress"
+
+
 def test_check_delivery_cli_reports_real_cp_failures(monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir):
     import qa_tools.cp.run_datacontract_cp as run_datacontract_cp
     import qa_tools.cp.run_dbt_cp as run_dbt_cp

@@ -21,6 +21,12 @@ here the way there is for Lambda-triggered per-file arrivals.
 
 Defaults to a throwaway, local-only check - pass --commit to write this
 run into the real, permanent qa_results/ git history instead.
+
+A real git-identity bug (found via a genuinely red CI run, not local
+`uv run pytest` - see qa_tools/bdm/check_file.py's own docstring for
+the full account) is fixed the same way here: a real git identity is
+only required for --commit; the throwaway path gets a real, honest
+"not persisted" attribution instead.
 """
 from __future__ import annotations
 import os
@@ -29,6 +35,7 @@ from datetime import datetime, timezone
 
 import click
 
+from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.lambda_results_dir import CP_MODULES, patch_write_qa_result_for_lambda
 from qa_tools.common.local_check import format_report, run_id_from_path
 from . import build_cp_warehouses, orchestrate_cp
@@ -79,9 +86,10 @@ def main(folder: str, reference_folder: str, run_date: str | None, run_id: str |
     if not commit:
         with tempfile.TemporaryDirectory() as tmp_dir:
             patch_write_qa_result_for_lambda(CP_MODULES, tmp_dir)
-            results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id)
+            results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id,
+                                                 run_by="local-check:not-persisted")
     else:
-        results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id)
+        results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id, run_by=get_run_by())
 
     click.echo(format_report(results, run_id))
     if not commit:
