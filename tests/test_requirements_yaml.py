@@ -35,6 +35,8 @@ requirements:
         "id": "REQ-001", "title": "A real feature", "story": "As a user, I want X, so that Y.",
         "moscow": "must", "status": "built",
         "acceptance_criteria": ["It does the thing."], "linked_tests": ["tests/test_x.py"],
+        "source": "", "non_functional_requirements": [], "dependencies": [],
+        "open_questions": [], "evidence": [],
     }
 
 
@@ -63,6 +65,34 @@ requirements:
     assert req["acceptance_criteria"] == []
     assert req["linked_tests"] == []
     assert req["story"] == ""
+    assert req["source"] == ""
+    assert req["non_functional_requirements"] == []
+    assert req["dependencies"] == []
+    assert req["open_questions"] == []
+    assert req["evidence"] == []
+
+
+def test_parses_the_5_optional_fields_when_present(tmp_path):
+    path = _write(tmp_path, """
+requirements:
+  - id: REQ-001
+    title: A real feature
+    source: Keith, voice-dictated batch, 2026-09-19
+    non_functional_requirements:
+      - CI must never touch live data
+    dependencies:
+      - REQ-002
+    open_questions:
+      - Should this apply to Child Protection too?
+    evidence:
+      - Playwright walkthrough 2026-09-20, confirmed it renders.
+""")
+    req = parse_requirements(path)[0]
+    assert req["source"] == "Keith, voice-dictated batch, 2026-09-19"
+    assert req["non_functional_requirements"] == ["CI must never touch live data"]
+    assert req["dependencies"] == ["REQ-002"]
+    assert req["open_questions"] == ["Should this apply to Child Protection too?"]
+    assert req["evidence"] == ["Playwright walkthrough 2026-09-20, confirmed it renders."]
 
 
 def test_folded_scalar_story_is_stripped_of_trailing_newline(tmp_path):

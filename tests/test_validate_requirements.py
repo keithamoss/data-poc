@@ -120,3 +120,78 @@ def test_method_name_that_does_not_exist_in_a_real_class_does_not_resolve():
 
 def test_python_test_exists_returns_false_for_a_missing_file():
     assert _python_test_exists("tests/does_not_exist.py", ["test_x"]) is False
+
+
+# ---- 5 new optional fields (2026-09-19, plans/wider.md #10) ---------
+
+def test_source_is_optional_and_absent_is_fine():
+    assert validate([_valid_entry()]) == []
+
+
+def test_source_defaulted_to_empty_string_by_the_real_parser_is_fine():
+    """Real bug found live, 2026-09-19: dashboard/requirements_yaml.py's
+    parse_requirements() defaults an unset `source` to `""` (falsy),
+    not `None` - and main() below always runs against parser output,
+    never a raw dict. An earlier version of this check used `is not
+    None`, which treated that real default as "present but invalid",
+    failing all 22 real requirements.yaml entries at once. Confirmed
+    failing against the pre-fix code by actually running `python3 -m
+    qa_tools.common.validate_requirements` against the real committed
+    file before this fix."""
+    assert validate([_valid_entry(source="")]) == []
+
+
+def test_source_if_present_must_be_a_non_empty_string():
+    errors = validate([_valid_entry(source="   ")])
+    assert any("source" in e for e in errors)
+
+
+def test_source_can_be_real_free_text():
+    assert validate([_valid_entry(source="Keith, voice-dictated batch, 2026-09-19")]) == []
+
+
+def test_non_functional_requirements_absent_is_fine():
+    assert validate([_valid_entry()]) == []
+
+
+def test_non_functional_requirements_must_be_a_list_not_a_bare_string():
+    errors = validate([_valid_entry(non_functional_requirements="CI must never touch live data")])
+    assert any("non_functional_requirements must be a list" in e for e in errors)
+
+
+def test_non_functional_requirements_rejects_empty_entries():
+    errors = validate([_valid_entry(non_functional_requirements=["", "  "])])
+    assert any("non_functional_requirements entries must be non-empty strings" in e for e in errors)
+
+
+def test_non_functional_requirements_accepts_real_entries():
+    assert validate([_valid_entry(non_functional_requirements=["CI must never touch live data"])]) == []
+
+
+def test_open_questions_must_be_a_list_of_non_empty_strings():
+    errors = validate([_valid_entry(open_questions=[None])])
+    assert any("open_questions" in e for e in errors)
+
+
+def test_evidence_must_be_a_list_of_non_empty_strings():
+    errors = validate([_valid_entry(evidence=[123])])
+    assert any("evidence" in e for e in errors)
+
+
+def test_dependencies_absent_is_fine():
+    assert validate([_valid_entry()]) == []
+
+
+def test_dependencies_must_be_a_list():
+    errors = validate([_valid_entry(dependencies="REQ-002")])
+    assert any("dependencies must be a list" in e for e in errors)
+
+
+def test_dependencies_referencing_a_real_id_in_the_same_file_is_fine():
+    errors = validate([_valid_entry(id="REQ-001", dependencies=["REQ-002"]), _valid_entry(id="REQ-002")])
+    assert errors == []
+
+
+def test_dependencies_referencing_a_nonexistent_id_is_an_error():
+    errors = validate([_valid_entry(id="REQ-001", dependencies=["REQ-999"])])
+    assert any("dependencies entry 'REQ-999' does not match any real requirement id" in e for e in errors)

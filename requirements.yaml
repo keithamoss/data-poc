@@ -22,6 +22,21 @@
 #   moscow:              must | should | could | wont
 #   status:               not_started | in_progress | built
 #   acceptance_criteria: list of real, checkable statements - at least 1.
+#                        Written in EARS style going forward (2026-09-19,
+#                        Keith's own explicit call, plans/wider.md #10's
+#                        requirements-analysis agents work) - "WHEN
+#                        <trigger>, THE SYSTEM SHALL <response>" (or
+#                        IF/THEN, WHILE/<state>, WHERE/<feature> for the
+#                        other real EARS templates) rather than free
+#                        prose - genuinely more rigorous/testable, not
+#                        force-parsed or regex-enforced here (natural
+#                        language has too many valid phrasings to safely
+#                        regex-validate), just a real convention the new
+#                        requirements-scoper agent writes to. Existing
+#                        pre-2026-09-19 entries below were NOT
+#                        retroactively rewritten - not worth the churn
+#                        for something CI doesn't actually enforce the
+#                        syntax of.
 #   linked_tests:        list of real pytest node ids ("tests/test_x.py"
 #                        or "tests/test_x.py::TestClass::test_method" or
 #                        "tests/test_x.py::test_function") or real
@@ -34,6 +49,42 @@
 #                        a requirement can't claim to be built with
 #                        nothing real verifying it. May be empty for
 #                        not_started/in_progress.
+#
+# Five further OPTIONAL fields (2026-09-19, same work) - all default to
+# empty/absent for the many pre-existing entries below, which were not
+# retroactively backfilled (nothing enforces backfilling optional
+# fields, and guessing real provenance/evidence for old entries after
+# the fact would be dishonest - these are for the new requirements-
+# scoper/-architect/-reviewer agents to actually populate going
+# forward):
+#   source:              free text - where this requirement came from
+#                        ("Keith, voice-dictated batch, 2026-09-19" /
+#                        "Requirements-analysis review of REQ-014, gap
+#                        found 2026-09-20"). Real provenance, not a
+#                        constrained enum.
+#   non_functional_requirements: list of real standing constraints this
+#                        requirement must also respect (this project's
+#                        own hard rules count - e.g. "CI must never
+#                        touch live/synthetic data directly") - forces
+#                        whoever's scoping a new idea to check it against
+#                        rules like that, not just functional behaviour.
+#   dependencies:        list of other real "REQ-NNN" ids this one needs
+#                        or blocks. Each one is checked to actually
+#                        exist in this same file (a dangling reference
+#                        is a real validation error, same treatment as
+#                        linked_tests).
+#   open_questions:      list of real, unresolved forks the scoping/
+#                        review agent found but couldn't resolve itself
+#                        - structured, not buried in prose, and exactly
+#                        what should get escalated to a human rather
+#                        than guessed.
+#   evidence:            list of real strings describing what was
+#                        actually checked and how, populated by the
+#                        requirements-reviewer agent, not the scoper -
+#                        ("Playwright walkthrough 2026-09-20, confirmed
+#                        X renders correctly"; "Read qa_tools/common/
+#                        foo.py:42-88") - a real paper trail distinct
+#                        from just which tests pass.
 #
 # This describes the PRODUCT (the QA dashboard/pipeline this PoC
 # delivers), not this project's own working process - things like "a

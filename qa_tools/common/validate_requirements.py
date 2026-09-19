@@ -11,6 +11,16 @@ real AST, not just a string match. A requirement claiming to be
 verified by a test that doesn't exist is exactly the failure mode this
 whole feature exists to prevent.
 
+Extended 2026-09-19 (plans/wider.md #10, the requirements-analysis
+agents work) with 5 further optional fields - see requirements.yaml's
+own header comment for the full field-by-field rationale. `source`/
+`non_functional_requirements`/`open_questions`/`evidence` are each
+real-but-permissive (absent is fine; if present, must be a non-empty
+string or a list of them). `dependencies` gets one further real check:
+every entry must resolve to an actual `REQ-NNN` id elsewhere in this
+same file - a dangling reference is a real error, the same treatment
+`linked_tests` already gets.
+
 Run as `python3 -m qa_tools.common.validate_requirements` from the repo
 root (no git history needed, unlike validate_check_lifecycle.py - this
 only ever validates the CURRENT working tree's requirements.yaml
@@ -84,6 +94,25 @@ def _linked_test_exists(entry: str) -> bool:
     return full_path.exists()
 
 
+def _valid_string_list(value, field_name: str, where: str) -> list[str]:
+    """Real validation shared by all 4 optional list-of-strings fields
+    (non_functional_requirements/dependencies/open_questions/evidence):
+    absent/empty is fine (all 4 are optional), but if present, must be
+    a real list of non-empty strings - a stray `null` entry or a bare
+    string instead of a list is a real authoring mistake, not silently
+    accepted."""
+    if value is None:
+        return []
+    errors = []
+    if not isinstance(value, list):
+        errors.append(f"{where}: {field_name} must be a list, got {type(value).__name__}")
+        return errors
+    for entry in value:
+        if not isinstance(entry, str) or not entry.strip():
+            errors.append(f"{where}: {field_name} entries must be non-empty strings, got {entry!r}")
+    return errors
+
+
 def validate(requirements: list[dict]) -> list[str]:
     """Pure function, no file I/O of its own (except each linked_tests
     entry's own real existence check) - testable directly against
@@ -126,9 +155,37 @@ def validate(requirements: list[dict]) -> list[str]:
                 errors.append(f"{where}: linked_tests entry {entry!r} does not resolve to a real "
                                f"file/test")
 
+        # dashboard/requirements_yaml.py's own parser defaults an unset
+        # `source` to `""` (falsy), not `None` - `main()` below always
+        # runs against parser output, so this must treat a real, unset
+        # default the same as genuinely absent, only flagging an
+        # actually-present-but-invalid value (whitespace-only, or a
+        # non-string).
+        source = r.get("source")
+        if source and (not isinstance(source, str) or not source.strip()):
+            errors.append(f"{where}: source, if present, must be a non-empty string")
+
+        for field_name in ("non_functional_requirements", "open_questions", "evidence"):
+            errors.extend(_valid_string_list(r.get(field_name), field_name, where))
+
+        # dependencies gets the same "is it a real list of strings" check
+        # as the other 3, PLUS its own extra rule below (each entry must
+        # actually exist as a real REQ-id in this same file) - same
+        # "dangling reference is a real error" treatment linked_tests
+        # already gets, checked once every id is known (after this loop).
+        errors.extend(_valid_string_list(r.get("dependencies"), "dependencies", where))
+
     for rid, count in seen_ids.items():
         if count > 1:
             errors.append(f"id {rid!r} is used {count} times - ids must be globally unique")
+
+    all_ids = set(seen_ids)
+    for i, r in enumerate(requirements):
+        where = r.get("id") or f"entry #{i + 1} (no id)"
+        for dep in r.get("dependencies") or []:
+            if isinstance(dep, str) and dep not in all_ids:
+                errors.append(f"{where}: dependencies entry {dep!r} does not match any real "
+                               f"requirement id in this file")
 
     return errors
 
