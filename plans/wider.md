@@ -568,8 +568,57 @@ check_lifecycle.py`'s own `check_id` convention.
     **Correction, same day**: Keith's earlier "let me do some research
     online" on whether real precedent exists for a UX-reviewer-agent
     role was reversed - he wants this session to do that research, not
-    him. Still not yet started (queued behind the requirements-register
-    refinement below); do it, don't wait on Keith for it.
+    him.
+
+    **UX-reviewer-agent precedent research, done same day.** Real
+    precedent exists, and this project's own design (a genuinely
+    separate `requirements-ux` pre-build agent, plus a post-build
+    visual-QA pass folded into `requirements-reviewer` rather than kept
+    as its own third agent) lines up with how others have actually built
+    this:
+    - `cfisch3r/estimate` PR #91 - a real repo running two SEPARATE
+      Claude Code subagents, `design-critic-ux` (UX heuristics) and
+      `design-critic-visual` (visual design), both wired to a Playwright
+      MCP server for "live screenshot-based UX and visual design review"
+      against a running dev server - the same "drive a real browser,
+      don't just read code" mechanism `requirements-reviewer`'s own
+      post-build pass uses (via ad hoc `Bash`+Playwright here instead of
+      an MCP server, since that's what this environment actually has).
+      Real precedent for keeping UX review genuinely separate from code
+      review, not folded into one generic reviewer.
+    - `xenstalker02/punchlist` - a structured, evidence-based design-
+      audit methodology: every review declares a concrete user scenario
+      up front ("a `[user]`, in `[state]` on `[device]`, starts at
+      `[entry point]` and tries to `[complete task]`"), findings must
+      cite what was actually inspected (a real screenshot, a real
+      element), and anything not actually checked goes in a "Not
+      assessed" section rather than inflating the finding count -
+      directly validates `requirements-reviewer`'s own "never mark a
+      criterion as met unless you've explicitly verified it" rule and
+      its explicit busy/moderately-attentive-steward persona (though
+      punchlist itself deliberately avoids a "frustrated user" archetype
+      in favour of a neutral state+device description - a real
+      alternative framing worth knowing about, not adopted here).
+    - `agapi-koutsi/UX-Design-Critique` - a different real pattern: MULTIPLE
+      named personas (Product Manager, Engineer, Skeptical User) critique
+      independently, then a Moderator agent summarizes the debate -
+      genuinely different from this project's single-UX-reviewer
+      design, not adopted, but confirms multi-persona critique is a real,
+      explored pattern elsewhere if ever revisited.
+    - General search confirms the wider "split review into independent
+      specialist lenses, fresh context per lens" pattern extends past
+      code review into UX/visual/accessibility-specific reviewer roles
+      in real, existing Claude Code subagent setups - not just a code-
+      review-only convention.
+    (`skills.lc` was blocked mid-research trying to read one further
+    design-review skill's primary source - flagged in `CLAUDE.md`,
+    only reachable via a search-engine snippet.)
+
+    Still not done, still Keith's to revisit when ready: deeper grounding
+    of `requirements-ux`'s own intent in real human-psychology/HCI
+    research - this precedent research answered "does a UX-reviewer role
+    exist elsewhere," not "what does the psychology literature say about
+    good UX," which is a separate, deliberately deferred question.
 
     **Requirements-register schema refined further, same day** - three
     more real follow-up asks, before the agent system's first real run:
