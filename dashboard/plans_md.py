@@ -10,8 +10,8 @@ There are two real, deliberately different tag placements in these files
 plans/running-thoughts.md #10's own write-up):
 
 1. Numbered-item files (`wider.md`, `qa-pipeline.md`, `dashboard.md`,
-   `data-generation.md`) - a plain markdown ordered list, each item
-   tagged at its own first token:
+   `data-generation.md`, `tooling.md`) - a plain markdown ordered list,
+   each item tagged at its own first token:
        N. **[status, date]** **[Component]** <text, wrapped across
           multiple lines/paragraphs, indented like a real markdown list
           continuation>
@@ -64,7 +64,7 @@ _THREAD_STATUS_RE = re.compile(
 )
 _NOTE_HEADING_RE = re.compile(r"^###\s+(?:(\d+)\.\s+)?(.+)$")
 
-# The 4 numbered-item files and the 2 Thread/Phase essay files, keyed by
+# The 5 numbered-item files and the 2 Thread/Phase essay files, keyed by
 # the short "file" id the dashboard's URL/filter state uses - deliberately
 # not just the filename stem, so a rename of the .md file itself doesn't
 # silently change every embedded id.
@@ -73,6 +73,7 @@ NUMBERED_FILES = {
     "qa-pipeline": "qa-pipeline.md",
     "dashboard": "dashboard.md",
     "data-generation": "data-generation.md",
+    "tooling": "tooling.md",
 }
 THREAD_FILES = {
     "publishing-and-history": "publishing-and-history.md",

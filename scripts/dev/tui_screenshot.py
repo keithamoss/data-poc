@@ -3,9 +3,10 @@ Dev-only tool: run a real command inside a real pseudo-terminal, feed it
 scripted keystrokes, and render the resulting on-screen terminal state
 (not a raw scrolling log - a real terminal-emulator buffer, via pyte) to a
 PNG screenshot. Built 2026-09-19 as prep for the mothman CLI work (plans/
-wider.md #7) so Keith can see real, actual TUI/CLI output in chat as it's
-built, rather than descriptions of it. Never imported by the shipped
-pipeline/CLI - dev tooling only, not covered by pytest-cov's threshold.
+tooling.md #1, split out of plans/wider.md #7 the same day) so Keith can
+see real, actual TUI/CLI output in chat as it's built, rather than
+descriptions of it. Never imported by the shipped pipeline/CLI - dev
+tooling only, not covered by pytest-cov's threshold.
 
 Why pyte and not a plain ANSI-to-HTML text converter: questionary/rich
 redraw in place using cursor-movement and erase ANSI codes (they don't

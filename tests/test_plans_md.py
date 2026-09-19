@@ -188,6 +188,7 @@ def test_parse_plans_reads_all_files_and_returns_the_combined_shape(tmp_path):
     (plans_dir / "qa-pipeline.md").write_text("1. **[todo, 2026-09-18]** **[QA checks & contract]** A QA item.\n")
     (plans_dir / "dashboard.md").write_text("1. **[done, 2026-09-18]** **[Dashboard UI]** A dashboard item.\n")
     (plans_dir / "data-generation.md").write_text("1. **[parked, 2026-09-18]** **[Data generation]** A data-gen item.\n")
+    (plans_dir / "tooling.md").write_text("1. **[in-progress, 2026-09-18]** **[Testing & dev tooling]** A tooling item.\n")
     (plans_dir / "publishing-and-history.md").write_text(
         "## Thread B - a thread\n\n**Status:** done (2026-09-16) · **Category:** Pipeline & publishing\n\nBody.\n"
     )
@@ -197,8 +198,8 @@ def test_parse_plans_reads_all_files_and_returns_the_combined_shape(tmp_path):
     (plans_dir / "running-thoughts.md").write_text("### 1. A raw idea\n\nBody.\n")
 
     result = parse_plans(plans_dir)
-    assert len(result["items"]) == 4
-    assert {i["file"] for i in result["items"]} == {"wider", "qa-pipeline", "dashboard", "data-generation"}
+    assert len(result["items"]) == 5
+    assert {i["file"] for i in result["items"]} == {"wider", "qa-pipeline", "dashboard", "data-generation", "tooling"}
     assert len(result["threads"]) == 2
     assert {t["file"] for t in result["threads"]} == {"publishing-and-history", "conceptual-design"}
     assert len(result["notes"]) == 1

@@ -849,8 +849,8 @@ const LEADERBOARD = [];
 // above. Shape: {items: [{file, number, status, date, components,
 // section, text}, ...], threads: [{file, heading, status, date,
 // category, body}, ...], notes: [{number, title, body}, ...]} - items
-// come from the 4 numbered-item files (wider/qa-pipeline/dashboard/
-// data-generation.md), threads from the 2 Thread/Phase essay files
+// come from the 5 numbered-item files (wider/qa-pipeline/dashboard/
+// data-generation/tooling.md), threads from the 2 Thread/Phase essay files
 // (publishing-and-history/conceptual-design.md), notes from running-
 // thoughts.md (deliberately untagged - Keith's own call, "just a looser
 // feed the dashboard shows as-is"). Unlike every other const here, this
@@ -3167,7 +3167,8 @@ function plansStatusPill(s){ return `<span class="pill ${PLANS_STATUS_CLASS[s]||
 
 const PLANS_FILE_LABEL = {
   wider:"wider.md", "qa-pipeline":"qa-pipeline.md", dashboard:"dashboard.md",
-  "data-generation":"data-generation.md", "publishing-and-history":"publishing-and-history.md",
+  "data-generation":"data-generation.md", tooling:"tooling.md",
+  "publishing-and-history":"publishing-and-history.md",
   "conceptual-design":"conceptual-design.md", "running-thoughts":"running-thoughts.md",
 };
 
@@ -3219,7 +3220,7 @@ const PLANS_ENTRIES = (function(){
 const PLANS_ALL_STATUSES = ["done","in-progress","investigate","todo","parked","superseded"];
 const PLANS_ALL_COMPONENTS = ["Data generation","QA checks & contract","Pipeline & publishing",
   "Dashboard UI","GitHub workflow & people","Testing & dev tooling","Docs & process"];
-const PLANS_ALL_FILES = ["wider","qa-pipeline","dashboard","data-generation",
+const PLANS_ALL_FILES = ["wider","qa-pipeline","dashboard","data-generation","tooling",
   "publishing-and-history","conceptual-design","running-thoughts"];
 
 // Chip filters narrow results (select one/more to filter down); an empty
