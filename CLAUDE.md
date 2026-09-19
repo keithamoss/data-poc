@@ -286,12 +286,24 @@ Rough layout:
   dir in tests - instead of the fixed, repo-relative `dbt_project/
   target/`), and the other 3 tools' own fixtures were confirmed already
   safe (their scratch dirs were already monkeypatched to per-worker
-  `tmp_path_factory` dirs). `uv run pytest -n auto` is the recommended
-  fast path for a full local run (real ~59s/411 tests measured on this
-  4-core sandbox, down from ~122s serial) - NOT the new default for a
-  bare `uv run pytest`, which stays serial on purpose (easier single-
-  test debugging, matching `qa_tools/common/parallel_orchestrate.py`'s
-  own stated preference for a sequential mode). CI
+  `tmp_path_factory` dirs). **Parallel is now the DEFAULT** (2026-09-19,
+  Keith's own call, reversing the earlier serial-by-default preference):
+  `pyproject.toml`'s `addopts = "-n auto --dist loadfile"` means a bare
+  `uv run pytest` is already parallel, locally and in CI alike. The
+  earlier reasoning for staying serial was debuggability, and the
+  biggest part of it turned out not to hold - **pytest-xdist silently
+  falls back to serial the moment `--pdb` is passed** (verified against
+  a real failing test: a real `(Pdb)` prompt, no `gw0` worker banner),
+  so interactive debugging is unaffected. Measured on this 4-core
+  sandbox: full suite ~220s serial -> ~78s; a targeted single-file run
+  pays a flat ~1s of worker startup (1.4s -> 2.2s). Use **`-n0`** to
+  force serial - the one case genuinely worse in parallel is
+  print-debugging several tests at once, where output interleaves.
+  `--dist loadfile` is load-bearing, not tuning: it keeps every test in
+  a file on one worker, without which `tests/test_dashboard_e2e.py`'s
+  session-scoped build fixture runs once per worker and several workers
+  race to rewrite the same real `reports/` files (`plans/tooling.md`
+  #10). CI
   (`.github/workflows/
   test.yml`) runs the full suite with `pytest-cov` on every push and
   enforces `pyproject.toml`'s `[tool.coverage.report] fail_under` - a
@@ -411,17 +423,43 @@ Rough layout:
   dbt test failures until it was), and `PLAYWRIGHT_CHROMIUM_PATH=/opt/
   pw-browsers/chromium` was needed for the e2e module (16 errors until
   it was set). Neither is a code fault; both are one-line fixes.
-  Also found during the same run: `-n auto` specifically is NOT
-  currently reliable for a full-suite pass - a real, PRE-EXISTING race
-  between `tests/test_embed_dashboard_data.py` and `tests/
-  test_dashboard_e2e.py` over shared `reports/` paths (confirmed
-  pre-existing against a stashed, clean tree; logged as `plans/
-  tooling.md` #10). Serial is clean. Until that's fixed, treat an
-  `-n auto` failure in either of those two modules as suspect and
-  re-check it serially before believing it.
+  -> **~83s/653 tests (2026-09-19 evening, parallel now the default)**.
+  The race that used to make `-n auto` unreliable for a full-suite pass
+  is fixed (`plans/tooling.md` #10 - two of them, actually: the embed
+  tests reading real `reports/` build artifacts mid-rewrite, and the
+  e2e build fixture running once per worker), so this number is a
+  like-for-like replacement of the 220s serial one above, not an
+  optimistic best case. The real CI coverage command
+  (`--cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard`)
+  passes at 94.76%, comfortably over the 92% floor.
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.
+- **In a fresh session, do the environment setup UP FRONT - before
+  running any test suite - rather than discovering what's missing from
+  test failures.** Keith's own explicit ask, 2026-09-19, after watching
+  a session run the full suite first, get 8 dbt failures and 16
+  Playwright errors, and only then work backwards to the cause - all of
+  which this file already documented. Every remote session starts from
+  a freshly-cloned container with none of the gitignored build
+  artifacts present, so assume they're missing rather than checking
+  after the fact. The three, all one-liners:
+  - `uv run dbt deps --project-dir dbt_project --profiles-dir
+    qa_tools/dbt_profiles` (installs `dbt_utils`, whose macros several
+    real dbt checks need - without it 8 real tests fail)
+  - `npm ci` (without it `npm test` won't start at all)
+  - `uv run playwright install chromium`, or in this sandbox
+    `export PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium` (the
+    pre-installed build lags what the pinned package expects)
+
+  Two things worth knowing so this doesn't get mis-diagnosed next time:
+  **CI is not affected** - `.github/workflows/test.yml` runs all three
+  as real steps, so a red local suite with a green CI almost certainly
+  means local setup, not a regression. And a failure in any of those
+  areas is not evidence of a code fault until setup has actually been
+  done. Automating this properly (a `.claude/settings.json` SessionStart
+  hook) is scoped as `plans/tooling.md` #11 - until it exists, this
+  bullet is the process fix.
 - **A push that ships anything release-note-worthy gets a `CHANGELOG.md`
   entry in the SAME push, not backfilled later.** "Release-note-worthy"
   is the same bar `CHANGELOG.md`'s own intro and item 62's original

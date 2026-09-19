@@ -61,8 +61,17 @@ from pathlib import Path
 _ITEM_TIME_RE = re.compile(r"^\*\*(\d{1,2}:\d{2}(?:am|pm))\*\* — (.*)$")
 # A bold span that doesn't itself start with "[" - so a **[Component]**
 # tag is never mistaken for the headline that precedes it.
-_ITEM_HEADLINE_RE = re.compile(r"^\*\*([^*\[][^*]*)\*\*\s*(.*)$")
+# `(?:[^*\\]|\\.)*` rather than a plain `[^*]*`: a headline may contain a
+# backslash-escaped asterisk (a real one does - "...Renamed to
+# delivery-\*"), which puts `***` immediately before the closing `**`.
+# The old `[^*]*` stopped at the backslash, `\*\*` then ate two of the
+# three asterisks, and the leftover `*` blocked the component match that
+# follows. The two alternatives here are deliberately non-overlapping
+# (a backslash only ever matches via `\\.`), so there's no ambiguity for
+# the engine to backtrack through. plans/dashboard.md #17.
+_ITEM_HEADLINE_RE = re.compile(r"^\*\*([^*\[](?:[^*\\]|\\.)*)\*\*\s*(.*)$")
 _ITEM_COMPONENT_RE = re.compile(r"^\*\*\[([^\]]+)\]\*\*\s*")
+_MD_ESCAPE_RE = re.compile(r"\\(.)")
 
 
 def _parse_item(text: str) -> dict:
@@ -73,6 +82,9 @@ def _parse_item(text: str) -> dict:
     hmatch = _ITEM_HEADLINE_RE.match(rest)
     if hmatch:
         headline, rest = hmatch.group(1), hmatch.group(2)
+        # `\*` is markdown escaping, not content - a reader should see
+        # the asterisk, not the backslash that protects it.
+        headline = _MD_ESCAPE_RE.sub(r"\1", headline)
 
     components = []
     while True:
@@ -97,11 +109,22 @@ def parse_changelog(path: str | Path) -> dict:
     current_section: dict | None = None
     current_para: list[str] = []
     seen_first_heading = False
+    pending_item: dict | None = None
 
     def flush_para():
         if current_para:
             intro_paragraphs.append(" ".join(current_para))
             current_para.clear()
+
+    def flush_item():
+        """Parse the open bullet from its FULL source text, then close it.
+        Deliberately not done line-by-line - see plans/dashboard.md #17."""
+        nonlocal pending_item
+        if pending_item is not None:
+            pending_item["section"]["items"].append(
+                _parse_item(" ".join(pending_item["lines"]))
+            )
+            pending_item = None
 
     with open(path) as f:
         for raw_line in f:
@@ -111,6 +134,7 @@ def parse_changelog(path: str | Path) -> dict:
             if line.startswith("# "):  # the file's own H1 title - not content
                 continue
             if line.startswith("## "):
+                flush_item()
                 flush_para()
                 current_entry = {"date": line[3:].strip(), "sections": []}
                 entries.append(current_entry)
@@ -118,11 +142,13 @@ def parse_changelog(path: str | Path) -> dict:
                 seen_first_heading = True
                 continue
             if line.startswith("### ") and current_entry is not None:
+                flush_item()
                 current_section = {"category": line[4:].strip(), "items": []}
                 current_entry["sections"].append(current_section)
                 continue
             if line.startswith("- ") and current_section is not None:
-                current_section["items"].append(_parse_item(stripped[2:]))
+                flush_item()
+                pending_item = {"section": current_section, "lines": [stripped[2:]]}
                 continue
             if not seen_first_heading:
                 # preamble before the first "## " heading - the page's own
@@ -132,11 +158,16 @@ def parse_changelog(path: str | Path) -> dict:
                 else:
                     flush_para()
                 continue
-            # a non-empty, non-heading, non-bullet line while inside a
-            # section with at least one item already - a soft-wrapped
-            # continuation of that item's own markdown source line
-            if stripped and current_section is not None and current_section["items"]:
-                current_section["items"][-1]["text"] += " " + stripped
+            # a non-empty, non-heading, non-bullet line while an item is
+            # still open - a soft-wrapped continuation of that item's own
+            # markdown source line. Buffered rather than appended straight
+            # onto ["text"]: the headline and **[Component]** tags are
+            # parsed off the WHOLE joined bullet at flush time, so a tag
+            # that wrapped onto this line (or split across the wrap) is
+            # still seen. plans/dashboard.md #17.
+            if stripped and pending_item is not None:
+                pending_item["lines"].append(stripped)
 
+    flush_item()
     flush_para()
     return {"intro": intro_paragraphs, "entries": entries}

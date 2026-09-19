@@ -93,6 +93,29 @@ override-dependencies = ["duckdb>=1.5"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Parallel by default (Keith's call, 2026-09-19, reversing the earlier
+# serial-by-default preference recorded in plans/running-thoughts.md
+# #12). The original reasoning was debuggability - and the biggest part
+# of it turned out not to hold: pytest-xdist silently falls back to
+# serial the moment `--pdb` is passed (verified against a real failing
+# test - a real (Pdb) prompt, no gw0 worker banner), so interactive
+# debugging is unaffected by this default. Measured cost/benefit on a
+# 4-core box: a targeted single-file run pays a flat ~1s of worker
+# startup (1.4s -> 2.2s), while the full suite goes ~220s -> ~55s. Use
+# `-n0` to force serial when print-debugging several tests at once,
+# which is the one case genuinely worsened by interleaved output.
+#
+# --dist loadfile is load-bearing, not a tuning knob: it keeps every
+# test in a file on ONE worker. tests/test_dashboard_e2e.py's own
+# session-scoped built_dashboard_html fixture shells out to the real
+# build chain, which rewrites reports/*.json and the built dashboard
+# HTML in the real tree - under the default `load` distribution that
+# fixture runs once PER WORKER, so several workers race to rewrite the
+# same files. See plans/tooling.md #10 for the full account (the other
+# half of that fix is tests/test_embed_dashboard_data.py's own
+# _isolate_embed_data_targets fixture, which stops it reading those
+# same artifacts while another worker is mid-rewrite).
+addopts = "-n auto --dist loadfile"
 # Just the repo root - generator/, pipeline/, and synthetic_data_generator/
 # are real packages now (each has an __init__.py), same as qa_tools/ always
 # was (plans/qa-pipeline.md #84), so everything imports as e.g.

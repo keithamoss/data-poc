@@ -50,7 +50,20 @@ name: Sync QA status to GitHub Issues
 # job never touches the dashboard itself.
 on:
   push:
-    branches: [claude/new-session-en9qen]
+    # A glob, not a single named branch - same fix and reason as
+    # test.yml/deploy-pages.yml (plans/publishing-and-history.md #7,
+    # 2026-09-19). Worth recording what that actually changed HERE,
+    # because this is the one of the three with `issues: write`: the
+    # push trigger below was deliberately enabled (see the note above),
+    # but the dead branch pin meant it had never once fired. So this
+    # workflow's first real automatic run is a consequence of fixing the
+    # pin, not of enabling anything new - Keith's call, 2026-09-19, made
+    # with the real number in front of him: 3 datasets currently read
+    # red (birth-registrations, cp-carers, cp-placements), down from all
+    # 7 before plans/qa-pipeline.md item 74's fix, so the first run opens
+    # 3 tickets rather than the noise-storm that item's own write-up had
+    # been holding this back to avoid.
+    branches: ["claude/**"]
     paths:
       - "qa_results/**"
       - "contract/**"

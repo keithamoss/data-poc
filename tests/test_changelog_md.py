@@ -239,3 +239,83 @@ def test_empty_file_after_title_produces_no_entries(tmp_path):
     path = _write(tmp_path, "# Changelog\n")
     result = parse_changelog(path)
     assert result == {"intro": [], "entries": []}
+
+
+# --- plans/dashboard.md #17 (fixed 2026-09-19) -------------------------
+#
+# _parse_item() used to be handed only a bullet's FIRST source line, with
+# soft-wrapped continuation lines appended to ["text"] afterwards. So a
+# **[Component]** tag only got parsed if it happened to fit on line one -
+# pure luck, not a rule anyone follows when writing an entry. 3 of 92
+# real CHANGELOG.md entries were affected, each rendering in the live
+# Release Notes panel with no component badge and the raw markup showing
+# as body text.
+
+def test_a_component_tag_wrapped_onto_the_next_line_is_still_parsed(tmp_path):
+    """The commonest shape: a long headline fills line one, pushing the
+    component tag onto the continuation line."""
+    path = _write(tmp_path, """# Changelog
+
+## 2026-01-01
+
+### Changed
+- **4:27pm** — **A Headline Long Enough To Fill The Whole First Line**
+  **[Docs & process]** The real body text follows here.
+""")
+    item = parse_changelog(path)["entries"][0]["sections"][0]["items"][0]
+    assert item["headline"] == "A Headline Long Enough To Fill The Whole First Line"
+    assert item["components"] == ["Docs & process"]
+    assert item["text"] == "The real body text follows here."
+
+
+def test_a_component_tag_split_mid_tag_across_lines_is_still_parsed(tmp_path):
+    """The nastier shape, and a real one in this repo's own history: the
+    wrap lands INSIDE the tag, so even joining-then-parsing only works
+    because the join restores the single space."""
+    path = _write(tmp_path, """# Changelog
+
+## 2026-01-01
+
+### Added
+- **4:23pm** — **Another Real Headline** **[Docs &
+  process]** Body text after a tag that was split across the wrap.
+""")
+    item = parse_changelog(path)["entries"][0]["sections"][0]["items"][0]
+    assert item["headline"] == "Another Real Headline"
+    assert item["components"] == ["Docs & process"]
+    assert item["text"] == "Body text after a tag that was split across the wrap."
+
+
+def test_an_escaped_asterisk_in_a_headline_does_not_break_parsing(tmp_path):
+    """A real entry title ends `...Renamed to delivery-\\*` - the escaped
+    asterisk sits immediately before the closing `**`, making `***`. The
+    old regex consumed two of the three and left a stray `*` that then
+    blocked the component match entirely. The backslash is a markdown
+    escape, not content, so it's stripped from the parsed headline."""
+    path = _write(tmp_path, r"""# Changelog
+
+## 2026-01-01
+
+### Changed
+- **7:25pm** — **The 8 Subagents Renamed to delivery-\*** **[Docs & process]**
+  Real body text here.
+""")
+    item = parse_changelog(path)["entries"][0]["sections"][0]["items"][0]
+    assert item["headline"] == "The 8 Subagents Renamed to delivery-*"
+    assert item["components"] == ["Docs & process"]
+    assert item["text"] == "Real body text here."
+
+
+def test_multiple_components_survive_a_wrap_between_them(tmp_path):
+    """Several entries carry two tags; the wrap can land between them."""
+    path = _write(tmp_path, """# Changelog
+
+## 2026-01-01
+
+### Fixed
+- **1:00pm** — **Two Tags, One Wrap** **[Dashboard UI]**
+  **[Testing & dev tooling]** Body text.
+""")
+    item = parse_changelog(path)["entries"][0]["sections"][0]["items"][0]
+    assert item["components"] == ["Dashboard UI", "Testing & dev tooling"]
+    assert item["text"] == "Body text."

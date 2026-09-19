@@ -2873,7 +2873,7 @@ one Thread's narrative.
    Not scoped - the point of this entry is to not lose the concern
    before that conversation happens.
 
-7. **[todo, 2026-09-19]** **[Pipeline & publishing]** Both GitHub Actions
+7. **[done, 2026-09-19]** **[Pipeline & publishing]** Both GitHub Actions
    workflows are pinned to a single, hardcoded session branch name -
    `on: push: branches: [claude/new-session-en9qen]` in
    `.github/workflows/test.yml`, and the equivalent in
@@ -2899,15 +2899,45 @@ one Thread's narrative.
    depends on someone remembering, which is the same class of thing the
    rule already says not to rely on.
 
-   Not fixed unprompted - it's a real fork worth a word with Keith, not
-   a mechanical change, and the options differ in more than effort:
-   drop the branch filter entirely (every branch gets CI - simplest,
-   costs runner minutes on throwaway branches); switch to a `claude/**`
-   glob (covers every session branch without naming one); or trigger on
-   pull requests instead of pushes (which would fit the "CI is the only
-   publish path" model already established in Thread A, but changes how
-   this project actually works day to day, since it currently pushes
-   straight to a session branch and never opens a PR). `deploy-pages.yml`
-   deserves its own answer rather than the same one by default - it is
-   the real publish path, so "every branch publishes" is very likely
-   wrong for it even if it's right for `test.yml`.
+   **Fixed 2026-09-19** (Keith's call: "open to moving to PR triggers if
+   that's cleaner, but also a Claude glob if simpler"). Chose the
+   `claude/**` glob, and the deciding fact was one nobody had checked:
+   **this repo has no trunk at all.** `list_branches` returns three
+   branches, every one a `claude/*` session branch, each continuing from
+   the last - there is no `main`. So a `pull_request` trigger has
+   nothing to target, and the PR option isn't "cleaner" here, it's
+   inapplicable without first inventing a trunk. Worth recording since
+   the option sounded reasonable in the abstract.
+
+   **A third workflow had the identical pin, found only by grepping
+   after fixing the first two**: `.github/workflows/ticket-sync.yml`.
+   That one matters more than the other two, because it holds
+   `issues: write` and opens real GitHub issues on a public repo - and
+   its own trigger `paths` include itself, so the very commit fixing its
+   pin would fire it. Its own comment records that Keith had explicitly
+   enabled its push trigger at the time; the dead pin meant it had
+   nonetheless never once fired. Flagged to him with the real number
+   before touching it - 3 datasets currently read red
+   (birth-registrations, cp-carers, cp-placements), down from all 7
+   before `plans/qa-pipeline.md` item 74's fix, so the first real run
+   opens 3 tickets rather than the noise storm that item's own write-up
+   had been holding this back to avoid - and his call was to fix the pin
+   and let it fire.
+
+   `test.yml` also gained a real `concurrency` group
+   (`test-${{ github.ref }}`, `cancel-in-progress: true`): this branch
+   pushes several times a session and only the newest commit's result
+   means anything. Keyed on the ref, so two concurrent sessions can't
+   cancel each other. `deploy-pages.yml` already had its own
+   `concurrency: pages` group, so deploys serialise rather than
+   interleave.
+
+   **One residual risk, named rather than silently accepted**: with a
+   glob, any `claude/*` branch can publish to the live public site. That
+   matches how this project actually works (sessions are sequential, so
+   "newest push publishes" is correct) and the pages concurrency group
+   stops two interleaving - but if two sessions genuinely overlap, an
+   older branch pushing last would publish older content. The honest fix
+   for that is a real trunk branch to publish from, which is a bigger
+   change to how this project works and is deliberately NOT bundled in
+   here.

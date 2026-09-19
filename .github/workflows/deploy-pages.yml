@@ -145,7 +145,24 @@ on:
     # (see the hard-rule note above), so a generator-only change has no
     # effect on what this job builds until someone runs it locally and
     # commits fresh qa_results/ history, which already triggers this.
-    branches: [claude/new-session-en9qen]
+    # A glob, not a single named branch - same fix and same reason as
+    # test.yml's own trigger (plans/publishing-and-history.md #7,
+    # 2026-09-19): this was pinned to one session's branch name, so it
+    # stopped firing for every later session.
+    #
+    # Worth being explicit about what this means HERE, since unlike
+    # test.yml this workflow is the real publish path to a live, public
+    # site: any `claude/*` branch can now publish. That matches how this
+    # project actually works (sessions are sequential, each branching
+    # from the last, so "the newest push publishes" is the correct
+    # behaviour), and the `concurrency: pages` group below already
+    # serialises deploys so two can never interleave. The residual risk
+    # it does NOT cover: if two sessions genuinely overlap, an older
+    # branch pushing last would publish older content. That's a real but
+    # narrow window, and the honest fix for it is a real trunk branch to
+    # publish from - a bigger change to how this project works, flagged
+    # in #7 rather than decided here.
+    branches: ["claude/**"]
     paths:
       - "qa_results/**"
       - "contract/**"

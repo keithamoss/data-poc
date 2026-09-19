@@ -55,6 +55,55 @@ edited for a punchier, friendlier read than a bare commit log.
   report), and how Keith can invoke it.
 
 ### Fixed
+- **8:49pm** — **CI Was Pinned to a Dead Branch and Hadn't Run in Weeks** **[Pipeline & publishing]**
+  All three workflows triggered on a hardcoded branch name —
+  `claude/new-session-en9qen`, the working branch of whichever session
+  last edited them. Every session since got a different name, so none of
+  them fired and CI silently did nothing. Nothing was ever red; the
+  failure mode was CI looking fine because it wasn't running, which is
+  exactly what the "a passing local pytest is not evidence CI is green"
+  rule exists to catch. Now a `claude/**` glob. A PR trigger was
+  considered and doesn't apply here: this repo has no trunk at all —
+  every branch is a sequential `claude/*` session branch, so a pull
+  request would have nothing to target. `test.yml` also gained a
+  per-branch concurrency group so superseded runs cancel themselves.
+  The third workflow, `ticket-sync.yml`, is the consequential one: it
+  holds `issues: write`, its push trigger had been deliberately enabled
+  long ago, and the dead pin meant it had never once fired. It fires now
+  — opening 3 real tickets for the datasets still genuinely red, down
+  from all 7 before the threshold fix below.
+- **8:49pm** — **A Changelog Entry's Component Tag Could Silently Vanish** **[Dashboard UI]**
+  The `CHANGELOG.md` parser only ever saw a bullet's *first* source
+  line, appending soft-wrapped continuation lines straight onto the body
+  text afterwards. So a `**[Component]**` tag was parsed only if it
+  happened to fit on line one — luck, not a rule anyone follows when
+  writing an entry. Three real entries were affected, rendering in the
+  live Release Notes panel with no component badge and raw `**[Docs &
+  process]**` markup showing as prose. The parser now buffers a bullet's
+  full source and parses headline and tags off the joined text, which
+  also fixes a tag split mid-wrap. Separately, a backslash-escaped
+  asterisk in a headline (`...Renamed to delivery-\*`) produced `***`
+  before the closing bold marker and broke the match outright; the
+  headline pattern now consumes an escape as one unit and strips the
+  backslash, so the panel shows `delivery-*`. All 92 entries now parse
+  with components, up from 89. 4 new tests, each confirmed failing
+  first.
+- **8:49pm** — **The Test Suite Is Parallel by Default, and No Longer Races** **[Testing & dev tooling]**
+  `uv run pytest` now runs `-n auto --dist loadfile`: ~220s down to
+  ~78s for the full 649-test suite. The earlier decision to stay serial
+  rested mainly on debuggability, and the load-bearing part of that
+  turned out not to hold — pytest-xdist silently falls back to serial
+  the moment `--pdb` is passed, so interactive debugging never saw a
+  worker anyway. `-n0` forces serial for the one case still genuinely
+  worse in parallel, print-debugging several tests at once. Making it
+  the default first meant fixing two real races that made `-n auto`
+  unreliable: the embed tests read the real multi-megabyte
+  `reports/*.json` build artifacts while the e2e module's build fixture
+  was rewriting them (they now use local stubs — nothing there asserts
+  on those files' contents, and the module got 2.3x faster as a side
+  effect), and that same session-scoped fixture ran once *per worker*
+  under the default distribution, so several workers raced to rebuild
+  the same files. `--dist loadfile` is what stops the second one.
 - **8:09pm** — **The Dashboard Now Trusts Each Tool's Own Verdict** **[Pipeline & publishing]** **[Dashboard UI]**
   Every dataset had been reading red on every single run, and the cause
   turned out to be the dashboard second-guessing the tools. Each real

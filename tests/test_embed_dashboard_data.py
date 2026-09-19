@@ -17,7 +17,38 @@ from __future__ import annotations
 import json
 import re
 
+import pytest
+
 from dashboard import embed_dashboard_data as edd
+
+
+@pytest.fixture(autouse=True)
+def _isolate_embed_data_targets(monkeypatch, tmp_path):
+    """plans/tooling.md #10 - every test here drives the real embed(),
+    which reads edd.TARGETS: the real, repo-relative
+    reports/birth_registrations_dashboard.json and
+    child_protection_dashboard.json. Those are BUILD ARTIFACTS, rewritten
+    from scratch by tests/test_dashboard_e2e.py's own session-scoped
+    built_dashboard_html fixture - so under pytest-xdist the two modules
+    land on different workers and this one reads a 6.5MB file mid-rewrite,
+    getting a truncated JSON and a failure that vanishes on a re-run.
+
+    Nothing in this module asserts anything about those two files'
+    CONTENTS - they're unit tests of embed()'s own wiring (changelog feed
+    merging, ticket status, leaderboard, amber decisions), and embed()
+    only json.loads each target and substitutes it into a const. So
+    pointing them at tiny local stubs is both the real isolation fix and
+    strictly more honest about what's under test. Every other real file
+    embed() touches was already monkeypatched per-test; TARGETS was the
+    one shared read nobody had covered."""
+    stub = tmp_path / "targets"
+    stub.mkdir()
+    targets = []
+    for const_name, real_path in edd.TARGETS:
+        p = stub / f"{const_name}.json"
+        p.write_text(json.dumps({"stub": const_name}))
+        targets.append((const_name, str(p)))
+    monkeypatch.setattr(edd, "TARGETS", targets)
 
 
 def _entry(dataset, committed_at, run_timestamp="2026-01-01T00:00:00+00:00", run_by="a@b.com"):

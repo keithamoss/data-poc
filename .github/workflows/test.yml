@@ -72,10 +72,33 @@ name: Run test suite
 # subprocess.run(..., check=False, capture_output=True) and nothing
 # surfaces a failed dbt invocation's own stderr.
 
+# A glob, not a single named branch (plans/publishing-and-history.md #7,
+# fixed 2026-09-19). This used to read `branches:
+# [claude/new-session-en9qen]` - the working branch of whichever session
+# last edited this file. Every session since got a different branch name,
+# so this workflow fired for NONE of them and CI silently did nothing:
+# `list_workflow_runs` filtered to a later session's branch returned zero
+# runs while the repo as a whole had 335. Nothing was ever red - the
+# failure mode was CI looking fine because it wasn't running at all,
+# exactly the thing CLAUDE.md's own "a passing local pytest is NOT
+# evidence CI is green" rule exists to catch.
+#
+# `claude/**` rather than a PR trigger, deliberately: this project has no
+# trunk at all (there is no `main` - every branch in the repo is a
+# `claude/*` session branch, each continuing from the last), and its own
+# convention is to push straight to a session branch and never open a PR
+# unless asked. A pull_request trigger would have nothing to target.
 on:
   push:
-    branches: [claude/new-session-en9qen]
+    branches: ["claude/**"]
   workflow_dispatch:
+
+# A superseded run tells you nothing - this branch pushes several times a
+# session, and only the newest commit's result matters. Cancels in
+# progress per-branch, so two concurrent sessions never cancel each other.
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

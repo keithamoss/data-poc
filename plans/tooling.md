@@ -1110,7 +1110,7 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
    file or couple it to questionary's own internal implementation. All
    13 `tests/test_cli_common.py` tests still pass; `ruff` clean.
 
-10. **[todo, 2026-09-19]** **[Testing & dev tooling]** A real, pre-existing
+10. **[done, 2026-09-19]** **[Testing & dev tooling]** A real, pre-existing
     test-isolation gap between `tests/test_embed_dashboard_data.py` and
     `tests/test_dashboard_e2e.py` under `pytest-xdist`. Found
     incidentally while verifying `plans/qa-pipeline.md` item 74's fix -
@@ -1141,13 +1141,96 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     dbt's shared `target/` directory, just in a different shared
     resource that the dbt fix didn't cover.
 
-    Not fixed here, and deliberately NOT given an automatic regression
-    test: this is the environment/wiring class `CLAUDE.md`'s own
-    bug-test convention carves out (shared paths / working-directory
-    assumptions, where the real fix is often to remove the shared
-    mechanism entirely rather than to document it), so it wants a word
-    with Keith first. Worth knowing when picking it up: the likely fix
-    mirrors the dbt one - point `embed()`'s output at a per-worker tmp
-    dir in tests rather than the real `reports/` tree - and that plain
-    serial `uv run pytest` is unaffected, so this only bites the `-n
-    auto` fast path `CLAUDE.md` recommends for a full local run.
+    **Fixed 2026-09-19** (Keith's own go-ahead, same message that made
+    `-n auto` the default - the two are the same piece of work, since a
+    flaky default is worse than a slow one). The diagnosis above was
+    right about the shared `reports/` paths but incomplete: there were
+    **two** independent races, and fixing either alone would have left
+    the suite flaky.
+
+    1. **A cross-module read/write race.**
+       `test_dashboard_e2e.py`'s session-scoped `built_dashboard_html`
+       shells out to the real build chain, rewriting the real
+       `reports/birth_registrations_dashboard.json` (6.5MB) and its CP
+       sibling. `test_embed_dashboard_data.py` monkeypatched every other
+       real path `embed()` touches - `DASHBOARD_HTML`,
+       `OPEN_TICKETS_JSON`, `TICKET_RESOLUTIONS_JSON`,
+       `CHANGELOG_SOURCES` - but never `TARGETS`, so it read those two
+       files live, and on a different worker could read one mid-rewrite
+       and get truncated JSON. Fixed with an autouse
+       `_isolate_embed_data_targets` fixture pointing `TARGETS` at tiny
+       local stubs. This is the honest fix rather than a workaround:
+       nothing in that module asserts anything about those files'
+       CONTENTS (they're unit tests of `embed()`'s own wiring), and
+       `embed()` only `json.load`s each target and substitutes it into a
+       const. Real side benefit, not the goal: that module went from
+       6.8s to 2.9s by not reading 7MB of JSON per test.
+    2. **A worker-vs-worker clobber, not in the original diagnosis.**
+       Under xdist's default `--dist load`, tests from one file are
+       spread across workers, so `built_dashboard_html` - session-scoped,
+       meaning once *per worker* - ran the whole build chain several
+       times concurrently, each writing the same real files. Fixed with
+       `--dist loadfile` (every test in a file stays on one worker),
+       which is why that flag is load-bearing in `pyproject.toml`'s
+       `addopts` rather than a tuning knob.
+
+    Verified rather than assumed: the two modules run together 3/3 clean
+    where they had failed reliably before, and the full suite is **649
+    passed in 78s** under the new default, against 220s serial - a real
+    2.8x. (Not the ~4x a naive `-n auto` would suggest: `--dist
+    loadfile` keeps the big e2e module on one worker, which is the
+    price of correctness here.)
+
+    A regression test was deliberately NOT written for the race itself -
+    this is the environment/wiring class `CLAUDE.md`'s bug-test
+    convention carves out, and both fixes REMOVE the shared mechanism
+    rather than guard it, so a test would document a hack that no longer
+    exists. The autouse fixture is itself the standing guarantee.
+
+11. **[todo, 2026-09-19]** **[Testing & dev tooling]** A real
+    `.claude/settings.json` with a SessionStart hook, so a fresh session
+    doesn't start from a half-configured sandbox. Keith's own ask,
+    2026-09-19, after watching this session rediscover the same three
+    gaps by hitting test failures rather than by reading setup docs.
+
+    **The concrete problem.** This project needs three things that
+    aren't (and shouldn't be) in git, because they're all correctly
+    gitignored build artifacts:
+    - `dbt_project/dbt_packages/` - `dbt_utils`, which several real dbt
+      checks' macros come from. Missing it fails 8 real tests.
+      (`uv run dbt deps --project-dir dbt_project --profiles-dir
+      qa_tools/dbt_profiles`)
+    - `node_modules/` - Vitest won't start at all without it.
+      (`npm ci`)
+    - Playwright's Chromium - 16 e2e errors without it.
+      (`uv run playwright install chromium`, or this sandbox's own
+      `PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium` escape hatch,
+      since the pre-installed build here lags what the pinned package
+      expects)
+
+    **What's already right, and what isn't.** `.github/workflows/
+    test.yml` runs all three as explicit steps, so CI is genuinely fine
+    - this is not a broken-pipeline problem. What has no equivalent is
+    the INTERACTIVE session: a fresh cloud container clones the repo and
+    runs no setup at all, and there is no `.claude/settings.json` in
+    this repo today (only `.claude/agents/` and `.claude/skills/`). So
+    every new session re-derives the same three failures from scratch.
+
+    Not scoped yet, and worth a real think rather than just writing the
+    obvious hook: whether all three belong in one SessionStart hook or
+    whether the Playwright one should stay opt-in (it's a real download,
+    and plenty of sessions never touch the e2e suite); whether the hook
+    should be idempotent-and-silent or actually report what it did;
+    whether `PLAYWRIGHT_CHROMIUM_PATH` belongs in `env` rather than a
+    hook, given `dashboard/check_dashboard_renders.py` already
+    auto-detects the symlink (2026-09-19) so the gap may be narrower
+    than it looks; and whether any of this wants to be shared with
+    `README.md`'s own setup instructions rather than duplicated. There's
+    a real `session-start-hook` skill available for building this.
+
+    Related but genuinely separate, worth not conflating: `CLAUDE.md`
+    already documents the `dbt deps` step in prose. The gap this closes
+    is automation, not documentation - and the standing process fix for
+    the documentation half (read and run setup BEFORE running the
+    suite, rather than diagnosing failures backwards) landed as its own
+    `CLAUDE.md` convention bullet the same day, at Keith's explicit ask.

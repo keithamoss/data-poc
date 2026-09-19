@@ -959,7 +959,7 @@ common/check_lifecycle.py`'s own `check_id` convention.
     this environment's own `/opt/pw-browsers/chromium` symlink instead
     of requiring `PLAYWRIGHT_CHROMIUM_PATH` set by hand).
 
-17. **[todo, 2026-09-19]** **[Dashboard UI]** `dashboard/changelog_md.py`
+17. **[done, 2026-09-19]** **[Dashboard UI]** `dashboard/changelog_md.py`
     silently drops a `**[Component]**` tag whenever it doesn't sit on the
     bullet's own FIRST source line - 3 of 92 real `CHANGELOG.md` entries
     are affected today, and all 3 render in the live Release Notes panel
@@ -995,17 +995,30 @@ common/check_lifecycle.py`'s own `check_id` convention.
       that then blocks `_ITEM_COMPONENT_RE`. A separate regex problem
       from the other two, same visible symptom.
 
-    Two real fix directions, not yet chosen - worth Keith's call since
-    they differ in more than effort. **Fix the parser** (join a bullet's
-    full source text first, THEN parse headline/components off the
-    joined string; separately teach the headline regex about `\*`) is
-    the real fix and stops this recurring every time a headline happens
-    to be long enough to push the tag onto line two - which is pure
-    luck today, not a rule anyone follows. **Fix the content** (re-wrap
-    those 3 entries so the tag lands on line one, reword the `\*` one)
-    is a one-minute change but leaves the trap armed for the next long
-    headline. Leaning parser, but not doing it unprompted - it's a real
-    behaviour change to a module with its own test suite
-    (`tests/test_changelog_md.py`, 14 tests) and this project's standing
-    bug convention wants a reproducing test written and confirmed
-    failing first either way.
+    **Fixed 2026-09-19, Keith's own call** - the parser, not the
+    content, so the trap can't re-arm the next time a headline happens
+    to run long. Two changes, one per cause:
+    - `parse_changelog()` now buffers a bullet's source lines and parses
+      the headline/components off the WHOLE joined text at flush time
+      (a new `flush_item()`, called on the next bullet, the next `###`/
+      `## ` heading, and at EOF), instead of calling `_parse_item()` on
+      line one and appending continuations straight onto `["text"]`.
+      The mid-tag split case (`**[Docs &` / `process]**`) falls out for
+      free, since the join restores the single space.
+    - `_ITEM_HEADLINE_RE`'s `[^*]*` became `(?:[^*\\]|\\.)*`, so a
+      backslash-escaped asterisk is consumed as one unit rather than
+      stopping the match at the backslash. The two alternatives are
+      deliberately non-overlapping (a backslash only ever matches via
+      `\\.`), so there's no ambiguity for the regex engine to backtrack
+      through. A new `_MD_ESCAPE_RE` then strips the backslash from the
+      captured headline - `\*` is markdown escaping, not content, so
+      the panel shows `delivery-*` rather than `delivery-\*`.
+
+    4 new tests (`tests/test_changelog_md.py`, 18 total), each confirmed
+    failing against the pre-fix parser first per this project's standing
+    bug convention: a tag wrapped onto the continuation line, a tag
+    split mid-tag across the wrap, an escaped asterisk in the headline,
+    and two components with the wrap landing between them. Verified
+    against the real committed `CHANGELOG.md` too, not just fixtures:
+    all 92 entries now parse with components (was 89), zero stray-
+    asterisk texts (was 7).
