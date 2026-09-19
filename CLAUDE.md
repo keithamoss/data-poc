@@ -483,3 +483,9 @@ Rough layout:
     real, relevant blog posts (isolated-specification-testing
     reasoning, a spec-pipeline write-up) only readable via search-engine
     snippets, not the primary source.
+  - **`skills.lc`** (2026-09-19) - blocked; hit while researching
+    real-world precedent for a UX-reviewer-agent role specifically
+    (`plans/wider.md` #10's own UX-agent thread, Keith's own ask -
+    reversed from his earlier "I'll research this myself") - a
+    real-looking design-review skill writeup only readable via
+    search-engine snippets, not the primary source.
