@@ -165,3 +165,42 @@ def test_embed_reads_real_ticket_resolutions_json_when_present(monkeypatch, tmp_
         "dataset_id": "birth-registrations", "name": "Known Person", "nickname": "KP",
         "github": "knownperson", "streak": 1,
     }]
+
+
+def _run_embed_and_extract_demo_cast(monkeypatch, tmp_path, cast_text=None):
+    out_html = tmp_path / "out.html"
+    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
+    if cast_text is None:
+        monkeypatch.setattr(edd, "DEMO_CAST_PATH", tmp_path / "does_not_exist.cast")
+    else:
+        cast_path = tmp_path / "qa_wizard.cast"
+        cast_path.write_text(cast_text)
+        monkeypatch.setattr(edd, "DEMO_CAST_PATH", cast_path)
+
+    edd.embed()
+
+    html = out_html.read_text()
+    match = re.search(r"const DEMO_CAST = (.*?);\n", html)
+    assert match, "DEMO_CAST const not found in built output"
+    return json.loads(match.group(1))
+
+
+def test_embed_defaults_to_null_demo_cast_when_file_absent(monkeypatch, tmp_path):
+    """Real scenario, same as TICKET_STATUS/LEADERBOARD above: a local
+    build where nobody's run scripts/dev/record_cast.py yet (or a fresh
+    clone before dashboard/demos/qa_wizard.cast exists) - embed() must
+    degrade to null and the Demo tab's own renderDemo() guard shows a
+    real "not built yet" message, not crash."""
+    assert _run_embed_and_extract_demo_cast(monkeypatch, tmp_path) is None
+
+
+def test_embed_reads_the_real_committed_cast_file_when_present(monkeypatch, tmp_path):
+    # A real, multi-line asciinema v2 .cast file (header + event lines) -
+    # embedded as a single JSON STRING (not parsed/reshaped), since the
+    # player consumes this exact raw text via its own "asciicast" parser.
+    cast_text = (
+        '{"version":2,"width":100,"height":28,"timestamp":1,"env":{}}\n'
+        '[0.1,"o","hello\\r\\n"]\n'
+    )
+    embedded = _run_embed_and_extract_demo_cast(monkeypatch, tmp_path, cast_text)
+    assert embedded == cast_text

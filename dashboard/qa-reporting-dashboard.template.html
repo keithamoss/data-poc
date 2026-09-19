@@ -441,6 +441,19 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
 }
 </style>
 
+<!-- Vendored, not CDN-loaded - same self-hosting rationale as the
+     fonts/ @font-face rules above (this page is meant to be shared
+     across government networks that may not have every third-party
+     domain reachable, and to keep working from a plain file:// open).
+     dashboard/vendor/asciinema-player.{css,min.js} - the Demo tab's
+     player (plans/tooling.md #1 Phase 6), Apache-2.0, see dashboard/
+     vendor/asciinema-player.LICENSE. Only loaded/used by renderDemo()
+     below, once the Demo tab is actually opened - CSS is harmless to
+     load eagerly (used for the player's own styling only), but the JS
+     bundle doesn't need to execute until then. -->
+<link rel="stylesheet" href="vendor/asciinema-player.css">
+<script src="vendor/asciinema-player.min.js"></script>
+
 <body>
 <div class="shell">
   <header class="masthead">
@@ -473,6 +486,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
       <button class="snapshots-btn" id="requirements-btn" type="button">📐 Requirements</button>
       <button class="snapshots-btn" id="leaderboard-btn" type="button">🏆 Leaderboard</button>
       <button class="snapshots-btn" id="plans-btn" type="button">🗂 Plans</button>
+      <button class="snapshots-btn" id="demo-btn" type="button">▶ Demo</button>
       <button class="snapshots-btn" id="snapshots-btn" type="button">🕐 Past snapshots</button>
       <div class="live"><span class="dot"></span><span id="clock-text">Live · updated moments ago</span></div>
     </div>
@@ -924,6 +938,26 @@ const LEADERBOARD = [];
 // content volume (100+ items/threads/notes) doesn't fit a cramped
 // drawer.
 const PLANS = {items:[], threads:[], notes:[]};
+
+// DEMO_CAST — plans/tooling.md #1 Phase 6's "Demo" tab: a real recording
+// of the actual mothman CLI/TUI (Quality Assurance wizard, Birth
+// Registrations, Synthetic mode - scoped via AskUserQuestion with Keith,
+// 2026-09-19), played back by the vendored asciinema-player widget
+// above. The raw asciinema v2 `.cast` file content (plain JSON-lines
+// text, dashboard/demos/qa_wizard.cast - scripts/dev/record_cast.py's
+// own real pty-capture output), embedded here as a STRING rather than
+// fetched at runtime by the player's own url: source option - the same
+// "placeholder here, real data only in the built output, no live
+// external dependency at render time" treatment every other const above
+// uses, and specifically avoids a real, foreseeable failure: a `fetch()`
+// of a sibling file is blocked by the browser's own CORS policy under a
+// plain `file://` open (this dashboard's own supported local/offline
+// viewing path), which a `data:`-sourced player embed sidesteps
+// entirely. Same top-level-tier treatment as PLANS above (STATE.
+// tier==="demo"), not a header side-panel - Keith's own call
+// (AskUserQuestion): a real recording deserves its own tab, not a
+// cramped drawer.
+const DEMO_CAST = null;
 
 // Shared by Birth Registrations (a single dataset) and Child Protection
 // (6 datasets, one per table) - both are reshaped server-side into this
@@ -1994,6 +2028,7 @@ function pathSegment(s){ return encodeURIComponent(s); }
 function stateToPath(state){
   if(!state || state.tier==="exec") return "/";
   if(state.tier==="plans") return "/plans";
+  if(state.tier==="demo") return "/demo";
   if(state.tier==="agency") return `/agency/${pathSegment(state.agencyId)}`;
   if(state.tier==="dataset"){
     let p = `/agency/${pathSegment(state.agencyId)}/collection/${pathSegment(state.collectionId)}/dataset/${pathSegment(state.datasetId)}`;
@@ -2009,6 +2044,7 @@ function pathToState(raw){
   const parts = raw.split("/").filter(Boolean).map(decodeURIComponent);
   if(parts.length===0) return {tier:"exec"};
   if(parts[0]==="plans") return {tier:"plans"};
+  if(parts[0]==="demo") return {tier:"demo"};
   if(parts[0]!=="agency" || !parts[1]) return null;
   const state = {tier:"agency", agencyId:parts[1]};
   if(parts[2]==="collection" && parts[3] && parts[4]==="dataset" && parts[5]){
@@ -2105,6 +2141,7 @@ function render(){
   const view = document.getElementById("view");
   if(STATE.tier==="exec") return renderExec(view);
   if(STATE.tier==="plans") return renderPlans(view);
+  if(STATE.tier==="demo") return renderDemo(view);
   if(STATE.tier==="agency") return renderAgency(view, STATE.agencyId);
   if(STATE.tier==="dataset") return renderDataset(view, STATE.agencyId, STATE.collectionId, STATE.datasetId);
 }
@@ -3435,6 +3472,41 @@ function renderPlans(view){
   renderPlansList();
 }
 document.getElementById("plans-btn").addEventListener("click", ()=> navigate({tier:"plans"}));
+
+// Demo tab - plans/tooling.md #1 Phase 6. Re-creates the player from
+// scratch on every render (view.innerHTML below replaces its whole DOM
+// subtree anyway, same "no leftover state" approach every other
+// navigate() target already uses) rather than trying to persist/reuse a
+// player instance across renders. DEMO_CAST null (the raw template with
+// no real data embedded, or a local build that hasn't been through
+// mothman dashboard embed yet) shows a real "not built yet" message
+// instead of calling into AsciinemaPlayer at all - same graceful-
+// degradation pattern as the "No snapshots yet" empty state.
+function renderDemo(view){
+  setRail([{tier:"Tier 1", label:"Demo", nav:{tier:"demo"}}]);
+  view.innerHTML = `
+    <div class="view-head">
+      <div>
+        <h2>Demo</h2>
+        <div class="view-sub">A real recording of the actual <code>mothman</code> CLI/TUI - the Quality Assurance wizard, run for real against real synthetic Birth Registrations data. Not a mockup: every keystroke and every line of output below is what actually happened, captured with a real pseudo-terminal (see <code>scripts/dev/record_cast.py</code>).</div>
+      </div>
+    </div>
+    <div id="demo-player-container" style="max-width:900px;"></div>
+  `;
+  const container = document.getElementById("demo-player-container");
+  if(!DEMO_CAST || typeof AsciinemaPlayer==="undefined"){
+    container.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
+      No demo recording embedded yet - run <code>mothman dashboard embed</code> (or <code>mothman pipeline run</code>) after recording one with <code>scripts/dev/record_cast.py</code>.
+    </div>`;
+    return;
+  }
+  AsciinemaPlayer.create(
+    {data: DEMO_CAST, parser: "asciicast"},
+    container,
+    {cols: 100, rows: 28, fit: "width", controls: true, terminalFontFamily: "'IBM Plex Mono', monospace"}
+  );
+}
+document.getElementById("demo-btn").addEventListener("click", ()=> navigate({tier:"demo"}));
 document.getElementById("wordmark-btn").addEventListener("click", ()=> navigate({tier:"exec"}));
 
 // Thread C - as-of date picker. rebuildData() throws the current DATA

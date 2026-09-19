@@ -79,6 +79,8 @@ def _state_to_path(state: dict) -> str:
     to build here)."""
     if not state or state.get("tier") == "exec":
         return "/"
+    if state.get("tier") == "demo":
+        return "/demo"
     quoted = {k: urllib.parse.quote(str(v), safe="") for k, v in state.items()}
     if state["tier"] == "agency":
         return f"/agency/{quoted['agencyId']}"
@@ -275,17 +277,20 @@ def dashboard_html_with_ticket(built_dashboard_html, tmp_path, monkeypatch) -> P
     whole build chain - dashboard.embed_dashboard_data.embed() is the
     only step that actually needs to re-run.
 
-    Symlinks dashboard/fonts/ alongside the output file: the template
-    loads its real local @font-face files via a path relative to the
-    HTML file's own directory, which only resolves when something is
-    actually there - built_dashboard_html doesn't need this since it
-    writes into the real dashboard/ directory itself, alongside the
-    real fonts/, but this fixture deliberately writes to tmp_path
-    instead (see OPEN_TICKETS_JSON's own docstring on why isolating
-    embed()'s real file targets matters here)."""
+    Symlinks dashboard/fonts/ and dashboard/vendor/ alongside the output
+    file: the template loads its real local @font-face files and (Phase
+    6, 2026-09-19) the Demo tab's vendored asciinema-player.{css,min.js}
+    via paths relative to the HTML file's own directory, which only
+    resolve when something is actually there - built_dashboard_html
+    doesn't need this since it writes into the real dashboard/ directory
+    itself, alongside the real fonts//vendor/, but this fixture
+    deliberately writes to tmp_path instead (see OPEN_TICKETS_JSON's own
+    docstring on why isolating embed()'s real file targets matters
+    here)."""
     from dashboard import embed_dashboard_data as edd
 
     (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
+    (tmp_path / "vendor").symlink_to((Path(edd.ROOT) / "dashboard" / "vendor").resolve())
 
     tickets_path = tmp_path / "open_tickets.json"
     tickets_path.write_text(json.dumps([{
@@ -339,6 +344,7 @@ def dashboard_html_with_acceptance(built_dashboard_html, tmp_path, monkeypatch) 
     from dashboard import embed_dashboard_data as edd
 
     (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
+    (tmp_path / "vendor").symlink_to((Path(edd.ROOT) / "dashboard" / "vendor").resolve())
 
     comments_path = tmp_path / "qa_comments.json"
     comments_path.write_text(json.dumps([{
@@ -384,3 +390,37 @@ class TestAcceptanceBadge:
         row = clean_page.locator('tr[data-run-date="2026-05-23"]')  # a different real amber run (run_002)
         assert row.count() > 0
         assert row.locator("a.pill.tag[href*='issuecomment']").count() == 0
+
+
+class TestDemoTab:
+    """plans/tooling.md #1 Phase 6 - a real recording of the actual
+    mothman CLI/TUI, played back by the vendored asciinema-player widget.
+    Unlike tests-js/demo-tab.test.js (jsdom, where the vendored external
+    <script src="vendor/asciinema-player.min.js"> never actually loads -
+    see that file's own header comment), this is a real browser against
+    the real BUILT dashboard, so the real player library, the real
+    committed dashboard/vendor/asciinema-player.{css,min.js}, and the
+    real committed dashboard/demos/qa_wizard.cast (embedded as DEMO_CAST
+    by the built_dashboard_html fixture's own real embed step) all
+    actually load - this is the one place real playback is verified."""
+
+    def test_opening_it_renders_the_real_player_with_zero_console_errors(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, state={"tier": "demo"})
+
+        assert clean_page.locator("h2", has_text="Demo").count() > 0
+        # asciinema-player's own real DOM (a canvas-free, DOM-rendered
+        # terminal grid + controls bar) - not the "No demo recording
+        # embedded yet" fallback, confirming DEMO_CAST is real, non-null
+        # content and the vendored player library actually loaded.
+        player = clean_page.locator("#demo-player-container [class*='ap-']")
+        assert player.count() > 0, "the real asciinema-player widget never rendered"
+        assert clean_page.locator("text=No demo recording embedded yet").count() == 0
+
+    def test_the_demo_header_button_navigates_there_from_anywhere(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+
+        clean_page.locator("#demo-btn").click()
+        clean_page.wait_for_timeout(300)
+
+        assert "#/demo" in clean_page.url
+        assert clean_page.locator("h2", has_text="Demo").count() > 0

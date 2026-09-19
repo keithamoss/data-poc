@@ -345,6 +345,46 @@ def test_prepare_deploy_site_is_a_clean_noop_for_snapshots_when_none_exist(tmp_p
     assert not (site_dir / "snapshots").exists()
 
 
+def test_prepare_deploy_site_copies_fonts_and_vendor_into_the_site(tmp_path):
+    # Real bug found live 2026-09-19 while building the Demo tab (plans/
+    # tooling.md #1 Phase 6): neither dashboard/fonts/ nor the new
+    # dashboard/vendor/ was ever copied into _site/, so the deployed site
+    # silently fell back to system fonts (a missing woff2 degrades
+    # quietly, no error) and would have 404'd on the Demo tab's own
+    # vendored asciinema-player.min.js/css. Confirmed live before the fix:
+    # `uv run mothman dashboard snapshot --prepare-site <dir>` produced no
+    # fonts/ or vendor/ subdirectory at all.
+    html_path = _write_fake_dashboard(tmp_path)
+    fonts_dir = tmp_path / "fonts"
+    fonts_dir.mkdir()
+    (fonts_dir / "public-sans-regular.woff2").write_bytes(b"fake-woff2-bytes")
+    vendor_dir = tmp_path / "vendor"
+    vendor_dir.mkdir()
+    (vendor_dir / "asciinema-player.min.js").write_text("/* fake player */")
+    (vendor_dir / "asciinema-player.css").write_text("/* fake css */")
+    site_dir = tmp_path / "_site"
+
+    snapshot_dashboard.prepare_deploy_site(
+        site_dir, html_path=html_path, snapshots_dir=tmp_path / "no-such-dir",
+        fonts_dir=fonts_dir, vendor_dir=vendor_dir)
+
+    assert (site_dir / "fonts" / "public-sans-regular.woff2").read_bytes() == b"fake-woff2-bytes"
+    assert (site_dir / "vendor" / "asciinema-player.min.js").read_text() == "/* fake player */"
+    assert (site_dir / "vendor" / "asciinema-player.css").read_text() == "/* fake css */"
+
+
+def test_prepare_deploy_site_is_a_clean_noop_when_fonts_and_vendor_dont_exist(tmp_path):
+    html_path = _write_fake_dashboard(tmp_path)
+    site_dir = tmp_path / "_site"
+
+    snapshot_dashboard.prepare_deploy_site(
+        site_dir, html_path=html_path, snapshots_dir=tmp_path / "no-such-dir",
+        fonts_dir=tmp_path / "no-fonts", vendor_dir=tmp_path / "no-vendor")
+
+    assert not (site_dir / "fonts").exists()
+    assert not (site_dir / "vendor").exists()
+
+
 def test_prepare_deploy_site_and_sync_local_snapshots_use_the_same_decompression(tmp_path):
     # The whole point of unifying these (Keith's own ask): a snapshot
     # decompressed locally and one decompressed for deploy must be

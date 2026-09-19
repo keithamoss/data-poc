@@ -28,6 +28,22 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
+- **1:49pm** — **A Real Recorded Demo, Right In The Dashboard** **[Dashboard]** A genuinely new top-level "Demo"
+  tab, playing back a real recording of the actual `mothman` CLI/TUI (the
+  Quality Assurance wizard - splash screen, menu navigation, the real
+  4-tool check chain actually running, the real report, declining to
+  Promote) - not a mockup, a real pseudo-terminal session captured with a
+  new `scripts/dev/record_cast.py` dev tool. Playback via a vendored,
+  self-hosted `asciinema-player` (no CDN dependency, works offline).
+  Found and fixed two real bugs along the way: a timing gap in the
+  recording tool itself (prompt_toolkit's own real cursor-position-probe
+  delay could silently drop a scripted key), and a genuinely separate,
+  previously-latent one in the site build - `dashboard/fonts/` had
+  silently never been copied into the deployed `_site/`, so the live
+  published dashboard had quietly been falling back to system fonts
+  instead of its real self-hosted ones this whole time, invisible
+  because a missing font file just degrades rather than erroring. Both
+  `fonts/` and the new `vendor/` directory are now correctly deployed.
 - **1:23pm** — **mothman CLI Phase 5: Population Data Command** **[Testing & dev tooling]** `mothman population`
   (Tier 4, explicitly exploratory) wraps `synthetic_data_generator/`'s
   own real argparse CLI - a population-scale (up to millions),

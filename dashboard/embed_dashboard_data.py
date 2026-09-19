@@ -152,7 +152,17 @@ RELEASE_NOTES/REQUIREMENTS above, and the same CI-safe, no-live-data
 status as everything else this script embeds (plans/*.md are real,
 committed markdown files, no `gh`/DuckDB access needed).
 
-This only replaces those twelve consts - the rest of the dashboard (its
+And `const DEMO_CAST` (plans/tooling.md #1 Phase 6, "Demo" tab,
+2026-09-19) - the raw asciinema v2 `.cast` file content (plain text,
+JSON-lines) from the real, committed dashboard/demos/qa_wizard.cast -
+a real recording of the actual mothman CLI/TUI (scripts/dev/
+record_cast.py), embedded as a plain string rather than fetched by the
+player at runtime (avoids a real file:// CORS failure - see the
+template's own const comment for the full reasoning). Empty/null
+locally if the file hasn't been recorded yet, same graceful-degradation
+treatment as everything else this script embeds.
+
+This only replaces those thirteen consts - the rest of the dashboard (its
 CSS, the rendering code, the other 14 illustrative datasets, and the
 separate SNAPSHOT_MANIFEST const dashboard/snapshot_dashboard.py owns)
 is copied through unchanged from the template.
@@ -178,6 +188,7 @@ TEMPLATE_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.
 DASHBOARD_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.html")
 CHANGELOG_MD = os.path.join(ROOT, "CHANGELOG.md")
 PLANS_DIR = os.path.join(ROOT, "plans")
+DEMO_CAST_PATH = os.path.join(os.path.dirname(__file__), "demos", "qa_wizard.cast")
 REQUIREMENTS_YAML = os.path.join(ROOT, "requirements.yaml")
 OPEN_TICKETS_JSON = os.path.join(ROOT, "reports", "open_tickets.json")
 QA_COMMENTS_JSON = os.path.join(ROOT, "reports", "qa_comments.json")
@@ -314,6 +325,15 @@ def embed() -> None:
     html = _replace_const(html, "PLANS", json.dumps(plans, separators=(",", ":")))
     print(f"Re-embedded PLANS = {len(plans['items'])} items, {len(plans['threads'])} threads, "
           f"{len(plans['notes'])} notes")
+
+    if os.path.exists(DEMO_CAST_PATH):
+        with open(DEMO_CAST_PATH) as f:
+            demo_cast_text = f.read()
+        html = _replace_const(html, "DEMO_CAST", json.dumps(demo_cast_text))
+        print(f"Re-embedded DEMO_CAST = {len(demo_cast_text)} bytes ({DEMO_CAST_PATH})")
+    else:
+        html = _replace_const(html, "DEMO_CAST", "null")
+        print("Re-embedded DEMO_CAST = null (no dashboard/demos/qa_wizard.cast - not recorded yet)")
 
     with open(DASHBOARD_HTML, "w") as f:
         f.write(html)

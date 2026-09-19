@@ -404,6 +404,110 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
      across all 3 agencies' own ID schemes for one real synthetic
      person), and both `--dirty amber`/`--dirty red` (the bug above,
      now fixed). 6 new tests, `uv run pytest`/`ruff check .` both clean.
+   - **Phase 6 finished 2026-09-19** (Keith's own explicit "feel free to
+     keep going to the next phase," plus a real AskUserQuestion round on
+     content/count/tab-placement before building - his answers: record
+     the Quality Assurance wizard only, one single combined recording
+     rather than several shorter ones, Demo tab placed last, after
+     Plans): a genuinely new top-level "Demo" tab (`STATE.tier==="demo"`,
+     a real `/demo` URL, same not-a-side-panel treatment `plans/
+     tooling.md #1 Phase 3.5's own PLANS precedent set) playing back a
+     real recording of the actual `mothman` CLI/TUI - not a mockup, a
+     real pty session, real keystrokes, real output.
+
+     New `scripts/dev/record_cast.py` (dev-only, same throwaway status
+     as the pre-existing `scripts/dev/tui_screenshot.py` it borrows its
+     real pty-spawn/read loop from) records a scripted session as a
+     timestamped asciinema v2 `.cast` file. A real, non-obvious problem
+     solved along the way: `tui_screenshot.py`'s own fixed `key_delay`
+     model (send the next key once output goes quiet for N seconds)
+     isn't safe for a session that also runs a real, several-seconds-
+     long subprocess mid-flow (the actual dbt-core/Soda Core/
+     datacontract-cli/Evidently chain a real QA run triggers) - a brief
+     real pause mid-subprocess could fire the next key too early. Fixed
+     with a STEP-based script instead (`wait:<substring>[:timeout]` /
+     `key:<name>`) that blocks on real text actually appearing in the
+     decoded terminal output before sending the next key, with a real,
+     loud `TimeoutError` (not a silent bad recording) if it never does.
+     A second, separate real timing bug found and fixed live: a
+     freshly-rendered `prompt_toolkit` prompt probes the real terminal
+     for its cursor position (CPR) before it's actually ready for input;
+     our synthetic pty never answers that probe, so prompt_toolkit falls
+     back after its own real internal timeout - a key sent before that
+     resolves can land during the probe window and get silently
+     dropped (reproduced live: a scripted Escape right after "What would
+     you like to do?" first matched never registered). Fixed by adding
+     the same settle pause after every `wait` match, not just after
+     every `key` send.
+
+     The real recording itself (`dashboard/demos/qa_wizard.cast`, ~22KB,
+     committed as plain text - small enough that HTTP-level gzip
+     transfer encoding already covers compression, unlike `dashboard/
+     snapshots/*.html.gz`'s app-level decompression dance) walks the
+     real Quality Assurance wizard for Birth Registrations/Synthetic
+     mode: splash screen, main menu, dataset picker, source picker, run
+     picker, the real 4-tool chain actually executing (~24s wall time,
+     genuinely captured, not sped up), the real report, declining to
+     Promote, back at the main menu - ends there deliberately rather
+     than also scripting a demonstrated exit, once the Escape-key CPR
+     issue above made that its own separate rabbit hole not worth
+     chasing further for a demo recording.
+
+     Playback via `asciinema-player` (npm, Apache-2.0), vendored - not
+     CDN-loaded - into new `dashboard/vendor/asciinema-player.{css,
+     min.js}`, same self-hosting rationale as the pre-existing `dashboard/
+     fonts/*.woff2` (no CDN dependency, works from a plain `file://`
+     open, works across government networks). The recording itself is
+     embedded into the built HTML as a plain JS string (`const
+     DEMO_CAST`, `dashboard/embed_dashboard_data.py`) rather than fetched
+     by the player at runtime via its own `url:` source option - a real,
+     foreseeable failure avoided deliberately: a `fetch()` of a sibling
+     file is blocked by the browser's own CORS policy under a plain
+     `file://` open, this dashboard's own supported local/offline
+     viewing path. `renderDemo()` creates the player lazily, only once
+     the tab is actually opened, and shows a real "not built yet"
+     fallback (not a crash) when `DEMO_CAST` is null or the player
+     library never loaded.
+
+     A real, separate, previously-latent bug found and fixed live while
+     wiring `dashboard/vendor/` into the deployed site:
+     `dashboard/snapshot_dashboard.py`'s `prepare_deploy_site()` never
+     copied EITHER `dashboard/fonts/` or the new `dashboard/vendor/`
+     into the `_site/` tree `.github/workflows/deploy-pages.yml`
+     deploys - confirmed live (`uv run mothman dashboard snapshot
+     --prepare-site <dir>` produced no `fonts/`/`vendor/` subdirectory
+     at all before the fix). `fonts/` had silently had this exact same
+     gap since the self-hosted-fonts switch, invisible because a missing
+     `.woff2` just falls back to a system font rather than erroring
+     loudly - the live published site had quietly been serving unstyled
+     system fonts, not the real Public Sans/Source Serif 4/IBM Plex Mono
+     choice this dashboard actually specifies, this whole time. Fixed by
+     copying both directories straight through into `_site/fonts/`/
+     `_site/vendor/`, with real regression tests confirming both the fix
+     and the clean-noop case when neither directory exists.
+
+     Verified: a real Playwright screenshot of the Demo tab mid-playback
+     (the real splash-screen ASCII moth artwork, the real wizard prompts,
+     a real progress bar/timestamp at the bottom - genuine asciinema-
+     player chrome, not a static image), `mothman dashboard check-renders`
+     passing clean against the real built output (embedded `DEMO_CAST`
+     included), and the real CI coverage command still passing at
+     94.65%. 9 new tests: `tests-js/demo-tab.test.js` (7 - routing/
+     rendering/graceful-degradation under jsdom, where the vendored
+     external player script never actually loads by design - see that
+     file's own header comment for why, and why real playback is instead
+     covered by...), 2 new real Playwright e2e tests
+     (`tests/test_dashboard_e2e.py::TestDemoTab` - the one place real
+     playback against the real vendored library is verified), plus
+     `tests/test_embed_dashboard_data.py`'s DEMO_CAST embed/degrade
+     coverage and `tests/test_snapshot_dashboard.py`'s fonts/vendor
+     copy-into-`_site/` regression coverage (both bugs found live during
+     this build, not pre-existing gaps this phase happened to also
+     close). `uv run pytest -n auto` (599 passing, zero errors with
+     `PLAYWRIGHT_CHROMIUM_PATH` set - the only pre-existing sandbox-only
+     Playwright gap this project's suite has ever had, now confirmed to
+     genuinely be sandbox-only, not code), `ruff check .`, and `npm test`
+     (111 passing) all clean.
 
    **Core shape, confirmed:**
    - Organized by dataset (bdm/cp) under a real interactive TUI - not

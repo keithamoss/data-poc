@@ -83,6 +83,7 @@ import gzip
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -91,6 +92,8 @@ from typing import Optional
 
 DASHBOARD_HTML = Path(__file__).parent / "qa-reporting-dashboard.html"
 SNAPSHOTS_DIR = Path(__file__).parent / "snapshots"
+FONTS_DIR = Path(__file__).parent / "fonts"
+VENDOR_DIR = Path(__file__).parent / "vendor"
 
 
 def _git_short_sha(cwd: Path) -> str:
@@ -210,11 +213,26 @@ def sync_local_snapshots(snapshots_dir: Path = SNAPSHOTS_DIR) -> list[Path]:
 
 
 def prepare_deploy_site(site_dir: Path, html_path: Path = DASHBOARD_HTML,
-                         snapshots_dir: Path = SNAPSHOTS_DIR) -> None:
+                         snapshots_dir: Path = SNAPSHOTS_DIR,
+                         fonts_dir: Path = FONTS_DIR, vendor_dir: Path = VENDOR_DIR) -> None:
     """Builds the `_site/` tree `.github/workflows/deploy-pages.yml`
     uploads to GitHub Pages: `index.html` (the live dashboard) plus every
     committed snapshot decompressed into `_site/snapshots/`, alongside a
-    copy of `manifest.json` for direct inspection. Deliberately the SAME
+    copy of `manifest.json` for direct inspection, PLUS `dashboard/fonts/`
+    and `dashboard/vendor/` copied straight through into `_site/fonts/`/
+    `_site/vendor/` - both are real, committed sibling directories the
+    built `index.html` references by relative URL (`url('fonts/....
+    woff2')` in its own `@font-face` rules; `<script src="vendor/
+    asciinema-player.min.js">` for the Demo tab, plans/tooling.md #1 Phase
+    6) but that NEITHER of them was ever copied into `_site/` before this
+    fix (2026-09-19, found live while building the Demo tab, which needs
+    `vendor/` to actually load on the published site) - `dashboard/
+    fonts/` had silently had this exact same gap since the self-hosted-
+    fonts switch, invisible because a missing woff2 just falls back to a
+    system font rather than erroring loudly, so the live site had quietly
+    been serving unstyled system fonts, not the real Public Sans/Source
+    Serif 4/IBM Plex Mono choice this dashboard actually specifies.
+    Deliberately the SAME
     `_decompress_snapshot()` call `sync_local_snapshots()` uses above -
     this function replaced an earlier version of this step written as a
     standalone `gunzip` loop directly in the workflow YAML, which worked
@@ -255,6 +273,10 @@ def prepare_deploy_site(site_dir: Path, html_path: Path = DASHBOARD_HTML,
         html_path.read_text(), manifest, f"{html_path} (deploy site copy)"
     )
     (site_dir / "index.html").write_text(html)
+
+    for static_dir, dest_name in ((fonts_dir, "fonts"), (vendor_dir, "vendor")):
+        if static_dir.exists():
+            shutil.copytree(static_dir, site_dir / dest_name, dirs_exist_ok=True)
 
     if not snapshots_dir.exists():
         return
