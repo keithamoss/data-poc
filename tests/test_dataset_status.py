@@ -82,3 +82,57 @@ class TestStatusByRun:
 
     def test_no_history_anywhere_returns_an_empty_map(self):
         assert status_by_run({"columns": [{"checks": [_history_check(1, 2)]}]}) == {}
+
+
+# --- plans/qa-pipeline.md item 74's own follow-up (2026-09-19) ---------
+#
+# This module is the PYTHON MIRROR of the dashboard's own client-side
+# status logic, and item 74's fix changed that logic in two ways without
+# updating the mirror: a warn/fail threshold may now legitimately be
+# None ("this check has no bound of that kind", e.g. the ODCS rowCount
+# rule's two-sided mustBeBetween range), and every check/history entry
+# now carries its own real tool verdict, which is authoritative.
+#
+# Caught by CI - the FIRST run of ticket-sync.yml after its own dead
+# branch pin was fixed (plans/publishing-and-history.md #7) died with a
+# real `TypeError: '>' not supported between instances of 'int' and
+# 'NoneType'` on real committed data. Worth recording as the concrete
+# argument for that pin fix: this regression existed for exactly as long
+# as CI wasn't running, and was found within seconds of it running again.
+
+def test_status_for_value_treats_a_null_bound_as_absent_not_zero():
+    """A None threshold means the check has no bound of that kind, so it
+    can never be crossed. Reading it as 0 is what item 74 fixed in the
+    dashboard; this mirror has to agree or the two disagree silently."""
+    assert status_for_value(1939, warn=None, fail=None) == "green"
+    assert status_for_value(7, warn=5, fail=None) == "amber"
+    assert status_for_value(3, warn=5, fail=None) == "green"
+    # a real zero-tolerance violation count still reads red
+    assert status_for_value(14, warn=None, fail=0) == "red"
+    assert status_for_value(0, warn=None, fail=0) == "green"
+
+
+def test_dataset_status_prefers_each_checks_real_tool_verdict():
+    d = _dataset([{**_check(1939, None, None), "current_status": "green"}])
+    assert dataset_status(d) == "green"
+    # and a real failure is still red even where thresholds say nothing
+    d = _dataset([{**_check(0, None, None), "current_status": "red"}])
+    assert dataset_status(d) == "red"
+
+
+def test_dataset_status_does_not_crash_on_a_null_threshold():
+    """The exact real CI failure: a rowCount check with both bounds
+    None and no verdict recorded reached `value > fail` and raised."""
+    assert dataset_status(_dataset([_check(1939, None, None)])) == "green"
+
+
+def test_status_by_run_prefers_each_history_entrys_real_verdict():
+    ck = _history_check(None, None, ("run_01", 1939), ("run_02", 2119))
+    for h, status in zip(ck["history"], ("green", "red")):
+        h["status"] = status
+    assert status_by_run({"columns": [{"checks": [ck]}]}) == {"run_02": "red"}
+
+
+def test_status_by_run_does_not_crash_on_a_null_threshold():
+    ck = _history_check(None, None, ("run_01", 1939))
+    assert status_by_run({"columns": [{"checks": [ck]}]}) == {}

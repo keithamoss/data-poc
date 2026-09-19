@@ -55,6 +55,28 @@ edited for a punchier, friendlier read than a bare commit log.
   report), and how Keith can invoke it.
 
 ### Fixed
+- **9:05pm** — **Two Consumers of the Tool Verdict Were Missed, One Dangerously** **[Dashboard UI]** **[Pipeline & publishing]**
+  Making a check's warn/fail threshold nullable earlier tonight left two
+  readers behind. `qa_tools/common/dataset_status.py` — the Python
+  mirror of the dashboard's own status logic, which exists because the
+  ticketing Action has no JS runtime — still did a bare `value > fail`
+  and raised a `TypeError` on real data. That one was found by CI, in
+  the very first run of the ticket-sync workflow after its dead branch
+  pin was lifted, which is about as direct an argument for fixing that
+  pin as could be asked for. The second was worse and quieter:
+  `buildRealDataset()` rebuilds every check into a new object and
+  dropped the verdict entirely, so the page fell back to threshold math
+  — and with bounds now legitimately null, a dbt `not_null` check with
+  14 real violations and no configured fail threshold would have
+  rendered **green**, the exact false-green the original fix was written
+  to avoid. It never reached the live site, because the Pages deploy was
+  itself failing. The real lesson is in how it hid: the original
+  verification compared the dashboard JSON against the tools and proved
+  the data layer correct while saying nothing about the render layer's
+  own transform. Now verified where it actually matters — 30,352
+  statuses computed by the page's own functions in a real browser, zero
+  disagreements with the tools. 8 new tests at the two layers that were
+  wrong.
 - **8:49pm** — **CI Was Pinned to a Dead Branch and Hadn't Run in Weeks** **[Pipeline & publishing]**
   All three workflows triggered on a hardcoded branch name —
   `claude/new-session-en9qen`, the working branch of whichever session

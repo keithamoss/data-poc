@@ -112,3 +112,67 @@ describe("fmtMetric", () => {
     expect(w.fmtMetric(1939, "count")).toBe("1,939");
   });
 });
+
+// --- the transform layer, not just the helpers ------------------------
+//
+// The helper tests above all passed while the rendered dashboard was
+// still wrong, because buildRealDataset() rebuilds every check and
+// history entry into a NEW object and silently dropped current_status
+// and history[].status. checkStatus() then fell back to threshold math -
+// and since a bound may now legitimately be null, that fallback isn't
+// graceful, it's a false GREEN on a genuinely failing check.
+//
+// Caught by auditing every consumer after CI found a sibling miss in
+// qa_tools/common/dataset_status.py, not by any existing test: the
+// earlier verification compared the dashboard JSON against the tools
+// directly and never exercised this transform. Hence this test.
+describe("buildRealDataset carries each check's real verdict through", () => {
+  function realDataset(check) {
+    return {
+      name: "Birth Registrations", provider: "BDM", deliveryFormat: "CSV",
+      sla: {}, arrivalHistory: [], arrivalByRun: {},
+      lastArrival: { run_date: "2026-01-01", arrivedAt: "2026-01-01 09:00:00", arrivalStatus: "on-time" },
+      rowCount: 1, prevRowCount: 1, runs: [{ run_id: "run_01", run_date: "2026-01-01" }],
+      columns: [{
+        name: "sex", logicalType: "string", description: "",
+        stats: { current: {}, previous: {}, byRun: {} },
+        checks: [check],
+      }],
+    };
+  }
+
+  const failingCheck = {
+    check_id: "c1", name: "dbt:not_null", dimension: "completeness", unit: "count",
+    // the real shape item 74 produces: no single-sided bound, a real
+    // verdict, and a genuinely non-zero violation count
+    warn: null, fail: null, current: 14, current_status: "red", previous: 0,
+    note: "", history: [{ run_id: "run_01", run_date: "2026-01-01", value: 14, status: "red" }],
+  };
+
+  it("keeps current_status so a real failure is not rendered green", () => {
+    const w = load();
+    const built = w.buildRealDataset(realDataset(failingCheck));
+    const ck = built.columns[0].checks[0];
+    expect(ck.current_status).toBe("red");
+    expect(w.checkStatus(ck)).toBe("red");
+  });
+
+  it("keeps each history entry's own status", () => {
+    const w = load();
+    const built = w.buildRealDataset(realDataset(failingCheck));
+    const ck = built.columns[0].checks[0];
+    expect(ck.history[0].status).toBe("red");
+    expect(w.historyStatus(ck.history[0], ck)).toBe("red");
+  });
+
+  it("still renders a passing two-sided range check green", () => {
+    const w = load();
+    const rowCount = {
+      ...failingCheck, check_id: "c2", name: "datacontract:rowCount",
+      current: 1939, current_status: "green",
+      history: [{ run_id: "run_01", run_date: "2026-01-01", value: 1939, status: "green" }],
+    };
+    const built = w.buildRealDataset(realDataset(rowCount));
+    expect(w.checkStatus(built.columns[0].checks[0])).toBe("green");
+  });
+});

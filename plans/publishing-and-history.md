@@ -2932,6 +2932,33 @@ one Thread's narrative.
    `concurrency: pages` group, so deploys serialise rather than
    interleave.
 
+   **A real second half to this, found immediately after pushing the
+   fix and NOT solvable from code**: `deploy-pages.yml` now fires, and
+   then fails in ~2 seconds with no steps run and no logs (a 404 on the
+   log download). That is the signature of GitHub's own **environment
+   protection rules** rejecting the branch: the job declares
+   `environment: github-pages`, and that environment is configured in
+   repo Settings to allow deployments only from specific branches -
+   almost certainly still just `claude/new-session-en9qen`, the same
+   dead branch this whole item is about. So the pin exists in TWO
+   places, and fixing the workflow file only fixed one of them.
+   Diagnosis is high-confidence but not directly confirmed: this
+   session's proxy blocks the `/repos/{owner}/{repo}/environments/...`
+   API path, so the rule couldn't be read back. Supporting evidence:
+   the same workflow succeeded on the old branch (run 163), a
+   job-level `if:` evaluating false would report "skipped" not
+   "failure", and the `concurrency: pages` group would report
+   "cancelled".
+
+   **Keith's to fix, not a session's** - repo Settings -> Environments
+   -> `github-pages` -> "Deployment branches and tags" -> allow
+   `claude/**` (or whatever pattern matches the glob above). Until
+   then, `test.yml` and `ticket-sync.yml` work correctly and
+   `deploy-pages.yml` fails visibly on every push. Deliberately NOT
+   reverted to a pinned branch to hide that: a visible failure is
+   strictly better than the silent non-run this item started as, and
+   it's a 30-second settings change.
+
    **One residual risk, named rather than silently accepted**: with a
    glob, any `claude/*` branch can publish to the live public site. That
    matches how this project actually works (sessions are sequential, so

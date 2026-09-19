@@ -4176,6 +4176,48 @@ relative, not a schedule — this is weeks of work, not months.
       needing exactly one row can address one. Small, but it removes a
       real footgun rather than working around it in a selector.
 
+    **Two real consumers of these thresholds were missed on the first
+    pass, both found the same evening - worth recording honestly,
+    because the way each was found says something.**
+    - `qa_tools/common/dataset_status.py` is the PYTHON MIRROR of the
+      dashboard's own client-side status logic (it exists because the
+      ticketing Action has no JS runtime). The fix changed the JS and
+      `pipeline/dashboard_check_labels.py` but not this third copy, so
+      `status_for_value()` still did a bare `value > fail` and died with
+      a real `TypeError: '>' not supported between instances of 'int'
+      and 'NoneType'`. **Found by CI** - specifically by the very first
+      run of `ticket-sync.yml` after its own dead branch pin was fixed
+      (`plans/publishing-and-history.md` #7), within seconds of that
+      workflow running for the first time ever. The cleanest possible
+      argument for fixing that pin.
+    - `buildRealDataset()` in the dashboard template rebuilds every
+      check and history entry into a NEW object, and copied neither
+      `current_status` nor the per-entry `status`. This one was worse:
+      dropping the verdict doesn't fail loudly, it falls back to
+      threshold math, and with null bounds now preserved a real dbt
+      `not_null` check with 14 violations and no configured fail
+      threshold would have rendered **GREEN** - the false-green
+      direction this item's own write-up above specifically identifies
+      as the danger, reintroduced by the fix meant to avoid it. Found by
+      auditing every remaining consumer after CI caught the sibling
+      miss, not by any test.
+
+    **Why the original verification missed both, since that matters more
+    than the misses themselves**: the 352/352 and 108/108 agreement
+    figures above were computed by reading `reports/*_dashboard.json`
+    and applying the status-preference rule in a throwaway script. That
+    genuinely verified the DATA layer - and nothing else. It never
+    exercised `buildRealDataset()`, and never touched the Python mirror
+    at all. A green data layer says nothing about the render layer when
+    the render layer has its own transform. Both now have real tests at
+    the layer that was actually wrong: 5 new Python tests
+    (`tests/test_dataset_status.py`) and 3 new JS tests
+    (`tests-js/tool-verdict-status.test.js`'s own `buildRealDataset`
+    block), each confirmed failing against the pre-fix code - and
+    notably, only 2 of those 3 JS tests fail without the fix, because
+    the passing-rowCount case gets the right answer from the fallback by
+    luck. That asymmetry is exactly why the bug was invisible.
+
     **Still open, deliberately not done here**: flipping
     `ticket-sync.yml`'s automatic push trigger on.
     `plans/running-thoughts.md` #1 records that the ticketing MVP

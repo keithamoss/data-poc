@@ -22,13 +22,33 @@ from __future__ import annotations
 STATUS_ORDER = {"green": 0, "amber": 1, "red": 2}
 
 
-def status_for_value(value: float, warn: float, fail: float) -> str:
-    """Mirrors the dashboard's own statusForValue() exactly."""
-    if value > fail:
+def status_for_value(value: float, warn: float | None, fail: float | None) -> str:
+    """Mirrors the dashboard's own statusForValue() exactly - including
+    (plans/qa-pipeline.md item 74) that a None bound means "this check
+    has no threshold of that kind", never zero, so it can never be
+    crossed. The real case: the ODCS `rowCount` rule is a two-sided
+    `mustBeBetween`, so neither bound exists as a single-sided number.
+
+    Only a FALLBACK now: where a real tool verdict was recorded, that
+    wins - see dashboard_status_of() below and its two callers."""
+    if fail is not None and value > fail:
         return "red"
-    if value > warn:
+    if warn is not None and value > warn:
         return "amber"
     return "green"
+
+
+def dashboard_status_of(record: dict, value_key: str, status_key: str,
+                        warn: float | None, fail: float | None) -> str:
+    """The real tool verdict where one was recorded, threshold math
+    otherwise - the Python mirror of the dashboard's own
+    checkStatus()/historyStatus() (item 74). Kept as one helper so the
+    two callers below can't drift apart the way this module drifted from
+    its own JS counterpart."""
+    recorded = record.get(status_key)
+    if recorded in STATUS_ORDER:
+        return recorded
+    return status_for_value(record.get(value_key) or 0, warn, fail)
 
 
 def status_by_run(dataset: dict) -> dict[str, str]:
@@ -54,7 +74,7 @@ def status_by_run(dataset: dict) -> dict[str, str]:
     for col in dataset.get("columns", []):
         for ck in col.get("checks", []):
             for h in ck.get("history", []):
-                s = status_for_value(h["value"], ck["warn"], ck["fail"])
+                s = dashboard_status_of(h, "value", "status", ck["warn"], ck["fail"])
                 prev = by_run.get(h["run_id"], "green")
                 if STATUS_ORDER[s] > STATUS_ORDER[prev]:
                     by_run[h["run_id"]] = s
@@ -74,7 +94,7 @@ def dataset_status(dataset: dict) -> str:
         for ck in col.get("checks", []):
             if ck.get("retired_as_of"):
                 continue
-            s = status_for_value(ck["current"], ck["warn"], ck["fail"])
+            s = dashboard_status_of(ck, "current", "current_status", ck["warn"], ck["fail"])
             if STATUS_ORDER[s] > STATUS_ORDER[worst]:
                 worst = s
     return worst
