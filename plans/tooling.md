@@ -1480,3 +1480,53 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     shouldn't show a bar has to be an explicit decision rather than an
     omission. Verified by removing one wrapper and confirming the guard
     fails naming the exact `file:line`.
+
+14. **[done, 2026-09-19]** **[Testing & dev tooling]** Confirming a
+    Promote ended the flow the same way declining it did. Keith's own
+    words, watching the demo: "after the user confirms promotion of
+    results, they should get a success message rather than being bumped
+    straight back to the menu."
+
+    Worth separating two things that looked like one problem, because
+    the first turned out not to be one. **A message did already exist**:
+    `cli/bdm.py`/`cli/cp.py`'s `_offer_promote()` printed a green
+    `Promoted -> <path>` plus a dim "commit and push it yourself to
+    publish" follow-up. Part of why it read as absent in the recorded
+    demo is `plans/dashboard.md` #13's CPR bug, fixed the same evening:
+    every prompt re-rendered from row 0 and erased the lines above it,
+    so in the demo that message was genuinely wiped the instant the
+    main menu came back. But the underlying complaint stands on its own
+    even with the recording fixed: two ordinary printed lines
+    immediately followed by a full menu redraw makes the single most
+    consequential action in the tool - writing into the permanent,
+    committed `qa_results/` history - end exactly like a no-op.
+
+    Built: `cli/common.report_promoted(dst)`, shared by both datasets'
+    interactive flows.
+    - **A bordered `rich` panel** rather than loose lines, so the
+      completion has a visible boundary instead of dissolving into
+      whatever prints next.
+    - **A real, checkable outcome**: how many result files were written
+      and where, counted from the destination directory rather than
+      asserted. Someone who wants to verify the claim has the number
+      and the path to check it against.
+    - **An explicit acknowledgement**
+      (`questionary.press_any_key_to_continue`) before the menu returns - the "rather
+      than being bumped straight back" half of the ask. Guarded on both
+      `stdin` and `stdout` being real terminals, so a piped or scripted
+      run can never hang on a keypress that will never come.
+    - **The flag-based `--commit` paths deliberately keep their
+      one-liner.** `_finish_flag_mode()` in both modules is the
+      scriptable form, where a panel is noise and a blocking keypress is
+      a hang. The parity rule in #1 is about capability, not about
+      making a script sit through a human's affordances.
+
+    Three tests in `tests/test_cli_common.py` cover the file count and
+    destination, the keypress firing in a real terminal, and - the one
+    that actually guards a hang - that it never prompts when stdout
+    isn't a terminal.
+
+    Not shown in the committed demo recording, which answers **no** at
+    the Promote prompt on purpose: saying yes there would write a real
+    run into the permanent, committed `qa_results/` history as a
+    side effect of making a video. Worth knowing when re-recording.

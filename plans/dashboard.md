@@ -922,6 +922,52 @@ common/check_lifecycle.py`'s own `check_id` convention.
     remove the demo's dead patch for free, without the recording having
     to fake anything.
 
+    **A second real defect, found after publishing and fixed the same
+    evening - Keith spotted it on the live site**: "the first three
+    clicks through the TUI, there is a very brief flash of orange text
+    appearing on the first line. I can't read it, but there's a flash of
+    orange happening." Decoding the `.cast` located it precisely -
+    `ESC[0;38;5;214;1m`, 256-colour 214, appearing 5 times. That's
+    `questionary`'s own **"answered" style**: the line it leaves behind
+    after a prompt is answered (`? What would you like to do? Quality
+    Assurance - run the real check chain against a dataset`). It was
+    being drawn and destroyed in the same frame.
+
+    The cause was in `scripts/dev/record_cast.py`, not the CLI.
+    Every CPR (cursor-position-request, `ESC[6n`) `prompt_toolkit` sends
+    on a fresh prompt render was answered with a **constant**
+    `ESC[1;1R` - "you are at the top-left". That constant was added
+    deliberately, to stop an unanswered probe printing a "your terminal
+    doesn't support cursor position requests" warning into the
+    recording, and it did fix that. But it replaced a missing answer
+    with a false one: `prompt_toolkit` believed it was at row 0 on every
+    render, so it re-rendered each prompt from the top of the screen and
+    erased everything above - the splash screen and the whole accumulated
+    trail of answered lines. Worth being precise, because it's the
+    opposite of the last defect: **this one was purely a recording
+    artifact**. A real terminal always answered truthfully, so a real
+    `mothman` session never behaved this way; only the published demo
+    did.
+
+    Fixed at the source. The recorder already had `pyte` available (
+    `scripts/dev/tui_screenshot.py` uses it to resolve in-place TUI
+    redraws), so it now feeds every byte the child writes through a real
+    `pyte.Screen` and answers each CPR with that screen's genuine
+    cursor position. Verified by replaying the new `.cast` through a
+    terminal emulator: at t=16s the splash occupies rows 1-18 and rows
+    20/22/23 carry the real answered trail, where the old recording had
+    4 non-blank rows and nothing above the current prompt. Re-recorded
+    (164 events, 46.1s, 67.8KB) and re-embedded. Covered by
+    `tests/test_record_cast.py`, which drives a real pty and asserts the
+    reply names the true row - it reports `1;1` against the pre-fix
+    recorder, confirmed by running it against the stashed original.
+
+    Recording it here as a general lesson too: answering a terminal
+    query with a plausible constant is not the same as answering it.
+    The warning it silenced was the visible symptom; the lie it told
+    was a quieter, worse bug that took a published artifact and a user
+    noticing a flash of colour to surface.
+
 14. **[todo, 2026-09-19]** **[Dashboard UI]** Decode a requirement's id
     into a real component badge/icon in the Requirements panel, the
     same way the Plans tab and Release Notes panel already render

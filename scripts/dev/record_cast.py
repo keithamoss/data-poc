@@ -39,6 +39,8 @@ import sys
 import termios
 import time
 
+import pyte
+
 NAMED_KEYS = {
     "up": "\x1b[A",
     "down": "\x1b[B",
@@ -52,11 +54,11 @@ NAMED_KEYS = {
     "backspace": "\x7f",
 }
 
-# ESC[6n (Device Status Report / cursor-position-request) and a real
-# terminal's own reply, ESC[<row>;<col>R - see _drain()'s own comment
-# for why this is answered for real rather than left unanswered.
+# ESC[6n (Device Status Report / cursor-position-request). A real
+# terminal replies ESC[<row>;<col>R with its ACTUAL cursor position - see
+# _drain()'s own comment for why this is answered at all, and why the
+# answer has to be truthful rather than constant.
 _CPR_QUERY = "\x1b[6n"
-_CPR_RESPONSE = b"\x1b[1;1R"
 
 
 def parse_steps(raw_steps: list[str]) -> list[dict]:
@@ -129,6 +131,12 @@ def record(cmd: list[str], steps: list[dict], cols: int, rows: int,
     t0 = time.time()
     events: list[tuple[float, str]] = []
     decoded_so_far = ""
+    # A real terminal-emulator buffer, fed every byte the child writes, so
+    # the CPR replies below can report the genuine cursor position rather
+    # than a constant. Same pyte dependency scripts/dev/tui_screenshot.py
+    # already uses to resolve in-place TUI redraws.
+    screen = pyte.Screen(cols, rows)
+    stream = pyte.Stream(screen)
 
     def _drain(deadline: float | None) -> None:
         nonlocal decoded_so_far
@@ -150,6 +158,7 @@ def record(cmd: list[str], steps: list[dict], cols: int, rows: int,
                 text = chunk.decode("utf-8", errors="replace")
                 events.append((time.time() - t0, text))
                 decoded_so_far += text
+                stream.feed(text)
                 # Answer a real CPR (cursor-position-request, ESC[6n) query
                 # the moment it appears - prompt_toolkit/questionary send
                 # one on every fresh prompt render to check the real
@@ -168,8 +177,23 @@ def record(cmd: list[str], steps: list[dict], cols: int, rows: int,
                 # real, immediately, fixes both at the actual source
                 # rather than working around the symptom.
                 if _CPR_QUERY in text:
+                    # Answer with the REAL cursor position, tracked by
+                    # feeding everything through a terminal emulator.
+                    # This used to reply a constant ESC[1;1R ("you are at
+                    # the top-left"), which silenced the warning but told
+                    # prompt_toolkit a lie: it re-rendered every prompt
+                    # from row 0 and erased whatever was above, so the
+                    # splash screen and every answered line got wiped the
+                    # instant the next prompt drew. What a viewer saw was
+                    # an unreadable orange flash - questionary's own
+                    # "answered" style, colour 214, appearing and being
+                    # destroyed in the same frame (plans/dashboard.md
+                    # #13's follow-up; Keith spotted it in the published
+                    # demo). A real terminal session never behaved that
+                    # way; only the recording did.
                     for _ in range(text.count(_CPR_QUERY)):
-                        os.write(master_fd, _CPR_RESPONSE)
+                        os.write(master_fd,
+                                  f"\x1b[{screen.cursor.y + 1};{screen.cursor.x + 1}R".encode())
                 continue
             if deadline is not None and time.time() >= deadline:
                 return

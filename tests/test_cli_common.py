@@ -133,3 +133,47 @@ def test_new_tmp_results_dir_returns_a_real_fresh_empty_directory():
         assert os.listdir(d) == []
     finally:
         shutil.rmtree(d, ignore_errors=True)
+
+
+def _promoted_run_dir(tmp_path, n_files: int = 5):
+    dst = tmp_path / "qa_results" / "agency-x" / "dataset-y" / "run_001"
+    dst.mkdir(parents=True)
+    for i in range(n_files):
+        (dst / f"tool_{i}.json").write_text("{}")
+    return dst
+
+
+def test_report_promoted_states_the_real_file_count_and_destination(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(common.sys.stdin, "isatty", lambda: False)
+    common.report_promoted(_promoted_run_dir(tmp_path))
+    out = capsys.readouterr().out
+    assert "Promoted" in out
+    assert "5 result files" in out
+    assert "run_001" in out
+    # The real "you still have to push this" follow-up has to survive the
+    # move into a panel - it's the whole point of the message.
+    assert "commit and push" in out
+
+
+def test_report_promoted_waits_for_a_keypress_in_a_real_terminal(tmp_path, monkeypatch):
+    """Keith's own ask (2026-09-19): a confirmed Promote must not bump the
+    user straight back to the main menu."""
+    monkeypatch.setattr(common.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(common.sys.stdout, "isatty", lambda: True)
+    asked = []
+    monkeypatch.setattr(common.questionary, "press_any_key_to_continue",
+                         lambda *a, **k: type("Q", (), {"ask": lambda self: asked.append(True)})())
+    common.report_promoted(_promoted_run_dir(tmp_path))
+    assert asked == [True]
+
+
+def test_report_promoted_never_blocks_when_stdout_is_not_a_terminal(tmp_path, monkeypatch):
+    """A piped/scripted run must never hang on a keypress that can't come."""
+    monkeypatch.setattr(common.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(common.sys.stdout, "isatty", lambda: False)
+
+    def _explode(*a, **k):
+        raise AssertionError("must not prompt when stdout isn't a terminal")
+
+    monkeypatch.setattr(common.questionary, "press_any_key_to_continue", _explode)
+    common.report_promoted(_promoted_run_dir(tmp_path))

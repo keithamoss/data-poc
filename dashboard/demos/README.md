@@ -116,10 +116,47 @@ the step count and elapsed time.
 
 In this recording that stretch went from **~0 terminal events and a
 13.5s frozen gap** to **133 events with a largest gap of 1.5s**. It's
-worth knowing when re-recording that this is why the `.cast` is ~71KB
+worth knowing when re-recording that this is why the `.cast` is ~68KB
 rather than ~26KB: the spinner redraws are real frames. Still plain
 text, still small enough that HTTP-level gzip covers it.
 
 Re-recording against a CLI *without* that progress reporting would
 silently reintroduce the frozen patch — if that ever shows up again,
 check the CLI first, not the pacing script.
+
+## The recorder answers cursor queries truthfully
+
+`prompt_toolkit` sends a CPR (cursor-position-request, `ESC[6n`) on
+every fresh prompt render, and a real terminal answers with where the
+cursor genuinely is. `record_cast.py` used to answer a constant
+`ESC[1;1R` — "top-left" — which silenced the "your terminal doesn't
+support cursor position requests" warning but told `prompt_toolkit`
+something untrue: it re-rendered every prompt from row 0 and erased
+the splash screen and the whole trail of answered lines above it. What
+a viewer saw was an unreadable orange flash (`questionary`'s "answered"
+style, 256-colour 214) appearing and being destroyed in the same frame.
+See `plans/dashboard.md` #13's follow-up.
+
+The recorder now feeds everything the child writes through a real
+`pyte` terminal emulator and answers each CPR with that screen's actual
+cursor position. A correct recording is easy to spot when replayed: the
+splash screen stays up, and the answered choices accumulate under it:
+
+```
+ 18| Quality Assurance for a multi-agency data asset
+ 20| ? What would you like to do? Quality Assurance - run the real check chain…
+ 22| ? Which dataset? Birth Registrations
+ 23| ? Which source? (Use arrow keys)
+```
+
+If a re-recording ever shows only the current prompt with nothing above
+it, that's this bug back, not a CLI change.
+
+## What the recording deliberately doesn't show
+
+The script answers **no** at the Promote prompt. Saying yes would write
+a real run into the permanent, committed `qa_results/` history as a side
+effect of making a video — so the promote success panel
+(`cli/common.report_promoted()`, `plans/tooling.md` #14) isn't in the
+demo. That's a deliberate omission, not a gap to fix by flipping the
+answer.

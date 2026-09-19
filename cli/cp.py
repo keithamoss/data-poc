@@ -334,10 +334,7 @@ def _offer_promote(results: list[dict], run_id: str, tmp_dir: str, commit_defaul
     if common.confirm("Promote this run into the real, permanent qa_results/ history?",
                        yes=False, default=commit_default):
         dst = common.promote(tmp_dir, AGENCY_ID, COLLECTION_ID, run_id)
-        console.print(f"Promoted -> {dst}", style="green")
-        console.print(
-            "This only wrote to qa_results/ - commit and push it yourself to publish "
-            "(that's what triggers the real CI rebuild).", style="dim")
+        common.report_promoted(dst)
     else:
         console.print("Not promoted - nothing written to the real qa_results/ history.", style="dim")
 

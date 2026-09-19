@@ -18,6 +18,8 @@ import questionary
 # plans/tooling.md #12, that per-module duplication is a real DRY seed
 # in its own right, not something to restructure in passing here.
 from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 from questionary import Style
 
 from qa_tools.common.qa_results_writer import QA_RESULTS_DIR
@@ -132,6 +134,44 @@ def promote(tmp_root: str, agency: str, dataset: str, run_id: str) -> Path:
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(src, dst, dirs_exist_ok=True)
     return dst
+
+
+def report_promoted(dst: Path) -> None:
+    """The real success affordance after an interactive Promote (Keith's
+    own ask, 2026-09-19: "after the user confirms promotion of results,
+    they should get a success message rather than being bumped straight
+    back to the menu").
+
+    Two separate things were wrong. The message itself already existed -
+    a green `Promoted -> <path>` plus a dim follow-up line - but it was
+    a pair of ordinary printed lines immediately followed by the main
+    menu redrawing, so the end of the single most consequential action
+    in the whole tool looked exactly like the end of a no-op. It now
+    lands as a bordered panel, states the real, checkable outcome (how
+    many files, where), and, in a real terminal, waits for an explicit
+    keypress before the menu comes back - a completion the user
+    acknowledges rather than one that scrolls past.
+
+    The flag-based `--commit` paths deliberately keep their existing
+    one-line `Promoted -> <path>`: those are the scriptable form, where
+    a panel is noise and a blocking keypress would be a hang.
+    """
+    files = sorted(p.name for p in dst.glob("*.json"))
+    try:
+        shown = dst.relative_to(Path.cwd())
+    except ValueError:
+        shown = dst
+    body = Text()
+    body.append(f"{len(files)} result file{'' if len(files) == 1 else 's'} written to the real, permanent "
+                 "qa_results/ history:\n", style="bold green")
+    body.append(f"{shown}\n\n", style="green")
+    body.append("Nothing has left this machine yet - commit and push qa_results/ yourself\n"
+                 "to publish. That push is what triggers the real CI rebuild.", style="dim")
+    console.print(Panel(body, title="Promoted", border_style="green", expand=False))
+
+    if sys.stdin.isatty() and sys.stdout.isatty():
+        questionary.press_any_key_to_continue(
+            "Press any key to return to the menu...", style=_QMARK_STYLE).ask()
 
 
 def new_tmp_results_dir() -> str:

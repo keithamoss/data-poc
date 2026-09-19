@@ -55,6 +55,37 @@ edited for a punchier, friendlier read than a bare commit log.
   report), and how Keith can invoke it.
 
 ### Fixed
+- **10:30pm** — **The Demo's Unreadable Orange Flash Was the Recorder Lying About the Cursor** **[Testing & dev tooling]** **[Dashboard UI]**
+  Keith spotted "a very brief flash of orange text appearing on the
+  first line" through the first few clicks of the published demo, gone
+  too fast to read. It was `questionary`'s own "answered" style (256-
+  colour 214) rendering the choice just made — drawn and destroyed in
+  the same frame. The cause was in `scripts/dev/record_cast.py`, not the
+  CLI: every cursor-position request the TUI sent got the same canned
+  reply, `ESC[1;1R` — "you are at the top-left". That silenced a real
+  warning, but it told `prompt_toolkit` something untrue, so every
+  prompt re-rendered from row 0 and wiped the splash screen and every
+  answered line above it. The recorder now feeds everything the child
+  writes through a real `pyte` terminal emulator and answers each
+  request with the genuine cursor position. The splash screen stays up,
+  the answered choices accumulate below it, and the recording finally
+  shows what a real terminal always showed. A regression test drives a
+  real pty and asserts the reply names the true row (it reports `1;1`
+  against the old code).
+
+- **10:28pm** — **A Confirmed Promote Now Lands as a Real Success, Not a Scroll-Past** **[Testing & dev tooling]**
+  Keith's own ask: after confirming a promotion, "they should get a
+  success message rather than being bumped straight back to the menu."
+  The message did exist — a green `Promoted -> <path>` and a dim
+  follow-up — but as two ordinary printed lines immediately followed by
+  the main menu redrawing, so the most consequential action in the whole
+  tool ended exactly like a no-op. It's now a bordered panel naming the
+  real, checkable outcome (how many result files, written where), and in
+  a real terminal it waits for a keypress before the menu returns. The
+  flag-based `--commit` paths keep their one-liner: those are the
+  scriptable form, where a panel is noise and a blocking keypress is a
+  hang.
+
 - **10:11pm** — **The Check Chain Now Shows Its Progress** **[Testing & dev tooling]** **[Dashboard UI]**
   Watching the demo, Keith asked why there's "20 seconds of like nothing
   and waiting and there's no progress indicator" — and whether a

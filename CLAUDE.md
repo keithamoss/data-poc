@@ -450,6 +450,8 @@ Rough layout:
   optimistic best case. The real CI coverage command
   (`--cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard`)
   passes at 94.76%, comfortably over the 92% floor.
+  -> **~81s/673 tests (2026-09-19 late evening)**. Flat against the
+  previous entry despite 20 more tests - no new hot spot.
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.
