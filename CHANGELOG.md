@@ -55,6 +55,32 @@ edited for a punchier, friendlier read than a bare commit log.
   report), and how Keith can invoke it.
 
 ### Fixed
+- **9:51pm** — **The Demo Recording Now Pauses Like a Person** **[Dashboard UI]** **[Testing & dev tooling]**
+  Keith's read was right, and the numbers behind it explain why two
+  earlier attempts at slowing the player down couldn't have worked.
+  Decoding the committed recording first: a uniform **0.78 seconds** from
+  each menu appearing to its keypress, **0.48 seconds** to read a dense
+  results table, and **zero arrow keys in the whole thing** — every
+  choice was just the already-highlighted first option, taken the instant
+  it appeared. The player's `speed` setting is an inverse multiplier, so
+  the previous `0.4` stretched everything 2.5×, including the ~13.5s
+  stretch where the tool chain runs and nothing is on screen at all. A
+  global multiplier can't fix a distribution problem — it padded the dead
+  air by exactly as much as the reading time.
+  So the hesitation is baked into the recording instead, where it can
+  vary: a new `pause:<seconds>` step type in the recorder, ~1.4–1.9s to
+  read each new menu, 5.5s on the report, and real scanning — the
+  highlight moves down past the other options and back up to the target
+  on every menu, which incidentally now shows a real amber run in the
+  run picker. Equal down/up counts land back on the first item whether a
+  menu wraps or clamps, so it's safe at any list length. Pauses are
+  explicit per step rather than random, so re-recording gives the same
+  rhythm every time. Playback is back to real time, and the whole thing
+  still runs ~48s — the time is just spent where a viewer needs it.
+  `dashboard/demos/README.md` also finally exists: the recorder's own
+  docstring had pointed at it for "the actual recorded script" since the
+  Demo tab was built, so the exact sequence behind the committed
+  recording was written down nowhere.
 - **9:41pm** — **The Plans Tab Was Never Republishing** **[Pipeline & publishing]**
   The dashboard embeds every `plans/*.md` file's content at build time,
   the same way it embeds `CHANGELOG.md` for Release Notes and

@@ -60,11 +60,26 @@ _CPR_RESPONSE = b"\x1b[1;1R"
 
 
 def parse_steps(raw_steps: list[str]) -> list[dict]:
-    """Each --step is either "wait:<substring>[:timeout_seconds]" (block
-    until that substring appears in the decoded output so far, or raise
-    after timeout_seconds - default 10, pass a bigger one for a step
-    that triggers a real, slow subprocess) or "key:<name or literal
-    text>" (sent immediately, no waiting)."""
+    """Each --step is one of:
+
+    - "wait:<substring>[:timeout_seconds]" - block until that substring
+      appears in the decoded output so far, or raise after
+      timeout_seconds (default 10; pass a bigger one for a step that
+      triggers a real, slow subprocess).
+    - "key:<name or literal text>" - sent immediately, no waiting.
+    - "pause:<seconds>" - send nothing and keep recording for that long.
+
+    `pause` exists because a recording of a TUI is watched by a human,
+    and a script that answers every prompt the instant it renders reads
+    as a machine driving a machine (plans/dashboard.md #13). The first
+    qa_wizard.cast gave a viewer a uniform 0.78s to read each menu and
+    0.48s to read a dense results table, with zero arrow keys anywhere -
+    every choice was just the already-highlighted first option. Real
+    hesitation is content here, not dead air, so it is scripted
+    explicitly rather than faked with a global delay: pauses genuinely
+    differ (a first-time menu earns longer than a familiar y/N), and
+    keeping them per-step keeps the recording deterministic, which a
+    random jitter would not."""
     steps = []
     for raw in raw_steps:
         kind, _, rest = raw.partition(":")
@@ -76,8 +91,17 @@ def parse_steps(raw_steps: list[str]) -> list[dict]:
                 steps.append({"type": "wait", "text": rest, "timeout": 10.0})
         elif kind == "key":
             steps.append({"type": "key", "value": rest})
+        elif kind == "pause":
+            try:
+                seconds = float(rest)
+            except ValueError:
+                raise ValueError(f"--step {raw!r}: pause needs a number of seconds, got {rest!r}") from None
+            if seconds < 0:
+                raise ValueError(f"--step {raw!r}: pause cannot be negative")
+            steps.append({"type": "pause", "seconds": seconds})
         else:
-            raise ValueError(f"Unrecognised --step {raw!r} (expected wait:... or key:...)")
+            raise ValueError(
+                f"Unrecognised --step {raw!r} (expected wait:..., key:... or pause:...)")
     return steps
 
 
@@ -175,6 +199,13 @@ def record(cmd: list[str], steps: list[dict], cols: int, rows: int,
         elif step["type"] == "key":
             os.write(master_fd, NAMED_KEYS.get(step["value"], step["value"]).encode())
             _drain(time.time() + settle_delay)
+        elif step["type"] == "pause":
+            # Keep draining rather than sleeping: real output arriving
+            # mid-pause still gets recorded with its own true timestamp,
+            # and asciinema v2 stores absolute elapsed times per event,
+            # so the resulting GAP is exactly what playback renders as
+            # the viewer's own thinking time.
+            _drain(time.time() + step["seconds"])
 
     # Keep recording real output until it genuinely goes quiet.
     last_activity = time.time()
@@ -231,7 +262,8 @@ def main() -> None:
                          help="Seconds of real silence after the last step before the recording stops.")
     parser.add_argument("--title", default="mothman CLI/TUI demo")
     parser.add_argument("--step", action="append", default=[], required=True,
-                         help="wait:<substring>[:timeout_s] or key:<name|literal text> - repeatable, in order.")
+                         help="wait:<substring>[:timeout_s], key:<name|literal text>, or "
+                              "pause:<seconds> - repeatable, applied in order.")
     args = parser.parse_args()
 
     steps = parse_steps(args.step)

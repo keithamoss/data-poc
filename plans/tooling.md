@@ -1368,3 +1368,41 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     Keith on approach and order before starting, not a full design
     conversation - the appetite question that would normally gate it is
     already answered.
+
+13. **[todo, 2026-09-19]** **[Testing & dev tooling]** The QA wizard
+    goes completely silent for ~13.5 seconds while the real check chain
+    runs. `cli/bdm.py`'s `_run_qa_interactive_synthetic()` prints one
+    `"Running the real dbt-core/Soda Core/datacontract-cli/Evidently
+    chain for <run_id>..."` line and then calls `run_check()`, which
+    emits nothing until it's done. A real operator gets a static screen
+    with no indication the tool is alive, working, or hung. `cli/cp.py`
+    has the same shape.
+
+    Found 2026-09-19 while re-recording the demo (`plans/dashboard.md`
+    #13) - the recording made it impossible to miss, because that
+    stretch shows up as a gap with **zero terminal events at all**, so
+    the Demo tab freezes on one line for 13.5s of its ~48s runtime.
+    Worth being precise that this is a real CLI gap, not a recording
+    artifact: the recording is faithful, and what it faithfully shows is
+    a CLI that says nothing for 14 seconds.
+
+    This was actually designed and then not built. `plans/tooling.md` #1's
+    own TUI research notes say "the planned spinner-under-10s /
+    step-progress-bar-otherwise split for `rich.progress.Progress`
+    already matches real progress-indicator UX guidance" - so the
+    intended behaviour is on record; it just never made it into the
+    synthetic-source path.
+
+    Not fixed with the demo work, deliberately: that was scoped to
+    recording-side pacing, and this is a change to the real shipped CLI
+    that deserves its own decision. Real options when picked up, in
+    rough order of effort: a `rich` `console.status()` spinner around the
+    whole call (smallest, and honest - it genuinely is one opaque
+    operation from the CLI's point of view); or a real per-tool
+    step indicator (dbt -> Soda -> datacontract-cli -> Evidently), which
+    is more informative and matches the "step progress bar over 10s" half
+    of the design above, but needs `run_check()` to report progress back
+    rather than returning once at the end. Either would also fix the
+    demo's dead patch for free, without faking anything - the fix is
+    that the tool starts saying something, not that the recording hides
+    the silence.
