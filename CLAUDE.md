@@ -496,3 +496,12 @@ Rough layout:
     the real file paths another way and fetching them directly from
     `raw.githubusercontent.com` instead (not blocked), so this one
     didn't block the actual research, just the first route tried.
+  - **`snyk.io`** (2026-09-19) - blocked; a real article Keith found
+    himself and asked about directly ("Top 8 Claude Skills for UI/UX
+    Engineers"). No working alternate route found this time (unlike
+    `patch-diff.githubusercontent.com` above) - a `translate.goog`
+    proxy mirror showed up in search results, deliberately NOT used to
+    route around the block (that's a real bypass mechanism, a different
+    thing from picking a different legitimate primary URL for the same
+    public content) - fell back to real WebSearch snippets instead,
+    reported to Keith as snippet-only, not the full article.
