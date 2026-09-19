@@ -14,7 +14,38 @@
 #
 # Schema per entry (validate_requirements.py enforces every rule below,
 # it isn't just documentation):
-#   id:                 "REQ-NNN", globally unique, zero-padded 3 digits.
+#   id:                 "REQ-<CODE>-NNN" (2026-09-19, Keith's own ask),
+#                        where <CODE> is a real 3-4 letter code for the
+#                        same 7-part component taxonomy plans/*.md items
+#                        and CHANGELOG.md entries already tag things with
+#                        (see qa_tools/common/validate_requirements.py's
+#                        own `_COMPONENT_CODES` for the single source of
+#                        truth):
+#                          GEN  = Data generation
+#                          QAC  = QA checks & contract
+#                          PIPE = Pipeline & publishing
+#                          DASH = Dashboard UI
+#                          GHUB = GitHub workflow & people
+#                          TEST = Testing & dev tooling
+#                          DOCS = Docs & process
+#                        NNN is zero-padded 3 digits, one single global
+#                        sequence across every component (not a
+#                        per-component counter, to avoid ever needing to
+#                        know "what's the next PIPE number" separately
+#                        from "what's the next number"), globally
+#                        unique. The 22 pre-2026-09-19 entries below were
+#                        bare "REQ-NNN" at first, then migrated the same
+#                        day to this format once Keith asked for the
+#                        legacy shape to be dropped entirely, not kept
+#                        as a grandfathered exception - each one kept
+#                        its own original NNN and picked up the real
+#                        component code that best matches it (checked
+#                        against how the equivalent feature is actually
+#                        tagged in CHANGELOG.md/plans/*.md; several real
+#                        features are legitimately tagged with more than
+#                        one component there, but this id can only carry
+#                        one - the single best-fit call for each is a
+#                        judgement call, not a mechanical derivation).
 #   title:              short, human title.
 #   story:              "As a <role>, I want <capability>, so that
 #                        <benefit>." - free text, not force-parsed, but
@@ -50,17 +81,27 @@
 #                        nothing real verifying it. May be empty for
 #                        not_started/in_progress.
 #
-# Five further OPTIONAL fields (2026-09-19, same work) - all default to
+# Six further OPTIONAL fields (2026-09-19, same work) - all default to
 # empty/absent for the many pre-existing entries below, which were not
 # retroactively backfilled (nothing enforces backfilling optional
 # fields, and guessing real provenance/evidence for old entries after
 # the fact would be dishonest - these are for the new requirements-
 # scoper/-architect/-reviewer agents to actually populate going
 # forward):
+#   date_written:        ISO date ("YYYY-MM-DD") this requirement was
+#                        actually drafted - Keith's own ask, so the
+#                        register has a real chronological trail, not
+#                        just a sequential id. Optional/absent for old
+#                        entries same as the rest of this list, but the
+#                        requirements-scoper agent should always set it
+#                        on anything it drafts from here on (Keith's own
+#                        real Perth/AWST local date - see CLAUDE.md's
+#                        own "Who this is for" section for why bare
+#                        environment `date` can be wrong).
 #   source:              free text - where this requirement came from
 #                        ("Keith, voice-dictated batch, 2026-09-19" /
-#                        "Requirements-analysis review of REQ-014, gap
-#                        found 2026-09-20"). Real provenance, not a
+#                        "Requirements-analysis review of REQ-DOCS-014,
+#                        gap found 2026-09-20"). Real provenance, not a
 #                        constrained enum.
 #   non_functional_requirements: list of real standing constraints this
 #                        requirement must also respect (this project's
@@ -68,8 +109,8 @@
 #                        touch live/synthetic data directly") - forces
 #                        whoever's scoping a new idea to check it against
 #                        rules like that, not just functional behaviour.
-#   dependencies:        list of other real "REQ-NNN" ids this one needs
-#                        or blocks. Each one is checked to actually
+#   dependencies:        list of other real requirement ids this one
+#                        needs or blocks. Each one is checked to actually
 #                        exist in this same file (a dangling reference
 #                        is a real validation error, same treatment as
 #                        linked_tests).
@@ -93,7 +134,7 @@
 # requirements of what gets delivered, so they're deliberately not here.
 
 requirements:
-  - id: REQ-001
+  - id: REQ-QAC-001
     title: Real multi-tool QA checks against Birth Registrations
     story: >
       As a data steward, I want Birth Registrations run through real
@@ -113,7 +154,7 @@ requirements:
       - tests/test_run_datacontract_bdm.py
       - tests/test_run_evidently_bdm.py
 
-  - id: REQ-002
+  - id: REQ-QAC-002
     title: Real multi-tool QA checks against Child Protection
     story: >
       As a data steward, I want the Child Protection collection (all 6
@@ -132,7 +173,7 @@ requirements:
       - tests/test_run_datacontract_cp.py
       - tests/test_run_evidently_cp_real.py
 
-  - id: REQ-003
+  - id: REQ-DASH-003
     title: Drill-down status rollup (Agency -> Collection -> Dataset -> Column)
     story: >
       As an executive, I want a single red/amber/green rollup per
@@ -149,7 +190,7 @@ requirements:
       - tests-js/status-rollups.test.js
       - tests-js/navigation.test.js
 
-  - id: REQ-004
+  - id: REQ-PIPE-004
     title: Committed, permanent QA history
     story: >
       As a data steward, I want every real QA run's raw tool output
@@ -167,7 +208,7 @@ requirements:
       - tests/test_qa_results_reader.py
       - tests/test_build_results_from_history.py
 
-  - id: REQ-005
+  - id: REQ-PIPE-005
     title: CI-gated publish, no manual publish path
     story: >
       As a data steward, I want the published dashboard to only ever
@@ -183,7 +224,7 @@ requirements:
       - tests/test_check_dashboard_renders.py
       - tests/test_dashboard_e2e.py::TestBuiltDashboardRenders
 
-  - id: REQ-006
+  - id: REQ-QAC-006
     title: Check lifecycle - retirement without losing history
     story: >
       As a data steward, I want a check's history preserved even after
@@ -202,7 +243,7 @@ requirements:
       - tests/test_check_lifecycle.py
       - tests/test_validate_check_lifecycle.py
 
-  - id: REQ-007
+  - id: REQ-PIPE-007
     title: Cadence-aware "as of" viewing
     story: >
       As a data steward, I want to pick any date and see the data asset
@@ -219,7 +260,7 @@ requirements:
       - tests/test_cadence.py
       - tests/test_dashboard_e2e.py::TestAsOfDatePicking::test_a_date_before_any_real_history_shows_no_data
 
-  - id: REQ-008
+  - id: REQ-QAC-008
     title: Resupply chains derived from real, observable signals
     story: >
       As a data steward, I want a resupply chain identified purely from
@@ -238,7 +279,7 @@ requirements:
     linked_tests:
       - tests-js/supply-history.test.js
 
-  - id: REQ-009
+  - id: REQ-DASH-009
     title: "Recent activity: who published what QA, when"
     story: >
       As a manager, I want a feed of who ran and published QA results
@@ -252,7 +293,7 @@ requirements:
     linked_tests:
       - tests/test_changelog.py
 
-  - id: REQ-010
+  - id: REQ-DASH-010
     title: "Release notes: the tool's own development history"
     story: >
       As anyone evaluating this PoC, I want a real, curated changelog of
@@ -266,7 +307,7 @@ requirements:
     linked_tests:
       - tests/test_changelog_md.py
 
-  - id: REQ-011
+  - id: REQ-TEST-011
     title: Real automated test coverage with an enforced floor
     story: >
       As a data steward relying on this pipeline, I want its own
@@ -283,7 +324,7 @@ requirements:
     linked_tests:
       - tests/test_dashboard_e2e.py::TestBuiltDashboardRenders::test_renders_with_zero_console_errors_and_a_populated_view
 
-  - id: REQ-012
+  - id: REQ-DASH-012
     title: Dark mode
     story: >
       As a viewer, I want a persistent dark mode toggle, so that I can
@@ -296,7 +337,7 @@ requirements:
     linked_tests:
       - tests/test_dashboard_e2e.py::TestDarkModeToggle::test_toggling_dark_mode_persists_across_a_reload
 
-  - id: REQ-013
+  - id: REQ-DASH-013
     title: "Time travel: point-in-time dashboard snapshots"
     story: >
       As a data steward, I want fully self-contained, gzip-archived
@@ -311,7 +352,7 @@ requirements:
     linked_tests:
       - tests/test_snapshot_dashboard.py
 
-  - id: REQ-014
+  - id: REQ-DOCS-014
     title: A live requirements register, tied to real tests
     story: >
       As a product owner, I want real user stories tracked with MoSCoW
@@ -328,7 +369,7 @@ requirements:
       - tests/test_validate_requirements.py
       - tests/test_requirements_yaml.py
 
-  - id: REQ-015
+  - id: REQ-GHUB-015
     title: GitHub Issues as the QA remediation ticketing system
     story: >
       As a QA analyst, I want a real ticket opened automatically when a
@@ -341,7 +382,7 @@ requirements:
         by the pipeline for real QA events.
     linked_tests: []
 
-  - id: REQ-016
+  - id: REQ-GHUB-016
     title: Data-asset-level people and roles config
     story: >
       As a manager, I want a config of who works on this data asset
@@ -354,7 +395,7 @@ requirements:
       - A real config file lists people, roles, and assignments.
     linked_tests: []
 
-  - id: REQ-017
+  - id: REQ-QAC-017
     title: An accept/reject decision workflow for amber-status supplies
     story: >
       As a data steward, I want a real, recorded decision on a
@@ -368,7 +409,7 @@ requirements:
         and reflected back in the dashboard's own status.
     linked_tests: []
 
-  - id: REQ-018
+  - id: REQ-PIPE-018
     title: An AWS MVP reacting to real S3 delivery events
     story: >
       As a data steward, I want the pipeline to run automatically when
@@ -384,7 +425,7 @@ requirements:
         individually.
     linked_tests: []
 
-  - id: REQ-019
+  - id: REQ-GEN-019
     title: Realistic Child Protection resupply simulation
     story: >
       As a data steward, I want Child Protection's synthetic data to
@@ -398,7 +439,7 @@ requirements:
         sequence across its own quarterly cadence.
     linked_tests: []
 
-  - id: REQ-020
+  - id: REQ-DASH-020
     title: Human-friendlier dashboard URLs
     story: >
       As a viewer, I want a shareable link to a specific dataset/column
@@ -410,7 +451,7 @@ requirements:
       - A dataset-level URL reads as a real path, not encoded JSON.
     linked_tests: []
 
-  - id: REQ-021
+  - id: REQ-DASH-021
     title: Expose this project's own planning memory in the dashboard
     story: >
       As a product owner, I want to browse the plans/*.md planning
@@ -424,7 +465,7 @@ requirements:
         indicator, not just raw markdown text.
     linked_tests: []
 
-  - id: REQ-022
+  - id: REQ-DASH-022
     title: Dashboard gamification for QA turnaround
     story: >
       As a manager, I want staff who turn QA around quickly or

@@ -218,7 +218,7 @@ class TestRequirementsPanel:
         # every entry, just that a real requirement genuinely rendered
         # (id, MoSCoW label, status label, and a real linked test path),
         # not the empty-state fallback.
-        assert "REQ-001" in rows_text
+        assert "REQ-QAC-001" in rows_text
         assert "No requirements yet" not in rows_text
         assert any(label in rows_text for label in ("Must", "Should", "Could"))
         assert any(label in rows_text for label in ("Built", "In progress", "Not started"))

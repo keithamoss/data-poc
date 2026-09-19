@@ -27,7 +27,29 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
-### Added
+### Changed
+- **4:38pm** — **Requirements Register: Component-Coded IDs, Written Dates, Scoper Now Asks About NFRs** **[Docs & process]**
+  Three more real refinements to the requirements
+  register (`requirements.yaml`) and `requirements-scoper`, Keith's own
+  follow-up asks before the agent system's first real run. Every id is
+  now `REQ-<CODE>-NNN`, where `<CODE>` is a real 3-4 letter code
+  (`GEN`/`QAC`/`PIPE`/`DASH`/`GHUB`/`TEST`/`DOCS`) for the same 7-part
+  component taxonomy `plans/*.md`/this changelog already tag things
+  with - `qa_tools/common/validate_requirements.py`'s own
+  `_COMPONENT_CODES` is the single source of truth. Keith's explicit
+  follow-up call: drop the old bare `REQ-NNN` shape entirely rather than
+  grandfather it, so all 22 real, pre-existing entries were migrated the
+  same day, each keeping its own original number and picking up
+  whichever real component best matches it (checked against how the
+  equivalent feature is actually tagged elsewhere in this changelog).
+  A new optional `date_written` field (real `YYYY-MM-DD`) gives the
+  register a real chronological trail, rendered next to each
+  requirement's title in the dashboard's own Requirements panel.
+  `requirements-scoper.md` now has a real second, explicit step for
+  non-functional requirements - proposing its own from this project's
+  standing conventions, as before, but now also genuinely asking Keith
+  (via `AskUserQuestion`) whether there's anything else only he'd know
+  to raise, rather than relying on its own read of the codebase alone.
 - **4:27pm** — **Requirements-Analysis Agents: Real Polish Bar, Real Role Depth, Post-Build UX Pass**
   **[Docs & process]** Three real refinements to the same-day agent
   system below, before its first real run - Keith held off running it to

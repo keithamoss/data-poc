@@ -35,7 +35,7 @@ requirements:
         "id": "REQ-001", "title": "A real feature", "story": "As a user, I want X, so that Y.",
         "moscow": "must", "status": "built",
         "acceptance_criteria": ["It does the thing."], "linked_tests": ["tests/test_x.py"],
-        "source": "", "non_functional_requirements": [], "dependencies": [],
+        "date_written": "", "source": "", "non_functional_requirements": [], "dependencies": [],
         "open_questions": [], "evidence": [],
     }
 
@@ -65,6 +65,7 @@ requirements:
     assert req["acceptance_criteria"] == []
     assert req["linked_tests"] == []
     assert req["story"] == ""
+    assert req["date_written"] == ""
     assert req["source"] == ""
     assert req["non_functional_requirements"] == []
     assert req["dependencies"] == []
@@ -72,11 +73,12 @@ requirements:
     assert req["evidence"] == []
 
 
-def test_parses_the_5_optional_fields_when_present(tmp_path):
+def test_parses_the_6_optional_fields_when_present(tmp_path):
     path = _write(tmp_path, """
 requirements:
-  - id: REQ-001
+  - id: REQ-DASH-023
     title: A real feature
+    date_written: "2026-09-19"
     source: Keith, voice-dictated batch, 2026-09-19
     non_functional_requirements:
       - CI must never touch live data
@@ -88,6 +90,7 @@ requirements:
       - Playwright walkthrough 2026-09-20, confirmed it renders.
 """)
     req = parse_requirements(path)[0]
+    assert req["date_written"] == "2026-09-19"
     assert req["source"] == "Keith, voice-dictated batch, 2026-09-19"
     assert req["non_functional_requirements"] == ["CI must never touch live data"]
     assert req["dependencies"] == ["REQ-002"]

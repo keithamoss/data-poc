@@ -30,8 +30,9 @@ _DEFAULTS = {
     "status": "not_started",
     "acceptance_criteria": [],
     "linked_tests": [],
-    # 5 further optional fields (2026-09-19, plans/wider.md #10) - see
+    # 6 further optional fields (2026-09-19, plans/wider.md #10) - see
     # requirements.yaml's own header comment for the full rationale.
+    "date_written": "",
     "source": "",
     "non_functional_requirements": [],
     "dependencies": [],

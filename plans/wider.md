@@ -562,8 +562,36 @@ check_lifecycle.py`'s own `check_id` convention.
 
     **Deliberately not yet done, Keith's own explicit call**: deeper
     grounding of `requirements-ux`'s own intent in real human-psychology/
-    HCI research (not just "consistency + workflow fit"), and whether
-    real precedent exists for a UX-reviewer-agent role specifically -
-    Keith is doing that second piece of research himself; revisit both
-    once his research and this refinement round are both in hand, not
-    before.
+    HCI research (not just "consistency + workflow fit"). Revisit once
+    this refinement round is in hand, not before.
+
+    **Correction, same day**: Keith's earlier "let me do some research
+    online" on whether real precedent exists for a UX-reviewer-agent
+    role was reversed - he wants this session to do that research, not
+    him. Still not yet started (queued behind the requirements-register
+    refinement below); do it, don't wait on Keith for it.
+
+    **Requirements-register schema refined further, same day** - three
+    more real follow-up asks, before the agent system's first real run:
+    - **Component-coded ids.** Every `requirements.yaml` id is now
+      `REQ-<CODE>-NNN` (`GEN`/`QAC`/`PIPE`/`DASH`/`GHUB`/`TEST`/`DOCS` -
+      `qa_tools/common/validate_requirements.py`'s own
+      `_COMPONENT_CODES` is the single source of truth), the same
+      7-part taxonomy this file's items and `CHANGELOG.md` entries
+      already tag with. Keith's own explicit follow-up: drop the old
+      bare `REQ-NNN` shape entirely rather than grandfather it - so all
+      22 real, pre-existing entries were migrated the same day (each
+      kept its own original number, picked up whichever real component
+      best fits, checked against how the equivalent feature is actually
+      tagged elsewhere in this repo) rather than left as a legacy
+      exception. `_ID_RE` now rejects the bare shape outright.
+    - **A real `date_written` field** (optional `YYYY-MM-DD`) - Keith's
+      own ask for a real chronological trail on the register, not just a
+      sequential id. Rendered next to each requirement's title in the
+      dashboard's own Requirements panel.
+    - **`requirements-scoper` now genuinely asks Keith about non-
+      functional requirements**, not just derives them from the
+      codebase itself - a real `AskUserQuestion` step added alongside
+      the existing "check against this project's own standing rules"
+      one, Keith's own explicit call that relying on self-derived NFRs
+      alone wasn't enough.

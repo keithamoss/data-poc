@@ -12,14 +12,27 @@ verified by a test that doesn't exist is exactly the failure mode this
 whole feature exists to prevent.
 
 Extended 2026-09-19 (plans/wider.md #10, the requirements-analysis
-agents work) with 5 further optional fields - see requirements.yaml's
+agents work) with 6 further optional fields - see requirements.yaml's
 own header comment for the full field-by-field rationale. `source`/
 `non_functional_requirements`/`open_questions`/`evidence` are each
 real-but-permissive (absent is fine; if present, must be a non-empty
 string or a list of them). `dependencies` gets one further real check:
-every entry must resolve to an actual `REQ-NNN` id elsewhere in this
+every entry must resolve to an actual requirement id elsewhere in this
 same file - a dangling reference is a real error, the same treatment
-`linked_tests` already gets.
+`linked_tests` already gets. `date_written`, if present, must be a real
+"YYYY-MM-DD" date.
+
+Extended again the same day (Keith's own follow-up ask) with a real
+middle component code in the id itself: every id is now `REQ-<CODE>-NNN`
+where `<CODE>` is one of `_COMPONENT_CODES` below - the same 7-part
+component taxonomy plans/*.md items and CHANGELOG.md entries already
+tag things with, just condensed to 3-4 letters. The bare legacy
+`REQ-NNN` shape is no longer valid at all, by Keith's own explicit
+follow-up call (drop it entirely rather than grandfather it) - the 22
+pre-2026-09-19 entries were migrated to the new shape the same day,
+each keeping its own original NNN and picking up whichever real
+component code best matches it (see requirements.yaml's own header
+comment for the full reasoning and the migration note).
 
 Run as `python3 -m qa_tools.common.validate_requirements` from the repo
 root (no git history needed, unlike validate_check_lifecycle.py - this
@@ -39,7 +52,26 @@ from dashboard.requirements_yaml import parse_requirements
 ROOT = Path(__file__).resolve().parent.parent.parent
 REQUIREMENTS_YAML = ROOT / "requirements.yaml"
 
-_ID_RE = re.compile(r"^REQ-\d{3}$")
+# Single source of truth for the id's own middle component code - the
+# same 7-part taxonomy plans/*.md items and CHANGELOG.md entries tag
+# things with (dashboard/qa-reporting-dashboard.template.html's own
+# `COMPONENT_ICON`/`PLANS_ALL_COMPONENTS` consts), just condensed to
+# 3-4 letters for the id. Keep this dict and those two consts in sync
+# by hand if the taxonomy itself ever changes - nothing currently
+# cross-checks them against each other.
+_COMPONENT_CODES = {
+    "GEN": "Data generation",
+    "QAC": "QA checks & contract",
+    "PIPE": "Pipeline & publishing",
+    "DASH": "Dashboard UI",
+    "GHUB": "GitHub workflow & people",
+    "TEST": "Testing & dev tooling",
+    "DOCS": "Docs & process",
+}
+# "REQ-<CODE>-NNN" only - the old bare "REQ-NNN" shape is no longer
+# valid, see this module's own docstring for the same-day migration.
+_ID_RE = re.compile(r"^REQ-(?:" + "|".join(_COMPONENT_CODES) + r")-\d{3}$")
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _VALID_MOSCOW = {"must", "should", "could", "wont"}
 _VALID_STATUS = {"not_started", "in_progress", "built"}
 
@@ -125,7 +157,9 @@ def validate(requirements: list[dict]) -> list[str]:
 
         rid = r.get("id", "")
         if not _ID_RE.match(rid):
-            errors.append(f"{where}: id {rid!r} doesn't match ^REQ-\\d{{3}}$")
+            errors.append(
+                f"{where}: id {rid!r} doesn't match ^REQ-({'|'.join(_COMPONENT_CODES)})-\\d{{3}}$"
+            )
         else:
             seen_ids[rid] = seen_ids.get(rid, 0) + 1
 
@@ -164,6 +198,14 @@ def validate(requirements: list[dict]) -> list[str]:
         source = r.get("source")
         if source and (not isinstance(source, str) or not source.strip()):
             errors.append(f"{where}: source, if present, must be a non-empty string")
+
+        # Same "permissive if absent, strict if present" treatment as
+        # `source` - dashboard/requirements_yaml.py's own parser also
+        # defaults an unset `date_written` to `""`.
+        date_written = r.get("date_written")
+        if date_written and (not isinstance(date_written, str) or not _DATE_RE.match(date_written)):
+            errors.append(f"{where}: date_written {date_written!r}, if present, must be a real "
+                           f"\"YYYY-MM-DD\" date")
 
         for field_name in ("non_functional_requirements", "open_questions", "evidence"):
             errors.extend(_valid_string_list(r.get(field_name), field_name, where))

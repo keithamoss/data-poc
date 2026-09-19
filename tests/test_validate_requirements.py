@@ -13,7 +13,7 @@ from qa_tools.common.validate_requirements import _linked_test_exists, _python_t
 
 def _valid_entry(**overrides):
     entry = {
-        "id": "REQ-001",
+        "id": "REQ-QAC-001",
         "title": "A real feature",
         "story": "As a user, I want X, so that Y.",
         "moscow": "must",
@@ -36,8 +36,30 @@ def test_validate_rejects_a_malformed_id():
     assert any("id" in e and "not-an-id" in e for e in errors)
 
 
+def test_validate_rejects_the_old_legacy_bare_id_format():
+    """2026-09-19, Keith's own follow-up ask: drop the legacy "REQ-NNN"
+    shape entirely rather than grandfather it - the 22 pre-2026-09-19
+    entries were migrated to the component-coded shape the same day
+    (requirements.yaml's own header comment has the full migration
+    note), so the bare shape is a real validation error now, not just
+    an old convention nobody uses any more."""
+    errors = validate([_valid_entry(id="REQ-014")])
+    assert any("id" in e and "REQ-014" in e for e in errors)
+
+
+def test_validate_accepts_a_current_component_coded_id():
+    """2026-09-19, Keith's own follow-up ask: a real 3-4 letter
+    component code in the id's middle segment."""
+    assert validate([_valid_entry(id="REQ-DASH-023")]) == []
+
+
+def test_validate_rejects_a_component_code_not_in_the_real_taxonomy():
+    errors = validate([_valid_entry(id="REQ-FOO-023")])
+    assert any("id" in e and "REQ-FOO-023" in e for e in errors)
+
+
 def test_validate_rejects_duplicate_ids():
-    errors = validate([_valid_entry(id="REQ-001"), _valid_entry(id="REQ-001")])
+    errors = validate([_valid_entry(id="REQ-QAC-001"), _valid_entry(id="REQ-QAC-001")])
     assert any("globally unique" in e for e in errors)
 
 
@@ -150,6 +172,26 @@ def test_source_can_be_real_free_text():
     assert validate([_valid_entry(source="Keith, voice-dictated batch, 2026-09-19")]) == []
 
 
+def test_date_written_is_optional_and_absent_is_fine():
+    assert validate([_valid_entry()]) == []
+
+
+def test_date_written_defaulted_to_empty_string_by_the_real_parser_is_fine():
+    """Same real-parser-default treatment as `source` above -
+    dashboard/requirements_yaml.py's parse_requirements() also defaults
+    an unset `date_written` to `""`, not `None`."""
+    assert validate([_valid_entry(date_written="")]) == []
+
+
+def test_date_written_accepts_a_real_iso_date():
+    assert validate([_valid_entry(date_written="2026-09-19")]) == []
+
+
+def test_date_written_rejects_a_non_iso_date():
+    errors = validate([_valid_entry(date_written="19/09/2026")])
+    assert any("date_written" in e for e in errors)
+
+
 def test_non_functional_requirements_absent_is_fine():
     assert validate([_valid_entry()]) == []
 
@@ -183,15 +225,16 @@ def test_dependencies_absent_is_fine():
 
 
 def test_dependencies_must_be_a_list():
-    errors = validate([_valid_entry(dependencies="REQ-002")])
+    errors = validate([_valid_entry(dependencies="REQ-QAC-002")])
     assert any("dependencies must be a list" in e for e in errors)
 
 
 def test_dependencies_referencing_a_real_id_in_the_same_file_is_fine():
-    errors = validate([_valid_entry(id="REQ-001", dependencies=["REQ-002"]), _valid_entry(id="REQ-002")])
+    errors = validate([_valid_entry(id="REQ-QAC-001", dependencies=["REQ-QAC-002"]),
+                        _valid_entry(id="REQ-QAC-002")])
     assert errors == []
 
 
 def test_dependencies_referencing_a_nonexistent_id_is_an_error():
-    errors = validate([_valid_entry(id="REQ-001", dependencies=["REQ-999"])])
-    assert any("dependencies entry 'REQ-999' does not match any real requirement id" in e for e in errors)
+    errors = validate([_valid_entry(id="REQ-QAC-001", dependencies=["REQ-QAC-999"])])
+    assert any("dependencies entry 'REQ-QAC-999' does not match any real requirement id" in e for e in errors)

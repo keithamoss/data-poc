@@ -48,7 +48,7 @@ self-contained. If the idea you're scoping is big enough that one
 requirement would end up sprawling, split it into several small ones
 instead - each independently meaningful, each with its own acceptance
 criteria - and link them with the `dependencies` field (a list of other
-`REQ-NNN` ids this one needs or blocks) rather than cramming everything
+requirement ids this one needs or blocks) rather than cramming everything
 into one entry. Prefer several small, clean requirements over one big,
 compound one.
 
@@ -68,34 +68,63 @@ Pick whichever template actually fits each criterion - most real features
 need a mix. Each criterion should be a single, checkable statement, not a
 paragraph.
 
-## Check against this project's own standing rules
+## Non-functional requirements: propose your own, AND ask Keith
 
-Before finalizing, check the idea against this project's own real,
-existing constraints (`docs/project-context-for-agents.md`'s own
-"Conventions worth carrying into any BA-style work" section has the
-starter list - `mothman` is the only access point, CI never touches live
-data, real design forks get scoped with Keith before building, etc.). Any
-that genuinely apply go in the requirement's `non_functional_requirements`
-field - this is what stops a new idea from silently violating a rule this
-project already holds itself to.
+Two real sources for this field, not one - Keith's own explicit call
+(2026-09-19): don't rely solely on what you can derive yourself.
+
+1. **Propose your own first.** Check the idea against this project's own
+   real, existing constraints (`docs/project-context-for-agents.md`'s
+   own "Conventions worth carrying into any BA-style work" section has
+   the starter list - `mothman` is the only access point, CI never
+   touches live data, real design forks get scoped with Keith before
+   building, etc.). Any that genuinely apply go in the requirement's
+   `non_functional_requirements` field.
+2. **Then actually ask Keith**, via `AskUserQuestion`, whether there are
+   any further non-functional requirements he wants applied - things
+   only he'd know to raise (a real performance/latency expectation, a
+   security or compliance concern specific to this idea, a data-volume/
+   scale assumption, an availability expectation) that you wouldn't
+   derive just from reading the codebase. Don't skip this step even when
+   your own proposed list already looks complete - ask anyway, briefly,
+   as a real question rather than assuming silence means "none."
+
+Fold whatever comes back from both sources into the same
+`non_functional_requirements` field - no need to track which source each
+one came from.
 
 ## What you produce
 
 For each new requirement, draft:
 
 ```yaml
-- id: REQ-NNN            # leave the real number for whoever applies this -
-                          # you don't know the next free one without
-                          # reading the live requirements.yaml yourself;
-                          # if you do read it, use the real next number.
+- id: REQ-<CODE>-NNN     # <CODE> is a real 3-4 letter component code -
+                          # GEN/QAC/PIPE/DASH/GHUB/TEST/DOCS, see
+                          # qa_tools/common/validate_requirements.py's
+                          # own `_COMPONENT_CODES` for the definitive
+                          # list and requirements.yaml's own header
+                          # comment for what each maps to. Pick the one
+                          # component this requirement most belongs to
+                          # (same taxonomy plans/*.md items and
+                          # CHANGELOG.md entries already tag with). NNN:
+                          # leave the real number for whoever applies
+                          # this - you don't know the next free one
+                          # without reading the live requirements.yaml
+                          # yourself; if you do read it, use the real
+                          # next number (one global sequence across all
+                          # components, not per-component).
   title: ...
+  date_written: "<Keith's real Perth/AWST local date - see CLAUDE.md's
+                  own 'Who this is for' section for why bare environment
+                  `date` can be wrong>"
   story: "As a <role>, I want <capability>, so that <benefit>."
   moscow: must | should | could | wont
   status: not_started
   source: "Keith, <how this was raised>, <real date>"
   acceptance_criteria:
     - "<EARS-format criterion>"
-  non_functional_requirements: [...]   # only if any genuinely apply
+  non_functional_requirements: [...]   # your own findings PLUS whatever
+                                        # Keith adds when you ask him
   dependencies: [...]                  # only if this requirement is part
                                         # of a split-up bigger idea
   open_questions: [...]                # only if something's genuinely
