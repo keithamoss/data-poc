@@ -867,15 +867,44 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
 4. **[todo, 2026-09-19]** **[Docs & process]** A documentation-quality
    agent - a real, adjacent idea found while digging into
    `cfisch3r/estimate`'s own real agent files for the UX/visual critic
-   split (`plans/wider.md` #10): that repo has a third agent,
-   `.claude/agents/doc-quality.md`, not yet looked at in any depth
-   (found via a real directory listing, content not yet fetched/read).
-   Flagged by Keith to look at later, distinct from item #2 above (that
-   one's about Python CODE quality tooling; this one's about
-   DOCUMENTATION quality specifically - comments, docstrings, README/
-   `plans/*.md` accuracy, or something else entirely, not yet known
-   without actually reading that file). Not yet scoped at all - read the
-   real file first before proposing anything.
+   split (`plans/wider.md` #10). Read the real file
+   (`.claude/agents/doc-quality.md`, fetched directly from source) while
+   Keith had a subagent doing separate research in parallel - read-only
+   (`tools: Read, Grep, Glob, Bash`, `model: inherit`), invoked via a
+   `/doc-review` slash command with 3 real scopes (`diff` - default,
+   reviews changed docs PLUS docs made stale by non-doc changes in the
+   same diff, explicitly "the most important part"; `all` - full
+   `docs/` audit; `path` - one file/subtree). 4 real check categories:
+   **accuracy** (High - doc contradicts shipped code, e.g. a documented
+   command that doesn't match the real `package.json` script) - the
+   category with the most obvious real analogue here; **cross-reference
+   integrity** (Medium - broken internal links, a docs-index table
+   missing a real file or listing one that doesn't exist); **convention
+   conformance** (Medium/Low - doc structure/format matching the repo's
+   own established patterns, e.g. their ADRs following a fixed
+   structure); **internal consistency** (Medium - two docs disagreeing,
+   stale dates, a "TBD" left in a doc that reads as finished). Its own
+   rubric is explicit that standards come from the repo's own real
+   conventions, read fresh each time, not hardcoded into the agent
+   itself - the same "check against this project's own real rules"
+   principle our own agents already follow.
+
+   **Real, concrete relevance to THIS project, not yet scoped into
+   anything**: several of its check categories map onto real, already-
+   -felt pain here - a `plans/*.md` item or a `CLAUDE.md` bullet going
+   stale after the code it describes changes (the exact kind of drift
+   `tests/test_component_taxonomy_consistency.py` just built a narrow,
+   one-off CI guard against, 2026-09-19, `plans/wider.md` #10);
+   cross-reference integrity between `requirements.yaml`'s own
+   `dependencies` field and real ids (already CI-enforced by
+   `validate_requirements.py`, so partial coverage already exists);
+   whether a `plans/*.md` item's own real file/line references
+   (`dashboard/qa-reporting-dashboard.template.html:3225`-style
+   citations, used throughout this project's own planning entries) still
+   resolve after a refactor - genuinely unchecked today. Not yet scoped
+   as a real requirement - a real conversation with Keith on whether
+   this is worth building here, and if so how narrow a first version
+   should be, comes before anything gets drafted.
 
 5. **[done, 2026-09-19]** **[Docs & process]** **[Testing & dev tooling]**
    2 real Claude Skills installed (`.claude/skills/`) - a genuinely
