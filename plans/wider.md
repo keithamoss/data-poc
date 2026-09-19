@@ -1482,17 +1482,16 @@ check_lifecycle.py`'s own `check_id` convention.
     `permissionMode:` is ignored entirely, so this session couldn't
     have observed it either way.
 
-    **A separate, small finding from the same sweep, flagged not
-    fixed**: a repo-wide grep for stale `requirements-<agentname>`
-    references outside `.claude/agents/` found 25 hits, all in
-    `CHANGELOG.md`. Every one is a historical entry describing what
-    those agents were genuinely called at the time they were built, so
-    leaving them is arguably correct (a changelog records history, it
-    doesn't get retro-edited) - but it does mean a future reader
-    grepping `CHANGELOG.md` for an agent by its current name finds
-    nothing. Keith's call whether that's worth a one-line note at the
-    rename's own CHANGELOG entry; no code or agent file is affected
-    either way.
+    **A separate, small finding from the same sweep - checked, then
+    found already settled**: a repo-wide grep for stale
+    `requirements-<agentname>` references outside `.claude/agents/`
+    found 25 hits, all in `CHANGELOG.md`. Briefly flagged here as
+    something needing Keith's call, then withdrawn on reading the
+    rename's own CHANGELOG entry, which already states it outright:
+    those entries were "deliberately left alone, since they're an
+    accurate record of what these agents were actually called at the
+    time." No open question - recorded only so the next session that
+    runs the same grep doesn't re-raise it a third time.
 
     **Keith's own offer, same evening, not yet acted on**: he offered to
     explain more about who the real users actually are, to sharpen both

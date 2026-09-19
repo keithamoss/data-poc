@@ -353,12 +353,12 @@ def dashboard_html_with_amber_decisions(built_dashboard_html, tmp_path, monkeypa
         "comments": [
             {
                 "author": {"login": "keithamoss"}, "body": "/accept",
-                "createdAt": "2026-05-22T10:00:00Z",
+                "createdAt": "2026-07-05T10:00:00Z",
                 "url": "https://github.com/keithamoss/data-poc/issues/998#issuecomment-1",
             },
             {
                 "author": {"login": "keithamoss"}, "body": "/reject",
-                "createdAt": "2026-05-24T10:00:00Z",
+                "createdAt": "2026-07-23T10:00:00Z",
                 "url": "https://github.com/keithamoss/data-poc/issues/998#issuecomment-2",
             },
         ],
@@ -380,7 +380,7 @@ class TestAmberDecisionBadge:
         if toggle.count():
             toggle.click()
 
-        row = clean_page.locator('tr[data-run-date="2026-05-22"]')
+        row = clean_page.locator('tr[data-run-id="run_044_2026-07-05"]')
         assert row.count() > 0, "the real amber run this test targets isn't in the rendered supply history"
         badge = row.locator("a.pill.tag[href*='issuecomment-1']")
         assert badge.count() > 0, "no decision badge rendered on the real amber run it was accepted against"
@@ -400,7 +400,7 @@ class TestAmberDecisionBadge:
         if toggle.count():
             toggle.click()
 
-        row = clean_page.locator('tr[data-run-date="2026-05-24"]')
+        row = clean_page.locator('tr[data-run-id="run_062_2026-07-23"]')
         assert row.count() > 0, "the real amber run this test targets isn't in the rendered supply history"
         status_pill_class = row.locator("td").nth(1).locator(".pill").first.get_attribute("class")
         assert "amber" in status_pill_class, "reject must never repaint the pill away from amber"
@@ -418,7 +418,7 @@ class TestAmberDecisionBadge:
         if toggle.count():
             toggle.click()
 
-        row = clean_page.locator('tr[data-run-date="2026-05-23"]')  # a different real amber run, no comment
+        row = clean_page.locator('tr[data-run-id="run_066_2026-07-27"]')  # a different real amber run, no comment
         assert row.count() > 0
         assert row.locator("a.pill.tag[href*='issuecomment']").count() == 0
 

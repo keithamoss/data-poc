@@ -33,7 +33,7 @@ from qa_tools.cp import cp_common
 from qa_tools.cp.dataset_stats import AGGREGATE_SPEC
 from qa_tools.common.validate_check_lifecycle import collect_checks
 from pipeline.cadence import classify_arrival, parse_cadence_from_contract
-from pipeline.dashboard_check_labels import rank_for_headline, display_name
+from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
@@ -160,8 +160,12 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
             "unit": r["unit"], "warn": r["warn_threshold"], "fail": r["fail_threshold"],
             "dimension": r["dimension"], "label": r.get("label"), "check_id": r["check_id"],
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
+            "status_by_run": {},
         })
         slot["by_run"][r["run_id"]] = r["metric_value"]
+        # item 74 Bug A: the tool's own verdict, carried through rather
+        # than dropped here and re-derived from thresholds downstream.
+        slot["status_by_run"][r["run_id"]] = dashboard_status(r.get("status"))
         slot["row_count_total"][r["run_id"]] = r["row_count_total"]
         slot["row_count_invalid"][r["run_id"]] = r["row_count_invalid"]
         slot["failing_sample_keys"][r["run_id"]] = r.get("failing_sample_keys") or []
@@ -195,6 +199,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                         "row_count_invalid": slot["row_count_invalid"].get(run_id),
                         "failing_sample_keys": slot["failing_sample_keys"].get(run_id) or [],
                         "aggregate_values": aggregate_values,
+                        "status": slot["status_by_run"].get(run_id),
                     })
             if not history:
                 continue
@@ -205,9 +210,14 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                 "name": display_name(check_name, engine_short, slot["label"]),
                 "dimension": slot["dimension"],
                 "unit": slot["unit"],
-                "warn": slot["warn"] if slot["warn"] is not None else 0,
-                "fail": slot["fail"] if slot["fail"] is not None else 0,
+                # item 74 Bug A: None stays None - it means "this check has
+                # no bound of that kind" (e.g. rowCount's two-sided
+                # mustBeBetween range), NOT "zero tolerance". Substituting
+                # 0 here is what fabricated a red on every run.
+                "warn": slot["warn"],
+                "fail": slot["fail"],
                 "current": slot["by_run"].get(latest_run, 0),
+                "current_status": slot["status_by_run"].get(latest_run),
                 "previous": slot["by_run"].get(prev_run, 0),
                 "history": history,
                 "note": f"Computed by {engine} against this run's real data — not a fabricated figure.",

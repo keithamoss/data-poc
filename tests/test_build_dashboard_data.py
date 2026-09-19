@@ -224,3 +224,120 @@ def test_a_checks_description_and_changelog_are_carried_through(tmp_path, monkey
     # a check with no matching check_id gets an empty changelog, not a crash
     uncovered = next(c for c in data["columns"] if c["name"] == "date_registered")
     assert uncovered["checks"][0].get("description") is None
+
+
+# --- plans/qa-pipeline.md item 74, Bug A (fixed 2026-09-19) ------------
+#
+# build_dashboard_data.py used to substitute 0 for a None warn/fail
+# threshold when building each check's dashboard record. The dashboard
+# then re-derived every status from those thresholds (checkStatus()/
+# statusForValue(), both `value > fail` => red), so a check whose real
+# rule CAN'T be expressed as a one-sided "value > threshold" bound got a
+# fabricated red.
+#
+# The real, measured case (2026-09-19, against this repo's own committed
+# history): the ODCS `rowCount` rule is `mustBeBetween: [500, 20000]`
+# with `severity: warning` - a genuine TWO-SIDED range. Both thresholds
+# come through as None (correctly - there is no single upper bound), the
+# real tool evaluates it and says `pass`, and the 0-substitution turned
+# that into `1939 > 0` => RED on 352/352 BDM runs and 18/18 CP runs -
+# one per dataset, which is exactly what made all 7 datasets read red on
+# every single run.
+#
+# The fix is NOT "pass None through and treat it as unbounded" - that
+# would regress the ~63 violation-count checks (not_null/unique/
+# relationships/matches_regex) whose null fail_threshold genuinely DOES
+# mean "any violation is a failure", and which currently agree with
+# their tool exactly. Instead the tool's own verdict is carried through
+# and used as the source of truth, with threshold math as the fallback.
+ROWCOUNT_CHECK_ID = (
+    "data-asset-1.registry-services.birth-registrations"
+    ".stg_birth_registrations.sex.rowCount_datacontract"
+)
+
+
+def _rowcount_results():
+    """A real two-sided-range check: no expressible one-sided threshold,
+    a large legitimate metric value, and a real `pass` from the tool."""
+    return [
+        _check("run_01_2026-09-01", "sex", 1939, status="pass",
+               check_name="datacontract:rowCount", label="Row count",
+               warn_threshold=None, fail_threshold=None,
+               check_id=ROWCOUNT_CHECK_ID, engine="datacontract-cli 1.2.0"),
+        _check("run_02_2026-09-02", "sex", 2119, status="pass",
+               check_name="datacontract:rowCount", label="Row count",
+               warn_threshold=None, fail_threshold=None,
+               check_id=ROWCOUNT_CHECK_ID, engine="datacontract-cli 1.2.0"),
+    ]
+
+
+def _write_rowcount_results(tmp_path):
+    results_path = tmp_path / "results_bdm.json"
+    results_path.write_text(json.dumps({
+        "runs": FIXTURE_RUNS, "results": _rowcount_results(),
+        "dataset_stats": FIXTURE_DATASET_STATS,
+    }))
+    return results_path
+
+
+def test_a_checks_real_tool_verdict_is_carried_into_every_history_entry(tmp_path, monkeypatch):
+    """Item 74 Bug A: the tool's own pass/warn/fail verdict is the
+    authority on whether a run was green. It already exists on every real
+    result record - it just used to be dropped when building history[],
+    leaving the dashboard to re-derive it from thresholds."""
+    _no_retired_checks(monkeypatch)
+    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_rowcount_results(tmp_path)))
+
+    check = next(c for c in next(
+        col for col in bdd.build()["columns"] if col["name"] == "sex")["checks"])
+
+    assert [h["status"] for h in check["history"]] == ["green", "green"], (
+        "each history entry should carry the real tool verdict, mapped to "
+        "the dashboard's own green/amber/red vocabulary"
+    )
+    assert check["current_status"] == "green", (
+        "the latest run's real verdict should be carried through too - this "
+        "is what checkStatus() reads before falling back to threshold math"
+    )
+
+
+def test_a_two_sided_range_check_keeps_its_null_thresholds(tmp_path, monkeypatch):
+    """The other half of Bug A: a threshold that genuinely doesn't exist
+    must stay None rather than being substituted with 0, so nothing
+    downstream can mistake 'no upper bound' for 'zero tolerance'."""
+    _no_retired_checks(monkeypatch)
+    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_rowcount_results(tmp_path)))
+
+    check = next(c for c in next(
+        col for col in bdd.build()["columns"] if col["name"] == "sex")["checks"])
+
+    assert check["warn"] is None and check["fail"] is None, (
+        "a mustBeBetween rule has no single-sided warn/fail bound; "
+        "substituting 0 is what fabricated the red"
+    )
+
+
+def test_a_violation_count_checks_zero_tolerance_is_not_regressed(tmp_path, monkeypatch):
+    """The regression guard that makes the naive fix unsafe: a dbt
+    not_null-style check reports a COUNT OF VIOLATING ROWS, and its real
+    tool verdict is `fail`. Carrying the verdict through must keep that
+    red - it must not become green just because a threshold was null."""
+    _no_retired_checks(monkeypatch)
+    results_path = tmp_path / "results_bdm.json"
+    results_path.write_text(json.dumps({
+        "runs": FIXTURE_RUNS,
+        "results": [
+            _check("run_01_2026-09-01", "sex", 0, status="pass",
+                   check_name="dbt:not_null", warn_threshold=None, fail_threshold=None),
+            _check("run_02_2026-09-02", "sex", 14, status="fail",
+                   check_name="dbt:not_null", warn_threshold=None, fail_threshold=None),
+        ],
+        "dataset_stats": FIXTURE_DATASET_STATS,
+    }))
+    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(results_path))
+
+    check = next(c for c in next(
+        col for col in bdd.build()["columns"] if col["name"] == "sex")["checks"])
+
+    assert [h["status"] for h in check["history"]] == ["green", "red"]
+    assert check["current_status"] == "red"

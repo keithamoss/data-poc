@@ -41,27 +41,71 @@ between the two builders.
 from __future__ import annotations
 
 
-def status_rank(current, warn, fail) -> int:
+# plans/qa-pipeline.md item 74, Bug A (fixed 2026-09-19). Every real
+# check result already carries its own tool's verdict - a real `status`
+# field written by each qa_tools/*/run_*.py module from what dbt-core/
+# Soda Core/datacontract-cli/Evidently actually decided. That verdict is
+# the authority; re-deriving one from warn/fail thresholds is a fallback,
+# not the source of truth, because a threshold pair can't express every
+# real rule. The concrete case that forced this: the ODCS `rowCount`
+# rule is `mustBeBetween: [500, 20000]`, a genuine TWO-SIDED range, so
+# both its thresholds are legitimately None - and the old code's
+# None-becomes-0 substitution turned a real row count of 1939 into
+# `1939 > 0` => red, on 352/352 BDM runs and 18/18 CP runs (one per
+# dataset, which is exactly what made all 7 datasets read red on every
+# run, while the tools themselves all said `pass`).
+_DASHBOARD_STATUS_BY_TOOL_STATUS = {
+    "pass": "green",
+    "warn": "amber",
+    "fail": "red",
+    "error": "red",
+}
+
+
+def dashboard_status(tool_status: str | None) -> str | None:
+    """Maps a real tool verdict onto the dashboard's own green/amber/red
+    vocabulary. None for anything unrecognised (or absent), so callers
+    fall back to threshold math rather than silently reading an unknown
+    status as green - an unknown verdict is not evidence of health."""
+    if not tool_status:
+        return None
+    return _DASHBOARD_STATUS_BY_TOOL_STATUS.get(tool_status)
+
+
+_RANK_BY_STATUS = {"green": 0, "amber": 1, "red": 2}
+
+
+def status_rank(current, warn, fail, status: str | None = None) -> int:
     """0 = green, 1 = amber, 2 = red - identical rule to the dashboard's
-    own checkStatus() (qa-reporting-dashboard.html): current > fail is
+    own checkStatus() (qa-reporting-dashboard.template.html): the real
+    tool verdict wins where there is one, otherwise current > fail is
     red, current > warn is amber, otherwise green. Kept in lockstep with
     that function on purpose - the sort order this drives should always
-    match what the reader actually sees rendered."""
+    match what the reader actually sees rendered.
+
+    A None warn/fail means "no bound of that kind exists" (item 74), not
+    zero, so it can never be crossed - never substitute 0 here."""
+    if status in _RANK_BY_STATUS:
+        return _RANK_BY_STATUS[status]
     current = current or 0
-    if current > fail:
+    if fail is not None and current > fail:
         return 2
-    if current > warn:
+    if warn is not None and current > warn:
         return 1
     return 0
 
 
 def rank_for_headline(checks_out: list[dict]) -> None:
-    """Sorts checks_out (each already carrying current/warn/fail) worst
-    status first, in place. Python's sort is stable, so checks tied on
-    status keep whatever relative order they arrived in (e.g. dbt before
+    """Sorts checks_out (each already carrying current/warn/fail, and
+    current_status where the tool gave a real verdict) worst status
+    first, in place. Python's sort is stable, so checks tied on status
+    keep whatever relative order they arrived in (e.g. dbt before
     datacontract-cli, matching each engine's place in the underlying
     results list) - no further tie-break needed."""
-    checks_out.sort(key=lambda c: status_rank(c["current"], c["warn"], c["fail"]), reverse=True)
+    checks_out.sort(
+        key=lambda c: status_rank(c["current"], c["warn"], c["fail"], c.get("current_status")),
+        reverse=True,
+    )
 
 
 def display_name(check_name: str, engine_short: str, label: str | None) -> str:

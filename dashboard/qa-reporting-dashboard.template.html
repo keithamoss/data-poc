@@ -758,6 +758,10 @@ function arrivalPill(status, size){
 // helper reused everywhere instead of patching each site by hand.
 function pluralize(n, singular, plural){ return n===1 ? singular : (plural || singular+"s"); }
 function fmtMetric(x, unit){
+  // item 74: a null threshold is a real, meaningful value ("no bound of
+  // this kind exists"), not a missing number - render it as such rather
+  // than calling .toFixed() on null and taking the whole panel down.
+  if(x==null) return "—";
   if(unit==="%") return x.toFixed(2)+"%";
   if(unit==="hrs") return x.toFixed(1)+"h";
   if(unit==="PSI") return x.toFixed(4);
@@ -774,7 +778,25 @@ function fmtMetric(x, unit){
 const STATUS_ORDER = {nodata:-1, green:0, amber:1, red:2};
 const STATUS_LABEL = {nodata:"No data", green:"Green", amber:"Amber", red:"Red"};
 function worstOf(list){ return list.reduce((w,s)=> STATUS_ORDER[s]>STATUS_ORDER[w]?s:w, "green"); }
-function checkStatus(check){ if(check.current>check.fail) return "red"; if(check.current>check.warn) return "amber"; return "green"; }
+// plans/qa-pipeline.md item 74, Bug A (fixed 2026-09-19). The real tool
+// (dbt-core/Soda Core/datacontract-cli/Evidently) already decided whether
+// each run passed - that verdict rides along on every check as
+// `current_status`, and on every history entry as `status`. It wins.
+// Threshold math is only a fallback, because a warn/fail pair can't
+// express every real rule: the ODCS `rowCount` rule is a two-sided
+// `mustBeBetween: [500, 20000]`, so both its bounds are legitimately
+// null, and the old "null means 0" reading turned a real row count of
+// 1939 into `1939 > 0` => red on every single run of all 7 datasets,
+// while the tools themselves all said pass.
+function checkStatus(check){
+  if(check.current_status) return check.current_status;
+  return statusForValue(check.current, check.warn, check.fail);
+}
+// The same rule for one history entry, preferring its own real verdict.
+function historyStatus(h, check){
+  if(h && h.status) return h.status;
+  return statusForValue(h ? h.value : 0, check.warn, check.fail);
+}
 
 // Data-quality-dimension categorisation (2026-09-19, Keith's own ask -
 // scoped via AskUserQuestion). Every real check result already carries a
@@ -1154,7 +1176,7 @@ function datasetStatusByRun(d){
   for(const col of d.columns || []){
     for(const ck of col.checks || []){
       for(const h of ck.history || []){
-        const s = statusForValue(h.value, ck.warn, ck.fail);
+        const s = historyStatus(h, ck);
         const prev = byRun.get(h.run_id) || "green";
         if(STATUS_ORDER[s] > STATUS_ORDER[prev]) byRun.set(h.run_id, s);
       }
@@ -1642,7 +1664,15 @@ let DATA = buildData(CURRENT_AS_OF);
 /* =========================================================================
    4. SVG CHART HELPERS
 ========================================================================= */
-function statusForValue(v,warn,fail){ if(v>fail) return "red"; if(v>warn) return "amber"; return "green"; }
+// A null warn/fail means "this check has no bound of that kind" (item
+// 74) - not zero, so it can never be crossed. Only ever reached as
+// checkStatus()/historyStatus()'s fallback, for a result with no real
+// tool verdict recorded.
+function statusForValue(v,warn,fail){
+  if(fail!=null && v>fail) return "red";
+  if(warn!=null && v>warn) return "amber";
+  return "green";
+}
 function statusColorVar(s){ return s==="red"?"var(--bad)": s==="amber"?"var(--warn-fill)":"var(--good)"; }
 
 // Phase 5e (plans/qa-pipeline.md #60), replacing the earlier
@@ -1672,7 +1702,7 @@ function aggregateFailureSeries(cols){
   const byDate = new Map();
   checks.forEach(ck=>{
     ck.history.forEach(h=>{
-      const status = statusForValue(h.value, ck.warn, ck.fail);
+      const status = historyStatus(h, ck);
       const key = h.date.getTime();
       if(!byDate.has(key)) byDate.set(key, {date:h.date, total:0, failing:0, worst:"green"});
       const e = byDate.get(key);
@@ -1759,7 +1789,7 @@ function trendChart(check, compareIdx, onPointClick, datasetRuns){
   const history = check.history, warn=check.warn, fail=check.fail, unit=check.unit;
   const W=480,H=180, padL=42,padR=16,padT=14,padB=26;
   const vals = history.map(r=>r.value);
-  const maxV = Math.max(fail*1.15, ...vals, 0.0001);
+  const maxV = Math.max((fail==null?0:fail)*1.15, ...vals, 0.0001);
   const n=vals.length;
   // n===1 guard (2026-09-15, Keith's question about a brand new column/
   // dataset's very first run): dividing by (n-1) is undefined at n=1 -
@@ -1838,18 +1868,21 @@ function trendChart(check, compareIdx, onPointClick, datasetRuns){
   // status color strip beneath
   const stripY = H-padB+8;
   let strip = history.map((r,i)=>{
-    const st = statusForValue(r.value,warn,fail);
+    const st = historyStatus(r, {warn, fail});
     const segW = (W-padL-padR)/n;
     return `<rect x="${(xs(i)-segW/2).toFixed(1)}" y="${stripY}" width="${(segW+0.5).toFixed(1)}" height="6" fill="${statusColorVar(st)}" opacity="0.85"/>`;
   }).join("");
-  const warnY=ys(warn).toFixed(1), failY=ys(fail).toFixed(1);
+  // item 74: a null bound has no line to draw - ys(null) would silently
+  // land on the baseline and read as a real threshold sitting at zero.
+  const warnY = warn==null ? null : ys(warn).toFixed(1);
+  const failY = fail==null ? null : ys(fail).toFixed(1);
   // sparse x labels: first, mid, last
   const tickIdx = [0, Math.floor((n-1)/2), n-1].filter((v,i,a)=>a.indexOf(v)===i);
   const xlabels = tickIdx.map(i=> `<text x="${xs(i).toFixed(1)}" y="${H-6}" font-size="9.5" text-anchor="middle" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${fmtDateShort(history[i].date)}</text>`).join("");
-  const yTicks=[0,warn,fail].filter((v,i,a)=>a.indexOf(v)===i);
+  const yTicks=[0,warn,fail].filter(v=>v!=null).filter((v,i,a)=>a.indexOf(v)===i);
   const ylabels = yTicks.map(v=> `<text x="${padL-6}" y="${(ys(v)+3).toFixed(1)}" font-size="9.5" text-anchor="end" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${fmtMetric(v,unit)}</text>`).join("");
   const last = history[n-1];
-  const lastStatus = statusForValue(last.value,warn,fail);
+  const lastStatus = historyStatus(last, {warn, fail});
   // #45: a hollow ring marking whichever run is currently selected as
   // the comparison point (openCheckPanel's own dropdown/click-to-select
   // - see setCompareIdx()) - distinct from the always-filled dot on the
@@ -1871,8 +1904,8 @@ function trendChart(check, compareIdx, onPointClick, datasetRuns){
   const svg = `
   <div class="chart-wrap">
     <svg viewBox="0 0 ${W} ${H+2}" width="100%" style="overflow:visible;display:block;" id="${id}">
-      <line x1="${padL}" y1="${warnY}" x2="${W-padR}" y2="${warnY}" stroke="var(--warn-fill)" stroke-dasharray="3,3" stroke-width="1"/>
-      <line x1="${padL}" y1="${failY}" x2="${W-padR}" y2="${failY}" stroke="var(--bad)" stroke-dasharray="3,3" stroke-width="1"/>
+      ${warnY==null ? "" : `<line x1="${padL}" y1="${warnY}" x2="${W-padR}" y2="${warnY}" stroke="var(--warn-fill)" stroke-dasharray="3,3" stroke-width="1"/>`}
+      ${failY==null ? "" : `<line x1="${padL}" y1="${failY}" x2="${W-padR}" y2="${failY}" stroke="var(--bad)" stroke-dasharray="3,3" stroke-width="1"/>`}
       <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H-padB}" stroke="var(--line)" stroke-width="1"/>
       ${dashConnectors}
       <path d="${segPaths}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
@@ -1897,7 +1930,7 @@ function trendChart(check, compareIdx, onPointClick, datasetRuns){
       <thead><tr><th>Run date</th><th>Value</th><th>Status</th></tr></thead>
       <tbody>
         ${history.slice().reverse().map(r=>{
-          const st=statusForValue(r.value,warn,fail);
+          const st=historyStatus(r, {warn, fail});
           return `<tr><td>${fmtDate(r.date)}</td><td class="num">${fmtMetric(r.value,unit)}</td><td>${pill(st,"sm")}</td></tr>`;
         }).join("")}
       </tbody>
@@ -1924,7 +1957,7 @@ function wireChart(id, history, warn, fail, unit, xs, ys, W, padL, padR, onPoint
   hit.addEventListener("mousemove", (e)=>{
     const idx = idxFromEvent(e);
     const r = history[idx];
-    const st = statusForValue(r.value,warn,fail);
+    const st = historyStatus(r, {warn, fail});
     hoverline.setAttribute("x1", xs(idx)); hoverline.setAttribute("x2", xs(idx)); hoverline.setAttribute("opacity","1");
     const wrapRect = svg.parentElement.getBoundingClientRect();
     const leftPx = (xs(idx)/W)*wrapRect.width;
@@ -2298,7 +2331,11 @@ function renderSupplyCycleRows(entries, datasetId){
           ? `<span class="mono" style="color:var(--ink-muted); font-size:12.5px;">${e.daysSincePrevious} ${pluralize(e.daysSincePrevious,"day")} since previous</span>`
           : "")
       : `${e.arrivalStatus ? arrivalPill(e.arrivalStatus,"sm") : ""} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt||""}</span>`;
-    return `<tr data-run-date="${e.run_date}">
+    // data-run-id alongside data-run-date: run_date is NOT unique (a
+    // resupply shares its base run's date - plans/conceptual-design.md
+    // Thread A found 352 real BDM runs across only 123 distinct dates),
+    // so anything needing to address exactly one row needs the run_id.
+    return `<tr data-run-date="${e.run_date}" data-run-id="${e.run_id}">
       <td class="mono">${e.run_date}</td>
       <td>${statusBadge}</td>
       <td>${arrivalCell}</td>
@@ -2509,7 +2546,11 @@ function openColumnDrawer(ag, col, ds, column, opts){
         ${ck.retired? `<span class="pill retired sm" title="Retired ${fmtDate(ck.retiredAsOf)}${ck.retiredReason?': '+ck.retiredReason:''}"><span class="ico"></span>Retired</span>` : pill(st,"sm")}
       </div>
       ${ck.dimension? `<div class="dim-tag">${ck.dimension}</div>`:""}
-      <div class="thresholds">warn &gt; ${fmtMetric(ck.warn,ck.unit)} · fail &gt; ${fmtMetric(ck.fail,ck.unit)} · current ${fmtMetric(ck.current,ck.unit)}</div>
+      <div class="thresholds">${[
+        ck.warn==null ? null : `warn &gt; ${fmtMetric(ck.warn,ck.unit)}`,
+        ck.fail==null ? null : `fail &gt; ${fmtMetric(ck.fail,ck.unit)}`,
+        `current ${fmtMetric(ck.current,ck.unit)}`,
+      ].filter(Boolean).join(" · ")}${(ck.warn==null&&ck.fail==null) ? ` <span class="muted">(no single-sided threshold — status is this tool's own verdict)</span>` : ""}</div>
       ${ck.note? `<div style="font-size:12px; color:var(--ink-muted); margin-top:6px;">${ck.note}</div>`:""}
       ${ck.retired? `<div class="retired-note">Retired ${fmtDate(ck.retiredAsOf)}${ck.retiredReason?' — '+ck.retiredReason:''} — no longer part of current status.</div>` : ""}
       <div class="check-card-hint">View current &amp; historical run detail ›</div>
@@ -2623,7 +2664,7 @@ function statusHistoryForColumn(column){
   const byDate = new Map();
   column.checks.forEach(ck=>{
     ck.history.forEach(h=>{
-      const st = statusForValue(h.value, ck.warn, ck.fail);
+      const st = historyStatus(h, ck);
       const key = h.date.getTime();
       const existing = byDate.get(key);
       if(!existing || STATUS_ORDER[st] > STATUS_ORDER[existing.worst]) byDate.set(key, {date:h.date, worst:st});

@@ -48,6 +48,40 @@ edited for a punchier, friendlier read than a bare commit log.
   report), and how Keith can invoke it.
 
 ### Fixed
+- **8:09pm** — **The Dashboard Now Trusts Each Tool's Own Verdict** **[Pipeline & publishing]** **[Dashboard UI]**
+  Every dataset had been reading red on every single run, and the cause
+  turned out to be the dashboard second-guessing the tools. Each real
+  check result already carries dbt-core/Soda Core/datacontract-cli/
+  Evidently's own pass/warn/fail verdict — but `build_dashboard_data.py`
+  threw it away when assembling each check's history, leaving the page
+  to re-derive a status from warn/fail thresholds, with a missing
+  threshold silently read as zero. That breaks for any rule a
+  single-sided "value > threshold" bound can't express: the ODCS
+  `rowCount` rule is `mustBeBetween: [500, 20000]`, so both its bounds
+  are legitimately absent, and a real row count of 1,939 became
+  `1939 > 0` → red. Measured against real committed history, the
+  dashboard disagreed with its own tools on **1,829 results** — always
+  in the same direction (tool says pass, page shows amber/red), so it
+  only ever raised false alarms and never once hid a real failure. The
+  fix makes the tool's verdict the source of truth, with threshold math
+  as an explicit fallback, and stops substituting zero for a threshold
+  that genuinely doesn't exist. Deliberately *not* the one-line version
+  of this fix: roughly 63 checks (`not_null`, `unique`, `relationships`)
+  rely on a null fail threshold meaning "any violation is a failure",
+  and simply reading null as unbounded would have turned real failures
+  green — a regression test now pins that down. An absent threshold also
+  had to become renderable rather than fatal: `fmtMetric(null)` was
+  calling `null.toFixed()` and taking the whole check-detail panel with
+  it. The dashboard now matches its tools on 352/352 Birth Registrations
+  runs and 108/108 Child Protection pairs, and 102 BDM runs read green
+  that structurally could not before — so resupply chains can finally
+  close. 14 new tests (3 Python, 11 JS), each confirmed failing first.
+  Two things fell out of it: the amber accept/reject badge tests broke
+  exactly as they should have, because the runs they targeted were only
+  ever amber *because* of this bug (retargeted to genuinely amber ones),
+  and re-deriving those exposed that supply-history rows could only be
+  addressed by run date — which isn't unique, since a resupply shares
+  its base run's date. Rows now carry a real `data-run-id` too.
 - **7:12pm** — **3 Real Papercuts Found by the Full Verification Pass, Fixed** **[Dashboard UI]** **[Testing & dev tooling]**
   `claude/playwright-mcp-verify-b2t4nb` picked up this branch and ran
   the full HTTPS-serving/port-collision-fix chain end to end, both

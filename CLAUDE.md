@@ -401,7 +401,24 @@ Rough layout:
   `plans/running-thoughts.md` #12's own real fix/verification account;
   plain serial `uv run pytest` is still ~122s-equivalent at today's test
   count, `-n auto` is the fast path, not the new default - see that
-  item for why).
+  item for why) -> **~220s/649 tests serial (2026-09-19 evening,
+  item 74's fix)**. The suite has grown ~58% in test count since the
+  last entry, and that's most of the runtime growth - nothing pointed
+  at a new hot spot this time. Two real, environment-only gotchas hit
+  on a genuinely fresh sandbox during that run, both worth knowing
+  before reading a red result as a code problem: the documented
+  one-time `uv run dbt deps ...` step had never been run here (8 real
+  dbt test failures until it was), and `PLAYWRIGHT_CHROMIUM_PATH=/opt/
+  pw-browsers/chromium` was needed for the e2e module (16 errors until
+  it was set). Neither is a code fault; both are one-line fixes.
+  Also found during the same run: `-n auto` specifically is NOT
+  currently reliable for a full-suite pass - a real, PRE-EXISTING race
+  between `tests/test_embed_dashboard_data.py` and `tests/
+  test_dashboard_e2e.py` over shared `reports/` paths (confirmed
+  pre-existing against a stashed, clean tree; logged as `plans/
+  tooling.md` #10). Serial is clean. Until that's fixed, treat an
+  `-n auto` failure in either of those two modules as suspect and
+  re-check it serially before believing it.
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.

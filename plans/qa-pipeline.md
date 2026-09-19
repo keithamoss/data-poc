@@ -3974,7 +3974,7 @@ relative, not a schedule — this is weeks of work, not months.
     day, rather than the old bug of two unrelated things merging purely
     by calendar coincidence).
 
-74. **[todo, 2026-09-18]** **[QA checks & contract]** Item 73's new
+74. **[done, 2026-09-19]** **[QA checks & contract]** Item 73's new
     per-run aggregate status made a pre-existing, previously-easy-to-
     miss calibration problem impossible to ignore: `birth-registrations`
     currently shows ONE never-closing resupply chain covering its entire
@@ -4041,6 +4041,149 @@ relative, not a schedule — this is weeks of work, not months.
     today's real (bug-affected) data - the never-closing chain is an
     accurate computation given that input, not a bug in the new
     derivation logic itself.
+
+    **Picked up and fixed, 2026-09-19** (Keith's own pick from the open-
+    items sweep at the start of the `claude/delivery-subagents-plans-
+    717lrx` session, chosen specifically because it blocks something
+    already built - see the ticketing note at the end). Investigating it
+    properly first turned up three things this entry had wrong or
+    didn't know:
+
+    **1. Bug B was already fixed, and this item went stale.**
+    `qa_tools/common/datacontract_common.py`'s
+    `fail_threshold_from_quality_definition()` already parses the real
+    `mustBe`/`mustBeLessThan`/`mustBeLessOrEqualTo` out of each ODCS
+    rule, and its own comment block names "Item 74 ... Bug B" directly.
+    It landed in `8ed69a9` and nothing ever came back to update this
+    entry. Both of Bug B's named examples are gone too - and
+    `registering_parent_1_name`'s Soda rule (Bug A's own named example)
+    has since gained a real `fail: when > 15%` with a changelog entry
+    citing this item. So the only thing still live was Bug A's root
+    cause in the builders.
+
+    **2. The real impact was bigger and differently shaped than the
+    "warn-only check" framing here suggested.** Measured against this
+    repo's own committed history by comparing every result's own tool
+    verdict against what the dashboard computed from thresholds: **1,829
+    disagreements** (1,648 BDM / 181 CP, ~6% of all results). Every
+    single one in the same direction - the tool said `pass`, the
+    dashboard rendered amber or red. Zero cases of the reverse, so this
+    bug only ever manufactured false alarms and never once hid a real
+    failure. They cluster into exactly three kinds:
+    - `rowCount_datacontract` + `row_count_soda` - **884 false reds.**
+      The real rule is `mustBeBetween: [500, 20000]`, a genuine
+      TWO-SIDED range, so both thresholds are correctly None; the
+      0-substitution turned a real row count of 1939 into `1939 > 0`.
+      Red on 352/352 BDM runs and 18/18 CP runs - one per dataset, which
+      is precisely the "all 7 datasets read red" this project had been
+      attributing to a vaguer threshold-encoding problem.
+    - `nullValues_datacontract` - 944 false ambers, the warn side of the
+      same substitution.
+    - `range_check_soda` - 1, an edge case.
+
+    **3. The obvious fix would have been a regression.** ~63 checks
+    (`not_null`/`unique`/`relationships`/`matches_regex`/
+    `accepted_range`) have a null `fail_threshold` AND currently agree
+    with their tool exactly, because for a violation COUNT "any
+    violation is a failure" genuinely is the rule - `fail=0` is the
+    correct encoding, not a bug. Simply passing None through and reading
+    it as "unbounded" would have turned real failures green, converting
+    a false-alarm bug into a missed-failure one. Worth naming plainly:
+    the naive reading of this item as originally written would have done
+    exactly that.
+
+    **The actual root cause, deeper than thresholds**: every result
+    already carries its own tool's real verdict, and
+    `build_dashboard_data.py` was **throwing it away** when building
+    each check's `history[]`, leaving the dashboard to re-derive a
+    status from a warn/fail pair that cannot express every real rule.
+
+    **Fix (Keith's own call via `AskUserQuestion`, picked over a
+    surgical range-check special-case and over adding a two-sided
+    threshold model): trust the tool's own verdict.** New
+    `dashboard_status()` in `pipeline/dashboard_check_labels.py` (the
+    module both builders already share, so the two can't drift) maps a
+    real `pass`/`warn`/`fail`/`error` onto green/amber/red, returning
+    None for anything unrecognised so callers fall back rather than
+    reading an unknown verdict as healthy. Both builders now carry
+    `status` onto every history entry and `current_status` onto each
+    check, and - the other half - **stop substituting 0 for a None
+    threshold**, since None means "no bound of this kind exists", not
+    "zero tolerance". Template side: `checkStatus()` prefers
+    `current_status`, a new `historyStatus(h, check)` prefers a history
+    entry's own `status`, and `statusForValue()` is now the explicit
+    fallback with null treated as absent rather than zero.
+
+    Null thresholds then had to become real, renderable values rather
+    than crashes - a concrete gap this entry's own "needs his call"
+    paragraph had flagged only in the abstract, now answered with real
+    findings: the trend chart turned out **safe** (`null * 1.15`
+    coerces to 0, so the y-axis still scales off the data), but
+    `fmtMetric(null, "%")` calls `null.toFixed(2)` and **hard-crashes
+    the whole check-detail panel** - so `fmtMetric()` now renders an
+    absent bound as an em dash, the chart omits guide lines/y-ticks for
+    a bound that doesn't exist, and the detail panel's threshold line
+    states "no single-sided threshold - status is this tool's own
+    verdict" instead of the previous, outright false "warn > 0 ·
+    fail > 0".
+
+    **Verified against real committed history, not fixtures**: the
+    dashboard now matches the tools' own verdict on **352/352 BDM runs**
+    and **108/108 CP (dataset, run) pairs** - every one of the 1,829
+    disagreements gone, with no status invented anywhere. The real
+    distribution underneath is BDM 198 red / 52 amber / 102 green and CP
+    19 red / 89 green - BDM genuinely does have a lot of red, because
+    the generator deliberately injects red deliveries and resupply
+    chains, but **102 BDM runs are now green that previously could not
+    be**, since the rowCount false-red hit literally every run. That is
+    what unblocks item 73's "ONE never-closing resupply chain covering
+    the entire 176-run history": chains can actually close now.
+
+    Tests, per this project's standing "reproduce it failing first"
+    convention (a logic bug, so the automatic rule applied, no need to
+    ask): 3 new Python tests in `tests/test_build_dashboard_data.py`
+    (the real rowCount shape; null thresholds surviving as null; and an
+    explicit regression guard that a violation-count check's real `fail`
+    verdict still reads red) - all 3 confirmed failing against the
+    pre-fix code first. 11 new JS tests
+    (`tests-js/tool-verdict-status.test.js`) - confirmed by stashing the
+    template and re-running that 8 of the 11 genuinely fail pre-fix,
+    with the other 3 passing by design as unchanged-behaviour guards.
+
+    **Two real knock-on changes the fix surfaced, both genuine rather
+    than test-wrangling:**
+    - `tests/test_dashboard_e2e.py`'s `TestAmberDecisionBadge` fixture
+      broke, correctly. It targeted 3 runs (2026-05-22/23/24) that its
+      own docstring recorded as "REAL, currently-amber ... found by
+      actually computing this dataset's own per-run status, not
+      assumed" - true when written, but they were only amber BECAUSE of
+      this bug. `run_001_2026-05-22` is BDM's very first run and is
+      genuinely clean; it now reads green, so the badge's own
+      `status==="amber"` gate correctly stopped firing. Re-derived 3
+      genuinely-amber, window-owning runs the same way the original
+      docstring describes (`run_044_2026-07-05` accept,
+      `run_062_2026-07-23` reject, `run_066_2026-07-27` neither). Worth
+      being explicit: the fixture's PREMISE expired, the mechanism it
+      tests did not - and it expiring is itself evidence the fix landed.
+    - Doing that re-derivation turned up a real, latent addressing
+      problem: the supply-history row identified itself only by
+      `data-run-date`, which is **not unique** - the exact "352 real BDM
+      runs across only 123 distinct dates" fact `plans/conceptual-
+      design.md` Thread A already found the hard way. Not one amber
+      window-owning run has a unique `run_date`. Added `data-run-id`
+      alongside it (`e.run_id` was already in scope on that row -
+      `amberDecisionBadge()` next to it already used it), so anything
+      needing exactly one row can address one. Small, but it removes a
+      real footgun rather than working around it in a selector.
+
+    **Still open, deliberately not done here**: flipping
+    `ticket-sync.yml`'s automatic push trigger on.
+    `plans/running-thoughts.md` #1 records that the ticketing MVP
+    shipped `workflow_dispatch`-only precisely because all 7 datasets
+    read red and would have generated pure noise - that blocker is now
+    gone, but actually turning the trigger on is Keith's call, not a
+    side effect of this fix, and wants a real look at how much genuine
+    ticket volume BDM's 198 real red runs would produce first.
 
 75. **[done, 2026-09-18]** **[Docs & process]** A live requirements register - Keith's own
     request, one of the ideas parked in `plans/running-thoughts.md`

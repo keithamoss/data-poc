@@ -1109,3 +1109,45 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
    since that would either slow down an otherwise-fully-mocked test
    file or couple it to questionary's own internal implementation. All
    13 `tests/test_cli_common.py` tests still pass; `ruff` clean.
+
+10. **[todo, 2026-09-19]** **[Testing & dev tooling]** A real, pre-existing
+    test-isolation gap between `tests/test_embed_dashboard_data.py` and
+    `tests/test_dashboard_e2e.py` under `pytest-xdist`. Found
+    incidentally while verifying `plans/qa-pipeline.md` item 74's fix -
+    a full `uv run pytest -n auto` came back with 4 failures in
+    `test_embed_dashboard_data.py` that passed cleanly the moment the
+    same file was run on its own, and that an EARLIER `-n auto` run of
+    the very same code had passed. So: a real race, not a deterministic
+    break, and order-dependent on how xdist happens to distribute tests
+    across workers that run.
+
+    **Confirmed pre-existing, not caused by item 74's change** - checked
+    properly rather than assumed, by `git stash`-ing every change and
+    re-running the same two files together under `-n auto` on the clean
+    tree: the untouched code produced the same class of collision (9
+    errors) as the changed tree did (11). The difference in count is
+    itself just the race landing differently, not a signal about either
+    tree.
+
+    Root cause not yet confirmed, but the obvious candidate: both
+    modules drive `dashboard/embed_dashboard_data.py`'s own `embed()`,
+    which reads and writes real, shared, repo-relative paths under
+    `reports/` (`birth_registrations_dashboard.json`, etc.). Each test
+    monkeypatches the specific module attributes it cares about
+    (`QA_COMMENTS_JSON`/`DASHBOARD_HTML`/...), but monkeypatching is
+    per-process, so two xdist WORKERS running `embed()` concurrently
+    still contend for the same real files on disk - the same class of
+    problem `plans/running-thoughts.md` #12 already found and fixed for
+    dbt's shared `target/` directory, just in a different shared
+    resource that the dbt fix didn't cover.
+
+    Not fixed here, and deliberately NOT given an automatic regression
+    test: this is the environment/wiring class `CLAUDE.md`'s own
+    bug-test convention carves out (shared paths / working-directory
+    assumptions, where the real fix is often to remove the shared
+    mechanism entirely rather than to document it), so it wants a word
+    with Keith first. Worth knowing when picking it up: the likely fix
+    mirrors the dbt one - point `embed()`'s output at a per-worker tmp
+    dir in tests rather than the real `reports/` tree - and that plain
+    serial `uv run pytest` is unaffected, so this only bites the `-n
+    auto` fast path `CLAUDE.md` recommends for a full local run.
