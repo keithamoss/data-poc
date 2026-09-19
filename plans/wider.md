@@ -417,14 +417,18 @@ check_lifecycle.py`'s own `check_id` convention.
    `prepare_warehouse(regenerate=True)` already fuses "generate" and
    "build the combined warehouse" into one function - so this is one
    command, not two, correcting an earlier draft of this design that had
-   wrongly split them. **Open question, lost to this session's own
-   context compaction and not yet re-resolved**: Keith asked for this
-   command's name to be something other than bare "generate" (operators
-   will mostly be running this against real-shaped data day to day, so
-   "generate" reads as implying dev-only/non-production use) - several
-   alternatives were discussed and one was settled on, but the exact
-   chosen string wasn't preserved through compaction. Reconfirm the name
-   with Keith before building Phase 1, rather than guessing.
+   wrongly split them. **Naming resolved, 2026-09-19**: an earlier
+   session had settled on a shorter alternative to bare "generate" (to
+   avoid reading as dev-only, since operators mostly run this against
+   real-shaped data day to day) but the exact string was lost to context
+   compaction; re-asked directly, and Keith's answer was to keep the
+   full, self-explanatory phrase rather than a single-word rename - the
+   command/menu label is **"Generate synthetic data"** (e.g.
+   `mothman bdm generate-synthetic-data` / `mothman cp
+   generate-synthetic-data` as the flag-invocable form), not a cute
+   one-word verb. Explicitly saying "synthetic data" in the name is
+   itself what avoids the dev-only-sounding ambiguity a bare "generate"
+   had.
 
    **Tier 4 - Population Data**: `synthetic_data_generator/` (the
    separate, population-scale, cross-agency-identity-linked generator,
