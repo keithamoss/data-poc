@@ -303,6 +303,25 @@ Same interactive reachability (bare `./mothman` → Quality Assurance →
 mode above — S3 mode is "download, then Local files mode" internally,
 not a third parallel check-running path.
 
+Child Protection also supports **single-table QA** — a real partial-
+resupply scenario (one table re-sent after a fix, the other 5
+unchanged), checked without needing the whole delivery on hand:
+
+```bash
+./mothman cp qa --table cp_clients --file path/to/cp_clients.csv
+./mothman cp qa --table cp_clients --s3-key cp/delivery_042/cp_clients.csv
+```
+
+The other 5 tables auto-pull from the last **Promoted** CP run's own
+local data (`data/cp_raw/<run_id>/`, the only place this PoC durably
+keeps CP table data) — that same run doubles as the Evidently drift
+baseline too, so no separate `--reference-*` flag is needed here. Needs
+at least one CP run already generated or Promoted locally to source the
+other 5 tables from; a clear error otherwise, not a silent wrong
+answer. Same interactive reachability (bare `./mothman` → Quality
+Assurance → pick Child Protection → "Single table"), same throwaway-
+by-default/`--commit` semantics as every other source mode.
+
 ## Speed
 
 `qa_tools/bdm/orchestrate_bdm.py`/`qa_tools/cp/orchestrate_cp.py`

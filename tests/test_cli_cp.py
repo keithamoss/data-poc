@@ -375,3 +375,181 @@ def test_qa_command_s3_delivery_flag_mode_downloads_and_runs_real_checks(monkeyp
     assert captured["reference_delivery_prefix"] == "cp/delivery_001/"
     assert captured["run_by"] == "local-check:not-persisted"
     assert captured["run_id"].startswith("s3_delivery_002_")
+
+
+# ---- Single-table Child Protection QA (plans/tooling.md #1 Phase 3.5) --
+
+
+def test_run_check_single_table_errors_when_the_other_tables_run_has_no_local_data(monkeypatch, tmp_path):
+    monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", str(tmp_path))
+    monkeypatch.setattr(cp, "load_manifest", lambda: [{"run_id": "cp_run_01"}])
+    monkeypatch.setattr(cp, "default_reference", lambda manifest: "cp_run_missing")
+
+    result_exc = None
+    try:
+        cp.run_check_single_table("cp_clients", "/some/cp_clients.csv", "test@example.com")
+    except Exception as e:  # noqa: BLE001 - asserting the real ClickException below
+        result_exc = e
+
+    import rich_click as click
+    assert isinstance(result_exc, click.ClickException)
+    assert "no local data" in str(result_exc).lower()
+
+
+def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(monkeypatch, tmp_path):
+    """The core Phase 3.5 mechanic - verified here at the unit level
+    (monkeypatched _load_delivery/add_table_to_run/orchestrate_cp.
+    run_single), since the real per-tool correctness for whatever lands
+    in the warehouse is already covered by the existing full-delivery
+    integration tests; this test is about proving the RIGHT 6 tables
+    from the RIGHT 2 sources (5 from the last Promoted run, 1 fresh)
+    actually get loaded."""
+    monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", str(tmp_path))
+    (tmp_path / "cp_run_promoted").mkdir()
+    monkeypatch.setattr(cp, "load_manifest", lambda: [{"run_id": "cp_run_01"}])
+    monkeypatch.setattr(cp, "default_reference", lambda manifest: "cp_run_promoted")
+
+    delivery_loads = []
+    monkeypatch.setattr(cp, "_load_delivery", lambda run_id: delivery_loads.append(run_id))
+
+    add_table_calls = []
+
+    def _fake_add_table_to_run(run_id, table, csv_path, out_dir=None, raw_dir=None):
+        add_table_calls.append((run_id, table, csv_path))
+
+    monkeypatch.setattr(build_cp_warehouses, "add_table_to_run", _fake_add_table_to_run)
+
+    captured = {}
+
+    def _fake_run_single(entry, reference_run_id=None, run_by=None):
+        captured.update(entry=entry, reference_run_id=reference_run_id, run_by=run_by)
+        return [{"status": "pass"}]
+
+    monkeypatch.setattr(orchestrate_cp, "run_single", _fake_run_single)
+
+    results, tmp_dir = cp.run_check_single_table(
+        "cp_clients", "/tmp/fresh_cp_clients.csv", "test@example.com", run_id="table_cp_clients_001")
+
+    assert delivery_loads == ["cp_run_promoted"]
+
+    target_calls = [c for c in add_table_calls if c[1] == "cp_clients"]
+    assert target_calls == [("table_cp_clients_001", "cp_clients", "/tmp/fresh_cp_clients.csv")]
+
+    other_calls = {c[1]: c[2] for c in add_table_calls if c[0] == "table_cp_clients_001" and c[1] != "cp_clients"}
+    assert set(other_calls) == {t for t in cp.TABLES if t != "cp_clients"}
+    for table, csv_path in other_calls.items():
+        assert csv_path == os.path.join(str(tmp_path), "cp_run_promoted", f"{table}.csv")
+
+    assert captured["reference_run_id"] == "cp_run_promoted"
+    assert captured["run_by"] == "test@example.com"
+    assert results == [{"status": "pass"}]
+    assert tmp_dir
+
+
+def test_run_check_s3_single_table_downloads_then_delegates_to_single_table_mode(monkeypatch):
+    download_calls = []
+
+    def _fake_download_key(bucket, key, dest_dir, s3_client=None):
+        assert bucket == "my-bucket"
+        local_path = os.path.join(dest_dir, os.path.basename(key))
+        with open(local_path, "w") as f:
+            f.write("id\n1\n")
+        download_calls.append(key)
+        return local_path
+
+    monkeypatch.setattr(cp.s3_source, "download_key", _fake_download_key)
+
+    captured = {}
+
+    def _fake_run_check_single_table(table, file_path, run_by, run_id=None, run_date=None):
+        captured.update(table=table, file_path=file_path, run_by=run_by, run_id=run_id)
+        return [{"status": "pass"}], "/tmp/fake-results"
+
+    monkeypatch.setattr(cp, "run_check_single_table", _fake_run_check_single_table)
+
+    results, tmp_dir = cp.run_check_s3_single_table(
+        "my-bucket", "cp_clients", "cp/delivery_005/cp_clients.csv", "test@example.com", run_id="table_run")
+
+    assert download_calls == ["cp/delivery_005/cp_clients.csv"]
+    assert captured["table"] == "cp_clients"
+    assert captured["file_path"].endswith("cp_clients.csv")
+    assert captured["run_by"] == "test@example.com"
+    assert captured["run_id"] == "table_run"
+    assert results == [{"status": "pass"}]
+    assert tmp_dir == "/tmp/fake-results"
+
+
+def test_qa_command_table_and_run_id_together_is_a_real_clean_error(tmp_path):
+    csv = tmp_path / "cp_clients.csv"
+    csv.write_text("id\n1\n")
+    result = _runner.invoke(cp.qa_command, [
+        "--run-id", "some_run", "--table", "cp_clients", "--file", str(csv),
+    ])
+    assert result.exit_code != 0
+    assert "single-table mode" in _flat(result.output)
+
+
+def test_qa_command_table_requires_exactly_one_of_file_or_s3_key(tmp_path):
+    result_neither = _runner.invoke(cp.qa_command, ["--table", "cp_clients"])
+    assert result_neither.exit_code != 0
+    assert "exactly one" in _flat(result_neither.output)
+
+    csv = tmp_path / "cp_clients.csv"
+    csv.write_text("id\n1\n")
+    result_both = _runner.invoke(cp.qa_command, [
+        "--table", "cp_clients", "--file", str(csv), "--s3-key", "cp/delivery_001/cp_clients.csv",
+    ])
+    assert result_both.exit_code != 0
+    assert "exactly one" in _flat(result_both.output)
+
+
+def test_qa_command_file_without_table_is_a_real_clean_error(tmp_path):
+    csv = tmp_path / "cp_clients.csv"
+    csv.write_text("id\n1\n")
+    result = _runner.invoke(cp.qa_command, ["--file", str(csv)])
+    assert result.exit_code != 0
+    assert "--table" in result.output
+
+
+def test_qa_command_table_file_flag_mode_calls_run_check_single_table(monkeypatch, tmp_path):
+    csv = tmp_path / "cp_clients.csv"
+    csv.write_text("id\n1\n")
+
+    captured = {}
+
+    def _fake_run_check_single_table(table, file_path, run_by, run_id=None, run_date=None):
+        captured.update(table=table, file_path=file_path, run_by=run_by, run_id=run_id)
+        return [{"status": "pass"}], "/tmp/fake-results"
+
+    monkeypatch.setattr(cp, "run_check_single_table", _fake_run_check_single_table)
+
+    result = _runner.invoke(cp.qa_command, ["--table", "cp_clients", "--file", str(csv)])
+
+    assert result.exit_code == 0, result.output
+    assert captured["table"] == "cp_clients"
+    assert captured["file_path"] == str(csv)
+    assert captured["run_by"] == "local-check:not-persisted"
+    assert captured["run_id"].startswith("table_cp_clients_")
+
+
+def test_qa_command_table_s3_key_flag_mode_calls_run_check_s3_single_table(monkeypatch):
+    monkeypatch.setenv(common.S3_BUCKET_ENV_VAR, "my-bucket")
+
+    captured = {}
+
+    def _fake_run_check_s3_single_table(bucket, table, key, run_by, run_id=None, run_date=None, s3_client=None):
+        captured.update(bucket=bucket, table=table, key=key, run_by=run_by, run_id=run_id)
+        return [{"status": "pass"}], "/tmp/fake-results"
+
+    monkeypatch.setattr(cp, "run_check_s3_single_table", _fake_run_check_s3_single_table)
+
+    result = _runner.invoke(cp.qa_command, [
+        "--table", "cp_clients", "--s3-key", "cp/delivery_005/cp_clients.csv",
+    ])
+
+    assert result.exit_code == 0, result.output
+    assert captured["bucket"] == "my-bucket"
+    assert captured["table"] == "cp_clients"
+    assert captured["key"] == "cp/delivery_005/cp_clients.csv"
+    assert captured["run_by"] == "local-check:not-persisted"
+    assert captured["run_id"].startswith("table_")

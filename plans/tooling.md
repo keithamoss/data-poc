@@ -212,6 +212,54 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
      enforced gate today - noted here as a real, live discrepancy
      between config and enforcement, not acted on unprompted since it's
      outside this item's own scope.
+   - **Phase 3.5 finished 2026-09-19**: single-table Child Protection QA
+     (`mothman cp qa --table <table> --file <csv>` / `mothman cp qa
+     --table <table> --s3-key <key>`, both flag-invocable and
+     TUI-navigable via a new "Full delivery or single table?" choice
+     right after picking CP - single-table's own "Which source?" step
+     only offers Local file/S3, since Synthetic mode's manifest runs are
+     always full 6-table deliveries by construction, so "single table"
+     has no real meaning there). This design was confirmed but not
+     code-level-specified ("it automatically pulls the most recent
+     Promoted state of the other 5 tables") - the concrete
+     interpretation built here, not re-asked since it's a reasonable
+     reading of an already-confirmed design, not a fresh fork:
+     `raw_dir()` (`data/cp_raw/`) is the only place this PoC durably
+     keeps CP table data once a check has finished running, so "the most
+     recent Promoted state" resolves via the exact same
+     `default_reference()` the Synthetic flow already uses (last
+     Promoted run, falling back to the manifest's own first entry) -
+     that same run doubles as the Evidently drift baseline too, so
+     single-table mode needs no separate reference flag the way
+     full-delivery Local files/S3 mode does. A real, explicit limitation
+     documented rather than silently assumed: single-table mode needs at
+     least one CP run already generated/Promoted locally to source the
+     other 5 tables from - a real `ClickException` if none exists,
+     never a silent wrong answer.
+
+     `cli/cp.py`'s `run_check_single_table()`/`run_check_s3_single_table()`
+     build the fresh table's warehouse from 2 sources in one run_id (the
+     new table via `add_table_to_run()` pointed at the fresh file, the
+     other 5 via the same call pointed at `raw_dir()/<other_tables_run_id>/
+     <table>.csv`), then call `orchestrate_cp.run_single()` exactly like
+     every other CP source mode - not a new check-running path, just a
+     new way of assembling one run's warehouse. 8 new unit tests
+     (monkeypatched `default_reference`/`_load_delivery`/
+     `add_table_to_run`/`orchestrate_cp.run_single` - the real per-tool
+     correctness is already covered elsewhere, this proves the RIGHT 6
+     tables from the RIGHT 2 sources get loaded) plus a real end-to-end
+     smoke test against real local data (`mothman cp qa --table
+     cp_clients --file data/cp_raw/cp_run_14_.../cp_clients.csv`,
+     deliberately mismatched against `cp_run_15`'s other 5 tables - a
+     real 177-check run, 120 pass/7 warn/50 fail-or-error, confirming
+     both that the combined warehouse genuinely builds and that a real
+     cross-run table mismatch produces real cross-table referential-
+     integrity failures rather than silently passing - exactly the
+     scenario this feature exists to catch). Confirmed the real
+     `data/cp_raw/manifest.json` (18 entries) and `qa_results/` were
+     untouched afterward (no `--commit` passed). `uv run pytest`
+     (539 passing) and `ruff` both clean; the real CI coverage command
+     still passes at 94.52%.
 
    **Core shape, confirmed:**
    - Organized by dataset (bdm/cp) under a real interactive TUI - not

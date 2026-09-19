@@ -28,6 +28,18 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
+- **12:45pm** — **mothman CLI Phase 3.5: Single-Table Child Protection QA** **[Testing & dev tooling]** `mothman cp
+  qa --table <table> --file <csv>` / `--s3-key <key>` - check a real
+  partial resupply (one table re-sent after a fix) without needing the
+  whole 6-table delivery on hand. The other 5 tables auto-pull from the
+  last Promoted CP run's own local data, which doubles as the Evidently
+  drift baseline too - no separate reference flag needed. Verified with
+  a real end-to-end smoke test against real local data, deliberately
+  mismatched across two different runs' tables: a real 177-check run
+  (120 pass/7 warn/50 fail-or-error) confirming both that the combined
+  warehouse genuinely builds and that a real cross-run mismatch produces
+  real cross-table referential-integrity failures rather than silently
+  passing - exactly the scenario this feature exists to catch.
 - **12:32pm** — **mothman CLI Phase 3: S3 QA Source Mode** **[Testing & dev tooling]** `mothman bdm qa --s3-key
   <key> --s3-reference-key <key>` and `mothman cp qa --s3-delivery
   <prefix> --s3-reference-delivery <prefix>` - browse the real raw-data

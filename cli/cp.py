@@ -210,6 +210,74 @@ def run_check_s3_delivery(bucket: str, delivery_prefix: str, reference_delivery_
     return run_check_local_folder(staging_dir, reference_staging_dir, run_by, run_id=run_id, run_date=run_date)
 
 
+def run_check_single_table(table: str, file_path: str, run_by: str,
+                            run_id: str | None = None, run_date: str | None = None) -> tuple[list[dict], str]:
+    """Single-table Child Protection QA (plans/tooling.md #1's own
+    "Single-table Child Protection QA" design, Phase 3.5) - a real
+    partial-resupply scenario (one table re-sent after a fix, the other
+    5 unchanged) modeled at check-running time the same way
+    generator/resupply.py already models it at data-generation time.
+
+    CP's real dbt models need all 6 real tables present (ref()/
+    source()), so a check against just one freshly-arrived table can't
+    run a reduced set - it auto-pulls the OTHER 5 tables from the most
+    recent Promoted run's own local data (data/cp_raw/<run_id>/
+    <table>.csv - the only place this PoC durably keeps CP table data
+    once a check has finished running), via the exact same
+    default_reference() the Synthetic flow already uses to pick its own
+    reference run. That same run doubles as the Evidently drift baseline
+    too - a real, known-good, already-Promoted 6-table delivery is
+    exactly what a drift baseline needs anyway, so no separate reference
+    flag is required here the way full-delivery Local files/S3 mode
+    needs one.
+
+    Requires at least one CP run already generated/Promoted locally
+    (falls back to the manifest's own first entry, same as
+    default_reference()) - there's no "other 5 tables" to pull from
+    otherwise, a real and clearly-reported limitation, not a silent
+    wrong answer."""
+    manifest = load_manifest()
+    other_tables_run_id = default_reference(manifest)
+    if not os.path.isdir(os.path.join(raw_dir(), other_tables_run_id)):
+        raise click.ClickException(
+            f"No local data for run {other_tables_run_id!r} (the last Promoted/fallback run) - "
+            f"run generate-synthetic-data first? Single-table mode needs a known-good delivery "
+            f"already on disk to source the other 5 tables from.")
+
+    run_date = run_date or datetime.now(timezone.utc).date().isoformat()
+    run_id = run_id or local_run_id_from_path(file_path, prefix="table")
+
+    tmp_dir = common.new_tmp_results_dir()
+    patch_write_qa_result_for_lambda(CP_MODULES, tmp_dir)
+
+    _load_delivery(other_tables_run_id)  # full 6-table warehouse, doubles as the Evidently reference
+
+    for other_table in (t for t in TABLES if t != table):
+        build_cp_warehouses.add_table_to_run(
+            run_id, other_table, os.path.join(raw_dir(), other_tables_run_id, f"{other_table}.csv"),
+            out_dir=build_cp_warehouses.OUT_DIR, raw_dir=build_cp_warehouses.CP_RAW_DIR)
+    build_cp_warehouses.add_table_to_run(
+        run_id, table, file_path, out_dir=build_cp_warehouses.OUT_DIR, raw_dir=build_cp_warehouses.CP_RAW_DIR)
+
+    entry = {"run_id": run_id, "run_date": run_date, "dirty_severity": None}
+    results = orchestrate_cp.run_single(entry, reference_run_id=other_tables_run_id, run_by=run_by)
+    return results, tmp_dir
+
+
+def run_check_s3_single_table(bucket: str, table: str, key: str, run_by: str,
+                               run_id: str | None = None, run_date: str | None = None,
+                               s3_client=None) -> tuple[list[dict], str]:
+    """Single-table Child Protection QA's S3 source mode (Phase 3.5) -
+    downloads the one real table object (real boto3, via
+    qa_tools.common.s3_source), then reuses run_check_single_table()
+    exactly as if a human had downloaded it themselves - S3 mode is
+    "download, then Local files mode" here too, same as the full-delivery
+    S3 mode above."""
+    staging_dir = tempfile.mkdtemp(prefix="mothman-s3-")
+    local_path = s3_source.download_key(bucket, key, staging_dir, s3_client=s3_client)
+    return run_check_single_table(table, local_path, run_by, run_id=run_id, run_date=run_date)
+
+
 _STATUS_STYLE = {"pass": "green", "warn": "yellow", "fail": "red", "error": "bold red"}
 
 
@@ -245,6 +313,10 @@ def run_id_from_choice(choice: str) -> str:
 _SOURCE_SYNTHETIC = "Synthetic - pick or generate a run"
 _SOURCE_LOCAL_FOLDER = "Local files - a delivery folder you've already downloaded"
 _SOURCE_S3 = "S3 - browse the real raw-data bucket"
+_SOURCE_LOCAL_FILE = "Local file - a CSV you've already downloaded"
+
+_DELIVERY_FULL = "Full delivery - all 6 real tables"
+_DELIVERY_SINGLE_TABLE = "Single table - a partial resupply (one table only)"
 
 
 def _offer_promote(results: list[dict], run_id: str, tmp_dir: str, commit_default: bool) -> None:
@@ -268,6 +340,16 @@ def run_qa_interactive(commit_default: bool = False) -> None:
     Phases 1-2), same upfront-git-identity reasoning as cli/bdm.py's own
     run_qa_interactive()."""
     run_by = get_run_by()
+
+    delivery_scope = common.select(
+        "Full delivery or single table?", [_DELIVERY_FULL, _DELIVERY_SINGLE_TABLE],
+        flag_hint="mothman cp qa --run-id <run_id> / mothman cp qa --table <table> --file <csv>")
+    if delivery_scope is None:
+        return
+
+    if delivery_scope == _DELIVERY_SINGLE_TABLE:
+        _run_qa_interactive_single_table(run_by, commit_default)
+        return
 
     source = common.select(
         "Which source?", [_SOURCE_SYNTHETIC, _SOURCE_LOCAL_FOLDER, _SOURCE_S3],
@@ -359,6 +441,49 @@ def _run_qa_interactive_s3(run_by: str, commit_default: bool) -> None:
     _offer_promote(results, run_id, tmp_dir, commit_default)
 
 
+def _run_qa_interactive_single_table(run_by: str, commit_default: bool) -> None:
+    """Single-table Child Protection QA's TUI body (plans/tooling.md #1
+    Phase 3.5) - picks a table, then Local file or S3 as the source for
+    just that one table's data. The other 5 tables and the Evidently
+    reference both come automatically from the last Promoted run
+    (run_check_single_table()'s own docstring has the full account) - no
+    separate reference prompt needed here, unlike full-delivery mode."""
+    flag_hint = "mothman cp qa --table <table> --file <csv> / mothman cp qa --table <table> --s3-key <key>"
+    table = common.select("Which table?", TABLES, flag_hint=flag_hint)
+    if table is None:
+        return
+
+    source = common.select("Which source?", [_SOURCE_LOCAL_FILE, _SOURCE_S3], flag_hint=flag_hint)
+    if source is None:
+        return
+
+    if source == _SOURCE_S3:
+        bucket = common.raw_bucket_name()
+        prefix = s3_config()["prefix"] or ""
+        console.print(f"Listing s3://{bucket}/{prefix} ...", style="dim")
+        keys = s3_source.list_keys(bucket, prefix)
+        if not keys:
+            console.print(f"No objects under s3://{bucket}/{prefix}", style="yellow")
+            return
+        key = common.select(f"Pick the {table} object to check:", keys, flag_hint=flag_hint)
+        if key is None:
+            return
+        run_id = local_run_id_from_path(key, prefix="table")
+        console.print(f"Downloading + running the real dbt-core/Soda Core/datacontract-cli/Evidently chain "
+                      f"for s3://{bucket}/{key} (table: {table})...", style="dim")
+        results, tmp_dir = run_check_s3_single_table(bucket, table, key, run_by, run_id=run_id)
+    else:
+        file_path = common.path_prompt(f"Path to the {table} CSV you've already downloaded:", flag_hint=flag_hint)
+        if file_path is None:
+            return
+        run_id = local_run_id_from_path(file_path, prefix="table")
+        console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {file_path} "
+                      f"(table: {table})...", style="dim")
+        results, tmp_dir = run_check_single_table(table, file_path, run_by, run_id=run_id)
+
+    _offer_promote(results, run_id, tmp_dir, commit_default)
+
+
 @click.group("cp")
 def cp_group() -> None:
     """Child Protection - Tier 1 commands."""
@@ -405,12 +530,44 @@ def _finish_flag_mode(results: list[dict], run_id: str, tmp_dir: str, commit: bo
 @click.option("--s3-reference-delivery", default=None,
               help="S3 mode: a known-good reference delivery prefix to compare distribution drift against. "
                    "Required together with --s3-delivery.")
+@click.option("--table", type=click.Choice(cp_common.TABLES), default=None,
+              help="Single-table mode (plans/tooling.md #1 Phase 3.5): check just this one table (a real "
+                   "partial resupply) - the other 5 tables auto-pull from the last Promoted run. "
+                   "Required together with --file or --s3-key.")
+@click.option("--file", "table_file", default=None, type=click.Path(exists=True, dir_okay=False),
+              help="Single-table mode: an already-downloaded CSV for --table (instead of --folder/--run-id).")
+@click.option("--s3-key", default=None,
+              help="Single-table mode: an object key under the dataset's s3Source prefix for --table "
+                   "(instead of --s3-delivery).")
 @click.option("--commit", is_flag=True, help="Write this run into the real, permanent qa_results/ history.")
 def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: str | None,
                reference_folder: str | None, s3_delivery: str | None, s3_reference_delivery: str | None,
-               commit: bool) -> None:
+               table: str | None, table_file: str | None, s3_key: str | None, commit: bool) -> None:
     """Run the real QA check chain against a Child Protection run - Synthetic (--run-id),
-    Local files (--folder/--reference-folder), or S3 (--s3-delivery/--s3-reference-delivery) source mode."""
+    Local files (--folder/--reference-folder), S3 (--s3-delivery/--s3-reference-delivery), or
+    single-table (--table plus --file or --s3-key) source mode."""
+    if table is None and (table_file is not None or s3_key is not None):
+        raise click.ClickException(
+            "--file/--s3-key need --table (single-table mode) to know which table they're for.")
+
+    if table is not None:
+        if run_id is not None or folder_path is not None or s3_delivery is not None:
+            raise click.ClickException(
+                "Pass --table only with --file or --s3-key (single-table mode) - not --run-id/--folder/"
+                "--s3-delivery (those are full-delivery modes).")
+        if (table_file is None) == (s3_key is None):
+            raise click.ClickException("--table requires exactly one of --file or --s3-key.")
+        run_by = get_run_by() if commit else "local-check:not-persisted"
+        if table_file is not None:
+            local_run_id = local_run_id_from_path(table_file, prefix="table")
+            results, tmp_dir = run_check_single_table(table, table_file, run_by, run_id=local_run_id)
+        else:
+            bucket = common.raw_bucket_name()
+            local_run_id = local_run_id_from_path(s3_key, prefix="table")
+            results, tmp_dir = run_check_s3_single_table(bucket, table, s3_key, run_by, run_id=local_run_id)
+        _finish_flag_mode(results, local_run_id, tmp_dir, commit)
+        return
+
     if s3_delivery is not None:
         if run_id is not None or folder_path is not None:
             raise click.ClickException(
