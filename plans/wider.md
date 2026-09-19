@@ -933,9 +933,73 @@ check_lifecycle.py`'s own `check_id` convention.
     itself, the "what is a subagent" 101 thread), the real, current
     answer is: **only the main session can use these 2 skills right
     now - none of the 6 requirements-* agents can, because `Skill`
-    isn't in any of their allowlists.** Not yet fixed - a real, small,
-    low-risk follow-up if Keith wants `requirements-ux`/
-    `requirements-ux-critic`/`requirements-visual-critic` (the 3 where
-    these design skills would actually be relevant) to gain real access
-    - just adding `Skill` to their own `tools:` line, nothing more
-    invasive.
+    isn't in any of their allowlists.**
+
+    **Fixed the same day, plus a much bigger real finding underneath
+    it.** Keith asked 3 more things in one message: does
+    `requirements-ux-critic`/`requirements-visual-critic` still need
+    `Bash` now they have Playwright MCP; fix `requirements-reviewer`'s
+    stale pre-split ad hoc Bash+Playwright-script instructions; and
+    (his own preferred mechanism, confirmed via the real official docs
+    rather than the generic `Skill` tool) scope skill access per agent
+    via the real `skills:` frontmatter field instead.
+
+    - **Bash**: still needed, but narrowly - confirmed by grepping the
+      real files, not memory. `requirements-ux-critic`/`requirements-
+      visual-critic` use `Bash` for exactly one thing, running `uv run
+      mothman dashboard rebuild` to build the dashboard before
+      Playwright can view it - all real browser automation is 100% via
+      Playwright MCP now. `requirements-reviewer` also needs `Bash` for
+      `pytest --cov` coverage checks, unrelated to Playwright.
+    - **`requirements-reviewer` fixed**: its "Observable UI behaviour"
+      section still described the pre-split ad hoc Bash+throwaway-
+      script mechanism and had never been granted `mcp__playwright` at
+      all. Now uses the same real MCP mechanism as the other two
+      agents, with `mcp__playwright` added to `tools:`.
+    - **`skills:` wired in, selectively, not blanket-applied**: real,
+      reasoned per-agent calls, not "add both skills everywhere since
+      Keith approved it." `requirements-ux` (pre-build, never sees
+      built code, and whose job - matching EXISTING patterns - is in
+      real tension with `frontend-design`'s whole ethos of breaking
+      from templated defaults) gets neither. `requirements-ux-critic`
+      (post-build, reviews real code) gets `web-design-guidelines`
+      only - its navigation/forms/content sections are real UX-critic
+      territory; `frontend-design`'s aesthetic-distinctiveness guidance
+      isn't its lane. `requirements-visual-critic` gets both - the
+      single best match for `frontend-design`, plus
+      `web-design-guidelines`'s visual-adjacent sections (animation,
+      typography, dark mode, hover states).
+
+    **The much bigger finding, caught by testing the fix rather than
+    trusting it**: re-ran the same real diagnostic-subagent test after
+    adding `mcp__playwright` to `requirements-ux-critic` - still ZERO
+    `mcp__playwright__*` tools visible, and the newly-added `skills:`
+    field wasn't reflected either. Dug into why rather than assuming
+    the docs were wrong: `ps aux` on this session's own real running
+    `claude` process showed a FIXED `--mcp-config
+    /tmp/mcp-config-cse_....json` naming only `github`/`Claude_Docs`/
+    `Claude_Code_Remote` - no `playwright`, and that file's real content
+    (read directly) confirmed it. This is a real, documented, correct
+    mechanism (Claude Code's own cloud-environments doc, verified
+    directly: "Your repo's `.mcp.json` MCP servers | Yes, in a session
+    with one repository | Part of the clone, found from the session's
+    working directory") - but "part of the clone" means read ONCE, at
+    session start, from whatever the repo looked like at that moment.
+    This session's own VM was provisioned before `.mcp.json` existed in
+    the repo (added mid-session, several turns after this session
+    began), so its own fixed MCP config never picked it up - not a bug
+    in anything built, not an environment limitation, just a real
+    timing gap between when this session started and when `.mcp.json`
+    landed. The fix (`mcpServers: [playwright]` on the 3 agent files,
+    the real official field for referencing an already-configured
+    project server) is correct and committed regardless - genuinely
+    untestable from inside this specific session, but should work for
+    real the moment a fresh session clones this repo with `.mcp.json`
+    already present. Flagging clearly rather than claiming victory:
+    **nobody has yet confirmed Playwright MCP actually works end to end
+    in a live Claude Code session on this repo** - the mobile-overflow-
+    bug test earlier used the old, genuinely-working ad hoc Bash+script
+    mechanism, before any of this MCP work existed. Re-run the same
+    diagnostic test (spawn `requirements-ux-critic`, ask it to report
+    its own visible `mcp__playwright__*` tools) in the next fresh
+    session on this repo to actually confirm it, rather than assuming.

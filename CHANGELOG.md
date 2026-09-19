@@ -27,6 +27,25 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Fixed
+- **5:43pm** — **requirements-reviewer's Stale Playwright Instructions; a Real MCP Timing Gap Found** **[Docs & process]** **[Testing & dev tooling]**
+  `requirements-reviewer` still described the pre-split ad hoc
+  Bash+throwaway-script Playwright mechanism and had never been granted
+  `mcp__playwright` at all - fixed to match `requirements-ux-critic`/
+  `requirements-visual-critic`. `skills:` wired in selectively per
+  agent, not blanket - `requirements-ux-critic` gets
+  `web-design-guidelines` only, `requirements-visual-critic` gets both,
+  `requirements-ux` gets neither (real reasoning in `plans/wider.md`
+  #10). Re-testing the fix (spawning a real diagnostic subagent, not
+  trusting the docs) found a much bigger thing: this session's own
+  Playwright MCP server has never actually connected, because `ps aux`
+  on the real running `claude` process shows a fixed `--mcp-config`
+  file from before `.mcp.json` existed in this repo - a real,
+  documented, one-time-at-session-start mechanism (confirmed against
+  Claude Code's own cloud-environments docs), not a bug in what was
+  built. The fix is correct and committed, but genuinely unverified
+  from inside this session - needs confirming in a fresh session.
+
 ### Added
 - **5:26pm** — **Two Real Claude Skills: frontend-design and web-design-guidelines** **[Docs & process]** **[Testing & dev tooling]**
   A genuinely different mechanism from the `requirements-*` subagents -

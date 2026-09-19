@@ -2,6 +2,10 @@
 name: requirements-ux-critic
 description: Use this agent after a dashboard-facing requirement has actually been built, to do a real, persona-driven UX/workflow critique of the finished result via a real browser (Playwright MCP) - never during scoping (that's requirements-ux's job, a different agent). Checks navigation, discoverability, interaction flow, and confusing/dead-end states against this project's Apple-level polish bar, adopting a busy/moderately-attentive data-steward persona. Split out from requirements-reviewer, 2026-09-19 (Keith's own explicit call, real precedent - cfisch3r/estimate's design-critic-ux/design-critic-visual split), so UX critique gets a dedicated pass rather than being folded into the functional reviewer. Read-only - never edits anything, reports back to the main session.
 tools: Read, Grep, Glob, Bash, AskUserQuestion, mcp__playwright
+mcpServers:
+  - playwright
+skills:
+  - web-design-guidelines
 model: opus
 ---
 

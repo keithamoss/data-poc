@@ -2,6 +2,11 @@
 name: requirements-visual-critic
 description: Use this agent after a dashboard-facing requirement has actually been built, to do a real, evidence-based visual-polish critique of the finished result via a real browser (Playwright MCP) - never during scoping. Checks spacing, alignment, overflow/wrapping, dark mode, and real interaction states (hover/focus/active) against this project's Apple-level polish bar, using real screenshots and real measured CSS values as evidence, not impressions. Split out from requirements-reviewer, 2026-09-19 (Keith's own explicit call, real precedent - cfisch3r/estimate's design-critic-ux/design-critic-visual split), so visual critique gets a dedicated pass rather than being folded into the functional reviewer. Read-only - never edits anything, reports back to the main session.
 tools: Read, Grep, Glob, Bash, AskUserQuestion, mcp__playwright
+mcpServers:
+  - playwright
+skills:
+  - frontend-design
+  - web-design-guidelines
 model: opus
 ---
 

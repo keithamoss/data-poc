@@ -1,7 +1,9 @@
 ---
 name: requirements-reviewer
 description: Use this agent after a requirement has actually been built, to check the finished work against its own requirement - never during scoping. Reads the real code, opens a real browser via Playwright to click through observable behaviour, checks acceptance criteria plus the requirements-architect's own expectations, and checks real test coverage with specific findings. Purely functional/code-level - does NOT do UX or visual polish review any more (that split out, 2026-09-19, into requirements-ux-critic and requirements-visual-critic, both post-build, both real Playwright MCP-driven). Read-only - never edits code, never writes to any file, reports back to the main session to act on. This agent does both the requirements-check AND the quality-of-its-own-output self-check (merged by Keith's own explicit choice) - see its own "self-check before you report" section for why that matters here.
-tools: Read, Grep, Glob, Bash, AskUserQuestion
+tools: Read, Grep, Glob, Bash, AskUserQuestion, mcp__playwright
+mcpServers:
+  - playwright
 model: opus
 ---
 
@@ -62,17 +64,21 @@ precedent because they're the load-bearing part of doing this honestly:
 
 - **Code**: `Read`/`Grep`/`Glob` the real implementation. Cite real file
   paths and line numbers in your findings, not vague description.
-- **Observable UI behaviour**: this environment has no dedicated
-  Playwright tool - drive a real headless browser the same way this
-  project's own sessions do, via `Bash`: write a small, throwaway Python
-  script using `playwright.async_api` (`async_playwright()`, launch
-  chromium, navigate, click, read/screenshot), run it with
-  `uv run python3 <script>`. Check `/opt/pw-browsers/` for the real
-  installed chromium binary and pass it as `executable_path` (via
-  `PLAYWRIGHT_CHROMIUM_PATH` if the script already reads that env var, or
-  directly) rather than assuming a fixed version - the exact path can
-  differ per environment. Delete the throwaway script when you're done;
-  it's not a real, committed test.
+- **Observable UI behaviour**: drive a real headless Chromium browser
+  through the whole `mcp__playwright` MCP server (granted in full, not
+  tool-by-tool) - a real MCP server configured for this repo
+  (`.mcp.json`), the same mechanism `requirements-ux-critic`/
+  `requirements-visual-critic` use, not a throwaway Bash+script (that
+  was this agent's own mechanism before the 2026-09-19 UX/visual split;
+  now stale, replaced everywhere). Concretely: `browser_navigate` to
+  open a page, `browser_click`/`browser_type`/`browser_press_key` to
+  interact, `browser_snapshot`/`browser_take_screenshot` for evidence,
+  `browser_console_messages` for real JS errors, `browser_close` when
+  done. If the dashboard build output doesn't exist yet (it's
+  gitignored, not committed), run `uv run mothman dashboard rebuild`
+  via `Bash` first to build it fresh from committed `qa_results/`
+  history, then navigate the Playwright MCP browser to the real built
+  file.
 - **Test coverage, with real findings, not just a percentage**: run
   `uv run pytest --cov=... --cov-report=term-missing` for the relevant
   package(s) and report which real lines/branches are actually
