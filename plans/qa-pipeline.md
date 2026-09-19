@@ -4849,6 +4849,38 @@ relative, not a schedule — this is weeks of work, not months.
     2026-09-18 split - a QA-checks-and-contract concern, not a
     whole-of-project one.)
 
+86. **[done, 2026-09-19]** **[QA checks & contract]** Real bug found and
+    fixed while building `/reject` for the amber-decision mechanism
+    (`plans/running-thoughts.md` #6, `plans/conceptual-design.md` Thread
+    A): `qa_tools/common/acceptance_sync.py`'s `_run_windows_for_
+    dataset()` builds each real run's own comment-matching arrival
+    WINDOW from consecutive entries sorted by `arrived_date` - two real
+    runs sharing the same `arrived_date` turn out to be common in this
+    project's own real committed history now (352 real BDM runs, only
+    123 distinct dates - a side effect of this project's own full
+    pipeline regenerations, which tend to produce same-day original+
+    resupply pairs), not the rare theoretical edge case the function's
+    own docstring originally described it as. The function's own
+    long-documented intent ("ties resolve to whichever sorts first")
+    didn't match what the code actually did: a naive
+    `entries[i+1]`-as-window-end lookup gave the FIRST tied entry a
+    zero-width `[date, date)` window (always empty, since
+    `start <= created < end` can never hold when `start==end`), so a
+    same-day `/accept` or `/reject` comment silently fell through to the
+    SECOND (or last, for 3+-way ties) run instead - the opposite of the
+    documented intent, and a real run a human could never actually
+    target via a same-day comment. Fixed by deduping to one
+    window-owning entry per distinct date (the first, by `list_run_ids`'
+    own iteration order) before computing window ends - a same-day
+    comment now genuinely resolves to whichever run sorts first, per the
+    function's own original intent; other same-day runs are simply
+    omitted from the window list rather than given a window that could
+    never match anything. 3 new regression tests, confirmed failing
+    against the pre-fix code first (via monkeypatched `list_run_ids`/
+    `read_dataset_stats`, not real files - the collision itself is
+    already covered against real committed history by this project's
+    existing `TestRunWindowsAgainstRealCommittedHistory` tests).
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest

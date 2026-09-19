@@ -98,11 +98,12 @@ now verified against real committed CP history (a real chain opens at
 resupply, both visible in the real supply-history UI with a real "N
 days since previous" counter).
 
-**Parked, NOT blocking the above.** How should a PERSISTENTLY amber
-dataset be handled? Keith's own words, thinking out loud, ended without
-landing on an answer: "how do we handle amber-level data sets... do we
-need to actually take a decision to accept that they're amber? Or are we
-saying amber is a warning that we have to resolve by changing the checks
+**Resolved, 2026-09-19 (was: Parked, NOT blocking the above).** How
+should a PERSISTENTLY amber dataset be handled? Keith's own words,
+thinking out loud, originally ended without landing on an answer: "how
+do we handle amber-level data sets... do we need to actually take a
+decision to accept that they're amber? Or are we saying amber is a
+warning that we have to resolve by changing the checks
 to accept it (become green) or reject it (become red)? Or a human taking
 a decision, accept/reject, making it effectively red or green." Three
 live options, none chosen yet:
@@ -119,10 +120,51 @@ live options, none chosen yet:
    itself.
 
 This is a real governance question (who owns that decision, where it'd
-be recorded, whether it's per-run or a standing decision for a check)
-with no scoped answer yet - explicitly deferred, not something the
-"keep it simple, amber-or-green closes a chain" rule above needs
-resolved first. Revisit when Keith raises it again.
+be recorded, whether it's per-run or a standing decision for a check) -
+explicitly deferred at the time, not something the "keep it simple,
+amber-or-green closes a chain" rule above needed resolved first.
+
+**Resolution, 2026-09-19 (Keith's own explicit ask, "let's tackle item
+six" - running-thoughts.md #6): option 3** - amber requires an explicit
+HUMAN decision, per run, accept or reject, without changing the check
+definition itself. Scoped via a real `AskUserQuestion` round covering
+the three options above plus two follow-up mechanics questions, all
+grounded in what `/accept` (built 2026-09-18) had already proven out in
+practice rather than decided from scratch: reject mirrors accept
+exactly (a real `/reject` GitHub comment, same ticket, same per-run
+window-matching, no new infrastructure) and - the smaller, safer
+option, Keith's own explicit call - a REJECTED run's pill still stays
+amber, same as accept's own "never silently repaint the pill" design;
+only the badge differs ("✗ Rejected by `<user>`" vs "✓ Accepted by
+`<user>`"). If a single run's window somehow carries both a real
+`/accept` and a real `/reject` (someone changes their mind, or two
+different people comment differently) - Keith's own explicit call -
+whichever comment is MOST RECENT wins, regardless of which command it
+was, not "reject always wins" or "accept always wins".
+
+Built the same session: `qa_tools/common/acceptance_sync.py` generalized
+from accept-only to `match_decisions()`/`build_decisions()` (both
+commands, most-recent-wins conflict resolution); `dashboard/qa-reporting-
+dashboard.template.html`'s `const ACCEPTANCES` renamed `const
+AMBER_DECISIONS`, `acceptanceBadge()` renamed `amberDecisionBadge()`
+(renders either badge kind off a new `decision` field). Found and fixed
+a real, separate bug live while adding test coverage against real
+current committed history: this project's own full BDM pipeline
+regenerations left MOST real runs sharing an `arrived_date` with
+another real run (352 real runs, only 123 distinct dates) -
+`_run_windows_for_dataset()`'s own long-documented intent ("ties
+resolve to whichever sorts first") didn't match what the code actually
+did (the FIRST tied entry got a zero-width, structurally unmatchable
+window; a same-day comment silently fell through to the SECOND or last
+tied entry instead) - fixed to dedupe to one window-owning entry per
+distinct date, matching the documented intent for real. Regression
+tests added first, confirmed failing against the pre-fix code, then
+fixed. 9 new/updated Python tests (`tests/test_acceptance_sync.py`),
+3 new real-browser e2e tests (`tests/test_dashboard_e2e.py`'s
+`TestAmberDecisionBadge`, verified against real committed amber runs).
+Revisit when Keith raises it again if this ever needs a "standing
+decision" (not per-run) mode - out of scope for this pass, per the
+original design's own "per-run, not standing" call for accept.
 
 **Related, still open (tracked in `plans/qa-pipeline.md` item 71's own
 "related risk" note, not duplicated here in full)**: the SLA tile's

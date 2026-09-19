@@ -34,6 +34,35 @@ edited for a punchier, friendlier read than a bare commit log.
   speed is an inverse multiplier, so `0.5 / 1.25 = 0.4`).
 
 ### Added
+- **3:09pm** — **Amber Supplies Can Now Be Rejected, Not Just Accepted** **[Dashboard]** **[QA checks &
+  contract]** Resolves a real governance question `plans/conceptual-
+  design.md` Thread A had left deliberately parked: should a
+  persistently-amber dataset ever need a human DECISION, or is amber
+  just a standing warning? Keith's own call, scoped via a real
+  `AskUserQuestion` round: yes - an explicit per-run human decision,
+  accept or reject. Reject mirrors `/accept` exactly (a real `/reject`
+  comment on the same GitHub ticket, same per-run window-matching, no
+  new infrastructure) and - the smaller, safer option - a rejected
+  run's pill still stays amber, same as accept's own "never silently
+  repaint the pill" design; only the badge differs ("✗ Rejected by
+  `<user>`" vs "✓ Accepted by `<user>`"). If a run's window somehow
+  carries both a real `/accept` and a real `/reject`, whichever comment
+  is most recent wins, regardless of which command it was.
+  `qa_tools/common/acceptance_sync.py` generalized from accept-only to
+  `match_decisions()`/`build_decisions()`; the dashboard's own
+  `ACCEPTANCES` const renamed `AMBER_DECISIONS`. Found and fixed a
+  real, separate bug live while adding test coverage against real
+  current committed history: most of today's real runs share an
+  `arrived_date` with another real run (352 real BDM runs, only 123
+  distinct dates), and the window-matching logic's own documented
+  intent ("ties resolve to whichever sorts first") turned out not to
+  match what the code actually did - the first tied run got a
+  zero-width, structurally unmatchable window, so a same-day comment
+  silently resolved to the wrong run. Fixed to match the documented
+  intent for real. 12 new/updated Python tests (3 of them regression
+  tests for the window bug, confirmed failing against the pre-fix code
+  first), 3 new real-browser e2e tests, verified with a real Playwright
+  screenshot of both badge kinds rendering correctly side by side.
 - **2:44pm** — **Leaderboard Now Shows Everyone, Not Just Ticket-Closers** **[Dashboard]** **[QA checks &
   contract]** Keith caught it live on the real published page: the
   Leaderboard panel showed nobody at all, despite real people already

@@ -143,7 +143,7 @@ def _run_embed_and_extract_leaderboard(monkeypatch, tmp_path, raw_ticket_resolut
 
 
 def test_embed_defaults_to_every_assigned_person_at_zero_when_file_absent(monkeypatch, tmp_path):
-    """Real scenario, same as TICKET_STATUS/ACCEPTANCES above: a local
+    """Real scenario, same as TICKET_STATUS/AMBER_DECISIONS above: a local
     build has no GH token, so .github/workflows/deploy-pages.yml's own
     TICKET_RESOLUTIONS_JSON-writing step (qa_tools/common/leaderboard.py's
     own real `gh` boundary) never ran, so there's no real ticket-close
@@ -173,6 +173,61 @@ def test_embed_reads_real_ticket_resolutions_json_when_present(monkeypatch, tmp_
         "dataset_id": "birth-registrations", "name": "Known Person", "nickname": "KP",
         "github": "knownperson", "streak": 1,
     }]
+
+
+def _run_embed_and_extract_amber_decisions(monkeypatch, tmp_path, raw_tickets=None):
+    out_html = tmp_path / "out.html"
+    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
+    if raw_tickets is None:
+        monkeypatch.setattr(edd, "QA_COMMENTS_JSON", tmp_path / "does_not_exist.json")
+    else:
+        path = tmp_path / "qa_comments.json"
+        path.write_text(json.dumps(raw_tickets))
+        monkeypatch.setattr(edd, "QA_COMMENTS_JSON", path)
+
+    edd.embed()
+
+    html = out_html.read_text()
+    match = re.search(r"const AMBER_DECISIONS = (.*?);\n", html)
+    assert match, "AMBER_DECISIONS const not found in built output"
+    return json.loads(match.group(1))
+
+
+def test_embed_defaults_to_empty_amber_decisions_when_file_absent(monkeypatch, tmp_path):
+    """Real scenario, same as TICKET_STATUS/LEADERBOARD above: a local
+    build has no GH token, so .github/workflows/deploy-pages.yml's own
+    QA_COMMENTS_JSON-writing step (qa_tools/common/acceptance_sync.py's
+    own real `gh` boundary) never ran - embed() must degrade to {}
+    rather than crash. Unlike LEADERBOARD (which now always shows the
+    real assignee roster), there's no roster-equivalent for amber
+    decisions - a dataset with no real /accept or /reject comment simply
+    has nothing to show, correctly."""
+    assert _run_embed_and_extract_amber_decisions(monkeypatch, tmp_path) == {}
+
+
+def test_embed_reads_real_qa_comments_json_when_present(monkeypatch, tmp_path):
+    """Real /accept and /reject comments on two different real tickets -
+    confirms both decision kinds embed correctly, not just accept."""
+    raw_tickets = [
+        {"number": 1, "labels": [{"name": "dataset:birth-registrations"}],
+         "comments": [{"author": {"login": "knownperson"}, "body": "/accept",
+                       "createdAt": "2026-01-10T09:00:00Z",
+                       "url": "https://github.com/o/r/issues/1#issuecomment-1"}]},
+        {"number": 2, "labels": [{"name": "dataset:cp-clients"}],
+         "comments": [{"author": {"login": "knownperson"}, "body": "/reject",
+                       "createdAt": "2026-01-10T09:00:00Z",
+                       "url": "https://github.com/o/r/issues/2#issuecomment-1"}]},
+    ]
+    from datetime import date
+
+    from qa_tools.common import acceptance_sync as acc
+    fixed_windows = [("run_x", date(2026, 1, 1), None)]
+    monkeypatch.setattr(acc, "_run_windows_for_dataset", lambda dataset_id, qa_results_dir=None: fixed_windows)
+
+    decisions = _run_embed_and_extract_amber_decisions(monkeypatch, tmp_path, raw_tickets)
+
+    assert decisions["birth-registrations"]["run_x"]["decision"] == "accept"
+    assert decisions["cp-clients"]["run_x"]["decision"] == "reject"
 
 
 def _run_embed_and_extract_demo_cast(monkeypatch, tmp_path, cast_text=None):

@@ -618,6 +618,26 @@ fake-but-realistic `/accept` comment resolves to the exact right real
 amber run and renders its badge while a different amber run with no
 comment shows none, full JS suite (71 passed), ruff clean.
 
+**`/reject` built, 2026-09-19 (Keith's own explicit ask, "let's tackle
+item six") - the amber-GOVERNANCE question this item's own original
+build deliberately parked is now resolved.** See
+`plans/conceptual-design.md` Thread A's own "Resolved" write-up for the
+full account (the three-option governance question, the scoping round,
+and the real bug found/fixed along the way - a same-day `arrived_date`
+collision that made most of today's real committed history structurally
+unmatchable). Summary: option 3 (explicit per-run human decision), a
+real `/reject` comment mirroring `/accept` exactly, a rejected run's
+pill still stays amber (same non-invasive treatment as accept, just a
+different badge), most-recent-comment-wins if a run's window somehow
+carries both. `ACCEPTANCES` generalized to `AMBER_DECISIONS`
+(`acceptance_sync.py`'s `build_acceptances()`/`match_acceptances()`
+renamed `build_decisions()`/`match_decisions()`, now returning a
+`decision: "accept"|"reject"` field); the dashboard's own
+`acceptanceBadge()` renamed `amberDecisionBadge()`. 9 new/updated Python
+tests, 3 new e2e tests, verified with a real Playwright screenshot of
+both badge kinds rendering correctly side by side against real
+committed amber runs.
+
 ### 7. Business requirements page on the dashboard
 
 A new dashboard page/view showing live-maintained user stories,

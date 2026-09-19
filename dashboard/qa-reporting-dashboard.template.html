@@ -928,7 +928,7 @@ const RELEASE_NOTES = {intro:[], entries:[]};
 const REQUIREMENTS = [];
 const TICKET_STATUS = {};
 const GITHUB_LINKS = {checks:{}, agencies:{}, datasets:{}};
-const ACCEPTANCES = {};
+const AMBER_DECISIONS = {};
 const ASSIGNMENTS = {agencies:{}, datasets:{}};
 const LEADERBOARD = [];
 // PLANS — running-thoughts.md #10's "Plans" tab: the project's own
@@ -2253,23 +2253,30 @@ function renderAgency(view, agencyId){
 // run_date already makes clipDatasetToAsOf() pick that exact run as the
 // effective one everywhere else on this same page.
 // running-thoughts.md #6 ("read-only tension: accepting/rejecting amber
-// supplies", 2026-09-18) - ACCEPTANCES is keyed by dataset_id then
-// run_id (qa_tools/common/acceptance_sync.py, matched purely by comment
+// supplies") - AMBER_DECISIONS is keyed by dataset_id then run_id
+// (qa_tools/common/acceptance_sync.py, matched purely by comment
 // timestamp against that run's own real arrival window - no run_id
-// ever typed by anyone). Deliberately gated on `status==="amber"` here,
-// not just "does a record exist": a /accept comment's timestamp could
-// in principle fall inside a run that was actually red or green (e.g.
-// someone commented early or the check history hasn't been rebuilt
-// yet) - this badge is specifically an AMBER acknowledgment, so it only
-// ever renders on a row this page ALSO independently computed as
-// amber, never silently relabelling a red or green row. The pill
-// itself never changes color - accepting an amber supply does not make
-// it read as green (Keith's own explicit call, AskUserQuestion).
-function acceptanceBadge(datasetId, runId, status){
+// ever typed by anyone; most-recent-comment-wins if a run somehow gets
+// both a /accept and a /reject). Deliberately gated on
+// `status==="amber"` here, not just "does a record exist": a decision
+// comment's timestamp could in principle fall inside a run that was
+// actually red or green (e.g. someone commented early or the check
+// history hasn't been rebuilt yet) - this badge is specifically an
+// AMBER acknowledgment, so it only ever renders on a row this page ALSO
+// independently computed as amber, never silently relabelling a red or
+// green row. The pill itself never changes color either way - Keith's
+// own explicit call, AskUserQuestion, both for accept (2026-09-18) and
+// again for reject (2026-09-19, resolving plans/conceptual-design.md
+// Thread A's own parked amber-governance question: option 3, an
+// explicit per-run human decision, but the smaller/safer "badge only"
+// treatment rather than repainting the pill red).
+function amberDecisionBadge(datasetId, runId, status){
   if(status!=="amber") return "";
-  const a = ACCEPTANCES[datasetId] && ACCEPTANCES[datasetId][runId];
-  if(!a) return "";
-  return `<a href="${a.comment_url}" target="_blank" rel="noopener" class="pill tag sm" title="Accepted ${fmtDate(new Date(a.accepted_at))} - click to view the real comment" onclick="event.stopPropagation()"><span class="ico"></span>✓ Accepted by ${a.accepted_by}</a>`;
+  const d = AMBER_DECISIONS[datasetId] && AMBER_DECISIONS[datasetId][runId];
+  if(!d) return "";
+  const icon = d.decision==="reject" ? "✗" : "✓";
+  const verb = d.decision==="reject" ? "Rejected" : "Accepted";
+  return `<a href="${d.comment_url}" target="_blank" rel="noopener" class="pill tag sm" title="${verb} ${fmtDate(new Date(d.decided_at))} - click to view the real comment" onclick="event.stopPropagation()"><span class="ico"></span>${icon} ${verb} by ${d.decided_by}</a>`;
 }
 function renderSupplyCycleRows(entries, datasetId){
   return entries.map(e => {
@@ -2281,7 +2288,7 @@ function renderSupplyCycleRows(entries, datasetId){
     // chain), so it's shown directly rather than the old, dropped
     // dirtySeverity pill (a synthetic-generation-only concept no real
     // production dashboard would have - item 72).
-    const statusBadge = pill(e.status, "sm") + " " + acceptanceBadge(datasetId, e.run_id, e.status);
+    const statusBadge = pill(e.status, "sm") + " " + amberDecisionBadge(datasetId, e.run_id, e.status);
     // A resupply (any entry after the first in its chain) has no real
     // arrivalStatus (item 69's own reasoning, now keyed off real chain
     // position) - shows how long it's been since the previous supply/

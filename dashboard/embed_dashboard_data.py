@@ -92,20 +92,25 @@ branch, so it always shows exactly what a check looked like when this
 dashboard was published, same reproducibility stance as everything else
 this script embeds.
 
-And `const ACCEPTANCES` (running-thoughts.md #6, "read-only tension:
-accepting/rejecting amber supplies", 2026-09-18, scoped via two
-AskUserQuestion rounds) - `{dataset_id: {run_id: {accepted_by,
-accepted_at, comment_url}}}`, a real human's `/accept` comment on that
-dataset's own QA ticket, matched to the real run it applies to purely
-by comment timestamp against that run's own real arrival window
-(qa_tools/common/acceptance_sync.py - no run_id ever typed by anyone).
+And `const AMBER_DECISIONS` (running-thoughts.md #6, "read-only tension:
+accepting/rejecting amber supplies" - `/accept` built 2026-09-18, scoped
+via two AskUserQuestion rounds; `/reject` added 2026-09-19, once Keith
+resolved the amber-GOVERNANCE question itself - plans/conceptual-
+design.md Thread A - via a further AskUserQuestion round: option 3,
+amber requires an explicit human decision, per run) -
+`{dataset_id: {run_id: {decision: "accept"|"reject", decided_by,
+decided_at, comment_url}}}`, a real human's `/accept` or `/reject`
+comment on that dataset's own QA ticket, matched to the real run it
+applies to purely by comment timestamp against that run's own real
+arrival window (qa_tools/common/acceptance_sync.py - no run_id ever
+typed by anyone; most-recent-comment-wins if a run somehow gets both).
 Same real-source-not-a-file-this-script-reads-directly treatment as
 TICKET_STATUS above, for the same reason (a real `gh` call needs a real
 token this script doesn't have): `.github/workflows/deploy-pages.yml`
 writes the raw `gh issue view` output for every real qa-ticket issue to
 QA_COMMENTS_JSON below (via `python3 -m qa_tools.common.acceptance_sync`,
 the one real `gh`-calling boundary), and this script calls
-acceptance_sync.build_acceptances() (pure, no `gh`/network here either)
+acceptance_sync.build_decisions() (pure, no `gh`/network here either)
 to turn it into the final embed. Empty {} locally with no such file,
 same graceful degradation as TICKET_STATUS.
 
@@ -131,14 +136,14 @@ per-person, per-dataset streak of CLEAN TICKET RESOLUTIONS (qa_tools/
 common/leaderboard.py's own build_leaderboard()), sorted by streak
 descending. No longer CI-safe without a token the way ASSIGNMENTS is -
 same real-source-not-a-file-this-script-reads-directly treatment as
-TICKET_STATUS/ACCEPTANCES above, for the same reason (a real `gh` call
+TICKET_STATUS/AMBER_DECISIONS above, for the same reason (a real `gh` call
 needs a real token this script doesn't have): `.github/workflows/
 deploy-pages.yml` writes the raw ticket close/reopen history for every
 real qa-ticket issue to TICKET_RESOLUTIONS_JSON below (via `python3 -m
 qa_tools.common.leaderboard`, that module's own real `gh` boundary), and
 this script calls leaderboard.build_leaderboard() (pure, no `gh`/network
 here either) to turn it into the final embed. Empty [] locally with no
-such file, same graceful degradation as TICKET_STATUS/ACCEPTANCES. Same
+such file, same graceful degradation as TICKET_STATUS/AMBER_DECISIONS. Same
 public-page privacy rule as ASSIGNMENTS: only people with a real
 contract/people.yaml entry ever appear, by name/nickname - resolved by
 real GitHub LOGIN now (whoever closed the ticket), not by email.
@@ -175,7 +180,7 @@ import re
 from dashboard.changelog_md import parse_changelog
 from dashboard.plans_md import parse_plans
 from dashboard.requirements_yaml import parse_requirements
-from qa_tools.common.acceptance_sync import build_acceptances
+from qa_tools.common.acceptance_sync import build_decisions
 from qa_tools.common.changelog import build_changelog
 from qa_tools.common.github_links import build_check_source_links, build_folder_links, current_commit_sha
 from qa_tools.common.leaderboard import build_leaderboard
@@ -290,9 +295,11 @@ def embed() -> None:
             raw_tickets = json.load(f)
     else:
         raw_tickets = []
-    acceptances = build_acceptances(raw_tickets)
-    html = _replace_const(html, "ACCEPTANCES", json.dumps(acceptances, separators=(",", ":")))
-    print(f"Re-embedded ACCEPTANCES = {sum(len(v) for v in acceptances.values())} accepted run(s) across {len(acceptances)} dataset(s)"
+    decisions = build_decisions(raw_tickets)
+    total_decisions = sum(len(v) for v in decisions.values())
+    total_rejected = sum(1 for runs in decisions.values() for r in runs.values() if r["decision"] == "reject")
+    html = _replace_const(html, "AMBER_DECISIONS", json.dumps(decisions, separators=(",", ":")))
+    print(f"Re-embedded AMBER_DECISIONS = {total_decisions} decision(s) ({total_rejected} reject/{total_decisions - total_rejected} accept) across {len(decisions)} dataset(s)"
           + ("" if os.path.exists(QA_COMMENTS_JSON) else " (no reports/qa_comments.json - local build, embedding empty)"))
 
     def _public(record: dict) -> dict:
