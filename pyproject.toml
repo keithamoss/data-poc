@@ -15,6 +15,12 @@ dependencies = [
     "PyYAML>=6.0",
     "Jinja2>=3.1",
     "click>=8.1",
+    "rich>=13.7", # promoted from transitive (dbt-core) to direct - the mothman
+    # CLI/TUI's own rich-rendered reports/progress, not just an incidental dep anymore
+    "rich-click>=1.7", # mothman CLI's help/error formatting - plans/tooling.md #1
+    "questionary>=2.1", # mothman CLI's real interactive arrow-key menus - chosen
+    # over InquirerPy/PyInquirer on project-health grounds, see plans/tooling.md #1
+    "pyfiglet>=1.0", # mothman CLI's splash-screen wordmark - plans/tooling.md #1
 ]
 
 [project.optional-dependencies]
@@ -33,6 +39,9 @@ aws = [
     "aws-cdk-lib>=2.150",
     "constructs>=10.0",
 ]
+
+[project.scripts]
+mothman = "cli.app:main"
 
 [dependency-groups]
 dev = [
@@ -78,7 +87,7 @@ pythonpath = ["."]
 # (dbt-generated), not synthetic_data_generator/ (deliberately out of
 # Phase 6's scope - plans/publishing-and-history.md/plans/data-
 # generation.md #8 - dormant/unwired code, not worth a coverage floor yet).
-source = ["qa_tools", "pipeline", "generator", "dashboard"]
+source = ["qa_tools", "pipeline", "generator", "dashboard", "cli"]
 
 [tool.coverage.report]
 exclude_also = [

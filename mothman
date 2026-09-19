@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# The mothman CLI/TUI entry point (plans/tooling.md #1). A real
+# `[project.scripts]` console-script entry exists in pyproject.toml for
+# when this repo is properly packaged/installed - it isn't today (this
+# repo has always relied on CWD-based `python3 -m` invocation, never an
+# installed package, same as every other module here), so this thin
+# wrapper gives a real `./mothman` command today without that packaging
+# risk. Same pattern as ./run_pipeline.sh - not a novel one.
+#
+# Run from the repo root: ./mothman [command] [options]
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")"
+exec uv run python3 -m cli.app "$@"

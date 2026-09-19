@@ -28,6 +28,30 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
+- **11:00am** — **mothman CLI Phase 1: TUI Shell + Birth Registrations QA** **[Testing & dev tooling]** The
+  real start of the unified `mothman` CLI/TUI (`plans/tooling.md` #1),
+  built on Keith's own explicit go-ahead. `cli/app.py` (the root
+  `mothman` Click group, bare-invocation TUI main menu with a real
+  pyfiglet/ASCII-moth splash screen), `cli/common.py` (the non-TTY
+  guard, confirm-by-default+`--yes`, back-navigation-aware menus, the
+  tmp-dir-first Promote pattern), and `cli/bdm.py` (`generate-synthetic-
+  data` and `qa [--run-id/--reference-run-id/--commit]`, both real,
+  flag-invocable AND TUI-navigable from one implementation). Verified
+  against the real dbt-core/Soda Core/datacontract-cli/Evidently chain,
+  not mocked, and the real arrow-key TUI navigation confirmed via a real
+  pty screenshot. A thin `./mothman` wrapper script gives a real command
+  today without needing this repo properly packaged (a bigger, separate
+  lift than Phase 1 needs - `[project.scripts]` is declared in
+  `pyproject.toml` for when that happens). `questionary`/`pyfiglet`
+  added as real dependencies; `rich`/`rich-click` promoted from
+  transitive to direct. A real bug found and fixed along the way: a
+  manual smoke test actually corrupted the real, local `data/raw/
+  manifest.json` from 176 entries down to 1 -
+  `orchestrate_bdm.run_single()`'s own manifest-overwriting side effect
+  (correct for its real AWS Lambda use case, a real collision against
+  an existing full batch manifest) - fixed in `cli/bdm.py`'s own
+  `run_check()`, regression-tested. Child Protection's own `mothman cp`
+  commands are still open.
 - **10:35am** — **Clickable Header Logo + Mothman SVG Mark** **[Dashboard UI]** Clicking the header logo/
   wordmark now returns to the homepage, matching the existing header nav
   buttons' own pattern - the wordmark is a real `<button>` now (keyboard/

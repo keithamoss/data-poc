@@ -30,13 +30,55 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
    Click CLIs, `plans/running-thoughts.md` #5) shipped - this item is the
    generalization of that same idea to every other entry point in the
    repo, reusing the already-decided `mothman` console-script name
-   (`plans/wider.md` #5, the project-rename decision). **Not yet built**
-   - Keith's own explicit standing instruction, still in force: "don't
-   begin building until I give permission." What follows is the real,
-   scoped design, ready to build once he gives the word; the two things
-   actually built so far (dev screenshot tooling, this writeup itself)
-   are called out separately at the end since neither counts as
-   "beginning" the CLI.
+   (`plans/wider.md` #5, the project-rename decision).
+
+   **Build started 2026-09-19, Keith's own explicit go-ahead** ("feel
+   free to just start working through the phases... only stop if you
+   need my input") - the standing "don't begin building until I give
+   permission" instruction above is now lifted. **Phase 1 progress, real
+   and verified, not just written:**
+   - `cli/` package: `cli/app.py` (root `mothman` Click group, bare-
+     invocation TUI main menu), `cli/common.py` (the non-TTY guard,
+     confirm-by-default+`--yes`, the back-navigation-aware `select()`,
+     the tmp-dir-first Promote helper), `cli/banner.py` (the splash
+     screen - iterated visually via `scripts/dev/tui_screenshot.py`'s
+     own real screenshots, both themes and the actual production ASCII
+     size, before landing), `cli/bdm.py` (Birth Registrations commands).
+   - `mothman bdm generate-synthetic-data` and `mothman bdm qa
+     [--run-id/--reference-run-id/--commit]` are real, working, flag-
+     invocable AND TUI-navigable (one implementation, both entry paths) -
+     verified against the real dbt-core/Soda Core/datacontract-cli/
+     Evidently chain, not mocked. `[project.scripts] mothman` is declared
+     in `pyproject.toml` but not actually wired (this repo has never been
+     properly packaged - `uv sync` warns "not packaged" - and doing so
+     properly is a bigger, separate lift than Phase 1 needs); a thin
+     `./mothman` wrapper script (same pattern as `./run_pipeline.sh`)
+     gives a real `./mothman` command today without that packaging risk.
+   - `questionary`/`pyfiglet` added as real dependencies; `rich`/
+     `rich-click` promoted from transitive to direct, per the original
+     design.
+   - **A real bug found and fixed while building this, not just
+     designed-around**: `orchestrate_bdm.run_single()` unconditionally
+     overwrites `RAW_DIR/manifest.json` with its own synthetic 1-or-2-
+     entry manifest - correct for its real AWS Lambda use case (no
+     pre-existing manifest there at all), but a real collision once
+     called against a `RAW_DIR` that already holds the real, full
+     `generate_runs.py` batch manifest this CLI's own run picker reads
+     from. A manual smoke test actually corrupted the real, local
+     `data/raw/manifest.json` from 176 entries down to 1 before this was
+     caught. Fixed in `cli/bdm.py`'s own `run_check()` (backs the real
+     manifest up and restores it around the call, rather than changing
+     `run_single()`'s already-tested Lambda-path contract) - a real
+     regression test added first, confirmed failing, then fixed,
+     confirmed passing, same as every other real bug this project finds.
+   - Verified end to end: the real check chain runs and reports
+     correctly through both the flag-invocable command and the real,
+     interactive TUI (arrow-key navigation confirmed via a real pty
+     screenshot, not just code review); throwaway vs `--commit` both
+     behave correctly against the real committed `qa_results/` tree;
+     `uv run pytest`/`ruff` both clean, 490 tests passing (18 new).
+   - **Still open, Phase 1 not fully done yet**: Child Protection's own
+     `mothman cp` commands (same pattern, not yet built).
 
    **Core shape, confirmed:**
    - Organized by dataset (bdm/cp) under a real interactive TUI - not
