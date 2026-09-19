@@ -2952,12 +2952,33 @@ one Thread's narrative.
 
    **Keith's to fix, not a session's** - repo Settings -> Environments
    -> `github-pages` -> "Deployment branches and tags" -> allow
-   `claude/**` (or whatever pattern matches the glob above). Until
-   then, `test.yml` and `ticket-sync.yml` work correctly and
-   `deploy-pages.yml` fails visibly on every push. Deliberately NOT
-   reverted to a pinned branch to hide that: a visible failure is
-   strictly better than the silent non-run this item started as, and
-   it's a 30-second settings change.
+   `claude/**` (or whatever pattern matches the glob above). Deliberately
+   NOT reverted to a pinned branch to hide it in the meantime: a visible
+   failure is strictly better than the silent non-run this item started
+   as.
+
+   **Done by Keith, 2026-09-19 evening - and the diagnosis is now
+   CONFIRMED, not just high-confidence.** He added the `claude/**`
+   wildcard to the environment's allowed branches, and the very next
+   push flipped the workflow's behaviour completely: instead of failing
+   in ~2 seconds with zero steps and a 404 on logs, it ran properly and
+   finished `success`. That's the first time all three workflows have
+   run and passed on a session branch since the pin broke - `Run test
+   suite`, `Sync QA status to GitHub Issues`, and `Build, validate, and
+   publish the dashboard`, all green on the same commit. The earlier
+   inference (environment protection rejecting the branch, unreadable
+   from here because the proxy blocks the environments API) held up
+   exactly.
+
+   Real, user-visible consequence worth naming: the live published
+   dashboard had not been rebuilt since before the pin broke, so this
+   is also the deploy that finally carries `plans/qa-pipeline.md` item
+   74's corrected statuses to the public site - the end of the "all 7
+   datasets read red on every run" era for anyone actually looking at
+   it. NOT independently verified against the live URL from this
+   session: `keithamoss.github.io` is on this environment's own blocked
+   list (`CLAUDE.md`), so this rests on the workflow's own `success`
+   conclusion rather than on loading the real page.
 
    **One residual risk, named rather than silently accepted**: with a
    glob, any `claude/*` branch can publish to the live public site. That
