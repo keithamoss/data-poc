@@ -901,3 +901,36 @@ common/check_lifecycle.py`'s own `check_id` convention.
     field. Flagged to Keith, not corrected unilaterally - his call
     whether to mark it `done` outright or run a real `requirements-
     reviewer` pass against it first.
+
+16. **[todo, 2026-09-19]** **[Dashboard UI]** Three more real visual-
+    polish findings, from `requirements-visual-critic`'s first genuine
+    end-to-end run (`claude/playwright-mcp-verify-b2t4nb`, verifying the
+    whole HTTPS-serving/port-collision-fix chain for real) - each
+    independently verified in the real template source afterwards, not
+    taken on the agent's word:
+    - `.drawer-body` declares only `overflow-y` (line 285) - no
+      corresponding `overflow-x` handling, plausibly contributing to
+      (or at least not guarding against) the same class of overflow
+      already tracked at #12.
+    - A real colour collision: `MOSCOW_CLASS.could` and
+      `REQ_STATUS_CLASS.built` both resolve to `"green"` (lines 3205/
+      3209), so a MoSCoW "Could" pill and a "Built" status pill render
+      with the exact same `pill green sm` styling side by side (line
+      3260) - two semantically different things sharing one visual
+      signal, the same category of collision already flagged for the
+      MoSCoW "Must" pill vs. the dashboard's own red-means-failing
+      language elsewhere.
+    - Every requirements-panel entry gets a `border-bottom` divider with
+      no `:last-child` reset (line 3254) - a dangling trailing divider
+      after the last real entry.
+    Not fixed here - logging only, same "real, not fixed, Keith's call"
+    treatment as #15. Also found and fixed in passing while acting on
+    this same verification run (not logged as its own item, already
+    committed): the `sleep 1` race in the 3 critics' own HTTPS-serving
+    one-liner (replaced with a real poll loop), a screenshot-path
+    papercut (`browser_take_screenshot` resolving a bare filename
+    against the repo root instead of the gitignored `.playwright-mcp/`),
+    and a `mothman dashboard rebuild` exit-1 gotcha in a genuinely fresh
+    sandbox (`dashboard/check_dashboard_renders.py` now auto-detects
+    this environment's own `/opt/pw-browsers/chromium` symlink instead
+    of requiring `PLAYWRIGHT_CHROMIUM_PATH` set by hand).

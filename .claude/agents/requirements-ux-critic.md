@@ -85,6 +85,14 @@ Navigate to the printed URL. Run the printed `kill ...` command (via
 `pkill -f serve_dashboard_https`, which would also kill any other
 copy of this server another agent has running in parallel.
 
+**If a navigate ever fails** (a real, confirmed behaviour, 2026-09-19,
+found by `claude/playwright-mcp-verify-b2t4nb` while it was working
+against a stale, pre-fix MCP server): the browser context parks on
+`chrome-error://chromewebdata` and every subsequent tool call keeps
+reporting that same error page, not a fresh attempt - don't spend
+several calls confused about why nothing's changing. `browser_navigate`
+to the real URL again explicitly to clear it before continuing.
+
 ## The real standard you're checking against
 
 Keith's own words, quoted in `docs/project-context-for-agents.md`: UX

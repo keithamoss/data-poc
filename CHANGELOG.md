@@ -28,6 +28,28 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Fixed
+- **7:12pm** — **3 Real Papercuts Found by the Full Verification Pass, Fixed** **[Dashboard UI]** **[Testing & dev tooling]**
+  `claude/playwright-mcp-verify-b2t4nb` picked up this branch and ran
+  the full HTTPS-serving/port-collision-fix chain end to end, both
+  post-build critics included - real findings, all fixed: `mothman
+  dashboard rebuild` exiting 1 in a genuinely fresh sandbox
+  (`dashboard/check_dashboard_renders.py` now auto-detects this
+  environment's own `/opt/pw-browsers/chromium` symlink rather than
+  needing `PLAYWRIGHT_CHROMIUM_PATH` set by hand, with 3 new unit
+  tests); a latent race in the 3 critics' own `sleep 1` before parsing
+  a server's `PORT=` line (now a real poll loop); and `browser_take_
+  screenshot` resolving a bare filename against the repo root instead
+  of the gitignored `.playwright-mcp/` (both screenshot-taking critics
+  now told explicitly where to save). Also a real, important correction
+  to `plans/wider.md`: Claude Code ignores a subagent's own
+  `permissionMode` entirely when the main session is in auto mode, so
+  the earlier defense-in-depth `permissionMode: plan` addition is a
+  no-op there (still real protection in a non-auto session). Three
+  further real visual findings from `requirements-visual-critic`'s
+  first genuine run (a colour collision between MoSCoW "Could" and
+  "Built" status pills, a drawer missing `overflow-x` handling, a
+  dangling trailing divider) logged in `plans/dashboard.md` #16, not
+  fixed - Keith's call, same treatment as #15.
 - **7:03pm** — **cli/common.py's Escape-Key Claim Corrected; Misleading Test Names Fixed** **[Testing & dev tooling]**
   Root-caused the real `select()`/`path_prompt()` docstring mismatch
   found while verifying `tui_drive.py` (`plans/tooling.md` #9): grepped
