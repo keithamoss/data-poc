@@ -53,6 +53,35 @@ def test_preserves_a_bullet_list_within_one_item_as_its_own_lines(tmp_path):
     )
 
 
+def test_preserves_a_numbered_list_within_one_item_as_its_own_lines(tmp_path):
+    """Real bug, found via Keith's own dashboard report (2026-09-19): a
+    numbered/ordered sub-list inside an item's body (e.g. plans/
+    tooling.md #1's own "Build order" phase list) was silently word-
+    joined into one flowing, illegible paragraph - only "- "/"* " bullet
+    markers were recognised as list-item boundaries, not "1. "/"2. "
+    ones."""
+    text = """1. **[done, 2026-09-18]** **[Testing & dev tooling]** Build order:
+   1. Phase one does the first thing.
+   2. Phase two does the second thing.
+"""
+    items = _parse_numbered_items(text, "wider")
+    assert items[0]["text"] == (
+        "Build order:\n\n1. Phase one does the first thing.\n2. Phase two does the second thing."
+    )
+
+
+def test_a_numbered_list_item_that_wraps_across_lines_stays_one_list_item(tmp_path):
+    text = """1. **[done, 2026-09-18]** **[Testing & dev tooling]** Build order:
+   1. Phase one does the first thing,
+      wrapped across two lines.
+   2. Phase two.
+"""
+    items = _parse_numbered_items(text, "wider")
+    assert items[0]["text"] == (
+        "Build order:\n\n1. Phase one does the first thing, wrapped across two lines.\n2. Phase two."
+    )
+
+
 def test_parses_multiple_items_in_file_order(tmp_path):
     text = """1. **[done, 2026-09-18]** **[Dashboard UI]** First item.
 

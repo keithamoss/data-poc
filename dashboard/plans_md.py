@@ -63,6 +63,12 @@ _THREAD_STATUS_RE = re.compile(
     r"^\*\*Status:\*\*\s*([a-z-]+)\s*\((\d{4}-\d{2}-\d{2})\)\s*·\s*\*\*Category:\*\*\s*(.+)$"
 )
 _NOTE_HEADING_RE = re.compile(r"^###\s+(?:(\d+)\.\s+)?(.+)$")
+# A list-item marker within an item's own body - either a "- "/"* " bullet
+# or a "1. "/"2. " ordered marker (real bug, found via Keith's own
+# dashboard report 2026-09-19: only bullets were recognised, so a numbered
+# sub-list like plans/tooling.md #1's own "Build order" phase list got
+# silently word-joined into one illegible paragraph).
+_LIST_MARKER_RE = re.compile(r"^(?:[-*]\s+|\d+\.\s+)")
 
 # The 5 numbered-item files and the 2 Thread/Phase essay files, keyed by
 # the short "file" id the dashboard's URL/filter state uses - deliberately
@@ -83,15 +89,15 @@ NOTES_FILE = "running-thoughts.md"
 
 
 def _join_blocks(blocks: list[str]) -> str:
-    """Joins block strings (plain paragraphs or `- `/`* ` bullet lines)
-    back into one markdown string - consecutive bullets stay on their own
-    single-newline-separated lines (one real list), everything else gets
-    a blank-line paragraph break, so the renderer can tell the two apart
-    without re-parsing indentation."""
+    """Joins block strings (plain paragraphs or `- `/`* `/`N. ` list-item
+    lines) back into one markdown string - consecutive list items stay on
+    their own single-newline-separated lines (one real list), everything
+    else gets a blank-line paragraph break, so the renderer can tell the
+    two apart without re-parsing indentation."""
     out: list[str] = []
     prev_bullet = None
     for b in blocks:
-        is_bullet = b.startswith(("- ", "* "))
+        is_bullet = bool(_LIST_MARKER_RE.match(b))
         if out:
             out.append("\n" if (is_bullet and prev_bullet) else "\n\n")
         out.append(b)
@@ -126,12 +132,12 @@ def _parse_numbered_items(text: str, file_key: str) -> list[dict]:
                 if cur_words:
                     blocks.append(" ".join(cur_words))
                     cur_words = []
-            elif stripped.startswith(("- ", "* ")):
+            elif _LIST_MARKER_RE.match(stripped):
                 if cur_words:
                     blocks.append(" ".join(cur_words))
                     cur_words = []
                 blocks.append(stripped)
-            elif blocks and blocks[-1].startswith(("- ", "* ")) and not cur_words:
+            elif blocks and _LIST_MARKER_RE.match(blocks[-1]) and not cur_words:
                 blocks[-1] += " " + stripped
             else:
                 cur_words.extend(stripped.split())

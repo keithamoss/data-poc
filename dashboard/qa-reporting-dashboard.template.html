@@ -181,7 +181,7 @@ button{font:inherit; color:inherit;}
 .plans-entry-body{padding:0 16px 16px; font-size:13.5px; line-height:1.6; border-top:1px solid var(--line); margin-top:2px; padding-top:12px;}
 .plans-entry-body p{margin:0 0 10px;}
 .plans-entry-body p:last-child{margin-bottom:0;}
-.plans-entry-body ul{margin:0 0 10px; padding-left:20px;}
+.plans-entry-body ul, .plans-entry-body ol{margin:0 0 10px; padding-left:20px;}
 .plans-entry-body li{margin-bottom:4px;}
 
 /* ============ Grid / cards ============ */
@@ -3184,10 +3184,22 @@ function inlinePlansMd(s){
 }
 function renderPlansMarkdown(md){
   if(!md) return "";
+  // A list-item line is either a "- "/"* " bullet or a "1. "/"2. " ordered
+  // marker (real bug fix, 2026-09-19 - Keith's own dashboard report: only
+  // bullets were recognised, so a numbered sub-list like plans/tooling.md
+  // #1's own "Build order" phase list rendered as one illegible run-on
+  // paragraph). An all-ordered block renders as <ol>; a mixed block (e.g.
+  // a numbered phase with its own nested "- " sub-bullets, dashboard/
+  // plans_md.py's own line-based parser can't tell nesting depth apart)
+  // safely falls back to <ul> - still a real list, just not numbered.
+  const isBulletLine = l => /^[-*]\s+/.test(l);
+  const isOrderedLine = l => /^\d+\.\s+/.test(l);
   return md.split(/\n\n+/).map(block=>{
     const lines = block.split("\n");
-    if(lines.length && lines.every(l=>/^[-*]\s+/.test(l))){
-      return `<ul>${lines.map(l=>`<li>${inlinePlansMd(l.replace(/^[-*]\s+/,""))}</li>`).join("")}</ul>`;
+    if(lines.length && lines.every(l=>isBulletLine(l)||isOrderedLine(l))){
+      const tag = lines.every(isOrderedLine) ? "ol" : "ul";
+      const items = lines.map(l=>`<li>${inlinePlansMd(l.replace(/^(?:[-*]|\d+\.)\s+/,""))}</li>`).join("");
+      return `<${tag}>${items}</${tag}>`;
     }
     return `<p>${inlinePlansMd(lines.join(" "))}</p>`;
   }).join("");

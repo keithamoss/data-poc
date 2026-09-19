@@ -103,6 +103,18 @@ describe("renderPlansMarkdown", () => {
     expect(html).toBe("<ul><li>a <strong>bold</strong> item</li><li>a <code>code</code> item</li></ul>");
   });
 
+  it("renders a block of consecutive numbered lines as a real <ol> - real bug, Keith's own report 2026-09-19", () => {
+    const w = load();
+    const html = w.renderPlansMarkdown("1. Phase one.\n2. Phase two.");
+    expect(html).toBe("<ol><li>Phase one.</li><li>Phase two.</li></ol>");
+  });
+
+  it("falls back to <ul> for a block mixing numbered phases with nested bullet sub-items", () => {
+    const w = load();
+    const html = w.renderPlansMarkdown("1. Phase one.\n- a sub-detail\n2. Phase two.");
+    expect(html).toBe("<ul><li>Phase one.</li><li>a sub-detail</li><li>Phase two.</li></ul>");
+  });
+
   it("returns an empty string for empty/falsy input", () => {
     const w = load();
     expect(w.renderPlansMarkdown("")).toBe("");
