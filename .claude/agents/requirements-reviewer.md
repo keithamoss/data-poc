@@ -85,7 +85,7 @@ precedent because they're the load-bearing part of doing this honestly:
   follow-up), so this never collides with another copy of itself
   another agent has running in parallel:
   ```
-  LOGFILE=$(mktemp) && PIDFILE=$(mktemp) && (uv run python3 scripts/dev/serve_dashboard_https.py > "$LOGFILE" 2>&1 & echo $! > "$PIDFILE") && sleep 1 && echo "https://localhost:$(grep -oP 'PORT=\K[0-9]+' "$LOGFILE")/qa-reporting-dashboard.html" && echo "stop later with: kill \$(cat $PIDFILE)"
+  LOGFILE=$(mktemp) && PIDFILE=$(mktemp) && (uv run python3 scripts/dev/serve_dashboard_https.py > "$LOGFILE" 2>&1 & echo $! > "$PIDFILE") && for i in $(seq 1 50); do grep -q "PORT=" "$LOGFILE" 2>/dev/null && break; sleep 0.2; done && echo "https://localhost:$(grep -oP 'PORT=\K[0-9]+' "$LOGFILE")/qa-reporting-dashboard.html" && echo "stop later with: kill \$(cat $PIDFILE)"
   ```
   Navigate to the printed URL. Run the printed `kill ...` command (via
   `Bash`) when you're done with it - never a blanket

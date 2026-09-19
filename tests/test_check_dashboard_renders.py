@@ -57,3 +57,32 @@ def test_main_fails_fast_when_the_dashboard_was_never_built(tmp_path, monkeypatc
     monkeypatch.setattr(cdr, "DASHBOARD_PATH", tmp_path / "does-not-exist.html")
 
     assert cdr.main() == 1
+
+
+def test_resolve_chromium_path_prefers_the_explicit_env_var(monkeypatch):
+    """A real bug, 2026-09-19 (found by claude/playwright-mcp-verify-
+    b2t4nb hitting exit 1 in a genuinely fresh sandbox): before this fix,
+    an unset PLAYWRIGHT_CHROMIUM_PATH meant Playwright's own default
+    channel lookup ran, which fails when the sandbox's installed
+    Chromium build doesn't match what the pinned Playwright package
+    expects."""
+    monkeypatch.setenv("PLAYWRIGHT_CHROMIUM_PATH", "/some/explicit/path")
+    monkeypatch.setattr(cdr, "_SANDBOX_CHROMIUM_SYMLINK", "/does/not/matter")
+
+    assert cdr._resolve_chromium_path() == "/some/explicit/path"
+
+
+def test_resolve_chromium_path_falls_back_to_the_sandbox_symlink_when_unset(monkeypatch, tmp_path):
+    monkeypatch.delenv("PLAYWRIGHT_CHROMIUM_PATH", raising=False)
+    fake_symlink = tmp_path / "chromium"
+    fake_symlink.write_text("")  # just needs to exist
+    monkeypatch.setattr(cdr, "_SANDBOX_CHROMIUM_SYMLINK", str(fake_symlink))
+
+    assert cdr._resolve_chromium_path() == str(fake_symlink)
+
+
+def test_resolve_chromium_path_returns_none_when_neither_is_available(monkeypatch, tmp_path):
+    monkeypatch.delenv("PLAYWRIGHT_CHROMIUM_PATH", raising=False)
+    monkeypatch.setattr(cdr, "_SANDBOX_CHROMIUM_SYMLINK", str(tmp_path / "does-not-exist"))
+
+    assert cdr._resolve_chromium_path() is None

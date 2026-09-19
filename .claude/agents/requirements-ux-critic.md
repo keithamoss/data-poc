@@ -52,8 +52,16 @@ a screenshot), `browser_click`/`browser_type`/`browser_hover`/
 `browser_press_key` to actually interact, `browser_resize` to test
 different real viewport sizes (mobile matters - Keith's own real find,
 2026-09-19, was a mobile-only bug this exact mechanism is meant to
-catch), `browser_take_screenshot` for real visual evidence,
-`browser_console_messages` to catch real JS errors, `browser_find` to
+catch), `browser_take_screenshot` for real visual evidence - **always
+pass a `filename` under `.playwright-mcp/`** (e.g.
+`.playwright-mcp/ux-01-whatever.png`), never a bare filename: a real,
+confirmed gap (2026-09-19, found by `claude/playwright-mcp-verify-
+b2t4nb` verifying this agent) is that `browser_take_screenshot`
+resolves a bare filename against the workspace root - real, git-tracked
+working tree - not the MCP's own output directory, leaving an
+untracked, uncommitted stray PNG behind; `.playwright-mcp/` is already
+gitignored for exactly this, `browser_console_messages` to catch real
+JS errors, `browser_find` to
 search the page's own accessibility snapshot for text, `browser_evaluate`
 to check real computed values (`document.title`, `document.activeElement`
 - see the SPA-navigation checks below). `browser_close` when you're done
@@ -70,7 +78,7 @@ captured to a file, via `Bash` - it binds an OS-assigned free port by
 default (2026-09-19, Keith's own follow-up), so this never collides
 with another copy of itself another agent has running in parallel:
 ```
-LOGFILE=$(mktemp) && PIDFILE=$(mktemp) && (uv run python3 scripts/dev/serve_dashboard_https.py > "$LOGFILE" 2>&1 & echo $! > "$PIDFILE") && sleep 1 && echo "https://localhost:$(grep -oP 'PORT=\K[0-9]+' "$LOGFILE")/qa-reporting-dashboard.html" && echo "stop later with: kill \$(cat $PIDFILE)"
+LOGFILE=$(mktemp) && PIDFILE=$(mktemp) && (uv run python3 scripts/dev/serve_dashboard_https.py > "$LOGFILE" 2>&1 & echo $! > "$PIDFILE") && for i in $(seq 1 50); do grep -q "PORT=" "$LOGFILE" 2>/dev/null && break; sleep 0.2; done && echo "https://localhost:$(grep -oP 'PORT=\K[0-9]+' "$LOGFILE")/qa-reporting-dashboard.html" && echo "stop later with: kill \$(cat $PIDFILE)"
 ```
 Navigate to the printed URL. Run the printed `kill ...` command (via
 `Bash`) when you're done with it - never a blanket

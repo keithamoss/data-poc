@@ -47,11 +47,36 @@ TEMPLATE_PATH = ROOT / "dashboard" / "qa-reporting-dashboard.template.html"
 # Normal Playwright resolution (needs `uv run playwright install chromium`
 # once - see pyproject.toml's dev dependency group) works on a real
 # contributor machine or a real CI runner. Some sandboxed dev
-# environments pre-install a Chromium build at a fixed path instead (a
-# version-pinned one that Playwright's own default channel lookup won't
-# find) - PLAYWRIGHT_CHROMIUM_PATH is the escape hatch for those, left
-# unset everywhere else.
-_CHROMIUM_PATH = os.environ.get("PLAYWRIGHT_CHROMIUM_PATH")
+# environments pre-install a Chromium build at a fixed, version-pinned
+# path instead that Playwright's own default channel lookup won't find
+# (a real, confirmed gap, 2026-09-19, found by `claude/playwright-mcp-
+# verify-b2t4nb` hitting exit 1 in a genuinely fresh sandbox - this
+# sandbox's installed `chromium_headless_shell-1194` didn't match what
+# the pinned Playwright package expected, `-1234`). `PLAYWRIGHT_
+# CHROMIUM_PATH` remains a real, explicit escape hatch when set - but
+# now falls back automatically to `/opt/pw-browsers/chromium`, this
+# environment's own documented, version-independent symlink (see this
+# session's own environment notes: "launch with executablePath:
+# '/opt/pw-browsers/chromium' instead of downloading" - a stable path
+# that survives the pinned browser build being bumped, unlike hardcoding
+# a version number), when that env var is unset AND the symlink actually
+# exists - so a fresh sandbox doesn't need the env var set by hand at
+# all. Falls through to Playwright's own default resolution (empty
+# kwargs) when neither applies - a real contributor machine or CI
+# runner, where this sandbox-specific path doesn't exist.
+_SANDBOX_CHROMIUM_SYMLINK = "/opt/pw-browsers/chromium"
+
+
+def _resolve_chromium_path() -> str | None:
+    explicit = os.environ.get("PLAYWRIGHT_CHROMIUM_PATH")
+    if explicit:
+        return explicit
+    if os.path.exists(_SANDBOX_CHROMIUM_SYMLINK):
+        return _SANDBOX_CHROMIUM_SYMLINK
+    return None
+
+
+_CHROMIUM_PATH = _resolve_chromium_path()
 
 
 def _check_embedded_json() -> list[str]:
