@@ -77,8 +77,29 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
      screenshot, not just code review); throwaway vs `--commit` both
      behave correctly against the real committed `qa_results/` tree;
      `uv run pytest`/`ruff` both clean, 490 tests passing (18 new).
-   - **Still open, Phase 1 not fully done yet**: Child Protection's own
-     `mothman cp` commands (same pattern, not yet built).
+   - **Phase 1 finished 2026-09-19**: `cli/cp.py` (Child Protection
+     commands) built on the same pattern as `cli/bdm.py`, adapted for
+     CP's real differences - a 6-table-per-run collection (not one CSV),
+     `run_check()` loading both the target and reference run's 6 tables
+     into their own per-run warehouses via `build_cp_warehouses.
+     add_table_to_run()` before calling `orchestrate_cp.run_single()`
+     (the same pattern `qa_tools/cp/check_delivery.py`'s own
+     `_load_delivery()` already established for local-folder CP checks,
+     reused here against an existing Synthetic manifest run's own
+     `data/cp_raw/<run_id>/` directory instead of an arbitrary folder),
+     and no row-count-growth/`previous_run_id` concept (CP has none).
+     `mothman cp generate-synthetic-data` and `mothman cp qa
+     [--run-id/--reference-run-id/--commit]` are real, working, both
+     flag-invocable and TUI-navigable - verified against the real
+     dbt-core/Soda Core/datacontract-cli/Evidently chain (177 real
+     checks, 0 fail) against real, existing local CP data, not mocked;
+     `cli/app.py`'s TUI main menu now offers a real Birth Registrations/
+     Child Protection dataset picker for both the QA and generate-
+     synthetic-data flows (previously a single-choice stand-in menu for
+     BDM only), confirmed via a real pty screenshot showing the Child
+     Protection branch of both menus. `uv run pytest`/`ruff` both clean
+     (13 new CP CLI tests + 3 new app-menu tests). Phase 1 is now fully
+     done - Phase 2 (Local-files QA source mode) is next.
 
    **Core shape, confirmed:**
    - Organized by dataset (bdm/cp) under a real interactive TUI - not

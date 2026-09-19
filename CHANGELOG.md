@@ -28,6 +28,24 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
+- **11:08am** — **mothman CLI Phase 1 Complete: Child Protection QA** **[Testing & dev tooling]** `cli/cp.py` -
+  `mothman cp generate-synthetic-data` and `mothman cp qa
+  [--run-id/--reference-run-id/--commit]`, the Child Protection
+  counterpart to the Birth Registrations commands below, on the same
+  wizard/flags duality. Adapted for CP's real shape: a 6-table-per-run
+  collection rather than one CSV, so `run_check()` loads both the target
+  and reference run's 6 tables into their own per-run warehouses (via
+  `build_cp_warehouses.add_table_to_run()`) before calling
+  `orchestrate_cp.run_single()` - the same pattern `qa_tools/cp/
+  check_delivery.py`'s own `_load_delivery()` already established for
+  local-folder CP checks, reused here against an existing Synthetic
+  manifest run instead of an arbitrary folder. `cli/app.py`'s TUI main
+  menu now offers a real Birth Registrations/Child Protection dataset
+  picker on both the QA and generate-synthetic-data flows. Verified
+  against the real dbt-core/Soda Core/datacontract-cli/Evidently chain
+  (177 real checks, 0 fail, against real existing local data) and via a
+  real pty screenshot of the new TUI dataset picker. `plans/tooling.md`
+  #1's Phase 1 is now fully done.
 - **11:00am** — **mothman CLI Phase 1: TUI Shell + Birth Registrations QA** **[Testing & dev tooling]** The
   real start of the unified `mothman` CLI/TUI (`plans/tooling.md` #1),
   built on Keith's own explicit go-ahead. `cli/app.py` (the root

@@ -11,6 +11,7 @@ from click.testing import CliRunner
 import cli.app as app
 import cli.bdm as bdm
 import cli.common as common
+import cli.cp as cp
 
 _runner = CliRunner()
 
@@ -23,14 +24,26 @@ def test_bare_mothman_with_no_real_terminal_fails_with_a_clear_message():
     assert "real interactive terminal" in result.output
 
 
-def test_qa_menu_picks_the_only_dataset_and_calls_run_qa_interactive(monkeypatch):
-    monkeypatch.setattr(common, "select", lambda *a, **k: "Birth Registrations")
+def test_qa_menu_picks_bdm_and_calls_its_run_qa_interactive(monkeypatch):
+    monkeypatch.setattr(common, "select", lambda *a, **k: app._DATASET_BDM)
     called = []
-    monkeypatch.setattr(bdm, "run_qa_interactive", lambda: called.append(True))
+    monkeypatch.setattr(bdm, "run_qa_interactive", lambda: called.append("bdm"))
+    monkeypatch.setattr(cp, "run_qa_interactive", lambda: called.append("cp"))
 
     app._qa_menu()
 
-    assert called == [True]
+    assert called == ["bdm"]
+
+
+def test_qa_menu_picks_cp_and_calls_its_run_qa_interactive(monkeypatch):
+    monkeypatch.setattr(common, "select", lambda *a, **k: app._DATASET_CP)
+    called = []
+    monkeypatch.setattr(bdm, "run_qa_interactive", lambda: called.append("bdm"))
+    monkeypatch.setattr(cp, "run_qa_interactive", lambda: called.append("cp"))
+
+    app._qa_menu()
+
+    assert called == ["cp"]
 
 
 def test_qa_menu_back_choice_does_not_run_anything(monkeypatch):
@@ -39,12 +52,13 @@ def test_qa_menu_back_choice_does_not_run_anything(monkeypatch):
     def _fail_if_called():
         raise AssertionError("Back must not run the QA flow")
     monkeypatch.setattr(bdm, "run_qa_interactive", _fail_if_called)
+    monkeypatch.setattr(cp, "run_qa_interactive", _fail_if_called)
 
     app._qa_menu()  # must not raise
 
 
 def test_generate_menu_first_run_skips_confirmation_and_generates(monkeypatch):
-    monkeypatch.setattr(common, "select", lambda *a, **k: "Birth Registrations")
+    monkeypatch.setattr(common, "select", lambda *a, **k: app._DATASET_BDM)
     monkeypatch.setattr(bdm, "manifest_exists", lambda: False)
     generated = []
     monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: generated.append(True))
@@ -59,7 +73,7 @@ def test_generate_menu_first_run_skips_confirmation_and_generates(monkeypatch):
 
 
 def test_generate_menu_existing_manifest_respects_a_declined_confirmation(monkeypatch):
-    monkeypatch.setattr(common, "select", lambda *a, **k: "Birth Registrations")
+    monkeypatch.setattr(common, "select", lambda *a, **k: app._DATASET_BDM)
     monkeypatch.setattr(bdm, "manifest_exists", lambda: True)
     monkeypatch.setattr(common, "confirm", lambda *a, **k: False)
 
@@ -68,6 +82,22 @@ def test_generate_menu_existing_manifest_respects_a_declined_confirmation(monkey
     monkeypatch.setattr(bdm, "generate_synthetic_data", _fail_if_called)
 
     app._generate_menu()  # must not raise
+
+
+def test_generate_menu_picks_cp_and_generates_via_the_cp_module(monkeypatch):
+    monkeypatch.setattr(common, "select", lambda *a, **k: app._DATASET_CP)
+    monkeypatch.setattr(cp, "manifest_exists", lambda: False)
+    generated = []
+    monkeypatch.setattr(cp, "generate_synthetic_data", lambda: generated.append(True))
+    monkeypatch.setattr(cp, "raw_dir", lambda: "/fake/cp_raw")
+
+    def _fail_if_called(*a, **k):
+        raise AssertionError("should not prompt when there's nothing to overwrite yet")
+    monkeypatch.setattr(common, "confirm", _fail_if_called)
+
+    app._generate_menu()
+
+    assert generated == [True]
 
 
 def test_main_menu_loop_exits_cleanly_on_back(monkeypatch, capsys):

@@ -9,7 +9,7 @@ from __future__ import annotations
 import rich_click as click
 from rich.console import Console
 
-from . import bdm, common
+from . import bdm, common, cp
 from .banner import print_banner
 
 click.rich_click.TEXT_MARKUP = "rich"
@@ -18,8 +18,11 @@ click.rich_click.STYLE_OPTION = common.TIER_1
 console = Console()
 
 _MAIN_MENU_QA = "Quality Assurance - run the real check chain against a dataset"
-_MAIN_MENU_GENERATE = "Generate synthetic data - Birth Registrations"
+_MAIN_MENU_GENERATE = "Generate synthetic data"
 _MAIN_MENU_EXIT = "Exit"
+
+_DATASET_BDM = "Birth Registrations"
+_DATASET_CP = "Child Protection"
 
 
 def _main_menu_loop() -> None:
@@ -42,30 +45,30 @@ def _main_menu_loop() -> None:
 
 
 def _qa_menu() -> None:
-    # Only Birth Registrations exists in Phase 1 - Child Protection joins
-    # once its own QA flow is built (plans/tooling.md #1's own phase
-    # order), so this is a single-choice "menu" for now rather than a
-    # dead end with nothing to pick.
-    dataset = common.select("Which dataset?", ["Birth Registrations"],
-                             flag_hint="mothman bdm qa")
+    dataset = common.select("Which dataset?", [_DATASET_BDM, _DATASET_CP],
+                             flag_hint="mothman bdm qa / mothman cp qa")
     if dataset is None:
         return
-    bdm.run_qa_interactive()
+    if dataset == _DATASET_BDM:
+        bdm.run_qa_interactive()
+    else:
+        cp.run_qa_interactive()
 
 
 def _generate_menu() -> None:
-    dataset = common.select("Which dataset?", ["Birth Registrations"],
-                             flag_hint="mothman bdm generate-synthetic-data")
+    dataset = common.select("Which dataset?", [_DATASET_BDM, _DATASET_CP],
+                             flag_hint="mothman bdm generate-synthetic-data / mothman cp generate-synthetic-data")
     if dataset is None:
         return
-    if bdm.manifest_exists() and not common.confirm(
-            "This will regenerate data/raw/ (deterministic - same content either way). Continue?",
+    mod, raw_dir_label = (bdm, "data/raw/") if dataset == _DATASET_BDM else (cp, "data/cp_raw/")
+    if mod.manifest_exists() and not common.confirm(
+            f"This will regenerate {raw_dir_label} (deterministic - same content either way). Continue?",
             yes=False, default=True):
         console.print("Not regenerated.", style="yellow")
         return
     console.print("Generating synthetic data...", style="dim")
-    bdm.generate_synthetic_data()
-    console.print(f"Generated -> {bdm.raw_dir()}", style="green")
+    mod.generate_synthetic_data()
+    console.print(f"Generated -> {mod.raw_dir()}", style="green")
 
 
 @click.group(invoke_without_command=True)
@@ -78,6 +81,7 @@ def cli(ctx: click.Context) -> None:
 
 
 cli.add_command(bdm.bdm_group)
+cli.add_command(cp.cp_group)
 
 
 def main() -> None:
