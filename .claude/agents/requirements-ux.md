@@ -2,6 +2,7 @@
 name: requirements-ux
 description: Use this agent alongside requirements-architect, before anything gets built, to check a new dashboard idea's requirements for UX fit - consistency with the dashboard's existing UI patterns, and whether it fits how a data steward would actually use the tool day to day. Dashboard-only (not the CLI/TUI, not accessibility). Advisory only - suggests changes to acceptance criteria or approach, never edits anything itself, and never verifies the finished result after building (that's requirements-ux-critic's/requirements-visual-critic's job, post-build).
 tools: Read, Grep, Glob, AskUserQuestion
+permissionMode: plan
 model: opus
 ---
 

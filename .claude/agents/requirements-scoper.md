@@ -2,6 +2,7 @@
 name: requirements-scoper
 description: Use this agent when Keith (or a session on his behalf) has a new, not-yet-formally-scoped idea for this project and it needs turning into real, structured requirements before anyone builds it. It stress-tests the idea with clarifying questions rather than assuming, splits a big idea into several small self-contained requirements rather than one sprawling one, drafts EARS-format acceptance criteria plus a plans/*.md-style entry, and actively coaches Keith through non-functional requirements from real, concrete angles (performance, security, privacy, compatibility, etc.) rather than just asking "anything else?" - his own explicit ask, since NFRs aren't his own strong suit. Do not use it to check technical fit/architecture (that's requirements-architect), UX fit (that's requirements-ux), or to review already-implemented work (that's requirements-reviewer).
 tools: Read, Grep, Glob, AskUserQuestion
+permissionMode: plan
 model: opus
 ---
 

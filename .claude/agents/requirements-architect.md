@@ -2,6 +2,7 @@
 name: requirements-architect
 description: Use this agent after requirements-scoper has drafted requirements for a new idea, to sanity-check technical fit before anything gets built. It checks for duplication/overlap with what already exists, whether the idea fits this project's existing mothman command-group structure, which real components it would touch, security and code-quality considerations, and optionally sketches a lightweight architecture/data-model note for whoever builds it. Deliberately NOT a full software-architecture agent - no ADRs, no API specs, no deep design docs. Advisory only, never edits code or plans files itself.
 tools: Read, Grep, Glob, AskUserQuestion
+permissionMode: plan
 model: opus
 ---
 

@@ -1003,3 +1003,42 @@ check_lifecycle.py`'s own `check_id` convention.
     diagnostic test (spawn `requirements-ux-critic`, ask it to report
     its own visible `mcp__playwright__*` tools) in the next fresh
     session on this repo to actually confirm it, rather than assuming.
+    **Keith's own follow-up, same day: a real prompt handed to him to
+    start that fresh session and confirm it himself** - see this
+    file's own closing note/the session transcript for the exact text
+    given.
+
+    **`permissionMode: plan` added, selectively - Keith's own explicit
+    "defense in depth" call.** Real ambiguity hit researching this
+    first: a first pass at the official docs summarized `plan` mode as
+    "read-only (reads files, runs read-only bash)"; a second, more
+    careful direct quote-check of the same real page instead found
+    `plan` described plainly as "read-only exploration," with the
+    built-in `Plan` subagent's own tools stated as "read-only tools;
+    Write and Edit are denied" - no documented mechanism for
+    distinguishing a read-only Bash command from a real write one.
+    Given that real contradiction between 2 research passes of the same
+    document, and the real risk of silently breaking
+    `requirements-reviewer`/`requirements-ux-critic`/`requirements-
+    visual-critic`'s own genuine need to run `uv run mothman dashboard
+    rebuild` via `Bash` (a real filesystem write, even though only to a
+    gitignored build path), applied `permissionMode: plan` only to the
+    3 agents that never use `Bash` at all -
+    `requirements-scoper`/`requirements-architect`/`requirements-ux` -
+    where it's unambiguously safe (pure defense-in-depth, no
+    functional change, since none of the 3 could ever write a file
+    anyway). Deliberately NOT applied to the other 3 yet - a real,
+    open question flagged rather than guessed at, worth resolving (via
+    the fresh session Keith is about to start to verify Playwright MCP
+    anyway) before deciding whether `plan` mode would actually break
+    their real `mothman dashboard rebuild` step or not.
+
+    **2 more real things recorded, Keith's own ask**: a periodic check
+    of the `.claude/agents/*.md` combined description-field token
+    budget (now a standing `CLAUDE.md` convention, checked 2026-09-19:
+    ~1,100 tokens combined, nowhere near the real 15,000-token warning
+    threshold) - and Claude Code's real spawn-time model-override
+    capability (plain language, e.g. "use the security-reviewer
+    subagent with Opus"), also now a standing `CLAUDE.md` note, since
+    Keith wants this proactively suggested when relevant rather than
+    only used if he happens to remember it exists.

@@ -27,6 +27,23 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Changed
+- **5:50pm** — **Defense-in-Depth: permissionMode: plan on the 3 Pure-Advisory Agents** **[Docs & process]** **[Testing & dev tooling]**
+  Keith's own ask: "defense in depth is important." Added the real,
+  harness-enforced `permissionMode: plan` field to
+  `requirements-scoper`/`requirements-architect`/`requirements-ux` -
+  the 3 agents that never use `Bash` at all, so it's unambiguously safe
+  (pure defense-in-depth, no functional change). Deliberately NOT
+  applied to the other 3 (which need `Bash` for `mothman dashboard
+  rebuild`) - real doc ambiguity found between 2 separate research
+  passes on what `plan` mode actually does to Bash execution, flagged
+  rather than guessed at. Also recorded 2 more standing conventions:
+  a periodic check of the combined agent description-field token
+  budget (checked today: ~1,100 tokens, nowhere near the real
+  15,000-token warning threshold), and Claude Code's real spawn-time
+  model-override capability, worth proactively suggesting rather than
+  only used if remembered.
+
 ### Fixed
 - **5:43pm** — **requirements-reviewer's Stale Playwright Instructions; a Real MCP Timing Gap Found** **[Docs & process]** **[Testing & dev tooling]**
   `requirements-reviewer` still described the pre-split ad hoc

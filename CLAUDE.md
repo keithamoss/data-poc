@@ -505,3 +505,25 @@ Rough layout:
     thing from picking a different legitimate primary URL for the same
     public content) - fell back to real WebSearch snippets instead,
     reported to Keith as snippet-only, not the full article.
+- **Periodically check the `.claude/agents/*.md` combined description-
+  field token budget** (2026-09-19, Keith's own ask - make this a
+  standing periodic check, same treatment as the pytest-runtime log
+  below). Claude Code warns at startup once combined subagent
+  descriptions (all non-built-in agents) exceed 15,000 tokens - the
+  `description:` field specifically, not the whole file, since only
+  that field loads for every session regardless of whether the agent
+  runs. Checked 2026-09-19: 6 real agents, ~4,450 characters combined
+  across just the `description:` fields (~1,100 tokens at a rough
+  4-chars/token estimate) - nowhere near the limit. Re-check whenever a
+  new agent is added or an existing one's description grows
+  substantially, not on a fixed schedule.
+- **Claude Code supports overriding a subagent's own default `model:`
+  at spawn time**, via plain language in the request itself (e.g. "use
+  the security-reviewer subagent with Opus to examine this module") -
+  the named model takes precedence over the agent file's own `model:`
+  frontmatter for that one invocation. Keith's own ask, 2026-09-19: a
+  good thing to actually remember and use, not just know about -
+  worth proactively suggesting when a specific run of one of this
+  project's own `requirements-*` agents would benefit from a deeper
+  (or, for something trivial, cheaper/faster) pass than its own default
+  model, rather than only ever using each agent's file-defined default.
