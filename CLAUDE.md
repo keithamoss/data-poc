@@ -534,6 +534,18 @@ Rough layout:
     `WebFetch` failure alone as proof it's still blocked - verify with a
     raw `curl` first, and fall back to `curl` + direct reading if
     `WebFetch` still won't cooperate.
+  - **`clig.dev`, `lawsofux.com`, `www.nngroup.com`** (2026-09-19) -
+    all blocked; hit researching real HCI/usability-psychology grounding
+    for the `requirements-ux`/CLI-TUI UX work Keith asked to revisit
+    (`plans/wider.md` #10's own deferred "ground the UX agent's intent
+    in real human-psychology/HCI research" item). `clig.dev` worked
+    around via its own real GitHub source
+    (`raw.githubusercontent.com/cli-guidelines/cli-guidelines/main/
+    content/_index.md`, not blocked - same repo, same content, real
+    primary source); `lawsofux.com`/`www.nngroup.com` had no working
+    alternate route found, fell back to WebSearch snippets (several
+    real secondary sources - UX Tigers, Toptal, LogRocket, The Decision
+    Lab - cited the underlying research clearly enough to use).
 - **Periodically check the `.claude/agents/*.md` combined description-
   field token budget** (2026-09-19, Keith's own ask - make this a
   standing periodic check, same treatment as the pytest-runtime log
