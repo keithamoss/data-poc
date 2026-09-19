@@ -1128,6 +1128,104 @@ check_lifecycle.py`'s own `check_id` convention.
     rebuild` step - this session verified the MCP wiring only, and
     didn't test that.
 
+    **Resolved, 2026-09-19 evening, by the `claude/playwright-mcp-
+    verify-b2t4nb` session** (asked to pick up `claude/new-session-
+    en9qen` and verify several things, including this) - and it also
+    found a real, important correction to the paragraph above. Couldn't
+    test `permissionMode: plan` live, two ways, and correctly didn't
+    work around either: a new throwaway agent file added mid-session
+    isn't registered (`Agent type ... not found` - the same session-
+    start-only agent-list read this project has now hit twice, see
+    `requirements-cli-ux-critic`'s own entry above), and editing an
+    EXISTING agent's frontmatter (`requirements-architect`, temporarily
+    adding `Bash`) was denied outright by the harness's own auto-mode
+    self-modification guard. So it verified the real, documented
+    behaviour from Claude Code's own primary docs instead:
+
+    - `plan` mode does NOT block `Bash` outright. Verbatim: "Claude
+      reads files, runs shell commands to explore, and writes a plan,
+      but does not edit your source" - "the classifier reviews shell
+      commands during planning instead of prompting you. Approved
+      commands run, and rejected ones are blocked. Otherwise, commands
+      outside the built-in read-only set prompt for approval." So the
+      real mechanism IS a read-only/side-effecting distinction (a
+      built-in read-only set plus a classifier for everything else) -
+      the second, more careful research pass earlier this project
+      (quoted just above, "no documented mechanism for distinguishing a
+      read-only Bash command from a real write one") undersold what
+      actually exists. `mothman dashboard rebuild` is genuinely side-
+      effecting (writes a gitignored build file), so under `plan` mode
+      in a normal (non-auto) session it would prompt for approval, not
+      execute silently and not get blocked outright either.
+    - **The real, more consequential correction**: "When the main
+      conversation is in `bypassPermissions`, `acceptEdits`, or auto
+      mode, the subagent runs in that same mode and Claude Code ignores
+      the `permissionMode` you set." This project's own sessions run in
+      auto mode a meaningful fraction of the time (this one included) -
+      in an auto-mode session, the `permissionMode: plan` added to
+      `requirements-scoper`/`requirements-architect`/`requirements-ux`
+      in `ed6435f` is a real, literal no-op: the subagent just inherits
+      auto mode instead. It's still correct, real protection in a
+      non-auto session (the original "pure defense-in-depth, no
+      functional change" framing above only holds THERE) - but the
+      blanket claim needed this caveat, which the original entry didn't
+      have. Confirms the decision not to apply `plan` mode to the 3
+      `Bash`-using critics was still the right call either way: in a
+      non-auto session, `mothman dashboard rebuild` being side-effecting
+      would mean `plan` mode prompts for approval inside a subagent with
+      no human there to answer it.
+
+    **The same verification session's other real findings** (asked to
+    pick up this branch and check several things at once - the full
+    HTTPS/port-collision mechanism, both critics running for real, and
+    the `permissionMode` question above):
+
+    - **Mechanism confirmed working, with one honestly-labelled gap.**
+      `serve_dashboard_https.py` works exactly as designed (ephemeral
+      port, `PORT=<n>` parsed cleanly, `curl` 200, `kill $(cat
+      $PIDFILE)` genuinely stops it) and the `cd405b9` port-collision fix
+      holds for real (two servers ran concurrently on distinct ports,
+      no bind error, each critic got its own). The one leg that
+      genuinely couldn't be tested end-to-end: that session's own live
+      MCP server process had started from the OLD `.mcp.json` (before
+      `--ignore-https-errors` existed) - checking out this branch
+      mid-session doesn't restart it, the same staleness class as the
+      original `file://` bug. Proved the underlying mechanism correct
+      anyway via a standalone script using the same server/Chromium
+      (`ignore_https_errors=False` → `net::ERR_CERT_AUTHORITY_INVALID`;
+      `=True` → real page, real title) - the fix is right, it just needs
+      a genuinely fresh session (new MCP server process) to confirm
+      through `.mcp.json` itself, same resolution as every other
+      session-start-only-read gap this project keeps hitting.
+    - **Both critics ran for real and produced real findings.**
+      `requirements-ux-critic` independently rediscovered `plans/
+      dashboard.md` #12 (the mobile overflow bug) with NO hints, and its
+      own measured number matched the already-recorded one exactly
+      (`maxScrollLeft: 457`, `plans/dashboard.md` #12's own "457px wider
+      than the phone"). `requirements-visual-critic` found 3 further
+      real things, each independently verified in source (not taken on
+      trust) - logged in `plans/dashboard.md` alongside #15, see that
+      file for detail.
+    - **4 real, mechanical issues found, flagged not fixed by that
+      session** (out of scope for someone else's branch): (1)
+      `mothman dashboard rebuild` exits 1 in a genuinely fresh sandbox -
+      not a branch bug, this sandbox's installed Chromium build
+      (`chromium_headless_shell-1194`) doesn't match what the pinned
+      Playwright package expects (`-1234`); the project's own
+      `PLAYWRIGHT_CHROMIUM_PATH` escape hatch fixes it (exit 0 once
+      set), but all 3 dashboard-driving agents' own instructions START
+      with this command, so a fresh sandbox without that env var set
+      could make one give up thinking something's actually broken. (2)
+      `browser_take_screenshot` resolves a bare `filename` against the
+      workspace root, not `.playwright-mcp/` - the visual critic's own
+      `vis-*.png` files landed as untracked repo-root files (caught and
+      self-corrected by relocating them before finishing, tree left
+      clean). (3) After a failed HTTPS navigate, the browser context
+      parks on `chrome-error://chromewebdata` and keeps reporting that
+      page until explicitly navigated away. (4) The agents' own
+      `sleep 1` before parsing `PORT=` held 3/3 in timed testing but is
+      a real race under load, not a guaranteed wait.
+
     **Follow-up, same day, 2026-09-19 evening**: flagged to Keith that
     `serve_dashboard_https.py`'s fixed default port (8743) would collide
     if two of the 3 Playwright-driving agents ever ran in parallel - he
