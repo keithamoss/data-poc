@@ -764,3 +764,23 @@ common/check_lifecycle.py`'s own `check_id` convention.
     confirming the real `blink` attribute is present on both eye spans;
     existing tests updated to match (no behaviour change to what they
     already covered).
+
+12. **[todo, 2026-09-19]** **[Dashboard UI]** Real mobile UI bug, found
+    live by Keith on his own phone: long, space-less strings (real file
+    paths and pytest node ids in the Requirements panel's `linked_tests`
+    list - e.g. `tests/test_dashboard_e2e.py::TestRequirementsPanel::
+    test_opening_it_shows_real_requirements_with_badges_and_linked_tests`
+    - are exactly the kind of string that won't naturally break) overflow
+    the viewport width on mobile instead of wrapping, causing real
+    horizontal scrolling. Keith's own words: "we should be using better
+    CSS wrapping here to make sure that things get wrapped and there's
+    no horizontal scrolling." He flagged the Requirements panel
+    specifically but suspects other panels may have the same issue
+    (anywhere else a `<code>` span renders a real file path/test id
+    without a length cap is worth checking once this gets picked up -
+    the Activity/Changelog panels' own `<code>` usage for check ids/
+    file paths is the obvious place to check first). Not yet scoped
+    beyond that - explicitly NOT to be fixed now, just flagged.
+
+    **Priority: work through today/tomorrow (2026-09-19, Keith's own
+    explicit ask).**

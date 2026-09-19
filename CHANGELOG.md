@@ -27,6 +27,24 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Added
+- **4:44pm** — **A Real Reference Doc For This Project's Own Component Taxonomy** **[Docs & process]**
+  `docs/components.md` - Keith's own ask: the 7-part component
+  taxonomy `plans/*.md`/`CHANGELOG.md`/`requirements.yaml`'s own ids
+  already tag things with had never been written up in one place with
+  real names, codes, scope, and file/directory ownership. Now it is:
+  one section per component (`GEN`/`QAC`/`PIPE`/`DASH`/`GHUB`/`TEST`/
+  `DOCS`), each with what it owns, what's in scope, and - just as
+  important - what's explicitly out of scope against its neighbours
+  (e.g. `QAC` owns check definitions and what red/amber/green means;
+  `PIPE` owns how a run gets committed/published; `DASH` only ever
+  renders what another component already computed). Wired into the
+  requirements-analysis agents that actually need it:
+  `requirements-scoper` reads it to pick a new requirement's id code,
+  `requirements-architect` reads it for its own cross-component
+  blast-radius check, and `docs/project-context-for-agents.md` now
+  points to it.
+
 ### Changed
 - **4:38pm** — **Requirements Register: Component-Coded IDs, Written Dates, Scoper Now Asks About NFRs** **[Docs & process]**
   Three more real refinements to the requirements

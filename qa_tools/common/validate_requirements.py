@@ -58,7 +58,10 @@ REQUIREMENTS_YAML = ROOT / "requirements.yaml"
 # `COMPONENT_ICON`/`PLANS_ALL_COMPONENTS` consts), just condensed to
 # 3-4 letters for the id. Keep this dict and those two consts in sync
 # by hand if the taxonomy itself ever changes - nothing currently
-# cross-checks them against each other.
+# cross-checks them against each other. docs/components.md has the
+# full write-up of what each one actually covers (real scope, real
+# file/directory ownership, in/out-of-scope boundary against its
+# neighbours) - this dict is deliberately just the bare code mapping.
 _COMPONENT_CODES = {
     "GEN": "Data generation",
     "QAC": "QA checks & contract",

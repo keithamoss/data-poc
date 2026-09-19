@@ -32,10 +32,12 @@ else**, then read the scoper's draft requirement(s) you've been handed.
    `pipeline`/`population`), or does it genuinely need a new one? Read
    `cli/`'s own layout to check, don't guess from the names alone.
 3. **Cross-component blast radius.** Which real components would this
-   actually touch (`contract/`, `qa_tools/`, `generator/`, `dashboard/`,
-   etc.)? If it spans enough of them, say so - that's a signal it might
-   need the cross-component treatment `plans/wider.md` items get, not a
-   single-file scoped item.
+   actually touch - `docs/components.md` has the full write-up of the 7
+   (`GEN`/`QAC`/`PIPE`/`DASH`/`GHUB`/`TEST`/`DOCS`), including real
+   file/directory ownership per one, so you can name them precisely
+   rather than guessing from directory names alone. If it spans enough
+   of them, say so - that's a signal it might need the cross-component
+   treatment `plans/wider.md` items get, not a single-file scoped item.
 4. **Security.** Any real concern worth flagging - new external access,
    anything that could touch data this project's own hard rules say CI
    must never touch, anything that widens what a script/agent can do.

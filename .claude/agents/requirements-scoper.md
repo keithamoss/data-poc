@@ -99,14 +99,20 @@ For each new requirement, draft:
 
 ```yaml
 - id: REQ-<CODE>-NNN     # <CODE> is a real 3-4 letter component code -
-                          # GEN/QAC/PIPE/DASH/GHUB/TEST/DOCS, see
-                          # qa_tools/common/validate_requirements.py's
-                          # own `_COMPONENT_CODES` for the definitive
-                          # list and requirements.yaml's own header
-                          # comment for what each maps to. Pick the one
-                          # component this requirement most belongs to
-                          # (same taxonomy plans/*.md items and
-                          # CHANGELOG.md entries already tag with). NNN:
+                          # GEN/QAC/PIPE/DASH/GHUB/TEST/DOCS. Read
+                          # docs/components.md before picking one - it
+                          # has the real scope, file/directory
+                          # ownership, and in/out-of-scope boundary for
+                          # each, not just the bare code list
+                          # (qa_tools/common/validate_requirements.py's
+                          # own `_COMPONENT_CODES` is the definitive
+                          # list of the codes themselves). Pick the one
+                          # component this requirement's PRIMARY
+                          # user-facing outcome belongs to, not
+                          # whichever file happens to need editing -
+                          # docs/components.md's own intro has the same
+                          # guidance for the genuinely-straddles-two-
+                          # components case. NNN:
                           # leave the real number for whoever applies
                           # this - you don't know the next free one
                           # without reading the live requirements.yaml

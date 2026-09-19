@@ -134,6 +134,13 @@ for the full, current, authoritative breakdown)
 | `requirements.yaml` | The live, structured requirements register (MoSCoW, acceptance criteria, real CI-enforced test linkage) - this is what the requirements-scoper/reviewer agents write into. |
 | `mothman` (`cli/`) | The one and only programmatic entry point to every script in this repo - nothing outside it should be invoked directly. |
 
+**`docs/components.md` has the full write-up of this project's own
+7-part component taxonomy** (`GEN`/`QAC`/`PIPE`/`DASH`/`GHUB`/`TEST`/
+`DOCS`) - names, scope, real file/directory ownership, and the
+in/out-of-scope boundary against each neighbour. `requirements-scoper`
+needs this specifically to pick the right code for a new requirement's
+`id` (`REQ-<CODE>-NNN`) - read it before drafting one.
+
 ## Conventions worth carrying into any BA-style work
 
 - **`mothman` is the only sanctioned way to run anything in this repo** -
