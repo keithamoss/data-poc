@@ -620,6 +620,25 @@ check_lifecycle.py`'s own `check_id` convention.
     exist elsewhere," not "what does the psychology literature say about
     good UX," which is a separate, deliberately deferred question.
 
+    **Follow-up, same day: does `agapi-koutsi/UX-Design-Critique`
+    actually show why its multi-persona approach works well?** Keith
+    asked directly, genuinely curious given how "pretty complex" it
+    sounded. Dug further (a direct fetch of its raw `README.md`, plus a
+    web search for any write-up, example output, or case study) and
+    found nothing beyond the one-line pitch already quoted above - no
+    screenshots of a real critique session, no sample agent dialogue,
+    no before/after example, no stated rationale for why 3 personas +
+    a moderator beats one reviewer. Honest finding: this looks like a
+    small, undocumented personal project (its author, Agapi Koutsi, is
+    a real UI/UX designer - Lead Product Designer, Questrade Financial
+    Group, per her own public profile - so the concept itself has real
+    design-practitioner authorship behind it), not a validated case
+    study. Keith's own reaction: interested in the UX-critic/visual-
+    critic split specifically (real precedent for that comes from
+    `cfisch3r/estimate` PR #91 above, which DOES show concrete
+    implementation, unlike this one) but wants it parked for now - "put
+    that to the side for now and come back to me on this."
+
     **Requirements-register schema refined further, same day** - three
     more real follow-up asks, before the agent system's first real run:
     - **Component-coded ids.** Every `requirements.yaml` id is now
@@ -644,3 +663,24 @@ check_lifecycle.py`'s own `check_id` convention.
       the existing "check against this project's own standing rules"
       one, Keith's own explicit call that relying on self-derived NFRs
       alone wasn't enough.
+
+    **Follow-up, same day: `requirements-scoper` now actively coaches
+    Keith through NFRs, not just asks once.** Keith's own words: "I feel
+    like I'm not good at doing non-functional requirements... I'd like
+    it to prompt me from different angles." The single generic
+    `AskUserQuestion` step above was replaced with a real, named set of
+    10 angles (performance, scalability, reliability, security, privacy/
+    data sensitivity, compatibility/portability, maintainability,
+    observability/auditability, compliance/retention, cost) - adapted
+    from the real ISO/IEC 25010 software-quality-characteristics
+    taxonomy, each one translated into a concrete question grounded in
+    this project's own real domain (e.g. "would this requirement's own
+    assumptions still hold if this were ever pointed at real production
+    Birth Registrations/Child Protection data" for privacy, "will this
+    still hold up once `qa_results/` has years of real history" for
+    scalability) rather than left as abstract textbook categories. The
+    agent works through the list itself, judges which angles are
+    plausibly relevant to the specific requirement at hand, and asks
+    Keith about those via batched `AskUserQuestion` calls (up to 4
+    questions per call) - genuine active coaching, not a mechanical
+    10-question interrogation on every requirement.

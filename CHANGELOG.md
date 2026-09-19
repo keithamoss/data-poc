@@ -27,6 +27,24 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Changed
+- **4:49pm** — **requirements-scoper Now Actively Coaches Non-Functional Requirements** **[Docs & process]**
+  Keith's own words: "I feel like I'm not good at doing non-functional
+  requirements... I'd like it to prompt me from different angles." The
+  single generic non-functional-requirements question was replaced with
+  10 real, concrete angles - adapted from the real ISO/IEC 25010
+  software-quality-characteristics taxonomy, but each one translated
+  into a question grounded in this project's own actual domain rather
+  than left abstract (performance, scalability, reliability, security,
+  privacy/data sensitivity, compatibility/portability, maintainability,
+  observability/auditability, compliance/retention, cost - e.g. privacy
+  asks "would this requirement's own assumptions still hold if this were
+  ever pointed at real production Birth Registrations/Child Protection
+  data," not a generic "any privacy concerns?"). The agent judges which
+  angles are plausibly relevant per requirement and asks about those via
+  batched `AskUserQuestion` calls, not a mechanical 10-question
+  interrogation every time.
+
 ### Added
 - **4:44pm** — **A Real Reference Doc For This Project's Own Component Taxonomy** **[Docs & process]**
   `docs/components.md` - Keith's own ask: the 7-part component
