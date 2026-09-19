@@ -307,3 +307,25 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
    consider adding tests for it." Not scoped further than that - revisit
    alongside whatever eventually wires this package into the real
    pipeline (if it ever does), not before.
+
+   **Still true as of `plans/tooling.md` #1 Phase 5 (2026-09-19)**: that
+   phase gave `synthetic_data_generator/` a real `mothman population`
+   CLI entry point (Tier 4, explicitly exploratory), but did NOT wire it
+   into the real BDM/CP pipeline - this item's own "not before" gate
+   still hasn't been met, so it stays parked. Phase 5's own tests
+   (`tests/test_cli_population.py`) are the narrower, standing
+   "whenever an actual bug is found" convention (CLAUDE.md), not a
+   response to this item: a real, genuine logic bug surfaced live while
+   building the CLI wrapper (`synthetic_data_generator/generate.py`'s
+   `build()` was calling `dirty_mod.apply_cp_notifications_presets()`
+   with its OLD 3-arg signature - the real function had since grown
+   `clients_df`/`workers_df` params for dangling-FK injection that
+   `generator/generate_cp_runs.py`'s own call site was updated for, but
+   this sibling call site in `synthetic_data_generator/` never was,
+   precisely because it's unwired and gets none of the real pipeline's
+   own maintenance). Fixed (passing `cp_tables["cp_clients"]`/
+   `cp_tables["cp_case_workers"]` through, matching `generate_cp_runs.
+   py`'s real calling convention) and covered by a regression test,
+   confirmed failing against the pre-fix code with the exact real
+   `TypeError` first. Comprehensive test coverage for the rest of
+   `synthetic_data_generator/` remains genuinely out of scope here.

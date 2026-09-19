@@ -39,16 +39,19 @@ installed package contents) is gitignored, same as `target/` and
 
 `mothman` (`./mothman` or `uv run mothman`) is the only programmatic
 access point to this repo (`plans/tooling.md` #1) - `mothman pipeline
-run` above is one of five command groups: `bdm`/`cp` (Quality Assurance +
-Generate/Regenerate synthetic data, Tier 1, also reachable via the
-interactive TUI from a bare `./mothman`), `dashboard` (the dashboard
-rebuild/embed/validate/snapshot chain, Tier 2), `github` (GitHub Issues
-ticket/acceptance/leaderboard sync, Tier 2), `debug` (per-tool debug
-runners against a run already on disk - `run-dbt`/`run-soda`/
-`run-datacontract`/`run-evidently`/`build-warehouses`/`load-warehouse`/
-`changelog`, Tier 3), and `pipeline` (the full real-tool batch run
-this section just ran, Tier 2). `./mothman <group> --help` lists each
-group's own commands.
+run` above is one of six command groups/commands: `bdm`/`cp` (Quality
+Assurance + Generate/Regenerate synthetic data, Tier 1, also reachable
+via the interactive TUI from a bare `./mothman`), `dashboard` (the
+dashboard rebuild/embed/validate/snapshot chain, Tier 2), `github`
+(GitHub Issues ticket/acceptance/leaderboard sync, Tier 2), `debug`
+(per-tool debug runners against a run already on disk - `run-dbt`/
+`run-soda`/`run-datacontract`/`run-evidently`/`build-warehouses`/
+`load-warehouse`/`changelog`, Tier 3), `pipeline` (the full real-tool
+batch run this section just ran, Tier 2), and `population` (a
+population-scale, cross-agency-identity-linked synthetic dataset via
+the separate `synthetic_data_generator/` package - Tier 4, explicitly
+exploratory, not wired into the real QA pipeline above). `./mothman
+<group> --help` lists each group's own commands.
 
 `uv` is the only supported path — deliberately, not an oversight. This
 repo gets handed to other people to run on their own machines as part of
@@ -648,6 +651,11 @@ held from the original equivalent-only build.
 `synthetic_data_generator/` is a separate, larger generator vendored into
 this repo (population-scale, cross-agency identity-linked) - not
 currently wired into the QA pipeline itself (see `plans/data-generation.md` #3).
+Run it via `./mothman population` (Tier 4, explicitly exploratory -
+`plans/tooling.md` #1 Phase 5), e.g. `./mothman population --population
+200000 --outdir synthetic_data_generator/output/demo` /
+`./mothman population --population 3000000 --outdir
+synthetic_data_generator/output/full_scale --dirty amber`.
 `generator/` (what the pipeline actually uses) doesn't reuse
 `population.py`'s whole-population household model — `generator/
 daily_batch.py` is a purpose-built event-flow generator instead, because a

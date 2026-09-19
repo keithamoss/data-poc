@@ -28,6 +28,26 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
+- **1:35pm** — **mothman CLI Phase 5: Population Data Command** **[Testing & dev tooling]** `mothman population`
+  (Tier 4, explicitly exploratory) wraps `synthetic_data_generator/`'s
+  own real argparse CLI - a population-scale (up to millions),
+  cross-agency-identity-linked synthetic dataset spanning 3 fictional
+  agencies (Registry Services/BDM, Child & Family Safety, Education),
+  still genuinely NOT wired into the real BDM/CP QA pipeline. Found and
+  fixed a real, genuine bug live while smoke-testing `--dirty amber` for
+  the first time: `synthetic_data_generator/generate.py`'s `build()`
+  was calling `apply_cp_notifications_presets()` with a stale 3-arg
+  signature that had drifted out of sync with the real function
+  (`generator/dirty.py` had since grown `clients_df`/`workers_df`
+  params for dangling-FK injection, updated in `generator/
+  generate_cp_runs.py`'s own call site but never in this unwired
+  sibling) - exactly the kind of drift a previously-parked item had
+  already flagged as a risk. Fixed and covered by a real regression
+  test, confirmed failing against the pre-fix code first with the exact
+  real `TypeError`. 6 new tests, real small-population smoke tests
+  (including a cross-agency identity resolution check - the same
+  synthetic person's name/DOB matching across all 3 agencies' own ID
+  schemes), `uv run pytest`/`ruff check .` both clean.
 - **1:13pm** — **mothman CLI Phase 4: Reorganized Every Remaining Script Into the CLI** **[Testing & dev tooling]**
   `mothman dashboard`/`mothman github`/`mothman debug`/`mothman pipeline` -
   4 new command groups replacing the last ~24 bare script entry points

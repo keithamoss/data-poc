@@ -6,11 +6,11 @@ same people (BDM birth registrations, school enrollment) - then writes
 everything to CSV, with an optional --dirty mode that seeds known QA
 failure modes into the output.
 
-Run from the repo root (needs generator/ importable alongside this
-package - see synthetic_data_generator/__init__.py):
+Run via `mothman population` (Tier 4, explicitly exploratory - cli/
+population.py, plans/tooling.md #1 Phase 5), never this module bare:
 
-    python3 -m synthetic_data_generator.generate --population 200000 --outdir synthetic_data_generator/output/demo
-    python3 -m synthetic_data_generator.generate --population 3000000 --outdir synthetic_data_generator/output/full_scale --dirty amber
+    ./mothman population --population 200000 --outdir synthetic_data_generator/output/demo
+    ./mothman population --population 3000000 --outdir synthetic_data_generator/output/full_scale --dirty amber
 
 Output layout:
     <outdir>/public/...        what a downstream QA/test consumer would get -
@@ -75,7 +75,8 @@ def build(population_n: int, seed: int, n_case_workers: int, dirty: str):
         t3 = time.time()
         birth_reg = dirty_mod.apply_birth_registrations_presets(birth_reg, dirty, seed=seed + 4000)
         cp_tables["cp_notifications"] = dirty_mod.apply_cp_notifications_presets(
-            cp_tables["cp_notifications"], dirty, seed=seed + 4100)
+            cp_tables["cp_notifications"], cp_tables["cp_clients"], cp_tables["cp_case_workers"],
+            dirty, seed=seed + 4100)
         print(f"  applied '{dirty}' failure-injection presets in {time.time()-t3:.1f}s")
 
     return pop, cp_tables, birth_reg, school

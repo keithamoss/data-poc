@@ -356,6 +356,54 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
      none found outside historical narrative comments (which stay,
      describing real past events) and this bullet's own "never a bare
      ... invocation" phrasing.
+   - **Phase 5 finished 2026-09-19**: the Tier 4 "Population Data"
+     command, explicitly exploratory - `mothman population` wraps
+     `synthetic_data_generator/generate.py`'s own real argparse CLI
+     (`build()`/`build_linkage_answer_key()`/`write_outputs()`/
+     `print_cross_agency_demo()`) with the exact same options/defaults
+     (`--population`/`--seed`/`--case-workers`/`--dirty`/`--outdir`/
+     `--demo-examples`) under the mothman umbrella - a reorg of the
+     entry point, not a rewrite of what it does, and NOT wired into the
+     real BDM/CP pipeline (still genuinely separate - `plans/data-
+     generation.md` #3/#8). Flag-invocable only, not part of the
+     interactive TUI's guided flows (those stay Tier 1/2/3) - matches
+     its own "exploratory" framing. `cli/common.TIER_4` (`magenta`,
+     defined since Phase 1 but unused until now) styles its own status
+     output.
+
+     A real, genuine logic bug surfaced live while smoke-testing
+     `--dirty amber` for the first time (not something already known -
+     found by actually running the real tool, this project's standing
+     verification practice): `synthetic_data_generator/generate.py`'s
+     `build()` called `dirty_mod.apply_cp_notifications_presets()` with
+     its OLD 3-arg signature (`df, severity, seed`) - the real function
+     had since grown `clients_df`/`workers_df` params for dangling-FK
+     injection (`generator/dirty.py`), which `generator/
+     generate_cp_runs.py`'s own call site was updated for at the time,
+     but this sibling call site in the unwired `synthetic_data_
+     generator/` package never was - exactly the kind of drift `plans/
+     data-generation.md` #8 already flagged as a risk of leaving that
+     package untested and unwired. Fixed (passes `cp_tables["cp_
+     clients"]`/`cp_tables["cp_case_workers"]` through, matching
+     `generate_cp_runs.py`'s real calling convention) and covered by a
+     real regression test (`tests/test_cli_population.py`, confirmed
+     failing against the pre-fix code with the exact real `TypeError`
+     first, per CLAUDE.md's standing "whenever an actual bug is found"
+     convention - a logic bug, not the environment/wiring exception, so
+     no need to ask first). `plans/data-generation.md` #8 updated with a
+     pointer - its own "not before [the package is wired into the real
+     pipeline]" gate on comprehensive coverage still holds; this was the
+     narrower, always-applicable bug-fix rule, not a response to that
+     item.
+
+     Verified: `--help`, a real small-population run (`--population 300`,
+     confirms `public/`/`internal/` outputs land correctly, including
+     the "ground truth - do not distribute" internal linkage answer
+     key), a real cross-agency identity demo (`--population 2000
+     --demo-examples 1` - confirmed the SAME name/DOB resolves correctly
+     across all 3 agencies' own ID schemes for one real synthetic
+     person), and both `--dirty amber`/`--dirty red` (the bug above,
+     now fixed). 6 new tests, `uv run pytest`/`ruff check .` both clean.
 
    **Core shape, confirmed:**
    - Organized by dataset (bdm/cp) under a real interactive TUI - not
