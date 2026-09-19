@@ -27,6 +27,24 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Added
+- **9:59am** — **TUI/CLI Screenshot Capture Tooling** **[Testing & dev tooling]** A real dev-only helper
+  (`scripts/dev/tui_screenshot.py`) for showing actual rendered CLI/TUI
+  output during development, ahead of the mothman CLI build itself
+  (still gated on Keith's own explicit go-ahead - see `plans/wider.md`
+  #7's rewrite below). Spawns a real command in a real pseudo-terminal
+  (stdlib `pty`), scripts keystrokes into it, and resolves the raw ANSI
+  byte stream through a real terminal-emulator buffer (`pyte`, new
+  dev-only dependency) into the actual on-screen character grid -
+  necessary because `questionary`/`rich`-style TUIs redraw in place via
+  cursor-movement/erase codes, so the raw byte stream alone isn't what a
+  human would actually see on screen. Renders that grid to HTML and
+  screenshots it via this sandbox's pre-installed headless Chromium
+  (pinned to its actual installed `chromium-1194` build via an explicit
+  `executable_path`, since it lags the `playwright` package's own
+  expected version here). Verified end to end against a small real
+  `rich` demo script; never imported by the shipped pipeline/CLI.
+
 ### Changed
 - **8:22am** — **On-Demand Checks Rebuilt With Click** **[Pipeline & publishing]** **[Testing & dev tooling]** The two on-demand check CLIs added
   minutes earlier switched from argparse to real Click commands (Keith's
