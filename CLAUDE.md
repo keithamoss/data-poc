@@ -477,3 +477,9 @@ Rough layout:
     reliance on search-engine-crawled snippets of that content rather
     than reading the primary source directly. `code.claude.com` (Claude
     Code's own docs) was reachable and didn't need this workaround.
+  - **`codecentric.de`, `iamjeremie.me`** (2026-09-19) - blocked; hit
+    while researching real-world "BA agent"/spec-driven-development
+    subagent examples for the same requirements-analysis work - two
+    real, relevant blog posts (isolated-specification-testing
+    reasoning, a spec-pipeline write-up) only readable via search-engine
+    snippets, not the primary source.
