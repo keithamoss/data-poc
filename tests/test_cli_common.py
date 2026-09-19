@@ -31,9 +31,19 @@ def test_select_returns_none_on_back(monkeypatch):
     assert common.select("pick one", ["a", "b"], flag_hint="x") is None
 
 
-def test_select_returns_none_on_ctrl_c_or_esc(monkeypatch):
-    """questionary returns None itself on Ctrl-C/Esc - treated the same
-    as an explicit Back, not as an error."""
+def test_select_returns_none_when_questionary_signals_cancellation(monkeypatch):
+    """This mocks questionary.select() to simulate a `None` answer (what
+    it returns for real on Ctrl-C - the only real cancellation key it
+    binds, plans/tooling.md #9, 2026-09-19) and checks common.select()'s
+    own pass-through logic treats that the same as an explicit Back, not
+    an error. It does NOT exercise real questionary key-binding
+    behaviour itself - a real, live pty-driven check of that (confirming
+    Ctrl-C really does return None, and Escape genuinely does not) was
+    done manually via scripts/dev/tui_drive.py while investigating
+    plans/tooling.md #9; not duplicated here as an automated test, since
+    that would mean either a slow, fixture-heavy real-pty test in a unit
+    suite that otherwise mocks this entirely, or coupling this test to
+    questionary's own internal key-binding implementation."""
     monkeypatch.setattr(common, "require_tty", lambda hint: None)
     monkeypatch.setattr(common.questionary, "select",
                          lambda *a, **k: type("Q", (), {"ask": lambda self: None})())
@@ -53,7 +63,10 @@ def test_select_returns_the_real_choice(monkeypatch):
     assert captured["choices"] == ["a", "b", common.BACK]  # Back always appended
 
 
-def test_path_prompt_returns_none_on_ctrl_c_or_esc(monkeypatch):
+def test_path_prompt_returns_none_when_questionary_signals_cancellation(monkeypatch):
+    """Same real caveat as test_select_returns_none_when_questionary_
+    signals_cancellation above - a mocked `None` answer (real Ctrl-C
+    behaviour), not a live exercise of questionary's own key bindings."""
     monkeypatch.setattr(common, "require_tty", lambda hint: None)
     monkeypatch.setattr(common.questionary, "path",
                          lambda *a, **k: type("Q", (), {"ask": lambda self: None})())

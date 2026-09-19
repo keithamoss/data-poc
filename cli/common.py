@@ -71,8 +71,13 @@ def select(message: str, choices: list[str], flag_hint: str) -> str | None:
     """A questionary select with the non-TTY guard already applied and a
     real "<- Back" choice always appended (the wizard back-navigation gap
     plans/tooling.md #1 flagged as a real, previously-undesigned hole).
-    Returns None if the operator picked Back or hit Ctrl-C/Esc - callers
-    treat that uniformly as "go back a step", not as an error."""
+    Returns None if the operator picked Back or hit Ctrl-C - callers treat
+    that uniformly as "go back a step", not as an error. Escape does NOT
+    also trigger this (a real, previously-undocumented gap found via
+    scripts/dev/tui_drive.py, 2026-09-19, plans/tooling.md #9 - the
+    installed questionary version never binds Keys.Escape in any of its
+    prompt types, only Ctrl-C/Ctrl-Q; this docstring used to claim
+    otherwise)."""
     require_tty(flag_hint)
     answer = questionary.select(message, choices=[*choices, BACK], style=_QMARK_STYLE).ask()
     if answer is None or answer == BACK:
@@ -84,9 +89,11 @@ def path_prompt(message: str, flag_hint: str) -> str | None:
     """A questionary.path() prompt (real tab-completion filesystem
     browsing, no hand-built file picker needed - plans/tooling.md #1's
     own Local-files QA source mode design) with the same non-TTY guard
-    every other prompt here uses. Returns None on Ctrl-C/Esc or a blank
+    every other prompt here uses. Returns None on Ctrl-C or a blank
     answer - callers treat that the same as select()'s Back: stop the
-    flow, don't proceed with an empty path."""
+    flow, don't proceed with an empty path. Escape does NOT also trigger
+    this - same real gap as select()'s own docstring above, questionary
+    never binds Escape in any of its prompt types."""
     require_tty(flag_hint)
     answer = questionary.path(message, style=_QMARK_STYLE).ask()
     return answer or None

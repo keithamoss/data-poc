@@ -1053,7 +1053,7 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
    needs confirming with him before real research time goes into any
    one of them, not guessed from a garbled transcription.
 
-9. **[todo, 2026-09-19]** **[Testing & dev tooling]** Real, verified
+9. **[done, 2026-09-19]** **[Testing & dev tooling]** Real, verified
    documentation/behaviour mismatch in `cli/common.py`: `select()`'s own
    docstring (and `path_prompt()`'s) claims "Returns None if the
    operator picked Back or hit Ctrl-C/Esc" - but a real, live test via
@@ -1076,3 +1076,36 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
    regression test first per this project's own standing "whenever an
    actual bug is found" convention (`CLAUDE.md`), confirmed failing
    against today's actual behaviour before any fix lands.
+
+   **Root cause found and fixed, same evening, Keith's own explicit
+   go-ahead**: grepped the actual installed `questionary` package's
+   source (`.venv/lib/.../questionary/prompts/*.py`) - `select()` binds
+   only `Keys.ControlC`/`Keys.ControlQ` to cancel (raising
+   `KeyboardInterrupt`, which `.ask()` turns into `None`); a repo-wide
+   grep for `Keys.Escape` across every real prompt type questionary
+   ships (`select`, `path`, `text`, `checkbox`, ...) found zero matches
+   - this questionary version never binds Escape to anything, in any
+   prompt type, not just `select()`. Chose "correct the docstring" over
+   "make Escape actually work": patching a third-party library's own
+   internal key bindings post-construction would be fragile (version-
+   coupled, no supported extension point for this in questionary's
+   public API) for a purely cosmetic UX nicety nobody had actually
+   asked for - the honest, low-risk fix was making `cli/common.py`'s
+   own docstrings (`select()`/`path_prompt()`) say what's actually true
+   (Ctrl-C only) rather than adding new library-patching surface area.
+   Also found and fixed the same real inaccuracy baked into
+   `tests/test_cli_common.py`'s own test names
+   (`test_select_returns_none_on_ctrl_c_or_esc`/`test_path_prompt_
+   returns_none_on_ctrl_c_or_esc`) - both tests only ever mocked
+   `questionary.select`/`.path` to return `None` directly (real Ctrl-C
+   behaviour), never actually exercising real questionary key-binding
+   behaviour at all, so their own names asserted something neither test
+   had ever verified - exactly the kind of gap that let the docstring
+   claim go unnoticed. Renamed both to describe what they actually test
+   (`common.select()`/`common.path_prompt()`'s own `None`-pass-through
+   logic), with a real docstring explaining the live pty-driven
+   verification (via `tui_drive.py`) happened manually, not as an
+   automated test - deliberately not duplicated as a real-pty unit test,
+   since that would either slow down an otherwise-fully-mocked test
+   file or couple it to questionary's own internal implementation. All
+   13 `tests/test_cli_common.py` tests still pass; `ruff` clean.

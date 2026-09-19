@@ -27,6 +27,21 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Fixed
+- **7:03pm** — **cli/common.py's Escape-Key Claim Corrected; Misleading Test Names Fixed** **[Testing & dev tooling]**
+  Root-caused the real `select()`/`path_prompt()` docstring mismatch
+  found while verifying `tui_drive.py` (`plans/tooling.md` #9): grepped
+  the actual installed `questionary` package - it never binds `Escape`
+  in any real prompt type (`select`, `path`, `text`, `checkbox`), only
+  `Ctrl-C`/`Ctrl-Q`. Fixed the docstrings to say what's actually true
+  rather than patch a third-party library's own internal key bindings
+  for a UX nicety nobody had asked for. Also found and fixed the same
+  inaccuracy baked into `tests/test_cli_common.py`'s own test names -
+  both only ever mocked a `None` return (real Ctrl-C behaviour), never
+  actually exercising real key-binding behaviour, so the names claimed
+  something neither test had verified. Renamed both to say what they
+  actually test.
+
 ### Added
 - **6:58pm** — **Real HCI/Behavioral-Psychology Grounding for the UX Agents; a New CLI/TUI Review Pair** **[Docs & process]** **[Dashboard UI]** **[Testing & dev tooling]**
   Keith's own deferred ask, finally revisited: ground `requirements-ux`'s
