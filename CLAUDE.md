@@ -470,3 +470,10 @@ Rough layout:
     session verify the live published dashboard directly (e.g. "is a
     just-deployed fix actually visible in production") instead of only
     inferring from GitHub Actions run status/logs.
+  - **`anthropic.com`** (2026-09-19) - blocked; hit while researching
+    Anthropic's own published multi-agent design guidance ("Building
+    Effective Agents", the multi-agent research system writeup) for the
+    requirements-analysis subagent work (`plans/wider.md` #10) - forced
+    reliance on search-engine-crawled snippets of that content rather
+    than reading the primary source directly. `code.claude.com` (Claude
+    Code's own docs) was reachable and didn't need this workaround.
