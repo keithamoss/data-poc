@@ -991,3 +991,64 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
    one real, already-known need (`dashboard rebuild`) - whether other
    `mothman` subcommands would eventually get their own tools too is a
    real question for whenever this gets picked up.
+
+7. **[todo, 2026-09-19]** **[Testing & dev tooling]** Bring real Google
+   Lighthouse findings into one of the requirements-analysis agents'
+   own review pass - Keith's own idea, prompted directly by the local-
+   HTTPS-serving work above ("this gives me a good idea"). Confirmed
+   real and working, not just plausible, before parking it: the real
+   `lighthouse` npm package (v13.5.0) ran end to end against the real
+   dashboard, served locally over HTTPS the same way
+   `scripts/dev/serve_dashboard_https.py` already does, pointed at this
+   sandbox's own installed Chromium via the real `CHROME_PATH` env var
+   (no separate browser download needed - matches the same real-binary-
+   reuse pattern this project already uses for Playwright). Produced a
+   real, structured JSON report with real, specific findings, not
+   placeholder output - e.g. a real `aria-hidden-focus` violation
+   (`[aria-hidden="true"]` elements containing focusable descendants)
+   and a real `color-contrast` failure, alongside category scores
+   (accessibility 0.90, best-practices 0.96, performance 0.25 - the
+   performance number is very likely an artefact of Lighthouse's
+   default throttled-CPU simulation against this dashboard's own
+   deliberately-different single-file-with-everything-embedded
+   architecture (7.9MB of inline data) rather than a real reflection of
+   how the actual published GitHub Pages site performs for a real
+   visitor - not yet confirmed either way, a real thing to check before
+   trusting that number for anything).
+
+   **Real, concrete relevance**: Lighthouse's accessibility category is
+   genuine, real prior art for a gap this project has already
+   identified and left open - `requirements-ux`/`requirements-ux-
+   critic`/`requirements-visual-critic` all explicitly declare
+   accessibility out of scope today, so nothing currently checks it at
+   all. Not yet scoped: which agent this belongs to (a new dedicated
+   accessibility-focused pass, or folded into
+   `requirements-visual-critic`'s existing remit), whether to run the
+   full Lighthouse suite (performance/best-practices/SEO too, several
+   of which may not even apply meaningfully to a single-file static
+   dashboard with no build pipeline, no server-side rendering, no SPA
+   routing) or scope it to just `accessibility`, and how findings get
+   reported (raw Lighthouse JSON is real but verbose - needs real
+   shaping into the same evidence-based finding format the other
+   critics already use). A real conversation with Keith before
+   building, same as every other agent-capability decision this
+   session.
+
+8. **[todo, 2026-09-19]** **[Testing & dev tooling]** Investigate
+   whether Snyk has something real worth bringing into the
+   requirements-analysis agents - flagged by Keith, real name garbled
+   in voice dictation ("the SNCC Snyk security project" - not a real,
+   recognizable Snyk product name as transcribed). Real candidates,
+   given what's already come up naturally in this project's own recent
+   research (the Snyk UI/UX-skills article, `plans/tooling.md` #5's own
+   write-up): the real "Snyk MCP integration" the article itself
+   mentioned in passing ("if you are already using Snyk Code or the
+   Snyk MCP integration, you can scan skill scripts the same way you
+   scan any code"); Snyk Code itself (static analysis); the real
+   ToxicSkills research project the same article cited (prompt-
+   injection/malicious-payload scanning for Claude Skills specifically -
+   directly relevant given this project has now installed 2 real,
+   external, third-party skills, `plans/tooling.md` #5). Not yet
+   investigated at all - which of these (if any) Keith actually meant
+   needs confirming with him before real research time goes into any
+   one of them, not guessed from a garbled transcription.
