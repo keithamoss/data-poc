@@ -52,6 +52,12 @@ NAMED_KEYS = {
     "backspace": "\x7f",
 }
 
+# ESC[6n (Device Status Report / cursor-position-request) and a real
+# terminal's own reply, ESC[<row>;<col>R - see _drain()'s own comment
+# for why this is answered for real rather than left unanswered.
+_CPR_QUERY = "\x1b[6n"
+_CPR_RESPONSE = b"\x1b[1;1R"
+
 
 def parse_steps(raw_steps: list[str]) -> list[dict]:
     """Each --step is either "wait:<substring>[:timeout_seconds]" (block
@@ -120,6 +126,26 @@ def record(cmd: list[str], steps: list[dict], cols: int, rows: int,
                 text = chunk.decode("utf-8", errors="replace")
                 events.append((time.time() - t0, text))
                 decoded_so_far += text
+                # Answer a real CPR (cursor-position-request, ESC[6n) query
+                # the moment it appears - prompt_toolkit/questionary send
+                # one on every fresh prompt render to check the real
+                # terminal's cursor position, and a real terminal always
+                # answers it (ESC[<row>;<col>R back on stdin). Skipping
+                # this used to leave the query unanswered, which did two
+                # real things wrong: printed a "your terminal doesn't
+                # support cursor position requests" warning INTO the
+                # recording itself (a real artifact of this synthetic
+                # pty, not something a real mothman user in a real
+                # terminal would ever see - caught live when the first
+                # real recording shipped with it baked in), and left the
+                # settle-pause-after-every-wait workaround above as the
+                # only thing preventing the timing bug that warning's own
+                # fallback delay could otherwise cause. Answering for
+                # real, immediately, fixes both at the actual source
+                # rather than working around the symptom.
+                if _CPR_QUERY in text:
+                    for _ in range(text.count(_CPR_QUERY)):
+                        os.write(master_fd, _CPR_RESPONSE)
                 continue
             if deadline is not None and time.time() >= deadline:
                 return
