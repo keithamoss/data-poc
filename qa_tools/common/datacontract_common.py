@@ -19,7 +19,7 @@ ENGINE_TAG = "datacontract-cli 1.2.0"
 
 DIMENSION_BY_METRIC = {
     "missing_count": "completeness",
-    "invalid_count": "validity",
+    "invalid_count": "conformity",
     "duplicate_count": "uniqueness",
     "custom_sql": "consistency",
     "row_count": "completeness",

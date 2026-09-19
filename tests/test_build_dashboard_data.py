@@ -186,7 +186,7 @@ def test_a_retired_checks_metadata_is_carried_through(tmp_path, monkeypatch):
     these two fields directly."""
     sex_check_id = "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.accepted_values_dbt"
     monkeypatch.setattr(bdd, "collect_checks", lambda ref: [
-        CheckMetadata(check_id=sex_check_id, tool="dbt", config_hash="abc123", source_file="fake.yml",
+        CheckMetadata(check_id=sex_check_id, category="conformity", tool="dbt", config_hash="abc123", source_file="fake.yml",
                       retired_as_of="2026-09-17", retired_reason="Superseded by a stricter rule."),
     ])
     monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))
@@ -211,7 +211,7 @@ def test_a_checks_description_and_changelog_are_carried_through(tmp_path, monkey
     changelog = [{"date": "2026-06-01T10:00:00Z", "description": "Tightened threshold",
                   "author": "Keith Moss", "breaking": False}]
     monkeypatch.setattr(bdd, "collect_checks", lambda ref: [
-        CheckMetadata(check_id=sex_check_id, tool="dbt", config_hash="abc123", source_file="fake.yml",
+        CheckMetadata(check_id=sex_check_id, category="conformity", tool="dbt", config_hash="abc123", source_file="fake.yml",
                       description="Sex must be one of the closed value set.", changelog=changelog),
     ])
     monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))

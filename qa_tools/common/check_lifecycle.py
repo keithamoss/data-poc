@@ -51,9 +51,63 @@ class MissingCheckIdError(ValueError):
     as "not yet migrated"."""
 
 
+class MissingCategoryError(ValueError):
+    """Raised when a check has no category in its metadata. Same
+    mandatory-no-grace-period treatment as MissingCheckIdError, for the
+    same reason: the 2026-09-19 categorisation retrofit gave every real
+    check a category alongside its check_id (Keith's own explicit call,
+    scoped via AskUserQuestion - a data-quality-dimension taxonomy,
+    explicit per-check metadata, "same pattern check_id already uses",
+    not inferred from tool/engine at read time)."""
+
+
+class InvalidCategoryError(ValueError):
+    """Raised when a check's category isn't one of CHECK_CATEGORIES - a
+    closed list (unlike check_id, which is free-form but unique), since
+    the whole point is a small, consistent set of data-quality
+    dimensions a human can filter/group by, not an open-ended taxonomy
+    that drifts per author."""
+
+
+# The data-quality-dimension taxonomy every real check in the system is
+# tagged with (2026-09-19, Keith's own explicit call via AskUserQuestion:
+# an explicit per-check field, "same pattern check_id already uses").
+# NOT an invented list - the ODCS contract's own quality rules already
+# carry a real, human-authored `dimension:` field (completeness/
+# conformity/consistency/timeliness/uniqueness - the real ODCS spec's own
+# enum, already used correctly on all 89 real datacontract-cli checks
+# well before this retrofit, e.g. `dimension: consistency` on every
+# relationships_datacontract check, `dimension: completeness` on every
+# rowCount_datacontract check - confirmed by reading the contract
+# directly, not assumed) AND already echoed into every real check
+# RESULT record across all 8 run_*.py modules as a `dimension` field
+# (also pre-existing, also confirmed by reading the code, not assumed).
+# Reusing that exact vocabulary here rather than inventing a rival one
+# that means the same thing in different words - the same real-world
+# rule is often implemented 3 ways (dbt + Soda + datacontract-cli) and
+# must land in the SAME category regardless of which tool runs it. A
+# real, pre-existing inconsistency was found and fixed alongside this
+# retrofit: dbt's/Soda's own per-module dimension dicts used "validity"
+# for the same conformity-type checks (accepted_values/matches_regex/
+# invalid_percent) the contract already correctly tagged "conformity" -
+# normalized to "conformity" everywhere (qa_tools/bdm/run_dbt_bdm.py,
+# qa_tools/cp/run_dbt_cp.py, qa_tools/bdm/run_soda_bdm.py,
+# qa_tools/common/datacontract_common.py). No category beyond ODCS's own
+# 5 was needed even for Evidently's own PSI drift checks, which already
+# had a real dimension value (consistency) before this retrofit too.
+CHECK_CATEGORIES = frozenset({
+    "completeness",  # required values/rows present (not_null, missing_count, row_count)
+    "uniqueness",    # no duplicates (unique, duplicate_count/duplicateValues)
+    "conformity",    # value/format/range conforms to what's expected (accepted_values, regex, range)
+    "consistency",   # cross-field/cross-table logical + business-rule constraints (relationships, ordering)
+    "timeliness",    # recency/freshness of the data itself
+})
+
+
 @dataclass
 class CheckMetadata:
     check_id: str
+    category: str
     tool: str
     config_hash: str
     source_file: str
@@ -71,6 +125,16 @@ def _config_hash(config: dict) -> str:
     crash the hash."""
     canonical = json.dumps(config, sort_keys=True, default=str)
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]
+
+
+def _require_category(meta: dict, error_prefix: str) -> str:
+    category = meta.get("category")
+    if not category:
+        raise MissingCategoryError(f"{error_prefix} has no category")
+    if category not in CHECK_CATEGORIES:
+        raise InvalidCategoryError(
+            f"{error_prefix} has category {category!r}, not one of {sorted(CHECK_CATEGORIES)}")
+    return category
 
 
 def _lifecycle_fields(meta: dict) -> dict:
@@ -99,8 +163,9 @@ def _parse_dbt_test(test: Any, source: str, location: str) -> list[CheckMetadata
     check_id = meta.get("check_id")
     if not check_id:
         raise MissingCheckIdError(f"{source}: {location}: dbt test {test_type!r} has no meta.check_id")
+    category = _require_category(meta, f"{source}: {location}: dbt test {test_type!r} (check_id={check_id!r})")
     return [CheckMetadata(
-        check_id=check_id, tool="dbt", config_hash=_config_hash(test_config),
+        check_id=check_id, category=category, tool="dbt", config_hash=_config_hash(test_config),
         source_file=source, **_lifecycle_fields(meta),
     )]
 
@@ -119,8 +184,9 @@ def _parse_dbt_singular_test(entry: dict, source: str) -> list[CheckMetadata]:
     check_id = meta.get("check_id")
     if not check_id:
         raise MissingCheckIdError(f"{source}: singular test {name!r} has no config.meta.check_id")
+    category = _require_category(meta, f"{source}: singular test {name!r} (check_id={check_id!r})")
     return [CheckMetadata(
-        check_id=check_id, tool="dbt", config_hash=_config_hash(config),
+        check_id=check_id, category=category, tool="dbt", config_hash=_config_hash(config),
         source_file=source, **_lifecycle_fields(meta),
     )]
 
@@ -135,13 +201,13 @@ def parse_dbt_check_metadata(schema_yml_path: Path | str) -> list[CheckMetadata]
         for test in model.get("tests", []) or []:  # model-level (dbt_utils.expression_is_true etc.)
             try:
                 out.extend(_parse_dbt_test(test, source, f"model {model['name']!r}"))
-            except MissingCheckIdError as e:
+            except (MissingCheckIdError, MissingCategoryError, InvalidCategoryError) as e:
                 errors.append(str(e))
         for col in model.get("columns", []) or []:
             for test in col.get("tests", []) or []:
                 try:
                     out.extend(_parse_dbt_test(test, source, f"model {model['name']!r} column {col['name']!r}"))
-                except MissingCheckIdError as e:
+                except (MissingCheckIdError, MissingCategoryError, InvalidCategoryError) as e:
                     errors.append(str(e))
     # Singular tests (tests/*.sql) - a real, pre-existing gap until
     # 2026-09-16: this function only ever walked models[].tests/
@@ -153,7 +219,7 @@ def parse_dbt_check_metadata(schema_yml_path: Path | str) -> list[CheckMetadata]
     for entry in doc.get("tests", []) or []:
         try:
             out.extend(_parse_dbt_singular_test(entry, source))
-        except MissingCheckIdError as e:
+        except (MissingCheckIdError, MissingCategoryError, InvalidCategoryError) as e:
             errors.append(str(e))
     if errors:
         raise MissingCheckIdError("\n".join(errors))
@@ -243,9 +309,10 @@ def _parse_soda_check(check: Any, source: str, location: str) -> list[CheckMetad
     check_id = attributes.get("check_id")
     if not check_id:
         raise MissingCheckIdError(f"{source}: {location}: soda check {check_expr!r} has no attributes.check_id")
+    category = _require_category(attributes, f"{source}: {location}: soda check {check_expr!r} (check_id={check_id!r})")
     check_config.pop("name", None)  # cosmetic label, not part of what the check does
     return [CheckMetadata(
-        check_id=check_id, tool="soda", config_hash=_config_hash(check_config),
+        check_id=check_id, category=category, tool="soda", config_hash=_config_hash(check_config),
         source_file=source, **_lifecycle_fields(attributes),
     )]
 
@@ -262,7 +329,7 @@ def parse_soda_check_metadata(soda_yml_path: Path | str) -> list[CheckMetadata]:
         for check in checks or []:
             try:
                 out.extend(_parse_soda_check(check, source, key))
-            except MissingCheckIdError as e:
+            except (MissingCheckIdError, MissingCategoryError, InvalidCategoryError) as e:
                 errors.append(str(e))
     if errors:
         raise MissingCheckIdError("\n".join(errors))
@@ -283,12 +350,20 @@ def _parse_contract_quality_rule(rule: dict, source: str, location: str) -> list
     if not check_id:
         rule_label = rule.get("rule") or rule.get("type") or rule.get("metric")
         raise MissingCheckIdError(f"{source}: {location}: quality rule {rule_label!r} has no check_id customProperty")
+    # category comes from the rule's own NATIVE `dimension:` field, not a
+    # new customProperties entry - every real quality rule here already
+    # carries a real, human-authored ODCS dimension (completeness/
+    # conformity/consistency/timeliness/uniqueness), well before this
+    # retrofit - see CHECK_CATEGORIES' own docstring for why this reuses
+    # that vocabulary rather than adding a redundant parallel field.
+    category = _require_category({"category": rule.get("dimension")},
+                                  f"{source}: {location}: quality rule (check_id={check_id!r})")
     native_description = rule.pop("description", None)
     changelog = meta.get("changelog")
     if isinstance(changelog, str):
         changelog = json.loads(changelog)  # ODCS customProperties values are scalar - a list gets stored as a JSON string
     return [CheckMetadata(
-        check_id=check_id, tool="datacontract", config_hash=_config_hash(rule),
+        check_id=check_id, category=category, tool="datacontract", config_hash=_config_hash(rule),
         source_file=source,
         introduced_date=meta.get("introduced_date"), retired_as_of=meta.get("retired_as_of"),
         retired_reason=meta.get("retired_reason"),
@@ -314,13 +389,13 @@ def parse_contract_check_metadata(contract_yaml_path: Path | str) -> list[CheckM
         for rule in table.get("quality", []) or []:  # table-level quality rules
             try:
                 out.extend(_parse_contract_quality_rule(rule, source, f"table {table_name!r}"))
-            except MissingCheckIdError as e:
+            except (MissingCheckIdError, MissingCategoryError, InvalidCategoryError) as e:
                 errors.append(str(e))
         for prop in table.get("properties", []) or []:
             for rule in prop.get("quality", []) or []:
                 try:
                     out.extend(_parse_contract_quality_rule(rule, source, f"table {table_name!r} column {prop.get('name')!r}"))
-                except MissingCheckIdError as e:
+                except (MissingCheckIdError, MissingCategoryError, InvalidCategoryError) as e:
                     errors.append(str(e))
     if errors:
         raise MissingCheckIdError("\n".join(errors))
@@ -336,13 +411,32 @@ def parse_evidently_check_metadata(check_lifecycle: dict, source: str) -> list[C
     testable with a plain dict fixture."""
     out = []
     for check_id, meta in check_lifecycle.items():
+        category = _require_category(meta, f"{source}: evidently check (check_id={check_id!r})")
         config = {k: v for k, v in meta.items()
-                  if k not in ("introduced_date", "retired_as_of", "retired_reason", "description", "changelog")}
+                  if k not in ("introduced_date", "retired_as_of", "retired_reason", "description", "changelog",
+                                "category")}
         out.append(CheckMetadata(
-            check_id=check_id, tool="evidently", config_hash=_config_hash(config),
+            check_id=check_id, category=category, tool="evidently", config_hash=_config_hash(config),
             source_file=source, **_lifecycle_fields(meta),
         ))
     return out
+
+
+def category_by_check_id(checks: list[CheckMetadata]) -> dict[str, str]:
+    """`{check_id: category}` for a list of already-parsed checks - the
+    real runtime wiring every `run_*.py` module uses to tag its own
+    result records with a category (2026-09-19), same pattern as
+    check_lifecycle.dbt_check_id_lookup()'s check_id lookup: read once at
+    import time from this module's own already-authoritative parse of
+    the check's real definition, not duplicated logic. A check_id already
+    resolved by each tool's own existing check_id-lookup machinery
+    (dbt_check_id_lookup()/check_id_from_resource_attributes()/
+    check_id_from_quality_definition()/CHECK_LIFECYCLE) is the key
+    straight into this dict, uniform across all 4 tools - no new
+    per-tool extraction helper needed, since category (like check_id)
+    already lives in each check's own meta/attributes/customProperties
+    block this module already parses."""
+    return {c.check_id: c.category for c in checks}
 
 
 # ---- Validation --------------------------------------------------------

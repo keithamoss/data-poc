@@ -171,8 +171,8 @@ _MODEL_LEVEL_TEST_COLUMN = {
 _DIMENSION_BY_TEST = {
     "unique": "uniqueness",
     "not_null": "completeness",
-    "accepted_values": "validity",
-    "matches_regex": "validity",
+    "accepted_values": "conformity",
+    "matches_regex": "conformity",
     "multiple_birth_sibling": "consistency",
     "accepted_range": "conformity",
     "expression_is_true": "consistency",

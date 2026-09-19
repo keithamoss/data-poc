@@ -28,6 +28,30 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
+- **11:47am** — **Checks Categorisation (Grouped by Data-Quality Dimension)** **[Dashboard UI]** Every check in
+  the column drawer now groups into a collapsible section by data-quality
+  category (Completeness/Uniqueness/Conformity/Consistency/Timeliness),
+  Keith's own ask. Reused the ODCS contract's own already-existing,
+  human-authored `dimension:` vocabulary rather than inventing a rival
+  one - a real discovery made while scoping this: all 89 real
+  datacontract-cli checks and every real check result across all 8
+  `run_*.py` modules already carried a matching `dimension` value.
+  Found and fixed a real pre-existing inconsistency alongside this:
+  dbt's/Soda's own dimension dicts used `"validity"` where the contract
+  already correctly said `"conformity"` for the same checks - normalized
+  everywhere and backfilled into 370 already-committed `qa_results/`
+  history files (2,838 records, `verified` only, `raw_output` untouched).
+  `qa_tools/common/check_lifecycle.py` gained a real, validated `category`
+  field on every check's own definition (165 new `category:` lines
+  across dbt/Soda YAML, contract reused its native `dimension:` field
+  directly) - verified with zero mismatches against real committed
+  results. A real bug caught and fixed along the way: grouping reorders
+  the check list, which broke the column drawer's old DOM-order-based
+  click handler - fixed via a `data-idx` attribute that travels with
+  each check through grouping. 5 new Vitest tests, verified with a real
+  Playwright pass against the real built dashboard (zero console
+  errors). `uv run pytest` (511 passing) and `npm test` (104 passing)
+  both clean.
 - **11:21am** — **mothman CLI Phase 2: Local Files QA Source Mode** **[Testing & dev tooling]** `mothman bdm qa
   --file <csv> --reference-file <csv>` and `mothman cp qa --folder <dir>
   --reference-folder <dir>` - run the real check chain against a file/

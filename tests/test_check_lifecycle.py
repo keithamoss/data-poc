@@ -32,6 +32,7 @@ def test_parse_dbt_check_metadata_extracts_check_id_and_lifecycle_fields(tmp_pat
                   - not_null:
                       meta:
                         check_id: data-asset-1.bdm.birth_registrations.stg_birth_registrations.registration_number.not_null
+                        category: completeness
                         introduced_date: "2026-01-15"
                         description: "Every record must carry a registration number."
                         changelog: []
@@ -87,6 +88,7 @@ def test_parse_dbt_check_metadata_covers_singular_tests(tmp_path):
             config:
               meta:
                 check_id: data-asset-1.bdm.birth_registrations.stg_birth_registrations.is_multiple_birth.multiple_birth_sibling_dbt
+                category: consistency
                 introduced_date: "2026-01-15"
                 description: "Every multiple-birth record needs a matching sibling."
                 changelog: []
@@ -223,6 +225,7 @@ def test_parse_dbt_check_metadata_covers_model_level_tests(tmp_path):
               - dbt_utils.recency:
                   meta:
                     check_id: data-asset-1.bdm.birth_registrations.stg_birth_registrations.recency
+                    category: timeliness
                     changelog: []
                   field: date_of_birth
         """)
@@ -243,6 +246,7 @@ def test_parse_dbt_check_metadata_config_hash_excludes_meta_but_includes_config(
                   - not_null:
                       meta:
                         check_id: x.y.z.m.c.not_null
+                        category: completeness
                         description: "{desc}"
                         changelog: []
                       config:
@@ -269,6 +273,7 @@ def test_parse_soda_check_metadata_extracts_check_id_from_attributes(tmp_path):
               name: facility missing rate
               attributes:
                 check_id: data-asset-1.bdm.birth_registrations.stg_birth_registrations.place_of_birth_facility.missing_percent
+                category: completeness
                 description: "Facility should usually be captured."
                 changelog: []
         """)
@@ -289,6 +294,7 @@ def test_parse_soda_check_metadata_ignores_dataset_level_attributes_block(tmp_pa
               name: has rows
               attributes:
                 check_id: data-asset-1.bdm.birth_registrations.stg_birth_registrations.row_count
+                category: completeness
         """)
 
     checks = cl.parse_soda_check_metadata(path)
@@ -315,6 +321,7 @@ def test_parse_soda_check_metadata_config_hash_ignores_name_and_attributes(tmp_p
               name: "{name}"
               attributes:
                 check_id: x.y.t.col.missing_percent
+                category: completeness
                 changelog: []
               samples limit: 100
         """
@@ -337,6 +344,7 @@ def test_parse_contract_check_metadata_extracts_check_id_from_custom_properties(
               - name: registration_number
                 quality:
                   - metric: nullValues
+                    dimension: completeness
                     mustBe: 0
                     customProperties:
                       - property: check_id
@@ -360,6 +368,7 @@ def test_parse_contract_check_metadata_reuses_native_description(tmp_path):
               - name: c
                 quality:
                   - metric: nullValues
+                    dimension: completeness
                     mustBe: 0
                     description: "A native ODCS description, not duplicated into customProperties."
                     customProperties:
@@ -378,6 +387,7 @@ def test_parse_contract_check_metadata_covers_table_level_quality(tmp_path):
           - name: birth_registrations
             quality:
               - metric: rowCount
+                dimension: completeness
                 mustBeGreaterThan: 0
                 customProperties:
                   - property: check_id
@@ -410,6 +420,7 @@ def test_parse_contract_check_metadata_raises_for_quality_rule_without_check_id(
 def test_parse_evidently_check_metadata_reads_a_check_lifecycle_dict():
     check_lifecycle = {
         "data-asset-1.bdm.birth_registrations.stg_birth_registrations.row_count_growth": {
+            "category": "completeness",
             "introduced_date": "2026-02-01",
             "description": "Row count should mostly grow run over run.",
             "changelog": [],
@@ -428,9 +439,9 @@ def test_parse_evidently_check_metadata_reads_a_check_lifecycle_dict():
 
 def test_find_duplicate_check_ids_flags_ids_used_more_than_once():
     checks = [
-        cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="f1"),
-        cl.CheckMetadata(check_id="b", tool="soda", config_hash="h2", source_file="f2"),
-        cl.CheckMetadata(check_id="a", tool="datacontract", config_hash="h3", source_file="f3"),
+        cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="h1", source_file="f1"),
+        cl.CheckMetadata(check_id="b", category="completeness", tool="soda", config_hash="h2", source_file="f2"),
+        cl.CheckMetadata(check_id="a", category="completeness", tool="datacontract", config_hash="h3", source_file="f3"),
     ]
 
     assert cl.find_duplicate_check_ids(checks) == ["a"]
@@ -438,8 +449,8 @@ def test_find_duplicate_check_ids_flags_ids_used_more_than_once():
 
 def test_find_duplicate_check_ids_empty_for_all_unique():
     checks = [
-        cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="f1"),
-        cl.CheckMetadata(check_id="b", tool="soda", config_hash="h2", source_file="f2"),
+        cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="h1", source_file="f1"),
+        cl.CheckMetadata(check_id="b", category="completeness", tool="soda", config_hash="h2", source_file="f2"),
     ]
 
     assert cl.find_duplicate_check_ids(checks) == []
@@ -448,30 +459,30 @@ def test_find_duplicate_check_ids_empty_for_all_unique():
 # ---- Undocumented-change detection ---------------------------------------
 
 def test_find_undocumented_changes_flags_a_hash_change_with_no_new_changelog_entry():
-    old = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="hash1", source_file="f", changelog=[])]
-    new = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="hash2", source_file="f", changelog=[])]
+    old = [cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="hash1", source_file="f", changelog=[])]
+    new = [cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="hash2", source_file="f", changelog=[])]
 
     assert cl.find_undocumented_changes(old, new) == ["a"]
 
 
 def test_find_undocumented_changes_allows_a_hash_change_with_a_new_changelog_entry():
-    old = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="hash1", source_file="f", changelog=[])]
-    new = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="hash2", source_file="f",
+    old = [cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="hash1", source_file="f", changelog=[])]
+    new = [cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="hash2", source_file="f",
                              changelog=[{"date": "2026-06-01", "description": "tightened it", "author": "Keith Moss", "breaking": False}])]
 
     assert cl.find_undocumented_changes(old, new) == []
 
 
 def test_find_undocumented_changes_ignores_checks_with_no_hash_change():
-    old = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="hash1", source_file="f", changelog=[])]
-    new = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="hash1", source_file="f", changelog=[])]
+    old = [cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="hash1", source_file="f", changelog=[])]
+    new = [cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="hash1", source_file="f", changelog=[])]
 
     assert cl.find_undocumented_changes(old, new) == []
 
 
 def test_find_undocumented_changes_ignores_brand_new_check_ids():
     old = []
-    new = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="hash1", source_file="f", changelog=[])]
+    new = [cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="hash1", source_file="f", changelog=[])]
 
     assert cl.find_undocumented_changes(old, new) == [], \
         "a check that didn't exist before has nothing to have 'changed' from"
@@ -480,7 +491,7 @@ def test_find_undocumented_changes_ignores_brand_new_check_ids():
 # ---- find_disappeared_check_ids() -----------------------------------------
 
 def test_find_disappeared_check_ids_flags_a_check_id_missing_from_new():
-    old = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="f")]
+    old = [cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="h1", source_file="f")]
     new = []
 
     assert cl.find_disappeared_check_ids(old, new) == ["a"]
@@ -495,22 +506,22 @@ def test_find_disappeared_check_ids_allows_a_properly_retired_check():
     check_id is still present in `new_checks`, just now carrying
     retired_as_of - this function only ever sees "is the check_id there
     at all", not which file it came from."""
-    old = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="schema.yml")]
-    new = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="schema-retired.yml",
+    old = [cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="h1", source_file="schema.yml")]
+    new = [cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="h1", source_file="schema-retired.yml",
                              retired_as_of="2026-09-16", retired_reason="superseded")]
 
     assert cl.find_disappeared_check_ids(old, new) == []
 
 
 def test_find_disappeared_check_ids_empty_when_nothing_changed():
-    checks = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="f")]
+    checks = [cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="h1", source_file="f")]
 
     assert cl.find_disappeared_check_ids(checks, checks) == []
 
 
 def test_find_disappeared_check_ids_ignores_brand_new_check_ids():
     old = []
-    new = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="f")]
+    new = [cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="h1", source_file="f")]
 
     assert cl.find_disappeared_check_ids(old, new) == []
 
@@ -518,13 +529,13 @@ def test_find_disappeared_check_ids_ignores_brand_new_check_ids():
 # ---- Top-level validate() ------------------------------------------------
 
 def test_validate_returns_empty_list_when_everything_is_clean():
-    checks = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="f")]
+    checks = [cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="h1", source_file="f")]
 
     assert cl.validate(checks, checks) == []
 
 
 def test_validate_reports_a_disappeared_check_id():
-    old = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="f")]
+    old = [cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="h1", source_file="f")]
     new = []
 
     errors = cl.validate(old, new)
@@ -534,19 +545,19 @@ def test_validate_reports_a_disappeared_check_id():
 
 
 def test_validate_allows_a_properly_retired_check_id():
-    old = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="schema.yml", changelog=[])]
-    new = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="schema-retired.yml",
+    old = [cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="h1", source_file="schema.yml", changelog=[])]
+    new = [cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="h1", source_file="schema-retired.yml",
                              changelog=[], retired_as_of="2026-09-16", retired_reason="superseded")]
 
     assert cl.validate(old, new) == []
 
 
 def test_validate_reports_both_kinds_of_error_together():
-    old = [cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h1", source_file="f", changelog=[])]
+    old = [cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="h1", source_file="f", changelog=[])]
     new = [
-        cl.CheckMetadata(check_id="a", tool="dbt", config_hash="h2", source_file="f", changelog=[]),  # undocumented change
-        cl.CheckMetadata(check_id="b", tool="soda", config_hash="h3", source_file="f2"),
-        cl.CheckMetadata(check_id="b", tool="datacontract", config_hash="h4", source_file="f3"),  # duplicate
+        cl.CheckMetadata(check_id="a", category="completeness", tool="dbt", config_hash="h2", source_file="f", changelog=[]),  # undocumented change
+        cl.CheckMetadata(check_id="b", category="completeness", tool="soda", config_hash="h3", source_file="f2"),
+        cl.CheckMetadata(check_id="b", category="completeness", tool="datacontract", config_hash="h4", source_file="f3"),  # duplicate
     ]
 
     errors = cl.validate(old, new)

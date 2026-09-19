@@ -44,6 +44,7 @@ checks for cp_clients:
         when > 2000
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.row_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Client row count should stay in a plausible band."
         changelog: []
@@ -60,6 +61,7 @@ checks for cp_clients:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every client record must carry a client ID."
         changelog: []
@@ -70,6 +72,7 @@ checks for cp_clients:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.duplicate_count_soda
+        category: uniqueness
         introduced_date: "2023-01-15"
         description: "Client IDs must not be duplicated."
         changelog: []
@@ -80,6 +83,7 @@ checks for cp_clients:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.given_name.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "A client's given name must be recorded."
         changelog: []
@@ -90,6 +94,7 @@ checks for cp_clients:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.family_name.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "A client's family name must be recorded."
         changelog: []
@@ -100,6 +105,7 @@ checks for cp_clients:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "A client record must carry a date of birth."
         changelog: []
@@ -111,6 +117,7 @@ checks for cp_clients:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.sex.invalid_percent_soda
+        category: conformity
         introduced_date: "2023-01-15"
         description: "Sex must be one of the closed value set M, F, or X."
         changelog: []
@@ -121,6 +128,7 @@ checks for cp_clients:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.suburb.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "A client's suburb must be recorded."
         changelog: []
@@ -131,6 +139,7 @@ checks for cp_clients:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.case_opened_date.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "A client record must carry the date its case was opened."
         changelog: []
@@ -145,6 +154,7 @@ checks for cp_clients:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.invalid_percent_soda
+        category: conformity
         introduced_date: "2023-01-15"
         description: "Postcode must be one of the closed value set paired with the suburb reference pool."
         changelog: []
@@ -155,6 +165,7 @@ checks for cp_clients:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "A client's postcode must be recorded."
         changelog: []
@@ -182,6 +193,7 @@ checks for cp_clients:
       samples limit: 100000
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.range_check_soda
+        category: conformity
         introduced_date: "2023-01-15"
         description: "Date of birth must not be implausibly old."
         changelog: []
@@ -194,6 +206,7 @@ checks for cp_notifications:
         when > 3000
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.row_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Notification row count should stay in a plausible band."
         changelog: []
@@ -210,6 +223,7 @@ checks for cp_notifications:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every notification must carry a notification ID."
         changelog: []
@@ -220,6 +234,7 @@ checks for cp_notifications:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.duplicate_count_soda
+        category: uniqueness
         introduced_date: "2023-01-15"
         description: "Notification IDs must not be duplicated."
         changelog: []
@@ -230,6 +245,7 @@ checks for cp_notifications:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every notification must reference a client."
         changelog: []
@@ -240,6 +256,7 @@ checks for cp_notifications:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_date.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every notification must carry the date it was made."
         changelog: []
@@ -251,6 +268,7 @@ checks for cp_notifications:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.source_type.invalid_percent_soda
+        category: conformity
         introduced_date: "2023-01-15"
         description: "Notification source must be one of the closed value set."
         changelog: []
@@ -262,6 +280,7 @@ checks for cp_notifications:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.concern_type.invalid_percent_soda
+        category: conformity
         introduced_date: "2023-01-15"
         description: "Concern type must be one of the closed value set - this collection's own traffic-light demo column."
         changelog: []
@@ -273,6 +292,7 @@ checks for cp_notifications:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.risk_rating.invalid_percent_soda
+        category: conformity
         introduced_date: "2023-01-15"
         description: "Risk rating must be one of the closed value set."
         changelog: []
@@ -283,6 +303,7 @@ checks for cp_notifications:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every notification must be assigned to a case worker."
         changelog: []
@@ -294,6 +315,7 @@ checks for cp_notifications:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.outcome.invalid_percent_soda
+        category: conformity
         introduced_date: "2023-01-15"
         description: "Notification outcome must be one of the closed value set."
         changelog: []
@@ -313,6 +335,7 @@ checks for cp_notifications:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.relationships_soda
+        category: consistency
         introduced_date: "2023-01-15"
         description: "A notification's client_id must reference a real, existing client record."
         changelog: []
@@ -320,6 +343,7 @@ checks for cp_notifications:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.relationships_soda
+        category: consistency
         introduced_date: "2023-01-15"
         description: "The assigned worker_id must reference a real, existing case worker record."
         changelog: []
@@ -347,6 +371,7 @@ checks for cp_notifications:
       samples limit: 100000
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.escalation_completeness_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every notification with outcome 'Investigation opened' must have a matching investigation record."
         changelog: []
@@ -359,6 +384,7 @@ checks for cp_investigations:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every investigation record must carry an investigation ID."
         changelog: []
@@ -369,6 +395,7 @@ checks for cp_investigations:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.duplicate_count_soda
+        category: uniqueness
         introduced_date: "2023-01-15"
         description: "Investigation IDs must not be duplicated."
         changelog: []
@@ -379,6 +406,7 @@ checks for cp_investigations:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every investigation must reference the notification that escalated into it."
         changelog: []
@@ -389,6 +417,7 @@ checks for cp_investigations:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every investigation must reference a client."
         changelog: []
@@ -399,6 +428,7 @@ checks for cp_investigations:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every investigation must have a lead case worker assigned."
         changelog: []
@@ -409,6 +439,7 @@ checks for cp_investigations:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.start_date.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every investigation must carry the date it started."
         changelog: []
@@ -420,6 +451,7 @@ checks for cp_investigations:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.substantiated.invalid_percent_soda
+        category: conformity
         introduced_date: "2023-01-15"
         description: "Investigation outcome must be one of the closed value set."
         changelog: []
@@ -428,6 +460,7 @@ checks for cp_investigations:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.relationships_soda
+        category: consistency
         introduced_date: "2023-01-15"
         description: "An investigation's notification_id must reference a real, existing notification record."
         changelog: []
@@ -435,6 +468,7 @@ checks for cp_investigations:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.relationships_soda
+        category: consistency
         introduced_date: "2023-01-15"
         description: "An investigation's client_id must reference a real, existing client record."
         changelog: []
@@ -442,6 +476,7 @@ checks for cp_investigations:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.relationships_soda
+        category: consistency
         introduced_date: "2023-01-15"
         description: "The lead_worker_id must reference a real, existing case worker record."
         changelog: []
@@ -466,6 +501,7 @@ checks for cp_investigations:
       samples limit: 100000
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.closed_case_hygiene_soda
+        category: consistency
         introduced_date: "2023-01-15"
         description: "A closed case's investigations must all have an end date - none should still be open."
         changelog: []
@@ -478,6 +514,7 @@ checks for cp_placements:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every placement record must carry a placement ID."
         changelog: []
@@ -488,6 +525,7 @@ checks for cp_placements:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.duplicate_count_soda
+        category: uniqueness
         introduced_date: "2023-01-15"
         description: "Placement IDs must not be duplicated."
         changelog: []
@@ -498,6 +536,7 @@ checks for cp_placements:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every placement must reference a client."
         changelog: []
@@ -509,6 +548,7 @@ checks for cp_placements:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_type.invalid_percent_soda
+        category: conformity
         introduced_date: "2023-01-15"
         description: "Placement type must be one of the closed value set."
         changelog: []
@@ -519,6 +559,7 @@ checks for cp_placements:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every placement must have a carer assigned."
         changelog: []
@@ -529,6 +570,7 @@ checks for cp_placements:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_start.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every placement must carry the date it started."
         changelog: []
@@ -539,6 +581,7 @@ checks for cp_placements:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_suburb.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every placement must carry the suburb it's located in."
         changelog: []
@@ -547,6 +590,7 @@ checks for cp_placements:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.relationships_soda
+        category: consistency
         introduced_date: "2023-01-15"
         description: "A placement's client_id must reference a real, existing client record."
         changelog: []
@@ -554,6 +598,7 @@ checks for cp_placements:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.relationships_soda
+        category: consistency
         introduced_date: "2023-01-15"
         description: "The carer_id must reference a real, existing carer record."
         changelog: []
@@ -579,6 +624,7 @@ checks for cp_placements:
       samples limit: 100000
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.approval_compliance_soda
+        category: consistency
         introduced_date: "2023-01-15"
         description: "A placement's carer must have Approved status."
         changelog: []
@@ -596,6 +642,7 @@ checks for cp_carers:
         when > 1000
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.row_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Carer row count should stay in a plausible band."
         changelog: []
@@ -606,6 +653,7 @@ checks for cp_carers:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every carer record must carry a carer ID."
         changelog: []
@@ -616,6 +664,7 @@ checks for cp_carers:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.duplicate_count_soda
+        category: uniqueness
         introduced_date: "2023-01-15"
         description: "Carer IDs must not be duplicated."
         changelog: []
@@ -626,6 +675,7 @@ checks for cp_carers:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.given_name.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "A carer's given name must be recorded."
         changelog: []
@@ -636,6 +686,7 @@ checks for cp_carers:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.family_name.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "A carer's family name must be recorded."
         changelog: []
@@ -647,6 +698,7 @@ checks for cp_carers:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_type.invalid_percent_soda
+        category: conformity
         introduced_date: "2023-01-15"
         description: "Carer type must be one of the closed value set."
         changelog: []
@@ -658,6 +710,7 @@ checks for cp_carers:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.approval_status.invalid_percent_soda
+        category: conformity
         introduced_date: "2023-01-15"
         description: "Approval status must be one of the closed value set."
         changelog: []
@@ -670,6 +723,7 @@ checks for cp_case_workers:
         when > 200
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.row_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Case worker row count should stay in a plausible band."
         changelog: []
@@ -680,6 +734,7 @@ checks for cp_case_workers:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "Every case worker record must carry a worker ID."
         changelog: []
@@ -690,6 +745,7 @@ checks for cp_case_workers:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.duplicate_count_soda
+        category: uniqueness
         introduced_date: "2023-01-15"
         description: "Case worker IDs must not be duplicated."
         changelog: []
@@ -700,6 +756,7 @@ checks for cp_case_workers:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.given_name.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "A case worker's given name must be recorded."
         changelog: []
@@ -710,6 +767,7 @@ checks for cp_case_workers:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.family_name.missing_count_soda
+        category: completeness
         introduced_date: "2023-01-15"
         description: "A case worker's family name must be recorded."
         changelog: []
@@ -721,6 +779,7 @@ checks for cp_case_workers:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.team_region.invalid_percent_soda
+        category: conformity
         introduced_date: "2023-01-15"
         description: "Team region must be one of the closed value set of WA regions."
         changelog: []

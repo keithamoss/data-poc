@@ -36,6 +36,7 @@ def _dbt_schema(check_id: str, extra_config: str = "") -> str:
                   - not_null:
                       meta:
                         check_id: {check_id}
+                        category: completeness
                         changelog: []
                       config:
                         warn_if: ">90"
@@ -189,6 +190,7 @@ def test_main_passes_when_a_check_is_properly_retired(tmp_path, monkeypatch, cap
                   - not_null:
                       meta:
                         check_id: a.b.c.not_null
+                        category: completeness
                         changelog: []
                         retired_as_of: "2026-09-16"
                         retired_reason: "superseded by a stricter check"

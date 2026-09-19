@@ -18,6 +18,10 @@ PSI_CHECK_ID = (
 
 CHECK_LIFECYCLE = {
     PSI_CHECK_ID: {
+        # See qa_tools/bdm/evidently_check_lifecycle.py's identical
+        # comment - matches this check's own already-existing
+        # "dimension": "consistency" in run_evidently_cp.py.
+        "category": "consistency",
         "introduced_date": "2023-01-15",
         "description": "Population Stability Index on concern_type's value distribution vs. the reference run - this collection's own traffic-light demo column.",
         "changelog": [],

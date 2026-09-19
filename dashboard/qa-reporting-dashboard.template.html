@@ -322,6 +322,20 @@ button{font:inherit; color:inherit;}
    to change, whichever checks happen to be visible. */
 .checks-list.hide-retired .check-card.is-retired{display:none;}
 .check-card.is-retired{opacity:.65;}
+
+/* Data-quality-category grouping (2026-09-19) - a native <details> per
+   category, open by default (grouping organizes, it never hides). */
+.category-group{margin-bottom:14px;}
+.category-group summary{cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px;
+  font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-muted);
+  font-family:"Public Sans",sans-serif; font-weight:700; padding:4px 0; margin-bottom:6px;
+  border-bottom:1px solid var(--line);}
+.category-group summary::-webkit-details-marker{display:none;}
+.category-group summary::before{content:"▾"; font-size:10px; color:var(--ink-faint); transition:transform .15s;}
+.category-group:not([open]) summary::before{transform:rotate(-90deg);}
+.category-count{font-family:"IBM Plex Mono",monospace; color:var(--ink-faint); font-weight:400; text-transform:none;
+  letter-spacing:0; background:var(--surface-alt); border-radius:999px; padding:1px 7px; font-size:11px;}
+.category-group-checks{padding-top:2px;}
 .pill.retired{background:var(--surface-alt); color:var(--ink-faint); border:1px solid var(--line);}
 .retired-toggle{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--ink-muted); margin-bottom:12px; cursor:pointer; user-select:none;}
 .retired-toggle input{cursor:pointer;}
@@ -735,6 +749,35 @@ const STATUS_ORDER = {nodata:-1, green:0, amber:1, red:2};
 const STATUS_LABEL = {nodata:"No data", green:"Green", amber:"Amber", red:"Red"};
 function worstOf(list){ return list.reduce((w,s)=> STATUS_ORDER[s]>STATUS_ORDER[w]?s:w, "green"); }
 function checkStatus(check){ if(check.current>check.fail) return "red"; if(check.current>check.warn) return "amber"; return "green"; }
+
+// Data-quality-dimension categorisation (2026-09-19, Keith's own ask -
+// scoped via AskUserQuestion). Every real check result already carries a
+// `dimension` field (qa_tools/*/run_*.py, real - completeness/
+// conformity/consistency/timeliness/uniqueness, the ODCS contract's own
+// vocabulary, reused rather than invented - see check_lifecycle.py's own
+// CHECK_CATEGORIES docstring for the full account). Fixed display order
+// (not alphabetical) - roughly "is the data there" -> "is it well-formed"
+// -> "does it hang together" -> "is it fresh", the order a human
+// triaging a red dataset would actually want to scan in. "Other" is a
+// real fallback, not dead code: a check whose dimension is missing/blank
+// still needs somewhere to render rather than silently vanishing from
+// the list.
+const CATEGORY_ORDER = ["completeness", "uniqueness", "conformity", "consistency", "timeliness", "other"];
+const CATEGORY_LABEL = {
+  completeness: "Completeness", uniqueness: "Uniqueness", conformity: "Conformity",
+  consistency: "Consistency", timeliness: "Timeliness", other: "Other",
+};
+
+function groupChecksByCategory(checks){
+  const byKey = {};
+  for(const ck of checks){
+    const key = CATEGORY_ORDER.includes(ck.dimension) ? ck.dimension : "other";
+    (byKey[key] = byKey[key] || []).push(ck);
+  }
+  return CATEGORY_ORDER
+    .filter(key => byKey[key] && byKey[key].length)
+    .map(key => ({key, label: CATEGORY_LABEL[key], checks: byKey[key]}));
+}
 
 
 /* =========================================================================
@@ -2394,6 +2437,34 @@ function openColumnDrawer(ag, col, ds, column, opts){
   // BY DEFAULT behind a toggle so they don't clutter "what's currently
   // being checked" - see the .hide-retired CSS rule above.
   const retiredCount = column.checks.filter(ck=>ck.retired).length;
+  // Grouping reorders checks (category order, not column.checks' own
+  // original order) - the click-wiring below used to assume DOM order
+  // == column.checks order (a plain per-element forEach index) and would
+  // silently open the WRONG check's detail panel once grouping changed
+  // that order. Each check's own ORIGINAL index travels with it through
+  // grouping (a fresh object via spread, column.checks itself never
+  // mutated) so the click handler can look it up directly instead of by
+  // rendered position.
+  const renderCheckCard = ck => {
+    const st = checkStatus(ck);
+    return `<div class="check-card ${ck.retired?'is-retired':''}" data-idx="${ck.__idx}" tabindex="0" role="button" aria-label="View details for ${ck.name}">
+      <div class="row1"><span class="name">${ck.name}</span>
+        ${ck.retired? `<span class="pill retired sm" title="Retired ${fmtDate(ck.retiredAsOf)}${ck.retiredReason?': '+ck.retiredReason:''}"><span class="ico"></span>Retired</span>` : pill(st,"sm")}
+      </div>
+      ${ck.dimension? `<div class="dim-tag">${ck.dimension}</div>`:""}
+      <div class="thresholds">warn &gt; ${fmtMetric(ck.warn,ck.unit)} · fail &gt; ${fmtMetric(ck.fail,ck.unit)} · current ${fmtMetric(ck.current,ck.unit)}</div>
+      ${ck.note? `<div style="font-size:12px; color:var(--ink-muted); margin-top:6px;">${ck.note}</div>`:""}
+      ${ck.retired? `<div class="retired-note">Retired ${fmtDate(ck.retiredAsOf)}${ck.retiredReason?' — '+ck.retiredReason:''} — no longer part of current status.</div>` : ""}
+      <div class="check-card-hint">View current &amp; historical run detail ›</div>
+    </div>`;
+  };
+  // Grouped into a collapsible section per data-quality category
+  // (completeness/uniqueness/conformity/consistency/timeliness - Keith's
+  // own ask, 2026-09-19, scoped via AskUserQuestion: "grouped sections",
+  // not just a filter-chip row) - open by default (nothing about
+  // grouping should hide content, only organize it; the separate
+  // retired-checks toggle above is the only "hidden by default" control
+  // in this list).
   const checksBlock = `
     <div class="drawer-section">
       <h4>Checks run on this column</h4>
@@ -2403,19 +2474,13 @@ function openColumnDrawer(ag, col, ds, column, opts){
         Show ${retiredCount} retired ${pluralize(retiredCount,"check")}
       </label>` : ""}
       <div class="checks-list hide-retired">
-      ${column.checks.map(ck=>{
-        const st = checkStatus(ck);
-        return `<div class="check-card ${ck.retired?'is-retired':''}" tabindex="0" role="button" aria-label="View details for ${ck.name}">
-          <div class="row1"><span class="name">${ck.name}</span>
-            ${ck.retired? `<span class="pill retired sm" title="Retired ${fmtDate(ck.retiredAsOf)}${ck.retiredReason?': '+ck.retiredReason:''}"><span class="ico"></span>Retired</span>` : pill(st,"sm")}
+      ${groupChecksByCategory(column.checks.map((ck,__idx)=>({...ck, __idx}))).map(group => `
+        <details class="category-group" open>
+          <summary>${group.label} <span class="category-count">${group.checks.length}</span></summary>
+          <div class="category-group-checks">
+            ${group.checks.map(renderCheckCard).join("")}
           </div>
-          ${ck.dimension? `<div class="dim-tag">${ck.dimension}</div>`:""}
-          <div class="thresholds">warn &gt; ${fmtMetric(ck.warn,ck.unit)} · fail &gt; ${fmtMetric(ck.fail,ck.unit)} · current ${fmtMetric(ck.current,ck.unit)}</div>
-          ${ck.note? `<div style="font-size:12px; color:var(--ink-muted); margin-top:6px;">${ck.note}</div>`:""}
-          ${ck.retired? `<div class="retired-note">Retired ${fmtDate(ck.retiredAsOf)}${ck.retiredReason?' — '+ck.retiredReason:''} — no longer part of current status.</div>` : ""}
-          <div class="check-card-hint">View current &amp; historical run detail ›</div>
-        </div>`;
-      }).join("")}
+        </details>`).join("")}
       </div>
     </div>`;
 
@@ -2452,8 +2517,9 @@ function openColumnDrawer(ag, col, ds, column, opts){
   document.getElementById("backdrop").classList.add("open");
   document.getElementById("drawer").classList.add("open");
   document.getElementById("drawer").setAttribute("aria-hidden","false");
-  body.querySelectorAll(".check-card").forEach((el,i)=>{
-    const open = ()=> openCheckPanel(ag, col, ds, column, column.checks[i]);
+  body.querySelectorAll(".check-card").forEach(el=>{
+    const idx = Number(el.dataset.idx);
+    const open = ()=> openCheckPanel(ag, col, ds, column, column.checks[idx]);
     el.addEventListener("click", open);
     el.addEventListener("keydown", (e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); } });
   });

@@ -22,11 +22,21 @@ ROW_COUNT_GROWTH_CHECK_ID = (
 
 CHECK_LIFECYCLE = {
     PSI_CHECK_ID: {
+        # Matches this check's own already-existing "dimension": value in
+        # run_evidently_bdm.py's own result-construction code (real,
+        # pre-existing, confirmed by reading that file directly, not
+        # assumed) - a distribution shift between runs read as a
+        # cross-run logical consistency concern, not a new category.
+        "category": "consistency",
         "introduced_date": "2026-01-15",
         "description": "Population Stability Index on sex's value distribution vs. the reference run - flags a real distribution shift.",
         "changelog": [],
     },
     ROW_COUNT_GROWTH_CHECK_ID: {
+        # Matches this check's own already-existing "dimension": value
+        # in run_evidently_bdm.py (real, pre-existing) - a growth-over-
+        # time concern read as timeliness, not completeness.
+        "category": "timeliness",
         "introduced_date": "2026-01-15",
         "description": "Row count should mostly grow run over run - a real drop signals a broken/partial extract.",
         "changelog": [],

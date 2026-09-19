@@ -88,7 +88,7 @@ _CUSTOM_CHECK_LABEL = {
 _DIMENSION_BY_BASE_CHECK = {
     "missing_count": "completeness",
     "missing_percent": "completeness",
-    "invalid_percent": "validity",
+    "invalid_percent": "conformity",
     "duplicate_count": "uniqueness",
     "row_count": "completeness",
 }
@@ -97,7 +97,7 @@ _DIMENSION_BY_BASE_CHECK = {
 # filter check) - these have no real metric name of their own for
 # _DIMENSION_BY_BASE_CHECK to key off, so each is named explicitly instead.
 _CUSTOM_CHECK_DIMENSION = {
-    "sex validity, last 24h only": "validity",
+    "sex validity, last 24h only": "conformity",
     "extract timestamp is logically ordered after date_registered": "consistency",
     "multiple birth records have a matching sibling": "consistency",
     "recent birth dates present (freshness)": "timeliness",

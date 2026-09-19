@@ -111,7 +111,7 @@ _AUDIT_AGGREGATE_SQL = {
 _DIMENSION_BY_TEST = {
     "unique": "uniqueness",
     "not_null": "completeness",
-    "accepted_values": "validity",
+    "accepted_values": "conformity",
     "relationships": "consistency",
     "escalation_completeness": "completeness",
     "closed_case_investigation_hygiene": "consistency",

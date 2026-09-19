@@ -628,3 +628,86 @@ common/check_lifecycle.py`'s own `check_id` convention.
    (today's URL is just `/plans`, same as every other tier's list view
    before a drill-down) - a real, deliberately deferred follow-up, not
    an oversight.
+
+8. **[done, 2026-09-19]** **[Dashboard UI]** Checks categorisation -
+   Keith's own ask, scoped via `AskUserQuestion` before building
+   (category axis: a real per-check metadata field, "same pattern
+   check_id already uses"; UI surface: grouped collapsible sections, not
+   just filter chips or a badge). A real, valuable discovery changed the
+   scope of the build before it started: the ODCS contract's own quality
+   rules already carried a real, human-authored `dimension:` field
+   (completeness/conformity/consistency/timeliness/uniqueness - the
+   real ODCS spec's own enum) on all 89 real datacontract-cli checks,
+   and every one of the 8 `run_*.py` modules already stamped a matching
+   `dimension` onto every real check RESULT record too - neither fact
+   was known going in, both found by reading the code directly rather
+   than assumed. Reused that exact, already-established vocabulary
+   (`qa_tools/common/check_lifecycle.py`'s new `CHECK_CATEGORIES`
+   frozenset) rather than inventing a rival one - Evidently's 2
+   check_ids needed no new category either, both already had a real
+   `dimension` value from a prior session (`consistency`/`timeliness`).
+
+   A real, pre-existing inconsistency was found and fixed alongside
+   this (not part of the categorisation ask itself, but the same class
+   of "check the actual data before trusting an assumption"): dbt's/
+   Soda's own per-module dimension dicts used `"validity"` for the same
+   conformity-type checks (`accepted_values`/`matches_regex`/
+   `invalid_percent`) the contract already correctly tagged
+   `"conformity"` - normalized everywhere (`qa_tools/bdm/run_dbt_bdm.py`,
+   `qa_tools/cp/run_dbt_cp.py`, `qa_tools/bdm/run_soda_bdm.py`,
+   `qa_tools/common/datacontract_common.py`), and **backfilled into
+   370 already-committed `qa_results/` history files (2,838 result
+   records)** via a targeted script touching only the `verified` list's
+   own `dimension` values, never `raw_output` (that tool-native half
+   stays genuinely unmodified, per `qa_results/`'s own documented
+   convention) - confirmed via a real diff review (surgical, one line
+   per fixed record, nothing else touched) before applying.
+
+   `check_lifecycle.py` retrofit: a real `category` field added to
+   `CheckMetadata`, parsed/validated (mandatory, closed-enum, same
+   `MissingCheckIdError`-style treatment as check_id) across all 4
+   tools' parsers - `_parse_dbt_test`/`_parse_dbt_singular_test`
+   (`meta.category`), `_parse_soda_check` (`attributes.category`),
+   `_parse_contract_quality_rule` (the rule's own native `dimension:`
+   field directly, not a new customProperties entry - the ODCS field
+   already living there was the real source of truth), Evidently's
+   `CHECK_LIFECYCLE` dicts (`category` key). 165 real `category:` lines
+   inserted into `dbt_project/models/staging/schema.yml` + `dbt_project/
+   schema-retired.yml` + both Soda checks YAMLs via a deterministic,
+   verified-then-applied script (check_id's own naming suffix
+   determines its category with zero ambiguity across all 257 real
+   checks - confirmed by cross-checking every dbt/Soda kind against its
+   real datacontract-cli sibling's own `dimension:` value where one
+   exists, not guessed). New `category_by_check_id()` helper - real
+   runtime wiring stays untouched (every tool's existing `dimension`-
+   stamping code already worked; this just gave it an explicit,
+   validated, single source of truth in each check's own definition
+   instead of scattered ad hoc per-module dicts). Verified end to end
+   against real committed history: 0 mismatches between the new
+   metadata's `category` and the real `dimension` already on 79 real
+   BDM check results from an actual promoted run.
+
+   UI: `groupChecksByCategory()` (a new pure, testable function in the
+   dashboard template's own inline JS) replaces the column drawer's flat
+   check list with a `<details>` per category (Completeness/Uniqueness/
+   Conformity/Consistency/Timeliness, fixed triage order, not
+   alphabetical; an "Other" fallback for any check missing/with an
+   unrecognised dimension), open by default - grouping organizes, it
+   never hides (the existing separate retired-checks toggle is still
+   the only true hide-by-default control in this list). A real bug this
+   surfaced and fixed in the same change: the column drawer's check-card
+   click handler used to assume DOM order matched `column.checks`'
+   own array order (a plain per-element loop index) - true only because
+   nothing had ever reordered the list before; grouping does reorder it
+   (category order, not original order), so each check's own original
+   index now travels with it through grouping (`data-idx` attribute) and
+   the click handler reads that directly instead of trusting render
+   position. 5 new Vitest tests (`tests-js/categorisation.test.js`).
+   Verified with a real Playwright pass against the real built
+   dashboard, real committed history, zero console errors - the
+   Completeness section (3 real checks: dbt `not_null`, Soda
+   `missing_count`, datacontract `missing_count`, all green) rendering
+   correctly above Uniqueness, confirmed by screenshot, not just code
+   review. Full local `uv run pytest` (511 passed, only the pre-existing
+   Playwright browser-binary gap) and `npm test` (104 passed) both
+   clean.
