@@ -82,6 +82,48 @@ self-contradicting mid-sentence), it's very likely a transcription
 artifact, not a genuine ambiguity - read for intent rather than asking
 him to repeat himself, unless the fork it implies is actually consequential.
 
+**Standing working-style conventions, 2026-09-19 (Keith's own explicit
+ask, a real end-of-session reflection on how this collaboration works -
+this overrides this environment's own general "bias toward proceeding
+without asking" default for this project specifically):**
+- **Ask him questions as a general rule, not just when genuinely
+  blocked.** His own words: it helps him think out loud, and he wants
+  more of it, not less - a real, standing preference, not a one-off.
+  Still use judgment on WHEN (mid-flow on something small doesn't need
+  it), but default toward asking rather than silently deciding when
+  there's a real, nameable choice to make, even a minor one.
+- **When he dumps several ideas/tasks in one message with no explicit
+  order, ask him which matters most rather than picking an order
+  myself.** His own words: "that's a thing I suffer from in real life
+  with my team" - prioritizing on his behalf risks working on whichever
+  item I happened to find easiest or got to first, not the one he'd
+  actually want first. Push back and ask, don't guess.
+- **Log any small aside or idea mentioned in passing into `plans/
+  running-thoughts.md` immediately, in the same turn - don't wait for a
+  later sweep or for him to ask "did we drop something."** Real
+  incident this session: the HCI/psychology grounding thread was
+  flagged once, then nearly lost - recovered only because Keith
+  directly asked and a slow, fragile grep of the raw session transcript
+  found it. The fix isn't a better recovery method, it's not needing
+  one - write it down the moment it's said, held to this standard from
+  the start of a session, not arrived at partway through one.
+- **Proactively suggest closing out and starting a fresh session when a
+  natural chunk of work completes** (not because a long session is
+  inherently bad - Keith's own words, he doesn't mind running one) **or
+  when this environment's own session-start-only-read gaps get hit**
+  (a subagent added mid-session not appearing in the `Agent` tool's own
+  roster, a `.mcp.json` change not picked up by an already-running MCP
+  server - both real, repeated incidents this project has hit, `plans/
+  wider.md` #10). These are two different problems with two different
+  fixes, worth keeping distinct: conversational memory loss from
+  compaction is mitigated by writing real decisions to `plans/*.md`
+  as they happen (a file doesn't degrade with turn count, unlike
+  conversational memory does through repeated lossy summarization) -
+  restarting the session doesn't fix that on its own, a fresh session
+  has zero memory of anything not already in a file. Session-start-only
+  config staleness is the one class of problem ONLY a fresh session
+  actually fixes.
+
 **Keith is in Perth (AWST, UTC+8, no daylight saving) - this session's
 own environment is not.** Real incident, 2026-09-18: a session wrote
 several genuinely-correct "2026-09-18" dates (in `plans/running-
