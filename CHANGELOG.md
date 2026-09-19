@@ -28,6 +28,15 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
+- **1:57pm** — **Demo Tab Polish: Half-Speed Playback, Glowing Red Moth Eyes** **[Dashboard]** **[Testing & dev
+  tooling]** Two small follow-ups from actually watching the real Demo
+  tab recording: playback now runs at half speed (the real recorded
+  pace read too fast to follow on first watch), and the TUI splash
+  screen's ASCII moth finally gets the glowing red eyes its own
+  original design text always described but the code never actually
+  rendered - built with `rich.text.Text` spans rather than a markup
+  string, since a literal backslash next to a `[red]...[/red]` tag
+  breaks rich's parser and this art is full of backslashes.
 - **1:49pm** — **A Real Recorded Demo, Right In The Dashboard** **[Dashboard]** A genuinely new top-level "Demo"
   tab, playing back a real recording of the actual `mothman` CLI/TUI (the
   Quality Assurance wizard - splash screen, menu navigation, the real
