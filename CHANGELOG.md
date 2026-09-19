@@ -27,6 +27,24 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Fixed
+- **6:04pm** — **Playwright MCP Confirmed Working; the Real file:// Fix Is Local HTTPS** **[Docs & process]** **[Testing & dev tooling]**
+  A fresh session confirmed the Playwright MCP server genuinely
+  connects and works end to end (real process, real tool calls, real
+  responses - `plans/wider.md` #10 has the full 3-way verification) -
+  found along the way that the server blocks the `file://` protocol
+  outright, so `requirements-reviewer`/`requirements-ux-critic`/
+  `requirements-visual-critic` could never actually open the dashboard
+  they're meant to review. Keith's own call: serve it locally over
+  HTTPS rather than allow `file://` at the server (which would've
+  granted access to the whole filesystem, not just this repo) or fall
+  back to plain HTTP. New `scripts/dev/serve_dashboard_https.py` (a
+  real throwaway self-signed cert + Python's stdlib `http.server`
+  wrapped in TLS, verified end to end before being written into any
+  agent's instructions) plus `.mcp.json`'s new `--ignore-https-errors`
+  flag. All 3 agents now explicitly forbidden from navigating to
+  `file://` URLs, pointed at the new script instead.
+
 ### Changed
 - **5:50pm** — **Defense-in-Depth: permissionMode: plan on the 3 Pure-Advisory Agents** **[Docs & process]** **[Testing & dev tooling]**
   Keith's own ask: "defense in depth is important." Added the real,

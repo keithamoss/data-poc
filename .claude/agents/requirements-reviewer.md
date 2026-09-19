@@ -77,8 +77,16 @@ precedent because they're the load-bearing part of doing this honestly:
   done. If the dashboard build output doesn't exist yet (it's
   gitignored, not committed), run `uv run mothman dashboard rebuild`
   via `Bash` first to build it fresh from committed `qa_results/`
-  history, then navigate the Playwright MCP browser to the real built
-  file.
+  history. **Never navigate to a `file://` URL** - the Playwright MCP
+  server blocks that protocol outright by default (a real, confirmed
+  gap, 2026-09-19 - `plans/wider.md` #10). Instead, run `uv run python3
+  scripts/dev/serve_dashboard_https.py &` via `Bash` to serve the real
+  built dashboard over local HTTPS (a real throwaway self-signed cert -
+  `.mcp.json`'s own `--ignore-https-errors` flag is what lets the
+  browser accept it), then navigate to
+  `https://localhost:8743/qa-reporting-dashboard.html`. Stop the server
+  (`pkill -f serve_dashboard_https`) when you're done with it - it's a
+  throwaway dev server, not something to leave running.
 - **Test coverage, with real findings, not just a percentage**: run
   `uv run pytest --cov=... --cov-report=term-missing` for the relevant
   package(s) and report which real lines/branches are actually

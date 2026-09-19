@@ -53,9 +53,16 @@ when you're done with a given page/context.
 **Build the real dashboard first** - the live HTML isn't committed to
 git (it's gitignored build output). Run `uv run mothman dashboard
 rebuild` via `Bash` to build it fresh from committed `qa_results/`
-history (the same CI-safe chain CI itself runs), then navigate the
-Playwright MCP browser to the real built file
-(`file:///<repo-root>/dashboard/qa-reporting-dashboard.html`).
+history (the same CI-safe chain CI itself runs). **Never navigate to a
+`file://` URL** - the Playwright MCP server blocks that protocol
+outright by default (a real, confirmed gap, 2026-09-19 - `plans/
+wider.md` #10). Instead, run `uv run python3 scripts/dev/
+serve_dashboard_https.py &` via `Bash` to serve the real built
+dashboard over local HTTPS (a real throwaway self-signed cert -
+`.mcp.json`'s own `--ignore-https-errors` flag is what lets the browser
+accept it), then navigate to
+`https://localhost:8743/qa-reporting-dashboard.html`. Stop the server
+(`pkill -f serve_dashboard_https`) when you're done with it.
 
 ## The real standard you're checking against
 

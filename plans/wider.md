@@ -1087,17 +1087,35 @@ check_lifecycle.py`'s own `check_id` convention.
     error seen was a `favicon.ico` 404 from the ad hoc server itself,
     not a page bug).
 
-    **[todo]** **[Docs & process]** Decide which fix to take for the
-    `file:` block, then update the 2 agent definitions to match - a real
-    fork, deliberately left for Keith rather than guessed at: (a) allow
-    the protocol at the server (an `--allowed-origins`-style setting in
-    `.mcp.json`), keeping the agents' existing `file://` instruction and
-    the dashboard's own genuinely-supported offline `file://` viewing
-    path under review; or (b) have the agents serve the built dashboard
-    over `http://localhost` first, which works today but means the
-    critics review it over a transport real users don't use. Worth
-    noting (a) keeps the review honest to how the artefact is actually
-    opened, while (b) needs no config change at all.
+    **Resolved, same day - Keith chose (b), serving locally, but asked
+    specifically for HTTPS rather than plain HTTP** (closer to how the
+    real published site, GitHub Pages, is always served, than a bare
+    local HTTP server would be). Verified the whole mechanism end to end
+    before writing it into any agent's own instructions, not just
+    assumed it'd work: a real ephemeral self-signed cert via `openssl
+    req -x509` (1-day validity, no passphrase), Python's stdlib
+    `http.server` wrapped in a real `ssl.SSLContext`, confirmed
+    reachable via `curl -k` and, separately, via a real `playwright`
+    Python script with `ignore_https_errors=True` (real page load, real
+    title `Data Asset QA Register`, zero console errors) - the same
+    context option `@playwright/mcp`'s own `--ignore-https-errors` flag
+    maps onto internally. Built as a real, shared, committed dev tool
+    rather than 3 separate agent-authored throwaway scripts each
+    re-implementing cert generation:
+    `scripts/dev/serve_dashboard_https.py` (same `scripts/dev/` throwaway-
+    tooling status as `record_cast.py`/`tui_screenshot.py`, excluded
+    from the coverage gate the same way - not in `[tool.coverage.run]`'s
+    own `source` list). `.mcp.json` gained the real `--ignore-https-
+    errors` flag. All 3 agents that drive Playwright (`requirements-
+    reviewer`/`requirements-ux-critic`/`requirements-visual-critic`) had
+    their own `file://` instructions replaced with "run the new script
+    via `Bash`, navigate to `https://localhost:8743/...`, stop the
+    server when done" - explicitly told **never** to navigate to a
+    `file://` URL, not just told about the new alternative, so the old,
+    now-broken instruction can't linger as a fallback. Rejected option
+    (a) (`--allow-unrestricted-file-access`) once its real scope was
+    understood - it grants `file://` access to the WHOLE filesystem, not
+    just this repo, broader than the real need.
 
     Also fixed in passing: `.playwright-mcp/` (page snapshots and
     console logs the MCP server writes straight into the workspace root)
