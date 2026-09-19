@@ -1235,7 +1235,19 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     suite, rather than diagnosing failures backwards) landed as its own
     `CLAUDE.md` convention bullet the same day, at Keith's explicit ask.
 
-12. **[todo, 2026-09-19]** **[Testing & dev tooling]** A real DRY /
+12. **[todo, 2026-09-19]** **[Testing & dev tooling]**
+    **Priority: HIGH - to FIX, not just to record (2026-09-19, Keith's own
+    explicit ask, in as many words: "this is a priority issue to fix,
+    so make that known").** Flagged at the top of this item rather than
+    buried at the end because it changes what "done" means here: the
+    closing paragraph below originally left "how much is worth acting
+    on versus just recording" as an open question, and Keith has
+    answered it - the output of this pass is real changes to the
+    codebase, not a findings list. See the rubric below before touching
+    anything though: "fix" still means fix the right category, and
+    collapsing (b) or (c) would make things worse, not better.
+
+    A real DRY /
     duplication pass across the whole codebase, to find the rest of what
     `plans/qa-pipeline.md` item 74 turned up by accident. Keith's own
     ask, immediately after that: the status logic existed in FOUR places
@@ -1303,10 +1315,16 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
       should probably be picked up together, since a real dead-code
       detector is a mechanical way to find one whole category here.
 
-    Not scoped further: whether this is a one-off manual pass, a
-    `delivery-*`-style agent doing it (cf. #3's code-reviewer agent
-    idea), or a real tool in CI; and how much of it is worth acting on
-    versus just recording. Needs a real conversation with Keith on
-    appetite before anything gets changed - a duplication pass that
-    mechanically collapses everything it finds would actively damage
-    (b) and (c) above.
+    **Resolved by the priority flag above**: how much of this is worth
+    acting on versus just recording. The answer is act - this is a fix,
+    and a findings list alone doesn't close it.
+
+    Still not scoped: whether the pass itself is a one-off manual sweep,
+    a `delivery-*`-style agent doing it (cf. #3's code-reviewer agent
+    idea), or a real tool in CI - and in what order the seeds above get
+    worked, since they differ a lot in risk (`_run_gh` is a safe,
+    obvious collapse; `cli/bdm.py`/`cli/cp.py` needs real judgement
+    about what genuinely differs). Worth a short scoping round with
+    Keith on approach and order before starting, not a full design
+    conversation - the appetite question that would normally gate it is
+    already answered.

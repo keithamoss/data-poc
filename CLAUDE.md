@@ -72,6 +72,24 @@ already scoped.
   flagged there, and scope each item with him before building it, same
   as anywhere else in this project.
 
+**Finding what's currently PRIORITY, without reading all seven files.**
+Some items carry an explicit priority line Keith has set (`Priority:
+work through today/tomorrow`, `Priority: HIGH - to FIX`, ...). They're
+scattered across files by design - priority is a property of an item,
+not of a file - so the way to see the current queue is to grep for it
+rather than trust any list written here, which would go stale the moment
+one lands:
+
+```
+grep -rn -i "priority[:-]" plans/*.md
+```
+
+Do this at the start of a session, alongside reading the files
+themselves. A priority line always states who set it and when, in Keith's
+own words, so a stale one is recognisable as stale rather than silently
+authoritative - check anything dated before the current session with him
+rather than assuming it's still top of the list.
+
 ## Who this is for
 
 Keith, Director of Data Technology at a Western Australian government
