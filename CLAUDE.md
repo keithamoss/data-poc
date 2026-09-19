@@ -596,86 +596,89 @@ Rough layout:
   to `www.google.com` during a Playwright browser launch is noise, not
   a real blocked need) - only a domain this project's own real work
   genuinely needed and couldn't reach.
-  - **`keithamoss.github.io`** (2026-09-19) - blocked; would let a
-    session verify the live published dashboard directly (e.g. "is a
-    just-deployed fix actually visible in production") instead of only
-    inferring from GitHub Actions run status/logs.
-  - **`anthropic.com`** (2026-09-19) - blocked; hit while researching
-    Anthropic's own published multi-agent design guidance ("Building
-    Effective Agents", the multi-agent research system writeup) for the
-    requirements-analysis subagent work (`plans/wider.md` #10) - forced
-    reliance on search-engine-crawled snippets of that content rather
-    than reading the primary source directly. `code.claude.com` (Claude
-    Code's own docs) was reachable and didn't need this workaround.
-  - **`codecentric.de`, `iamjeremie.me`** (2026-09-19) - blocked; hit
-    while researching real-world "BA agent"/spec-driven-development
-    subagent examples for the same requirements-analysis work - two
-    real, relevant blog posts (isolated-specification-testing
-    reasoning, a spec-pipeline write-up) only readable via search-engine
-    snippets, not the primary source.
-  - **`skills.lc`** (2026-09-19) - blocked; hit while researching
-    real-world precedent for a UX-reviewer-agent role specifically
-    (`plans/wider.md` #10's own UX-agent thread, Keith's own ask -
-    reversed from his earlier "I'll research this myself") - a
-    real-looking design-review skill writeup only readable via
-    search-engine snippets, not the primary source.
-  - **`patch-diff.githubusercontent.com`** (2026-09-19) - blocked; hit
-    trying to fetch `cfisch3r/estimate` PR #91's real `.diff` (Keith's
-    own direct ask: "are you able to access that pull request and see
-    what was actually in their prompts") - worked around it by finding
-    the real file paths another way and fetching them directly from
-    `raw.githubusercontent.com` instead (not blocked), so this one
-    didn't block the actual research, just the first route tried.
-  - **`snyk.io`** (2026-09-19) - blocked; a real article Keith found
-    himself and asked about directly ("Top 8 Claude Skills for UI/UX
-    Engineers"). No working alternate route found this time (unlike
-    `patch-diff.githubusercontent.com` above) - a `translate.goog`
-    proxy mirror showed up in search results, deliberately NOT used to
-    route around the block (that's a real bypass mechanism, a different
-    thing from picking a different legitimate primary URL for the same
-    public content) - fell back to real WebSearch snippets instead,
-    reported to Keith as snippet-only, not the full article.
-  - **`smart-interface-design-patterns.com`, `rakhman.info`,
-    `developer.mozilla.org`, `web.dev`, `en.wikipedia.org`** (2026-09-19)
-    - all five blocked; hit researching real SPA/URL-design best
-    practice for the `delivery-dashboard-ux`/`delivery-dashboard-ux-critic`
-    knowledge update Keith asked for. The first two were never
-    reachable; MDN/web.dev/Wikipedia were initially assumed reachable
-    (Wikipedia articles had surfaced by name in WebSearch results) but a
-    direct `WebFetch` against each came back `EGRESS_BLOCKED` too -
-    caught before that assumption was committed here uncorrected. No
-    primary source reachable for any of the five - fell back to real
-    WebSearch snippets only (of Wikipedia's "Clean URL"/"Human-readable
-    medium and data" articles plus several SEO/UX blog summaries) for
-    this research task. Keith offered to allow-list these on request,
-    2026-09-19.
+  **Audited in full 2026-09-19 evening (Keith's own ask, after he
+  allow-listed several more).** Every domain below was re-tested with a
+  raw `curl`, not `WebFetch` - per the standing lesson at the end of
+  this bullet. A `403` here means a real `curl: (56) CONNECT tunnel
+  failed, response 403` from the proxy, which is unambiguous; a `200`
+  means the real page came back, confirmed by reading its actual
+  `<title>` rather than just the status code.
 
-    **Resolved, same evening**: Keith allow-listed all five. A raw
-    `curl` confirmed real network-level access (genuine 200s/301/302,
-    `web.dev/articles/urls` a genuine 404 rather than a block) - but
-    `WebFetch` itself kept returning the identical `EGRESS_BLOCKED` error
-    for all five even after that, a stale tool-level check out of sync
-    with the live proxy policy (not a real ongoing block - same class of
-    "some config is read once and doesn't dynamically update mid-session"
-    issue this session already hit once with `.mcp.json`). Worked around
-    by fetching the raw HTML via `curl` and reading it directly instead
-    of through `WebFetch`. **Standing lesson for future sessions**: after
-    a domain gets allow-listed mid-session, don't treat a repeated
-    `WebFetch` failure alone as proof it's still blocked - verify with a
-    raw `curl` first, and fall back to `curl` + direct reading if
-    `WebFetch` still won't cooperate.
-  - **`clig.dev`, `lawsofux.com`, `www.nngroup.com`** (2026-09-19) -
-    all blocked; hit researching real HCI/usability-psychology grounding
-    for the `delivery-dashboard-ux`/CLI-TUI UX work Keith asked to revisit
-    (`plans/wider.md` #10's own deferred "ground the UX agent's intent
-    in real human-psychology/HCI research" item). `clig.dev` worked
-    around via its own real GitHub source
+  **Still genuinely blocked** (re-confirmed 2026-09-19, all `403`):
+  - **`www.anthropic.com`** - Anthropic's own published multi-agent
+    design guidance ("Building Effective Agents", the multi-agent
+    research system writeup), wanted for the `delivery-*` subagent work
+    (`plans/wider.md` #10). Note bare `anthropic.com` is NOT separately
+    reachable: it returns a real 301 to `www.anthropic.com`, which is
+    the blocked host, so the redirect is not a way around it.
+    `code.claude.com` (Claude Code's own docs) remains reachable and
+    needs no workaround.
+  - **`skills.lc`** - a design-review skill writeup, wanted for the
+    UX-reviewer-agent precedent research.
+  - **`patch-diff.githubusercontent.com`** - `cfisch3r/estimate` PR
+    #91's real `.diff`. Never actually blocked the work: the real file
+    paths were found another way and fetched from
+    `raw.githubusercontent.com` (reachable) instead.
+  - **`snyk.io`** - the "Top 8 Claude Skills for UI/UX Engineers"
+    article Keith found himself. A `translate.goog` proxy mirror exists
+    and was deliberately NOT used - routing around a block is a
+    different thing from picking a different legitimate primary URL.
+  - **`clig.dev`** - the CLI guidelines, used for the CLI/TUI UX work.
+    Worked around legitimately via its own real GitHub source
     (`raw.githubusercontent.com/cli-guidelines/cli-guidelines/main/
-    content/_index.md`, not blocked - same repo, same content, real
-    primary source); `lawsofux.com`/`www.nngroup.com` had no working
-    alternate route found, fell back to WebSearch snippets (several
-    real secondary sources - UX Tigers, Toptal, LogRocket, The Decision
-    Lab - cited the underlying research clearly enough to use).
+    content/_index.md`) - same repo, same content, a real primary
+    source rather than a bypass.
+
+  **Now reachable** (allow-listed by Keith; kept here rather than
+  deleted so a future session reading an old `plans/*.md` reference to
+  "the blocked X" can see it has since been resolved):
+  - **`keithamoss.github.io`** - this project's own live published
+    dashboard. Resolved 2026-09-19 evening, and immediately paid for
+    itself: the deploy that had just gone out was verified directly
+    against the real site rather than inferred from a workflow's own
+    `success` conclusion - 30,561 rendered statuses compared against
+    each tool's own recorded verdict inside the real page, zero
+    disagreements, zero results missing a verdict
+    (`plans/qa-pipeline.md` item 74). **Two real gotchas when driving
+    it with Playwright**, both environmental rather than page bugs:
+    the agent proxy's MITM certificate needs
+    `browser.new_context(ignore_https_errors=True)` (the same option
+    `scripts/dev/serve_dashboard_https.py`'s own work already
+    established), and the ~8MB page intermittently fails the navigation
+    outright with `net::ERR_TOO_MANY_RETRIES` through the proxy - it
+    succeeded on one attempt and failed on the next with no change, and
+    a plain `curl` of the same URL downloads all 8.2MB reliably. Retry,
+    or fetch with `curl` and drive the local copy, rather than reading
+    that error as a broken deploy.
+  - **`www.codecentric.de`**, **`iamjeremie.me`** - the
+    isolated-specification-testing post and a spec-pipeline write-up,
+    both previously snippet-only for the requirements-analysis work.
+  - **`lawsofux.com`**, **`www.nngroup.com`** - previously
+    snippet-only for the HCI/psychology grounding
+    (`docs/hci-ux-psychology.md`). Both now readable as primary
+    sources, so that guide's own citations can be checked directly if
+    it's ever revisited.
+  - **`smart-interface-design-patterns.com`**, **`rakhman.info`**,
+    **`developer.mozilla.org`**, **`web.dev`**, **`en.wikipedia.org`** -
+    allow-listed earlier the same day for the SPA best-practice
+    research; re-confirmed still reachable in this audit (MDN 302,
+    Wikipedia 301, the rest 200).
+
+  **Standing lesson, and the reason this whole list gets re-tested with
+  `curl` rather than `WebFetch`**: when a domain is allow-listed
+  mid-session, `WebFetch` can keep returning `EGRESS_BLOCKED` for it
+  long after the proxy itself has started allowing it - a stale
+  tool-level check out of sync with the live policy, the same
+  "read once, doesn't update mid-session" class of problem this project
+  has hit with `.mcp.json` and the `Agent` roster. Hit for real on all
+  five SPA-research domains (2026-09-19): raw `curl` returned genuine
+  200s/301/302 while `WebFetch` still refused. **So never treat a
+  repeated `WebFetch` failure as proof a domain is still blocked** -
+  verify with `curl` first, and if `WebFetch` still won't cooperate,
+  fetch the raw HTML with `curl` and read it directly. Only a real
+  `curl: (56) CONNECT tunnel failed, response 403` is evidence of an
+  actual block.
+
 - **Periodically check the `.claude/agents/*.md` combined description-
   field token budget** (2026-09-19, Keith's own ask - make this a
   standing periodic check, same treatment as the pytest-runtime log

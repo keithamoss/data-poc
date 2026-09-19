@@ -2975,10 +2975,23 @@ one Thread's narrative.
    is also the deploy that finally carries `plans/qa-pipeline.md` item
    74's corrected statuses to the public site - the end of the "all 7
    datasets read red on every run" era for anyone actually looking at
-   it. NOT independently verified against the live URL from this
-   session: `keithamoss.github.io` is on this environment's own blocked
-   list (`CLAUDE.md`), so this rests on the workflow's own `success`
-   conclusion rather than on loading the real page.
+   it.
+
+   **Now verified against the real live site, not just inferred from the
+   workflow's own conclusion** - Keith allow-listed
+   `keithamoss.github.io` minutes later (see `CLAUDE.md`'s own audited
+   blocked-domain list), which made the check that this item originally
+   had to skip actually possible. Driving the real published URL in a
+   real browser and using the page's OWN
+   `buildRealDataset()`/`checkStatus()`/`historyStatus()`: **30,561
+   rendered statuses compared against each tool's own recorded verdict,
+   zero disagreements, and zero results missing a verdict** (locally it
+   had been 198 before the placeholder fix, so that shipped too). The
+   live page's embedded `GITHUB_LINKS` commit confirms it was built from
+   `24b2560`, the commit carrying all of item 74's work. This is the
+   first time this project has verified its own published output at the
+   render layer against the real source of truth, rather than trusting a
+   green workflow.
 
    **One residual risk, named rather than silently accepted**: with a
    glob, any `claude/*` branch can publish to the live public site. That
