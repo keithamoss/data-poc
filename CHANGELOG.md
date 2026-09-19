@@ -28,6 +28,20 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Fixed
+- **6:17pm** — **serve_dashboard_https.py Now Auto-Assigns a Free Port** **[Testing & dev tooling]**
+  Keith's own follow-up after approving the local-HTTPS-serving fix:
+  the script's fixed default port (8743) would've collided if two of
+  `requirements-reviewer`/`requirements-ux-critic`/
+  `requirements-visual-critic` ever ran in parallel, one server failing
+  outright with "address already in use." Now defaults to `--port 0`
+  (an OS-assigned free ephemeral port) and prints it as `PORT=<n>` on
+  its first stdout line; all 3 agents' own instructions updated to
+  capture that output to a file, read the real port back, and kill only
+  their own server by PID rather than a blanket `pkill`. Verified by
+  actually running two instances in parallel and confirming both bind
+  distinct ports and serve real content simultaneously.
+
+### Fixed
 - **6:04pm** — **Playwright MCP Confirmed Working; the Real file:// Fix Is Local HTTPS** **[Docs & process]** **[Testing & dev tooling]**
   A fresh session confirmed the Playwright MCP server genuinely
   connects and works end to end (real process, real tool calls, real

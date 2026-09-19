@@ -506,17 +506,19 @@ Rough layout:
     public content) - fell back to real WebSearch snippets instead,
     reported to Keith as snippet-only, not the full article.
   - **`smart-interface-design-patterns.com`, `rakhman.info`,
-    `developer.mozilla.org`, `web.dev`** (2026-09-19) - all four blocked;
-    hit researching real SPA/URL-design best practice for the
-    `requirements-ux`/`requirements-ux-critic` knowledge update Keith
-    asked for. The first two were never reachable; MDN/web.dev were
-    initially assumed reachable (they'd appeared as WebSearch result
-    links) but a direct `WebFetch` against both came back
-    `EGRESS_BLOCKED` too - caught before that assumption was committed
-    here uncorrected. No primary source reachable for any of the four -
-    fell back to real WebSearch snippets only (Wikipedia's "Clean URL"/
-    "Human-readable medium and data" articles plus several SEO/UX blog
-    summaries) for this research task.
+    `developer.mozilla.org`, `web.dev`, `en.wikipedia.org`** (2026-09-19)
+    - all five blocked; hit researching real SPA/URL-design best
+    practice for the `requirements-ux`/`requirements-ux-critic`
+    knowledge update Keith asked for. The first two were never
+    reachable; MDN/web.dev/Wikipedia were initially assumed reachable
+    (Wikipedia articles had surfaced by name in WebSearch results) but a
+    direct `WebFetch` against each came back `EGRESS_BLOCKED` too -
+    caught before that assumption was committed here uncorrected. No
+    primary source reachable for any of the five - fell back to real
+    WebSearch snippets only (of Wikipedia's "Clean URL"/"Human-readable
+    medium and data" articles plus several SEO/UX blog summaries) for
+    this research task. Keith offered to allow-list these on request,
+    2026-09-19.
 - **Periodically check the `.claude/agents/*.md` combined description-
   field token budget** (2026-09-19, Keith's own ask - make this a
   standing periodic check, same treatment as the pytest-runtime log

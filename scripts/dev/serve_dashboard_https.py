@@ -30,7 +30,23 @@ hoc reviewer scripts already use elsewhere, just supplied to the MCP
 server at launch instead of per-script.
 
 Usage:
-    uv run python3 scripts/dev/serve_dashboard_https.py [--port 8743]
+    uv run python3 scripts/dev/serve_dashboard_https.py [--port PORT]
+
+Defaults to an OS-assigned ephemeral port (`--port 0`, the default) so
+two invocations never collide - the actual port is printed to stdout as
+the very first line, in the form `PORT=<n>`, so a caller (an agent
+running this via Bash) can read it back without guessing. Pass an
+explicit `--port` only for a one-off manual run where a fixed, memorable
+port is more convenient than reading it back.
+
+Real gap this fixes (2026-09-19, Keith's own explicit follow-up after
+approving the HTTPS-serving mechanism itself): the original version
+always bound a fixed default port (8743) - fine for one agent at a time,
+but `requirements-reviewer`/`requirements-ux-critic`/
+`requirements-visual-critic` can in principle run concurrently (nothing
+stops a caller invoking more than one in parallel), and a second
+`serve_dashboard_https.py` on the same fixed port would fail outright
+with "address already in use" rather than degrade gracefully.
 
 Runs in the foreground - background it yourself (`... &` in Bash) and
 stop it (`kill %1`, or `pkill -f serve_dashboard_https`) once the real
@@ -76,7 +92,12 @@ def _generate_self_signed_cert(cert_dir: Path) -> tuple[Path, Path]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--port", type=int, default=8743)
+    parser.add_argument(
+        "--port", type=int, default=0,
+        help="Port to bind. Default 0 = let the OS assign a free ephemeral "
+             "port (so parallel runs never collide) - the actual port is "
+             "printed as `PORT=<n>` on the first stdout line.",
+    )
     args = parser.parse_args()
 
     if not BUILT_FILE.exists():
@@ -96,11 +117,14 @@ def main() -> int:
         ctx.load_cert_chain(certfile=str(cert_path), keyfile=str(key_path))
         server.socket = ctx.wrap_socket(server.socket, server_side=True)
 
+        bound_port = server.server_address[1]
+        print(f"PORT={bound_port}")
         print(f"Serving {DASHBOARD_DIR} over HTTPS at "
-              f"https://localhost:{args.port}/qa-reporting-dashboard.html "
+              f"https://localhost:{bound_port}/qa-reporting-dashboard.html "
               f"(self-signed cert - the Playwright MCP server's own "
               f"--ignore-https-errors flag is what makes this real browser "
               f"navigation actually work). Ctrl-C to stop.")
+        sys.stdout.flush()
         try:
             server.serve_forever()
         except KeyboardInterrupt:

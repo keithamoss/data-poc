@@ -56,13 +56,17 @@ rebuild` via `Bash` to build it fresh from committed `qa_results/`
 history (the same CI-safe chain CI itself runs). **Never navigate to a
 `file://` URL** - the Playwright MCP server blocks that protocol
 outright by default (a real, confirmed gap, 2026-09-19 - `plans/
-wider.md` #10). Instead, run `uv run python3 scripts/dev/
-serve_dashboard_https.py &` via `Bash` to serve the real built
-dashboard over local HTTPS (a real throwaway self-signed cert -
-`.mcp.json`'s own `--ignore-https-errors` flag is what lets the browser
-accept it), then navigate to
-`https://localhost:8743/qa-reporting-dashboard.html`. Stop the server
-(`pkill -f serve_dashboard_https`) when you're done with it.
+wider.md` #10). Instead, run it as a background job with its output
+captured to a file, via `Bash` - it binds an OS-assigned free port by
+default (2026-09-19, Keith's own follow-up), so this never collides
+with another copy of itself another agent has running in parallel:
+```
+LOGFILE=$(mktemp) && PIDFILE=$(mktemp) && (uv run python3 scripts/dev/serve_dashboard_https.py > "$LOGFILE" 2>&1 & echo $! > "$PIDFILE") && sleep 1 && echo "https://localhost:$(grep -oP 'PORT=\K[0-9]+' "$LOGFILE")/qa-reporting-dashboard.html" && echo "stop later with: kill \$(cat $PIDFILE)"
+```
+Navigate to the printed URL. Run the printed `kill ...` command (via
+`Bash`) when you're done with it - never a blanket
+`pkill -f serve_dashboard_https`, which would also kill any other
+copy of this server another agent has running in parallel.
 
 ## The real standard you're checking against
 

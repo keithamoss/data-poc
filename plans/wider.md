@@ -1127,3 +1127,17 @@ check_lifecycle.py`'s own `check_id` convention.
     `requirements-visual-critic`'s own `Bash`-driven `mothman dashboard
     rebuild` step - this session verified the MCP wiring only, and
     didn't test that.
+
+    **Follow-up, same day, 2026-09-19 evening**: flagged to Keith that
+    `serve_dashboard_https.py`'s fixed default port (8743) would collide
+    if two of the 3 Playwright-driving agents ever ran in parallel - he
+    asked for it fixed. Now defaults to `--port 0` (an OS-assigned free
+    ephemeral port) and prints the real bound port as `PORT=<n>` on its
+    first stdout line. All 3 agents' instructions rewritten to capture
+    that output to a file (`mktemp`), read the real port back, and kill
+    only their own server by PID (`kill $(cat $PIDFILE)`) rather than a
+    blanket `pkill -f serve_dashboard_https` - the earlier instruction
+    would have killed any other copy running in parallel too, not just
+    its own. Verified for real: ran two instances concurrently, both
+    bound distinct OS-assigned ports and served real content
+    simultaneously (`curl -k` 200 from both).
