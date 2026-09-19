@@ -112,6 +112,25 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
      `has_child_protection_history` children get birthdates placed inside
      the rolling window vs. left at their existing 0-17-year spread.
 
+   **Priority bumped, 2026-09-19 (Keith's own ask, voice-dictated batch)**:
+   Keith flagged wanting to "settle" the `generator/`/
+   `synthetic_data_generator/` duplicate-pipeline situation sooner than
+   this item's original "once there are enough datasets wired into the
+   dashboard" gate - two stated motivations, not yet scoped further:
+   avoiding two separate codepaths that can generate the same kind of
+   data (the exact `apply_cp_notifications_presets()` signature-drift
+   bug `plans/tooling.md`'s Phase 5 write-up/`CHANGELOG.md` already hit
+   once, 2026-09-19, is a real, concrete instance of the risk this
+   duplication creates), and making synthetic data generation itself
+   faster. Tied to item #9 below (faster/incremental resupply
+   regeneration) in Keith's own framing - he suggested folding that into
+   whatever this consolidation work ends up being, since "most resupplies,
+   most records won't change." Not scoped: whether "settle" means
+   actually completing the re-pointing this item already describes, or a
+   narrower speed-only fix that doesn't require the full cross-agency
+   linkage work. Needs a scoping pass with Keith before building, same as
+   this item's own original 2026-09-14 scoping rounds.
+
 4. **[todo, 2026-09-18]** **[Data generation]** Document/explain how the
    synthetic data population is generated and how `dirty.py`'s failure
    injection reflects real government data quality issues — Keith wants
@@ -329,3 +348,39 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
    confirmed failing against the pre-fix code with the exact real
    `TypeError` first. Comprehensive test coverage for the rest of
    `synthetic_data_generator/` remains genuinely out of scope here.
+
+9. **[todo, 2026-09-19]** **[Data generation]** Faster resupply
+   regeneration - flagged by Keith (voice-dictated batch, same session
+   as item #3's priority bump above), explicitly tied to that item in
+   his own framing ("we can tie that into the synthetic data
+   generation"). His stated reasoning: regenerating a resupply is a real
+   pain point today, and most records in a resupply attempt don't
+   actually change between runs - `generator/resupply.py`'s current
+   approach hasn't been checked yet for whether it already does anything
+   incremental or fully regenerates every record from scratch each time.
+   Not scoped at all: whether this means caching/diffing against the
+   previous resupply attempt's own output, changing the generation
+   algorithm to only touch records that are meant to change, or
+   something else - needs a real look at `generator/resupply.py`'s
+   current mechanics first, then a scoping conversation with Keith
+   before building, same as every other design-fork item in this file.
+
+10. **[todo, 2026-09-19]** **[Data generation]** A synthetic "education"
+    dataset with a genuinely wide schema (Keith floated ~400 columns) -
+    flagged by Keith (voice-dictated batch) as a way to exercise a test
+    scenario this pipeline has never had: a dataset with a lot of
+    columns. Note `synthetic_data_generator/`'s own `agency_datasets.py`
+    already names "Education" as one of its 3 fictional agencies
+    (alongside Registry Services/BDM and Child & Family Safety - see
+    `plans/tooling.md`'s Phase 5 write-up and `CHANGELOG.md`'s
+    2026-09-19 1:23pm entry), so this may already have a natural home
+    rather than needing an entirely new agency stood up - not confirmed
+    yet whether that existing Education dataset is anywhere close to
+    400 columns today or would need substantial schema growth. Not
+    scoped: why a ~400-column scenario matters (stress-testing the real
+    dbt/Soda/datacontract-cli check runs and the dashboard's own column
+    drawer UI at that scale? a specific real-world dataset shape Keith
+    has in mind?), which of the 4 real QA tools would actually need
+    validating against it, or whether this lives in
+    `synthetic_data_generator/` or `generator/`. Needs a scoping
+    conversation with Keith before building.

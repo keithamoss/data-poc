@@ -409,3 +409,21 @@ check_lifecycle.py`'s own `check_id` convention.
    checks library" concern (a real checks library for a multi-agency
    register would need to cover more than one asset shape from the
    start) - worth revisiting together once either gets scoped for real.
+
+10. **[todo, 2026-09-19]** **[Docs & process]** A dedicated requirements-
+    analysis subagent - Keith's own idea (voice-dictated batch): "I think
+    I'd like to work on creating an agent with you to do requirements
+    analysis, and then we can have them go off and do some work while we
+    continue." Genuinely cross-cutting (not tied to one component) - a
+    process/tooling idea about HOW work on this project gets scoped, not
+    a feature of any one part of the system. Not scoped at all yet: what
+    "requirements analysis" means concretely here (triaging/scoping
+    `plans/*.md` items before they're built? analyzing the real
+    `requirements.yaml`/`qa_tools/common/validate_requirements` gate
+    that already exists? something else entirely?), what such an agent
+    would actually read/produce, or how its output would feed back into
+    this project's existing "scope via clarifying questions before
+    building" convention (CLAUDE.md) rather than bypass it. Needs a real
+    scoping conversation with Keith - his own phrasing suggests he wants
+    to build this WITH Claude as a joint design exercise, not have it
+    speced unilaterally.

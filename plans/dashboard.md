@@ -711,3 +711,25 @@ common/check_lifecycle.py`'s own `check_id` convention.
    review. Full local `uv run pytest` (511 passed, only the pre-existing
    Playwright browser-binary gap) and `npm test` (104 passed) both
    clean.
+
+9. **[todo, 2026-09-19]** **[Dashboard UI]** Revisit the Mothman icon and
+   header - flagged by Keith (voice-dictated batch), explicitly deferred
+   by his own words to "once you've done with this bunch of stuff" (i.e.
+   after the Plans tab filter-URL-persistence/chip-styling work the same
+   batch also asked for - `CHANGELOG.md` 2026-09-19 2:33pm entry - not
+   immediately). Ambiguous which "header" he means and not yet asked:
+   the dashboard's own header (the moth logo + "Data Asset QA Register"
+   title bar at the top of every tier) and/or the CLI/TUI's own splash
+   banner (`cli/banner.py`'s ASCII moth, just given glowing red eyes the
+   same session - `CHANGELOG.md` 2026-09-19 1:57pm entry). Not scoped at
+   all: what specifically Keith wants changed about either. Needs a real
+   scoping conversation before building.
+
+10. **[todo, 2026-09-19]** **[Dashboard UI]** Release Notes panel follow-up
+    work that will require online research - flagged by Keith (voice-
+    dictated batch) with no further specifics given. Not scoped: what
+    the actual work is, only that it exists and will need real web
+    research (distinct from this project's usual "read the code/ask
+    Keith" scoping pattern). Needs a real conversation with Keith to
+    find out what he actually wants here before anything can be
+    scoped, let alone built.
