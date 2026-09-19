@@ -3503,7 +3503,9 @@ function renderDemo(view){
   AsciinemaPlayer.create(
     {data: DEMO_CAST, parser: "asciicast"},
     container,
-    {cols: 100, rows: 28, fit: "width", controls: true, terminalFontFamily: "'IBM Plex Mono', monospace"}
+    // speed: 0.5 - Keith's own call (2026-09-19), the real recorded pace
+    // read too fast to follow comfortably on first watch.
+    {cols: 100, rows: 28, fit: "width", controls: true, speed: 0.5, terminalFontFamily: "'IBM Plex Mono', monospace"}
   );
 }
 document.getElementById("demo-btn").addEventListener("click", ()=> navigate({tier:"demo"}));
