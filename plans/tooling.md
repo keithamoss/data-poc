@@ -1327,12 +1327,18 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     - **9 mirrored filenames across `qa_tools/bdm/` and `qa_tools/cp/`**
       (`build_results_from_history.py`, `dataset_stats.py`,
       `evidently_check_lifecycle.py`, ...). This overlaps
-      `plans/publishing-and-history.md` #6, which already parks the
-      per-dataset file ARCHITECTURE question - deliberately not
-      duplicated here: #6 is "is one file per dataset per concern the
-      right shape at ~30 datasets", this item is the narrower "is the
-      CONTENT of these pairs actually the same code". Resolve #6 first,
-      or at least together; don't let this item quietly re-answer it.
+      `plans/publishing-and-history.md` #6, which owns the per-dataset
+      file ARCHITECTURE question - deliberately not duplicated here: #6
+      is "is one file per dataset per concern the right shape at ~30
+      datasets", this item is the narrower "is the CONTENT of these
+      pairs actually the same code". **#6 stopped being parked on
+      2026-09-19** - Keith named the copy-paste-a-file cost as "not
+      tolerable in the short term", so it is now `todo` and HIGH
+      priority alongside this item. That makes the earlier "resolve #6
+      first, or at least together" a real sequencing call rather than a
+      politeness: #6 is the one with a concrete felt cost attached, and
+      this sweep would otherwise keep rediscovering symptoms of it.
+      Don't let this item quietly re-answer it.
     - **Known JS<->Python mirrors to audit as a class** (each needs a
       (b)-style cross-check, not removal): `cadence.py`/
       `cycleStartDate()` (has one, informally), `dataset_status.py`/

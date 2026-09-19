@@ -2833,13 +2833,33 @@ one Thread's narrative.
    "log the specific mistake" (done, `plans/dashboard.md` #5's addendum)
    with "fix the pattern" (this item).
 
-6. **[parked]** **[Pipeline & publishing]** Revisit the per-dataset file
-   architecture across `qa_tools/`/`pipeline/` - flagged by Keith right
-   after Phase 2 landed, near-future not now: "I don't really want a
-   separate file for each individual dataset/agency, but I am open to it
-   if needs be." Explicitly a discussion/brainstorm to have later, not a
-   decision made here - this entry just records the concern and its
-   context, no proposed solution.
+6. **[todo, 2026-09-19]** **[Pipeline & publishing]**
+   **Priority: HIGH - to FIX, and no longer a "discuss it later"
+   (2026-09-19, Keith's own explicit words, quoting `plans/qa-pipeline.md`
+   #84's own closing cost back at it): "every new data set currently
+   means copy pasting a whole file and manually picking apart which
+   parts to keep - that is not tolerable in the short term as we add
+   more data sets, so that will need to be addressed as a priority."**
+
+   That is a real change of position on this item, and worth recording
+   as one rather than quietly rewriting the entry: this was parked from
+   Phase 2 until now on Keith's own earlier, softer framing - "near-
+   future not now", "I don't really want a separate file for each
+   individual dataset/agency, but I am open to it if needs be" - and
+   logged explicitly as "a discussion/brainstorm to have later, not a
+   decision made here." Both the urgency and the appetite have moved:
+   the copy-paste cost is now named as NOT tolerable, on a short-term
+   horizon, tied to datasets actually being added rather than to the
+   ~30 target as an abstraction. What has NOT changed is the caveat
+   three paragraphs down - #84's finding that the per-dataset LOGIC is
+   genuinely different still stands, and "fix" here does not mean
+   forcing it into one shared abstraction to reduce file count.
+
+   Revisit the per-dataset file
+   architecture across `qa_tools/`/`pipeline/` - originally flagged by
+   Keith right after Phase 2 landed. This entry originally recorded only
+   the concern and its context, with no proposed solution; the sections
+   below are still that, now with a real mandate attached.
 
    Related to, but a reopening of, `plans/qa-pipeline.md` #84 rather
    than the same question: `plans/qa-pipeline.md` #84 confirmed the same
@@ -2870,8 +2890,30 @@ one Thread's narrative.
    better, or whether the current shape is still fine and it's
    specifically the Phase 1/2 additions (which are more mechanical/
    generic than the original 4 tool-runners) that should collapse first.
-   Not scoped - the point of this entry is to not lose the concern
-   before that conversation happens.
+
+   **Relationship to `plans/tooling.md` #12, since both are now HIGH
+   priority and they overlap** - worth being precise so a session
+   doesn't do half of each twice. #12 is the broad duplication sweep
+   across the whole codebase (`_run_gh` copied three times, the JS<->
+   Python mirrors, dead code); THIS item is the narrower, sharper one
+   Keith's words above are actually about: making "add a dataset" stop
+   meaning "copy-paste a file." #12's own rubric already says to resolve
+   this one first or alongside it, and that ordering now looks right
+   rather than incidental - this is the item with a concrete, felt cost
+   attached to it, and #12 is the sweep that would otherwise keep
+   rediscovering symptoms of it. `plans/qa-pipeline.md` #84 supplies the
+   method for both (diff the real pairs in full, sort into
+   genuinely-shared vs genuinely-dataset-specific, extract only what's
+   confirmed) - and note #84 measured 2 datasets, whereas Phase 1/2 have
+   since added more per-dataset pairs on top, so its numbers need
+   re-measuring rather than reusing.
+
+   Still genuinely unscoped: WHICH of the shapes above is right
+   (data-driven off each dataset's own config, a per-tool plugin/
+   registry, or collapsing only the mechanical Phase 1/2 additions).
+   That's the conversation this entry was always waiting for - it just
+   now has a decided outcome to aim at rather than an open question
+   about whether to bother.
 
 7. **[done, 2026-09-19]** **[Pipeline & publishing]** Both GitHub Actions
    workflows are pinned to a single, hardcoded session branch name -

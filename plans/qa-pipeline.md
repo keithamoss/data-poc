@@ -5049,8 +5049,15 @@ relative, not a schedule — this is weeks of work, not months.
     measured **2 datasets** against a stated target of ~30; and its own
     closing cost - "every new dataset currently means copy-pasting a
     whole file and manually picking apart which parts to keep" - was
-    accepted as tolerable at that scale and has since been reopened by
-    `plans/publishing-and-history.md` #6. Nothing about the FINDING is
+    accepted as tolerable at that scale, reopened by
+    `plans/publishing-and-history.md` #6, and then, 2026-09-19,
+    explicitly REJECTED as tolerable by Keith quoting this very
+    sentence back: "that is not tolerable in the short term as we add
+    more data sets, so that will need to be addressed as a priority."
+    #6 is now `todo` and HIGH priority on the strength of it. So this
+    item's own closing line has outlived the judgement attached to it -
+    the cost it names is real and still there, what changed is that
+    paying it is no longer acceptable. Nothing about the FINDING is
     being second-guessed; the codebase it was measured against has
     simply grown a lot since (`plans/qa-pipeline.md` item 74 alone
     turned up four separate status implementations, one of them dead).
