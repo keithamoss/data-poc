@@ -10,13 +10,19 @@
 # whole system - Thread C's own correction, see that file's header) -
 # both real, deliberate forks, resolved with Keith before building.
 #
-# Deliberately shipped EMPTY here, not seeded with real names/emails -
-# this session doesn't know Keith's real email or full name and won't
-# guess at personal details, even small ones. Fill in real people
-# below; every consumer of this file (ticket_sync.py, the dashboard's
-# own "Owned by" badge) degrades to "no assignee" gracefully when a
-# scope has no matching entry, same treatment every other optional
-# embedded feed on this page already gets.
+# Shipped EMPTY at first - this session didn't know Keith's real email
+# or full name and wouldn't guess at personal details, even small ones.
+# Filled in 2026-09-19 once Keith gave his own real details directly
+# (name/nickname/github/roles/scope, all via AskUserQuestion rounds) -
+# his `registry-services` (Birth Registrations/RBDM) assignment is real.
+# The other entries below are Monty Python-named placeholders (his own
+# explicit ask, same round) standing in for colleagues not yet named for
+# real - fictional people, fictional example.com emails, deliberately
+# no `github:` so they can never be real-assigned to a real ticket, only
+# shown in the dashboard's "Owned by" badge. Every consumer of this file
+# (ticket_sync.py, that badge) still degrades to "no assignee" gracefully
+# when a scope has no matching entry, same treatment every other
+# optional embedded feed on this page already gets.
 #
 # Schema:
 #
@@ -51,6 +57,38 @@
 # responsible for that dataset/agency, not just one arbitrarily-picked
 # role.
 
-people: []
+people:
+  - email: fpycnkgvmt@privaterelay.appleid.com
+    name: Keith Moss
+    nickname: K$
+    github: keithamoss
+    roles: [qa, manager]
+  - email: brian.cohen@example.com
+    name: Brian Cohen
+    nickname: Brian
+    roles: [qa]
+  - email: reg@example.com
+    name: Reg
+    nickname: Reg
+    roles: [peer_review]
+  - email: arthur.pendragon@example.com
+    name: Arthur, King of the Britons
+    nickname: Arthur
+    roles: [manager]
 
-assignments: []
+assignments:
+  - agency: registry-services
+    person: fpycnkgvmt@privaterelay.appleid.com
+    role: qa
+  - agency: registry-services
+    person: fpycnkgvmt@privaterelay.appleid.com
+    role: manager
+  - agency: child-protection-family-support
+    person: brian.cohen@example.com
+    role: qa
+  - agency: child-protection-family-support
+    person: reg@example.com
+    role: peer_review
+  - agency: child-protection-family-support
+    person: arthur.pendragon@example.com
+    role: manager
