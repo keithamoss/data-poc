@@ -505,6 +505,18 @@ Rough layout:
     thing from picking a different legitimate primary URL for the same
     public content) - fell back to real WebSearch snippets instead,
     reported to Keith as snippet-only, not the full article.
+  - **`smart-interface-design-patterns.com`, `rakhman.info`,
+    `developer.mozilla.org`, `web.dev`** (2026-09-19) - all four blocked;
+    hit researching real SPA/URL-design best practice for the
+    `requirements-ux`/`requirements-ux-critic` knowledge update Keith
+    asked for. The first two were never reachable; MDN/web.dev were
+    initially assumed reachable (they'd appeared as WebSearch result
+    links) but a direct `WebFetch` against both came back
+    `EGRESS_BLOCKED` too - caught before that assumption was committed
+    here uncorrected. No primary source reachable for any of the four -
+    fell back to real WebSearch snippets only (Wikipedia's "Clean URL"/
+    "Human-readable medium and data" articles plus several SEO/UX blog
+    summaries) for this research task.
 - **Periodically check the `.claude/agents/*.md` combined description-
   field token budget** (2026-09-19, Keith's own ask - make this a
   standing periodic check, same treatment as the pytest-runtime log
