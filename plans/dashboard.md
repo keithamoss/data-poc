@@ -725,6 +725,9 @@ common/check_lifecycle.py`'s own `check_id` convention.
    all: what specifically Keith wants changed about either. Needs a real
    scoping conversation before building.
 
+   **Priority: work through today/tomorrow (2026-09-19, Keith's own
+   explicit ask).**
+
 10. **[todo, 2026-09-19]** **[Dashboard UI]** Release Notes panel follow-up
     work that will require online research - flagged by Keith (voice-
     dictated batch) with no further specifics given. Not scoped: what
@@ -733,3 +736,6 @@ common/check_lifecycle.py`'s own `check_id` convention.
     Keith" scoping pattern). Needs a real conversation with Keith to
     find out what he actually wants here before anything can be
     scoped, let alone built.
+
+    **Priority: work through today/tomorrow (2026-09-19, Keith's own
+    explicit ask).**

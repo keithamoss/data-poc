@@ -427,3 +427,6 @@ check_lifecycle.py`'s own `check_id` convention.
     scoping conversation with Keith - his own phrasing suggests he wants
     to build this WITH Claude as a joint design exercise, not have it
     speced unilaterally.
+
+    **Priority: work through today/tomorrow (2026-09-19, Keith's own
+    explicit ask).**

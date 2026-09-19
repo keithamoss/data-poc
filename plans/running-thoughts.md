@@ -320,6 +320,15 @@ while building item #3's redesign above) DOES carry a real actor on
 every event, so the underlying data GitHub has to work with is there
 even if the Teams card doesn't surface it.
 
+**Priority: work through today/tomorrow (2026-09-19, Keith's own
+explicit ask).** Worth checking first whether CLAUDE.md's own new
+blocked-domain-reporting convention (added the same day, after this
+item's own egress-block discovery) has since gotten Keith to widen
+network access for this environment - if so, the "research from an
+environment with unrestricted web access" option above might now
+actually be available, rather than still needing a real Teams
+installation to settle the actor-field question.
+
 ### 5. Staff adoption - two threads
 
 Motivation: Keith wants staff to actually start using this tool/

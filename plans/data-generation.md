@@ -131,6 +131,9 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
    linkage work. Needs a scoping pass with Keith before building, same as
    this item's own original 2026-09-14 scoping rounds.
 
+   **Priority: work through today/tomorrow (2026-09-19, Keith's own
+   explicit ask).**
+
 4. **[todo, 2026-09-18]** **[Data generation]** Document/explain how the
    synthetic data population is generated and how `dirty.py`'s failure
    injection reflects real government data quality issues — Keith wants
@@ -365,6 +368,9 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
    current mechanics first, then a scoping conversation with Keith
    before building, same as every other design-fork item in this file.
 
+   **Priority: work through today/tomorrow (2026-09-19, Keith's own
+   explicit ask).**
+
 10. **[todo, 2026-09-19]** **[Data generation]** A synthetic "education"
     dataset with a genuinely wide schema (Keith floated ~400 columns) -
     flagged by Keith (voice-dictated batch) as a way to exercise a test
@@ -384,3 +390,6 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
     validating against it, or whether this lives in
     `synthetic_data_generator/` or `generator/`. Needs a scoping
     conversation with Keith before building.
+
+    **Priority: work through today/tomorrow (2026-09-19, Keith's own
+    explicit ask).**
