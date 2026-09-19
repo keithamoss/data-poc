@@ -538,11 +538,40 @@ check_lifecycle.py`'s own `check_id` convention.
    4. **Phase 3.5** - single-table Child Protection QA (auto-pull last-
       Promoted state of the other 5 tables, full check suite) - depends
       on Phases 1-3's QA flow already existing to extend.
-   5. **Phase 4** - reorg the remaining ~20 Tier 2/3 scripts into the CLI
-      tree (dashboard rebuild, GitHub ticket-sync/acceptance-sync,
-      `validate_check_lifecycle`, etc. under the Tier 3 debug group as
-      appropriate); rewrite the 3 GitHub Actions workflows to call
-      `mothman` subcommands; retire `run_pipeline.sh`.
+   5. **Phase 4** - reorg the remaining scripts into the CLI tree.
+      **Real enumeration (2026-09-19), replacing an earlier vague "~20"
+      estimate lost to context compaction** - every real script entry
+      point in the repo (`grep -rl '__name__ == "__main__"'` across
+      `qa_tools/`, `pipeline/`, `generator/`, `dashboard/`, `aws/`,
+      `synthetic_data_generator/`), re-derived from the actual codebase
+      rather than from memory, minus the 6 already named in Phases 1-3
+      (`check_file.py`/`check_delivery.py`, `generate_runs.py`/
+      `generate_cp_runs.py`, `orchestrate_bdm.py`/`orchestrate_cp.py`):
+      25 remain. Grouped by real role, not just left as a flat list:
+      - **Dashboard rebuild chain (Tier 2)**: `pipeline/
+        build_dashboard_data.py`, `pipeline/build_cp_dashboard_data.py`,
+        `qa_tools/bdm/build_results_from_history.py`, `qa_tools/cp/
+        build_results_from_history.py`, `dashboard/
+        embed_dashboard_data.py`, `dashboard/check_dashboard_renders.py`,
+        `dashboard/snapshot_dashboard.py` (opt-in) - likely one
+        `mothman dashboard rebuild` command wrapping the whole chain,
+        not 7 separate ones.
+      - **GitHub workflow/people automation (Tier 2)**: `qa_tools/
+        common/ticket_sync.py`, `qa_tools/common/acceptance_sync.py`,
+        `qa_tools/common/leaderboard.py`.
+      - **CI validation gates (Tier 2)**: `qa_tools/common/
+        validate_check_lifecycle.py`, `qa_tools/common/
+        validate_requirements.py`.
+      - **Per-tool debug runners (Tier 3, the real answer to "if it
+        wasn't in the CLI, how would a human debug it")**: the 8
+        individual `run_{dbt,soda,datacontract,evidently}_{bdm,cp}.py`
+        modules (run one real tool in isolation against a run already on
+        disk) plus `qa_tools/common/changelog.py` (already named),
+        `qa_tools/bdm/build_per_run_warehouses.py`, `qa_tools/cp/
+        build_cp_warehouses.py`, and `pipeline/load.py` - all under the
+        `mothman debug` group.
+      Rewrite the 3 GitHub Actions workflows to call `mothman`
+      subcommands; retire `run_pipeline.sh`.
    6. **Phase 5** - Tier 4 Population Data command
       (`synthetic_data_generator/`), flagged exploratory.
    7. **Phase 6 (new, 2026-09-19)** - a recorded CLI/TUI demo embedded in
