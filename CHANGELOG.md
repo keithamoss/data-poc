@@ -28,6 +28,34 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
+- **6:58pm** — **Real HCI/Behavioral-Psychology Grounding for the UX Agents; a New CLI/TUI Review Pair** **[Docs & process]** **[Dashboard UI]** **[Testing & dev tooling]**
+  Keith's own deferred ask, finally revisited: ground `requirements-ux`'s
+  intent in real human-psychology/HCI research, then widened (his own
+  call, scoped via 2 rounds of clarifying questions) to reach the CLI/
+  TUI too, not just the dashboard. New `docs/hci-ux-psychology.md` - a
+  context-indexed guide (6 real interaction moments, from at-a-glance
+  scanning to error/failure states) built on real, cited research
+  (negativity bias, the service-recovery-paradox literature, Lindgaard's
+  real 50ms first-impressions study, Lally's real habit-formation study,
+  `clig.dev`'s own CLI guidelines, Nielsen's heuristics, and more) with
+  an honest, research-backed priority ordering rather than a flat
+  checklist - Keith confirmed the taxonomy and weighting before
+  anything got wired in. `requirements-ux`/`requirements-ux-critic`
+  updated to use it for the dashboard; a genuinely new sibling pair,
+  `requirements-cli-ux`/`requirements-cli-ux-critic`, built for the CLI/
+  TUI (`mothman`) - the post-build critic driven by a new dev tool,
+  `scripts/dev/tui_drive.py`, a persistent, addressable real pty session
+  a subagent can drive step by step across separate `Bash` calls (send a
+  key, read the real on-screen text, wait for real output, close) -
+  built on the same real `pyte` terminal-buffer and CPR-answering logic
+  `tui_screenshot.py`/`record_cast.py` already use. Verified end to end
+  against the real `mothman` wizard before being wired into any agent's
+  instructions - and along the way, found a real, previously-unnoticed
+  bug: `cli/common.py`'s own docstring claims `select()`/`path_prompt()`
+  return on "Ctrl-C/Esc," but Escape genuinely doesn't back out of a
+  real prompt today (only Ctrl-C does) - logged as `plans/tooling.md`
+  #9, not fixed in this pass, real proof the new mechanism catches
+  genuine gaps.
 - **6:28pm** — **SPA Guide Re-Verified Against Real Sources; a Real Navigation Gap Found** **[Docs & process]** **[Dashboard UI]**
   Keith allow-listed the 5 domains blocked while writing
   `docs/spa-best-practices.md` earlier that evening - re-verified the

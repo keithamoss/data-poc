@@ -1206,3 +1206,126 @@ check_lifecycle.py`'s own `check_id` convention.
     `plans/dashboard.md` #15 alongside the earlier accessibility gap,
     not fixed. Both `requirements-ux`/`requirements-ux-critic` updated
     to check for this class of gap going forward.
+
+    **The deferred HCI/psychology grounding item, finally revisited,
+    same evening.** Real process, scoped with Keith directly before any
+    research started (his own ask, "let's talk through my own thinking
+    first" - 2 rounds of clarifying questions, then research, then
+    refine, matching a pattern this session had already used
+    successfully for the SPA work): (1) both classic HCI/usability
+    psychology AND behavioral/motivational psychology, roughly equal
+    weight; (2) reaches BOTH the dashboard and the CLI/TUI (`mothman`) -
+    a genuine scope widening from the original, dashboard-only ask; (3)
+    proactive/foundational, not a response to one bad moment; (4)
+    context-indexed - different principles for different interaction
+    moments, Keith's own explicit ask, not a flat checklist. Real
+    research done (2 rounds - a first WebSearch-only pass, then a
+    second pass against real primary sources once Keith allow-listed
+    `clig.dev`/`lawsofux.com`/`www.nngroup.com` and asked for it to be
+    redone properly): Sweller, Nielsen, Hick's/Fitts's/Doherty/Gestalt/
+    Von Restorff/Jakob's/Tesler's laws, `clig.dev`'s own real CLI
+    guidelines (worked around its own block via its real GitHub source),
+    real TUI design principles, Self-Determination Theory, the Fogg
+    Behavior Model, Lally et al.'s real 2010 habit-formation study,
+    Seligman & Maier's learned helplessness, Baumeister et al.'s real
+    2001 negativity-bias paper (read via Wikipedia once allow-listed -
+    the real "negativity dominance"/"dishonest person" findings),
+    attribution theory via the real service-recovery-paradox literature
+    (McCollough & Bharadwaj 1992, Michel & Coughlan 2009, real meta-
+    analyses - read via Wikipedia), Kahneman & Fredrickson's real 1993
+    peak-end study (NN/g's own real elaboration, including a genuinely
+    useful worked example - a real Spotify bad-error-message case), and
+    Lindgaard et al.'s real, heavily-cited 2006 50ms first-impressions
+    study. Proposed a real 6-context taxonomy (at-a-glance/scanning,
+    investigating/drill-down, first-time use, routine daily use, error/
+    failure states, configuration/setup) mapped onto real dashboard AND
+    CLI/TUI examples, plus an honest research-based weighting (error
+    states > first-time use > routine daily use > the rest, stated
+    plainly where the evidence is strong vs. merely theory-grounded, not
+    a false uniform precision) - Keith confirmed both before anything
+    got written into the repo or any agent file.
+
+    Same real "verify a domain change before trusting WebFetch" gap hit
+    again mid-research: `lawsofux.com`/`www.nngroup.com` genuinely
+    reachable via `curl` once allow-listed, but `WebFetch` itself kept
+    returning `EGRESS_BLOCKED` for both - same stale-tool-level-check
+    class of issue as the SPA research round, same `curl`-and-read-
+    directly workaround, already logged in `CLAUDE.md`'s own blocked-
+    domains entry (which also now covers `clig.dev`, worked around via
+    its real GitHub source instead).
+
+    Built: `docs/hci-ux-psychology.md` (the real guide); `requirements-
+    ux`/`requirements-ux-critic` updated to read and apply it
+    (context-indexed, not a flat checklist - each agent works out which
+    of the 6 contexts a requirement/built result falls into, then checks
+    against THAT context's own dominant principles specifically). Two
+    real architectural forks resolved with Keith before building
+    further (his own explicit choices, both via `AskUserQuestion`): (1)
+    a genuinely NEW sibling pair, `requirements-cli-ux`/`requirements-
+    cli-ux-critic`, rather than widening the dashboard pair - his own
+    reasoning matched mine: the post-build mechanism genuinely differs
+    (a real pty session vs. Playwright MCP), so keeping each pair's
+    scope/mechanism clean beats one agent straddling two unrelated
+    review mechanisms; (2) build the real CLI/TUI-driving mechanism now,
+    not defer it.
+
+    New `scripts/dev/tui_drive.py` - a persistent, addressable real pty
+    session (reuses `tui_screenshot.py`'s real `pyte` terminal-buffer
+    rendering and `record_cast.py`'s real CPR-answering fix, rather than
+    reinventing either) exposed over a local Unix domain socket so a
+    subagent can drive it step by step across separate `Bash` calls
+    (`serve` in the background, then `send`/`screen`/`wait`/`alive`/
+    `close` as separate client calls reading the socket path back from a
+    file - same "env vars don't survive between Bash calls" reasoning as
+    `serve_dashboard_https.py`'s own port-file design). A genuinely new
+    protocol, not a scripted-replay tool like `record_cast.py`'s own
+    fixed `--step` list - a real post-build critic needs to SEE the
+    actual current screen before deciding its next action, the same
+    "observe, then act" loop Playwright MCP gives the dashboard critics,
+    which a pre-written script can't do; a persistent session (not a
+    fresh pty per command) matters because `mothman`'s own wizard flows
+    can trigger real, several-seconds-long subprocess runs, and
+    replaying from scratch every step would re-trigger that real work
+    repeatedly. Verified end to end against the real, live `mothman`
+    wizard before being written into `requirements-cli-ux-critic`'s own
+    instructions (this project's own standing discipline, same as
+    `serve_dashboard_https.py`'s own pre-verification) - real
+    interactive navigation, real screen capture, real wait-for-substring,
+    clean process/socket shutdown confirmed, and one real, useful side-
+    finding along the way: Ctrl-C at a `questionary` prompt genuinely
+    goes back one step (not a full exit), matching `cli/common.py`'s own
+    documented design.
+
+    **A second, more interesting real finding surfaced by the same
+    verification pass**: `cli/common.py`'s own docstring claims
+    `select()`/`path_prompt()` return `None` (the "go back" signal) on
+    either Ctrl-C OR Escape - real, live testing (twice, including a
+    full extra second to rule out a settle-delay artifact) found Escape
+    genuinely does NOT back out of a real prompt today, only Ctrl-C
+    does. A real, live proof the new mechanism catches genuine gaps,
+    found incidentally while verifying it, not chased down deliberately.
+    Not fixed here - logged as `plans/tooling.md` #9 (root cause not yet
+    investigated - a real `questionary`/`prompt_toolkit` default-
+    binding gap, or a docstring that went stale after some real
+    dependency version changed default behaviour), matching this
+    project's own standing "whenever an actual bug is found, add a
+    regression test first" convention once someone does pick it up.
+
+    **A real, known limitation hit trying to empirically verify the new
+    agent pair actually works when spawned** (the same methodology this
+    session used successfully to verify the `mcpServers:` field earlier)
+    - the `Agent` tool's own available-agent-type list is read once at
+    session start, so `requirements-cli-ux-critic` (added mid-session)
+    wasn't in this session's own list, `Agent type ... not found`. Same
+    category of gap as the earlier `.mcp.json`-read-once-at-start issue
+    (`plans/wider.md` #10's own earlier entry, resolved that time by a
+    fresh session). Worked around by verifying the underlying mechanism
+    directly (this main session driving `tui_drive.py` itself, not
+    through the new subagent) rather than the full agent-level
+    invocation - real, live end-to-end verification of `tui_drive.py`
+    itself happened either way, just not routed through the new agent's
+    own instructions text. **Still open**: a real, live spawn of
+    `requirements-cli-ux`/`requirements-cli-ux-critic` needs a fresh
+    session (or the other already-open one) to confirm the agent files
+    themselves - not just the underlying mechanism - actually work as
+    written.

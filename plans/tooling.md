@@ -1052,3 +1052,27 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
    investigated at all - which of these (if any) Keith actually meant
    needs confirming with him before real research time goes into any
    one of them, not guessed from a garbled transcription.
+
+9. **[todo, 2026-09-19]** **[Testing & dev tooling]** Real, verified
+   documentation/behaviour mismatch in `cli/common.py`: `select()`'s own
+   docstring (and `path_prompt()`'s) claims "Returns None if the
+   operator picked Back or hit Ctrl-C/Esc" - but a real, live test via
+   the new `scripts/dev/tui_drive.py` (built the same day for
+   `requirements-cli-ux-critic`, `plans/wider.md` #10) found `Escape`
+   does NOT actually back out of a real `questionary.select()` prompt
+   (confirmed twice, including with a full extra second to rule out a
+   timing artifact) - only Ctrl-C genuinely triggers the "go back a
+   step" behaviour today. A real, live proof the new CLI/TUI-driving
+   mechanism catches genuine gaps, found incidentally while verifying it
+   end to end, not chased down deliberately. Not fixed here - out of
+   scope for that verification pass. Likely either a real `questionary`/
+   `prompt_toolkit` default-binding gap (Escape may need an explicit
+   keybinding this project's own `select()`/`path_prompt()` don't add)
+   or a stale docstring claim from before some real dependency version
+   changed default behaviour - root cause not yet investigated. Real fix
+   needed either way: either make Escape actually work (matching the
+   documented claim) or correct the docstring to match reality (never
+   both left mismatched) - whichever ends up correct, add a real
+   regression test first per this project's own standing "whenever an
+   actual bug is found" convention (`CLAUDE.md`), confirmed failing
+   against today's actual behaviour before any fix lands.

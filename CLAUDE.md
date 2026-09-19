@@ -557,7 +557,10 @@ Rough layout:
   across just the `description:` fields (~1,100 tokens at a rough
   4-chars/token estimate) - nowhere near the limit. Re-check whenever a
   new agent is added or an existing one's description grows
-  substantially, not on a fixed schedule.
+  substantially, not on a fixed schedule. Re-checked 2026-09-19 evening
+  after adding `requirements-cli-ux`/`requirements-cli-ux-critic`: 8
+  real agents, ~6,420 characters (~1,600 tokens) - still nowhere near
+  the limit.
 - **Claude Code supports overriding a subagent's own default `model:`
   at spawn time**, via plain language in the request itself (e.g. "use
   the security-reviewer subagent with Opus to examine this module") -
