@@ -281,7 +281,15 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
         build_cp_warehouses.py`, and `pipeline/load.py` - all under the
         `mothman debug` group.
       Rewrite the 3 GitHub Actions workflows to call `mothman`
-      subcommands; retire `run_pipeline.sh`.
+      subcommands; retire `run_pipeline.sh`. **Completeness bar, made
+      explicit 2026-09-19 (Keith's own ask)**: this phase isn't done at
+      "workflows call mothman now" - it's done when there is no bare
+      `python3 -m qa_tools.*`/`pipeline.*`/`generator.*`/`dashboard.*`
+      invocation left reachable from outside `mothman`'s own
+      implementation anywhere in the repo (workflows, README, docs/),
+      and a standing rule from then on (see CLAUDE.md's own new
+      convention bullet): any script added after this phase ships gets
+      a `mothman` subcommand in the same change, never left bare.
    6. **Phase 5** - Tier 4 Population Data command
       (`synthetic_data_generator/`), flagged exploratory.
    7. **Phase 6 (new, 2026-09-19)** - a recorded CLI/TUI demo embedded in

@@ -126,6 +126,24 @@ Rough layout:
 
 ## Conventions worth knowing before touching anything
 
+- **Once the `mothman` CLI/TUI exists (`plans/tooling.md` #1), it is the
+  only programmatic access point to this repo - a standing constraint,
+  not a one-time migration.** Keith's own explicit ask, 2026-09-19: once
+  that work is done, nothing else - not CI workflows, not docs/README
+  instructions, not a future session's own ad hoc script - should call
+  a script directly, and that has to remain true going forward, not just
+  be true the day Phase 4 ships. Concretely: Phase 4 rewriting the 3
+  GitHub Actions workflows and retiring `run_pipeline.sh` is necessary
+  but not sufficient on its own - it has to leave NO bare
+  `python3 -m qa_tools.*`/`pipeline.*`/`generator.*`/`dashboard.*`
+  invocation reachable from outside `mothman`'s own implementation
+  anywhere in the repo (workflows, README, docs/). Any new script added
+  to this repo after that point gets a `mothman` subcommand in the same
+  change that adds it, not left as a bare invocation to be swept up
+  later - the same discipline this bullet itself is asking for. Until
+  `mothman` exists, this doesn't apply yet - today's `uv run python3 -m
+  ...`/`./run_pipeline.sh` invocations elsewhere in this file are still
+  the real, current way to run things.
 - `data/raw/`, `data/warehouse.duckdb`, `reports/*.json` etc. are
   gitignored and fully regenerated - never hand-edit or try to commit
   them. `dashboard/snapshots/*.html.gz` and `qa_results/` are the
