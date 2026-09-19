@@ -100,6 +100,46 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
      Protection branch of both menus. `uv run pytest`/`ruff` both clean
      (13 new CP CLI tests + 3 new app-menu tests). Phase 1 is now fully
      done - Phase 2 (Local-files QA source mode) is next.
+   - **Phase 2 finished 2026-09-19**: Local files QA source mode, both
+     flag-invocable (`mothman bdm qa --file <csv> --reference-file
+     <csv>` / `mothman cp qa --folder <dir> --reference-folder <dir>`)
+     and TUI-navigable (a real "Which source?" picker now precedes the
+     existing Synthetic-only run picker in both `run_qa_interactive()`
+     bodies, browsed via a new `common.path_prompt()` -
+     `questionary.path()` with the same non-TTY guard/Back-navigation
+     treatment every other prompt gets). `qa_tools/bdm/check_file.py`/
+     `qa_tools/cp/check_delivery.py` are **retired and deleted** (not
+     just superseded) - their real logic folded verbatim into
+     `cli/bdm.py`'s `run_check_local_file()`/`cli/cp.py`'s
+     `run_check_local_folder()`; `qa_tools/common/local_check.py`'s
+     shared `run_id_from_path()`/`copy_into()` outlived them (called
+     from the CLI modules now), its `format_report()` did not (replaced
+     by the richer `rich.table.Table` report both source modes already
+     shared). Two real bugs caught and fixed before they could bite,
+     proactively rather than via a live incident (same manifest-
+     clobbering bug class Phase 1 found for real, recognized early here
+     instead): (1) `orchestrate_bdm.run_single()`'s manifest-clobbering
+     side effect applies to Local files mode too (an arbitrary
+     downloaded CSV has nothing to do with the batch manifest, but
+     `run_single()` doesn't know that) - fixed by extracting Phase 1's
+     backup/restore fix into a shared `_run_single_preserving_manifest()`
+     helper, now used by both source modes, with a fallback for the
+     case where no manifest exists yet at all (Local files mode's own
+     first-ever call). (2) A real ordering bug in `local_run_id_from_path()`
+     calls: since a Local-file run_id embeds a real UTC timestamp, calling
+     it twice (once for the CLI's own report/promote call, once inside
+     `run_check_local_file()`'s own default-run_id fallback) would silently
+     produce two DIFFERENT run_ids - fixed by always computing it once at
+     the call site and passing it through explicitly. Verified end to end
+     against real local data outside any manifest (a real BDM CSV, 79
+     checks; a real CP 6-table delivery folder, 177 checks) - not mocked,
+     and the real batch manifests (176 BDM / 18 CP entries) confirmed
+     untouched afterward. `uv run pytest`/`ruff` both clean (511 passing,
+     only the 13 pre-existing, unrelated Playwright chromium-binary-
+     mismatch errors this sandbox already had). `README.md`'s "On-demand
+     checks" section rewritten for the new `./mothman bdm qa --file`/
+     `./mothman cp qa --folder` commands. Phase 3 (S3 QA source mode) is
+     next.
 
    **Core shape, confirmed:**
    - Organized by dataset (bdm/cp) under a real interactive TUI - not

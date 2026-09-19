@@ -241,28 +241,31 @@ implicit "also have X on your PATH already" assumptions anywhere.
 
 The manifest-driven batch pipeline above (`./run_pipeline.sh`,
 `orchestrate_bdm.py`/`orchestrate_cp.py`) is this repo's own synthetic-data
-demo harness. `qa_tools/bdm/check_file.py`/`qa_tools/cp/check_delivery.py`
-are a separate, smaller CLI pair for a real use case scoped with Keith
-2026-09-19 (`plans/running-thoughts.md` #5, Thread A): staff already pull
-data down from S3 or local storage manually today, and are comfortable
-with a CLI — these run the same real dbt-core/Soda Core/datacontract-cli/
-Evidently checks against whatever file (or, for Child Protection, whatever
-6-table delivery folder) you've already downloaded, on demand, before you
-use it:
+demo harness. `mothman`'s **Local files QA source mode** (`plans/tooling.md`
+#1 Phase 2 — originally scoped as a separate CLI pair with Keith 2026-09-19,
+`plans/running-thoughts.md` #5 Thread A, since folded into `mothman` itself)
+is for a real use case: staff already pull data down from S3 or local
+storage manually today, and are comfortable with a CLI — this runs the same
+real dbt-core/Soda Core/datacontract-cli/Evidently checks against whatever
+file (or, for Child Protection, whatever 6-table delivery folder) you've
+already downloaded, on demand, before you use it:
 
 ```bash
-uv run python3 -m qa_tools.bdm.check_file path/to/birth_registrations.csv \
-  --reference-csv path/to/a-known-good-file.csv
+./mothman bdm qa --file path/to/birth_registrations.csv \
+  --reference-file path/to/a-known-good-file.csv
 
-uv run python3 -m qa_tools.cp.check_delivery path/to/delivery_folder \
+./mothman cp qa --folder path/to/delivery_folder \
   --reference-folder path/to/a-known-good-delivery_folder
 ```
 
 Both print a short pass/warn/fail/error report and exit non-zero on any
-real failure/error (so a shell script can gate on it). `--reference-csv`/
+real failure/error (so a shell script can gate on it). `--reference-file`/
 `--reference-folder` is required — the distribution-drift check needs a
 real known-good comparison, and there's no synthetic manifest to
-default one from for a file you downloaded yourself.
+default one from for a file you downloaded yourself. The same flow is also
+reachable interactively — bare `./mothman`, then Quality Assurance → pick a
+dataset → "Local files" — browsed via real filesystem tab-completion
+instead of typed paths.
 
 **Defaults to a throwaway, local-only check** — nothing gets written into
 this repo's real, committed `qa_results/` history unless you pass

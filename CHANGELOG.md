@@ -28,6 +28,26 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
+- **11:21am** — **mothman CLI Phase 2: Local Files QA Source Mode** **[Testing & dev tooling]** `mothman bdm qa
+  --file <csv> --reference-file <csv>` and `mothman cp qa --folder <dir>
+  --reference-folder <dir>` - run the real check chain against a file/
+  delivery you've already downloaded, not tied to any synthetic
+  manifest, both flag-invocable and TUI-navigable (a real "Which
+  source?" picker now precedes the run picker in both datasets' QA
+  flows). The two standalone CLIs this replaces,
+  `qa_tools/bdm/check_file.py`/`qa_tools/cp/check_delivery.py`, are
+  **deleted** - their logic folded verbatim into `cli/bdm.py`/`cli/cp.py`
+  (mothman is the only entry point now). Two real bugs caught proactively
+  before they could bite (the same manifest-clobbering bug class Phase 1
+  found live): local-file checks can clobber the real batch manifest the
+  same way Phase 1's bug did, fixed by extracting a shared
+  `_run_single_preserving_manifest()` helper; and a real ordering bug
+  where calling the timestamp-embedding `run_id_from_path()` twice for
+  the same check would silently produce two different run_ids. Verified
+  against real local data outside any manifest (a real BDM CSV, 79
+  checks; a real CP 6-table delivery, 177 checks), with the real batch
+  manifests confirmed untouched afterward. `uv run pytest`/`ruff` clean
+  (511 passing).
 - **11:08am** — **mothman CLI Phase 1 Complete: Child Protection QA** **[Testing & dev tooling]** `cli/cp.py` -
   `mothman cp generate-synthetic-data` and `mothman cp qa
   [--run-id/--reference-run-id/--commit]`, the Child Protection

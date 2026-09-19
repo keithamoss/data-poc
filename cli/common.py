@@ -72,6 +72,18 @@ def select(message: str, choices: list[str], flag_hint: str) -> str | None:
     return answer
 
 
+def path_prompt(message: str, flag_hint: str) -> str | None:
+    """A questionary.path() prompt (real tab-completion filesystem
+    browsing, no hand-built file picker needed - plans/tooling.md #1's
+    own Local-files QA source mode design) with the same non-TTY guard
+    every other prompt here uses. Returns None on Ctrl-C/Esc or a blank
+    answer - callers treat that the same as select()'s Back: stop the
+    flow, don't proceed with an empty path."""
+    require_tty(flag_hint)
+    answer = questionary.path(message, style=_QMARK_STYLE).ask()
+    return answer or None
+
+
 def confirm(message: str, *, yes: bool, default: bool = False) -> bool:
     """Confirm-by-default on writes, with a --yes bypass (plans/
     tooling.md #1's own design requirement) - --yes skips the prompt

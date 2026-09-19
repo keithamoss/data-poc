@@ -1,13 +1,23 @@
 """mothman bdm - Birth Registrations commands (plans/tooling.md #1
-Phase 1): generate-synthetic-data and the Quality Assurance flow against
-Synthetic source mode. Every function here is called from both the real
-Click command (flag-invocable, scriptable) and the TUI menu (cli/app.py) -
-one real implementation, two entry paths, per the wizard/flags duality
-plans/tooling.md #1 itself was designed around."""
+Phase 1/2): generate-synthetic-data and the Quality Assurance flow
+against Synthetic and Local files source modes. Every function here is
+called from both the real Click command (flag-invocable, scriptable)
+and the TUI menu (cli/app.py) - one real implementation, two entry
+paths, per the wizard/flags duality plans/tooling.md #1 itself was
+designed around.
+
+The Local files mode (Phase 2) folds in qa_tools/bdm/check_file.py's own
+retired standalone-CLI logic verbatim (that module is gone - this is now
+the only place it runs from, per CLAUDE.md's "mothman is the only
+programmatic access point" convention) - same real dbt-core/Soda Core/
+datacontract-cli/Evidently chain via orchestrate_bdm.run_single(), just
+reached from a browsable questionary.path() prompt or --file/
+--reference-file flags instead of a positional CSV argument."""
 from __future__ import annotations
 import json
 import os
 import sys
+from datetime import datetime, timezone
 
 import rich_click as click
 from rich.console import Console
@@ -16,6 +26,7 @@ from rich.table import Table
 from qa_tools.bdm import build_per_run_warehouses, orchestrate_bdm
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.lambda_results_dir import BDM_MODULES, patch_write_qa_result_for_lambda
+from qa_tools.common.local_check import copy_into, run_id_from_path as local_run_id_from_path
 from qa_tools.common.qa_results_reader import list_run_ids
 
 from . import common
@@ -123,19 +134,63 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None) -> 
     tmp_dir = common.new_tmp_results_dir()
     patch_write_qa_result_for_lambda(BDM_MODULES, tmp_dir)
 
+    results = _run_single_preserving_manifest(
+        run_id, csv_path, entry["run_date"], entry["dirty_severity"],
+        reference_run_id, reference_csv, run_by=run_by,
+        previous_run_id=previous_entry["run_id"] if previous_entry else None,
+        previous_csv=previous_entry["file"] if previous_entry else None,
+    )
+    return results, tmp_dir
+
+
+def _run_single_preserving_manifest(*args, **kwargs) -> list[dict]:
+    """Calls orchestrate_bdm.run_single(*args, **kwargs), backing up and
+    restoring raw_dir()'s real manifest.json around the call - see
+    run_check()'s own docstring for the real bug this guards against
+    (run_single() unconditionally overwrites it with its own synthetic
+    1-or-2-entry manifest, correct for its real Lambda use case but a
+    real collision against the full generate_runs.py batch manifest this
+    CLI's own run picker reads from). Local files mode (Phase 2) hits
+    this exact same collision - a real CSV a human downloaded has
+    nothing to do with the batch manifest, but run_single() would still
+    clobber it - so this helper is shared, not just run_check()'s own."""
     real_manifest_path = manifest_path()
-    with open(real_manifest_path) as f:
-        real_manifest_backup = f.read()
+    real_manifest_backup = None
+    if os.path.exists(real_manifest_path):
+        with open(real_manifest_path) as f:
+            real_manifest_backup = f.read()
     try:
-        results = orchestrate_bdm.run_single(
-            run_id, csv_path, entry["run_date"], entry["dirty_severity"],
-            reference_run_id, reference_csv, run_by=run_by,
-            previous_run_id=previous_entry["run_id"] if previous_entry else None,
-            previous_csv=previous_entry["file"] if previous_entry else None,
-        )
+        return orchestrate_bdm.run_single(*args, **kwargs)
     finally:
-        with open(real_manifest_path, "w") as f:
-            f.write(real_manifest_backup)
+        if real_manifest_backup is not None:
+            with open(real_manifest_path, "w") as f:
+                f.write(real_manifest_backup)
+
+
+def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
+                          run_id: str | None = None, run_date: str | None = None) -> tuple[list[dict], str]:
+    """The Local files QA source mode's real check-running body (plans/
+    tooling.md #1 Phase 2) - folds in qa_tools/bdm/check_file.py's own
+    retired logic: copies the reference CSV into raw_dir() under a real
+    run_id (there's no synthetic manifest[0] to fall back on for a real,
+    manually-downloaded file - a real reference is required, not
+    defaulted), then reuses orchestrate_bdm.run_single(), same entry
+    point both the Synthetic flow above and Thread B's Lambda handler
+    call. Returns (results, tmp_results_dir) - same tmp-dir-first Promote
+    pattern as run_check()."""
+    run_date = run_date or datetime.now(timezone.utc).date().isoformat()
+    run_id = run_id or local_run_id_from_path(csv_path)
+    reference_run_id = local_run_id_from_path(reference_csv, prefix="ref")
+    reference_csv_filename = f"{reference_run_id}.csv"
+    copy_into(reference_csv, raw_dir(), reference_csv_filename)
+
+    tmp_dir = common.new_tmp_results_dir()
+    patch_write_qa_result_for_lambda(BDM_MODULES, tmp_dir)
+
+    results = _run_single_preserving_manifest(
+        run_id, csv_path, run_date, None,
+        reference_run_id=reference_run_id, reference_csv=reference_csv_filename, run_by=run_by,
+    )
     return results, tmp_dir
 
 
@@ -171,16 +226,44 @@ def run_id_from_choice(choice: str) -> str:
     return choice.split()[0]
 
 
+_SOURCE_SYNTHETIC = "Synthetic - pick or generate a run"
+_SOURCE_LOCAL_FILE = "Local files - a CSV you've already downloaded"
+
+
+def _offer_promote(results: list[dict], run_id: str, tmp_dir: str, commit_default: bool) -> None:
+    console.print(report_table(results, run_id))
+    if common.confirm("Promote this run into the real, permanent qa_results/ history?",
+                       yes=False, default=commit_default):
+        dst = common.promote(tmp_dir, AGENCY_ID, DATASET_ID, run_id)
+        console.print(f"Promoted -> {dst}", style="green")
+        console.print(
+            "This only wrote to qa_results/ - commit and push it yourself to publish "
+            "(that's what triggers the real CI rebuild).", style="dim")
+    else:
+        console.print("Not promoted - nothing written to the real qa_results/ history.", style="dim")
+
+
 def run_qa_interactive(commit_default: bool = False) -> None:
-    """The Quality Assurance flow's Synthetic-source-mode body, called
-    from both `mothman bdm qa` (no --run-id given, a real terminal) and
-    the TUI main menu - one real implementation. A real git identity is
-    required upfront here (not deferred to Promote time): the flow always
-    asks "Promote?" only after the report is already shown, so run_by has
-    to be resolved - and correct - before the real tool chain ever runs,
-    or a later "yes, promote" would copy a placeholder identity into
-    permanent history."""
+    """The Quality Assurance flow's real body, called from both `mothman
+    bdm qa` (no --run-id/--file given, a real terminal) and the TUI main
+    menu - one real implementation across both the Synthetic and Local
+    files source modes (plans/tooling.md #1 Phases 1-2). A real git
+    identity is required upfront here (not deferred to Promote time):
+    the flow always asks "Promote?" only after the report is already
+    shown, so run_by has to be resolved - and correct - before the real
+    tool chain ever runs, or a later "yes, promote" would copy a
+    placeholder identity into permanent history."""
     run_by = get_run_by()
+
+    source = common.select(
+        "Which source?", [_SOURCE_SYNTHETIC, _SOURCE_LOCAL_FILE],
+        flag_hint="mothman bdm qa --run-id <run_id> / mothman bdm qa --file <csv> --reference-file <csv>")
+    if source is None:
+        return
+
+    if source == _SOURCE_LOCAL_FILE:
+        _run_qa_interactive_local_file(run_by, commit_default)
+        return
 
     if not manifest_exists():
         if not common.confirm("No synthetic data generated yet - generate it now?", yes=False, default=True):
@@ -199,17 +282,30 @@ def run_qa_interactive(commit_default: bool = False) -> None:
     console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {run_id}...",
                   style="dim")
     results, tmp_dir = run_check(run_id, run_by)
-    console.print(report_table(results, run_id))
+    _offer_promote(results, run_id, tmp_dir, commit_default)
 
-    if common.confirm("Promote this run into the real, permanent qa_results/ history?",
-                       yes=False, default=commit_default):
-        dst = common.promote(tmp_dir, AGENCY_ID, DATASET_ID, run_id)
-        console.print(f"Promoted -> {dst}", style="green")
-        console.print(
-            "This only wrote to qa_results/ - commit and push it yourself to publish "
-            "(that's what triggers the real CI rebuild).", style="dim")
-    else:
-        console.print("Not promoted - nothing written to the real qa_results/ history.", style="dim")
+
+def _run_qa_interactive_local_file(run_by: str, commit_default: bool) -> None:
+    """The Local files source mode's TUI body (plans/tooling.md #1 Phase
+    2) - browses via questionary.path() (real tab-completion, no
+    hand-built file picker), then runs the exact same
+    run_check_local_file() the flag-invocable --file/--reference-file
+    form below also calls."""
+    csv_path = common.path_prompt("Path to the CSV you've already downloaded:",
+                                   flag_hint="mothman bdm qa --file <csv> --reference-file <csv>")
+    if csv_path is None:
+        return
+    reference_csv = common.path_prompt(
+        "Path to a known-good reference CSV (for distribution-drift comparison):",
+        flag_hint="mothman bdm qa --file <csv> --reference-file <csv>")
+    if reference_csv is None:
+        return
+
+    run_id = local_run_id_from_path(csv_path)
+    console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {csv_path}...",
+                  style="dim")
+    results, tmp_dir = run_check_local_file(csv_path, reference_csv, run_by, run_id=run_id)
+    _offer_promote(results, run_id, tmp_dir, commit_default)
 
 
 @click.group("bdm")
@@ -230,22 +326,7 @@ def generate_synthetic_data_command(yes: bool) -> None:
     console.print(f"Generated -> {raw_dir()}", style="green")
 
 
-@bdm_group.command("qa")
-@click.option("--run-id", default=None, help="An existing manifest run_id (e.g. run_005_2026-...). "
-                                              "Omit to pick interactively.")
-@click.option("--reference-run-id", default=None,
-              help="Defaults to the last Promoted run, or the manifest's own first (clean) entry.")
-@click.option("--commit", is_flag=True, help="Write this run into the real, permanent qa_results/ history.")
-def qa_command(run_id: str | None, reference_run_id: str | None, commit: bool) -> None:
-    """Run the real QA check chain against a Synthetic Birth Registrations run."""
-    if run_id is None:
-        if not (sys.stdin.isatty() and sys.stdout.isatty()):
-            raise click.ClickException("Not a real terminal - pass --run-id explicitly.")
-        run_qa_interactive(commit_default=commit)
-        return
-
-    run_by = get_run_by() if commit else "local-check:not-persisted"
-    results, tmp_dir = run_check(run_id, run_by, reference_run_id=reference_run_id)
+def _finish_flag_mode(results: list[dict], run_id: str, tmp_dir: str, commit: bool) -> None:
     console.print(report_table(results, run_id))
     if commit:
         dst = common.promote(tmp_dir, AGENCY_ID, DATASET_ID, run_id)
@@ -254,3 +335,40 @@ def qa_command(run_id: str | None, reference_run_id: str | None, commit: bool) -
         console.print("(local-only check - not written to qa_results/ history; re-run with --commit to keep it)",
                        style="dim")
     sys.exit(1 if has_failures(results) else 0)
+
+
+@bdm_group.command("qa")
+@click.option("--run-id", default=None, help="Synthetic mode: an existing manifest run_id "
+                                              "(e.g. run_005_2026-...). Omit to pick interactively.")
+@click.option("--reference-run-id", default=None,
+              help="Synthetic mode: defaults to the last Promoted run, or the manifest's own first (clean) entry.")
+@click.option("--file", "file_path", default=None, type=click.Path(exists=True, dir_okay=False),
+              help="Local files mode: an already-downloaded CSV to check (instead of --run-id).")
+@click.option("--reference-file", default=None, type=click.Path(exists=True, dir_okay=False),
+              help="Local files mode: a known-good CSV to compare distribution drift against. "
+                   "Required together with --file.")
+@click.option("--commit", is_flag=True, help="Write this run into the real, permanent qa_results/ history.")
+def qa_command(run_id: str | None, reference_run_id: str | None, file_path: str | None,
+               reference_file: str | None, commit: bool) -> None:
+    """Run the real QA check chain against a Birth Registrations run - Synthetic (--run-id) or
+    Local files (--file/--reference-file) source mode."""
+    if file_path is not None:
+        if run_id is not None:
+            raise click.ClickException("Pass either --run-id (Synthetic mode) or --file (Local files mode), not both.")
+        if reference_file is None:
+            raise click.ClickException("--file requires --reference-file (a known-good CSV to compare against).")
+        run_by = get_run_by() if commit else "local-check:not-persisted"
+        local_run_id = local_run_id_from_path(file_path)
+        results, tmp_dir = run_check_local_file(file_path, reference_file, run_by, run_id=local_run_id)
+        _finish_flag_mode(results, local_run_id, tmp_dir, commit)
+        return
+
+    if run_id is None:
+        if not (sys.stdin.isatty() and sys.stdout.isatty()):
+            raise click.ClickException("Not a real terminal - pass --run-id or --file explicitly.")
+        run_qa_interactive(commit_default=commit)
+        return
+
+    run_by = get_run_by() if commit else "local-check:not-persisted"
+    results, tmp_dir = run_check(run_id, run_by, reference_run_id=reference_run_id)
+    _finish_flag_mode(results, run_id, tmp_dir, commit)

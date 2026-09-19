@@ -45,8 +45,9 @@ def _main_menu_loop() -> None:
 
 
 def _qa_menu() -> None:
-    dataset = common.select("Which dataset?", [_DATASET_BDM, _DATASET_CP],
-                             flag_hint="mothman bdm qa / mothman cp qa")
+    dataset = common.select(
+        "Which dataset?", [_DATASET_BDM, _DATASET_CP],
+        flag_hint="mothman bdm qa [--run-id/--file] / mothman cp qa [--run-id/--folder]")
     if dataset is None:
         return
     if dataset == _DATASET_BDM:

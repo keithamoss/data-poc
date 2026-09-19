@@ -1,19 +1,24 @@
-"""mothman cp - Child Protection commands (plans/tooling.md #1 Phase 1,
-"still open" item finished): generate-synthetic-data and the Quality
-Assurance flow against Synthetic source mode. Same wizard/flags duality
-as cli/bdm.py, adapted for CP's real differences from Birth
-Registrations: a 6-table-per-run collection (not one CSV), no
-row-count-growth/previous_run_id concept, and orchestrate_cp.run_single()
-needing all 6 tables already loaded into that run's warehouse (via
-build_cp_warehouses.add_table_to_run()) before it's called at all -
-qa_tools/cp/check_delivery.py's own _load_delivery() already establishes
-this exact pattern for local-folder CP checks; run_check() below reuses
-it against an existing Synthetic manifest entry's own data/cp_raw/<run_id>/
-directory instead of an arbitrary folder."""
+"""mothman cp - Child Protection commands (plans/tooling.md #1 Phases
+1-2): generate-synthetic-data and the Quality Assurance flow against
+Synthetic and Local files source modes. Same wizard/flags duality as
+cli/bdm.py, adapted for CP's real differences from Birth Registrations:
+a 6-table-per-run collection (not one CSV), no row-count-growth/
+previous_run_id concept, and orchestrate_cp.run_single() needing all 6
+tables already loaded into that run's warehouse (via
+build_cp_warehouses.add_table_to_run()) before it's called at all.
+
+The Local files mode (Phase 2) folds in qa_tools/cp/check_delivery.py's
+own retired standalone-CLI logic verbatim (that module is gone - this is
+now the only place it runs from, per CLAUDE.md's "mothman is the only
+programmatic access point" convention) - same real dbt-core/Soda Core/
+datacontract-cli/Evidently chain via orchestrate_cp.run_single(), just
+reached from a browsable questionary.path() prompt or --folder/
+--reference-folder flags instead of a positional folder argument."""
 from __future__ import annotations
 import json
 import os
 import sys
+from datetime import datetime, timezone
 
 import rich_click as click
 from rich.console import Console
@@ -22,6 +27,7 @@ from rich.table import Table
 from qa_tools.cp import build_cp_warehouses, cp_common, orchestrate_cp
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.lambda_results_dir import CP_MODULES, patch_write_qa_result_for_lambda
+from qa_tools.common.local_check import run_id_from_path as local_run_id_from_path
 from qa_tools.common.qa_results_reader import list_run_ids
 
 from . import common
@@ -80,21 +86,35 @@ def default_reference(manifest: list[dict]) -> str:
     return manifest[0]["run_id"]
 
 
-def _load_delivery(run_id: str) -> None:
-    """Loads all 6 real tables for an existing Synthetic manifest run_id
-    into that run's warehouse - the same call qa_tools/cp/check_delivery.
-    py's own _load_delivery() makes for an arbitrary folder, pointed at
-    this run's own data/cp_raw/<run_id>/ directory instead."""
-    run_dir = os.path.join(raw_dir(), run_id)
-    missing = [t for t in TABLES if not os.path.isfile(os.path.join(run_dir, f"{t}.csv"))]
+def _load_delivery_from_folder(folder: str, run_id: str) -> None:
+    """Loads all 6 real tables for one run_id from an arbitrary folder
+    into that run's warehouse - the retired qa_tools/cp/check_delivery.py
+    CLI's own _load_delivery() logic, folded in here verbatim (Phase 2).
+    Used by both Synthetic mode (_load_delivery(), pointed at this run's
+    own data/cp_raw/<run_id>/ directory) and Local files mode
+    (run_check_local_folder(), pointed at whatever folder the operator
+    browsed to)."""
+    missing = [t for t in TABLES if not os.path.isfile(os.path.join(folder, f"{t}.csv"))]
     if missing:
         raise click.ClickException(
-            f"{run_dir} is missing: {', '.join(f'{t}.csv' for t in missing)} - "
-            f"run generate-synthetic-data first?")
+            f"{folder} is missing: {', '.join(f'{t}.csv' for t in missing)} - "
+            f"a CP delivery needs all 6 real tables, the cross-table checks can't run on a partial set")
     for table in TABLES:
-        build_cp_warehouses.add_table_to_run(run_id, table, os.path.join(run_dir, f"{table}.csv"),
+        build_cp_warehouses.add_table_to_run(run_id, table, os.path.join(folder, f"{table}.csv"),
                                               out_dir=build_cp_warehouses.OUT_DIR,
                                               raw_dir=build_cp_warehouses.CP_RAW_DIR)
+
+
+def _load_delivery(run_id: str) -> None:
+    """Synthetic mode's own delivery loader - a thin wrapper around
+    _load_delivery_from_folder() pointed at this run's own
+    data/cp_raw/<run_id>/ directory, with a clearer error message for
+    that specific (missing-synthetic-data) case."""
+    run_dir = os.path.join(raw_dir(), run_id)
+    if not os.path.isdir(run_dir):
+        raise click.ClickException(
+            f"No manifest entry for run_id={run_id!r} - run generate-synthetic-data first?")
+    _load_delivery_from_folder(run_dir, run_id)
 
 
 def run_check(run_id: str, run_by: str, reference_run_id: str | None = None) -> tuple[list[dict], str]:
@@ -133,6 +153,31 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None) -> 
     return results, tmp_dir
 
 
+def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
+                            run_id: str | None = None, run_date: str | None = None) -> tuple[list[dict], str]:
+    """The Local files QA source mode's real check-running body (plans/
+    tooling.md #1 Phase 2) - folds in qa_tools/cp/check_delivery.py's own
+    retired logic: loads both folder and reference_folder's 6 real
+    tables (an arbitrary, already-downloaded delivery - not tied to any
+    Synthetic manifest entry) via _load_delivery_from_folder(), then
+    reuses orchestrate_cp.run_single(), same entry point the Synthetic
+    flow above and Thread B's Lambda handler call. Returns (results,
+    tmp_results_dir) - same tmp-dir-first Promote pattern as run_check()."""
+    run_date = run_date or datetime.now(timezone.utc).date().isoformat()
+    run_id = run_id or local_run_id_from_path(folder)
+    reference_run_id = local_run_id_from_path(reference_folder, prefix="ref")
+
+    tmp_dir = common.new_tmp_results_dir()
+    patch_write_qa_result_for_lambda(CP_MODULES, tmp_dir)
+
+    _load_delivery_from_folder(reference_folder, reference_run_id)
+    _load_delivery_from_folder(folder, run_id)
+
+    entry = {"run_id": run_id, "run_date": run_date, "dirty_severity": None}
+    results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id, run_by=run_by)
+    return results, tmp_dir
+
+
 _STATUS_STYLE = {"pass": "green", "warn": "yellow", "fail": "red", "error": "bold red"}
 
 
@@ -165,12 +210,41 @@ def run_id_from_choice(choice: str) -> str:
     return choice.split()[0]
 
 
+_SOURCE_SYNTHETIC = "Synthetic - pick or generate a run"
+_SOURCE_LOCAL_FOLDER = "Local files - a delivery folder you've already downloaded"
+
+
+def _offer_promote(results: list[dict], run_id: str, tmp_dir: str, commit_default: bool) -> None:
+    console.print(report_table(results, run_id))
+    if common.confirm("Promote this run into the real, permanent qa_results/ history?",
+                       yes=False, default=commit_default):
+        dst = common.promote(tmp_dir, AGENCY_ID, COLLECTION_ID, run_id)
+        console.print(f"Promoted -> {dst}", style="green")
+        console.print(
+            "This only wrote to qa_results/ - commit and push it yourself to publish "
+            "(that's what triggers the real CI rebuild).", style="dim")
+    else:
+        console.print("Not promoted - nothing written to the real qa_results/ history.", style="dim")
+
+
 def run_qa_interactive(commit_default: bool = False) -> None:
-    """The Quality Assurance flow's Synthetic-source-mode body for Child
-    Protection, called from both `mothman cp qa` (no --run-id given, a
-    real terminal) and the TUI main menu - one real implementation, same
-    upfront-git-identity reasoning as cli/bdm.py's own run_qa_interactive()."""
+    """The Quality Assurance flow's real body for Child Protection,
+    called from both `mothman cp qa` (no --run-id/--folder given, a real
+    terminal) and the TUI main menu - one real implementation across
+    both the Synthetic and Local files source modes (plans/tooling.md #1
+    Phases 1-2), same upfront-git-identity reasoning as cli/bdm.py's own
+    run_qa_interactive()."""
     run_by = get_run_by()
+
+    source = common.select(
+        "Which source?", [_SOURCE_SYNTHETIC, _SOURCE_LOCAL_FOLDER],
+        flag_hint="mothman cp qa --run-id <run_id> / mothman cp qa --folder <dir> --reference-folder <dir>")
+    if source is None:
+        return
+
+    if source == _SOURCE_LOCAL_FOLDER:
+        _run_qa_interactive_local_folder(run_by, commit_default)
+        return
 
     if not manifest_exists():
         if not common.confirm("No synthetic data generated yet - generate it now?", yes=False, default=True):
@@ -189,17 +263,31 @@ def run_qa_interactive(commit_default: bool = False) -> None:
     console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {run_id}...",
                   style="dim")
     results, tmp_dir = run_check(run_id, run_by)
-    console.print(report_table(results, run_id))
+    _offer_promote(results, run_id, tmp_dir, commit_default)
 
-    if common.confirm("Promote this run into the real, permanent qa_results/ history?",
-                       yes=False, default=commit_default):
-        dst = common.promote(tmp_dir, AGENCY_ID, COLLECTION_ID, run_id)
-        console.print(f"Promoted -> {dst}", style="green")
-        console.print(
-            "This only wrote to qa_results/ - commit and push it yourself to publish "
-            "(that's what triggers the real CI rebuild).", style="dim")
-    else:
-        console.print("Not promoted - nothing written to the real qa_results/ history.", style="dim")
+
+def _run_qa_interactive_local_folder(run_by: str, commit_default: bool) -> None:
+    """The Local files source mode's TUI body (plans/tooling.md #1 Phase
+    2) - browses via questionary.path() (real tab-completion, no
+    hand-built file picker), then runs the exact same
+    run_check_local_folder() the flag-invocable --folder/--reference-folder
+    form below also calls."""
+    folder = common.path_prompt(
+        "Path to the delivery folder you've already downloaded (all 6 real CP tables):",
+        flag_hint="mothman cp qa --folder <dir> --reference-folder <dir>")
+    if folder is None:
+        return
+    reference_folder = common.path_prompt(
+        "Path to a known-good reference delivery folder (for distribution-drift comparison):",
+        flag_hint="mothman cp qa --folder <dir> --reference-folder <dir>")
+    if reference_folder is None:
+        return
+
+    run_id = local_run_id_from_path(folder)
+    console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {folder}...",
+                  style="dim")
+    results, tmp_dir = run_check_local_folder(folder, reference_folder, run_by, run_id=run_id)
+    _offer_promote(results, run_id, tmp_dir, commit_default)
 
 
 @click.group("cp")
@@ -220,22 +308,7 @@ def generate_synthetic_data_command(yes: bool) -> None:
     console.print(f"Generated -> {raw_dir()}", style="green")
 
 
-@cp_group.command("qa")
-@click.option("--run-id", default=None, help="An existing manifest run_id (e.g. cp_run_05_2024-...). "
-                                              "Omit to pick interactively.")
-@click.option("--reference-run-id", default=None,
-              help="Defaults to the last Promoted run, or the manifest's own first (clean) entry.")
-@click.option("--commit", is_flag=True, help="Write this run into the real, permanent qa_results/ history.")
-def qa_command(run_id: str | None, reference_run_id: str | None, commit: bool) -> None:
-    """Run the real QA check chain against a Synthetic Child Protection run."""
-    if run_id is None:
-        if not (sys.stdin.isatty() and sys.stdout.isatty()):
-            raise click.ClickException("Not a real terminal - pass --run-id explicitly.")
-        run_qa_interactive(commit_default=commit)
-        return
-
-    run_by = get_run_by() if commit else "local-check:not-persisted"
-    results, tmp_dir = run_check(run_id, run_by, reference_run_id=reference_run_id)
+def _finish_flag_mode(results: list[dict], run_id: str, tmp_dir: str, commit: bool) -> None:
     console.print(report_table(results, run_id))
     if commit:
         dst = common.promote(tmp_dir, AGENCY_ID, COLLECTION_ID, run_id)
@@ -244,3 +317,43 @@ def qa_command(run_id: str | None, reference_run_id: str | None, commit: bool) -
         console.print("(local-only check - not written to qa_results/ history; re-run with --commit to keep it)",
                        style="dim")
     sys.exit(1 if has_failures(results) else 0)
+
+
+@cp_group.command("qa")
+@click.option("--run-id", default=None, help="Synthetic mode: an existing manifest run_id "
+                                              "(e.g. cp_run_05_2024-...). Omit to pick interactively.")
+@click.option("--reference-run-id", default=None,
+              help="Synthetic mode: defaults to the last Promoted run, or the manifest's own first (clean) entry.")
+@click.option("--folder", "folder_path", default=None, type=click.Path(exists=True, file_okay=False),
+              help="Local files mode: an already-downloaded delivery folder, all 6 real tables "
+                   "(instead of --run-id).")
+@click.option("--reference-folder", default=None, type=click.Path(exists=True, file_okay=False),
+              help="Local files mode: a known-good reference delivery folder to compare distribution drift "
+                   "against. Required together with --folder.")
+@click.option("--commit", is_flag=True, help="Write this run into the real, permanent qa_results/ history.")
+def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: str | None,
+               reference_folder: str | None, commit: bool) -> None:
+    """Run the real QA check chain against a Child Protection run - Synthetic (--run-id) or
+    Local files (--folder/--reference-folder) source mode."""
+    if folder_path is not None:
+        if run_id is not None:
+            raise click.ClickException(
+                "Pass either --run-id (Synthetic mode) or --folder (Local files mode), not both.")
+        if reference_folder is None:
+            raise click.ClickException(
+                "--folder requires --reference-folder (a known-good delivery folder to compare against).")
+        run_by = get_run_by() if commit else "local-check:not-persisted"
+        local_run_id = local_run_id_from_path(folder_path)
+        results, tmp_dir = run_check_local_folder(folder_path, reference_folder, run_by, run_id=local_run_id)
+        _finish_flag_mode(results, local_run_id, tmp_dir, commit)
+        return
+
+    if run_id is None:
+        if not (sys.stdin.isatty() and sys.stdout.isatty()):
+            raise click.ClickException("Not a real terminal - pass --run-id or --folder explicitly.")
+        run_qa_interactive(commit_default=commit)
+        return
+
+    run_by = get_run_by() if commit else "local-check:not-persisted"
+    results, tmp_dir = run_check(run_id, run_by, reference_run_id=reference_run_id)
+    _finish_flag_mode(results, run_id, tmp_dir, commit)

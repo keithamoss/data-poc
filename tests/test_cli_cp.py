@@ -176,3 +176,80 @@ def test_generate_synthetic_data_command_no_prompt_needed_on_first_run(monkeypat
 
     assert result.exit_code == 0
     assert called == [True]
+
+
+# Local files QA source mode (plans/tooling.md #1 Phase 2) - migrated
+# from the now-deleted tests/test_check_cli.py once qa_tools/cp/
+# check_delivery.py's own standalone CLI logic folded into qa_command's
+# --folder/--reference-folder flags (mothman is the only entry point
+# now).
+
+def test_qa_command_local_folder_reports_real_cp_failures(monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir):
+    _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir)
+    fake_qa_results = tmp_path / "not_the_real_qa_results"
+    monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
+
+    result = _runner.invoke(cp.qa_command, [
+        "--folder", os.path.join(cp_raw_dir, _DIRTY_RUN_ID),
+        "--reference-folder", os.path.join(cp_raw_dir, _REF_RUN_ID),
+    ])
+
+    assert result.exit_code == 1, result.output
+    assert "fail" in result.output.lower()
+    assert "local-only check" in result.output
+    assert not fake_qa_results.exists()
+
+
+def test_qa_command_local_folder_commit_promotes_into_the_patched_qa_results_dir(
+        monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir):
+    _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir)
+    fake_qa_results = tmp_path / "not_the_real_qa_results"
+    monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
+    monkeypatch.setattr(cp, "get_run_by", lambda: "test@example.com")
+
+    result = _runner.invoke(cp.qa_command, [
+        "--folder", os.path.join(cp_raw_dir, _REF_RUN_ID),
+        "--reference-folder", os.path.join(cp_raw_dir, _REF_RUN_ID),
+        "--commit",
+    ])
+
+    assert result.exit_code == 0, result.output
+    assert "Promoted" in result.output
+    matches = list(fake_qa_results.glob(f"{cp.AGENCY_ID}/{cp.COLLECTION_ID}/*/dataset_stats.json"))
+    assert len(matches) == 1
+    with open(matches[0]) as f:
+        assert json.load(f)["run_by"] == "test@example.com"
+
+
+def _flat(output: str) -> str:
+    """See tests/test_cli_bdm.py's own _flat() - same rich-click panel
+    line-wrapping issue, same fix."""
+    return " ".join(output.replace("│", " ").split()).lower()
+
+
+def test_qa_command_local_folder_and_run_id_together_is_a_real_clean_error(cp_raw_dir):
+    result = _runner.invoke(cp.qa_command, [
+        "--run-id", "some_run",
+        "--folder", os.path.join(cp_raw_dir, _REF_RUN_ID),
+        "--reference-folder", os.path.join(cp_raw_dir, _REF_RUN_ID),
+    ])
+    assert result.exit_code != 0
+    assert "not both" in _flat(result.output)
+
+
+def test_qa_command_local_folder_without_reference_folder_is_a_real_clean_error(cp_raw_dir):
+    result = _runner.invoke(cp.qa_command, ["--folder", os.path.join(cp_raw_dir, _REF_RUN_ID)])
+    assert result.exit_code != 0
+    assert "--reference-folder" in result.output
+
+
+def test_qa_command_local_folder_errors_on_a_partial_delivery(tmp_path):
+    partial = tmp_path / "partial_delivery"
+    partial.mkdir()
+    (partial / "cp_clients.csv").write_text("id\n1\n")
+    # the other 5 real tables are deliberately missing
+
+    result = _runner.invoke(cp.qa_command, ["--folder", str(partial), "--reference-folder", str(partial)])
+
+    assert result.exit_code != 0
+    assert "missing" in result.output.lower()

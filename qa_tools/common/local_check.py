@@ -1,7 +1,8 @@
 """
-Shared logic for the two on-demand CLI checks (`qa_tools/bdm/check_file.py`,
-`qa_tools/cp/check_delivery.py`) - Thread A of plans/running-thoughts.md
-#5 ("fit into today's actual workflow"), scoped 2026-09-19 with Keith:
+Shared logic for the mothman CLI's Local files QA source mode
+(`cli/bdm.py`'s `run_check_local_file()`, `cli/cp.py`'s
+`run_check_local_folder()`) - Thread A of plans/running-thoughts.md #5
+("fit into today's actual workflow"), scoped 2026-09-19 with Keith:
 staff already pull data down from S3/local storage manually today and
 are technical (data engineers/analysts comfortable with a CLI) - the
 real gap isn't an automated trigger (that's Thread B), it's a fast,
@@ -10,6 +11,17 @@ they've just downloaded, before they use it. Reuses orchestrate_bdm.
 run_single()/orchestrate_cp.run_single() - the exact same single-arrival
 entry points Thread B built for Lambda - invoked locally instead of from
 an S3 event.
+
+Originally the shared logic behind two standalone CLIs
+(`qa_tools/bdm/check_file.py`/`qa_tools/cp/check_delivery.py`) - both
+retired (plans/tooling.md #1 Phase 2, 2026-09-19) once mothman's own
+Local files source mode folded their logic in directly; run_id_from_path/
+copy_into outlived them unchanged, just called from cli/bdm.py/cli/cp.py
+now instead. Their own format_report() (a plain-text terminal report) did
+not outlive them - cli/bdm.py's/cli/cp.py's own report_table() (a richer,
+rich.table.Table-rendered report, shared with the Synthetic source mode
+these two never had) replaced it, so it was deleted rather than kept
+unused.
 
 Ad hoc runs default to NOT touching the real, permanent qa_results/ git
 history (Keith's own explicit call, 2026-09-19: "throwaway by default,
@@ -47,35 +59,3 @@ def copy_into(src_path: str, dest_dir: str, dest_filename: str) -> str:
         with open(src_path, "rb") as src, open(dest_path, "wb") as dst:
             dst.write(src.read())
     return dest_path
-
-
-def format_report(results: list[dict], run_id: str) -> str:
-    """A short, human-readable terminal report - real counts and every
-    real failing/warning check's own label and metric, not a raw JSON
-    dump (this CLI's whole audience is someone deciding whether to trust
-    a file, not something re-parsing the output)."""
-    n_pass = sum(1 for r in results if r["status"] == "pass")
-    n_warn = sum(1 for r in results if r["status"] == "warn")
-    n_fail = sum(1 for r in results if r["status"] == "fail")
-    n_error = sum(1 for r in results if r["status"] == "error")
-
-    lines = [f"QA check: {run_id}", f"{len(results)} checks - {n_pass} pass, {n_warn} warn, {n_fail} fail, "
-                                     f"{n_error} error", ""]
-
-    problems = [r for r in results if r["status"] in ("fail", "error")]
-    if problems:
-        lines.append("Failures/errors:")
-        for r in problems:
-            metric = f" ({r['metric_value']}{r.get('unit') or ''})" if r.get("metric_value") is not None else ""
-            lines.append(f"  [{r['status'].upper()}] {r.get('column_name') or '(dataset)'} - {r['label']}{metric}")
-    else:
-        lines.append("No failures or errors.")
-
-    warnings = [r for r in results if r["status"] == "warn"]
-    if warnings:
-        lines.append("")
-        lines.append("Warnings:")
-        for r in warnings:
-            lines.append(f"  [WARN] {r.get('column_name') or '(dataset)'} - {r['label']}")
-
-    return "\n".join(lines)

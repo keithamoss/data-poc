@@ -212,3 +212,125 @@ def test_generate_synthetic_data_command_no_prompt_needed_on_first_run(monkeypat
 
     assert result.exit_code == 0
     assert called == [True]
+
+
+# Local files QA source mode (plans/tooling.md #1 Phase 2) - migrated
+# from the now-deleted tests/test_check_cli.py once qa_tools/bdm/
+# check_file.py's own standalone CLI logic folded into qa_command's
+# --file/--reference-file flags (mothman is the only entry point now).
+
+def test_qa_command_local_file_reports_real_failures_and_never_touches_real_qa_results(
+        monkeypatch, tmp_path, bdm_raw_dir):
+    raw_dir = str(tmp_path / "raw")
+    duckdb_dir = str(tmp_path / "duckdb_runs")
+    os.makedirs(raw_dir)
+    _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir)
+    fake_qa_results = tmp_path / "not_the_real_qa_results"
+    monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
+
+    result = _runner.invoke(bdm.qa_command, [
+        "--file", os.path.join(bdm_raw_dir, f"{_DIRTY_RUN_ID}.csv"),
+        "--reference-file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
+    ])
+
+    assert result.exit_code == 1, result.output
+    assert "fail" in result.output.lower()
+    assert "local-only check" in result.output
+    assert not fake_qa_results.exists()
+
+
+def test_qa_command_local_file_commit_promotes_into_the_patched_qa_results_dir(
+        monkeypatch, tmp_path, bdm_raw_dir):
+    raw_dir = str(tmp_path / "raw")
+    duckdb_dir = str(tmp_path / "duckdb_runs")
+    os.makedirs(raw_dir)
+    _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir)
+    fake_qa_results = tmp_path / "not_the_real_qa_results"
+    monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
+    monkeypatch.setattr(bdm, "get_run_by", lambda: "test@example.com")
+
+    result = _runner.invoke(bdm.qa_command, [
+        "--file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
+        "--reference-file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
+        "--commit",
+    ])
+
+    assert result.exit_code == 0, result.output
+    assert "Promoted" in result.output
+    matches = list(fake_qa_results.glob(f"{bdm.AGENCY_ID}/{bdm.DATASET_ID}/*/dataset_stats.json"))
+    assert len(matches) == 1
+    with open(matches[0]) as f:
+        assert json.load(f)["run_by"] == "test@example.com"
+
+
+def _flat(output: str) -> str:
+    """rich-click wraps its error panels to a fixed width, which can
+    split a short assertion phrase like "not both" across a line break
+    mid-word - collapsing all whitespace (and box-drawing borders) into
+    single spaces makes a plain substring check reliable regardless of
+    where the panel happened to wrap."""
+    return " ".join(output.replace("│", " ").split()).lower()
+
+
+def test_qa_command_local_file_and_run_id_together_is_a_real_clean_error(bdm_raw_dir):
+    result = _runner.invoke(bdm.qa_command, [
+        "--run-id", "some_run",
+        "--file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
+        "--reference-file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
+    ])
+    assert result.exit_code != 0
+    assert "not both" in _flat(result.output)
+
+
+def test_qa_command_local_file_without_reference_file_is_a_real_clean_error(bdm_raw_dir):
+    result = _runner.invoke(bdm.qa_command, ["--file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv")])
+    assert result.exit_code != 0
+    assert "--reference-file" in result.output
+
+
+def test_qa_command_local_file_rejects_a_reference_file_that_does_not_exist(bdm_raw_dir):
+    result = _runner.invoke(bdm.qa_command, [
+        "--file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
+        "--reference-file", "/no/such/file.csv",
+    ])
+    assert result.exit_code != 0
+    assert "does not exist" in _flat(result.output)
+
+
+def test_run_check_local_file_default_path_never_requires_a_real_git_identity(
+        monkeypatch, tmp_path, bdm_raw_dir):
+    """Real regression test for a real red CI run (test.yml, 2026-09-19,
+    originally against the now-retired qa_tools/bdm/check_file.py, ported
+    here since the same logic now lives in run_check_local_file()):
+    orchestrate_bdm.run_single() calls git_identity.get_run_by() whenever
+    run_by isn't passed explicitly - correct for a --commit run, wrong
+    for the default throwaway path, which discards the result before
+    anything ever reads run_by. qa_command's own flag-mode body already
+    passes a real "local-check:not-persisted" run_by rather than calling
+    get_run_by() at all when --commit isn't set - this proves that holds
+    for the --file path too, not just --run-id."""
+    raw_dir = str(tmp_path / "raw")
+    duckdb_dir = str(tmp_path / "duckdb_runs")
+    os.makedirs(raw_dir)
+    _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir)
+
+    from qa_tools.common.git_identity import MissingGitIdentityError
+
+    def _no_git_identity():
+        raise MissingGitIdentityError("git config user.email is not set")
+    monkeypatch.setattr(bdm, "get_run_by", _no_git_identity)
+
+    result = _runner.invoke(bdm.qa_command, [
+        "--file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
+        "--reference-file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
+    ])
+    assert result.exit_code == 0, f"a default (non---commit) run must never require a real git identity: " \
+                                   f"{result.output!r} exc={result.exception!r}"
+
+    result_commit = _runner.invoke(bdm.qa_command, [
+        "--file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
+        "--reference-file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
+        "--commit",
+    ])
+    assert isinstance(result_commit.exception, MissingGitIdentityError), \
+        "a --commit run must still fail loudly without a real git identity - that guarantee must not regress"

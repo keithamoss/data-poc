@@ -3,7 +3,7 @@ Thread A on-demand CLIs (plans/running-thoughts.md #5, 2026-09-19)."""
 from __future__ import annotations
 import os
 
-from qa_tools.common.local_check import copy_into, format_report, run_id_from_path
+from qa_tools.common.local_check import copy_into, run_id_from_path
 
 
 def test_run_id_from_path_includes_the_source_stem():
@@ -43,24 +43,3 @@ def test_copy_into_is_a_no_op_when_src_already_is_dest(tmp_path):
 
     assert dest_path == str(existing)
     assert open(dest_path).read() == "id\n1\n"
-
-
-def _result(status, column_name="sex", label="Some check", metric_value=None, unit=None):
-    return {"status": status, "column_name": column_name, "label": label, "metric_value": metric_value, "unit": unit}
-
-
-def test_format_report_summarizes_counts_and_lists_failures():
-    results = [_result("pass"), _result("pass"), _result("warn", column_name="place_of_birth_suburb"),
-               _result("fail", column_name="date_of_birth", label="out of range", metric_value=3, unit="%")]
-
-    report = format_report(results, "adhoc_run_01")
-
-    assert "4 checks - 2 pass, 1 warn, 1 fail, 0 error" in report
-    assert "[FAIL] date_of_birth - out of range (3%)" in report
-    assert "[WARN] place_of_birth_suburb" in report
-
-
-def test_format_report_says_no_failures_when_clean():
-    results = [_result("pass"), _result("pass")]
-    report = format_report(results, "adhoc_run_01")
-    assert "No failures or errors." in report

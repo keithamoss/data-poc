@@ -53,6 +53,27 @@ def test_select_returns_the_real_choice(monkeypatch):
     assert captured["choices"] == ["a", "b", common.BACK]  # Back always appended
 
 
+def test_path_prompt_returns_none_on_ctrl_c_or_esc(monkeypatch):
+    monkeypatch.setattr(common, "require_tty", lambda hint: None)
+    monkeypatch.setattr(common.questionary, "path",
+                         lambda *a, **k: type("Q", (), {"ask": lambda self: None})())
+    assert common.path_prompt("pick a file", flag_hint="x") is None
+
+
+def test_path_prompt_returns_none_on_a_blank_answer(monkeypatch):
+    monkeypatch.setattr(common, "require_tty", lambda hint: None)
+    monkeypatch.setattr(common.questionary, "path",
+                         lambda *a, **k: type("Q", (), {"ask": lambda self: ""})())
+    assert common.path_prompt("pick a file", flag_hint="x") is None
+
+
+def test_path_prompt_returns_the_real_answer(monkeypatch):
+    monkeypatch.setattr(common, "require_tty", lambda hint: None)
+    monkeypatch.setattr(common.questionary, "path",
+                         lambda *a, **k: type("Q", (), {"ask": lambda self: "/some/file.csv"})())
+    assert common.path_prompt("pick a file", flag_hint="x") == "/some/file.csv"
+
+
 def test_confirm_yes_flag_bypasses_the_prompt_entirely(monkeypatch):
     def _fail_if_called(*a, **k):
         raise AssertionError("yes=True must never touch require_tty or questionary")
