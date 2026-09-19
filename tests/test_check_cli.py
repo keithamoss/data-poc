@@ -70,6 +70,16 @@ def test_check_file_cli_commit_flag_writes_into_the_real_qa_results_dir(monkeypa
     duckdb_dir = str(tmp_path / "duckdb_runs")
     os.makedirs(raw_dir)
     _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir)
+    # A real git identity is required for --commit (by design - see
+    # check_file.py's own docstring), but this test's own job is
+    # verifying --commit's write behavior, not get_run_by() itself
+    # (already covered by tests/test_git_identity.py) - stubbed rather
+    # than depending on the ambient environment actually having one
+    # configured, which is true in this sandbox but not on a real CI
+    # runner checkout (the exact gap that made this test itself flaky
+    # against real CI - see the "reports real failures" test's sibling
+    # regression test above for the full account).
+    monkeypatch.setattr(check_file, "get_run_by", lambda: "test@example.com")
 
     committed_root = tmp_path / "committed_qa_results"
     import functools
