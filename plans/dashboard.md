@@ -844,6 +844,30 @@ common/check_lifecycle.py`'s own `check_id` convention.
     just the player's own speed setting) - don't assume it's another
     speed-multiplier tweak until Keith actually says what he's spotted.
 
+    **Keith's real hypothesis, shared before closing out this session,
+    2026-09-19 evening**: confirms it's NOT the playback speed
+    multiplier (already tried twice) - it's the INPUT PATTERN baked
+    into the `.cast` file itself, via `scripts/dev/record_cast.py`'s
+    own scripted `--step` sequence (`dashboard/demos/README.md` has the
+    actual recorded script). Two concrete, real things missing that
+    make it read as inhuman rather than just fast: (1) no pause before
+    a selection - the real recording selects a menu item the instant
+    it's available, where a real human reads, hesitates, and only then
+    chooses; (2) no realistic up/down navigation "noise" - a real human
+    doesn't move directly to the target option, they page/scan past
+    options, overshoot, correct - the current recording moves with
+    optimal, direct precision instead. His own words: "you are not
+    pausing like a human would when you are choosing items... there's
+    no kind of paging up and down in the list of options... it just
+    feels like it's not real." The real fix direction: re-script
+    `record_cast.py`'s own `--step` sequence for `qa_wizard.cast` with
+    added realistic pauses before each `key:` step and added realistic
+    extra `key:down`/`key:up` navigation before the final selection on
+    at least some menu choices - not a player-side speed tweak, a
+    recording-side scripting change. Still parked - not built this
+    session, captured here so it survives to whichever session picks
+    this up next.
+
 14. **[todo, 2026-09-19]** **[Dashboard UI]** Decode a requirement's id
     into a real component badge/icon in the Requirements panel, the
     same way the Plans tab and Release Notes panel already render
