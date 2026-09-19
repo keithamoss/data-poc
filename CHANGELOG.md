@@ -27,6 +27,20 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Fixed
+- **2:00pm** — **Real Terminal Warning Text Baked Into The Demo Recording** **[Dashboard]** **[Testing & dev
+  tooling]** Keith caught it: the published Demo tab recording had a
+  literal "WARNING: your terminal doesn't support cursor position
+  requests (CPR)." printed right into the captured output - a real
+  artifact of the recording environment (the synthetic pty never
+  answered prompt_toolkit's real cursor-position-request probe), not
+  something a real `mothman` user in a real terminal would ever see.
+  Fixed at the actual source - `scripts/dev/record_cast.py`'s pty loop
+  now answers that probe for real, immediately, exactly like any real
+  terminal emulator would - and re-recorded `dashboard/demos/
+  qa_wizard.cast` with the fix, confirmed clean (0 occurrences, was 1)
+  via a real Playwright screenshot of the Demo tab mid-playback.
+
 ### Added
 - **1:57pm** — **Demo Tab Polish: Half-Speed Playback, Glowing Red Moth Eyes** **[Dashboard]** **[Testing & dev
   tooling]** Two small follow-ups from actually watching the real Demo
