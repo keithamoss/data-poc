@@ -210,7 +210,8 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
 
 
 def run_check_s3(bucket: str, key: str, reference_key: str, run_by: str,
-                  run_id: str | None = None, run_date: str | None = None, s3_client=None) -> tuple[list[dict], str]:
+                  run_id: str | None = None, run_date: str | None = None, s3_client=None,
+                  on_step=None) -> tuple[list[dict], str]:
     """The S3 QA source mode's real check-running body (plans/tooling.md
     #1 Phase 3) - downloads key/reference_key (real boto3, via
     qa_tools.common.s3_source) into a fresh local staging dir, then
@@ -222,7 +223,8 @@ def run_check_s3(bucket: str, key: str, reference_key: str, run_by: str,
     staging_dir = tempfile.mkdtemp(prefix="mothman-s3-")
     local_path = s3_source.download_key(bucket, key, staging_dir, s3_client=s3_client)
     local_reference_path = s3_source.download_key(bucket, reference_key, staging_dir, s3_client=s3_client)
-    return run_check_local_file(local_path, local_reference_path, run_by, run_id=run_id, run_date=run_date)
+    return run_check_local_file(local_path, local_reference_path, run_by, run_id=run_id, run_date=run_date,
+                                 on_step=on_step)
 
 
 _STATUS_STYLE = {"pass": "green", "warn": "yellow", "fail": "red", "error": "bold red"}
@@ -376,7 +378,9 @@ def _run_qa_interactive_s3(run_by: str, commit_default: bool) -> None:
     run_id = local_run_id_from_path(key, prefix="s3")
     console.print(f"Downloading + running the real dbt-core/Soda Core/datacontract-cli/Evidently chain "
                   f"for s3://{bucket}/{key}...", style="dim")
-    results, tmp_dir = run_check_s3(bucket, key, reference_key, run_by, run_id=run_id)
+    with common.chain_progress(run_id) as on_step:
+        results, tmp_dir = run_check_s3(bucket, key, reference_key, run_by, run_id=run_id,
+                                         on_step=on_step)
     _offer_promote(results, run_id, tmp_dir, commit_default)
 
 
@@ -442,7 +446,9 @@ def qa_command(run_id: str | None, reference_run_id: str | None, file_path: str 
         bucket = common.raw_bucket_name()
         run_by = get_run_by() if commit else "local-check:not-persisted"
         local_run_id = local_run_id_from_path(s3_key, prefix="s3")
-        results, tmp_dir = run_check_s3(bucket, s3_key, s3_reference_key, run_by, run_id=local_run_id)
+        with common.chain_progress(local_run_id) as on_step:
+            results, tmp_dir = run_check_s3(bucket, s3_key, s3_reference_key, run_by,
+                                             run_id=local_run_id, on_step=on_step)
         _finish_flag_mode(results, local_run_id, tmp_dir, commit)
         return
 
@@ -453,7 +459,9 @@ def qa_command(run_id: str | None, reference_run_id: str | None, file_path: str 
             raise click.ClickException("--file requires --reference-file (a known-good CSV to compare against).")
         run_by = get_run_by() if commit else "local-check:not-persisted"
         local_run_id = local_run_id_from_path(file_path)
-        results, tmp_dir = run_check_local_file(file_path, reference_file, run_by, run_id=local_run_id)
+        with common.chain_progress(local_run_id) as on_step:
+            results, tmp_dir = run_check_local_file(file_path, reference_file, run_by,
+                                                     run_id=local_run_id, on_step=on_step)
         _finish_flag_mode(results, local_run_id, tmp_dir, commit)
         return
 
@@ -464,5 +472,6 @@ def qa_command(run_id: str | None, reference_run_id: str | None, file_path: str 
         return
 
     run_by = get_run_by() if commit else "local-check:not-persisted"
-    results, tmp_dir = run_check(run_id, run_by, reference_run_id=reference_run_id)
+    with common.chain_progress(run_id) as on_step:
+        results, tmp_dir = run_check(run_id, run_by, reference_run_id=reference_run_id, on_step=on_step)
     _finish_flag_mode(results, run_id, tmp_dir, commit)

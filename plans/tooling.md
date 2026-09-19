@@ -1452,3 +1452,31 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     (`tests/test_cli_cp.py`'s `_fake_run_single` mirrored the real
     signature exactly and rejected the new optional kwarg) - fixed with
     `**kwargs` so it stops re-breaking on unrelated signature growth.
+
+    **Completed properly after Keith caught that the first pass was
+    partial.** He asked what "wired it into the BDM synthetic path"
+    actually meant and whether CP needed it too - a question worth
+    checking rather than answering from memory, and the audit found the
+    first pass had covered only 5 of 13 real call sites. CP's Synthetic
+    and Local-files paths did have it; **eight others did not**: both S3
+    modes, CP's single-table mode (2 sites), and every flag-invocable
+    `mothman <ds> qa` form (5 sites). That last group matters most - a
+    human typing `mothman bdm qa --run-id X` waits the same ~13.5s, and
+    it's the route someone uses repeatedly once they know the tool.
+    Flag-mode parity is also `plans/tooling.md` #1's own stated design
+    rule ("just put everything in the TUI" - no CLI-only/TUI-only
+    split), so leaving it out would have been a real inconsistency, not
+    just a gap. `on_step` now threads through the S3 wrappers too (they
+    delegate down to the local-file/local-folder bodies), and all 13
+    sites are covered.
+
+    Two new tests specifically guard the thing that went wrong, since
+    "I wired some of them" is not a mistake a functional test would
+    catch: one asserts **no** `results, tmp_dir = run_check*(...)` call
+    site anywhere in `cli/` sits outside a `chain_progress()` block, and
+    one asserts flag mode and interactive mode both show it. Structural
+    rather than driving 13 real chain runs, which would cost minutes -
+    and deliberately blunt, so a future call site that genuinely
+    shouldn't show a bar has to be an explicit decision rather than an
+    omission. Verified by removing one wrapper and confirming the guard
+    fails naming the exact `file:line`.

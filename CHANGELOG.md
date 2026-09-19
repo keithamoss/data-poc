@@ -79,6 +79,14 @@ edited for a punchier, friendlier read than a bare commit log.
   exposed the problem: that stretch went from roughly zero terminal
   events and a 13.5-second frozen gap to 133 events with a largest gap
   of 1.5 seconds, each tool visibly named as it runs.
+  The first pass at this only covered 5 of the 13 places the CLI starts
+  that chain — Keith caught it by asking whether Child Protection needed
+  it too. Both S3 modes, CP's single-table mode, and every
+  flag-invocable `mothman <dataset> qa` form were missed; that last
+  group matters most, since typing `--run-id` waits exactly as long and
+  is the route someone uses repeatedly once they know the tool. All 13
+  are covered now, and two tests guard it structurally — "I wired some
+  of them" isn't a mistake a functional test would ever catch.
 - **9:51pm** — **The Demo Recording Now Pauses Like a Person** **[Dashboard UI]** **[Testing & dev tooling]**
   Keith's read was right, and the numbers behind it explain why two
   earlier attempts at slowing the player down couldn't have worked.

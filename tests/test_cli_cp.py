@@ -295,7 +295,7 @@ def test_run_check_s3_delivery_downloads_both_prefixes_then_delegates_to_local_f
 
     captured = {}
 
-    def _fake_run_check_local_folder(folder, reference_folder, run_by, run_id=None, run_date=None):
+    def _fake_run_check_local_folder(folder, reference_folder, run_by, run_id=None, run_date=None, **kwargs):
         captured["folder"] = folder
         captured["reference_folder"] = reference_folder
         captured["run_by"] = run_by
@@ -357,7 +357,7 @@ def test_qa_command_s3_delivery_flag_mode_downloads_and_runs_real_checks(monkeyp
     captured = {}
 
     def _fake_run_check_s3_delivery(bucket, delivery_prefix, reference_delivery_prefix, run_by,
-                                     run_id=None, run_date=None, s3_client=None):
+                                     run_id=None, run_date=None, s3_client=None, **kwargs):
         captured.update(bucket=bucket, delivery_prefix=delivery_prefix,
                          reference_delivery_prefix=reference_delivery_prefix, run_by=run_by, run_id=run_id)
         return [{"status": "pass"}], "/tmp/fake-results"
@@ -467,7 +467,7 @@ def test_run_check_s3_single_table_downloads_then_delegates_to_single_table_mode
 
     captured = {}
 
-    def _fake_run_check_single_table(table, file_path, run_by, run_id=None, run_date=None):
+    def _fake_run_check_single_table(table, file_path, run_by, run_id=None, run_date=None, **kwargs):
         captured.update(table=table, file_path=file_path, run_by=run_by, run_id=run_id)
         return [{"status": "pass"}], "/tmp/fake-results"
 
@@ -523,7 +523,7 @@ def test_qa_command_table_file_flag_mode_calls_run_check_single_table(monkeypatc
 
     captured = {}
 
-    def _fake_run_check_single_table(table, file_path, run_by, run_id=None, run_date=None):
+    def _fake_run_check_single_table(table, file_path, run_by, run_id=None, run_date=None, **kwargs):
         captured.update(table=table, file_path=file_path, run_by=run_by, run_id=run_id)
         return [{"status": "pass"}], "/tmp/fake-results"
 
@@ -543,7 +543,7 @@ def test_qa_command_table_s3_key_flag_mode_calls_run_check_s3_single_table(monke
 
     captured = {}
 
-    def _fake_run_check_s3_single_table(bucket, table, key, run_by, run_id=None, run_date=None, s3_client=None):
+    def _fake_run_check_s3_single_table(bucket, table, key, run_by, run_id=None, run_date=None, s3_client=None, **kwargs):
         captured.update(bucket=bucket, table=table, key=key, run_by=run_by, run_id=run_id)
         return [{"status": "pass"}], "/tmp/fake-results"
 

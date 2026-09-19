@@ -70,3 +70,61 @@ def test_chain_progress_degrades_to_a_plain_line_off_a_tty(monkeypatch, capsys):
     with common.chain_progress("run_042") as on_step:
         assert on_step is None
     assert "run_042" in capsys.readouterr().out
+
+
+def test_no_check_chain_call_site_is_left_without_a_progress_indicator():
+    """Every place the CLI kicks off the real ~13.5s chain must show
+    progress - a human waits exactly as long whichever route they took.
+
+    This exists because the first pass at plans/tooling.md #13 wired only
+    some of them. Keith caught it by asking a question I had to go and
+    check rather than answer from memory ("does it need to be in the CP
+    one as well?"): BDM's Synthetic and Local-files paths had it, and
+    eight others did not - both S3 modes, CP's single-table mode, and
+    every flag-invocable `mothman <ds> qa` form, which is the route a
+    human most likely uses more than once.
+
+    Asserted structurally rather than by driving 13 real chain runs,
+    which would cost minutes. It's deliberately a blunt check: any new
+    `results, tmp_dir = run_check*(...)` must sit inside a
+    `common.chain_progress(...)` block. If a future call site genuinely
+    shouldn't show a bar, that's a real decision worth making explicitly
+    here rather than by omission."""
+    import pathlib
+    import re
+
+    bare = []
+    for name in ("cli/bdm.py", "cli/cp.py"):
+        lines = pathlib.Path(name).read_text().splitlines()
+        for i, line in enumerate(lines):
+            if not re.search(r"results, tmp_dir = run_check", line):
+                continue
+            # the `with common.chain_progress(...) as on_step:` opening
+            # the block sits within a couple of lines above the call
+            if not any("chain_progress" in lines[j] for j in range(max(0, i - 3), i)):
+                bare.append(f"{name}:{i + 1}: {line.strip()}")
+
+    assert bare == [], (
+        "these start the real check chain with no progress indicator, so a "
+        "human waits ~13.5s at a frozen screen:\n" + "\n".join(bare))
+
+
+def test_flag_mode_and_interactive_mode_both_show_progress():
+    """plans/tooling.md #1's own design rule is that every command is
+    BOTH flag-invocable and TUI-navigable, with no split in behaviour
+    between them (Keith: "just put everything in the TUI"). Progress
+    reporting is part of that parity - `mothman bdm qa --run-id X` waits
+    the same ~13.5s as picking the run in the wizard."""
+    import pathlib
+    import re
+
+    for name in ("cli/bdm.py", "cli/cp.py"):
+        src = pathlib.Path(name).read_text()
+        # qa_command is the flag-invocable entry point in both modules
+        m = re.search(r"^def qa_command\(", src, re.M)
+        assert m, f"{name} has no qa_command to check"
+        nxt = re.search(r"^def ", src[m.end():], re.M)
+        body = src[m.end():m.end() + (nxt.start() if nxt else len(src))]
+        assert "chain_progress" in body, (
+            f"{name}'s flag-invocable qa_command runs the chain without a "
+            "progress indicator, while the interactive path shows one")

@@ -195,7 +195,8 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
 
 def run_check_s3_delivery(bucket: str, delivery_prefix: str, reference_delivery_prefix: str, run_by: str,
                            run_id: str | None = None, run_date: str | None = None,
-                           s3_client=None) -> tuple[list[dict], str]:
+                           s3_client=None,
+                                on_step=None) -> tuple[list[dict], str]:
     """The S3 QA source mode's real check-running body for Child
     Protection (plans/tooling.md #1 Phase 3) - a delivery here is all 6
     real table CSVs landing together under one shared S3 prefix
@@ -211,7 +212,8 @@ def run_check_s3_delivery(bucket: str, delivery_prefix: str, reference_delivery_
     reference_staging_dir = tempfile.mkdtemp(prefix="mothman-s3-ref-")
     s3_source.download_prefix(bucket, delivery_prefix, staging_dir, s3_client=s3_client)
     s3_source.download_prefix(bucket, reference_delivery_prefix, reference_staging_dir, s3_client=s3_client)
-    return run_check_local_folder(staging_dir, reference_staging_dir, run_by, run_id=run_id, run_date=run_date)
+    return run_check_local_folder(staging_dir, reference_staging_dir, run_by, run_id=run_id, run_date=run_date,
+                                   on_step=on_step)
 
 
 def run_check_single_table(table: str, file_path: str, run_by: str,
@@ -272,7 +274,8 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
 
 def run_check_s3_single_table(bucket: str, table: str, key: str, run_by: str,
                                run_id: str | None = None, run_date: str | None = None,
-                               s3_client=None) -> tuple[list[dict], str]:
+                               s3_client=None,
+                                on_step=None) -> tuple[list[dict], str]:
     """Single-table Child Protection QA's S3 source mode (Phase 3.5) -
     downloads the one real table object (real boto3, via
     qa_tools.common.s3_source), then reuses run_check_single_table()
@@ -281,7 +284,8 @@ def run_check_s3_single_table(bucket: str, table: str, key: str, run_by: str,
     S3 mode above."""
     staging_dir = tempfile.mkdtemp(prefix="mothman-s3-")
     local_path = s3_source.download_key(bucket, key, staging_dir, s3_client=s3_client)
-    return run_check_single_table(table, local_path, run_by, run_id=run_id, run_date=run_date)
+    return run_check_single_table(table, local_path, run_by, run_id=run_id, run_date=run_date,
+                                   on_step=on_step)
 
 
 _STATUS_STYLE = {"pass": "green", "warn": "yellow", "fail": "red", "error": "bold red"}
@@ -446,7 +450,9 @@ def _run_qa_interactive_s3(run_by: str, commit_default: bool) -> None:
     run_id = local_run_id_from_path(delivery, prefix="s3")
     console.print(f"Downloading + running the real dbt-core/Soda Core/datacontract-cli/Evidently chain "
                   f"for s3://{bucket}/{delivery}...", style="dim")
-    results, tmp_dir = run_check_s3_delivery(bucket, delivery, reference_delivery, run_by, run_id=run_id)
+    with common.chain_progress(run_id) as on_step:
+        results, tmp_dir = run_check_s3_delivery(bucket, delivery, reference_delivery, run_by,
+                                                  run_id=run_id, on_step=on_step)
     _offer_promote(results, run_id, tmp_dir, commit_default)
 
 
@@ -480,7 +486,9 @@ def _run_qa_interactive_single_table(run_by: str, commit_default: bool) -> None:
         run_id = local_run_id_from_path(key, prefix="table")
         console.print(f"Downloading + running the real dbt-core/Soda Core/datacontract-cli/Evidently chain "
                       f"for s3://{bucket}/{key} (table: {table})...", style="dim")
-        results, tmp_dir = run_check_s3_single_table(bucket, table, key, run_by, run_id=run_id)
+        with common.chain_progress(run_id) as on_step:
+            results, tmp_dir = run_check_s3_single_table(bucket, table, key, run_by, run_id=run_id,
+                                                          on_step=on_step)
     else:
         file_path = common.path_prompt(f"Path to the {table} CSV you've already downloaded:", flag_hint=flag_hint)
         if file_path is None:
@@ -488,7 +496,9 @@ def _run_qa_interactive_single_table(run_by: str, commit_default: bool) -> None:
         run_id = local_run_id_from_path(file_path, prefix="table")
         console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {file_path} "
                       f"(table: {table})...", style="dim")
-        results, tmp_dir = run_check_single_table(table, file_path, run_by, run_id=run_id)
+        with common.chain_progress(run_id) as on_step:
+            results, tmp_dir = run_check_single_table(table, file_path, run_by, run_id=run_id,
+                                                       on_step=on_step)
 
     _offer_promote(results, run_id, tmp_dir, commit_default)
 
@@ -569,11 +579,15 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
         run_by = get_run_by() if commit else "local-check:not-persisted"
         if table_file is not None:
             local_run_id = local_run_id_from_path(table_file, prefix="table")
-            results, tmp_dir = run_check_single_table(table, table_file, run_by, run_id=local_run_id)
+            with common.chain_progress(local_run_id) as on_step:
+                results, tmp_dir = run_check_single_table(table, table_file, run_by,
+                                                           run_id=local_run_id, on_step=on_step)
         else:
             bucket = common.raw_bucket_name()
             local_run_id = local_run_id_from_path(s3_key, prefix="table")
-            results, tmp_dir = run_check_s3_single_table(bucket, table, s3_key, run_by, run_id=local_run_id)
+            with common.chain_progress(local_run_id) as on_step:
+                results, tmp_dir = run_check_s3_single_table(bucket, table, s3_key, run_by,
+                                                              run_id=local_run_id, on_step=on_step)
         _finish_flag_mode(results, local_run_id, tmp_dir, commit)
         return
 
@@ -588,8 +602,9 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
         bucket = common.raw_bucket_name()
         run_by = get_run_by() if commit else "local-check:not-persisted"
         local_run_id = local_run_id_from_path(s3_delivery, prefix="s3")
-        results, tmp_dir = run_check_s3_delivery(bucket, s3_delivery, s3_reference_delivery, run_by,
-                                                   run_id=local_run_id)
+        with common.chain_progress(local_run_id) as on_step:
+            results, tmp_dir = run_check_s3_delivery(bucket, s3_delivery, s3_reference_delivery, run_by,
+                                                      run_id=local_run_id, on_step=on_step)
         _finish_flag_mode(results, local_run_id, tmp_dir, commit)
         return
 
@@ -602,7 +617,9 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
                 "--folder requires --reference-folder (a known-good delivery folder to compare against).")
         run_by = get_run_by() if commit else "local-check:not-persisted"
         local_run_id = local_run_id_from_path(folder_path)
-        results, tmp_dir = run_check_local_folder(folder_path, reference_folder, run_by, run_id=local_run_id)
+        with common.chain_progress(local_run_id) as on_step:
+            results, tmp_dir = run_check_local_folder(folder_path, reference_folder, run_by,
+                                                       run_id=local_run_id, on_step=on_step)
         _finish_flag_mode(results, local_run_id, tmp_dir, commit)
         return
 
@@ -613,5 +630,6 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
         return
 
     run_by = get_run_by() if commit else "local-check:not-persisted"
-    results, tmp_dir = run_check(run_id, run_by, reference_run_id=reference_run_id)
+    with common.chain_progress(run_id) as on_step:
+        results, tmp_dir = run_check(run_id, run_by, reference_run_id=reference_run_id, on_step=on_step)
     _finish_flag_mode(results, run_id, tmp_dir, commit)

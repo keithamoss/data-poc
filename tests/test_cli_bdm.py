@@ -385,7 +385,7 @@ def test_run_check_s3_downloads_both_keys_then_delegates_to_local_file_mode(monk
 
     captured = {}
 
-    def _fake_run_check_local_file(csv_path, reference_csv, run_by, run_id=None, run_date=None):
+    def _fake_run_check_local_file(csv_path, reference_csv, run_by, run_id=None, run_date=None, **kwargs):
         captured["csv_path"] = csv_path
         captured["reference_csv"] = reference_csv
         captured["run_by"] = run_by
@@ -456,7 +456,7 @@ def test_qa_command_s3_key_flag_mode_downloads_and_runs_real_checks(monkeypatch)
 
     captured = {}
 
-    def _fake_run_check_s3(bucket, key, reference_key, run_by, run_id=None, run_date=None, s3_client=None):
+    def _fake_run_check_s3(bucket, key, reference_key, run_by, run_id=None, run_date=None, s3_client=None, **kwargs):
         captured.update(bucket=bucket, key=key, reference_key=reference_key, run_by=run_by, run_id=run_id)
         return [{"status": "pass"}], "/tmp/fake-results"
 
