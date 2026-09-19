@@ -142,7 +142,7 @@ describe("plansEntryMatchesFilter", () => {
     return view;
   }
   function clickChip(view, kind, value) {
-    const btn = [...view.querySelectorAll(`.plans-chip[data-kind="${kind}"]`)].find(b => b.dataset.value === value);
+    const btn = [...view.querySelectorAll(`[data-kind="${kind}"]`)].find(b => b.dataset.value === value);
     btn.click();
   }
   function typeSearch(w, text) {

@@ -177,6 +177,18 @@ button{font:inherit; color:inherit;}
 }
 .plans-chip:hover{border-color:var(--accent);}
 .plans-chip.active{background:var(--accent-soft); border-color:var(--accent-soft-line); color:var(--accent-ink);}
+/* Status/component filter chips (real .pill markup, not .plans-chip) -
+   just the interactive toggle states layered on top: dimmed/outlined
+   until selected, full colour once active. Written as its own class
+   (not combined with .plans-chip) since .plans-chip's own background/
+   border rules above would otherwise win the cascade against .pill's
+   earlier-defined ones at equal specificity - two single-class
+   selectors, later one wins, and .plans-chip is defined after .pill. */
+.plans-chip-toggle{cursor:pointer; border:1.5px solid transparent; opacity:.6;}
+.pill.plans-chip-toggle:not(.active){background:var(--surface-alt); color:var(--ink-muted);}
+.pill.plans-chip-toggle:not(.active) .ico{background:var(--ink-faint);}
+.plans-chip-toggle:hover{opacity:.85;}
+.plans-chip-toggle.active{opacity:1; border-color:currentColor;}
 .plans-count{font-size:12px; color:var(--ink-faint); margin:14px 0 8px;}
 .plans-entry{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); margin-bottom:10px; overflow:hidden;}
 .plans-entry-head{width:100%; text-align:left; padding:14px 16px; background:none; border:none; cursor:pointer; display:block;}
@@ -269,7 +281,7 @@ button{font:inherit; color:inherit;}
 .drawer.open{transform:translateX(0);}
 .drawer-head{padding:20px 22px 14px; border-bottom:1px solid var(--line); display:flex; align-items:flex-start; justify-content:space-between; gap:12px;}
 .drawer-head h3{font-size:19px;}
-.drawer-close{background:var(--surface-alt); border:1px solid var(--line); border-radius:50%; width:30px; height:30px; cursor:pointer; font-size:15px; line-height:1;}
+.drawer-close{background:var(--surface-alt); border:1px solid var(--line); border-radius:50%; width:30px; height:30px; cursor:pointer; font-size:15px; line-height:1; display:flex; align-items:center; justify-content:center; padding:0;}
 .drawer-body{padding:18px 22px 32px; overflow-y:auto; flex:1;}
 .drawer-section{margin-bottom:26px;}
 .drawer-section h4{font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-faint); margin-bottom:10px; font-family:"Public Sans",sans-serif; font-weight:700;}
@@ -2140,7 +2152,7 @@ window.addEventListener("popstate", (e)=>{
 function render(){
   const view = document.getElementById("view");
   if(STATE.tier==="exec") return renderExec(view);
-  if(STATE.tier==="plans") return renderPlans(view);
+  if(STATE.tier==="plans"){ PLANS_FILTER = plansFilterFromUrl(); return renderPlans(view); }
   if(STATE.tier==="demo") return renderDemo(view);
   if(STATE.tier==="agency") return renderAgency(view, STATE.agencyId);
   if(STATE.tier==="dataset") return renderDataset(view, STATE.agencyId, STATE.collectionId, STATE.datasetId);
@@ -3367,6 +3379,33 @@ const PLANS_ALL_FILES = ["wider","qa-pipeline","dashboard","data-generation","to
 let PLANS_FILTER = {query:"", statuses:new Set(), components:new Set(), files:new Set()};
 const PLANS_EXPANDED = new Set();
 
+// Real URL persistence for the filter bar (Keith's own ask, 2026-09-19) -
+// q=/status=/component=/file= in location.search, the same "orthogonal,
+// non-navigational state lives in the query string" convention asof=/
+// panel=/cmp= already established (see stateToPath()'s own comment).
+// Read once on real tier-entry (render()'s own dispatch, never from
+// inside renderPlans() itself - that also runs on every internal chip-
+// toggle re-render, which would otherwise stomp the just-applied change
+// with whatever's still in the URL from before it). Written back after
+// every real filter mutation (search input, chip toggle, clear) via
+// history.replaceState - many rapid chip clicks shouldn't each get their
+// own back-button-navigable history entry, the same reasoning
+// setCompareIdx() already uses for cmp=.
+function plansFilterFromUrl(){
+  const params = new URLSearchParams(location.search);
+  const csv = (key) => new Set((params.get(key)||"").split(",").filter(Boolean));
+  return {query: params.get("q")||"", statuses: csv("status"), components: csv("component"), files: csv("file")};
+}
+function writePlansFilterToUrl(){
+  const url = new URL(location.href);
+  const setOrDelete = (key, value) => { if(value) url.searchParams.set(key, value); else url.searchParams.delete(key); };
+  setOrDelete("q", PLANS_FILTER.query);
+  setOrDelete("status", [...PLANS_FILTER.statuses].join(","));
+  setOrDelete("component", [...PLANS_FILTER.components].join(","));
+  setOrDelete("file", [...PLANS_FILTER.files].join(","));
+  history.replaceState(STATE, "", url.pathname + url.search + location.hash);
+}
+
 function plansEntryMatchesFilter(e){
   if(PLANS_FILTER.statuses.size && !PLANS_FILTER.statuses.has(e.status)) return false;
   if(PLANS_FILTER.components.size && !e.components.some(c=>PLANS_FILTER.components.has(c))) return false;
@@ -3379,11 +3418,21 @@ function plansEntryMatchesFilter(e){
 }
 
 function renderPlansFilterBar(){
+  // Status/component filter chips reuse the exact same .pill styling the
+  // real items themselves render with (plansStatusPill()/componentBadge()
+  // above) - Keith's own ask, 2026-09-19: a filter chip should look like
+  // what it filters FOR, not a generic flat grey toggle unrelated to the
+  // real status colour-coding. .plans-chip-toggle layers on just the
+  // interactive states (dimmed until active, hover, active border) - see
+  // that class's own CSS comment for why it can't just be `.plans-chip`
+  // + `.pill` combined (a real CSS cascade-order conflict, not a style
+  // preference). File chips keep the old flat `.plans-chip` look - there
+  // is no real per-file item chip anywhere else on a plan entry to match.
   const statusChips = PLANS_ALL_STATUSES.map(s=>
-    `<button type="button" class="plans-chip${PLANS_FILTER.statuses.has(s)?" active":""}" data-kind="status" data-value="${s}">${plansStatusLabel(s)}</button>`
+    `<button type="button" class="pill ${PLANS_STATUS_CLASS[s]||"nodata"} sm plans-chip-toggle${PLANS_FILTER.statuses.has(s)?" active":""}" data-kind="status" data-value="${s}"><span class="ico"></span>${plansStatusLabel(s)}</button>`
   ).join("");
   const componentChips = PLANS_ALL_COMPONENTS.map(c=>
-    `<button type="button" class="plans-chip${PLANS_FILTER.components.has(c)?" active":""}" data-kind="component" data-value="${c}"><span aria-hidden="true">${componentIcon(c)}</span> ${c}</button>`
+    `<button type="button" class="pill tag sm plans-chip-toggle${PLANS_FILTER.components.has(c)?" active":""}" data-kind="component" data-value="${c}"><span aria-hidden="true">${componentIcon(c)}</span> ${c}</button>`
   ).join("");
   const fileChips = PLANS_ALL_FILES.map(f=>
     `<button type="button" class="plans-chip${PLANS_FILTER.files.has(f)?" active":""}" data-kind="file" data-value="${f}">${PLANS_FILE_LABEL[f]}</button>`
@@ -3454,19 +3503,22 @@ function renderPlans(view){
   `;
   document.getElementById("plans-search").addEventListener("input", (e)=>{
     PLANS_FILTER.query = e.target.value;
+    writePlansFilterToUrl();
     renderPlansList();
   });
   const PLANS_FILTER_KEY = {status:"statuses", component:"components", file:"files"};
-  view.querySelectorAll(".plans-chip[data-kind]").forEach(btn=>{
+  view.querySelectorAll("[data-kind]").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       const set = PLANS_FILTER[PLANS_FILTER_KEY[btn.dataset.kind]];
       if(set.has(btn.dataset.value)) set.delete(btn.dataset.value); else set.add(btn.dataset.value);
+      writePlansFilterToUrl();
       renderPlans(view);
     });
   });
   const clearBtn = document.getElementById("plans-clear-filters");
   if(clearBtn) clearBtn.addEventListener("click", ()=>{
     PLANS_FILTER = {query:"", statuses:new Set(), components:new Set(), files:new Set()};
+    writePlansFilterToUrl();
     renderPlans(view);
   });
   renderPlansList();

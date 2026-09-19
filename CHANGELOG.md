@@ -27,7 +27,37 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Added
+- **2:33pm** — **Plans Tab: Filters Now Persist In The URL** **[Dashboard]** The Plans tab's search box and
+  status/component/file filter chips now round-trip through
+  `location.search` (`q=`/`status=`/`component=`/`file=`, comma-joined
+  for multi-select), written via `history.replaceState` on every real
+  filter mutation so rapid chip clicks don't spam browser history - a
+  filtered Plans URL can now be bookmarked, shared, or linked to
+  directly and lands back in the same filtered state. Status/component
+  chips were also restyled to use the exact same `.pill` markup and
+  colour classes real plan-item chips already use (green for Done, the
+  per-component tag colour, etc.) instead of their own separate flat
+  style, so the filter bar now visually matches what it's filtering.
+  Found a real jsdom test-harness gotcha while writing coverage for
+  this: stubbing `matchMedia` *after* `new JSDOM()` construction is too
+  late for a URL that already restores filter state on load - the
+  page's own top-level script calls `currentTheme()` (which touches
+  `matchMedia`) before reaching later top-level `const` declarations
+  like `SIDE_PANELS`, so a late stub lets that call throw and silently
+  aborts the script partway through, leaving those later consts
+  permanently in their TDZ even though the (hoisted) functions
+  referencing them stay callable - surfaces as a confusing "Cannot
+  access 'SIDE_PANELS' before initialization" that looks URL-shape-
+  specific but isn't. Fixed by using jsdom's `beforeParse` hook, matching
+  `tests-js/support/loadDashboard.js`'s own established pattern. 11 new
+  tests.
+
 ### Fixed
+- **2:33pm** — **Drawer Close Icon Wasn't Vertically Centered** **[Dashboard]** The circular "×" close button on
+  every side panel/drawer was missing flexbox centering, leaving the
+  icon visibly offset within its circle. Confirmed with a real Playwright
+  screenshot before and after.
 - **2:00pm** — **Real Terminal Warning Text Baked Into The Demo Recording** **[Dashboard]** **[Testing & dev
   tooling]** Keith caught it: the published Demo tab recording had a
   literal "WARNING: your terminal doesn't support cursor position
