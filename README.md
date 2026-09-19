@@ -272,6 +272,37 @@ this repo's real, committed `qa_results/` history unless you pass
 `--commit` (Keith's own explicit call: an ad hoc sanity check on your own
 pull usually isn't meant to become part of the permanent QA record).
 
+`mothman`'s **S3 QA source mode** (`plans/tooling.md` #1 Phase 3) covers the
+same real use case one step earlier — before you've pulled the file down
+yourself — by browsing the real raw-data landing bucket directly (real
+`boto3`, the same tools/checks either way):
+
+```bash
+export MOTHMAN_RAW_BUCKET_NAME=your-real-raw-data-bucket-name
+
+./mothman bdm qa --s3-key bdm/birth_registrations_2026-09-19.csv \
+  --s3-reference-key bdm/birth_registrations_2026-09-18.csv
+
+./mothman cp qa --s3-delivery cp/delivery_042/ \
+  --s3-reference-delivery cp/delivery_041/
+```
+
+`MOTHMAN_RAW_BUCKET_NAME` is env-provided rather than hardcoded, since
+`aws/cdk/data_pipeline_stack.py`'s `RawDataBucket` auto-generates a
+globally-unique bucket name at deploy time (no fixed `bucket_name=`
+passed). The `bdm/`/`cp/` prefixes and per-dataset default local root
+(`data/raw`/`data/cp_raw`) come from each dataset's own real ODCS
+contract (`contract/*.yaml`'s `s3Source`/`localSource`
+`customProperties`, verified 2026-09-19 against real datacontract-cli
+parsing before landing there) — a Child Protection "delivery" here is a
+prefix holding all 6 real table CSVs together
+(`<s3Source prefix><delivery_id>/`), matched via S3's own
+`Delimiter="/"` folder-like grouping, not one flat key the way BDM's is.
+Same interactive reachability (bare `./mothman` → Quality Assurance →
+"S3"), same throwaway-by-default/`--commit` semantics as Local files
+mode above — S3 mode is "download, then Local files mode" internally,
+not a third parallel check-running path.
+
 ## Speed
 
 `qa_tools/bdm/orchestrate_bdm.py`/`qa_tools/cp/orchestrate_cp.py`

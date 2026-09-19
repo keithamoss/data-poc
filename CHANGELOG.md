@@ -28,6 +28,26 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
+- **12:32pm** — **mothman CLI Phase 3: S3 QA Source Mode** **[Testing & dev tooling]** `mothman bdm qa --s3-key
+  <key> --s3-reference-key <key>` and `mothman cp qa --s3-delivery
+  <prefix> --s3-reference-delivery <prefix>` - browse the real raw-data
+  landing bucket directly and run the same real dbt-core/Soda Core/
+  datacontract-cli/Evidently chain against whatever's there, before
+  you've even pulled it down yourself. Real `boto3`, verified only via a
+  mocked client (no real AWS access in this sandbox) - S3 mode is
+  "download, then Local files mode" internally, reusing Phase 2's own
+  check-running logic rather than a third parallel code path. A real,
+  previously-flagged fork got resolved along the way, not silently:
+  `docs/aws-event-driven-mvp-design.md` had proposed a real
+  `arrivalPattern` ODCS contract extension overnight but deliberately
+  kept it OUT of the real contract files - unverified that it wouldn't
+  break real dbt/Soda/datacontract-cli parsing. Flagged to Keith before
+  touching the real contract; his call was to verify then wire it all
+  in now that real tool access exists - confirmed via a real
+  `DataContract(...).lint()` pass, the real datacontract-cli
+  integration suite, and the real `validate_check_lifecycle` CI gate,
+  all clean, before landing `s3Source`/`localSource`/`arrivalPattern`
+  in both real `contract/*.yaml` files.
 - **11:47am** — **Checks Categorisation (Grouped by Data-Quality Dimension)** **[Dashboard UI]** Every check in
   the column drawer now groups into a collapsible section by data-quality
   category (Completeness/Uniqueness/Conformity/Consistency/Timeliness),

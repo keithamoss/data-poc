@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from unittest.mock import MagicMock
 
 from click.testing import CliRunner
 
@@ -344,3 +345,131 @@ def test_run_check_local_file_default_path_never_requires_a_real_git_identity(
     ])
     assert isinstance(result_commit.exception, MissingGitIdentityError), \
         "a --commit run must still fail loudly without a real git identity - that guarantee must not regress"
+
+
+# ---- S3 QA source mode (plans/tooling.md #1 Phase 3) -----------------
+
+
+def test_s3_config_reads_the_real_committed_contract():
+    """A real, not-mocked read of the actual committed contract YAML -
+    catches contract drift (a renamed property, a missing entry) that a
+    fixture-only test never would."""
+    config = bdm.s3_config()
+    assert config["prefix"] == "bdm/"
+    assert config["local_source"] == "data/raw"
+    assert config["arrival_pattern"] == [
+        {"type": "single_file", "keyPattern": "bdm/birth_registrations_{date}.csv",
+         "dataset_id": "bdm-birth-registrations"},
+    ]
+
+
+def test_run_check_s3_downloads_both_keys_then_delegates_to_local_file_mode(monkeypatch, tmp_path):
+    """run_check_s3() is "download, then Local files mode", not a third
+    parallel check-running code path - verified here by mocking the
+    boto3 client and monkeypatching run_check_local_file() itself, so
+    this stays a fast unit test: the real tool-chain correctness for
+    whatever lands on disk is already covered by the Local files mode's
+    own real integration tests."""
+    download_calls = []
+
+    def _fake_download_key(bucket, key, dest_dir, s3_client=None):
+        assert bucket == "my-bucket"
+        assert s3_client is _fake_client
+        local_path = os.path.join(dest_dir, os.path.basename(key))
+        with open(local_path, "w") as f:
+            f.write("id\n1\n")
+        download_calls.append(key)
+        return local_path
+
+    monkeypatch.setattr(bdm.s3_source, "download_key", _fake_download_key)
+
+    captured = {}
+
+    def _fake_run_check_local_file(csv_path, reference_csv, run_by, run_id=None, run_date=None):
+        captured["csv_path"] = csv_path
+        captured["reference_csv"] = reference_csv
+        captured["run_by"] = run_by
+        captured["run_id"] = run_id
+        return [{"status": "pass"}], "/tmp/fake-results"
+
+    monkeypatch.setattr(bdm, "run_check_local_file", _fake_run_check_local_file)
+
+    _fake_client = MagicMock()
+    results, tmp_dir = bdm.run_check_s3(
+        "my-bucket", "bdm/run_005.csv", "bdm/run_004.csv", "test@example.com",
+        run_id="s3_run_005", s3_client=_fake_client)
+
+    assert download_calls == ["bdm/run_005.csv", "bdm/run_004.csv"]
+    assert captured["csv_path"].endswith("run_005.csv")
+    assert captured["reference_csv"].endswith("run_004.csv")
+    assert captured["run_by"] == "test@example.com"
+    assert captured["run_id"] == "s3_run_005"
+    assert results == [{"status": "pass"}]
+    assert tmp_dir == "/tmp/fake-results"
+
+
+def test_qa_command_s3_key_and_run_id_together_is_a_real_clean_error(monkeypatch):
+    monkeypatch.setenv(common.S3_BUCKET_ENV_VAR, "my-bucket")
+    result = _runner.invoke(bdm.qa_command, [
+        "--run-id", "some_run",
+        "--s3-key", "bdm/run_005.csv",
+        "--s3-reference-key", "bdm/run_004.csv",
+    ])
+    assert result.exit_code != 0
+    assert "exactly one" in _flat(result.output)
+
+
+def test_qa_command_s3_key_and_file_together_is_a_real_clean_error(bdm_raw_dir, monkeypatch):
+    monkeypatch.setenv(common.S3_BUCKET_ENV_VAR, "my-bucket")
+    result = _runner.invoke(bdm.qa_command, [
+        "--file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
+        "--s3-key", "bdm/run_005.csv",
+        "--s3-reference-key", "bdm/run_004.csv",
+    ])
+    assert result.exit_code != 0
+    assert "exactly one" in _flat(result.output)
+
+
+def test_qa_command_s3_key_without_reference_key_is_a_real_clean_error(monkeypatch):
+    monkeypatch.setenv(common.S3_BUCKET_ENV_VAR, "my-bucket")
+    result = _runner.invoke(bdm.qa_command, ["--s3-key", "bdm/run_005.csv"])
+    assert result.exit_code != 0
+    assert "--s3-reference-key" in result.output
+
+
+def test_qa_command_s3_key_requires_the_real_bucket_env_var(monkeypatch):
+    monkeypatch.delenv(common.S3_BUCKET_ENV_VAR, raising=False)
+    result = _runner.invoke(bdm.qa_command, [
+        "--s3-key", "bdm/run_005.csv",
+        "--s3-reference-key", "bdm/run_004.csv",
+    ])
+    assert result.exit_code != 0
+    assert common.S3_BUCKET_ENV_VAR.lower() in _flat(result.output)
+
+
+def test_qa_command_s3_key_flag_mode_downloads_and_runs_real_checks(monkeypatch):
+    """The full flag-invocable S3 path, end to end, with a mocked boto3
+    client (no real AWS access in this sandbox) - proves qa_command's
+    own S3 branch wires bucket/key/run_id through to run_check_s3()
+    correctly, not just that run_check_s3() itself works in isolation."""
+    monkeypatch.setenv(common.S3_BUCKET_ENV_VAR, "my-bucket")
+
+    captured = {}
+
+    def _fake_run_check_s3(bucket, key, reference_key, run_by, run_id=None, run_date=None, s3_client=None):
+        captured.update(bucket=bucket, key=key, reference_key=reference_key, run_by=run_by, run_id=run_id)
+        return [{"status": "pass"}], "/tmp/fake-results"
+
+    monkeypatch.setattr(bdm, "run_check_s3", _fake_run_check_s3)
+
+    result = _runner.invoke(bdm.qa_command, [
+        "--s3-key", "bdm/birth_registrations_2026-01-02.csv",
+        "--s3-reference-key", "bdm/birth_registrations_2026-01-01.csv",
+    ])
+
+    assert result.exit_code == 0, result.output
+    assert captured["bucket"] == "my-bucket"
+    assert captured["key"] == "bdm/birth_registrations_2026-01-02.csv"
+    assert captured["reference_key"] == "bdm/birth_registrations_2026-01-01.csv"
+    assert captured["run_by"] == "local-check:not-persisted"
+    assert captured["run_id"].startswith("s3_birth_registrations_2026-01-02_")

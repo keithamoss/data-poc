@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
 from datetime import datetime, timezone
 
 import rich_click as click
@@ -25,6 +26,7 @@ from rich.console import Console
 from rich.table import Table
 
 from qa_tools.cp import build_cp_warehouses, cp_common, orchestrate_cp
+from qa_tools.common import s3_source
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.lambda_results_dir import CP_MODULES, patch_write_qa_result_for_lambda
 from qa_tools.common.local_check import run_id_from_path as local_run_id_from_path
@@ -35,8 +37,17 @@ from . import common
 AGENCY_ID = cp_common.AGENCY_ID
 COLLECTION_ID = cp_common.COLLECTION_ID
 TABLES = cp_common.TABLES
+CONTRACT_PATH = os.path.join(os.path.dirname(__file__), "..", "contract", "child-protection-contract.yaml")
 
 console = Console()
+
+
+def s3_config() -> dict:
+    """The real s3Source/localSource/arrivalPattern config off this
+    dataset's own contract YAML - see qa_tools.common.s3_source.
+    dataset_s3_config()'s own docstring for the full account of how this
+    got safely wired into the real contract (Phase 3, 2026-09-19)."""
+    return s3_source.dataset_s3_config(CONTRACT_PATH)
 
 
 def raw_dir() -> str:
@@ -178,6 +189,27 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
     return results, tmp_dir
 
 
+def run_check_s3_delivery(bucket: str, delivery_prefix: str, reference_delivery_prefix: str, run_by: str,
+                           run_id: str | None = None, run_date: str | None = None,
+                           s3_client=None) -> tuple[list[dict], str]:
+    """The S3 QA source mode's real check-running body for Child
+    Protection (plans/tooling.md #1 Phase 3) - a delivery here is all 6
+    real table CSVs landing together under one shared S3 prefix
+    (<s3Source><delivery_id>/), not a single flat key the way BDM's is.
+    Downloads every object under delivery_prefix/reference_delivery_prefix
+    (real boto3, via qa_tools.common.s3_source) into their own fresh
+    local staging dirs, then reuses run_check_local_folder() exactly as
+    if a human had downloaded the whole delivery themselves: S3 mode is
+    "download, then Local files mode", not a third parallel
+    check-running code path. Returns (results, tmp_results_dir) - same
+    tmp-dir-first Promote pattern as run_check_local_folder()."""
+    staging_dir = tempfile.mkdtemp(prefix="mothman-s3-")
+    reference_staging_dir = tempfile.mkdtemp(prefix="mothman-s3-ref-")
+    s3_source.download_prefix(bucket, delivery_prefix, staging_dir, s3_client=s3_client)
+    s3_source.download_prefix(bucket, reference_delivery_prefix, reference_staging_dir, s3_client=s3_client)
+    return run_check_local_folder(staging_dir, reference_staging_dir, run_by, run_id=run_id, run_date=run_date)
+
+
 _STATUS_STYLE = {"pass": "green", "warn": "yellow", "fail": "red", "error": "bold red"}
 
 
@@ -212,6 +244,7 @@ def run_id_from_choice(choice: str) -> str:
 
 _SOURCE_SYNTHETIC = "Synthetic - pick or generate a run"
 _SOURCE_LOCAL_FOLDER = "Local files - a delivery folder you've already downloaded"
+_SOURCE_S3 = "S3 - browse the real raw-data bucket"
 
 
 def _offer_promote(results: list[dict], run_id: str, tmp_dir: str, commit_default: bool) -> None:
@@ -237,13 +270,18 @@ def run_qa_interactive(commit_default: bool = False) -> None:
     run_by = get_run_by()
 
     source = common.select(
-        "Which source?", [_SOURCE_SYNTHETIC, _SOURCE_LOCAL_FOLDER],
-        flag_hint="mothman cp qa --run-id <run_id> / mothman cp qa --folder <dir> --reference-folder <dir>")
+        "Which source?", [_SOURCE_SYNTHETIC, _SOURCE_LOCAL_FOLDER, _SOURCE_S3],
+        flag_hint="mothman cp qa --run-id <run_id> / mothman cp qa --folder <dir> --reference-folder <dir> / "
+                   "mothman cp qa --s3-delivery <prefix> --s3-reference-delivery <prefix>")
     if source is None:
         return
 
     if source == _SOURCE_LOCAL_FOLDER:
         _run_qa_interactive_local_folder(run_by, commit_default)
+        return
+
+    if source == _SOURCE_S3:
+        _run_qa_interactive_s3(run_by, commit_default)
         return
 
     if not manifest_exists():
@@ -290,6 +328,37 @@ def _run_qa_interactive_local_folder(run_by: str, commit_default: bool) -> None:
     _offer_promote(results, run_id, tmp_dir, commit_default)
 
 
+def _run_qa_interactive_s3(run_by: str, commit_default: bool) -> None:
+    """The S3 source mode's TUI body for Child Protection (plans/
+    tooling.md #1 Phase 3) - lists real "delivery" prefixes one level
+    under the dataset's own configured s3Source prefix (contract/
+    child-protection-contract.yaml's own customProperties), via S3's
+    own Delimiter="/" folder-like grouping, picks two of them, then runs
+    the exact same run_check_s3_delivery() the flag-invocable
+    --s3-delivery/--s3-reference-delivery form below also calls."""
+    bucket = common.raw_bucket_name()
+    prefix = s3_config()["prefix"] or ""
+    console.print(f"Listing deliveries under s3://{bucket}/{prefix} ...", style="dim")
+    deliveries = s3_source.list_delivery_prefixes(bucket, prefix)
+    if not deliveries:
+        console.print(f"No deliveries under s3://{bucket}/{prefix}", style="yellow")
+        return
+
+    flag_hint = "mothman cp qa --s3-delivery <prefix> --s3-reference-delivery <prefix>"
+    delivery = common.select("Pick a delivery to check:", deliveries, flag_hint=flag_hint)
+    if delivery is None:
+        return
+    reference_delivery = common.select("Pick a known-good reference delivery:", deliveries, flag_hint=flag_hint)
+    if reference_delivery is None:
+        return
+
+    run_id = local_run_id_from_path(delivery, prefix="s3")
+    console.print(f"Downloading + running the real dbt-core/Soda Core/datacontract-cli/Evidently chain "
+                  f"for s3://{bucket}/{delivery}...", style="dim")
+    results, tmp_dir = run_check_s3_delivery(bucket, delivery, reference_delivery, run_by, run_id=run_id)
+    _offer_promote(results, run_id, tmp_dir, commit_default)
+
+
 @click.group("cp")
 def cp_group() -> None:
     """Child Protection - Tier 1 commands."""
@@ -330,11 +399,34 @@ def _finish_flag_mode(results: list[dict], run_id: str, tmp_dir: str, commit: bo
 @click.option("--reference-folder", default=None, type=click.Path(exists=True, file_okay=False),
               help="Local files mode: a known-good reference delivery folder to compare distribution drift "
                    "against. Required together with --folder.")
+@click.option("--s3-delivery", default=None,
+              help="S3 mode: a delivery prefix under the dataset's s3Source prefix to check "
+                   "(instead of --run-id/--folder).")
+@click.option("--s3-reference-delivery", default=None,
+              help="S3 mode: a known-good reference delivery prefix to compare distribution drift against. "
+                   "Required together with --s3-delivery.")
 @click.option("--commit", is_flag=True, help="Write this run into the real, permanent qa_results/ history.")
 def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: str | None,
-               reference_folder: str | None, commit: bool) -> None:
-    """Run the real QA check chain against a Child Protection run - Synthetic (--run-id) or
-    Local files (--folder/--reference-folder) source mode."""
+               reference_folder: str | None, s3_delivery: str | None, s3_reference_delivery: str | None,
+               commit: bool) -> None:
+    """Run the real QA check chain against a Child Protection run - Synthetic (--run-id),
+    Local files (--folder/--reference-folder), or S3 (--s3-delivery/--s3-reference-delivery) source mode."""
+    if s3_delivery is not None:
+        if run_id is not None or folder_path is not None:
+            raise click.ClickException(
+                "Pass exactly one of --run-id (Synthetic mode), --folder (Local files mode), "
+                "or --s3-delivery (S3 mode).")
+        if s3_reference_delivery is None:
+            raise click.ClickException(
+                "--s3-delivery requires --s3-reference-delivery (a known-good delivery prefix to compare against).")
+        bucket = common.raw_bucket_name()
+        run_by = get_run_by() if commit else "local-check:not-persisted"
+        local_run_id = local_run_id_from_path(s3_delivery, prefix="s3")
+        results, tmp_dir = run_check_s3_delivery(bucket, s3_delivery, s3_reference_delivery, run_by,
+                                                   run_id=local_run_id)
+        _finish_flag_mode(results, local_run_id, tmp_dir, commit)
+        return
+
     if folder_path is not None:
         if run_id is not None:
             raise click.ClickException(

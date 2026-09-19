@@ -1310,3 +1310,53 @@ customProperties:
     value: csv
   - property: piiClassification
     value: "Contains sensitive personal information about children and families. Confirm and record the correct security/handling classification for your agency before this leaves draft status."
+  # mothman CLI Phase 3 (plans/tooling.md #1) - S3 QA source mode config.
+  # s3Source/localSource verified 2026-09-19 against real datacontract-cli
+  # parsing (qa_tools/cp/run_datacontract_cp.py) before landing here.
+  # arrivalPattern was previously a design-doc-only proposal
+  # (docs/aws-event-driven-mvp-design.md's own flagged "confirm in the
+  # morning" item) - Keith's own explicit go-ahead, 2026-09-19, to wire
+  # it into the real contract now that it's been verified this way.
+  - property: s3Source
+    value: "cp/"
+    # Real prefix within the raw-data landing bucket
+    # (aws/cdk/data_pipeline_stack.py's RawDataBucket) - matches the
+    # exact prefix its own S3 event-notification wiring already filters
+    # on. The bucket's own name is env-provided (MOTHMAN_RAW_BUCKET_NAME),
+    # never hardcoded here, since CDK auto-generates a globally-unique
+    # name at deploy time.
+  - property: localSource
+    value: data/cp_raw
+    # Default local root `mothman cp qa`'s Local files source mode
+    # browses from - the same real CP_RAW_DIR
+    # qa_tools/cp/build_cp_warehouses.py already uses.
+  - property: arrivalPattern
+    value:
+      - type: nested_folder
+        keyPattern: "cp/{delivery_id}/cp_clients.csv"
+        dataset_id: child-protection-casework
+        extractTo: cp_clients
+      - type: nested_folder
+        keyPattern: "cp/{delivery_id}/cp_notifications.csv"
+        dataset_id: child-protection-casework
+        extractTo: cp_notifications
+      - type: nested_folder
+        keyPattern: "cp/{delivery_id}/cp_investigations.csv"
+        dataset_id: child-protection-casework
+        extractTo: cp_investigations
+      - type: nested_folder
+        keyPattern: "cp/{delivery_id}/cp_placements.csv"
+        dataset_id: child-protection-casework
+        extractTo: cp_placements
+      - type: nested_folder
+        keyPattern: "cp/{delivery_id}/cp_carers.csv"
+        dataset_id: child-protection-casework
+        extractTo: cp_carers
+      - type: nested_folder
+        keyPattern: "cp/{delivery_id}/cp_case_workers.csv"
+        dataset_id: child-protection-casework
+        extractTo: cp_case_workers
+    # qa_tools/common/file_arrival.py's real, tested pattern-matching
+    # shape - one nested_folder pattern per real table, since one CP
+    # delivery is all 6 tables landing together under a shared
+    # {delivery_id}/ prefix, not a single flat key the way BDM's is.

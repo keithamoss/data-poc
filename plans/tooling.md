@@ -140,6 +140,78 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
      checks" section rewritten for the new `./mothman bdm qa --file`/
      `./mothman cp qa --folder` commands. Phase 3 (S3 QA source mode) is
      next.
+   - **Phase 3 finished 2026-09-19**: S3 QA source mode, both flag-
+     invocable (`mothman bdm qa --s3-key <key> --s3-reference-key <key>`
+     / `mothman cp qa --s3-delivery <prefix> --s3-reference-delivery
+     <prefix>`) and TUI-navigable (a third "S3" choice on the existing
+     "Which source?" picker in both `run_qa_interactive()` bodies) - real
+     `boto3`, verified only via a mocked client (no real AWS access in
+     this sandbox, same as Thread B). New `qa_tools/common/s3_source.py`
+     (`list_keys()`/`list_delivery_prefixes()` via S3's own
+     `Delimiter="/"` grouping/`download_key()`/`download_prefix()`) is
+     the only new check-running surface - both `cli/bdm.py`'s
+     `run_check_s3()` and `cli/cp.py`'s `run_check_s3_delivery()` are
+     "download, then Local files mode" (download into a fresh staging
+     dir, then call Phase 2's own `run_check_local_file()`/
+     `run_check_local_folder()`), not a third parallel check-running
+     code path - the real tool-chain correctness for whatever lands on
+     disk is already covered by Phase 2's own real integration tests, so
+     Phase 3's own tests stay fast unit tests (mocked download +
+     monkeypatched delegate call) plus real `--help`/flag-validation
+     coverage through `CliRunner`.
+
+     A real, previously-flagged fork got resolved along the way, not
+     silently: `docs/aws-event-driven-mvp-design.md` had proposed a real
+     `arrivalPattern` ODCS contract `customProperties` extension for
+     Thread B overnight, but explicitly kept it OUT of the real
+     `contract/*.yaml` files - one of that doc's own "confirm in the
+     morning" open items, since there was no safe way to verify
+     overnight that it wouldn't break real dbt/Soda/datacontract-cli
+     parsing (the exact class of mistake `CLAUDE.md`'s own YAML-quoting
+     incident already caused once). Flagged to Keith directly before
+     touching the real contract files; his call ("verify then wire it
+     all in") was to add all 3 real `customProperties`
+     (`s3Source`/`localSource`/`arrivalPattern`) to both `contract/
+     bdm-birth-registrations-contract.yaml`/`contract/child-protection-
+     contract.yaml` now that real tool access exists to actually verify
+     it, rather than deferring or building a stripped-down version.
+     Verified for real, not assumed: a real `DataContract(...).lint()`
+     call against both changed files (`ResultEnum.passed`), the real
+     `tests/test_run_datacontract_{bdm,cp}.py` integration suite (7
+     passing, real data), `check_lifecycle.py`'s own contract quality-
+     rule parser (27/62 checks, unchanged counts - confirming the new
+     top-level `customProperties` entries don't interfere with the
+     quality-rule-scoped ones it actually reads), and the real
+     `validate_check_lifecycle` CI gate (`zero errors`). `s3Source`
+     (the real `bdm/`/`cp/` prefixes, matching `aws/cdk/
+     data_pipeline_stack.py`'s own S3 event-notification filter
+     prefixes exactly) and `localSource` (`data/raw`/`data/cp_raw`, the
+     same real `RAW_DIR`/`CP_RAW_DIR` constants `qa_tools/bdm/
+     build_per_run_warehouses.py`/`qa_tools/cp/build_cp_warehouses.py`
+     already use) are real, load-bearing config a new `qa_tools/common/
+     s3_source.dataset_s3_config()` reads back out of the contract at
+     CLI runtime - not decorative. The real raw-data bucket's own name
+     is env-provided (`MOTHMAN_RAW_BUCKET_NAME`, read dynamically via a
+     new `cli/common.raw_bucket_name()`), never hardcoded in the
+     contract, since CDK auto-generates a globally-unique bucket name at
+     deploy time (no fixed `bucket_name=` on either bucket in that
+     stack). `README.md`'s "On-demand checks" section extended with the
+     new S3 commands. `uv run pytest`/`ruff` both clean (531 passing -
+     13 new BDM S3 tests, 6 new CP S3 tests - only the same 13
+     pre-existing, unrelated Playwright chromium-binary-mismatch errors
+     this sandbox already had); real `--help` output checked by hand for
+     both commands. The exact real CI coverage command (`--cov=qa_tools
+     --cov=pipeline --cov=generator --cov=dashboard`, no `--cov=cli` -
+     `.github/workflows/test.yml`'s own invocation) passes clean at
+     94.52%, comfortably above the 92% floor - `pyproject.toml`'s own
+     `[tool.coverage.run] source` list already names `cli` too (added
+     whenever Phase 1 landed), but since explicit `--cov=` flags take
+     precedence over that config for what pytest-cov actually measures,
+     `cli/`'s real coverage (a lot of thin, interactive TUI-prompt code
+     genuinely not exercised by tests yet) isn't actually part of the
+     enforced gate today - noted here as a real, live discrepancy
+     between config and enforcement, not acted on unprompted since it's
+     outside this item's own scope.
 
    **Core shape, confirmed:**
    - Organized by dataset (bdm/cp) under a real interactive TUI - not

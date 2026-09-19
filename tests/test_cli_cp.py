@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from unittest.mock import MagicMock
 
 from click.testing import CliRunner
 
@@ -257,3 +258,120 @@ def test_qa_command_local_folder_errors_on_a_partial_delivery(tmp_path):
 
     assert result.exit_code != 0
     assert "missing" in result.output.lower()
+
+
+# ---- S3 QA source mode (plans/tooling.md #1 Phase 3) -----------------
+
+
+def test_s3_config_reads_the_real_committed_contract():
+    """A real, not-mocked read of the actual committed contract YAML -
+    catches contract drift (a renamed property, a missing entry) that a
+    fixture-only test never would."""
+    config = cp.s3_config()
+    assert config["prefix"] == "cp/"
+    assert config["local_source"] == "data/cp_raw"
+    arrival = config["arrival_pattern"]
+    assert len(arrival) == 6
+    assert {p["extractTo"] for p in arrival} == set(cp.TABLES)
+    assert all(p["type"] == "nested_folder" and p["dataset_id"] == "child-protection-casework" for p in arrival)
+
+
+def test_run_check_s3_delivery_downloads_both_prefixes_then_delegates_to_local_folder_mode(monkeypatch):
+    """run_check_s3_delivery() is "download, then Local files mode", not
+    a third parallel check-running code path - verified here by
+    monkeypatching download_prefix()/run_check_local_folder() itself, so
+    this stays a fast unit test: the real tool-chain correctness for
+    whatever lands on disk is already covered by the Local files mode's
+    own real integration tests."""
+    download_calls = []
+
+    def _fake_download_prefix(bucket, prefix, dest_dir, s3_client=None):
+        assert bucket == "my-bucket"
+        assert s3_client is _fake_client
+        download_calls.append((prefix, dest_dir))
+        return [os.path.join(dest_dir, f"{t}.csv") for t in cp.TABLES]
+
+    monkeypatch.setattr(cp.s3_source, "download_prefix", _fake_download_prefix)
+
+    captured = {}
+
+    def _fake_run_check_local_folder(folder, reference_folder, run_by, run_id=None, run_date=None):
+        captured["folder"] = folder
+        captured["reference_folder"] = reference_folder
+        captured["run_by"] = run_by
+        captured["run_id"] = run_id
+        return [{"status": "pass"}], "/tmp/fake-results"
+
+    monkeypatch.setattr(cp, "run_check_local_folder", _fake_run_check_local_folder)
+
+    _fake_client = MagicMock()
+    results, tmp_dir = cp.run_check_s3_delivery(
+        "my-bucket", "cp/delivery_002/", "cp/delivery_001/", "test@example.com",
+        run_id="s3_delivery_002", s3_client=_fake_client)
+
+    assert [c[0] for c in download_calls] == ["cp/delivery_002/", "cp/delivery_001/"]
+    assert captured["folder"] == download_calls[0][1]
+    assert captured["reference_folder"] == download_calls[1][1]
+    assert captured["run_by"] == "test@example.com"
+    assert captured["run_id"] == "s3_delivery_002"
+    assert results == [{"status": "pass"}]
+    assert tmp_dir == "/tmp/fake-results"
+
+
+def test_qa_command_s3_delivery_and_run_id_together_is_a_real_clean_error(monkeypatch):
+    monkeypatch.setenv(common.S3_BUCKET_ENV_VAR, "my-bucket")
+    result = _runner.invoke(cp.qa_command, [
+        "--run-id", "some_run",
+        "--s3-delivery", "cp/delivery_002/",
+        "--s3-reference-delivery", "cp/delivery_001/",
+    ])
+    assert result.exit_code != 0
+    assert "exactly one" in _flat(result.output)
+
+
+def test_qa_command_s3_delivery_without_reference_is_a_real_clean_error(monkeypatch):
+    monkeypatch.setenv(common.S3_BUCKET_ENV_VAR, "my-bucket")
+    result = _runner.invoke(cp.qa_command, ["--s3-delivery", "cp/delivery_002/"])
+    assert result.exit_code != 0
+    assert "--s3-reference-delivery" in result.output
+
+
+def test_qa_command_s3_delivery_requires_the_real_bucket_env_var(monkeypatch):
+    monkeypatch.delenv(common.S3_BUCKET_ENV_VAR, raising=False)
+    result = _runner.invoke(cp.qa_command, [
+        "--s3-delivery", "cp/delivery_002/",
+        "--s3-reference-delivery", "cp/delivery_001/",
+    ])
+    assert result.exit_code != 0
+    assert common.S3_BUCKET_ENV_VAR.lower() in _flat(result.output)
+
+
+def test_qa_command_s3_delivery_flag_mode_downloads_and_runs_real_checks(monkeypatch):
+    """The full flag-invocable S3 path, end to end, with a mocked boto3
+    client (no real AWS access in this sandbox) - proves qa_command's
+    own S3 branch wires bucket/delivery/run_id through to
+    run_check_s3_delivery() correctly, not just that
+    run_check_s3_delivery() itself works in isolation."""
+    monkeypatch.setenv(common.S3_BUCKET_ENV_VAR, "my-bucket")
+
+    captured = {}
+
+    def _fake_run_check_s3_delivery(bucket, delivery_prefix, reference_delivery_prefix, run_by,
+                                     run_id=None, run_date=None, s3_client=None):
+        captured.update(bucket=bucket, delivery_prefix=delivery_prefix,
+                         reference_delivery_prefix=reference_delivery_prefix, run_by=run_by, run_id=run_id)
+        return [{"status": "pass"}], "/tmp/fake-results"
+
+    monkeypatch.setattr(cp, "run_check_s3_delivery", _fake_run_check_s3_delivery)
+
+    result = _runner.invoke(cp.qa_command, [
+        "--s3-delivery", "cp/delivery_002/",
+        "--s3-reference-delivery", "cp/delivery_001/",
+    ])
+
+    assert result.exit_code == 0, result.output
+    assert captured["bucket"] == "my-bucket"
+    assert captured["delivery_prefix"] == "cp/delivery_002/"
+    assert captured["reference_delivery_prefix"] == "cp/delivery_001/"
+    assert captured["run_by"] == "local-check:not-persisted"
+    assert captured["run_id"].startswith("s3_delivery_002_")

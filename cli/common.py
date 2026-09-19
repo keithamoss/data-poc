@@ -6,6 +6,7 @@ real, permanent qa_results/ history on explicit confirmation - never a
 second, wasteful re-run of the real tool chain just to change where the
 result lands)."""
 from __future__ import annotations
+import os
 import shutil
 import sys
 import tempfile
@@ -16,6 +17,13 @@ import questionary
 from questionary import Style
 
 from qa_tools.common.qa_results_writer import QA_RESULTS_DIR
+
+# S3 QA source mode (plans/tooling.md #1 Phase 3) - the real raw-data
+# bucket to browse. Env-provided, never hardcoded, since CDK
+# auto-generates a globally-unique bucket name at deploy time (see
+# aws/cdk/data_pipeline_stack.py's own comment on why neither S3 bucket
+# there gets a fixed bucket_name=).
+S3_BUCKET_ENV_VAR = "MOTHMAN_RAW_BUCKET_NAME"
 
 # Three-tier colour coding (plans/tooling.md #1, Keith's own explicit
 # ask): Tier 1 (human, day-to-day) = green, Tier 2 (machine/CI-only) =
@@ -112,3 +120,19 @@ def promote(tmp_root: str, agency: str, dataset: str, run_id: str) -> Path:
 
 def new_tmp_results_dir() -> str:
     return tempfile.mkdtemp(prefix="mothman-qa-")
+
+
+def raw_bucket_name() -> str:
+    """Reads S3_BUCKET_ENV_VAR dynamically at call time (this project's
+    own established convention against a module-level constant captured
+    once at import time - see cli/bdm.py's raw_dir() for the real bug
+    class that guards against). Raised as a real, clear ClickException
+    here rather than reading None and failing deeper inside a confusing
+    boto3 error."""
+    bucket = os.environ.get(S3_BUCKET_ENV_VAR)
+    if not bucket:
+        raise click.ClickException(
+            f"S3 QA source mode needs the {S3_BUCKET_ENV_VAR} environment variable set to the "
+            f"real raw-data bucket name (see aws/cdk/data_pipeline_stack.py's RawDataBucket)."
+        )
+    return bucket

@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
 from datetime import datetime, timezone
 
 import rich_click as click
@@ -24,6 +25,7 @@ from rich.console import Console
 from rich.table import Table
 
 from qa_tools.bdm import build_per_run_warehouses, orchestrate_bdm
+from qa_tools.common import s3_source
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.lambda_results_dir import BDM_MODULES, patch_write_qa_result_for_lambda
 from qa_tools.common.local_check import copy_into, run_id_from_path as local_run_id_from_path
@@ -33,8 +35,17 @@ from . import common
 
 AGENCY_ID = orchestrate_bdm.AGENCY_ID
 DATASET_ID = orchestrate_bdm.DATASET_ID
+CONTRACT_PATH = os.path.join(os.path.dirname(__file__), "..", "contract", "bdm-birth-registrations-contract.yaml")
 
 console = Console()
+
+
+def s3_config() -> dict:
+    """The real s3Source/localSource/arrivalPattern config off this
+    dataset's own contract YAML - see qa_tools.common.s3_source.
+    dataset_s3_config()'s own docstring for the full account of how this
+    got safely wired into the real contract (Phase 3, 2026-09-19)."""
+    return s3_source.dataset_s3_config(CONTRACT_PATH)
 
 
 def raw_dir() -> str:
@@ -194,6 +205,22 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
     return results, tmp_dir
 
 
+def run_check_s3(bucket: str, key: str, reference_key: str, run_by: str,
+                  run_id: str | None = None, run_date: str | None = None, s3_client=None) -> tuple[list[dict], str]:
+    """The S3 QA source mode's real check-running body (plans/tooling.md
+    #1 Phase 3) - downloads key/reference_key (real boto3, via
+    qa_tools.common.s3_source) into a fresh local staging dir, then
+    reuses run_check_local_file() exactly as if a human had downloaded
+    them themselves: S3 mode is "download, then Local files mode", not a
+    third parallel check-running code path. Returns (results,
+    tmp_results_dir) - same tmp-dir-first Promote pattern as
+    run_check_local_file()."""
+    staging_dir = tempfile.mkdtemp(prefix="mothman-s3-")
+    local_path = s3_source.download_key(bucket, key, staging_dir, s3_client=s3_client)
+    local_reference_path = s3_source.download_key(bucket, reference_key, staging_dir, s3_client=s3_client)
+    return run_check_local_file(local_path, local_reference_path, run_by, run_id=run_id, run_date=run_date)
+
+
 _STATUS_STYLE = {"pass": "green", "warn": "yellow", "fail": "red", "error": "bold red"}
 
 
@@ -228,6 +255,7 @@ def run_id_from_choice(choice: str) -> str:
 
 _SOURCE_SYNTHETIC = "Synthetic - pick or generate a run"
 _SOURCE_LOCAL_FILE = "Local files - a CSV you've already downloaded"
+_SOURCE_S3 = "S3 - browse the real raw-data bucket"
 
 
 def _offer_promote(results: list[dict], run_id: str, tmp_dir: str, commit_default: bool) -> None:
@@ -256,13 +284,18 @@ def run_qa_interactive(commit_default: bool = False) -> None:
     run_by = get_run_by()
 
     source = common.select(
-        "Which source?", [_SOURCE_SYNTHETIC, _SOURCE_LOCAL_FILE],
-        flag_hint="mothman bdm qa --run-id <run_id> / mothman bdm qa --file <csv> --reference-file <csv>")
+        "Which source?", [_SOURCE_SYNTHETIC, _SOURCE_LOCAL_FILE, _SOURCE_S3],
+        flag_hint="mothman bdm qa --run-id <run_id> / mothman bdm qa --file <csv> --reference-file <csv> / "
+                   "mothman bdm qa --s3-key <key> --s3-reference-key <key>")
     if source is None:
         return
 
     if source == _SOURCE_LOCAL_FILE:
         _run_qa_interactive_local_file(run_by, commit_default)
+        return
+
+    if source == _SOURCE_S3:
+        _run_qa_interactive_s3(run_by, commit_default)
         return
 
     if not manifest_exists():
@@ -308,6 +341,36 @@ def _run_qa_interactive_local_file(run_by: str, commit_default: bool) -> None:
     _offer_promote(results, run_id, tmp_dir, commit_default)
 
 
+def _run_qa_interactive_s3(run_by: str, commit_default: bool) -> None:
+    """The S3 source mode's TUI body (plans/tooling.md #1 Phase 3) -
+    lists real object keys under the dataset's own configured s3Source
+    prefix (contract/bdm-birth-registrations-contract.yaml's own
+    customProperties), picks two of them, then runs the exact same
+    run_check_s3() the flag-invocable --s3-key/--s3-reference-key form
+    below also calls."""
+    bucket = common.raw_bucket_name()
+    prefix = s3_config()["prefix"] or ""
+    console.print(f"Listing s3://{bucket}/{prefix} ...", style="dim")
+    keys = s3_source.list_keys(bucket, prefix)
+    if not keys:
+        console.print(f"No objects under s3://{bucket}/{prefix} - nothing to check.", style="yellow")
+        return
+
+    flag_hint = "mothman bdm qa --s3-key <key> --s3-reference-key <key>"
+    key = common.select("Pick an object to check:", keys, flag_hint=flag_hint)
+    if key is None:
+        return
+    reference_key = common.select("Pick a known-good reference object:", keys, flag_hint=flag_hint)
+    if reference_key is None:
+        return
+
+    run_id = local_run_id_from_path(key, prefix="s3")
+    console.print(f"Downloading + running the real dbt-core/Soda Core/datacontract-cli/Evidently chain "
+                  f"for s3://{bucket}/{key}...", style="dim")
+    results, tmp_dir = run_check_s3(bucket, key, reference_key, run_by, run_id=run_id)
+    _offer_promote(results, run_id, tmp_dir, commit_default)
+
+
 @click.group("bdm")
 def bdm_group() -> None:
     """Birth Registrations - Tier 1 commands."""
@@ -347,11 +410,33 @@ def _finish_flag_mode(results: list[dict], run_id: str, tmp_dir: str, commit: bo
 @click.option("--reference-file", default=None, type=click.Path(exists=True, dir_okay=False),
               help="Local files mode: a known-good CSV to compare distribution drift against. "
                    "Required together with --file.")
+@click.option("--s3-key", default=None,
+              help="S3 mode: an object key under the dataset's s3Source prefix to check "
+                   "(instead of --run-id/--file).")
+@click.option("--s3-reference-key", default=None,
+              help="S3 mode: a known-good reference object key to compare distribution drift against. "
+                   "Required together with --s3-key.")
 @click.option("--commit", is_flag=True, help="Write this run into the real, permanent qa_results/ history.")
 def qa_command(run_id: str | None, reference_run_id: str | None, file_path: str | None,
-               reference_file: str | None, commit: bool) -> None:
-    """Run the real QA check chain against a Birth Registrations run - Synthetic (--run-id) or
-    Local files (--file/--reference-file) source mode."""
+               reference_file: str | None, s3_key: str | None, s3_reference_key: str | None,
+               commit: bool) -> None:
+    """Run the real QA check chain against a Birth Registrations run - Synthetic (--run-id),
+    Local files (--file/--reference-file), or S3 (--s3-key/--s3-reference-key) source mode."""
+    if s3_key is not None:
+        if run_id is not None or file_path is not None:
+            raise click.ClickException(
+                "Pass exactly one of --run-id (Synthetic mode), --file (Local files mode), "
+                "or --s3-key (S3 mode).")
+        if s3_reference_key is None:
+            raise click.ClickException(
+                "--s3-key requires --s3-reference-key (a known-good object key to compare against).")
+        bucket = common.raw_bucket_name()
+        run_by = get_run_by() if commit else "local-check:not-persisted"
+        local_run_id = local_run_id_from_path(s3_key, prefix="s3")
+        results, tmp_dir = run_check_s3(bucket, s3_key, s3_reference_key, run_by, run_id=local_run_id)
+        _finish_flag_mode(results, local_run_id, tmp_dir, commit)
+        return
+
     if file_path is not None:
         if run_id is not None:
             raise click.ClickException("Pass either --run-id (Synthetic mode) or --file (Local files mode), not both.")
