@@ -639,6 +639,29 @@ check_lifecycle.py`'s own `check_id` convention.
     implementation, unlike this one) but wants it parked for now - "put
     that to the side for now and come back to me on this."
 
+    **Follow-up, Keith asked the same "is there a real basis to it"
+    question of `cfisch3r/estimate` too.** Dug further - the PR itself
+    (#91) and its follow-up issue (#88, "Design critique: remaining
+    screens") are both task descriptions only, no raw critique output
+    published either. But PR #87 ("Mode Select"), which #88 says already
+    used this critique process, DOES show something real: a concrete
+    list of fixes the author applied as a result of it - a heading using
+    a bespoke inline `font-size` instead of the real `h2` scale, a
+    component using the wrong text style (`CardMeta` instead of
+    `CardBody`), vertical centering fixed via a real design token instead
+    of a magic number, an icon colour brought into line with its sibling
+    icon, a footer layout change, and real accessibility additions (a
+    skip link, a `<main>` landmark) - exactly the kind of "you don't
+    notice it's polished" detail-level issue this project's own Apple-
+    polish bar cares about, not vague generic feedback. The author also
+    noted "two investigated-but-not-fixed findings turned out to be
+    false positives" - an honest, real signal this isn't a magic bullet,
+    just a real process with a real (imperfect) hit rate, not unlike
+    what `requirements-reviewer`'s own post-build UX pass should expect
+    to produce. Still no raw agent transcript/output published anywhere
+    public for either repo, so "why it works" is inferred from real
+    fix-list evidence, not directly observed.
+
     **Keith's own follow-up: keeping `docs/components.md` in sync with
     the UI, and the first real standalone test of the reviewer's
     post-build UX pass.** Two real asks, same day:

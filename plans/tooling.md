@@ -825,3 +825,41 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
    separate, manually-typed commands, each needing the right module path
    remembered and run in the right order. Real friction for anyone other
    than whoever's been living in this repo daily.
+
+2. **[todo, 2026-09-19]** **[Testing & dev tooling]** More Python code-
+   quality tooling, beyond today's `ruff` (a deliberately lean rule set
+   - real bugs only, not style, per `CLAUDE.md`'s own framing). Flagged
+   by Keith (voice-dictated batch) with no further specifics given - not
+   yet scoped which real tool(s) (candidates worth a real look when this
+   gets picked up: `mypy`/`pyright` for real static type checking,
+   `radon`/`ruff`'s own complexity rules for cyclomatic-complexity/code-
+   smell detection, `bandit` for security-specific static analysis,
+   `vulture` for real dead-code detection), what it should actually
+   catch that `ruff`/`pytest-cov` don't already, or whether it becomes a
+   real CI gate (like `pytest-cov`'s enforced threshold) or stays
+   advisory (like `ruff`'s current deliberately-lean scope). Needs a
+   real conversation with Keith on what gap he's actually trying to
+   close before anything gets scoped further.
+
+3. **[todo, 2026-09-19]** **[Testing & dev tooling]** A real code-
+   reviewer agent (or agents) - genuinely distinct from
+   `requirements-reviewer` (`plans/wider.md` #10), which only ever
+   checks finished work against one specific requirement's own
+   acceptance criteria. This would be a general-purpose code-review
+   capability, not tied to a requirement. Flagged by Keith alongside
+   item #2 above, with one real detail already given: possibly split
+   into more than one agent by language/stack - a Python-focused one and
+   a front-end (dashboard JS/HTML/CSS) one, rather than one generalist
+   reviewer, mirroring real-world precedent already found for the
+   requirements-analysis work (`plans/wider.md` #10's own research
+   turned up several real multi-subagent code-review setups doing
+   exactly this kind of domain split - `dev.to`'s "How I Split Code
+   Review Across Five Claude Code Subagents", `VoltAgent/awesome-claude-
+   code-subagents`' own `code-reviewer.md`). Not yet scoped: whether
+   this reuses/extends `requirements-architect`'s own code-quality/
+   security checks (which already exist but only run pre-build, on a
+   drafted requirement, never against already-merged code generally) or
+   is a genuinely separate capability; what triggers it (a manual
+   invocation, every PR, every push); how many agents and where the
+   language boundary actually falls. Needs a real conversation with
+   Keith before anything gets built.
