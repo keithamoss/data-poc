@@ -18,52 +18,58 @@ Lambda context).
 Defaults to a throwaway, local-only check (Keith's own explicit call,
 2026-09-19) - pass --commit to write this run into the real, permanent
 qa_results/ git history instead.
+
+Built with Click (Keith's own explicit ask, 2026-09-19) rather than
+argparse - real, validated path arguments (click.Path(exists=True)
+rejects a typo'd path before any real tool ever runs, not partway
+through) and a real exit-code contract Click already handles correctly
+under both direct invocation and click.testing.CliRunner (tests/
+test_check_cli.py).
 """
 from __future__ import annotations
-import argparse
-import sys
 import tempfile
+from datetime import datetime, timezone
+
+import click
 
 from qa_tools.common.lambda_results_dir import BDM_MODULES, patch_write_qa_result_for_lambda
 from qa_tools.common.local_check import copy_into, format_report, run_id_from_path
 from . import build_per_run_warehouses, orchestrate_bdm
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[1])
-    parser.add_argument("csv_path", help="The Birth Registrations CSV to check - wherever you already downloaded it.")
-    parser.add_argument("--reference-csv", required=True,
-                         help="A known-good CSV to compare distribution drift against (e.g. last accepted delivery).")
-    parser.add_argument("--run-date", default=None, help="Defaults to today (UTC).")
-    parser.add_argument("--run-id", default=None, help="Defaults to a generated id from the filename + timestamp.")
-    parser.add_argument("--commit", action="store_true",
-                         help="Write this run into the real, permanent qa_results/ git history "
-                              "(default: local-only, throwaway).")
-    args = parser.parse_args(argv)
-
-    from datetime import datetime, timezone
-    run_date = args.run_date or datetime.now(timezone.utc).date().isoformat()
-    run_id = args.run_id or run_id_from_path(args.csv_path)
-    reference_run_id = run_id_from_path(args.reference_csv, prefix="ref")
+@click.command()
+@click.argument("csv_path", type=click.Path(exists=True, dir_okay=False))
+@click.option("--reference-csv", required=True, type=click.Path(exists=True, dir_okay=False),
+              help="A known-good CSV to compare distribution drift against (e.g. last accepted delivery).")
+@click.option("--run-date", default=None, help="Defaults to today (UTC).")
+@click.option("--run-id", "run_id", default=None, help="Defaults to a generated id from the filename + timestamp.")
+@click.option("--commit", is_flag=True,
+              help="Write this run into the real, permanent qa_results/ git history "
+                   "(default: local-only, throwaway).")
+def main(csv_path: str, reference_csv: str, run_date: str | None, run_id: str | None, commit: bool) -> None:
+    """Run the real QA check chain against CSV_PATH - a Birth Registrations file you've already downloaded."""
+    run_date = run_date or datetime.now(timezone.utc).date().isoformat()
+    run_id = run_id or run_id_from_path(csv_path)
+    reference_run_id = run_id_from_path(reference_csv, prefix="ref")
     reference_csv_filename = f"{reference_run_id}.csv"
-    copy_into(args.reference_csv, build_per_run_warehouses.RAW_DIR, reference_csv_filename)
+    copy_into(reference_csv, build_per_run_warehouses.RAW_DIR, reference_csv_filename)
 
-    if not args.commit:
+    if not commit:
         with tempfile.TemporaryDirectory() as tmp_dir:
             patch_write_qa_result_for_lambda(BDM_MODULES, tmp_dir)
-            results = orchestrate_bdm.run_single(run_id, args.csv_path, run_date, None,
+            results = orchestrate_bdm.run_single(run_id, csv_path, run_date, None,
                                                   reference_run_id=reference_run_id,
                                                   reference_csv=reference_csv_filename)
     else:
-        results = orchestrate_bdm.run_single(run_id, args.csv_path, run_date, None,
+        results = orchestrate_bdm.run_single(run_id, csv_path, run_date, None,
                                               reference_run_id=reference_run_id, reference_csv=reference_csv_filename)
 
-    print(format_report(results, run_id))
-    if not args.commit:
-        print("\n(local-only check - not written to qa_results/ history; re-run with --commit to keep it)")
+    click.echo(format_report(results, run_id))
+    if not commit:
+        click.echo("\n(local-only check - not written to qa_results/ history; re-run with --commit to keep it)")
 
-    return 1 if any(r["status"] in ("fail", "error") for r in results) else 0
+    raise SystemExit(1 if any(r["status"] in ("fail", "error") for r in results) else 0)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

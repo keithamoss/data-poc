@@ -401,6 +401,25 @@ exit codes, and a real assertion that a non-`--commit` run never creates
 anything under the real, permanent `qa_results/` path), `uv run ruff
 check .` clean.
 
+**Rebuilt with Click, 2026-09-19 (Keith's own explicit ask), same
+morning.** Both CLIs rewritten from argparse to real `@click.command()`s
+- `click.Path(exists=True, ...)` now rejects a typo'd path before any
+real tool ever runs (previously a plain string that would only fail
+later, inside `orchestrate_bdm.run_single()`/`_load_delivery()`), and
+the partial-delivery error in `check_delivery.py` is now a real
+`click.ClickException` rather than a bare `SystemExit(message)`. `click`
+added as a real, direct `pyproject.toml` dependency (it was already
+present transitively, via dbt-core/datacontract-cli, but this project's
+own convention is to declare what it directly imports, not rely on
+someone else's transitive pin). Tests rewritten to drive both commands
+through `click.testing.CliRunner` - Click's own standard test harness -
+instead of calling `main()` directly; two new tests added for the
+path-validation behavior Click now provides for free. Verified: 12
+tests in `tests/test_check_cli.py` (up from 4, the 8 new ones covering
+the same ground as before plus the two new Click-validation cases),
+`uv run ruff check .` clean, and the real `--help` output for both
+commands checked by hand against an actual invocation.
+
 **Thread B - an AWS MVP that reacts to real S3 events.** Deploy this
 pipeline (or some version of it) to AWS, triggered by real S3 events as
 files land, running the QA pipeline automatically rather than as a

@@ -27,6 +27,16 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Changed
+- **8:22am** — **On-Demand Checks Rebuilt With Click** **[Pipeline & publishing]** **[Testing & dev tooling]** The two on-demand check CLIs added
+  minutes earlier switched from argparse to real Click commands (Keith's
+  own explicit ask). Real, immediate benefit: `click.Path(exists=True)`
+  now rejects a typo'd file/folder path before any real QA tool ever
+  runs, rather than failing partway through a real dbt/Soda run. `click`
+  added as a real, direct dependency (previously only present
+  transitively). Tests now drive both CLIs through `click.testing.
+  CliRunner`, Click's own standard test harness.
+
 ### Added
 - **8:16am** — **On-Demand File Checks** **[Pipeline & publishing]** **[Docs & process]** Two new CLIs (`qa_tools/bdm/check_file.py`/
   `qa_tools/cp/check_delivery.py`) for real, ad hoc QA checks against a
