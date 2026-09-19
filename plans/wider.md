@@ -522,3 +522,48 @@ check_lifecycle.py`'s own `check_id` convention.
     Not yet exercised end-to-end on a real feature - built and reviewed
     in design, not yet run for real. First real use will be the natural
     test of whether the design holds up in practice.
+
+    **Refined further, same day, before that first real run** - Keith
+    held off running the loop to give more real input first, three real
+    additions:
+    - **A real, named polish standard.** Keith's own words: he wants
+      dashboard UX polished "to the level that Apple goes for their
+      products... a UX where you don't even realize it's polished
+      because of everything else." Now a real, explicit bar in both
+      `requirements-ux.md` and `requirements-reviewer.md`'s own
+      instructions, not just implied.
+    - **Real role depth in `docs/project-context-for-agents.md`.**
+      Keith's own observation: the agents (UX especially) need more than
+      role labels - real motivations and perspectives per role. Added:
+      what Keith himself is actually doing when he looks at this (judging
+      the approach generally, and using it as something to show other
+      people); the data steward's real frustration point (noise, too many
+      clicks before reaching what matters, checking this quickly
+      alongside other work); the accountable data owner's real concern
+      (trend over time, defensibility); the pipeline maintainer's
+      opposite need (wants the raw tool-level detail the steward
+      doesn't) - a real, concrete tension the same dashboard has to serve
+      both sides of.
+    - **The "banked for later" post-build UX pass pulled forward into
+      `requirements-reviewer` now**, not deferred - Keith explicitly liked
+      the idea flagged during the UX-agent scoping research (a real-
+      world precedent, VoltAgent's `ui-ux-tester`: a "frustrated
+      end-user" persona doing actual Playwright-driven visual QA) and
+      asked for it built into the current reviewer rather than parked.
+      `requirements-reviewer` now does a real, separate visual-QA pass
+      for dashboard-facing requirements only, adopting a busy/moderately-
+      attentive data-steward persona, taking real screenshots as
+      evidence (spacing, interaction states, dark mode, whether a
+      confused click-path is possible), checked against the same
+      Apple-level bar - and, since `requirements-ux`'s own pre-build note
+      is a real standard to check against (same "not implementation
+      reasoning" treatment `requirements-architect`'s note already gets),
+      the reviewer is explicitly told it may be given that note too.
+
+    **Deliberately not yet done, Keith's own explicit call**: deeper
+    grounding of `requirements-ux`'s own intent in real human-psychology/
+    HCI research (not just "consistency + workflow fit"), and whether
+    real precedent exists for a UX-reviewer-agent role specifically -
+    Keith is doing that second piece of research himself; revisit both
+    once his research and this refinement round are both in hand, not
+    before.

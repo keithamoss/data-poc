@@ -38,24 +38,58 @@ independent tools - dbt-core, Soda Core, datacontract-cli, Evidently AI
 - run against real data on a real cadence) rather than a hand-maintained
 spreadsheet or a mocked-up dashboard with fabricated numbers.
 
-## Who this is for
+## Who this is for, and what each of them actually wants
 
-**The person actually evaluating this PoC today**: Keith, Director of
-Data Technology at a Western Australian government agency. He is both
-the project's sponsor and its most active real user right now - he
-reviews the live dashboard, gives feedback by voice dictation, and makes
-the real design calls this project's `plans/*.md` files record.
+Real roles, not just names - added 2026-09-19 at Keith's own explicit
+request, specifically so `requirements-ux` (and any other agent
+reasoning about how a real person would experience this tool) has real
+motivations and perspectives to check against, not just a label.
 
-**Who this models being for, in a real (non-PoC) deployment**: data
-stewards who'd use the dashboard day-to-day to see whether their
-dataset's current status is trustworthy; the agencies who actually own
-each real dataset (e.g. Registry Services for Birth Registrations, the
-Department for Child Protection and Family Support for the Child
-Protection collection) as accountable parties; and whoever maintains the
-pipeline itself (the QA checks, the contract, the ingestion). None of
-these are real named people yet in this PoC - `contract/people.yaml` has
-Keith's own real identity plus fictional Monty-Python-named placeholders
-standing in for colleagues not yet named for real.
+**Keith, Director of Data Technology at a Western Australian government
+agency** - the project's sponsor and its most active real user right
+now. Two things he's actually doing when he looks at this: deciding
+whether this approach is worth taking further (so he's judging it
+against what "good" looks like generally, not just against this PoC's
+own prior state), and using it as something he can put in front of other
+people. That second point matters for UX specifically - he cares about
+polish to the level where it *stops being visible as an effort* - his
+own words, the standard he's set for this: "the level that Apple goes
+for their products... a UX where you don't even realize it's polished
+because of everything else." That's a real, standing bar for anything
+UX-related in this project, not just a nice-to-have.
+
+**A data steward** (the day-to-day dashboard user this PoC models, not
+yet a real named person) - checks the register regularly, often quickly,
+often alongside other work, not as their sole focus. What they actually
+need in that moment: "is my dataset OK, and if not, what's wrong and
+what do I do about it" - fast, without needing to understand dbt/Soda/
+datacontract-cli internals to get there. Their real frustration point is
+noise: too many clicks, too much raw tool jargon, before they reach the
+one thing that actually matters right now. A UX decision should be
+checked against this person's real state of mind - busy, moderately
+attentive, not looking to be impressed, just wants a fast, honest
+answer.
+
+**An agency's accountable data owner** (e.g. Registry Services for Birth
+Registrations, the Department for Child Protection and Family Support
+for the Child Protection collection) - cares less about right-now and
+more about trend: is this dataset's quality improving or degrading over
+time, and do they have something defensible to point to if someone above
+them asks "why is this red."
+
+**Whoever maintains the pipeline itself** (the QA checks, the contract,
+the ingestion) - the opposite of the data steward's need: this person
+*wants* the raw tool-level detail (which specific dbt test, which Soda
+check, the actual failing values) to find and fix a real root cause, not
+a simplified summary. A UX decision that's right for the steward (hide
+the noise) can be wrong for this person (surface the detail) - both are
+real users of the same dashboard, at different depths of the same
+information.
+
+None of these last three are real named people yet in this PoC -
+`contract/people.yaml` has Keith's own real identity plus fictional
+Monty-Python-named placeholders standing in for colleagues not yet named
+for real.
 
 ## Current state and maturity
 

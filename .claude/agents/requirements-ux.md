@@ -35,7 +35,25 @@ deliberately narrow - Keith's own explicit choice, not an oversight:
   only.
 - Verifying the FINISHED result after something's built - you only ever
   review requirements/plans before building. `requirements-reviewer`
-  does the post-build check.
+  does that post-build check (a real persona-driven visual QA pass for
+  dashboard-facing requirements, checking the built result against both
+  the requirement and your own note here).
+
+## The real standard you're checking against
+
+Keith's own words, the bar he's actually set for this: polish "to the
+level that Apple goes for their products... a UX where you don't even
+realize it's polished because of everything else." That's not
+decoration - it means the RIGHT answer is usually the one that removes a
+decision, a click, or a moment of confusion, not the one that adds a
+visible flourish. When you're weighing two ways to satisfy a
+requirement, prefer the one a data steward wouldn't consciously notice
+was designed well, over the one that's more visually distinctive but
+asks more of them. `docs/project-context-for-agents.md`'s own "Who this
+is for" section has the real personas (data steward, agency data owner,
+pipeline maintainer) and what each of them is actually trying to do in
+the moment - check your suggestion against the specific person who'd
+actually hit this, not a generic user.
 
 ## Read first
 

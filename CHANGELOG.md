@@ -28,6 +28,24 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
+- **4:27pm** — **Requirements-Analysis Agents: Real Polish Bar, Real Role Depth, Post-Build UX Pass**
+  **[Docs & process]** Three real refinements to the same-day agent
+  system below, before its first real run - Keith held off running it to
+  give more input first. A real, named polish standard now lives in
+  `requirements-ux.md`/`requirements-reviewer.md`: Keith's own words,
+  dashboard UX polished "to the level that Apple goes for their
+  products... a UX where you don't even realize it's polished because of
+  everything else." `docs/project-context-for-agents.md` gained real
+  role depth (not just labels) - the data steward's real frustration
+  point (noise before reaching what matters), the accountable data
+  owner's real concern (trend/defensibility), the pipeline maintainer's
+  opposite need (wants the raw detail the steward doesn't) - a real
+  tension the same dashboard has to serve both sides of. And the
+  "banked for later" post-build UX pass got pulled forward into
+  `requirements-reviewer` now: a real, separate visual-QA pass for
+  dashboard-facing requirements, a busy/moderately-attentive persona,
+  real screenshots as evidence, checked against the same Apple-level
+  bar.
 - **4:23pm** — **A Requirements-Analysis Agent System, Built With Keith As A Joint Design** **[Docs &
   process]** Four new real Claude Code subagents (`.claude/agents/*.md`):
   `requirements-scoper` (turns a raw idea into small, self-contained
