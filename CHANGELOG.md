@@ -27,6 +27,30 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Added
+- **6:22pm** — **A Real SPA Best-Practice Guide for the UX Review Pair** **[Docs & process]** **[Dashboard UI]**
+  Keith's own ask: "care about clean, human-readable URLs... and embody
+  single page application best practice" more broadly, not just URLs.
+  New `docs/spa-best-practices.md`, grounded in this dashboard's own
+  real client-side routing (`stateToPath()`/`pathToState()`, hash-based
+  on purpose since GitHub Pages can't rewrite paths for a single static
+  file) rather than generic advice - covers URL design (path vs. query
+  string), History API mechanics (push vs. replace, this dashboard's own
+  real bug fixed by switching a comparison-picker to `replaceState`),
+  deep-linking/cold-load testing, scroll position, and route-change
+  accessibility (title, focus, ARIA live regions). `requirements-ux`
+  (pre-build) and `requirements-ux-critic` (post-build) both updated to
+  read and act on it - a real, narrow carve-out lets `requirements-ux`
+  check route-change accessibility specifically, despite general
+  accessibility staying out of its scope. Found 2 real gaps while
+  writing this: zero route-change accessibility handling anywhere in the
+  template (no `document.title` update, no focus management, no ARIA
+  live region - logged as `plans/dashboard.md` #15) and `REQ-DASH-020`
+  ("Human-friendlier dashboard URLs") still reading `status:
+  not_started` despite its acceptance criterion already being satisfied
+  by the 2026-09-18 hash-path rework - both flagged to Keith, neither
+  fixed as part of this pass.
+
 ### Fixed
 - **6:17pm** — **serve_dashboard_https.py Now Auto-Assigns a Free Port** **[Testing & dev tooling]**
   Keith's own follow-up after approving the local-HTTPS-serving fix:

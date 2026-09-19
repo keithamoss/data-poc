@@ -857,4 +857,32 @@ common/check_lifecycle.py`'s own `check_id` convention.
     rather than build now. Not yet scoped: parsing the code back out of
     a real id (a small real regex against `_COMPONENT_CODES`' own key
     set, or a matching JS-side lookup keyed the same way) and where
+
+15. **[todo, 2026-09-19]** **[Dashboard UI]** Three real, currently-
+    unaddressed accessibility gaps in the dashboard's own client-side
+    routing, found while writing `docs/spa-best-practices.md` (Keith's
+    own ask, `plans/wider.md` #10) - a grep of the template's own inline
+    JS for `document.title`, `.focus(`, `aria-live`, and
+    `role="status"`/`role="alert"` returned zero matches, across every
+    real client-side route change (`navigate()`, `popstate`, drawer/
+    panel open). Concretely: the browser tab title never updates per
+    view; keyboard focus never moves anywhere after a route change (it
+    silently stays on whatever was clicked); there's no ARIA live region
+    announcing a navigation. Not fixed here - logging only, real scoping
+    needed (how much of this the single-file, no-framework template can
+    take on cleanly, whether it's one change or several). `requirements-
+    ux-critic` should now actively check for this class of gap on every
+    future post-build pass (`docs/spa-best-practices.md` section E), not
+    just when a requirement is explicitly about accessibility.
+
+    Also found the same day: `requirements.yaml`'s `REQ-DASH-020`
+    ("Human-friendlier dashboard URLs") still reads `status:
+    not_started`, but its own acceptance criterion ("a dataset-level URL
+    reads as a real path, not encoded JSON") was actually satisfied by
+    `plans/running-thoughts.md` #9's 2026-09-18 hash-path rework - the
+    work shipped outside the formal `requirements-scoper`/
+    `requirements-reviewer` pipeline, so nothing ever flipped the status
+    field. Flagged to Keith, not corrected unilaterally - his call
+    whether to mark it `done` outright or run a real `requirements-
+    reviewer` pass against it first.
     exactly in the existing card layout the badge should sit.

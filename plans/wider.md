@@ -1141,3 +1141,41 @@ check_lifecycle.py`'s own `check_id` convention.
     its own. Verified for real: ran two instances concurrently, both
     bound distinct OS-assigned ports and served real content
     simultaneously (`curl -k` 200 from both).
+
+    **Follow-up, same session, 2026-09-19 evening**: Keith's own ask -
+    "we should tell one of the sub agents to care about... clean human
+    readable URLs... and also to embody single page application best
+    practice" - wider than just URLs. Real research done (WebSearch
+    only - `smart-interface-design-patterns.com`/`rakhman.info`/
+    `developer.mozilla.org`/`web.dev`/`en.wikipedia.org` all blocked,
+    `CLAUDE.md`'s own blocked-domains list has the account), synthesized
+    into a new `docs/spa-best-practices.md`, grounded in this
+    dashboard's own real routing mechanism (read straight from the
+    template's own `stateToPath()`/`pathToState()`/`navigate()`/
+    `popstate` handler, not written generically) - covers URL design
+    (path vs. query string), History API mechanics, deep-linking,
+    scroll position, and route-change accessibility. `requirements-ux`
+    (pre-build) and `requirements-ux-critic` (post-build) both updated
+    to read it and act on it - the pairing recommended to Keith earlier
+    this session, confirmed. One deliberate scope carve-out made without
+    a separate round of questions (flagged in both agent files and
+    below for Keith to correct if he disagrees): `requirements-ux`'s
+    existing "accessibility - not this agent's job" boundary now
+    excludes general a11y but explicitly INCLUDES route-change
+    accessibility (title/focus/ARIA-live), since that's structurally
+    part of "does this navigation mechanism work," not general page
+    accessibility.
+
+    Real, concrete findings surfaced by grounding the guide in the
+    actual template rather than writing it generically (both logged as
+    `plans/dashboard.md` #15, not fixed in this pass): (1) zero
+    route-change accessibility handling exists anywhere in the template
+    today - no `document.title` update, no focus management, no ARIA
+    live region, confirmed via a real grep returning zero matches; (2)
+    `requirements.yaml`'s `REQ-DASH-020` ("Human-friendlier dashboard
+    URLs") still reads `status: not_started` even though its own
+    acceptance criterion was actually satisfied by
+    `plans/running-thoughts.md` #9's 2026-09-18 hash-path rework - that
+    work shipped outside the formal requirements pipeline, so nothing
+    ever flipped the status field. Both flagged to Keith rather than
+    corrected unilaterally.
