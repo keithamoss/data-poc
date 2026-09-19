@@ -1578,34 +1578,47 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     **Three real levers, none decided - this is the part to work through
     with Keith, not to guess at:**
 
-    1. **`plans/qa-pipeline.md` has outgrown a single file.** 5,180
-       lines against `publishing-and-history.md`'s 3,077,
-       `tooling.md`'s 1,532 and `wider.md`'s 1,506. There is direct
-       precedent twice over: `plans/wider.md` was split 2026-09-18 as
-       an "undifferentiated 32-item dump", and this very file was split
-       out of it 2026-09-19 "once that one item had grown far larger
-       than anything else there". `qa-pipeline.md` is now well past
-       where both of those triggered a split, and is nominally scoped
-       to ONE dataset's pipeline while plainly carrying everything.
-       Every agent touching any QA-check question pays the full ~58k to
-       read one item out of it.
+    1. **`plans/qa-pipeline.md` has outgrown a single file** - every
+       agent touching any QA-check question pays the full ~58k to read
+       one item out of it. **Split out into its own item, #17**, at
+       Keith's own ask: the same cost is paid by every SESSION at
+       start, not just by agents, so it's broader than agent speed.
+       See #17 for the real numbers and the options.
     2. **`omitClaudeMd: true` is a real, documented frontmatter option**
        (verified against Claude Code's own subagent docs while checking
        the `AskUserQuestion` question - see #16). A subagent loads
        "every level of the CLAUDE.md hierarchy the main conversation
-       loads" unless it opts out. **None of the 8 `delivery-*` agents
-       opts out - and all 8 are separately instructed to read
-       `docs/project-context-for-agents.md`, the condensed orientation
-       built precisely so they wouldn't need the full file.** So each
-       agent currently pays ~11,800 tokens for the long version AND
-       ~1,900 for the short version of the same material. That said:
-       `CLAUDE.md` carries real conventions an agent may genuinely need
-       (the "enumerate every consumer" rule, the no-live-data rule, the
-       bug-gets-a-test rule), so this is NOT a free win - the real
-       question is whether `project-context-for-agents.md` should
-       absorb the conventions that actually matter to an agent, and
-       then the full file be dropped. Needs a real read of both before
-       deciding.
+       loads" unless it opts out, and none of the 8 `delivery-*` agents
+       opts out - so each pays ~11,800 tokens for it.
+
+       **A first version of this bullet claimed that cost was
+       duplicated, because all 8 are also told to read the condensed
+       `docs/project-context-for-agents.md`. That claim was asserted,
+       not checked, and checking it showed it was wrong** - recorded
+       here rather than quietly deleted, since the mistake is the
+       instructive part. The two documents are largely
+       COMPLEMENTARY: the agents doc is domain orientation (who the
+       users are, what each wants, what's real vs illustrative,
+       maturity) and explicitly defers to `CLAUDE.md` for architecture;
+       `CLAUDE.md` carries the operational rules the agents doc barely
+       touches. Real counts - `mothman` entry-point rule 22 mentions vs
+       3, the no-live-data rule 5 vs 0, `uv run` 17 vs 0,
+       enumerate-every-consumer 2 vs 0.
+
+       So this lever is **much weaker than it first looked**, and worth
+       keeping only as a documented option rather than a recommendation.
+       `delivery-scoper` visibly USED `CLAUDE.md` on its first real run:
+       its NFRs cite the "enumerate every consumer mechanically"
+       convention, Thread D's settled "no CLI" call, and the real
+       check-yaml pre-commit incident with shell-style quoting - none of
+       which is in the agents doc. Dropping it would have cost real
+       output quality to save ~12k tokens. If this is revisited, the
+       question is narrower than "opt out": whether the handful of
+       operational conventions an agent genuinely needs should be
+       promoted into the agents doc, and only THEN the full file
+       dropped - and whether that differs between pre-build agents
+       (which reason about requirements) and post-build critics (which
+       actually run commands and need the `uv run`/`mothman` rules).
     3. **Point an agent at an item, not a file.** The scoper was told
        to read "`plans/qa-pipeline.md` item 25 (around line 1131)" and
        appears to have read the file. A prompt that hands over the
@@ -1682,3 +1695,80 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     Also worth a look while in there: `#15`'s own finding that none of
     the 8 sets `omitClaudeMd`, which is a second frontmatter-level
     thing nobody has audited since these files were written.
+
+17. **[todo, 2026-09-19]** **[Docs & process]**
+    **Priority: pick up tomorrow morning alongside #15 (2026-09-19,
+    Keith's own ask - "yes, please log the QA pipeline token problem").**
+
+    This project's own orientation instruction now costs **~159,000
+    tokens before any work begins**. `CLAUDE.md` opens by telling every
+    new session to read seven `plans/*.md` files "in full before doing
+    anything else", and that instruction has quietly become one of the
+    most expensive things in the repo:
+
+    | file | ~tokens |
+    |---|---|
+    | `plans/qa-pipeline.md` | **57,962** |
+    | `plans/publishing-and-history.md` | 34,656 |
+    | `plans/tooling.md` | 18,764 |
+    | `plans/wider.md` | 16,752 |
+    | `plans/dashboard.md` | 12,744 |
+    | `CLAUDE.md` itself | 11,830 |
+    | `plans/data-generation.md` | 4,264 |
+    | `plans/conceptual-design.md` | 2,050 |
+    | **total** | **~159,022** |
+
+    Split out from #15 (agent speed) at Keith's own ask, because it
+    isn't only an agent problem - #15 found it, but **every session pays
+    this, including the main one, at every start.** A subagent reading
+    one file is the cheap case.
+
+    **The real finding is not file size, it's the `done`/`todo` ratio.**
+    Parsed through `dashboard/plans_md.py`'s own parser: 137 items, of
+    which **78 `done` plus 3 `superseded`** - and those account for
+    **~85,000 of the ~107,000 tokens of item text, 79% of it.** The
+    numbered-item files have become mostly a record of completed work,
+    because this project's convention is to append a full build write-up
+    to an item when it lands rather than collapse it to a line. Current
+    live work - 37 `todo`, 12 `parked`, 7 `investigate` - is under a
+    quarter of the volume.
+
+    **And that is exactly what makes this hard rather than obvious.**
+    Those completed write-ups are not dead weight: they exist precisely
+    so a session doesn't re-derive a settled decision, which is
+    `CLAUDE.md`'s own stated reason for the read-everything rule
+    ("don't re-derive a decision that's already recorded there, and
+    don't re-propose something already logged"). Cutting them to save
+    tokens would cause the exact failure the instruction was written to
+    prevent. This item is NOT "the plans files are too big, trim them".
+
+    Real options to weigh tomorrow, none decided:
+
+    - **Split `qa-pipeline.md`.** 5,180 lines, nominally scoped to one
+      dataset's pipeline while plainly carrying everything. Direct
+      precedent twice: `wider.md` split 2026-09-18, `tooling.md` split
+      out of it 2026-09-19. Reduces the per-question cost without
+      losing anything - but doesn't reduce the session-start total at
+      all if the instruction still says read all of them.
+    - **Change the instruction, not the files.** Read the live items in
+      full; read `done`/`superseded` as an index (id, title, one line)
+      and drill in on demand. This is the only option that actually
+      moves the ~159k number, and it's the one with real risk attached -
+      it trades a guaranteed cost for a probabilistic one, where the
+      failure mode is a session confidently re-proposing something
+      settled months ago.
+    - **Generate the digest rather than hand-maintain it.**
+      `dashboard/plans_md.py` already parses every item into structured
+      fields (status, components, file, number, text) for the Plans tab.
+      A generated per-file index is close to free and can't drift from
+      the source the way a hand-written summary would.
+    - **Do nothing deliberately.** ~159k is affordable in a large
+      context window, and the instruction demonstrably works - this
+      session alone caught two stale items (`plans/qa-pipeline.md` #74's
+      partly-fixed threshold bug, item 25's half-built premise) because
+      the context was actually there. Worth stating as a real option
+      rather than assuming the cost must be paid down.
+
+    Measure before and after, same standing lesson as #15 and the
+    `pytest --durations` work: a real token count on one identical task
+    is the way to tell whether a change helped.
