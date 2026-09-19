@@ -927,19 +927,17 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
    - the second confirmed via that repo's own `README.md` "## License"
    section, since no separate `LICENSE` file exists there).
 
-   **Still pending, real work already in progress when Keith asked to
-   pause it**: `UI/UX Pro Max` (`nextlevelbuilder/ui-ux-pro-max-skill`)
-   and `AccessLint` (`accesslint/claude-marketplace` +
-   `@accesslint/mcp`) - both of these DO bundle/run real executable
-   code (a Python search CLI; an MCP server), unlike the 2 above, so
-   they got a real security review in progress (all 5 of UI/UX Pro
-   Max's real Python scripts read directly from source and confirmed
-   clean - stdlib-only, no network/subprocess/eval/exec, safe path
-   handling; `@accesslint/mcp`'s real npm package downloaded and partly
-   inspected) before Keith asked to stop and hold off installing either
-   - explicitly not yet approved, not yet installed. Everything
-   downloaded during that review was deleted per his own explicit ask
-   (confirmed via `git status` showing a clean tree - nothing had
-   actually been written into the repo yet at the point he stopped it).
-   Resume this security review before installing either, don't assume
-   the earlier partial review still covers a later re-fetch.
+   **Declined, same day**: `UI/UX Pro Max`
+   (`nextlevelbuilder/ui-ux-pro-max-skill`) and `AccessLint`
+   (`accesslint/claude-marketplace` + `@accesslint/mcp`) - Keith's own
+   explicit call, "don't worry about" either. Both bundle/run real
+   executable code (a Python search CLI; an MCP server), unlike the 2
+   installed above, and got a real security review in progress (all 5
+   of UI/UX Pro Max's real Python scripts read directly from source and
+   confirmed clean - stdlib-only, no network/subprocess/eval/exec, safe
+   path handling; `@accesslint/mcp`'s real npm package downloaded and
+   partly inspected) before Keith first asked to pause it, then decided
+   not to pursue either at all. Not installed; everything downloaded
+   during that partial review was deleted, confirmed via a clean
+   `git status` (nothing had actually been written into the repo yet).
+   Not parked for later either - a real decision, not just deferred.

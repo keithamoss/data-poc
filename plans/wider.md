@@ -911,3 +911,31 @@ check_lifecycle.py`'s own `check_id` convention.
       yet even read** - parked as its own new item,
       `plans/tooling.md` #4, distinct from that file's existing #2
       (Python code-quality tooling generally).
+
+    **Real, verified finding, same day: none of the 6 `requirements-*`
+    agents can use the 2 real Claude Skills just installed
+    (`plans/tooling.md` #5).** Keith asked directly whether the UX/
+    reviewer subagents use these skills, or only the main session does.
+    Didn't guess - tested it for real: a fresh general-purpose subagent
+    was asked to introspect and report its own real, visible tool list
+    and system-reminders. It confirmed a real `Skill` tool and a real
+    system-reminder listing both `frontend-design` and
+    `web-design-guidelines` among ~24 available skills - but that
+    agent's own tool access is unrestricted (`tools: *`, its own type
+    definition). Checked our own 6 agents' real `tools:` frontmatter
+    directly (`grep -n "^tools:" .claude/agents/*.md`): none of them
+    list `Skill` - `requirements-architect`/`requirements-scoper`/
+    `requirements-ux` are `Read, Grep, Glob, AskUserQuestion`;
+    `requirements-reviewer` adds `Bash`; `requirements-ux-critic`/
+    `requirements-visual-critic` add `Bash, mcp__playwright`. Since
+    Claude Code subagent tool restriction is harness-enforced, not just
+    prompt-level (confirmed earlier this session, `plans/wider.md`
+    itself, the "what is a subagent" 101 thread), the real, current
+    answer is: **only the main session can use these 2 skills right
+    now - none of the 6 requirements-* agents can, because `Skill`
+    isn't in any of their allowlists.** Not yet fixed - a real, small,
+    low-risk follow-up if Keith wants `requirements-ux`/
+    `requirements-ux-critic`/`requirements-visual-critic` (the 3 where
+    these design skills would actually be relevant) to gain real access
+    - just adding `Skill` to their own `tools:` line, nothing more
+    invasive.
