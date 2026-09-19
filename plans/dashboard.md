@@ -843,3 +843,18 @@ common/check_lifecycle.py`'s own `check_id` convention.
     real `.cast` file's own baked-in timing between keystrokes, not
     just the player's own speed setting) - don't assume it's another
     speed-multiplier tweak until Keith actually says what he's spotted.
+
+14. **[todo, 2026-09-19]** **[Dashboard UI]** Decode a requirement's id
+    into a real component badge/icon in the Requirements panel, the
+    same way the Plans tab and Release Notes panel already render
+    `componentBadge()`/`componentIcon()` for their own entries. Today
+    the panel only shows the raw id string (e.g. `REQ-QAC-001`) - the
+    component code is visible but never translated into the full name/
+    icon a reader would recognize from those other 2 panels. Raised as
+    a question while building the component-taxonomy CI consistency
+    guard (`tests/test_component_taxonomy_consistency.py`,
+    `plans/wider.md` #10); Keith's own call: a good idea, park it
+    rather than build now. Not yet scoped: parsing the code back out of
+    a real id (a small real regex against `_COMPONENT_CODES`' own key
+    set, or a matching JS-side lookup keyed the same way) and where
+    exactly in the existing card layout the badge should sit.

@@ -970,3 +970,24 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
    during that partial review was deleted, confirmed via a clean
    `git status` (nothing had actually been written into the repo yet).
    Not parked for later either - a real decision, not just deferred.
+
+6. **[todo, 2026-09-19]** **[Testing & dev tooling]** A real, dedicated
+   MCP server wrapping `mothman` (via `uv run`), so the requirements-
+   analysis agents that currently use `Bash` only to run `uv run
+   mothman dashboard rebuild` (`requirements-reviewer`/
+   `requirements-ux-critic`/`requirements-visual-critic`) could get a
+   single narrow, purpose-built tool instead of open shell access -
+   real, buildable (a small Python MCP server, `mcp.server.fastmcp` or
+   the official `modelcontextprotocol` SDK, matching this project's own
+   Python-first convention rather than introducing Node for something
+   we'd write ourselves), and would let `Bash` be dropped entirely from
+   those 3 agents' own tool grants - a further least-privilege step in
+   the same spirit as the Playwright MCP split. Keith's own call: park
+   it as an idea rather than build now, deliberately sequenced behind
+   confirming the existing Playwright MCP setup actually works end to
+   end first (`plans/wider.md` #10's own still-open verification gap) -
+   a second custom MCP server built on the same currently-unconfirmed
+   foundation would carry the identical risk. Not yet scoped beyond the
+   one real, already-known need (`dashboard rebuild`) - whether other
+   `mothman` subcommands would eventually get their own tools too is a
+   real question for whenever this gets picked up.
