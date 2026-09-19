@@ -876,3 +876,70 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
    `plans/*.md` accuracy, or something else entirely, not yet known
    without actually reading that file). Not yet scoped at all - read the
    real file first before proposing anything.
+
+5. **[done, 2026-09-19]** **[Docs & process]** **[Testing & dev tooling]**
+   2 real Claude Skills installed (`.claude/skills/`) - a genuinely
+   different mechanism from the `requirements-*` subagents above:
+   skills are progressive-disclosure capability packages that activate
+   contextually (or as a slash command), not separate-context-window
+   delegates. Found via a real Snyk article Keith found himself ("Top 8
+   Claude Skills for UI/UX Engineers") and supplied as a PDF once the
+   real site turned out to be blocked (`snyk.io`, flagged in
+   `CLAUDE.md`). Keith picked 4 of the article's 8 real skills to bring
+   in; 2 are installed, 2 are still pending (see below):
+   - **`frontend-design`** (Anthropic's own, `anthropics/skills`,
+     Apache-2.0) - pushes Claude away from generic "AI slop" aesthetics
+     (banned fonts/palettes, a two-pass plan-then-build process,
+     concrete anti-pattern examples). Vendored verbatim, byte-identical
+     to the real upstream `SKILL.md`/`LICENSE.txt` (confirmed via a
+     real `diff`, not just copied by hand) - no bundled scripts, purely
+     markdown guidance, lowest real risk of the 4.
+   - **`web-design-guidelines`** (adapted from Vercel's own
+     `vercel-labs/agent-skills`, MIT) - reviews existing UI code against
+     a real, comprehensive 17-section ruleset (accessibility, focus
+     states, forms, performance, dark mode, i18n, anti-patterns, etc.),
+     output in a terse `file:line` format. The real upstream skill does
+     a live `WebFetch` of its ruleset before every review; Keith's own
+     explicit call was to vendor a reproducible offline copy instead
+     (same rationale as `dashboard/vendor/`'s own vendored assets - no
+     live external dependency, works offline, works on a network that
+     can't reach every third-party domain). The real ruleset (`vercel-
+     labs/web-interface-guidelines`'s own `command.md`, MIT) is
+     vendored verbatim at `.claude/skills/web-design-guidelines/
+     reference/web-interface-guidelines.md` (confirmed byte-identical
+     to upstream via a real `diff` after an earlier manual-retype
+     attempt was caught corrupting curly quotes into straight ones -
+     redone as an exact file copy instead); only the SKILL.md's own
+     retrieval instructions were changed to read that local file
+     instead of fetching live. No automated re-sync process exists yet
+     - a real, deliberate gap, noted in the vendored file's own header
+     comment.
+
+   **Real security review done before installing, not just installed on
+   the article's word** (both of these are pure markdown/text content,
+   no bundled executable scripts - lowest-risk of the 4 skills Keith
+   picked): read each real file directly from its real source
+   (`raw.githubusercontent.com`, not a rendered/summarized page) and
+   confirmed neither contains anything beyond design/review guidance
+   text. Both source repos' real licenses were checked before vendoring
+   (Apache-2.0 for `anthropics/skills`; MIT for both
+   `vercel-labs/agent-skills` and `vercel-labs/web-interface-guidelines`
+   - the second confirmed via that repo's own `README.md` "## License"
+   section, since no separate `LICENSE` file exists there).
+
+   **Still pending, real work already in progress when Keith asked to
+   pause it**: `UI/UX Pro Max` (`nextlevelbuilder/ui-ux-pro-max-skill`)
+   and `AccessLint` (`accesslint/claude-marketplace` +
+   `@accesslint/mcp`) - both of these DO bundle/run real executable
+   code (a Python search CLI; an MCP server), unlike the 2 above, so
+   they got a real security review in progress (all 5 of UI/UX Pro
+   Max's real Python scripts read directly from source and confirmed
+   clean - stdlib-only, no network/subprocess/eval/exec, safe path
+   handling; `@accesslint/mcp`'s real npm package downloaded and partly
+   inspected) before Keith asked to stop and hold off installing either
+   - explicitly not yet approved, not yet installed. Everything
+   downloaded during that review was deleted per his own explicit ask
+   (confirmed via `git status` showing a clean tree - nothing had
+   actually been written into the repo yet at the point he stopped it).
+   Resume this security review before installing either, don't assume
+   the earlier partial review still covers a later re-fetch.

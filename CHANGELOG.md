@@ -27,6 +27,26 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Added
+- **5:26pm** — **Two Real Claude Skills: frontend-design and web-design-guidelines** **[Docs & process]** **[Testing & dev tooling]**
+  A genuinely different mechanism from the `requirements-*` subagents -
+  Claude Skills, progressive-disclosure capability packages that
+  activate contextually rather than separate-context-window delegates.
+  Keith found a real Snyk article himself ("Top 8 Claude Skills for
+  UI/UX Engineers"), picked 4 of its 8 real skills to bring in.
+  2 are installed now: Anthropic's own `frontend-design` (vendored
+  verbatim, byte-identical to upstream, confirmed via a real `diff` -
+  pushes Claude away from generic "AI slop" aesthetics) and a real,
+  adapted `web-design-guidelines` (Vercel's own 17-section UI-review
+  ruleset, vendored offline per Keith's own explicit call rather than
+  the upstream skill's live `WebFetch` on every run - same rationale as
+  `dashboard/vendor/`'s own vendored assets). Both read directly from
+  their real sources and reviewed before installing, not installed on
+  the article's word alone. The other 2 (`UI/UX Pro Max`, `AccessLint`)
+  are still pending - both bundle real executable code, mid-review when
+  Keith asked to pause; nothing from that review was installed, and
+  everything downloaded during it was deleted per his own ask.
+
 ### Changed
 - **5:15pm** — **UX/Visual Critics Refined Against the Real cfisch3r/estimate Prompts** **[Docs & process]** **[Testing & dev tooling]**
   Keith asked directly whether `requirements-ux-critic`/
