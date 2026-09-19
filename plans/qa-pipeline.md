@@ -5031,6 +5031,30 @@ relative, not a schedule — this is weeks of work, not months.
     2026-09-18 split - a QA-checks-and-contract concern, not a
     whole-of-project one.)
 
+    **Picked up again, widened, 2026-09-19 - see `plans/tooling.md` #12**
+    (Keith's own pointer, tying that item back to this one). This item
+    stays `done`: what it actually did - diff the BDM/CP tool-runner
+    pairs in full, sort the result into genuinely-shared vs
+    genuinely-dataset-specific, extract only the confirmed-shared part -
+    was completed and verified. What #12 takes from it is the METHOD,
+    which is the closest thing this project has to a proven approach for
+    this kind of work, plus two findings worth carrying forward: that
+    actually diffing candidates side by side surfaced shared code nobody
+    predicted, and that the honest answer here was "not a false-DRY
+    situation, but not nothing either" rather than a clean verdict
+    either way.
+
+    Two things about this item are worth reading as OF ITS TIME rather
+    than as standing rulings, since #12 will re-measure both. It
+    measured **2 datasets** against a stated target of ~30; and its own
+    closing cost - "every new dataset currently means copy-pasting a
+    whole file and manually picking apart which parts to keep" - was
+    accepted as tolerable at that scale and has since been reopened by
+    `plans/publishing-and-history.md` #6. Nothing about the FINDING is
+    being second-guessed; the codebase it was measured against has
+    simply grown a lot since (`plans/qa-pipeline.md` item 74 alone
+    turned up four separate status implementations, one of them dead).
+
 85. **[investigate, 2026-09-18]** **[QA checks & contract]** A real, currently-unused
     way to make the ODCS contract the actual single source of truth for
     dbt's and Soda's own check files too - not just something the

@@ -1271,10 +1271,44 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     duplication** (a real client/server or language boundary) that needs
     a shared-fixture cross-check rather than removal; and **(c)
     deliberate, justified separation** that should be left alone -
-    `plans/qa-pipeline.md` #84 already established that the per-dataset
-    BDM/CP split is genuinely different check-to-dashboard logic, not
-    copy-paste, and that finding shouldn't be re-litigated by a
-    mechanical duplication scan that can't tell the difference.
+    `plans/qa-pipeline.md` #84 already established, by real diffing,
+    that the per-dataset BDM/CP split is genuinely different
+    check-to-dashboard logic rather than copy-paste - a finding a
+    mechanical duplication scan cannot reproduce and would contradict.
+    Re-measure it rather than re-litigate it (see the note on #84 just
+    below: it was measured at 2 datasets, and more has been built since).
+
+    **Read `plans/qa-pipeline.md` #84 before starting - it is this exact
+    pass, already done once, narrower** (Keith's own pointer,
+    2026-09-19). In 2026-09-14 it asked the same question of the BDM/CP
+    tool-runner file pairs, and it is the closest thing this project has
+    to a proven method for the work:
+    - **It diffed the pairs in full rather than reasoning about them.**
+      That is what produced a defensible split (~30-40 shared lines per
+      pair vs the rest genuinely dataset-specific) instead of a guess.
+    - **The diff found MORE shared code than predicted** - two further
+      bits (datacontract-cli's "local_test" server + `DataContract
+      .test()` construction, and Evidently's PSI-via-DataDriftPreset
+      computation) turned out byte-identical "once written side by
+      side," in that item's own words, and were "found while doing the
+      extraction, not predicted in advance." A strong argument that this
+      pass has to actually put candidates next to each other rather
+      than eyeball them from a filename similarity scan.
+    - **It extracted ONLY the confirmed-shared part** and deliberately
+      left the rest, landing on "not a false-DRY situation, but not
+      nothing either." That is exactly the (a)/(b)/(c) judgement this
+      item's rubric above is asking for, arrived at independently two
+      months earlier - so the rubric is not a new invention to be
+      trusted on faith, it is a restatement of what already worked here.
+    - **Its own unresolved residue is still open and belongs to this
+      pass**: "every new dataset currently means copy-pasting a whole
+      file and manually picking apart which parts to keep." That cost
+      was acceptable at 2 datasets and is the thing
+      `plans/publishing-and-history.md` #6 later reopened at the
+      project's stated ~30-dataset target. Worth treating #84's finding
+      as correct FOR ITS TIME rather than as a permanent ruling - it
+      measured 2 datasets, and the seeds below are what 2 more years of
+      building on top of it produced.
 
     **Real seeds found in a 10-minute reconnaissance while parking this**
     - concrete starting points, not a guess that duplication exists:
