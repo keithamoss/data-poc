@@ -172,6 +172,17 @@ on:
       - "dashboard/**"
       - "CHANGELOG.md" # item 62's "Release notes" panel embeds this file's own content at build time
       - "requirements.yaml" # item 75's "Requirements" panel embeds this file's own content at build time
+      # plans/**: the Plans TAB embeds every plans/*.md file's own
+      # content at build time (dashboard/plans_md.py's parse_plans(),
+      # via embed_dashboard_data.py's PLANS_DIR -> `const PLANS`), for
+      # exactly the same reason CHANGELOG.md and requirements.yaml are
+      # listed above. Missed when that tab was built (2026-09-18,
+      # plans/running-thoughts.md #10), so for a day every plans-only
+      # commit silently failed to republish and the live Plans tab drifted
+      # behind the repo - confirmed by fetching the real published page
+      # and finding none of that day's plans work in it. See
+      # plans/publishing-and-history.md #8.
+      - "plans/**"
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
   # running-thoughts.md #6 ("read-only tension: accepting/rejecting

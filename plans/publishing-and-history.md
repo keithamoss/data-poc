@@ -3044,3 +3044,34 @@ one Thread's narrative.
    for that is a real trunk branch to publish from, which is a bigger
    change to how this project works and is deliberately NOT bundled in
    here.
+
+8. **[done, 2026-09-19]** **[Pipeline & publishing]** The Plans tab was
+   silently never republishing. `dashboard/embed_dashboard_data.py`
+   embeds every `plans/*.md` file's own content into `const PLANS` at
+   build time (via `dashboard/plans_md.py`'s `parse_plans()`,
+   `PLANS_DIR`), exactly like `CHANGELOG.md` feeds Release Notes and
+   `requirements.yaml` feeds the Requirements panel - but **`plans/**`
+   was never added to `.github/workflows/deploy-pages.yml`'s own trigger
+   `paths`**, so a plans-only commit didn't rebuild the site and the
+   live Plans tab quietly drifted behind the repo.
+
+   Missed when that tab was built (2026-09-18, `plans/running-
+   thoughts.md` #10). The other two embedded files each carry an inline
+   comment in that path list saying why they're there ("embeds this
+   file's own content at build time") - `plans/**` just never got added
+   alongside them.
+
+   Found 2026-09-19 evening, and only because `keithamoss.github.io`
+   had just been allow-listed (`CLAUDE.md`'s own audited domain list):
+   fetching the REAL published page and grepping it showed none of that
+   day's plans work present, with the live build's own embedded
+   `GITHUB_LINKS` commit still reading `24b2560` after five subsequent
+   plans-only commits. Not findable any other way from here - the
+   workflow wasn't failing, it simply wasn't running, the same
+   silent-non-run failure mode as item #7 above and caught by the same
+   habit of checking the real artifact rather than the green tick.
+
+   Fixed by adding `plans/**` to that `paths` list, with a comment
+   matching the convention the neighbouring two already use. The fix
+   verifies itself: the commit carrying it is a `plans/**` change, so
+   it triggers the very rebuild it enables.

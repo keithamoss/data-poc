@@ -54,6 +54,25 @@ edited for a punchier, friendlier read than a bare commit log.
   concurrently - real evidence from the verification session's own
   report), and how Keith can invoke it.
 
+### Fixed
+- **9:41pm** — **The Plans Tab Was Never Republishing** **[Pipeline & publishing]**
+  The dashboard embeds every `plans/*.md` file's content at build time,
+  the same way it embeds `CHANGELOG.md` for Release Notes and
+  `requirements.yaml` for the Requirements panel — but `plans/**` was
+  never added to the deploy workflow's trigger paths when that tab was
+  built. So a plans-only commit didn't rebuild the site, and the live
+  Plans tab quietly drifted behind the repo. The other two embedded
+  files each carry an inline comment in that path list explaining why
+  they're there; this one just never got added beside them. Found only
+  because the live site had just become reachable from this environment:
+  fetching the real published page showed none of the day's plans work
+  in it, with the live build still reporting a commit from five
+  plans-only commits earlier. The workflow wasn't failing — it simply
+  wasn't running, the same silent non-run as the dead branch pin earlier
+  tonight, and caught the same way, by checking the real artifact rather
+  than the green tick. The fix verifies itself: the commit carrying it
+  is a `plans/**` change, so it triggers the rebuild it enables.
+
 ### Changed
 - **9:17pm** — **Four Status Implementations, Down to Two** **[Pipeline & publishing]** **[Dashboard UI]** **[Testing & dev tooling]**
   Keith asked why two tools were doing the same job. Looking properly,
