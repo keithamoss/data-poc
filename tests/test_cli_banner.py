@@ -6,7 +6,9 @@ ASCII art byte-for-byte (this project's own real incident, plans/
 tooling.md #1: a literal backslash next to a rich markup tag once
 already broke this art once), plus the real ask that started this
 refactor (2026-09-19, Keith's own): the eyes render in a distinct red,
-not the body's cyan."""
+not the body's cyan - and, a same-day follow-up once Keith noticed the
+eyes were static, not actually pulsing: a real `blink` style too (the
+real ANSI SGR blink attribute, not something faked by re-rendering)."""
 from __future__ import annotations
 
 from cli.banner import _moth_text
@@ -48,3 +50,21 @@ def test_moth_eyes_are_styled_red_distinct_from_the_cyan_body():
     body_offset = text.plain.index("(") + 1  # a body character, not an eye
     assert "cyan" in styles_by_offset[body_offset]
     assert "red" not in styles_by_offset[body_offset]
+
+
+def test_moth_eyes_actually_blink_not_just_static_red():
+    """Keith's own follow-up, same day: noticed the eyes were a static
+    red, not actually pulsing/glowing - a real rich.style `blink`
+    attribute (the real ANSI SGR blink code) on each eye span."""
+    text = _moth_text()
+    eyes_line_start = text.plain.index("\\O  O/")
+    first_eye_offset = eyes_line_start + 1
+    second_eye_offset = eyes_line_start + 4
+
+    styles_by_offset = {}
+    for span in text.spans:
+        for offset in range(span.start, span.end):
+            styles_by_offset[offset] = str(span.style)
+
+    assert "blink" in styles_by_offset[first_eye_offset]
+    assert "blink" in styles_by_offset[second_eye_offset]

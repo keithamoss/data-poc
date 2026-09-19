@@ -28,6 +28,15 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Changed
+- **3:17pm** — **Mothman's Eyes Now Actually Blink** **[Testing & dev tooling]** Keith noticed the CLI/TUI
+  splash banner's "glowing red eyes" were a static colour, not actually
+  pulsing, and asked directly whether they blink for real - they
+  didn't. Confirmed `rich` (already a direct dependency) genuinely
+  supports a real `blink` style attribute, mapping to the real ANSI SGR
+  blink escape code (verified in the actual rendered output, not just
+  Rich's own API) - added it to both eye spans. Whether it actually
+  renders as a blink depends on the terminal emulator, same as any real
+  ANSI blink code; most modern ones support it.
 - **2:49pm** — **Demo Tab: 25% Slower Again** **[Dashboard]** Keith's own follow-up after reloading the
   real published page: `speed: 0.5` (the earlier half-speed fix) still
   read too fast. Another 25% slower on top of that (`speed: 0.4` -

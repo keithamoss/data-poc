@@ -712,21 +712,20 @@ common/check_lifecycle.py`'s own `check_id` convention.
    Playwright browser-binary gap) and `npm test` (104 passed) both
    clean.
 
-9. **[todo, 2026-09-19]** **[Dashboard UI]** Revisit the Mothman icon and
-   header - flagged by Keith (voice-dictated batch), explicitly deferred
-   by his own words to "once you've done with this bunch of stuff" (i.e.
-   after the Plans tab filter-URL-persistence/chip-styling work the same
-   batch also asked for - `CHANGELOG.md` 2026-09-19 2:33pm entry - not
-   immediately). Ambiguous which "header" he means and not yet asked:
-   the dashboard's own header (the moth logo + "Data Asset QA Register"
-   title bar at the top of every tier) and/or the CLI/TUI's own splash
-   banner (`cli/banner.py`'s ASCII moth, just given glowing red eyes the
-   same session - `CHANGELOG.md` 2026-09-19 1:57pm entry). Not scoped at
-   all: what specifically Keith wants changed about either. Needs a real
-   scoping conversation before building.
-
-   **Priority: work through today/tomorrow (2026-09-19, Keith's own
-   explicit ask).**
+9. **[parked, 2026-09-19]** **[Dashboard UI]** Revisit the dashboard's
+   own page header (the small SVG Mothman mark + "MULTI-AGENCY DATA
+   ASSET · QUALITY ASSURANCE / Data Asset QA Register" title bar at the
+   top of every tier). Originally logged ambiguous between this and the
+   CLI/TUI splash banner - asked Keith directly which he meant
+   (2026-09-19 afternoon, with a real screenshot of each shown for
+   comparison); he confirmed the CLI/TUI banner first (that half is now
+   split out and built - see item #11 below), then explicitly parked
+   THIS half ("put that back on the list of parked things, and we'll
+   focus on this for now" - "this" being the CLI banner). Not scoped at
+   all yet: what specifically he wants changed about the SVG mark itself
+   (already a deliberate, iterated-via-screenshot redesign from a plain
+   "DA" text badge, 2026-09-18 morning - CHANGELOG.md 10:35am entry) or
+   the title text next to it. Revisit when Keith raises it again.
 
 10. **[todo, 2026-09-19]** **[Dashboard UI]** Release Notes panel follow-up
     work that will require online research - flagged by Keith (voice-
@@ -739,3 +738,29 @@ common/check_lifecycle.py`'s own `check_id` convention.
 
     **Priority: work through today/tomorrow (2026-09-19, Keith's own
     explicit ask).**
+
+11. **[done, 2026-09-19]** **[Testing & dev tooling]** CLI/TUI splash
+    banner (`cli/banner.py`'s ASCII moth) - the half of item #9 above
+    Keith actually meant (he'd misspoken and said "header" when he
+    meant the CLI, not the dashboard - confirmed via a real screenshot
+    of each shown for comparison). Two real follow-ups on the same
+    already-built moth (glowing red eyes, `CHANGELOG.md` 2026-09-19
+    1:57pm entry): first, Keith asked directly whether the eyes
+    actually pulsate/glow or are just a static colour - confirmed (by
+    reading the code, then verifying the real rendered output) they
+    were static `style="bold red"`, no animation. Second, asked whether
+    `rich` was already a dependency or would need adding to get a real
+    blink effect - confirmed already a real, direct dependency
+    (`rich>=13.7`, `pyproject.toml`), already imported in
+    `cli/banner.py`, and that `rich.style` genuinely supports a `blink`
+    attribute mapping to the real ANSI SGR blink code (verified:
+    `Style.parse("bold red blink").blink is True`, and the actual
+    rendered output contains the real `\x1b[1;5;31m` escape sequence -
+    SGR bold+blink+red - not something Rich fakes). Built: both eye
+    spans now carry `style="bold red blink"` instead of `"bold red"`.
+    Whether a given terminal emulator actually RENDERS blink is a real
+    terminal-support question, not a Rich or mothman limitation - most
+    modern ones do. 1 new regression test (`tests/test_cli_banner.py`),
+    confirming the real `blink` attribute is present on both eye spans;
+    existing tests updated to match (no behaviour change to what they
+    already covered).

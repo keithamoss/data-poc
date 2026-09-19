@@ -11,11 +11,17 @@ The moth's own eyes are styled red separately from the rest (a real
 "glowing red eyes" ask, 2026-09-19, Keith's own - the original design
 text in plans/tooling.md already said "glowing red eyes" but the actual
 code had never done more than print the whole moth in one flat cyan,
-this closes that real gap). Built as a `rich.text.Text` with each eye
-appended as its own separately-styled span, not a markup string - the
+this closes that real gap), and blink (a follow-up the same day, once
+Keith noticed the eyes were static red, not actually pulsing - a real
+`rich.style` attribute mapping to the real ANSI SGR blink code, not
+something Rich fakes; whether a given terminal emulator actually
+renders it is a real terminal-support question, not a Rich or mothman
+limitation - most modern ones do). Built as a `rich.text.Text` with each
+eye appended as its own separately-styled span, not a markup string - the
 same backslash-escaping trap the docstring above already warns about
-would apply just as much to a `[red]O[/red]` markup string embedded
-next to this many literal backslashes, so this sidesteps markup parsing
+would apply just as much to a `[red blink]O[/red blink]` markup string
+embedded next to this many literal backslashes, so this sidesteps markup
+parsing
 entirely rather than trying to escape around it."""
 from __future__ import annotations
 
@@ -46,9 +52,9 @@ def _moth_text() -> Text:
     for line in _MOTH_BODY_LINES:
         text.append(line + "\n", style="cyan")
     text.append(_MOTH_EYES_PREFIX, style="cyan")
-    text.append(_MOTH_EYE, style="bold red")
+    text.append(_MOTH_EYE, style="bold red blink")
     text.append(_MOTH_EYES_GAP, style="cyan")
-    text.append(_MOTH_EYE, style="bold red")
+    text.append(_MOTH_EYE, style="bold red blink")
     text.append(_MOTH_EYES_SUFFIX + "\n", style="cyan")
     text.append(_MOTH_TAIL_LINE, style="cyan")
     return text
