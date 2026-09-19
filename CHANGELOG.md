@@ -28,7 +28,7 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
-- **1:35pm** — **mothman CLI Phase 5: Population Data Command** **[Testing & dev tooling]** `mothman population`
+- **1:23pm** — **mothman CLI Phase 5: Population Data Command** **[Testing & dev tooling]** `mothman population`
   (Tier 4, explicitly exploratory) wraps `synthetic_data_generator/`'s
   own real argparse CLI - a population-scale (up to millions),
   cross-agency-identity-linked synthetic dataset spanning 3 fictional
