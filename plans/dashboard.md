@@ -827,3 +827,19 @@ common/check_lifecycle.py`'s own `check_id` convention.
 
     **Priority: work through today/tomorrow (2026-09-19, Keith's own
     explicit ask).**
+
+13. **[todo, 2026-09-19]** **[Dashboard UI]** Revisit the Demo tab's
+    playback pacing again - Keith's own follow-up, same day, after the
+    2 earlier real speed changes this session (`speed: 0.5` then `0.4`
+    in the `AsciinemaPlayer.create()` call, `dashboard/qa-reporting-
+    dashboard.template.html:3599` - see `plans/tooling.md` #1 Phase 6
+    for the real recording/embedding work this sits on top of). Keith's
+    own words this time: "I think I see what the issue is now" - he has
+    a real hypothesis about what's actually wrong, not yet shared, and
+    explicitly wants this parked rather than dug into right now. Worth
+    checking when this gets picked up whether the real issue is the
+    playback speed multiplier itself (the thing tweaked twice already)
+    or something else entirely about the recording/pacing (e.g. the
+    real `.cast` file's own baked-in timing between keystrokes, not
+    just the player's own speed setting) - don't assume it's another
+    speed-multiplier tweak until Keith actually says what he's spotted.
