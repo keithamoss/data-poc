@@ -331,6 +331,76 @@ data down from S3 buckets or local storage themselves. Whatever this
 tool becomes needs to fit that existing motion, not replace it outright
 on day one.
 
+**Built, 2026-09-19 morning - Keith's own "Let's go" once Thread B's
+overnight build was reviewed.** Scoped first via two real
+`AskUserQuestion` rounds, since this thread was explicitly blocked on
+real specifics only Keith had: staff are **data engineers/analysts**
+(comfortable with a CLI, not needing a GUI-first experience); today's
+real pull is **manual download + local processing** (no existing
+scheduled/scripted sync to hook into); and the right trigger point is
+**on demand, after the manual pull** - someone runs a check themselves
+once they already have the file, not something that fires automatically.
+A second round resolved a real fork this surfaced while designing the
+CLI: should an ad hoc check write into the real, permanent `qa_results/`
+git history? **Throwaway by default, `--commit` to keep it** - Keith's
+own explicit call, recommended option.
+
+This maps directly onto the single-arrival entry points Thread B had
+already built the same night (`orchestrate_bdm.run_single()`/
+`orchestrate_cp.run_single()`) - reused as-is, invoked locally instead of
+from an S3 event, rather than building a second QA-running code path.
+
+- `qa_tools/common/local_check.py` - shared helpers: `run_id_from_path()`
+  (a real, sortable, collision-resistant id from the source file/folder's
+  own name + a real UTC timestamp - no manifest to draw one from),
+  `copy_into()` (mirrors `run_single()`'s own arrived-file normalization,
+  reused here for the user-supplied reference file/folder too), and
+  `format_report()` (a short, human-readable pass/warn/fail/error summary
+  with every real failing/warning check's own label and metric - this
+  CLI's audience is someone deciding whether to trust a file, not
+  something re-parsing JSON).
+- `qa_tools/bdm/check_file.py` / `qa_tools/cp/check_delivery.py` - the
+  two real CLIs (`uv run python3 -m qa_tools.bdm.check_file <csv>
+  --reference-csv <known-good.csv>` / `...cp.check_delivery <folder>
+  --reference-folder <known-good-folder>`), documented in `README.md`'s
+  own new "On-demand checks against a file you already have" section.
+  `check_delivery.py` loads all 6 real CP tables up front (a person
+  running this by hand already has the whole delivery in one folder -
+  no "wait for the rest to arrive" case the way Thread B's Lambda-
+  triggered per-file arrivals have) and errors clearly on a partial
+  delivery rather than attempting a partial run. `--commit` reuses
+  `git_identity.get_run_by()` for the same real attribution every other
+  committed run gets; the default (no `--commit`) path redirects every
+  tool's own `write_qa_result()` to a throwaway tmp dir via `qa_tools/
+  common/lambda_results_dir.py`'s `patch_write_qa_result_for_lambda()` -
+  the exact same Lambda-writability fix Thread B built, reused here for
+  a different reason (never touching the real committed history) rather
+  than duplicated.
+
+**Two real bugs found and fixed while writing this session's own
+integration tests, not assumed correct on the first pass**: (1)
+`orchestrate_bdm.run_single()`'s call to `build_one()` (and, mirrored
+here, `check_delivery.py`'s calls to `add_table_to_run()`) omitted
+`out_dir`/`raw_dir` as explicit keyword arguments - Python binds a
+default parameter value once, at the function's own definition/import
+time, so a caller monkeypatching the module's `OUT_DIR`/`CP_RAW_DIR`
+constant afterwards was silently ignored, and the real code went ahead
+and wrote into this repo's own actual `data/duckdb_runs/`/`data/
+cp_duckdb_runs/`/`data/raw/`/`data/cp_raw/` directories instead of the
+test's own tmp dir - reproduced for real (stray files genuinely
+appeared there) before being caught and fixed, cleaned up immediately,
+confirmed gitignored so nothing reached git either time. Fixed by
+passing `out_dir=`/`raw_dir=` explicitly, read off the module attribute
+at call time, the same fix `run_single()`'s own code comment already
+documents for the identical class of bug found the night before.
+
+Verified: `tests/test_local_check.py` (7 tests, pure), `tests/
+test_check_cli.py` (4 real integration tests against the real local dbt/
+Soda/datacontract-cli/Evidently chain - real failures reported, real
+exit codes, and a real assertion that a non-`--commit` run never creates
+anything under the real, permanent `qa_results/` path), `uv run ruff
+check .` clean.
+
 **Thread B - an AWS MVP that reacts to real S3 events.** Deploy this
 pipeline (or some version of it) to AWS, triggered by real S3 events as
 files land, running the QA pipeline automatically rather than as a

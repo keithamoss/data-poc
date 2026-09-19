@@ -28,6 +28,24 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
+- **8:16am** — **On-Demand File Checks** **[Pipeline & publishing]** **[Docs & process]** Two new CLIs (`qa_tools/bdm/check_file.py`/
+  `qa_tools/cp/check_delivery.py`) for real, ad hoc QA checks against a
+  file or delivery you've already pulled down yourself - Thread A of
+  the staff-adoption item, scoped with Keith this morning: staff already
+  download data from S3/local storage manually and are CLI-comfortable,
+  so this fits that existing motion (`uv run python3 -m
+  qa_tools.bdm.check_file <csv> --reference-csv <known-good.csv>`)
+  rather than replacing it. Reuses the exact same single-arrival
+  orchestration entry points built for last night's AWS MVP design
+  (`orchestrate_bdm.run_single()`/`orchestrate_cp.run_single()`), run
+  locally instead of from an S3 event. Defaults to a throwaway,
+  local-only check - nothing touches the real, permanent `qa_results/`
+  history unless `--commit` is passed. A real bug found and fixed while
+  testing this: a Python default-argument-value gotcha (bound once at
+  import time) meant a couple of calls could silently ignore a
+  redirected output directory and write into this repo's own real,
+  gitignored data folders instead of a test's tmp dir - caught,
+  cleaned up, and fixed at the source.
 - **12:30am** — **AWS Event-Driven MVP Design** **[Pipeline & publishing]** **[Docs & process]** A real design doc plus real, unit-tested code for
   triggering this pipeline automatically from S3 file arrivals instead
   of a manually-kicked-off local script (`docs/aws-event-driven-mvp-

@@ -237,6 +237,38 @@ on their own machines, not just the one it was built on — `uv sync --dev`
 plus the one-time `playwright install` should be the entire setup, with no
 implicit "also have X on your PATH already" assumptions anywhere.
 
+## On-demand checks against a file you already have
+
+The manifest-driven batch pipeline above (`./run_pipeline.sh`,
+`orchestrate_bdm.py`/`orchestrate_cp.py`) is this repo's own synthetic-data
+demo harness. `qa_tools/bdm/check_file.py`/`qa_tools/cp/check_delivery.py`
+are a separate, smaller CLI pair for a real use case scoped with Keith
+2026-09-19 (`plans/running-thoughts.md` #5, Thread A): staff already pull
+data down from S3 or local storage manually today, and are comfortable
+with a CLI — these run the same real dbt-core/Soda Core/datacontract-cli/
+Evidently checks against whatever file (or, for Child Protection, whatever
+6-table delivery folder) you've already downloaded, on demand, before you
+use it:
+
+```bash
+uv run python3 -m qa_tools.bdm.check_file path/to/birth_registrations.csv \
+  --reference-csv path/to/a-known-good-file.csv
+
+uv run python3 -m qa_tools.cp.check_delivery path/to/delivery_folder \
+  --reference-folder path/to/a-known-good-delivery_folder
+```
+
+Both print a short pass/warn/fail/error report and exit non-zero on any
+real failure/error (so a shell script can gate on it). `--reference-csv`/
+`--reference-folder` is required — the distribution-drift check needs a
+real known-good comparison, and there's no synthetic manifest to
+default one from for a file you downloaded yourself.
+
+**Defaults to a throwaway, local-only check** — nothing gets written into
+this repo's real, committed `qa_results/` history unless you pass
+`--commit` (Keith's own explicit call: an ad hoc sanity check on your own
+pull usually isn't meant to become part of the permanent QA record).
+
 ## Speed
 
 `qa_tools/bdm/orchestrate_bdm.py`/`qa_tools/cp/orchestrate_cp.py`
