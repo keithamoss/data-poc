@@ -465,6 +465,56 @@ check_lifecycle.py`'s own `check_id` convention.
    also directly reusable for the Local-files source mode's browsing UI,
    rather than needing a hand-built file picker.
 
+   **TUI design considerations, from real online research (2026-09-19,
+   Keith's own explicit "one last check before we proceed" ask) - 5
+   concrete additions to the Phase 1 design, sourced rather than
+   guessed:**
+   - **Non-TTY guard.** `questionary`/`prompt_toolkit` can crash outright
+     in a non-terminal context (a script, some CI runners, an IDE
+     console) rather than degrading gracefully. Every TUI entry point
+     must check `sys.stdin.isatty()` before calling into `questionary`
+     and fail with a clear message pointing at the equivalent
+     flag-based invocation, not a stack trace - the wizard/flags duality
+     already designed (every command both flag-invocable and
+     TUI-navigable) only actually holds together with this guard in
+     place.
+   - **Never encode meaning in colour alone.** Every Tier
+     (green/blue/amber) and status indicator needs a real text label
+     alongside its colour, not colour as the only signal - real practice
+     from GitHub CLI's own accessibility work. Respecting
+     `NO_COLOR`/`FORCE_COLOR`/`CLICOLOR` env vars is `rich-click`'s
+     already-default behaviour - explicitly don't override that default.
+   - **Confirm-by-default on writes, with a bypass.** **Promote** (writes
+     real, permanent `qa_results/` history) and **Generate/Regenerate
+     synthetic data** (can overwrite local generated data) should both
+     default to an explicit `[y/N]` confirmation (no as the safe
+     default), with a `--yes` flag to bypass it for repeatable/scripted
+     use - not removing the prompt, bypassing it. Worth a `--dry-run` on
+     Promote specifically, showing what would be written without writing
+     it, given how permanent that write is meant to be.
+   - **Back-navigation gap in the QA wizard - a real, previously
+     undesigned hole.** `questionary` prompts have no native "go back a
+     step" support, and the agency -> dataset -> source-mode -> ...
+     chain as designed has no way to back up if the operator picks
+     wrong partway through. Fix: inject a "<- Back" choice into every
+     `select()` menu in the chain, decided now rather than retrofitted
+     after Phase 1 ships.
+   - **Default output stays human-readable; raw/developer detail is
+     opt-in.** Standard CLI guidance (clig.dev): don't show
+     developer-only output by default. Applies to the Tier 3 debug
+     commands and to the QA flow's own report - the default report stays
+     the rich-rendered summary already designed, with raw dbt/Soda/
+     datacontract-cli/Evidently tool output behind an explicit
+     `--verbose`/`-v`.
+
+   (Two other things researched came back as confirmation of what was
+   already designed, not new work: the wizard/flags duality itself is a
+   real, named pattern - "wizards and flags aren't opposites... the
+   wizard is the flags with training wheels" - and the planned
+   spinner-under-10s / step-progress-bar-otherwise split for `rich.
+   progress.Progress` already matches real progress-indicator UX
+   guidance.)
+
    **Build order (revised 2026-09-19 to fold in what Generate/Synthetic
    and single-table CP QA need to already exist):**
    1. **Phase 1** - `cli/` package scaffold; `mothman` console-script
