@@ -6,6 +6,7 @@ through click.testing.CliRunner, same as that file."""
 from __future__ import annotations
 import json
 import os
+import re
 
 from click.testing import CliRunner
 
@@ -263,13 +264,22 @@ def test_qa_command_local_file_commit_promotes_into_the_patched_qa_results_dir(
         assert json.load(f)["run_by"] == "test@example.com"
 
 
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
 def _flat(output: str) -> str:
     """rich-click wraps its error panels to a fixed width, which can
     split a short assertion phrase like "not both" across a line break
     mid-word - collapsing all whitespace (and box-drawing borders) into
     single spaces makes a plain substring check reliable regardless of
-    where the panel happened to wrap."""
-    return " ".join(output.replace("│", " ").split()).lower()
+    where the panel happened to wrap. Real CI incident, 2026-09-19: CI's
+    runner renders these panels WITH ANSI colour escape codes even
+    though CliRunner.invoke() isn't given color=True (rich's own
+    terminal-colour auto-detection differs from this project's local
+    sandbox, which emits none) - an escape code landing between two
+    words defeats a substring check even after whitespace-collapsing,
+    since it's not whitespace, so it must be stripped explicitly too."""
+    return " ".join(_ANSI_RE.sub("", output).replace("│", " ").split()).lower()
 
 
 def test_qa_command_local_file_and_run_id_together_is_a_real_clean_error(bdm_raw_dir):

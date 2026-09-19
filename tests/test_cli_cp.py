@@ -7,6 +7,7 @@ tests/test_cli_bdm.py."""
 from __future__ import annotations
 import json
 import os
+import re
 
 from click.testing import CliRunner
 
@@ -221,10 +222,13 @@ def test_qa_command_local_folder_commit_promotes_into_the_patched_qa_results_dir
         assert json.load(f)["run_by"] == "test@example.com"
 
 
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
 def _flat(output: str) -> str:
     """See tests/test_cli_bdm.py's own _flat() - same rich-click panel
-    line-wrapping issue, same fix."""
-    return " ".join(output.replace("│", " ").split()).lower()
+    line-wrapping/ANSI-colour-code issue, same fix."""
+    return " ".join(_ANSI_RE.sub("", output).replace("│", " ").split()).lower()
 
 
 def test_qa_command_local_folder_and_run_id_together_is_a_real_clean_error(cp_raw_dir):
