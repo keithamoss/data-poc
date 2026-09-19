@@ -1,90 +1,30 @@
 {
-  "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+  "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
   "run_by": null,
   "raw_output": {
     "definitionName": null,
     "defaultDataSource": "cp_collection",
-    "dataTimestamp": "2026-09-18T11:06:58+00:00",
-    "scanStartTimestamp": "2026-09-18T11:06:58+00:00",
-    "scanEndTimestamp": "2026-09-18T11:06:58+00:00",
+    "dataTimestamp": "2026-09-19T06:16:40+00:00",
+    "scanStartTimestamp": "2026-09-19T06:16:40+00:00",
+    "scanEndTimestamp": "2026-09-19T06:16:40+00:00",
     "hasErrors": false,
     "hasWarnings": false,
     "hasFailures": false,
     "metrics": [
       {
-        "identity": "metric-cp_collection-cp_notifications-cp_client_id-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_clients-postcode-invalid_count-f46fbec6",
-        "metricName": "invalid_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_notifications-concern_type-invalid_count-e32bfc69",
-        "metricName": "invalid_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_clients-cp_client_id-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_placements-cp_client_id-reference-9ba4fe01",
+        "identity": "metric-cp_collection-cp_placements-carer_id-reference-2b7dc1ac",
         "metricName": "reference",
         "value": 0,
         "dataSourceName": "cp_collection"
       },
       {
-        "identity": "metric-cp_collection-cp_placements-placement_start-missing_count",
-        "metricName": "missing_count",
+        "identity": "metric-cp_collection-cp_investigations-substantiated-invalid_count-c0811f15",
+        "metricName": "invalid_count",
         "value": 0,
         "dataSourceName": "cp_collection"
       },
       {
-        "identity": "metric-cp_collection-cp_carers-given_name-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_investigations-row_count",
-        "metricName": "row_count",
-        "value": 181,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_carers-carer_type-invalid_percent-bb517137",
-        "metricName": "invalid_percent",
-        "value": 0.0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_notifications-cp_client_id-reference-9ba4fe01",
-        "metricName": "reference",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_placements-placement_id-duplicate_count",
-        "metricName": "duplicate_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_carers-carer_id-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_placements-cp_client_id-missing_count",
+        "identity": "metric-cp_collection-cp_carers-family_name-missing_count",
         "metricName": "missing_count",
         "value": 0,
         "dataSourceName": "cp_collection"
@@ -96,9 +36,9 @@
         "dataSourceName": "cp_collection"
       },
       {
-        "identity": "metric-cp_collection-cp_clients-case_opened_date-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
+        "identity": "metric-cp_collection-cp_notifications-source_type-invalid_percent-b1d06836",
+        "metricName": "invalid_percent",
+        "value": 0.0,
         "dataSourceName": "cp_collection"
       },
       {
@@ -108,51 +48,15 @@
         "dataSourceName": "cp_collection"
       },
       {
-        "identity": "metric-cp_collection-cp_clients-suburb-missing_count",
+        "identity": "metric-cp_collection-cp_notifications-cp_client_id-missing_count",
         "metricName": "missing_count",
         "value": 0,
         "dataSourceName": "cp_collection"
       },
       {
-        "identity": "metric-cp_collection-cp_clients-failed rows-aca7ea1d",
-        "metricName": "failed rows",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_notifications-source_type-invalid_count-b1d06836",
-        "metricName": "invalid_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_placements-carer_id-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_investigations-notification_id-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_carers-family_name-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_carers-carer_type-invalid_count-bb517137",
-        "metricName": "invalid_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_investigations-substantiated-invalid_count-c0811f15",
-        "metricName": "invalid_count",
-        "value": 0,
+        "identity": "metric-cp_collection-cp_notifications-row_count",
+        "metricName": "row_count",
+        "value": 987,
         "dataSourceName": "cp_collection"
       },
       {
@@ -162,92 +66,32 @@
         "dataSourceName": "cp_collection"
       },
       {
-        "identity": "metric-cp_collection-cp_investigations-investigation_id-duplicate_count",
-        "metricName": "duplicate_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_carers-carer_id-duplicate_count",
-        "metricName": "duplicate_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_notifications-failed rows-bdf38d01",
-        "metricName": "failed rows",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_placements-failed rows-67bd00ca",
-        "metricName": "failed rows",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_carers-approval_status-invalid_percent-6d3c55fc",
-        "metricName": "invalid_percent",
-        "value": 0.0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_carers-approval_status-invalid_count-6d3c55fc",
-        "metricName": "invalid_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_investigations-failed rows-0403c15d",
-        "metricName": "failed rows",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_clients-row_count",
+        "identity": "metric-cp_collection-cp_placements-row_count",
         "metricName": "row_count",
-        "value": 527,
+        "value": 242,
         "dataSourceName": "cp_collection"
       },
       {
-        "identity": "metric-cp_collection-cp_notifications-outcome-invalid_percent-4f43f723",
-        "metricName": "invalid_percent",
-        "value": 0.0,
+        "identity": "metric-cp_collection-cp_case_workers-row_count",
+        "metricName": "row_count",
+        "value": 60,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_investigations-row_count",
+        "metricName": "row_count",
+        "value": 181,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_carers-given_name-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
         "dataSourceName": "cp_collection"
       },
       {
         "identity": "metric-cp_collection-cp_case_workers-given_name-missing_count",
         "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_notifications-notification_date-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_case_workers-team_region-invalid_percent-a83790f2",
-        "metricName": "invalid_percent",
-        "value": 0.0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_placements-placement_id-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_case_workers-family_name-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_notifications-risk_rating-invalid_count-ec3e2d8e",
-        "metricName": "invalid_count",
         "value": 0,
         "dataSourceName": "cp_collection"
       },
@@ -258,14 +102,8 @@
         "dataSourceName": "cp_collection"
       },
       {
-        "identity": "metric-cp_collection-cp_placements-carer_id-reference-2b7dc1ac",
-        "metricName": "reference",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_investigations-cp_client_id-missing_count",
-        "metricName": "missing_count",
+        "identity": "metric-cp_collection-cp_placements-placement_type-invalid_count-a6189ee3",
+        "metricName": "invalid_count",
         "value": 0,
         "dataSourceName": "cp_collection"
       },
@@ -276,110 +114,20 @@
         "dataSourceName": "cp_collection"
       },
       {
-        "identity": "metric-cp_collection-cp_notifications-notification_id-duplicate_count",
-        "metricName": "duplicate_count",
+        "identity": "metric-cp_collection-cp_notifications-failed rows-bdf38d01",
+        "metricName": "failed rows",
         "value": 0,
         "dataSourceName": "cp_collection"
       },
       {
-        "identity": "metric-cp_collection-cp_investigations-lead_worker_id-reference-172d2fd9",
-        "metricName": "reference",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_placements-row_count",
-        "metricName": "row_count",
-        "value": 242,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_notifications-row_count",
-        "metricName": "row_count",
-        "value": 987,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_placements-placement_suburb-missing_count",
+        "identity": "metric-cp_collection-cp_placements-placement_id-missing_count",
         "metricName": "missing_count",
         "value": 0,
         "dataSourceName": "cp_collection"
       },
       {
-        "identity": "metric-cp_collection-cp_investigations-investigation_id-missing_count",
+        "identity": "metric-cp_collection-cp_placements-cp_client_id-missing_count",
         "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_notifications-source_type-invalid_percent-b1d06836",
-        "metricName": "invalid_percent",
-        "value": 0.0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_investigations-notification_id-reference-da324b35",
-        "metricName": "reference",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_clients-sex-invalid_percent-725b96e3",
-        "metricName": "invalid_percent",
-        "value": 0.0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_investigations-start_date-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_investigations-lead_worker_id-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_case_workers-row_count",
-        "metricName": "row_count",
-        "value": 60,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_placements-placement_type-invalid_percent-a6189ee3",
-        "metricName": "invalid_percent",
-        "value": 0.0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_clients-postcode-invalid_percent-f46fbec6",
-        "metricName": "invalid_percent",
-        "value": 0.0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_clients-given_name-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_notifications-assigned_worker_id-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_clients-postcode-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_clients-sex-invalid_count-725b96e3",
-        "metricName": "invalid_count",
         "value": 0,
         "dataSourceName": "cp_collection"
       },
@@ -390,37 +138,25 @@
         "dataSourceName": "cp_collection"
       },
       {
-        "identity": "metric-cp_collection-cp_clients-date_of_birth-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_notifications-notification_id-missing_count",
-        "metricName": "missing_count",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_investigations-cp_client_id-reference-9ba4fe01",
-        "metricName": "reference",
-        "value": 0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_investigations-substantiated-invalid_percent-c0811f15",
-        "metricName": "invalid_percent",
-        "value": 0.0,
-        "dataSourceName": "cp_collection"
-      },
-      {
-        "identity": "metric-cp_collection-cp_placements-placement_type-invalid_count-a6189ee3",
+        "identity": "metric-cp_collection-cp_clients-postcode-invalid_count-f46fbec6",
         "metricName": "invalid_count",
         "value": 0,
         "dataSourceName": "cp_collection"
       },
       {
-        "identity": "metric-cp_collection-cp_clients-family_name-missing_count",
+        "identity": "metric-cp_collection-cp_notifications-notification_id-duplicate_count",
+        "metricName": "duplicate_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_clients-given_name-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_investigations-start_date-missing_count",
         "metricName": "missing_count",
         "value": 0,
         "dataSourceName": "cp_collection"
@@ -432,14 +168,278 @@
         "dataSourceName": "cp_collection"
       },
       {
+        "identity": "metric-cp_collection-cp_clients-cp_client_id-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_notifications-source_type-invalid_count-b1d06836",
+        "metricName": "invalid_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_clients-postcode-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_clients-postcode-invalid_percent-f46fbec6",
+        "metricName": "invalid_percent",
+        "value": 0.0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_investigations-cp_client_id-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_carers-carer_type-invalid_count-bb517137",
+        "metricName": "invalid_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_notifications-outcome-invalid_percent-4f43f723",
+        "metricName": "invalid_percent",
+        "value": 0.0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_clients-row_count",
+        "metricName": "row_count",
+        "value": 527,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_notifications-concern_type-invalid_count-e32bfc69",
+        "metricName": "invalid_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_clients-failed rows-aca7ea1d",
+        "metricName": "failed rows",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_investigations-lead_worker_id-reference-172d2fd9",
+        "metricName": "reference",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_investigations-investigation_id-duplicate_count",
+        "metricName": "duplicate_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
         "identity": "metric-cp_collection-cp_clients-cp_client_id-duplicate_count",
         "metricName": "duplicate_count",
         "value": 0,
         "dataSourceName": "cp_collection"
       },
       {
+        "identity": "metric-cp_collection-cp_clients-sex-invalid_count-725b96e3",
+        "metricName": "invalid_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_investigations-investigation_id-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_investigations-substantiated-invalid_percent-c0811f15",
+        "metricName": "invalid_percent",
+        "value": 0.0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_clients-suburb-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_carers-carer_id-duplicate_count",
+        "metricName": "duplicate_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_notifications-assigned_worker_id-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_case_workers-team_region-invalid_percent-a83790f2",
+        "metricName": "invalid_percent",
+        "value": 0.0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_investigations-notification_id-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_placements-failed rows-67bd00ca",
+        "metricName": "failed rows",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_clients-sex-invalid_percent-725b96e3",
+        "metricName": "invalid_percent",
+        "value": 0.0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_placements-carer_id-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_notifications-cp_client_id-reference-9ba4fe01",
+        "metricName": "reference",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_notifications-notification_id-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_clients-case_opened_date-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_investigations-notification_id-reference-da324b35",
+        "metricName": "reference",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_placements-placement_id-duplicate_count",
+        "metricName": "duplicate_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_carers-carer_type-invalid_percent-bb517137",
+        "metricName": "invalid_percent",
+        "value": 0.0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_notifications-notification_date-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_case_workers-family_name-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_clients-family_name-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_notifications-risk_rating-invalid_count-ec3e2d8e",
+        "metricName": "invalid_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_carers-approval_status-invalid_percent-6d3c55fc",
+        "metricName": "invalid_percent",
+        "value": 0.0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_placements-placement_start-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_clients-date_of_birth-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_investigations-cp_client_id-reference-9ba4fe01",
+        "metricName": "reference",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_placements-placement_type-invalid_percent-a6189ee3",
+        "metricName": "invalid_percent",
+        "value": 0.0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_placements-placement_suburb-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_carers-carer_id-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_carers-approval_status-invalid_count-6d3c55fc",
+        "metricName": "invalid_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_investigations-lead_worker_id-missing_count",
+        "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
         "identity": "metric-cp_collection-cp_case_workers-worker_id-missing_count",
         "metricName": "missing_count",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_placements-cp_client_id-reference-9ba4fe01",
+        "metricName": "reference",
+        "value": 0,
+        "dataSourceName": "cp_collection"
+      },
+      {
+        "identity": "metric-cp_collection-cp_investigations-failed rows-0403c15d",
+        "metricName": "failed rows",
         "value": 0,
         "dataSourceName": "cp_collection"
       }
@@ -449,11 +449,15 @@
         "identity": "989f8e54",
         "name": "row_count warn when < 300 fail when < 100 when > 2000",
         "type": "generic",
-        "definition": "checks for cp_clients:\n  - row_count:\n      warn: when < 300\n      fail: when < 100 when > 2000\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.row_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Client row count should stay in a plausible band.\"\n        changelog: []\n",
+        "definition": "checks for cp_clients:\n  - row_count:\n      warn: when < 300\n      fail: when < 100 when > 2000\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.row_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Client row count should stay in a plausible band.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.row_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -498,11 +502,15 @@
         "identity": "1dad2331",
         "name": "date_of_birth out of range",
         "type": "generic",
-        "definition": "checks for cp_clients:\n  - failed rows:\n      name: date_of_birth out of range\n      fail query: |\n        SELECT cp_client_id FROM cp_clients WHERE date_of_birth < DATE '1900-01-01'\n      warn: when > 10\n      fail: when > 20\n      # Explicit high ceiling, not reliance on Soda's own (documented,\n      # unfixed) bug that \"failed rows\" checks ignore samples limit\n      # entirely (GitHub sodadata/soda-core#1985 - see plans/qa-\n      # pipeline.md #29's correction). Same rationale on all 4 \"failed\n      # rows\" checks in this file.\n      samples limit: 100000\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.range_check_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Date of birth must not be implausibly old.\"\n        changelog: []\n",
+        "definition": "checks for cp_clients:\n  - failed rows:\n      name: date_of_birth out of range\n      fail query: |\n        SELECT cp_client_id FROM cp_clients WHERE date_of_birth < DATE '1900-01-01'\n      warn: when > 10\n      fail: when > 20\n      # Explicit high ceiling, not reliance on Soda's own (documented,\n      # unfixed) bug that \"failed rows\" checks ignore samples limit\n      # entirely (GitHub sodadata/soda-core#1985 - see plans/qa-\n      # pipeline.md #29's correction). Same rationale on all 4 \"failed\n      # rows\" checks in this file.\n      samples limit: 100000\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.range_check_soda\n        category: conformity\n        introduced_date: \"2023-01-15\"\n        description: \"Date of birth must not be implausibly old.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.range_check_soda"
+          },
+          {
+            "name": "category",
+            "value": "conformity"
           },
           {
             "name": "introduced_date",
@@ -519,7 +527,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 171,
+          "line": 182,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -565,11 +573,15 @@
         "identity": "f3fd8ed4",
         "name": "missing_count(cp_client_id) warn when > 0 fail when > 3",
         "type": "generic",
-        "definition": "checks for cp_clients:\n  - missing_count(cp_client_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every client record must carry a client ID.\"\n        changelog: []\n",
+        "definition": "checks for cp_clients:\n  - missing_count(cp_client_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every client record must carry a client ID.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -586,7 +598,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 57,
+          "line": 58,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -614,11 +626,15 @@
         "identity": "41b908ca",
         "name": "duplicate_count(cp_client_id) warn when > 0 fail when > 3",
         "type": "generic",
-        "definition": "checks for cp_clients:\n  - duplicate_count(cp_client_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.duplicate_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Client IDs must not be duplicated.\"\n        changelog: []\n",
+        "definition": "checks for cp_clients:\n  - duplicate_count(cp_client_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.duplicate_count_soda\n        category: uniqueness\n        introduced_date: \"2023-01-15\"\n        description: \"Client IDs must not be duplicated.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.duplicate_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "uniqueness"
           },
           {
             "name": "introduced_date",
@@ -635,7 +651,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 67,
+          "line": 69,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -663,11 +679,15 @@
         "identity": "de3a88cf",
         "name": "missing_count(given_name) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_clients:\n  - missing_count(given_name):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.given_name.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"A client's given name must be recorded.\"\n        changelog: []\n",
+        "definition": "checks for cp_clients:\n  - missing_count(given_name):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.given_name.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"A client's given name must be recorded.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.given_name.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -684,7 +704,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 77,
+          "line": 80,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -712,11 +732,15 @@
         "identity": "e925a9f8",
         "name": "missing_count(family_name) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_clients:\n  - missing_count(family_name):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.family_name.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"A client's family name must be recorded.\"\n        changelog: []\n",
+        "definition": "checks for cp_clients:\n  - missing_count(family_name):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.family_name.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"A client's family name must be recorded.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.family_name.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -733,7 +757,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 87,
+          "line": 91,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -761,11 +785,15 @@
         "identity": "489d72fb",
         "name": "missing_count(date_of_birth) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_clients:\n  - missing_count(date_of_birth):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"A client record must carry a date of birth.\"\n        changelog: []\n",
+        "definition": "checks for cp_clients:\n  - missing_count(date_of_birth):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"A client record must carry a date of birth.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -782,7 +810,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 97,
+          "line": 102,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -810,11 +838,15 @@
         "identity": "cedd760d",
         "name": "invalid_percent(sex) warn when > 0% fail when > 2%",
         "type": "generic",
-        "definition": "checks for cp_clients:\n  - invalid_percent(sex):\n      valid values: [M, F, X]\n      warn: when > 0%\n      fail: when > 2%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.sex.invalid_percent_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Sex must be one of the closed value set M, F, or X.\"\n        changelog: []\n",
+        "definition": "checks for cp_clients:\n  - invalid_percent(sex):\n      valid values: [M, F, X]\n      warn: when > 0%\n      fail: when > 2%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.sex.invalid_percent_soda\n        category: conformity\n        introduced_date: \"2023-01-15\"\n        description: \"Sex must be one of the closed value set M, F, or X.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.sex.invalid_percent_soda"
+          },
+          {
+            "name": "category",
+            "value": "conformity"
           },
           {
             "name": "introduced_date",
@@ -831,7 +863,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 107,
+          "line": 113,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -859,11 +891,15 @@
         "identity": "0923b11b",
         "name": "missing_count(suburb) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_clients:\n  - missing_count(suburb):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.suburb.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"A client's suburb must be recorded.\"\n        changelog: []\n",
+        "definition": "checks for cp_clients:\n  - missing_count(suburb):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.suburb.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"A client's suburb must be recorded.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.suburb.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -880,7 +916,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 118,
+          "line": 125,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -908,11 +944,15 @@
         "identity": "9ceb7674",
         "name": "missing_count(case_opened_date) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_clients:\n  - missing_count(case_opened_date):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.case_opened_date.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"A client record must carry the date its case was opened.\"\n        changelog: []\n",
+        "definition": "checks for cp_clients:\n  - missing_count(case_opened_date):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.case_opened_date.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"A client record must carry the date its case was opened.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.case_opened_date.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -929,7 +969,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 128,
+          "line": 136,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -957,11 +997,15 @@
         "identity": "169bcc40",
         "name": "invalid_percent(postcode) warn when > 0% fail when > 3%",
         "type": "generic",
-        "definition": "checks for cp_clients:\n  - invalid_percent(postcode):\n      valid values: [\"6007\", \"6008\", \"6014\", \"6018\", \"6019\", \"6027\", \"6028\", \"6030\",\n        \"6035\", \"6036\", \"6050\", \"6056\", \"6061\", \"6062\", \"6064\", \"6069\", \"6100\", \"6102\",\n        \"6107\", \"6109\", \"6110\", \"6112\", \"6122\", \"6148\", \"6151\", \"6155\", \"6160\", \"6162\",\n        \"6163\", \"6164\", \"6167\", \"6168\", \"6171\", \"6210\", \"6215\", \"6225\", \"6230\", \"6258\",\n        \"6280\", \"6285\", \"6312\", \"6330\", \"6401\", \"6430\", \"6450\", \"6530\", \"6714\", \"6721\",\n        \"6725\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.invalid_percent_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Postcode must be one of the closed value set paired with the\n          suburb reference pool.\"\n        changelog: []\n",
+        "definition": "checks for cp_clients:\n  - invalid_percent(postcode):\n      valid values: [\"6007\", \"6008\", \"6014\", \"6018\", \"6019\", \"6027\", \"6028\", \"6030\",\n        \"6035\", \"6036\", \"6050\", \"6056\", \"6061\", \"6062\", \"6064\", \"6069\", \"6100\", \"6102\",\n        \"6107\", \"6109\", \"6110\", \"6112\", \"6122\", \"6148\", \"6151\", \"6155\", \"6160\", \"6162\",\n        \"6163\", \"6164\", \"6167\", \"6168\", \"6171\", \"6210\", \"6215\", \"6225\", \"6230\", \"6258\",\n        \"6280\", \"6285\", \"6312\", \"6330\", \"6401\", \"6430\", \"6450\", \"6530\", \"6714\", \"6721\",\n        \"6725\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.invalid_percent_soda\n        category: conformity\n        introduced_date: \"2023-01-15\"\n        description: \"Postcode must be one of the closed value set paired with the\n          suburb reference pool.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.invalid_percent_soda"
+          },
+          {
+            "name": "category",
+            "value": "conformity"
           },
           {
             "name": "introduced_date",
@@ -978,7 +1022,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 141,
+          "line": 150,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1006,11 +1050,15 @@
         "identity": "cd882720",
         "name": "missing_count(postcode) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_clients:\n  - missing_count(postcode):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"A client's postcode must be recorded.\"\n        changelog: []\n",
+        "definition": "checks for cp_clients:\n  - missing_count(postcode):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"A client's postcode must be recorded.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -1027,7 +1075,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 152,
+          "line": 162,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1055,11 +1103,15 @@
         "identity": "cd1fcb66",
         "name": "row_count warn when < 600 fail when < 200 when > 3000",
         "type": "generic",
-        "definition": "checks for cp_notifications:\n  - row_count:\n      warn: when < 600\n      fail: when < 200 when > 3000\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.row_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Notification row count should stay in a plausible band.\"\n        changelog: []\n",
+        "definition": "checks for cp_notifications:\n  - row_count:\n      warn: when < 600\n      fail: when < 200 when > 3000\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.row_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Notification row count should stay in a plausible band.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.row_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -1076,7 +1128,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 190,
+          "line": 202,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1104,11 +1156,15 @@
         "identity": "2da35055",
         "name": "values in (cp_client_id) must exist in cp_clients (cp_client_id)",
         "type": "generic",
-        "definition": "checks for cp_notifications:\n  - values in (cp_client_id) must exist in cp_clients (cp_client_id):\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.relationships_soda\n        introduced_date: \"2023-01-15\"\n        description: \"A notification's client_id must reference a real, existing client\n          record.\"\n        changelog: []\n",
+        "definition": "checks for cp_notifications:\n  - values in (cp_client_id) must exist in cp_clients (cp_client_id):\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.relationships_soda\n        category: consistency\n        introduced_date: \"2023-01-15\"\n        description: \"A notification's client_id must reference a real, existing client\n          record.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.relationships_soda"
+          },
+          {
+            "name": "category",
+            "value": "consistency"
           },
           {
             "name": "introduced_date",
@@ -1125,7 +1181,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 312,
+          "line": 334,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1147,11 +1203,15 @@
         "identity": "3ff148e7",
         "name": "values in (assigned_worker_id) must exist in cp_case_workers (worker_id)",
         "type": "generic",
-        "definition": "checks for cp_notifications:\n  - values in (assigned_worker_id) must exist in cp_case_workers (worker_id):\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.relationships_soda\n        introduced_date: \"2023-01-15\"\n        description: \"The assigned worker_id must reference a real, existing case\n          worker record.\"\n        changelog: []\n",
+        "definition": "checks for cp_notifications:\n  - values in (assigned_worker_id) must exist in cp_case_workers (worker_id):\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.relationships_soda\n        category: consistency\n        introduced_date: \"2023-01-15\"\n        description: \"The assigned worker_id must reference a real, existing case\n          worker record.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.relationships_soda"
+          },
+          {
+            "name": "category",
+            "value": "consistency"
           },
           {
             "name": "introduced_date",
@@ -1168,7 +1228,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 319,
+          "line": 342,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1190,11 +1250,15 @@
         "identity": "2fca8ee5",
         "name": "Escalation completeness",
         "type": "generic",
-        "definition": "checks for cp_notifications:\n  - failed rows:\n      name: Escalation completeness\n      fail query: |\n        SELECT n.notification_id\n        FROM cp_notifications n\n        LEFT JOIN cp_investigations i ON n.notification_id = i.notification_id\n        WHERE n.outcome = 'Investigation opened' AND i.investigation_id IS NULL\n      # 0/0 on clean runs (cp_investigations is only ever built from\n      # notifications with this exact outcome) - genuinely catches the\n      # dirty(amber/red) near-duplicate notifications\n      # apply_cp_notifications_presets injects, since each duplicate keeps\n      # its source row's outcome but gets a perturbed notification_id that\n      # cp_investigations never references. Confirmed for real: 0 clean,\n      # 2-3 amber, 6 on the red run - same numbers\n      # child-protection-contract.yaml's matching rule found.\n      # Explicit high ceiling, not reliance on Soda's own (documented,\n      # unfixed) bug that \"failed rows\" checks ignore samples limit\n      # entirely (GitHub sodadata/soda-core#1985 - see plans/qa-\n      # pipeline.md #29's correction).\n      samples limit: 100000\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.escalation_completeness_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every notification with outcome 'Investigation opened' must\n          have a matching investigation record.\"\n        changelog: []\n",
+        "definition": "checks for cp_notifications:\n  - failed rows:\n      name: Escalation completeness\n      fail query: |\n        SELECT n.notification_id\n        FROM cp_notifications n\n        LEFT JOIN cp_investigations i ON n.notification_id = i.notification_id\n        WHERE n.outcome = 'Investigation opened' AND i.investigation_id IS NULL\n      # 0/0 on clean runs (cp_investigations is only ever built from\n      # notifications with this exact outcome) - genuinely catches the\n      # dirty(amber/red) near-duplicate notifications\n      # apply_cp_notifications_presets injects, since each duplicate keeps\n      # its source row's outcome but gets a perturbed notification_id that\n      # cp_investigations never references. Confirmed for real: 0 clean,\n      # 2-3 amber, 6 on the red run - same numbers\n      # child-protection-contract.yaml's matching rule found.\n      # Explicit high ceiling, not reliance on Soda's own (documented,\n      # unfixed) bug that \"failed rows\" checks ignore samples limit\n      # entirely (GitHub sodadata/soda-core#1985 - see plans/qa-\n      # pipeline.md #29's correction).\n      samples limit: 100000\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.escalation_completeness_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every notification with outcome 'Investigation opened' must\n          have a matching investigation record.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.escalation_completeness_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -1211,7 +1275,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 328,
+          "line": 352,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1257,11 +1321,15 @@
         "identity": "b8f7619d",
         "name": "missing_count(notification_id) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_notifications:\n  - missing_count(notification_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every notification must carry a notification ID.\"\n        changelog: []\n",
+        "definition": "checks for cp_notifications:\n  - missing_count(notification_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every notification must carry a notification ID.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -1278,7 +1346,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 207,
+          "line": 220,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1306,11 +1374,15 @@
         "identity": "42d7c5f9",
         "name": "duplicate_count(notification_id) warn when > 0 fail when > 3",
         "type": "generic",
-        "definition": "checks for cp_notifications:\n  - duplicate_count(notification_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.duplicate_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Notification IDs must not be duplicated.\"\n        changelog: []\n",
+        "definition": "checks for cp_notifications:\n  - duplicate_count(notification_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.duplicate_count_soda\n        category: uniqueness\n        introduced_date: \"2023-01-15\"\n        description: \"Notification IDs must not be duplicated.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.duplicate_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "uniqueness"
           },
           {
             "name": "introduced_date",
@@ -1327,7 +1399,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 217,
+          "line": 231,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1355,11 +1427,15 @@
         "identity": "5d5d5650",
         "name": "missing_count(cp_client_id) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_notifications:\n  - missing_count(cp_client_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every notification must reference a client.\"\n        changelog: []\n",
+        "definition": "checks for cp_notifications:\n  - missing_count(cp_client_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every notification must reference a client.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -1376,7 +1452,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 227,
+          "line": 242,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1404,11 +1480,15 @@
         "identity": "23104792",
         "name": "missing_count(notification_date) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_notifications:\n  - missing_count(notification_date):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_date.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every notification must carry the date it was made.\"\n        changelog: []\n",
+        "definition": "checks for cp_notifications:\n  - missing_count(notification_date):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_date.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every notification must carry the date it was made.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_date.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -1425,7 +1505,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 237,
+          "line": 253,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1453,11 +1533,15 @@
         "identity": "3c2a68ba",
         "name": "invalid_percent(source_type) warn when > 0% fail when > 3%",
         "type": "generic",
-        "definition": "checks for cp_notifications:\n  - invalid_percent(source_type):\n      valid values: [\"School\", \"Police\", \"Health service\", \"Family member\", \"Neighbour\",\n        \"Anonymous\", \"Self-report\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.source_type.invalid_percent_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Notification source must be one of the closed value set.\"\n        changelog: []\n",
+        "definition": "checks for cp_notifications:\n  - invalid_percent(source_type):\n      valid values: [\"School\", \"Police\", \"Health service\", \"Family member\", \"Neighbour\",\n        \"Anonymous\", \"Self-report\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.source_type.invalid_percent_soda\n        category: conformity\n        introduced_date: \"2023-01-15\"\n        description: \"Notification source must be one of the closed value set.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.source_type.invalid_percent_soda"
+          },
+          {
+            "name": "category",
+            "value": "conformity"
           },
           {
             "name": "introduced_date",
@@ -1474,7 +1558,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 247,
+          "line": 264,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1502,11 +1586,15 @@
         "identity": "5558539a",
         "name": "invalid_percent(concern_type) warn when > 0% fail when > 3%",
         "type": "generic",
-        "definition": "checks for cp_notifications:\n  - invalid_percent(concern_type):\n      valid values: [\"Neglect\", \"Physical abuse\", \"Emotional abuse\", \"Sexual abuse\",\n        \"Domestic violence exposure\", \"Parental substance use\", \"Parental mental health\n            concern\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.concern_type.invalid_percent_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Concern type must be one of the closed value set - this collection's\n          own traffic-light demo column.\"\n        changelog: []\n",
+        "definition": "checks for cp_notifications:\n  - invalid_percent(concern_type):\n      valid values: [\"Neglect\", \"Physical abuse\", \"Emotional abuse\", \"Sexual abuse\",\n        \"Domestic violence exposure\", \"Parental substance use\", \"Parental mental health\n            concern\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.concern_type.invalid_percent_soda\n        category: conformity\n        introduced_date: \"2023-01-15\"\n        description: \"Concern type must be one of the closed value set - this collection's\n          own traffic-light demo column.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.concern_type.invalid_percent_soda"
+          },
+          {
+            "name": "category",
+            "value": "conformity"
           },
           {
             "name": "introduced_date",
@@ -1523,7 +1611,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 258,
+          "line": 276,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1551,11 +1639,15 @@
         "identity": "c7584eed",
         "name": "invalid_percent(risk_rating) warn when > 0% fail when > 3%",
         "type": "generic",
-        "definition": "checks for cp_notifications:\n  - invalid_percent(risk_rating):\n      valid values: [\"Low\", \"Medium\", \"High\", \"Critical\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.risk_rating.invalid_percent_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Risk rating must be one of the closed value set.\"\n        changelog: []\n",
+        "definition": "checks for cp_notifications:\n  - invalid_percent(risk_rating):\n      valid values: [\"Low\", \"Medium\", \"High\", \"Critical\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.risk_rating.invalid_percent_soda\n        category: conformity\n        introduced_date: \"2023-01-15\"\n        description: \"Risk rating must be one of the closed value set.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.risk_rating.invalid_percent_soda"
+          },
+          {
+            "name": "category",
+            "value": "conformity"
           },
           {
             "name": "introduced_date",
@@ -1572,7 +1664,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 269,
+          "line": 288,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1600,11 +1692,15 @@
         "identity": "3981203e",
         "name": "missing_count(assigned_worker_id) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_notifications:\n  - missing_count(assigned_worker_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every notification must be assigned to a case worker.\"\n        changelog: []\n",
+        "definition": "checks for cp_notifications:\n  - missing_count(assigned_worker_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every notification must be assigned to a case worker.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -1621,7 +1717,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 280,
+          "line": 300,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1649,11 +1745,15 @@
         "identity": "9a6f3a23",
         "name": "invalid_percent(outcome) warn when > 0% fail when > 3%",
         "type": "generic",
-        "definition": "checks for cp_notifications:\n  - invalid_percent(outcome):\n      valid values: [\"No further action\", \"Referred to family support\", \"Investigation\n            opened\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.outcome.invalid_percent_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Notification outcome must be one of the closed value set.\"\n        changelog: []\n",
+        "definition": "checks for cp_notifications:\n  - invalid_percent(outcome):\n      valid values: [\"No further action\", \"Referred to family support\", \"Investigation\n            opened\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.outcome.invalid_percent_soda\n        category: conformity\n        introduced_date: \"2023-01-15\"\n        description: \"Notification outcome must be one of the closed value set.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.outcome.invalid_percent_soda"
+          },
+          {
+            "name": "category",
+            "value": "conformity"
           },
           {
             "name": "introduced_date",
@@ -1670,7 +1770,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 290,
+          "line": 311,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1698,11 +1798,15 @@
         "identity": "76de0bbf",
         "name": "values in (notification_id) must exist in cp_notifications (notification_id)",
         "type": "generic",
-        "definition": "checks for cp_investigations:\n  - values in (notification_id) must exist in cp_notifications (notification_id):\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.relationships_soda\n        introduced_date: \"2023-01-15\"\n        description: \"An investigation's notification_id must reference a real, existing\n          notification record.\"\n        changelog: []\n",
+        "definition": "checks for cp_investigations:\n  - values in (notification_id) must exist in cp_notifications (notification_id):\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.relationships_soda\n        category: consistency\n        introduced_date: \"2023-01-15\"\n        description: \"An investigation's notification_id must reference a real, existing\n          notification record.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.relationships_soda"
+          },
+          {
+            "name": "category",
+            "value": "consistency"
           },
           {
             "name": "introduced_date",
@@ -1719,7 +1823,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 427,
+          "line": 459,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1741,11 +1845,15 @@
         "identity": "dbd0574d",
         "name": "values in (cp_client_id) must exist in cp_clients (cp_client_id)",
         "type": "generic",
-        "definition": "checks for cp_investigations:\n  - values in (cp_client_id) must exist in cp_clients (cp_client_id):\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.relationships_soda\n        introduced_date: \"2023-01-15\"\n        description: \"An investigation's client_id must reference a real, existing\n          client record.\"\n        changelog: []\n",
+        "definition": "checks for cp_investigations:\n  - values in (cp_client_id) must exist in cp_clients (cp_client_id):\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.relationships_soda\n        category: consistency\n        introduced_date: \"2023-01-15\"\n        description: \"An investigation's client_id must reference a real, existing\n          client record.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.relationships_soda"
+          },
+          {
+            "name": "category",
+            "value": "consistency"
           },
           {
             "name": "introduced_date",
@@ -1762,7 +1870,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 434,
+          "line": 467,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1784,11 +1892,15 @@
         "identity": "99a27abe",
         "name": "values in (lead_worker_id) must exist in cp_case_workers (worker_id)",
         "type": "generic",
-        "definition": "checks for cp_investigations:\n  - values in (lead_worker_id) must exist in cp_case_workers (worker_id):\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.relationships_soda\n        introduced_date: \"2023-01-15\"\n        description: \"The lead_worker_id must reference a real, existing case worker\n          record.\"\n        changelog: []\n",
+        "definition": "checks for cp_investigations:\n  - values in (lead_worker_id) must exist in cp_case_workers (worker_id):\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.relationships_soda\n        category: consistency\n        introduced_date: \"2023-01-15\"\n        description: \"The lead_worker_id must reference a real, existing case worker\n          record.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.relationships_soda"
+          },
+          {
+            "name": "category",
+            "value": "consistency"
           },
           {
             "name": "introduced_date",
@@ -1805,7 +1917,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 441,
+          "line": 475,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1827,11 +1939,15 @@
         "identity": "efc90262",
         "name": "Closed-case investigation hygiene",
         "type": "generic",
-        "definition": "checks for cp_investigations:\n  - failed rows:\n      name: Closed-case investigation hygiene\n      fail query: |\n        SELECT i.investigation_id\n        FROM cp_investigations i\n        JOIN cp_clients c ON i.cp_client_id = c.cp_client_id\n        WHERE c.case_status = 'Closed' AND i.end_date IS NULL\n      # Passes 0/0 on every clean run - child_protection.py only ever\n      # marks a case Closed once none of that client's investigations are\n      # still open. dirty.py's apply_cp_investigations_presets (amber/red\n      # only) reopens a controlled number to demonstrate a real violation:\n      # 0 clean, 1-3 amber, 6 on the red run. See child-protection-\n      # contract.yaml's matching rule and plans/qa-pipeline.md #9 for the\n      # fuller account (this rule used to always fail - fixed, not hidden).\n      # Explicit high ceiling - see escalation completeness's own comment\n      # above for why (GitHub sodadata/soda-core#1985).\n      samples limit: 100000\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.closed_case_hygiene_soda\n        introduced_date: \"2023-01-15\"\n        description: \"A closed case's investigations must all have an end date - none\n          should still be open.\"\n        changelog: []\n",
+        "definition": "checks for cp_investigations:\n  - failed rows:\n      name: Closed-case investigation hygiene\n      fail query: |\n        SELECT i.investigation_id\n        FROM cp_investigations i\n        JOIN cp_clients c ON i.cp_client_id = c.cp_client_id\n        WHERE c.case_status = 'Closed' AND i.end_date IS NULL\n      # Passes 0/0 on every clean run - child_protection.py only ever\n      # marks a case Closed once none of that client's investigations are\n      # still open. dirty.py's apply_cp_investigations_presets (amber/red\n      # only) reopens a controlled number to demonstrate a real violation:\n      # 0 clean, 1-3 amber, 6 on the red run. See child-protection-\n      # contract.yaml's matching rule and plans/qa-pipeline.md #9 for the\n      # fuller account (this rule used to always fail - fixed, not hidden).\n      # Explicit high ceiling - see escalation completeness's own comment\n      # above for why (GitHub sodadata/soda-core#1985).\n      samples limit: 100000\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.closed_case_hygiene_soda\n        category: consistency\n        introduced_date: \"2023-01-15\"\n        description: \"A closed case's investigations must all have an end date - none\n          should still be open.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.closed_case_hygiene_soda"
+          },
+          {
+            "name": "category",
+            "value": "consistency"
           },
           {
             "name": "introduced_date",
@@ -1848,7 +1964,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 450,
+          "line": 485,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1894,11 +2010,15 @@
         "identity": "76950074",
         "name": "missing_count(investigation_id) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_investigations:\n  - missing_count(investigation_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every investigation record must carry an investigation ID.\"\n        changelog: []\n",
+        "definition": "checks for cp_investigations:\n  - missing_count(investigation_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every investigation record must carry an investigation ID.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -1915,7 +2035,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 356,
+          "line": 381,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1943,11 +2063,15 @@
         "identity": "f185e5e2",
         "name": "duplicate_count(investigation_id) warn when > 0 fail when > 3",
         "type": "generic",
-        "definition": "checks for cp_investigations:\n  - duplicate_count(investigation_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.duplicate_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Investigation IDs must not be duplicated.\"\n        changelog: []\n",
+        "definition": "checks for cp_investigations:\n  - duplicate_count(investigation_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.duplicate_count_soda\n        category: uniqueness\n        introduced_date: \"2023-01-15\"\n        description: \"Investigation IDs must not be duplicated.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.duplicate_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "uniqueness"
           },
           {
             "name": "introduced_date",
@@ -1964,7 +2088,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 366,
+          "line": 392,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -1992,11 +2116,15 @@
         "identity": "d788c077",
         "name": "missing_count(notification_id) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_investigations:\n  - missing_count(notification_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every investigation must reference the notification that escalated\n          into it.\"\n        changelog: []\n",
+        "definition": "checks for cp_investigations:\n  - missing_count(notification_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every investigation must reference the notification that escalated\n          into it.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -2013,7 +2141,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 376,
+          "line": 403,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2041,11 +2169,15 @@
         "identity": "34c641ca",
         "name": "missing_count(cp_client_id) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_investigations:\n  - missing_count(cp_client_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every investigation must reference a client.\"\n        changelog: []\n",
+        "definition": "checks for cp_investigations:\n  - missing_count(cp_client_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every investigation must reference a client.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -2062,7 +2194,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 386,
+          "line": 414,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2090,11 +2222,15 @@
         "identity": "f5c20367",
         "name": "missing_count(lead_worker_id) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_investigations:\n  - missing_count(lead_worker_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every investigation must have a lead case worker assigned.\"\n        changelog: []\n",
+        "definition": "checks for cp_investigations:\n  - missing_count(lead_worker_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every investigation must have a lead case worker assigned.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -2111,7 +2247,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 396,
+          "line": 425,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2139,11 +2275,15 @@
         "identity": "bd4892af",
         "name": "missing_count(start_date) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_investigations:\n  - missing_count(start_date):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.start_date.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every investigation must carry the date it started.\"\n        changelog: []\n",
+        "definition": "checks for cp_investigations:\n  - missing_count(start_date):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.start_date.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every investigation must carry the date it started.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.start_date.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -2160,7 +2300,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 406,
+          "line": 436,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2188,11 +2328,15 @@
         "identity": "aa294ecd",
         "name": "invalid_percent(substantiated) warn when > 0% fail when > 3%",
         "type": "generic",
-        "definition": "checks for cp_investigations:\n  - invalid_percent(substantiated):\n      valid values: [\"Substantiated\", \"Not substantiated\", \"Inconclusive\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.substantiated.invalid_percent_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Investigation outcome must be one of the closed value set.\"\n        changelog: []\n",
+        "definition": "checks for cp_investigations:\n  - invalid_percent(substantiated):\n      valid values: [\"Substantiated\", \"Not substantiated\", \"Inconclusive\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.substantiated.invalid_percent_soda\n        category: conformity\n        introduced_date: \"2023-01-15\"\n        description: \"Investigation outcome must be one of the closed value set.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.substantiated.invalid_percent_soda"
+          },
+          {
+            "name": "category",
+            "value": "conformity"
           },
           {
             "name": "introduced_date",
@@ -2209,7 +2353,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 416,
+          "line": 447,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2237,11 +2381,15 @@
         "identity": "d5543811",
         "name": "values in (cp_client_id) must exist in cp_clients (cp_client_id)",
         "type": "generic",
-        "definition": "checks for cp_placements:\n  - values in (cp_client_id) must exist in cp_clients (cp_client_id):\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.relationships_soda\n        introduced_date: \"2023-01-15\"\n        description: \"A placement's client_id must reference a real, existing client\n          record.\"\n        changelog: []\n",
+        "definition": "checks for cp_placements:\n  - values in (cp_client_id) must exist in cp_clients (cp_client_id):\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.relationships_soda\n        category: consistency\n        introduced_date: \"2023-01-15\"\n        description: \"A placement's client_id must reference a real, existing client\n          record.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.relationships_soda"
+          },
+          {
+            "name": "category",
+            "value": "consistency"
           },
           {
             "name": "introduced_date",
@@ -2258,7 +2406,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 546,
+          "line": 589,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2280,11 +2428,15 @@
         "identity": "c261b0bc",
         "name": "values in (carer_id) must exist in cp_carers (carer_id)",
         "type": "generic",
-        "definition": "checks for cp_placements:\n  - values in (carer_id) must exist in cp_carers (carer_id):\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.relationships_soda\n        introduced_date: \"2023-01-15\"\n        description: \"The carer_id must reference a real, existing carer record.\"\n        changelog: []\n",
+        "definition": "checks for cp_placements:\n  - values in (carer_id) must exist in cp_carers (carer_id):\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.relationships_soda\n        category: consistency\n        introduced_date: \"2023-01-15\"\n        description: \"The carer_id must reference a real, existing carer record.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.relationships_soda"
+          },
+          {
+            "name": "category",
+            "value": "consistency"
           },
           {
             "name": "introduced_date",
@@ -2301,7 +2453,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 553,
+          "line": 597,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2323,11 +2475,15 @@
         "identity": "aeff6e45",
         "name": "Placement/carer approval compliance",
         "type": "generic",
-        "definition": "checks for cp_placements:\n  - failed rows:\n      name: Placement/carer approval compliance\n      fail query: |\n        SELECT p.placement_id\n        FROM cp_placements p\n        JOIN cp_carers c ON p.carer_id = c.carer_id\n        WHERE c.approval_status != 'Approved'\n      # Passes 0/0 on every clean run - child_protection.py only ever\n      # assigns an Approved carer to a placement. dirty.py's\n      # apply_cp_placements_presets (amber/red only) reassigns a\n      # controlled number to a non-Approved carer to demonstrate a real\n      # violation: 0 clean, 3 amber, 17 on the red run. See\n      # child-protection-contract.yaml's matching rule and\n      # plans/qa-pipeline.md #9 for the fuller account (this rule used to\n      # always fail - fixed, not hidden).\n      # Explicit high ceiling - see escalation completeness's own comment\n      # above for why (GitHub sodadata/soda-core#1985).\n      samples limit: 100000\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.approval_compliance_soda\n        introduced_date: \"2023-01-15\"\n        description: \"A placement's carer must have Approved status.\"\n        changelog: []\n",
+        "definition": "checks for cp_placements:\n  - failed rows:\n      name: Placement/carer approval compliance\n      fail query: |\n        SELECT p.placement_id\n        FROM cp_placements p\n        JOIN cp_carers c ON p.carer_id = c.carer_id\n        WHERE c.approval_status != 'Approved'\n      # Passes 0/0 on every clean run - child_protection.py only ever\n      # assigns an Approved carer to a placement. dirty.py's\n      # apply_cp_placements_presets (amber/red only) reassigns a\n      # controlled number to a non-Approved carer to demonstrate a real\n      # violation: 0 clean, 3 amber, 17 on the red run. See\n      # child-protection-contract.yaml's matching rule and\n      # plans/qa-pipeline.md #9 for the fuller account (this rule used to\n      # always fail - fixed, not hidden).\n      # Explicit high ceiling - see escalation completeness's own comment\n      # above for why (GitHub sodadata/soda-core#1985).\n      samples limit: 100000\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.approval_compliance_soda\n        category: consistency\n        introduced_date: \"2023-01-15\"\n        description: \"A placement's carer must have Approved status.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.approval_compliance_soda"
+          },
+          {
+            "name": "category",
+            "value": "consistency"
           },
           {
             "name": "introduced_date",
@@ -2344,7 +2500,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 562,
+          "line": 607,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2390,11 +2546,15 @@
         "identity": "02ec0c21",
         "name": "missing_count(placement_id) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_placements:\n  - missing_count(placement_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every placement record must carry a placement ID.\"\n        changelog: []\n",
+        "definition": "checks for cp_placements:\n  - missing_count(placement_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every placement record must carry a placement ID.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -2411,7 +2571,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 475,
+          "line": 511,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2439,11 +2599,15 @@
         "identity": "1898e100",
         "name": "duplicate_count(placement_id) warn when > 0 fail when > 3",
         "type": "generic",
-        "definition": "checks for cp_placements:\n  - duplicate_count(placement_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.duplicate_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Placement IDs must not be duplicated.\"\n        changelog: []\n",
+        "definition": "checks for cp_placements:\n  - duplicate_count(placement_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.duplicate_count_soda\n        category: uniqueness\n        introduced_date: \"2023-01-15\"\n        description: \"Placement IDs must not be duplicated.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.duplicate_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "uniqueness"
           },
           {
             "name": "introduced_date",
@@ -2460,7 +2624,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 485,
+          "line": 522,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2488,11 +2652,15 @@
         "identity": "e94770c8",
         "name": "missing_count(cp_client_id) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_placements:\n  - missing_count(cp_client_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every placement must reference a client.\"\n        changelog: []\n",
+        "definition": "checks for cp_placements:\n  - missing_count(cp_client_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every placement must reference a client.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -2509,7 +2677,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 495,
+          "line": 533,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2537,11 +2705,15 @@
         "identity": "8998d91b",
         "name": "invalid_percent(placement_type) warn when > 0% fail when > 3%",
         "type": "generic",
-        "definition": "checks for cp_placements:\n  - invalid_percent(placement_type):\n      valid values: [\"Kinship care\", \"Foster care\", \"Residential care\", \"Family group\n            home\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_type.invalid_percent_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Placement type must be one of the closed value set.\"\n        changelog: []\n",
+        "definition": "checks for cp_placements:\n  - invalid_percent(placement_type):\n      valid values: [\"Kinship care\", \"Foster care\", \"Residential care\", \"Family group\n            home\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_type.invalid_percent_soda\n        category: conformity\n        introduced_date: \"2023-01-15\"\n        description: \"Placement type must be one of the closed value set.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_type.invalid_percent_soda"
+          },
+          {
+            "name": "category",
+            "value": "conformity"
           },
           {
             "name": "introduced_date",
@@ -2558,7 +2730,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 505,
+          "line": 544,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2586,11 +2758,15 @@
         "identity": "4e0482dc",
         "name": "missing_count(carer_id) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_placements:\n  - missing_count(carer_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every placement must have a carer assigned.\"\n        changelog: []\n",
+        "definition": "checks for cp_placements:\n  - missing_count(carer_id):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every placement must have a carer assigned.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -2607,7 +2783,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 516,
+          "line": 556,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2635,11 +2811,15 @@
         "identity": "46753112",
         "name": "missing_count(placement_start) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_placements:\n  - missing_count(placement_start):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_start.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every placement must carry the date it started.\"\n        changelog: []\n",
+        "definition": "checks for cp_placements:\n  - missing_count(placement_start):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_start.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every placement must carry the date it started.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_start.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -2656,7 +2836,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 526,
+          "line": 567,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2684,11 +2864,15 @@
         "identity": "9bf22b4d",
         "name": "missing_count(placement_suburb) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_placements:\n  - missing_count(placement_suburb):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_suburb.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every placement must carry the suburb it's located in.\"\n        changelog: []\n",
+        "definition": "checks for cp_placements:\n  - missing_count(placement_suburb):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_suburb.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every placement must carry the suburb it's located in.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_suburb.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -2705,7 +2889,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 536,
+          "line": 578,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2733,11 +2917,15 @@
         "identity": "e2c27dc3",
         "name": "row_count warn when < 150 fail when < 50 when > 1000",
         "type": "generic",
-        "definition": "checks for cp_carers:\n  - row_count:\n      warn: when < 150\n      fail: when < 50 when > 1000\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.row_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Carer row count should stay in a plausible band.\"\n        changelog: []\n",
+        "definition": "checks for cp_carers:\n  - row_count:\n      warn: when < 150\n      fail: when < 50 when > 1000\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.row_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Carer row count should stay in a plausible band.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.row_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -2754,7 +2942,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 592,
+          "line": 638,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2782,11 +2970,15 @@
         "identity": "65f5d541",
         "name": "missing_count(carer_id) warn when > 0 fail when > 3",
         "type": "generic",
-        "definition": "checks for cp_carers:\n  - missing_count(carer_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every carer record must carry a carer ID.\"\n        changelog: []\n",
+        "definition": "checks for cp_carers:\n  - missing_count(carer_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every carer record must carry a carer ID.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -2803,7 +2995,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 603,
+          "line": 650,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2831,11 +3023,15 @@
         "identity": "73c5515e",
         "name": "duplicate_count(carer_id) warn when > 0 fail when > 3",
         "type": "generic",
-        "definition": "checks for cp_carers:\n  - duplicate_count(carer_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.duplicate_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Carer IDs must not be duplicated.\"\n        changelog: []\n",
+        "definition": "checks for cp_carers:\n  - duplicate_count(carer_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.duplicate_count_soda\n        category: uniqueness\n        introduced_date: \"2023-01-15\"\n        description: \"Carer IDs must not be duplicated.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.duplicate_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "uniqueness"
           },
           {
             "name": "introduced_date",
@@ -2852,7 +3048,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 613,
+          "line": 661,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2880,11 +3076,15 @@
         "identity": "84e32b40",
         "name": "missing_count(given_name) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_carers:\n  - missing_count(given_name):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.given_name.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"A carer's given name must be recorded.\"\n        changelog: []\n",
+        "definition": "checks for cp_carers:\n  - missing_count(given_name):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.given_name.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"A carer's given name must be recorded.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.given_name.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -2901,7 +3101,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 623,
+          "line": 672,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2929,11 +3129,15 @@
         "identity": "95185373",
         "name": "missing_count(family_name) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_carers:\n  - missing_count(family_name):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.family_name.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"A carer's family name must be recorded.\"\n        changelog: []\n",
+        "definition": "checks for cp_carers:\n  - missing_count(family_name):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.family_name.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"A carer's family name must be recorded.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.family_name.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -2950,7 +3154,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 633,
+          "line": 683,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -2978,11 +3182,15 @@
         "identity": "e411b292",
         "name": "invalid_percent(carer_type) warn when > 0% fail when > 3%",
         "type": "generic",
-        "definition": "checks for cp_carers:\n  - invalid_percent(carer_type):\n      valid values: [\"Kinship\", \"Foster\", \"Residential-staff\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_type.invalid_percent_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Carer type must be one of the closed value set.\"\n        changelog: []\n",
+        "definition": "checks for cp_carers:\n  - invalid_percent(carer_type):\n      valid values: [\"Kinship\", \"Foster\", \"Residential-staff\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_type.invalid_percent_soda\n        category: conformity\n        introduced_date: \"2023-01-15\"\n        description: \"Carer type must be one of the closed value set.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_type.invalid_percent_soda"
+          },
+          {
+            "name": "category",
+            "value": "conformity"
           },
           {
             "name": "introduced_date",
@@ -2999,7 +3207,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 643,
+          "line": 694,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -3027,11 +3235,15 @@
         "identity": "42917a9d",
         "name": "invalid_percent(approval_status) warn when > 0% fail when > 3%",
         "type": "generic",
-        "definition": "checks for cp_carers:\n  - invalid_percent(approval_status):\n      valid values: [\"Approved\", \"Provisional\", \"Under review\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.approval_status.invalid_percent_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Approval status must be one of the closed value set.\"\n        changelog: []\n",
+        "definition": "checks for cp_carers:\n  - invalid_percent(approval_status):\n      valid values: [\"Approved\", \"Provisional\", \"Under review\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.approval_status.invalid_percent_soda\n        category: conformity\n        introduced_date: \"2023-01-15\"\n        description: \"Approval status must be one of the closed value set.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.approval_status.invalid_percent_soda"
+          },
+          {
+            "name": "category",
+            "value": "conformity"
           },
           {
             "name": "introduced_date",
@@ -3048,7 +3260,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 654,
+          "line": 706,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -3076,11 +3288,15 @@
         "identity": "4af70d04",
         "name": "row_count warn when < 40 fail when < 15 when > 200",
         "type": "generic",
-        "definition": "checks for cp_case_workers:\n  - row_count:\n      warn: when < 40\n      fail: when < 15 when > 200\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.row_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Case worker row count should stay in a plausible band.\"\n        changelog: []\n",
+        "definition": "checks for cp_case_workers:\n  - row_count:\n      warn: when < 40\n      fail: when < 15 when > 200\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.row_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Case worker row count should stay in a plausible band.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.row_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -3097,7 +3313,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 666,
+          "line": 719,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -3125,11 +3341,15 @@
         "identity": "deb85768",
         "name": "missing_count(worker_id) warn when > 0 fail when > 3",
         "type": "generic",
-        "definition": "checks for cp_case_workers:\n  - missing_count(worker_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Every case worker record must carry a worker ID.\"\n        changelog: []\n",
+        "definition": "checks for cp_case_workers:\n  - missing_count(worker_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"Every case worker record must carry a worker ID.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -3146,7 +3366,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 677,
+          "line": 731,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -3174,11 +3394,15 @@
         "identity": "0e77424e",
         "name": "duplicate_count(worker_id) warn when > 0 fail when > 3",
         "type": "generic",
-        "definition": "checks for cp_case_workers:\n  - duplicate_count(worker_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.duplicate_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Case worker IDs must not be duplicated.\"\n        changelog: []\n",
+        "definition": "checks for cp_case_workers:\n  - duplicate_count(worker_id):\n      warn: when > 0\n      fail: when > 3\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.duplicate_count_soda\n        category: uniqueness\n        introduced_date: \"2023-01-15\"\n        description: \"Case worker IDs must not be duplicated.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.duplicate_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "uniqueness"
           },
           {
             "name": "introduced_date",
@@ -3195,7 +3419,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 687,
+          "line": 742,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -3223,11 +3447,15 @@
         "identity": "f16051fe",
         "name": "missing_count(given_name) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_case_workers:\n  - missing_count(given_name):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.given_name.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"A case worker's given name must be recorded.\"\n        changelog: []\n",
+        "definition": "checks for cp_case_workers:\n  - missing_count(given_name):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.given_name.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"A case worker's given name must be recorded.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.given_name.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -3244,7 +3472,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 697,
+          "line": 753,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -3272,11 +3500,15 @@
         "identity": "c49bf088",
         "name": "missing_count(family_name) warn when > 0 fail when > 5",
         "type": "generic",
-        "definition": "checks for cp_case_workers:\n  - missing_count(family_name):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.family_name.missing_count_soda\n        introduced_date: \"2023-01-15\"\n        description: \"A case worker's family name must be recorded.\"\n        changelog: []\n",
+        "definition": "checks for cp_case_workers:\n  - missing_count(family_name):\n      warn: when > 0\n      fail: when > 5\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.family_name.missing_count_soda\n        category: completeness\n        introduced_date: \"2023-01-15\"\n        description: \"A case worker's family name must be recorded.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.family_name.missing_count_soda"
+          },
+          {
+            "name": "category",
+            "value": "completeness"
           },
           {
             "name": "introduced_date",
@@ -3293,7 +3525,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 707,
+          "line": 764,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -3321,11 +3553,15 @@
         "identity": "a0828e4f",
         "name": "invalid_percent(team_region) warn when > 0% fail when > 3%",
         "type": "generic",
-        "definition": "checks for cp_case_workers:\n  - invalid_percent(team_region):\n      valid values: [\"Metro North\", \"Metro South\", \"Metro East\", \"South West\", \"Great\n            Southern\", \"Goldfields\", \"Kimberley\", \"Pilbara\", \"Wheatbelt\", \"Midwest-Gascoyne\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.team_region.invalid_percent_soda\n        introduced_date: \"2023-01-15\"\n        description: \"Team region must be one of the closed value set of WA regions.\"\n        changelog: []\n",
+        "definition": "checks for cp_case_workers:\n  - invalid_percent(team_region):\n      valid values: [\"Metro North\", \"Metro South\", \"Metro East\", \"South West\", \"Great\n            Southern\", \"Goldfields\", \"Kimberley\", \"Pilbara\", \"Wheatbelt\", \"Midwest-Gascoyne\"]\n      warn: when > 0%\n      fail: when > 3%\n      samples limit: 5\n      attributes:\n        check_id: \n          data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.team_region.invalid_percent_soda\n        category: conformity\n        introduced_date: \"2023-01-15\"\n        description: \"Team region must be one of the closed value set of WA regions.\"\n        changelog: []\n",
         "resourceAttributes": [
           {
             "name": "check_id",
             "value": "data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.team_region.invalid_percent_soda"
+          },
+          {
+            "name": "category",
+            "value": "conformity"
           },
           {
             "name": "introduced_date",
@@ -3342,7 +3578,7 @@
         ],
         "location": {
           "filePath": "/home/user/data-poc/qa_tools/cp/../../contract/child-protection-soda-checks.yml",
-          "line": 717,
+          "line": 775,
           "col": 5
         },
         "dataSource": "cp_collection",
@@ -3376,7 +3612,7 @@
         "column": null,
         "sql": "SELECT \n  COUNT(*),\n  COUNT(CASE WHEN cp_client_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN given_name IS NULL THEN 1 END),\n  COUNT(CASE WHEN family_name IS NULL THEN 1 END),\n  COUNT(CASE WHEN date_of_birth IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (sex IS NULL) AND NOT (sex IN ('M','F','X')) THEN 1 END),\n  COUNT(CASE WHEN suburb IS NULL THEN 1 END),\n  COUNT(CASE WHEN case_opened_date IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (postcode IS NULL) AND NOT (postcode IN ('6007','6008','6014','6018','6019','6027','6028','6030','6035','6036','6050','6056','6061','6062','6064','6069','6100','6102','6107','6109','6110','6112','6122','6148','6151','6155','6160','6162','6163','6164','6167','6168','6171','6210','6215','6225','6230','6258','6280','6285','6312','6330','6401','6430','6450','6530','6714','6721','6725')) THEN 1 END),\n  COUNT(CASE WHEN postcode IS NULL THEN 1 END) \nFROM cp_clients",
         "exception": null,
-        "duration": "0:00:00.003881"
+        "duration": "0:00:00.003468"
       },
       {
         "name": "3.cp_collection.cp_clients.cp_client_id.duplicate_count",
@@ -3386,7 +3622,7 @@
         "column": "cp_client_id",
         "sql": "\nWITH frequencies AS (\n    SELECT COUNT(*) AS frequency\n    FROM cp_clients\n    WHERE cp_client_id IS NOT NULL\n    GROUP BY cp_client_id)\nSELECT COUNT(*)\nFROM frequencies\nWHERE frequency > 1",
         "exception": null,
-        "duration": "0:00:00.001872"
+        "duration": "0:00:00.005109"
       },
       {
         "name": "3.cp_collection.cp_clients.cp_client_id.duplicate_count.failing_sql",
@@ -3416,7 +3652,7 @@
         "column": null,
         "sql": "SELECT \n  COUNT(*),\n  COUNT(CASE WHEN notification_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN cp_client_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN notification_date IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (source_type IS NULL) AND NOT (source_type IN ('School','Police','Health service','Family member','Neighbour','Anonymous','Self-report')) THEN 1 END),\n  COUNT(CASE WHEN NOT (concern_type IS NULL) AND NOT (concern_type IN ('Neglect','Physical abuse','Emotional abuse','Sexual abuse','Domestic violence exposure','Parental substance use','Parental mental health concern')) THEN 1 END),\n  COUNT(CASE WHEN NOT (risk_rating IS NULL) AND NOT (risk_rating IN ('Low','Medium','High','Critical')) THEN 1 END),\n  COUNT(CASE WHEN assigned_worker_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (outcome IS NULL) AND NOT (outcome IN ('No further action','Referred to family support','Investigation opened')) THEN 1 END) \nFROM cp_notifications",
         "exception": null,
-        "duration": "0:00:00.002541"
+        "duration": "0:00:00.002114"
       },
       {
         "name": "8.cp_collection.cp_notifications.notification_id.duplicate_count",
@@ -3426,7 +3662,7 @@
         "column": "notification_id",
         "sql": "\nWITH frequencies AS (\n    SELECT COUNT(*) AS frequency\n    FROM cp_notifications\n    WHERE notification_id IS NOT NULL\n    GROUP BY notification_id)\nSELECT COUNT(*)\nFROM frequencies\nWHERE frequency > 1",
         "exception": null,
-        "duration": "0:00:00.001519"
+        "duration": "0:00:00.001578"
       },
       {
         "name": "8.cp_collection.cp_notifications.notification_id.duplicate_count.failing_sql",
@@ -3456,7 +3692,7 @@
         "column": null,
         "sql": "SELECT \n  COUNT(CASE WHEN investigation_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN notification_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN cp_client_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN lead_worker_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN start_date IS NULL THEN 1 END),\n  COUNT(*),\n  COUNT(CASE WHEN NOT (substantiated IS NULL) AND NOT (substantiated IN ('Substantiated','Not substantiated','Inconclusive')) THEN 1 END) \nFROM cp_investigations",
         "exception": null,
-        "duration": "0:00:00.001542"
+        "duration": "0:00:00.001284"
       },
       {
         "name": "14.cp_collection.cp_investigations.investigation_id.duplicate_count",
@@ -3466,7 +3702,7 @@
         "column": "investigation_id",
         "sql": "\nWITH frequencies AS (\n    SELECT COUNT(*) AS frequency\n    FROM cp_investigations\n    WHERE investigation_id IS NOT NULL\n    GROUP BY investigation_id)\nSELECT COUNT(*)\nFROM frequencies\nWHERE frequency > 1",
         "exception": null,
-        "duration": "0:00:00.001250"
+        "duration": "0:00:00.001774"
       },
       {
         "name": "14.cp_collection.cp_investigations.investigation_id.duplicate_count.failing_sql",
@@ -3496,7 +3732,7 @@
         "column": null,
         "sql": "SELECT \n  COUNT(CASE WHEN placement_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN cp_client_id IS NULL THEN 1 END),\n  COUNT(*),\n  COUNT(CASE WHEN NOT (placement_type IS NULL) AND NOT (placement_type IN ('Kinship care','Foster care','Residential care','Family group home')) THEN 1 END),\n  COUNT(CASE WHEN carer_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN placement_start IS NULL THEN 1 END),\n  COUNT(CASE WHEN placement_suburb IS NULL THEN 1 END) \nFROM cp_placements",
         "exception": null,
-        "duration": "0:00:00.001495"
+        "duration": "0:00:00.001560"
       },
       {
         "name": "19.cp_collection.cp_placements.placement_id.duplicate_count",
@@ -3506,7 +3742,7 @@
         "column": "placement_id",
         "sql": "\nWITH frequencies AS (\n    SELECT COUNT(*) AS frequency\n    FROM cp_placements\n    WHERE placement_id IS NOT NULL\n    GROUP BY placement_id)\nSELECT COUNT(*)\nFROM frequencies\nWHERE frequency > 1",
         "exception": null,
-        "duration": "0:00:00.002218"
+        "duration": "0:00:00.001140"
       },
       {
         "name": "19.cp_collection.cp_placements.placement_id.duplicate_count.failing_sql",
@@ -3536,7 +3772,7 @@
         "column": null,
         "sql": "SELECT \n  COUNT(*),\n  COUNT(CASE WHEN carer_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN given_name IS NULL THEN 1 END),\n  COUNT(CASE WHEN family_name IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (carer_type IS NULL) AND NOT (carer_type IN ('Kinship','Foster','Residential-staff')) THEN 1 END),\n  COUNT(CASE WHEN NOT (approval_status IS NULL) AND NOT (approval_status IN ('Approved','Provisional','Under review')) THEN 1 END) \nFROM cp_carers",
         "exception": null,
-        "duration": "0:00:00.001590"
+        "duration": "0:00:00.006348"
       },
       {
         "name": "21.cp_collection.cp_carers.carer_id.duplicate_count",
@@ -3546,7 +3782,7 @@
         "column": "carer_id",
         "sql": "\nWITH frequencies AS (\n    SELECT COUNT(*) AS frequency\n    FROM cp_carers\n    WHERE carer_id IS NOT NULL\n    GROUP BY carer_id)\nSELECT COUNT(*)\nFROM frequencies\nWHERE frequency > 1",
         "exception": null,
-        "duration": "0:00:00.001455"
+        "duration": "0:00:00.001248"
       },
       {
         "name": "21.cp_collection.cp_carers.carer_id.duplicate_count.failing_sql",
@@ -3576,7 +3812,7 @@
         "column": null,
         "sql": "SELECT \n  COUNT(*),\n  COUNT(CASE WHEN worker_id IS NULL THEN 1 END),\n  COUNT(CASE WHEN given_name IS NULL THEN 1 END),\n  COUNT(CASE WHEN family_name IS NULL THEN 1 END),\n  COUNT(CASE WHEN NOT (team_region IS NULL) AND NOT (team_region IN ('Metro North','Metro South','Metro East','South West','Great Southern','Goldfields','Kimberley','Pilbara','Wheatbelt','Midwest-Gascoyne')) THEN 1 END) \nFROM cp_case_workers",
         "exception": null,
-        "duration": "0:00:00.001260"
+        "duration": "0:00:00.001114"
       },
       {
         "name": "23.cp_collection.cp_case_workers.worker_id.duplicate_count",
@@ -3586,7 +3822,7 @@
         "column": "worker_id",
         "sql": "\nWITH frequencies AS (\n    SELECT COUNT(*) AS frequency\n    FROM cp_case_workers\n    WHERE worker_id IS NOT NULL\n    GROUP BY worker_id)\nSELECT COUNT(*)\nFROM frequencies\nWHERE frequency > 1",
         "exception": null,
-        "duration": "0:00:00.001444"
+        "duration": "0:00:00.001273"
       },
       {
         "name": "23.cp_collection.cp_case_workers.worker_id.duplicate_count.failing_sql",
@@ -3616,7 +3852,7 @@
         "column": null,
         "sql": "SELECT cp_client_id FROM cp_clients WHERE date_of_birth < DATE '1900-01-01'",
         "exception": null,
-        "duration": "0:00:00.010390"
+        "duration": "0:00:00.011232"
       },
       {
         "name": "5.cp_collection.cp_notifications.reference[cp_client_id]",
@@ -3626,7 +3862,7 @@
         "column": null,
         "sql": "\nSELECT COUNT(*)\n    FROM cp_notifications  SOURCE\n    LEFT JOIN cp_clients TARGET on SOURCE.cp_client_id = TARGET.cp_client_id\nWHERE (SOURCE.cp_client_id IS NOT NULL AND TARGET.cp_client_id IS  NULL)",
         "exception": null,
-        "duration": "0:00:00.001767"
+        "duration": "0:00:00.001410"
       },
       {
         "name": "5.cp_collection.cp_notifications.reference[cp_client_id].failing_sql",
@@ -3656,7 +3892,7 @@
         "column": null,
         "sql": "\nSELECT COUNT(*)\n    FROM cp_notifications  SOURCE\n    LEFT JOIN cp_case_workers TARGET on SOURCE.assigned_worker_id = TARGET.worker_id\nWHERE (SOURCE.assigned_worker_id IS NOT NULL AND TARGET.worker_id IS  NULL)",
         "exception": null,
-        "duration": "0:00:00.001468"
+        "duration": "0:00:00.001208"
       },
       {
         "name": "6.cp_collection.cp_notifications.reference[assigned_worker_id].failing_sql",
@@ -3686,7 +3922,7 @@
         "column": null,
         "sql": "SELECT n.notification_id\nFROM cp_notifications n\nLEFT JOIN cp_investigations i ON n.notification_id = i.notification_id\nWHERE n.outcome = 'Investigation opened' AND i.investigation_id IS NULL",
         "exception": null,
-        "duration": "0:00:00.003338"
+        "duration": "0:00:00.002918"
       },
       {
         "name": "9.cp_collection.cp_investigations.reference[notification_id]",
@@ -3696,7 +3932,7 @@
         "column": null,
         "sql": "\nSELECT COUNT(*)\n    FROM cp_investigations  SOURCE\n    LEFT JOIN cp_notifications TARGET on SOURCE.notification_id = TARGET.notification_id\nWHERE (SOURCE.notification_id IS NOT NULL AND TARGET.notification_id IS  NULL)",
         "exception": null,
-        "duration": "0:00:00.003242"
+        "duration": "0:00:00.001254"
       },
       {
         "name": "9.cp_collection.cp_investigations.reference[notification_id].failing_sql",
@@ -3726,7 +3962,7 @@
         "column": null,
         "sql": "\nSELECT COUNT(*)\n    FROM cp_investigations  SOURCE\n    LEFT JOIN cp_clients TARGET on SOURCE.cp_client_id = TARGET.cp_client_id\nWHERE (SOURCE.cp_client_id IS NOT NULL AND TARGET.cp_client_id IS  NULL)",
         "exception": null,
-        "duration": "0:00:00.001455"
+        "duration": "0:00:00.001220"
       },
       {
         "name": "10.cp_collection.cp_investigations.reference[cp_client_id].failing_sql",
@@ -3756,7 +3992,7 @@
         "column": null,
         "sql": "\nSELECT COUNT(*)\n    FROM cp_investigations  SOURCE\n    LEFT JOIN cp_case_workers TARGET on SOURCE.lead_worker_id = TARGET.worker_id\nWHERE (SOURCE.lead_worker_id IS NOT NULL AND TARGET.worker_id IS  NULL)",
         "exception": null,
-        "duration": "0:00:00.002447"
+        "duration": "0:00:00.001141"
       },
       {
         "name": "11.cp_collection.cp_investigations.reference[lead_worker_id].failing_sql",
@@ -3786,7 +4022,7 @@
         "column": null,
         "sql": "SELECT i.investigation_id\nFROM cp_investigations i\nJOIN cp_clients c ON i.cp_client_id = c.cp_client_id\nWHERE c.case_status = 'Closed' AND i.end_date IS NULL",
         "exception": null,
-        "duration": "0:00:00.003490"
+        "duration": "0:00:00.002987"
       },
       {
         "name": "15.cp_collection.cp_placements.reference[cp_client_id]",
@@ -3796,7 +4032,7 @@
         "column": null,
         "sql": "\nSELECT COUNT(*)\n    FROM cp_placements  SOURCE\n    LEFT JOIN cp_clients TARGET on SOURCE.cp_client_id = TARGET.cp_client_id\nWHERE (SOURCE.cp_client_id IS NOT NULL AND TARGET.cp_client_id IS  NULL)",
         "exception": null,
-        "duration": "0:00:00.001317"
+        "duration": "0:00:00.001088"
       },
       {
         "name": "15.cp_collection.cp_placements.reference[cp_client_id].failing_sql",
@@ -3826,7 +4062,7 @@
         "column": null,
         "sql": "\nSELECT COUNT(*)\n    FROM cp_placements  SOURCE\n    LEFT JOIN cp_carers TARGET on SOURCE.carer_id = TARGET.carer_id\nWHERE (SOURCE.carer_id IS NOT NULL AND TARGET.carer_id IS  NULL)",
         "exception": null,
-        "duration": "0:00:00.001309"
+        "duration": "0:00:00.001195"
       },
       {
         "name": "16.cp_collection.cp_placements.reference[carer_id].failing_sql",
@@ -3856,7 +4092,7 @@
         "column": null,
         "sql": "SELECT p.placement_id\nFROM cp_placements p\nJOIN cp_carers c ON p.carer_id = c.carer_id\nWHERE c.approval_status != 'Approved'",
         "exception": null,
-        "duration": "0:00:00.002893"
+        "duration": "0:00:00.002625"
       }
     ],
     "automatedMonitoringChecks": [],
@@ -3866,7 +4102,7 @@
       {
         "level": "INFO",
         "message": "Soda Core 3.5.6",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 1,
         "doc": null,
         "location": null
@@ -3874,7 +4110,7 @@
       {
         "level": "INFO",
         "message": "Scan summary:",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 2,
         "doc": null,
         "location": null
@@ -3882,7 +4118,7 @@
       {
         "level": "INFO",
         "message": "59/59 checks PASSED: ",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 3,
         "doc": null,
         "location": null
@@ -3890,7 +4126,7 @@
       {
         "level": "INFO",
         "message": "    cp_clients in cp_collection",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 4,
         "doc": null,
         "location": null
@@ -3898,7 +4134,7 @@
       {
         "level": "INFO",
         "message": "      row_count warn when < 300 fail when < 100 when > 2000 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 5,
         "doc": null,
         "location": null
@@ -3906,7 +4142,7 @@
       {
         "level": "INFO",
         "message": "      date_of_birth out of range [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 6,
         "doc": null,
         "location": null
@@ -3914,7 +4150,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(cp_client_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 7,
         "doc": null,
         "location": null
@@ -3922,7 +4158,7 @@
       {
         "level": "INFO",
         "message": "      duplicate_count(cp_client_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 8,
         "doc": null,
         "location": null
@@ -3930,7 +4166,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(given_name) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 9,
         "doc": null,
         "location": null
@@ -3938,7 +4174,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(family_name) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 10,
         "doc": null,
         "location": null
@@ -3946,7 +4182,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(date_of_birth) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 11,
         "doc": null,
         "location": null
@@ -3954,7 +4190,7 @@
       {
         "level": "INFO",
         "message": "      invalid_percent(sex) warn when > 0% fail when > 2% [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 12,
         "doc": null,
         "location": null
@@ -3962,7 +4198,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(suburb) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 13,
         "doc": null,
         "location": null
@@ -3970,7 +4206,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(case_opened_date) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 14,
         "doc": null,
         "location": null
@@ -3978,7 +4214,7 @@
       {
         "level": "INFO",
         "message": "      invalid_percent(postcode) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 15,
         "doc": null,
         "location": null
@@ -3986,7 +4222,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(postcode) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 16,
         "doc": null,
         "location": null
@@ -3994,7 +4230,7 @@
       {
         "level": "INFO",
         "message": "    cp_notifications in cp_collection",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 17,
         "doc": null,
         "location": null
@@ -4002,7 +4238,7 @@
       {
         "level": "INFO",
         "message": "      row_count warn when < 600 fail when < 200 when > 3000 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 18,
         "doc": null,
         "location": null
@@ -4010,7 +4246,7 @@
       {
         "level": "INFO",
         "message": "      values in (cp_client_id) must exist in cp_clients (cp_client_id) [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 19,
         "doc": null,
         "location": null
@@ -4018,7 +4254,7 @@
       {
         "level": "INFO",
         "message": "      values in (assigned_worker_id) must exist in cp_case_workers (worker_id) [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 20,
         "doc": null,
         "location": null
@@ -4026,7 +4262,7 @@
       {
         "level": "INFO",
         "message": "      Escalation completeness [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 21,
         "doc": null,
         "location": null
@@ -4034,7 +4270,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(notification_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 22,
         "doc": null,
         "location": null
@@ -4042,7 +4278,7 @@
       {
         "level": "INFO",
         "message": "      duplicate_count(notification_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 23,
         "doc": null,
         "location": null
@@ -4050,7 +4286,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(cp_client_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 24,
         "doc": null,
         "location": null
@@ -4058,7 +4294,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(notification_date) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 25,
         "doc": null,
         "location": null
@@ -4066,7 +4302,7 @@
       {
         "level": "INFO",
         "message": "      invalid_percent(source_type) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 26,
         "doc": null,
         "location": null
@@ -4074,7 +4310,7 @@
       {
         "level": "INFO",
         "message": "      invalid_percent(concern_type) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 27,
         "doc": null,
         "location": null
@@ -4082,7 +4318,7 @@
       {
         "level": "INFO",
         "message": "      invalid_percent(risk_rating) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 28,
         "doc": null,
         "location": null
@@ -4090,7 +4326,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(assigned_worker_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 29,
         "doc": null,
         "location": null
@@ -4098,7 +4334,7 @@
       {
         "level": "INFO",
         "message": "      invalid_percent(outcome) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 30,
         "doc": null,
         "location": null
@@ -4106,7 +4342,7 @@
       {
         "level": "INFO",
         "message": "    cp_investigations in cp_collection",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 31,
         "doc": null,
         "location": null
@@ -4114,7 +4350,7 @@
       {
         "level": "INFO",
         "message": "      values in (notification_id) must exist in cp_notifications (notification_id) [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 32,
         "doc": null,
         "location": null
@@ -4122,7 +4358,7 @@
       {
         "level": "INFO",
         "message": "      values in (cp_client_id) must exist in cp_clients (cp_client_id) [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 33,
         "doc": null,
         "location": null
@@ -4130,7 +4366,7 @@
       {
         "level": "INFO",
         "message": "      values in (lead_worker_id) must exist in cp_case_workers (worker_id) [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 34,
         "doc": null,
         "location": null
@@ -4138,7 +4374,7 @@
       {
         "level": "INFO",
         "message": "      Closed-case investigation hygiene [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 35,
         "doc": null,
         "location": null
@@ -4146,7 +4382,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(investigation_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 36,
         "doc": null,
         "location": null
@@ -4154,7 +4390,7 @@
       {
         "level": "INFO",
         "message": "      duplicate_count(investigation_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 37,
         "doc": null,
         "location": null
@@ -4162,7 +4398,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(notification_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 38,
         "doc": null,
         "location": null
@@ -4170,7 +4406,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(cp_client_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 39,
         "doc": null,
         "location": null
@@ -4178,7 +4414,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(lead_worker_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 40,
         "doc": null,
         "location": null
@@ -4186,7 +4422,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(start_date) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 41,
         "doc": null,
         "location": null
@@ -4194,7 +4430,7 @@
       {
         "level": "INFO",
         "message": "      invalid_percent(substantiated) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 42,
         "doc": null,
         "location": null
@@ -4202,7 +4438,7 @@
       {
         "level": "INFO",
         "message": "    cp_placements in cp_collection",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 43,
         "doc": null,
         "location": null
@@ -4210,7 +4446,7 @@
       {
         "level": "INFO",
         "message": "      values in (cp_client_id) must exist in cp_clients (cp_client_id) [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 44,
         "doc": null,
         "location": null
@@ -4218,7 +4454,7 @@
       {
         "level": "INFO",
         "message": "      values in (carer_id) must exist in cp_carers (carer_id) [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 45,
         "doc": null,
         "location": null
@@ -4226,7 +4462,7 @@
       {
         "level": "INFO",
         "message": "      Placement/carer approval compliance [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 46,
         "doc": null,
         "location": null
@@ -4234,7 +4470,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(placement_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 47,
         "doc": null,
         "location": null
@@ -4242,7 +4478,7 @@
       {
         "level": "INFO",
         "message": "      duplicate_count(placement_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 48,
         "doc": null,
         "location": null
@@ -4250,7 +4486,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(cp_client_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 49,
         "doc": null,
         "location": null
@@ -4258,7 +4494,7 @@
       {
         "level": "INFO",
         "message": "      invalid_percent(placement_type) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 50,
         "doc": null,
         "location": null
@@ -4266,7 +4502,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(carer_id) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 51,
         "doc": null,
         "location": null
@@ -4274,7 +4510,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(placement_start) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 52,
         "doc": null,
         "location": null
@@ -4282,7 +4518,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(placement_suburb) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 53,
         "doc": null,
         "location": null
@@ -4290,7 +4526,7 @@
       {
         "level": "INFO",
         "message": "    cp_carers in cp_collection",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 54,
         "doc": null,
         "location": null
@@ -4298,7 +4534,7 @@
       {
         "level": "INFO",
         "message": "      row_count warn when < 150 fail when < 50 when > 1000 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 55,
         "doc": null,
         "location": null
@@ -4306,7 +4542,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(carer_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 56,
         "doc": null,
         "location": null
@@ -4314,7 +4550,7 @@
       {
         "level": "INFO",
         "message": "      duplicate_count(carer_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 57,
         "doc": null,
         "location": null
@@ -4322,7 +4558,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(given_name) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 58,
         "doc": null,
         "location": null
@@ -4330,7 +4566,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(family_name) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 59,
         "doc": null,
         "location": null
@@ -4338,7 +4574,7 @@
       {
         "level": "INFO",
         "message": "      invalid_percent(carer_type) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 60,
         "doc": null,
         "location": null
@@ -4346,7 +4582,7 @@
       {
         "level": "INFO",
         "message": "      invalid_percent(approval_status) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 61,
         "doc": null,
         "location": null
@@ -4354,7 +4590,7 @@
       {
         "level": "INFO",
         "message": "    cp_case_workers in cp_collection",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 62,
         "doc": null,
         "location": null
@@ -4362,7 +4598,7 @@
       {
         "level": "INFO",
         "message": "      row_count warn when < 40 fail when < 15 when > 200 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 63,
         "doc": null,
         "location": null
@@ -4370,7 +4606,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(worker_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 64,
         "doc": null,
         "location": null
@@ -4378,7 +4614,7 @@
       {
         "level": "INFO",
         "message": "      duplicate_count(worker_id) warn when > 0 fail when > 3 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 65,
         "doc": null,
         "location": null
@@ -4386,7 +4622,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(given_name) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 66,
         "doc": null,
         "location": null
@@ -4394,7 +4630,7 @@
       {
         "level": "INFO",
         "message": "      missing_count(family_name) warn when > 0 fail when > 5 [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 67,
         "doc": null,
         "location": null
@@ -4402,7 +4638,7 @@
       {
         "level": "INFO",
         "message": "      invalid_percent(team_region) warn when > 0% fail when > 3% [PASSED]",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 68,
         "doc": null,
         "location": null
@@ -4410,7 +4646,7 @@
       {
         "level": "INFO",
         "message": "All is good. No failures. No warnings. No errors.",
-        "timestamp": "2026-09-18T11:06:58+00:00",
+        "timestamp": "2026-09-19T06:16:40+00:00",
         "index": 69,
         "doc": null,
         "location": null
@@ -4428,7 +4664,7 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 527,
       "unit": "count",
       "warn_threshold": 300.0,
@@ -4450,7 +4686,7 @@
       "dimension": "conformity",
       "label": null,
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -4472,7 +4708,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4494,7 +4730,7 @@
       "dimension": "",
       "label": "Duplicate rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4516,7 +4752,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4538,7 +4774,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4560,7 +4796,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4582,7 +4818,7 @@
       "dimension": "",
       "label": "Invalid values",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": 0.0,
@@ -4604,7 +4840,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4626,7 +4862,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4648,7 +4884,7 @@
       "dimension": "",
       "label": "Invalid values",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": 0.0,
@@ -4670,7 +4906,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4692,7 +4928,7 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 987,
       "unit": "count",
       "warn_threshold": 600.0,
@@ -4714,7 +4950,7 @@
       "dimension": "",
       "label": null,
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -4736,7 +4972,7 @@
       "dimension": "",
       "label": null,
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -4758,7 +4994,7 @@
       "dimension": "completeness",
       "label": null,
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -4780,7 +5016,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4802,7 +5038,7 @@
       "dimension": "",
       "label": "Duplicate rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4824,7 +5060,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4846,7 +5082,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4868,7 +5104,7 @@
       "dimension": "",
       "label": "Invalid values",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": 0.0,
@@ -4890,7 +5126,7 @@
       "dimension": "",
       "label": "Invalid values",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": 0.0,
@@ -4912,7 +5148,7 @@
       "dimension": "",
       "label": "Invalid values",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": 0.0,
@@ -4934,7 +5170,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -4956,7 +5192,7 @@
       "dimension": "",
       "label": "Invalid values",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": 0.0,
@@ -4978,7 +5214,7 @@
       "dimension": "",
       "label": null,
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5000,7 +5236,7 @@
       "dimension": "",
       "label": null,
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5022,7 +5258,7 @@
       "dimension": "",
       "label": null,
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5044,7 +5280,7 @@
       "dimension": "consistency",
       "label": null,
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5066,7 +5302,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5088,7 +5324,7 @@
       "dimension": "",
       "label": "Duplicate rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5110,7 +5346,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5132,7 +5368,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5154,7 +5390,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5176,7 +5412,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5198,7 +5434,7 @@
       "dimension": "",
       "label": "Invalid values",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": 0.0,
@@ -5220,7 +5456,7 @@
       "dimension": "",
       "label": null,
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5242,7 +5478,7 @@
       "dimension": "",
       "label": null,
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5264,7 +5500,7 @@
       "dimension": "consistency",
       "label": null,
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5286,7 +5522,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5308,7 +5544,7 @@
       "dimension": "",
       "label": "Duplicate rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5330,7 +5566,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5352,7 +5588,7 @@
       "dimension": "",
       "label": "Invalid values",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": 0.0,
@@ -5374,7 +5610,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5396,7 +5632,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5418,7 +5654,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5440,7 +5676,7 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 289,
       "unit": "count",
       "warn_threshold": 150.0,
@@ -5462,7 +5698,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5484,7 +5720,7 @@
       "dimension": "",
       "label": "Duplicate rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5506,7 +5742,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5528,7 +5764,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5550,7 +5786,7 @@
       "dimension": "",
       "label": "Invalid values",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": 0.0,
@@ -5572,7 +5808,7 @@
       "dimension": "",
       "label": "Invalid values",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": 0.0,
@@ -5594,7 +5830,7 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 60,
       "unit": "count",
       "warn_threshold": 40.0,
@@ -5616,7 +5852,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5638,7 +5874,7 @@
       "dimension": "",
       "label": "Duplicate rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5660,7 +5896,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5682,7 +5918,7 @@
       "dimension": "",
       "label": "Null rate",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": 0.0,
@@ -5704,7 +5940,7 @@
       "dimension": "",
       "label": "Invalid values",
       "run_id": "cp_run_01_2023-02-01",
-      "run_timestamp": "2026-09-18T11:06:50.829216+00:00",
+      "run_timestamp": "2026-09-19T06:16:34.203855+00:00",
       "metric_value": 0.0,
       "unit": "%",
       "warn_threshold": 0.0,
