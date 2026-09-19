@@ -230,9 +230,19 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         if not checks_out:
             checks_out = [{
                 "name": "No automated quality rule defined",
-                "dimension": "", "unit": "count", "warn": 1, "fail": 1,
-                "current": 0, "previous": 0,
-                "history": [{"run_id": m["run_id"], "run_date": m["run_date"], "value": 0} for m in manifest],
+                # This check is synthesized HERE, not produced by any real
+                # tool - so it has to state its own status explicitly
+                # (item 74). Without it, it would be the only thing left
+                # in the whole app relying on the warn/fail fallback, and
+                # a fallback with exactly one synthetic caller is a trap,
+                # not a safety net: it keeps three status implementations
+                # alive to serve data this file makes up. "No rule
+                # defined" is a real gap, honestly labelled in `note` -
+                # it is not a failure, so green is the truthful answer.
+                "dimension": "", "unit": "count", "warn": None, "fail": None,
+                "current": 0, "current_status": "green", "previous": 0,
+                "history": [{"run_id": m["run_id"], "run_date": m["run_date"], "value": 0,
+                             "status": "green"} for m in manifest],
                 "note": "Neither the ODCS contract nor the Soda/dbt check files define a rule for this "
                         "column today — this is a real gap, not a hidden failure.",
             }]

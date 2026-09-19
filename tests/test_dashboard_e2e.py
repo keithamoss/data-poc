@@ -455,3 +455,100 @@ class TestDemoTab:
 
         assert "#/demo" in clean_page.url
         assert clean_page.locator("h2", has_text="Demo").count() > 0
+
+
+class TestStatusMatchesEachToolsOwnVerdict:
+    """plans/qa-pipeline.md item 74's own follow-up, 2026-09-19 - the
+    test that would have caught the two bugs that shipped.
+
+    Item 74 made each check's real tool verdict authoritative and made
+    warn/fail thresholds nullable. That was verified by reading
+    reports/*.json and applying the rule in a throwaway script, which
+    proved the DATA layer and nothing else - it never exercised the
+    template's own buildRealDataset() transform, nor the Python mirror in
+    qa_tools/common/dataset_status.py. Both were wrong, and one of them
+    wrong in the dangerous direction: buildRealDataset() silently dropped
+    `current_status`, so a dbt not_null check with 14 real violations and
+    no configured fail threshold rendered GREEN.
+
+    So this asserts at the layer that was actually broken: it drives the
+    REAL built dashboard in a REAL browser and uses the page's OWN
+    buildRealDataset()/checkStatus()/historyStatus() against the real
+    embedded data, comparing every resulting status to the verdict the
+    real tool recorded for that same result. ~30k comparisons, a couple
+    of seconds - the whole point is that it crosses every transform
+    between committed qa_results/ history and what a human actually
+    sees, rather than stopping at the first one."""
+
+    _COMPARE_JS = """() => {
+      let compared = 0, missingVerdict = 0;
+      const disagreements = [];
+      for (const raw of [REAL_BIRTH_REG_DATA, REAL_CP_DATA]) {
+        if (!raw) continue;
+        for (const d of (raw.datasets ? raw.datasets : [raw])) {
+          const built = buildRealDataset(d);
+          d.columns.forEach((rawCol, ci) => {
+            rawCol.checks.forEach((rawCk, ki) => {
+              const builtCk = built.columns[ci].checks[ki];
+              rawCk.history.forEach((rawH, hi) => {
+                if (!rawH.status) { missingVerdict++; return; }
+                compared++;
+                const got = historyStatus(builtCk.history[hi], builtCk);
+                if (got !== rawH.status && disagreements.length < 10) {
+                  disagreements.push({check: rawCk.check_id, run: rawH.run_id,
+                                      tool: rawH.status, rendered: got, value: rawH.value,
+                                      warn: rawCk.warn, fail: rawCk.fail});
+                } else if (got !== rawH.status) { compared += 0; }
+              });
+              if (rawCk.current_status) {
+                compared++;
+                const got = checkStatus(builtCk);
+                if (got !== rawCk.current_status && disagreements.length < 10) {
+                  disagreements.push({check: rawCk.check_id, scope: "current",
+                                      tool: rawCk.current_status, rendered: got});
+                }
+              }
+            });
+          });
+        }
+      }
+      return {compared, missingVerdict, disagreements};
+    }"""
+
+    def test_every_rendered_status_matches_the_tool_that_produced_it(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        result = clean_page.evaluate(self._COMPARE_JS)
+
+        assert result["compared"] > 10000, (
+            "expected tens of thousands of real statuses to compare - got "
+            f"{result['compared']}, which suggests the embedded data or the "
+            "traversal is wrong rather than the statuses being right"
+        )
+        assert result["disagreements"] == [], (
+            "the rendered dashboard disagrees with the tools' own verdicts:\n"
+            + "\n".join(str(d) for d in result["disagreements"])
+        )
+
+    def test_only_the_synthetic_placeholder_check_lacks_a_verdict(self, clean_page, built_dashboard_html):
+        """Every real result carries its own tool's verdict. The only
+        thing that legitimately doesn't is the "No automated quality rule
+        defined" placeholder the builders synthesize for a column no real
+        rule covers - and since 2026-09-19 even that states its own
+        status explicitly, so the threshold fallback has no live callers
+        at all. If this ever fails, some real result lost its verdict on
+        the way through - exactly the silent-drop class of bug this
+        whole class exists to catch."""
+        _goto(clean_page, built_dashboard_html)
+        names = clean_page.evaluate("""() => {
+          const out = new Set();
+          for (const raw of [REAL_BIRTH_REG_DATA, REAL_CP_DATA]) {
+            if (!raw) continue;
+            for (const d of (raw.datasets ? raw.datasets : [raw]))
+              for (const col of d.columns)
+                for (const ck of col.checks)
+                  for (const h of ck.history)
+                    if (!h.status) out.add(ck.name);
+          }
+          return [...out];
+        }""")
+        assert names == [], f"real checks are missing their tool verdict: {names}"

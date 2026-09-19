@@ -4218,6 +4218,68 @@ relative, not a schedule — this is weeks of work, not months.
     the passing-rowCount case gets the right answer from the fallback by
     luck. That asymmetry is exactly why the bug was invisible.
 
+    **Keith's own follow-up, same evening: "why do we have two tools
+    doing the same thing", and "what can we do to make that more
+    robust".** Investigating turned up more than the two known
+    implementations:
+    - **Four status implementations existed, not two**: the template's
+      JS, `qa_tools/common/dataset_status.py`, `pipeline/
+      dashboard_check_labels.py`'s own `status_rank`, and - the
+      telling one - a `worst` column rollup in `build_dashboard_data.py`
+      that was **dead code**. It rolled up from each real engine's own
+      `status` field, which is exactly the right idea, and then nothing
+      ever read it; `columns_out.append()` never carried it. Ruff
+      couldn't flag it either, since `worst` is read inside its own
+      accumulating loop so `F841` never fires. BDM-only; CP never had it.
+    - **The duplication that remains is genuinely unavoidable** - the
+      dashboard is static, so the browser must re-roll status for any
+      as-of date a viewer picks, and the ticketing Action has no JS
+      runtime. The useful contrast is `pipeline/cadence.py`, which has
+      the SAME kind of split and hasn't drifted, because its own
+      docstring says why: both sides are tested against the same real
+      configs and dates. `dataset_status.py` had no such cross-check,
+      which is precisely how it drifted.
+    - **Item 74 had already made most of it vestigial** - measured, not
+      assumed: after the fix, only 198 results in the whole app still
+      reached the threshold fallback, every one of them the builders'
+      own synthetic "No automated quality rule defined" placeholder, and
+      zero real tool results.
+
+    **Built (Keith picked all three options offered):**
+    1. The placeholder now states its own status explicitly, so the
+       threshold fallback has **no live callers at all** - a fallback
+       with one synthetic caller is a trap, not a safety net.
+       `dashboard_status()`/`dashboard_status_of()`/`status_for_value()`
+       now live in one canonical Python module, with
+       `dashboard_check_labels.status_rank()` delegating rather than
+       carrying its own copy; the dead `worst` block is deleted. Two
+       implementations remain, one per language, which is the real floor.
+    2. `buildRealDataset()` inverted from a hand-maintained allowlist of
+       ~11 copied fields to **spread-then-override**. The old shape had
+       exactly one failure mode - add a field upstream, forget it here,
+       lose it silently - which is what shipped. Now a new field flows
+       through by default and you only write code to CHANGE something.
+       Verified safe first: nothing anywhere iterates a check's own keys,
+       so the raw twins left beside their transformed versions are inert.
+       Guarded by a real test that fails, naming the field, if anything
+       is dropped - confirmed by reverting to an allowlist and watching
+       it fail on `dimension`.
+    3. **The test that would have caught both**:
+       `tests/test_dashboard_e2e.py::TestStatusMatchesEachToolsOwnVerdict`
+       drives the real built dashboard in a real browser and uses the
+       PAGE's own `buildRealDataset()`/`checkStatus()`/`historyStatus()`
+       to compare ~30,000 rendered statuses against the verdict each real
+       tool recorded. Runs in ~8s. Proven rather than assumed: the real
+       bug was reintroduced and it failed with a genuinely diagnostic
+       message (`not_null_dbt`, tool `red`, rendered `green`, value 1,
+       both bounds null). A second test asserts no REAL check ever lacks
+       a verdict, so a future silent drop fails loudly.
+
+    The standing lesson landed as its own `CLAUDE.md` convention:
+    enumerate consumers mechanically on a shape change, and verify at
+    the LAST transform before the user rather than the first one after
+    the source.
+
     **Still open, deliberately not done here**: flipping
     `ticket-sync.yml`'s automatic push trigger on.
     `plans/running-thoughts.md` #1 records that the ticketing MVP

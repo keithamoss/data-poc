@@ -172,9 +172,19 @@ def build() -> dict:
             # honest placeholder - no rule anywhere covers this column today
             checks_out = [{
                 "name": "No automated quality rule defined",
-                "dimension": "", "unit": "count", "warn": 1, "fail": 1,
-                "current": 0, "previous": 0,
-                "history": [{"run_id": m["run_id"], "run_date": m["run_date"], "value": 0} for m in manifest],
+                # This check is synthesized HERE, not produced by any real
+                # tool - so it has to state its own status explicitly
+                # (item 74). Without it, it would be the only thing left
+                # in the whole app relying on the warn/fail fallback, and
+                # a fallback with exactly one synthetic caller is a trap,
+                # not a safety net: it keeps three status implementations
+                # alive to serve data this file makes up. "No rule
+                # defined" is a real gap, honestly labelled in `note` -
+                # it is not a failure, so green is the truthful answer.
+                "dimension": "", "unit": "count", "warn": None, "fail": None,
+                "current": 0, "current_status": "green", "previous": 0,
+                "history": [{"run_id": m["run_id"], "run_date": m["run_date"], "value": 0,
+                             "status": "green"} for m in manifest],
                 "note": "Neither the ODCS contract nor the Soda/dbt check files define a rule for this "
                         "column today — this is a real gap, not a hidden failure.",
             }]
@@ -228,14 +238,16 @@ def build() -> dict:
             }
         stats["byRun"] = stats_by_run
 
-        status_rank = {"pass": 0, "warn": 1, "fail": 2}
-        # column status = worst status among its real checks (mirrors the
-        # dashboard's own worst-of rollup rule, computed here from real
-        # engine output rather than the client re-deriving it)
-        worst = "pass"
-        for r in results:
-            if r["column_name"] == col and status_rank.get(r["status"], 0) > status_rank.get(worst, 0):
-                worst = r["status"]
+        # (Removed 2026-09-19, plans/qa-pipeline.md item 74's follow-up: a
+        # `worst` column rollup used to be computed here, from each real
+        # engine's own `status` - the right idea - and then never used.
+        # `columns_out.append()` below never carried it, and nothing else
+        # in this file read it. Ruff couldn't flag it either: `worst` is
+        # read inside its own accumulating loop, so F841 never fires. The
+        # dashboard does this rollup client-side instead, because it has
+        # to - the as-of picker re-rolls status for an arbitrary date the
+        # viewer picks in the browser, which no build-time value can
+        # answer. Deleted rather than wired up for that reason.)
 
         columns_out.append({
             "name": col, "logicalType": logical_type, "description": desc,

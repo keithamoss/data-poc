@@ -21,6 +21,30 @@ from __future__ import annotations
 
 STATUS_ORDER = {"green": 0, "amber": 1, "red": 2}
 
+# Each real check result carries its own tool's verdict - a real `status`
+# written by every qa_tools/*/run_*.py module from what dbt-core/Soda
+# Core/datacontract-cli/Evidently actually decided. That verdict is the
+# authority everywhere; threshold math is only ever a fallback, because a
+# warn/fail pair cannot express every real rule (the ODCS `rowCount` rule
+# is a two-sided `mustBeBetween`, so neither bound exists as a single
+# number). plans/qa-pipeline.md item 74.
+_DASHBOARD_STATUS_BY_TOOL_STATUS = {
+    "pass": "green",
+    "warn": "amber",
+    "fail": "red",
+    "error": "red",
+}
+
+
+def dashboard_status(tool_status: str | None) -> str | None:
+    """Maps a real tool verdict onto the dashboard's own green/amber/red
+    vocabulary. None for anything unrecognised (or absent), so callers
+    fall back rather than silently reading an unknown verdict as green -
+    an unknown verdict is not evidence of health."""
+    if not tool_status:
+        return None
+    return _DASHBOARD_STATUS_BY_TOOL_STATUS.get(tool_status)
+
 
 def status_for_value(value: float, warn: float | None, fail: float | None) -> str:
     """Mirrors the dashboard's own statusForValue() exactly - including

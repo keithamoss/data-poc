@@ -54,6 +54,38 @@ edited for a punchier, friendlier read than a bare commit log.
   concurrently - real evidence from the verification session's own
   report), and how Keith can invoke it.
 
+### Changed
+- **9:17pm** — **Four Status Implementations, Down to Two** **[Pipeline & publishing]** **[Dashboard UI]** **[Testing & dev tooling]**
+  Keith asked why two tools were doing the same job. Looking properly,
+  there were four: the dashboard's JS, two separate Python modules, and
+  a column rollup in the BDM builder that was dead code — it computed
+  the right answer from each engine's own verdict and nothing ever read
+  it, which ruff couldn't flag because the variable is read inside its
+  own accumulating loop. Some duplication here is genuinely unavoidable:
+  the dashboard is static, so the browser has to re-roll status for
+  whatever as-of date a viewer picks, and the ticketing Action has no JS
+  runtime. The instructive comparison is `cadence.py`, which has the
+  same split and hasn't drifted, because both sides are tested against
+  the same fixtures — the status mirror had no such cross-check, which
+  is exactly how it drifted. Tonight's verdict work had already made
+  most of this vestigial: only 198 results still reached the threshold
+  fallback, every one the builders' own synthetic "no rule defined"
+  placeholder. That placeholder now states its own status, so the
+  fallback has no live callers at all, and the surviving Python logic
+  lives in one module that the other imports. Two implementations, one
+  per language, which is the real floor.
+  `buildRealDataset()` also changed shape: it was a hand-maintained list
+  of fields copied one by one, which has a single failure mode — add a
+  field upstream, forget it here, lose it in silence. It now spreads the
+  source and overrides only what genuinely transforms, so new fields
+  arrive by default, with a test that fails and names the field if one
+  is ever dropped again.
+  And the test that would have caught tonight's bug in the first place:
+  it drives the real dashboard in a real browser, uses the page's own
+  functions, and compares ~30,000 rendered statuses against the verdict
+  each tool recorded. Eight seconds. Proven by reintroducing the bug and
+  watching it fail with the offending check named.
+
 ### Fixed
 - **9:05pm** — **Two Consumers of the Tool Verdict Were Missed, One Dangerously** **[Dashboard UI]** **[Pipeline & publishing]**
   Making a check's warn/fail threshold nullable earlier tonight left two

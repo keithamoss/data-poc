@@ -506,6 +506,39 @@ Rough layout:
   `orchestrate_bdm.py`'s/`orchestrate_cp.py`'s own run step and a
   committed `qa_results/` file, not in `pipeline/build_*_dashboard_
   data.py`.
+- **When you change the SHAPE of a value (making it nullable, adding a
+  field, changing what's authoritative), enumerate every consumer
+  mechanically, and verify at the LAST transform before the user - not
+  the first one after the source.** Added 2026-09-19 after a real,
+  instructive incident (`plans/qa-pipeline.md` item 74): making a
+  check's warn/fail threshold nullable left two readers behind. One
+  (`qa_tools/common/dataset_status.py`, the Python mirror of the
+  dashboard's status logic) raised a real `TypeError` in CI. The other
+  (`buildRealDataset()` in the template) silently dropped the new
+  authoritative field and fell back to threshold math, rendering a check
+  with 14 real violations GREEN - a false green, the dangerous
+  direction, introduced by the very fix written to prevent it.
+  Both hid for the same reason: the change was verified by reading
+  `reports/*.json` and applying the new rule in a throwaway script.
+  That proved the DATA layer and nothing else - two transforms sat
+  downstream, untouched. **A green data layer says nothing about a
+  render layer that has its own transform.** Concretely:
+  - `grep` for every consumer before declaring a shape change done. Note
+    that a value can have more implementations than expected - that
+    incident turned up FOUR status implementations (JS, two Python, plus
+    a dead one), not the two that were known about.
+  - Assert at the layer a human actually sees. `tests/
+    test_dashboard_e2e.py`'s own `TestStatusMatchesEachToolsOwnVerdict`
+    is the worked example: it drives the real built dashboard in a real
+    browser, uses the PAGE's own functions, and compares ~30k statuses
+    against the verdicts the real tools recorded. It runs in seconds and
+    catches exactly this class of bug - verified by reintroducing the
+    real bug and confirming it fails with a diagnostic message.
+  - Prefer a shape that fails loudly over one that fails silently. A
+    hand-maintained allowlist of copied fields drops new fields in
+    silence; spread-then-override carries them by default. Same
+    reasoning as this file's own "no permissive fallback" stance
+    elsewhere.
 - **Whenever an actual bug is found** (not a design gap, not a missing
   feature - a case where the code produces a genuinely wrong result),
   add a test to `tests/` that reproduces it and fails against the

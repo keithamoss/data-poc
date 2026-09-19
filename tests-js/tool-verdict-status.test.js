@@ -176,3 +176,66 @@ describe("buildRealDataset carries each check's real verdict through", () => {
     expect(w.checkStatus(built.columns[0].checks[0])).toBe("green");
   });
 });
+
+// --- the structural guard ---------------------------------------------
+//
+// The bug above wasn't a wrong value, it was a MISSING one - and the
+// shape of buildRealDataset() (a hand-maintained allowlist of copied
+// fields) made that the default failure mode. It's now spread-first, so
+// new fields flow through by default; this test is what stops anyone
+// quietly going back to an allowlist, and fails loudly if a field the
+// builders emit stops reaching the rendered object.
+describe("buildRealDataset drops no field it was given", () => {
+  // Fields the transform deliberately REPLACES with a richer version.
+  // Anything else disappearing is a bug, not a decision.
+  const INTENTIONALLY_TRANSFORMED = new Set([]);
+
+  function sourceDataset(extraCheckFields, extraHistoryFields) {
+    return {
+      name: "Birth Registrations", provider: "BDM", deliveryFormat: "CSV",
+      sla: {}, arrivalHistory: [], arrivalByRun: {},
+      lastArrival: { run_date: "2026-01-01", arrivedAt: "2026-01-01 09:00:00", arrivalStatus: "on-time" },
+      rowCount: 1, prevRowCount: 1, runs: [{ run_id: "run_01", run_date: "2026-01-01" }],
+      columns: [{
+        name: "sex", logicalType: "string", description: "",
+        stats: { current: {}, previous: {}, byRun: {} },
+        checks: [{
+          check_id: "c1", name: "dbt:not_null", dimension: "completeness", unit: "count",
+          warn: null, fail: null, current: 0, current_status: "green", previous: 0,
+          note: "", description: null, changelog: [], retired_as_of: null, retired_reason: null,
+          history: [{ run_id: "run_01", run_date: "2026-01-01", value: 0, status: "green",
+                      row_count_total: 10, row_count_invalid: 0, failing_sample_keys: [],
+                      aggregate_values: null, ...extraHistoryFields }],
+          ...extraCheckFields,
+        }],
+      }],
+    };
+  }
+
+  it("carries every field the builders currently emit", () => {
+    const w = load();
+    const src = sourceDataset({}, {});
+    const built = w.buildRealDataset(src);
+    const srcCk = src.columns[0].checks[0];
+    const gotCk = built.columns[0].checks[0];
+    for (const key of Object.keys(srcCk)) {
+      if (key === "history" || INTENTIONALLY_TRANSFORMED.has(key)) continue;
+      expect(gotCk, `check field "${key}" was dropped`).toHaveProperty(key);
+    }
+    for (const key of Object.keys(srcCk.history[0])) {
+      expect(gotCk.history[0], `history field "${key}" was dropped`).toHaveProperty(key);
+    }
+  });
+
+  it("carries a field the builders have not added yet", () => {
+    // The real regression shape: something new appears upstream. Under
+    // the old allowlist this silently vanished; it must not now.
+    const w = load();
+    const built = w.buildRealDataset(
+      sourceDataset({ some_future_field: "xyz" }, { some_future_run_field: 42 })
+    );
+    const ck = built.columns[0].checks[0];
+    expect(ck.some_future_field).toBe("xyz");
+    expect(ck.history[0].some_future_run_field).toBe(42);
+  });
+});

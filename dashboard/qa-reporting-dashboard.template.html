@@ -1002,40 +1002,39 @@ function buildRealDataset(d){
   const toDate = s => new Date(s.length>10 ? s.replace(" ","T")+"Z" : s+"T00:00:00Z");
 
   const columns = d.columns.map(col => {
+    // SPREAD-THEN-OVERRIDE, deliberately (plans/qa-pipeline.md item 74's
+    // follow-up, 2026-09-19). This used to be a hand-maintained allowlist
+    // of ~11 fields copied across one by one, and that shape has exactly
+    // one failure mode: add a field to the builders and forget it here,
+    // and it vanishes SILENTLY. That is not hypothetical - it shipped.
+    // current_status (each check's own real tool verdict) was dropped
+    // here, so the page fell back to threshold math, and with a null
+    // fail bound a dbt not_null check with 14 real violations rendered
+    // GREEN. Spreading first inverts the failure mode: a new field flows
+    // through by default, and you only write code to CHANGE something.
+    // Safe to spread - nothing anywhere iterates a check's own keys, so
+    // the raw twins left alongside their transformed versions (e.g.
+    // retired_as_of beside retiredAsOf) are inert.
     const checks = col.checks.map(ck => ({
-      check_id: ck.check_id, name: ck.name, dimension: ck.dimension, unit: ck.unit, warn: ck.warn, fail: ck.fail,
-      // current_status is the check's own REAL tool verdict (item 74) and
-      // must be carried through here - checkStatus() reads it in
-      // preference to threshold math, and since a warn/fail bound may now
-      // legitimately be null, dropping it doesn't fall back gracefully,
-      // it falls back WRONG: a dbt not_null check with 14 real violations
-      // and no configured fail threshold would read green.
-      current: ck.current, current_status: ck.current_status, previous: ck.previous, note: ck.note,
+      ...ck,
       // Phase 5b (plans/publishing-and-history.md Thread D): a check is
       // "retired" once its own definition carries a retired_as_of date -
       // explicit metadata from check_lifecycle.py, never inferred from a
-      // check going quiet (see that plan file's own "explicit
-      // declaration, not inferred from absence" rule). retired_as_of/
-      // retired_reason pass straight through for display; `retired` is
-      // the boolean the rest of the dashboard actually branches on.
-      retired: ck.retired_as_of != null, retiredAsOf: ck.retired_as_of ? toDate(ck.retired_as_of) : null,
+      // check going quiet. `retired` is the boolean the rest of the
+      // dashboard actually branches on.
+      retired: ck.retired_as_of != null,
+      retiredAsOf: ck.retired_as_of ? toDate(ck.retired_as_of) : null,
       retiredReason: ck.retired_reason,
-      // Phase 5c: hand-authored check-lifecycle metadata (check_lifecycle.py's
-      // description/changelog fields), same source as retired_as_of/reason
-      // above - surfaced in the check-detail panel, not the drawer's card.
-      description: ck.description,
       // changelog dates are already full ISO-8601 ("2026-09-17T00:00:00Z",
       // check_lifecycle.py's own authored format) - new Date() directly,
       // NOT toDate() above (that helper's "append Z" branch is for the
       // space-separated/bare-date formats run_date/run_timestamp use
       // elsewhere in this app; applying it here would double up the Z).
       changelog: (ck.changelog||[]).map(e=>({ date: new Date(e.date), description: e.description, author: e.author, breaking: e.breaking })),
-      // `status` here is that RUN's own real tool verdict - same reasoning
-      // as current_status above, for every historical point the trend
-      // chart, status strip and per-run rollups read via historyStatus().
-      history: ck.history.map((h,i)=>({ idx:i, date: toDate(h.run_date), value: h.value, status: h.status,
-        row_count_total: h.row_count_total, row_count_invalid: h.row_count_invalid,
-        failing_sample_keys: h.failing_sample_keys, aggregate_values: h.aggregate_values })),
+      // Each history entry keeps everything it arrived with - including
+      // `status`, that run's own real tool verdict, which historyStatus()
+      // reads in preference to threshold math.
+      history: ck.history.map((h,i)=>({ ...h, idx:i, date: toDate(h.run_date) })),
     }));
     return { name: col.name, logicalType: col.logicalType, description: col.description, checks, stats: col.stats };
   });
