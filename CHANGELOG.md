@@ -28,7 +28,7 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-19
 
 ### Added
-- **1:20pm** — **mothman CLI Phase 4: Reorganized Every Remaining Script Into the CLI** **[Testing & dev tooling]**
+- **1:13pm** — **mothman CLI Phase 4: Reorganized Every Remaining Script Into the CLI** **[Testing & dev tooling]**
   `mothman dashboard`/`mothman github`/`mothman debug`/`mothman pipeline` -
   4 new command groups replacing the last ~24 bare script entry points
   (the dashboard rebuild chain, GitHub ticket/acceptance/leaderboard
