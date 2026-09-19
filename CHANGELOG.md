@@ -27,6 +27,20 @@ edited for a punchier, friendlier read than a bare commit log.
 
 ## 2026-09-19
 
+### Fixed
+- **10:31am** — **Numbered Lists In Plans Tab** **[Dashboard UI]** Real bug, found from Keith's own
+  dashboard report: expanding an item card (e.g. `plans/tooling.md`
+  #1's own "Build order" phase list) word-joined every numbered list
+  line into one illegible run-on paragraph - `dashboard/plans_md.py`'s
+  parser only recognised `-`/`*` bullets as list-item boundaries, never
+  `1. `/`2. ` ordered markers. Fixed on both sides: the parser now
+  preserves numbered lines as their own list items, and the JS renderer
+  (`renderPlansMarkdown`) renders an all-numbered block as a real
+  `<ol>`, with a mixed block (a numbered phase with its own nested
+  bullet sub-items) safely falling back to `<ul>` rather than losing
+  structure again. Regression tests added on both sides, confirmed
+  failing against the buggy code first.
+
 ### Added
 - **9:59am** — **TUI/CLI Screenshot Capture Tooling** **[Testing & dev tooling]** A real dev-only helper
   (`scripts/dev/tui_screenshot.py`) for showing actual rendered CLI/TUI
