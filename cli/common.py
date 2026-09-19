@@ -14,9 +14,16 @@ from pathlib import Path
 
 import click
 import questionary
+# Own Console, matching what every other cli/ module already does - see
+# plans/tooling.md #12, that per-module duplication is a real DRY seed
+# in its own right, not something to restructure in passing here.
+from rich.console import Console
 from questionary import Style
 
 from qa_tools.common.qa_results_writer import QA_RESULTS_DIR
+# Both orchestrators define an identical RUN_STEPS; importing one keeps
+# this helper honest about the real step count rather than hardcoding 5.
+from qa_tools.bdm.orchestrate_bdm import RUN_STEPS
 
 # S3 QA source mode (plans/tooling.md #1 Phase 3) - the real raw-data
 # bucket to browse. Env-provided, never hardcoded, since CDK
@@ -29,6 +36,8 @@ S3_BUCKET_ENV_VAR = "MOTHMAN_RAW_BUCKET_NAME"
 # ask): Tier 1 (human, day-to-day) = green, Tier 2 (machine/CI-only) =
 # blue, Tier 3 (developer debugging) = yellow/amber. Tier 4 is its own
 # separately-flagged exploratory bucket, not part of this scheme.
+console = Console()
+
 TIER_1 = "green"
 TIER_2 = "blue"
 TIER_3 = "yellow"
@@ -143,3 +152,66 @@ def raw_bucket_name() -> str:
             f"real raw-data bucket name (see aws/cdk/data_pipeline_stack.py's RawDataBucket)."
         )
     return bucket
+
+
+def chain_progress(label: str):
+    """Context manager for the real check chain's own progress indicator,
+    yielding an `on_step` callback to hand to
+    orchestrate_bdm/cp.run_single() (plans/tooling.md #13).
+
+    The chain takes ~13.5s and used to print exactly one line and then
+    nothing at all for the whole stretch - a static screen with no sign
+    the tool was alive, working, or hung. Keith, watching it in the
+    recorded demo: "20 seconds of like nothing and waiting and there's
+    no progress indicator."
+
+    This is a REAL progress measure, not a decorative one: the chain has
+    genuinely known, discrete steps (RUN_STEPS on either orchestrator -
+    one source of truth for both the labels and the count), so the bar
+    reflects actual position. The honest caveat is that those steps are
+    very unevenly sized - dbt-core ~5s and datacontract-cli ~6s dominate,
+    Soda Core and Evidently are ~0.1s each (plans/performance.md) - so it
+    advances in real but lumpy jumps. The spinner and elapsed-time
+    columns are what carry continuity across the two long steps, which
+    is exactly where a bare bar would look stalled.
+
+    `transient=True` so the finished bar erases itself and the real
+    report lands on a clean screen rather than under leftover chrome.
+    Falls back to a plain one-line print when stdout isn't a TTY (a
+    redirected log, CI), where an animated bar would just emit thousands
+    of control sequences into a file."""
+    from contextlib import contextmanager
+
+    from rich.progress import (BarColumn, Progress, SpinnerColumn, TextColumn,
+                               TimeElapsedColumn)
+
+    @contextmanager
+    def _run():
+        if not sys.stdout.isatty():
+            console.print(f"Running the real check chain for {label}...", style="dim")
+            yield None
+            return
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[dim]{task.description}[/dim]"),
+            BarColumn(bar_width=28),
+            TextColumn("[dim]{task.completed}/{task.total}[/dim]"),
+            TimeElapsedColumn(),
+            console=console,
+            transient=True,
+        ) as progress:
+            task = progress.add_task(f"Checking {label}", total=len(RUN_STEPS))
+            done = 0
+
+            def on_step(step_label: str) -> None:
+                nonlocal done
+                # Called BEFORE each step starts, so `done` is the count
+                # genuinely finished - never report work that hasn't
+                # happened yet just to make the bar move sooner.
+                progress.update(task, completed=done, description=f"Running {step_label}")
+                done += 1
+
+            yield on_step
+            progress.update(task, completed=len(RUN_STEPS), description="Done")
+
+    return _run()

@@ -20,6 +20,8 @@ Run as `python3 -m qa_tools.cp.orchestrate_cp` (this is a package
 now, not a flat script directory - see plans/qa-pipeline.md #84).
 """
 from __future__ import annotations
+
+from collections.abc import Callable
 import json
 import os
 import sys
@@ -45,18 +47,46 @@ RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
 CP_DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
 
 
-def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str) -> list[dict]:
+# The real, discrete steps one run of the check chain goes through, in
+# order - the single source of truth for both the labels a progress
+# indicator shows and how many there are (plans/tooling.md #13). The
+# chain takes ~13.5s and used to print NOTHING for that whole stretch,
+# so an operator got a static screen with no sign the tool was alive,
+# working, or hung. These are genuinely known steps, so an indicator
+# built on them is a real measure of progress rather than a decorative
+# fake - the one honest caveat being that they are very unevenly sized
+# (dbt-core ~5s and datacontract-cli ~6s dominate; Soda Core and
+# Evidently are ~0.1s each - see plans/performance.md), so the bar
+# advances in genuine but lumpy jumps.
+RUN_STEPS = ("dbt-core", "Soda Core", "datacontract-cli", "Evidently", "Dataset statistics")
+
+
+def _announce(on_step, label: str) -> None:
+    """Report the step ABOUT to start. Optional by design: every existing
+    caller (the full-manifest batch loop, the AWS Lambda handlers, the
+    tests) passes nothing and behaves exactly as before - only the
+    interactive CLI, where a human is actually watching, opts in."""
+    if on_step is not None:
+        on_step(label)
+
+def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str,
+             on_step: Callable[[str], None] | None = None) -> list[dict]:
     run_id = entry["run_id"]
     print(f"--- {run_id} ---")
 
     results: list[dict] = []
+    _announce(on_step, RUN_STEPS[0])
     results.extend(run_dbt_cp.evaluate_dbt_cp(run_id, run_timestamp))
+    _announce(on_step, RUN_STEPS[1])
     results.extend(run_soda_cp.evaluate_soda_cp(run_id, run_timestamp))
+    _announce(on_step, RUN_STEPS[2])
     results.extend(run_datacontract_cp.evaluate_datacontract_cp(run_id, run_timestamp))
+    _announce(on_step, RUN_STEPS[3])
     results.extend(run_evidently_cp.evaluate_evidently_cp(run_id, run_timestamp, reference_run_id=reference_run_id))
 
     # Same rationale as orchestrate_bdm.py's identical block - see
     # qa_tools/bdm/dataset_stats.py's own docstring.
+    _announce(on_step, RUN_STEPS[4])
     conn = duckdb.connect(os.path.join(CP_DUCKDB_RUNS_DIR, f"{run_id}.duckdb"), read_only=True)
     stats = dataset_stats.compute_dataset_stats(conn, entry)
     conn.close()
@@ -68,7 +98,8 @@ def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str
     return results
 
 
-def run_single(entry: dict, reference_run_id: str, run_by: str | None = None) -> list[dict]:
+def run_single(entry: dict, reference_run_id: str, run_by: str | None = None,
+               on_step: Callable[[str], None] | None = None) -> list[dict]:
     """The single-delivery counterpart to run_pipeline_cp()'s full-manifest
     batch loop - built for the AWS event-driven MVP (plans/running-
     thoughts.md #5 Thread B / docs/aws-event-driven-mvp-design.md).
@@ -91,7 +122,7 @@ def run_single(entry: dict, reference_run_id: str, run_by: str | None = None) ->
     counts from the live warehouse instead of trusting a passed-in one)."""
     run_timestamp = datetime.now(timezone.utc).isoformat()
     run_by = run_by or get_run_by()
-    return _run_one(entry, run_timestamp, run_by, reference_run_id)
+    return _run_one(entry, run_timestamp, run_by, reference_run_id, on_step=on_step)
 
 
 def run_pipeline_cp(sequential: bool = False) -> dict:

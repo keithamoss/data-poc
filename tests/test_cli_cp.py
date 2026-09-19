@@ -421,7 +421,13 @@ def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(
 
     captured = {}
 
-    def _fake_run_single(entry, reference_run_id=None, run_by=None):
+    def _fake_run_single(entry, reference_run_id=None, run_by=None, **kwargs):
+        # **kwargs so this double doesn't have to mirror run_single()'s
+        # full signature - it only asserts on the three arguments this
+        # test is actually about. Caught for real when run_single() grew
+        # an optional on_step callback (plans/tooling.md #13) and this
+        # fake rejected it, failing a test that has nothing to do with
+        # progress reporting.
         captured.update(entry=entry, reference_run_id=reference_run_id, run_by=run_by)
         return [{"status": "pass"}]
 

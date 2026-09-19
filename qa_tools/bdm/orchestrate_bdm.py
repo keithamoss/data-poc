@@ -26,6 +26,8 @@ Phase 4's completeness bar: mothman is the only programmatic access
 point to this repo).
 """
 from __future__ import annotations
+
+from collections.abc import Callable
 import json
 import os
 import sys
@@ -53,15 +55,42 @@ AGENCY_ID = "registry-services"
 DATASET_ID = "birth-registrations"
 
 
-def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str, reference_csv: str) -> list[dict]:
+# The real, discrete steps one run of the check chain goes through, in
+# order - the single source of truth for both the labels a progress
+# indicator shows and how many there are (plans/tooling.md #13). The
+# chain takes ~13.5s and used to print NOTHING for that whole stretch,
+# so an operator got a static screen with no sign the tool was alive,
+# working, or hung. These are genuinely known steps, so an indicator
+# built on them is a real measure of progress rather than a decorative
+# fake - the one honest caveat being that they are very unevenly sized
+# (dbt-core ~5s and datacontract-cli ~6s dominate; Soda Core and
+# Evidently are ~0.1s each - see plans/performance.md), so the bar
+# advances in genuine but lumpy jumps.
+RUN_STEPS = ("dbt-core", "Soda Core", "datacontract-cli", "Evidently", "Dataset statistics")
+
+
+def _announce(on_step, label: str) -> None:
+    """Report the step ABOUT to start. Optional by design: every existing
+    caller (the full-manifest batch loop, the AWS Lambda handlers, the
+    tests) passes nothing and behaves exactly as before - only the
+    interactive CLI, where a human is actually watching, opts in."""
+    if on_step is not None:
+        on_step(label)
+
+def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str, reference_csv: str,
+             on_step: Callable[[str], None] | None = None) -> list[dict]:
     run_id = entry["run_id"]
     csv_filename = entry["file"]
     print(f"--- {run_id} ---")
 
     results: list[dict] = []
+    _announce(on_step, RUN_STEPS[0])
     results.extend(run_dbt_bdm.evaluate_dbt_bdm(run_id, run_timestamp))
+    _announce(on_step, RUN_STEPS[1])
     results.extend(run_soda_bdm.evaluate_soda_bdm(run_id, run_timestamp))
+    _announce(on_step, RUN_STEPS[2])
     results.extend(run_datacontract_bdm.evaluate_datacontract_bdm(run_id, csv_filename, run_timestamp))
+    _announce(on_step, RUN_STEPS[3])
     results.extend(run_evidently_bdm.evaluate_evidently_bdm(
         run_id, csv_filename, run_timestamp, reference_run_id=reference_run_id, reference_csv=reference_csv))
 
@@ -71,6 +100,7 @@ def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str
     # real) data, so this is where it has to happen. See dataset_stats.py's
     # own docstring - Keith's hard rule, 2026-09-16: CI must never touch
     # data, only ever committed history.
+    _announce(on_step, RUN_STEPS[4])
     conn = duckdb.connect(WAREHOUSE_DB_PATH, read_only=True)
     stats = dataset_stats.compute_dataset_stats(conn, run_id, entry)
     conn.close()
@@ -85,7 +115,8 @@ def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str
 
 def run_single(run_id: str, csv_path: str, run_date: str, dirty_severity: str, reference_run_id: str,
                reference_csv: str, run_by: str | None = None, previous_run_id: str | None = None,
-               previous_csv: str | None = None) -> list[dict]:
+               previous_csv: str | None = None,
+               on_step: Callable[[str], None] | None = None) -> list[dict]:
     """The single-arrival counterpart to run_pipeline()'s full-manifest
     batch loop - built for the AWS event-driven MVP (plans/running-
     thoughts.md #5 Thread B / docs/aws-event-driven-mvp-design.md), called
@@ -172,7 +203,7 @@ def run_single(run_id: str, csv_path: str, run_date: str, dirty_severity: str, r
     # threaded, so there's no concurrent call this could race with.
     global WAREHOUSE_DB_PATH
     WAREHOUSE_DB_PATH = db_path
-    return _run_one(entry, run_timestamp, run_by, reference_run_id, reference_csv)
+    return _run_one(entry, run_timestamp, run_by, reference_run_id, reference_csv, on_step=on_step)
 
 
 def run_pipeline(sequential: bool = False) -> dict:

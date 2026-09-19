@@ -55,6 +55,30 @@ edited for a punchier, friendlier read than a bare commit log.
   report), and how Keith can invoke it.
 
 ### Fixed
+- **10:11pm** — **The Check Chain Now Shows Its Progress** **[Testing & dev tooling]** **[Dashboard UI]**
+  Watching the demo, Keith asked why there's "20 seconds of like nothing
+  and waiting and there's no progress indicator" — and whether a
+  progress bar was possible. It was, and a real one rather than a
+  decorative one: the chain has genuinely discrete steps, so a bar over
+  them measures actual position. The four tools plus the dataset-stats
+  computation are now declared once as the single source of truth for
+  both the labels and the count, and an optional callback threads
+  through to the CLI, which renders a spinner, the current tool's name,
+  a bar, the step count and elapsed time. The callback is optional by
+  design and defaults to off, so the batch pipeline, the Lambda handlers
+  and every existing test behave exactly as before — only the
+  interactive CLI, where someone is actually watching, opts in. Off a
+  TTY it degrades to a single printed line rather than spraying cursor
+  control codes into a redirected log.
+  One caveat is documented in the code rather than smoothed over: the
+  steps are very unevenly sized — dbt-core and datacontract-cli dominate
+  while Soda Core and Evidently take a fraction of a second each — so
+  the bar advances in real but lumpy jumps, and it's the spinner and
+  elapsed time that carry continuity across the two long steps. Verified
+  by re-recording the demo against the real CLI, the same artifact that
+  exposed the problem: that stretch went from roughly zero terminal
+  events and a 13.5-second frozen gap to 133 events with a largest gap
+  of 1.5 seconds, each tool visibly named as it runs.
 - **9:51pm** — **The Demo Recording Now Pauses Like a Person** **[Dashboard UI]** **[Testing & dev tooling]**
   Keith's read was right, and the numbers behind it explain why two
   earlier attempts at slowing the player down couldn't have worked.

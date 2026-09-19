@@ -128,7 +128,8 @@ def _load_delivery(run_id: str) -> None:
     _load_delivery_from_folder(run_dir, run_id)
 
 
-def run_check(run_id: str, run_by: str, reference_run_id: str | None = None) -> tuple[list[dict], str]:
+def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
+              on_step=None) -> tuple[list[dict], str]:
     """Runs the real check chain for one existing Synthetic manifest
     entry into a fresh throwaway location - never the real, permanent
     qa_results/ history directly. Returns (results, tmp_results_dir); the
@@ -160,12 +161,14 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None) -> 
     _load_delivery(reference_run_id)
     _load_delivery(run_id)
 
-    results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id, run_by=run_by)
+    results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id, run_by=run_by,
+                                        on_step=on_step)
     return results, tmp_dir
 
 
 def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
-                            run_id: str | None = None, run_date: str | None = None) -> tuple[list[dict], str]:
+                            run_id: str | None = None, run_date: str | None = None,
+                            on_step=None) -> tuple[list[dict], str]:
     """The Local files QA source mode's real check-running body (plans/
     tooling.md #1 Phase 2) - folds in qa_tools/cp/check_delivery.py's own
     retired logic: loads both folder and reference_folder's 6 real
@@ -185,7 +188,8 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
     _load_delivery_from_folder(folder, run_id)
 
     entry = {"run_id": run_id, "run_date": run_date, "dirty_severity": None}
-    results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id, run_by=run_by)
+    results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id, run_by=run_by,
+                                        on_step=on_step)
     return results, tmp_dir
 
 
@@ -211,7 +215,8 @@ def run_check_s3_delivery(bucket: str, delivery_prefix: str, reference_delivery_
 
 
 def run_check_single_table(table: str, file_path: str, run_by: str,
-                            run_id: str | None = None, run_date: str | None = None) -> tuple[list[dict], str]:
+                            run_id: str | None = None, run_date: str | None = None,
+                            on_step=None) -> tuple[list[dict], str]:
     """Single-table Child Protection QA (plans/tooling.md #1's own
     "Single-table Child Protection QA" design, Phase 3.5) - a real
     partial-resupply scenario (one table re-sent after a fix, the other
@@ -260,7 +265,8 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
         run_id, table, file_path, out_dir=build_cp_warehouses.OUT_DIR, raw_dir=build_cp_warehouses.CP_RAW_DIR)
 
     entry = {"run_id": run_id, "run_date": run_date, "dirty_severity": None}
-    results = orchestrate_cp.run_single(entry, reference_run_id=other_tables_run_id, run_by=run_by)
+    results = orchestrate_cp.run_single(entry, reference_run_id=other_tables_run_id, run_by=run_by,
+                                        on_step=on_step)
     return results, tmp_dir
 
 
@@ -382,7 +388,8 @@ def run_qa_interactive(commit_default: bool = False) -> None:
 
     console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {run_id}...",
                   style="dim")
-    results, tmp_dir = run_check(run_id, run_by)
+    with common.chain_progress(run_id) as on_step:
+        results, tmp_dir = run_check(run_id, run_by, on_step=on_step)
     _offer_promote(results, run_id, tmp_dir, commit_default)
 
 
@@ -406,7 +413,9 @@ def _run_qa_interactive_local_folder(run_by: str, commit_default: bool) -> None:
     run_id = local_run_id_from_path(folder)
     console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {folder}...",
                   style="dim")
-    results, tmp_dir = run_check_local_folder(folder, reference_folder, run_by, run_id=run_id)
+    with common.chain_progress(run_id) as on_step:
+        results, tmp_dir = run_check_local_folder(folder, reference_folder, run_by, run_id=run_id,
+                                                   on_step=on_step)
     _offer_promote(results, run_id, tmp_dir, commit_default)
 
 

@@ -103,11 +103,23 @@ player config in `dashboard/qa-reporting-dashboard.template.html`).
 Total runtime is ~48s, about the same as the old recording's effective
 playback at 0.4 — the time is simply spent where a viewer needs it now.
 
-## Known dead patch
+## The chain now shows progress
 
-The real check chain takes ~13.5s and the CLI prints **nothing** while
-it runs (`cli/bdm.py` prints one "Running the real ... chain for ..."
-line, then calls `run_check()` silently), so both the recording and a
-real terminal session sit frozen for that whole stretch. That's a real
-CLI gap rather than a recording artifact — logged as
-`plans/tooling.md` #13.
+The real check chain takes ~13.5s, and the CLI used to print **nothing**
+for that whole stretch — so both the recording and a real terminal
+session sat frozen on one line. That was a real gap in the CLI rather
+than a recording artifact, and it's fixed at the source
+(`plans/tooling.md` #13): the chain now reports each of its real steps
+(the 4 tools plus the dataset-stats computation) and `cli/common.py`'s
+`chain_progress()` renders a spinner, the current tool's name, a bar,
+the step count and elapsed time.
+
+In this recording that stretch went from **~0 terminal events and a
+13.5s frozen gap** to **133 events with a largest gap of 1.5s**. It's
+worth knowing when re-recording that this is why the `.cast` is ~71KB
+rather than ~26KB: the spinner redraws are real frames. Still plain
+text, still small enough that HTTP-level gzip covers it.
+
+Re-recording against a CLI *without* that progress reporting would
+silently reintroduce the frozen patch — if that ever shows up again,
+check the CLI first, not the pacing script.

@@ -102,7 +102,8 @@ def default_reference(manifest: list[dict]) -> tuple[str, str]:
     return first["run_id"], first["file"]
 
 
-def run_check(run_id: str, run_by: str, reference_run_id: str | None = None) -> tuple[list[dict], str]:
+def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
+              on_step=None) -> tuple[list[dict], str]:
     """Runs the real check chain for one existing Synthetic manifest entry
     into a fresh throwaway location - never the real, permanent
     qa_results/ history directly. Returns (results, tmp_results_dir); the
@@ -150,6 +151,7 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None) -> 
         reference_run_id, reference_csv, run_by=run_by,
         previous_run_id=previous_entry["run_id"] if previous_entry else None,
         previous_csv=previous_entry["file"] if previous_entry else None,
+        on_step=on_step,
     )
     return results, tmp_dir
 
@@ -179,7 +181,8 @@ def _run_single_preserving_manifest(*args, **kwargs) -> list[dict]:
 
 
 def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
-                          run_id: str | None = None, run_date: str | None = None) -> tuple[list[dict], str]:
+                          run_id: str | None = None, run_date: str | None = None,
+                          on_step=None) -> tuple[list[dict], str]:
     """The Local files QA source mode's real check-running body (plans/
     tooling.md #1 Phase 2) - folds in qa_tools/bdm/check_file.py's own
     retired logic: copies the reference CSV into raw_dir() under a real
@@ -201,6 +204,7 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
     results = _run_single_preserving_manifest(
         run_id, csv_path, run_date, None,
         reference_run_id=reference_run_id, reference_csv=reference_csv_filename, run_by=run_by,
+        on_step=on_step,
     )
     return results, tmp_dir
 
@@ -312,9 +316,12 @@ def run_qa_interactive(commit_default: bool = False) -> None:
         return
     run_id = run_id_from_choice(choice)
 
+    # plans/tooling.md #13 - this used to print the line below and then
+    # go completely silent for ~13.5s while the real chain ran.
     console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {run_id}...",
                   style="dim")
-    results, tmp_dir = run_check(run_id, run_by)
+    with common.chain_progress(run_id) as on_step:
+        results, tmp_dir = run_check(run_id, run_by, on_step=on_step)
     _offer_promote(results, run_id, tmp_dir, commit_default)
 
 
@@ -337,7 +344,9 @@ def _run_qa_interactive_local_file(run_by: str, commit_default: bool) -> None:
     run_id = local_run_id_from_path(csv_path)
     console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {csv_path}...",
                   style="dim")
-    results, tmp_dir = run_check_local_file(csv_path, reference_csv, run_by, run_id=run_id)
+    with common.chain_progress(run_id) as on_step:
+        results, tmp_dir = run_check_local_file(csv_path, reference_csv, run_by, run_id=run_id,
+                                                 on_step=on_step)
     _offer_promote(results, run_id, tmp_dir, commit_default)
 
 

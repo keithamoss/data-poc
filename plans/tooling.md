@@ -1369,7 +1369,7 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     conversation - the appetite question that would normally gate it is
     already answered.
 
-13. **[todo, 2026-09-19]** **[Testing & dev tooling]** The QA wizard
+13. **[done, 2026-09-19]** **[Testing & dev tooling]** The QA wizard
     goes completely silent for ~13.5 seconds while the real check chain
     runs. `cli/bdm.py`'s `_run_qa_interactive_synthetic()` prints one
     `"Running the real dbt-core/Soda Core/datacontract-cli/Evidently
@@ -1406,3 +1406,49 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     demo's dead patch for free, without faking anything - the fix is
     that the tool starts saying something, not that the recording hides
     the silence.
+
+    **Built the same evening, Keith's own ask on seeing the demo**: "it
+    says 20 seconds of like nothing and waiting and there's no progress
+    indicator. Is it possible to show a progress bar while that's
+    happening?" It is, and genuinely rather than decoratively - the
+    chain has real, discrete steps, so a bar over them measures actual
+    position rather than animating to look busy.
+
+    - **`RUN_STEPS`** on both orchestrators (identical, cross-checked by
+      a test) is one source of truth for the step labels AND the count:
+      the 4 real tools plus the `dataset_stats` computation. A bar sized
+      from it can't drift from what actually runs.
+    - **An optional `on_step` callback** threaded through
+      `_run_one()` -> `run_single()` -> each `cli/` `run_check*`. Optional
+      by design and defaulting to `None`, so the full-manifest batch
+      loop, the AWS Lambda handlers and every existing test behave
+      exactly as before - only the interactive CLI, where a human is
+      actually watching, opts in.
+    - **`cli/common.chain_progress()`** renders it: a spinner, the
+      current tool's name, a real bar, the step count and elapsed time,
+      `transient=True` so the report lands on a clean screen. It falls
+      back to a plain one-line print when stdout isn't a TTY - a
+      redirected log or CI runner gets no cursor-control spam.
+
+    Honest caveat, documented in the code rather than smoothed over: the
+    steps are very unevenly sized (dbt-core ~3.5s and datacontract-cli
+    ~5.5s dominate; Soda Core and Evidently are a fraction of a second -
+    matching `plans/performance.md`'s own measurements), so the bar
+    advances in real but lumpy jumps. The spinner and elapsed-time
+    columns are what carry continuity across the two long steps, which
+    is precisely where a bare bar would look stalled.
+
+    Verified by re-recording the demo against the real CLI, which is the
+    same artifact that exposed the problem: the chain window went from
+    **~0 terminal events and a 13.5s frozen gap** to **133 events with a
+    largest gap of 1.5s**, with each tool visibly named as it runs
+    (dbt-core -> Soda Core -> datacontract-cli -> Evidently). Real
+    rendered frames confirmed rather than assumed, e.g. at t=35s:
+    `⠹ Running datacontract-cli ━━━━━━━━━━━╺━━━━━━━━━━ 2/5 0:00:06`.
+    5 new tests (`tests/test_chain_progress.py`) cover the plumbing -
+    the two orchestrators agreeing on the steps, `_announce` being a
+    genuine no-op without a callback, ordered reporting, and the non-TTY
+    fallback. One pre-existing test double needed widening
+    (`tests/test_cli_cp.py`'s `_fake_run_single` mirrored the real
+    signature exactly and rejected the new optional kwarg) - fixed with
+    `**kwargs` so it stops re-breaking on unrelated signature growth.
