@@ -2436,6 +2436,9 @@ requirements:
         historical arrival.
       - THE SYSTEM SHALL permit composition to span the whole data
         asset, across agencies and collections.
+      - THE SYSTEM SHALL compose only after every table a run depends on
+        that is present in the supply has been loaded, so that a check
+        is never evaluated against a table still mid-load.
     non_functional_requirements:
       - CI must never compose, open or query a warehouse. Composition is
         real-run-time work only, the same rule dataset_stats.py follows -
@@ -2463,6 +2466,15 @@ requirements:
         2026-09-21). Closest to how a real pipeline behaves. The cost,
         accepted - a rebuild from committed history can replay recorded
         results but cannot re-derive them.
+      - Decided loading completes before QA runs, whether a human or an
+        automation triggers it, and QA then evaluates against the latest
+        version available of each table - from this supply where it
+        arrived in it, from an earlier one otherwise (Keith,
+        2026-09-21). This is what resolves the ordering tension a
+        tool-does-the-loading world creates, where placements could
+        otherwise be QA'd before carers has been loaded. It does not
+        remove the never-arrived case, which is a table that has no
+        version at all.
       - Decided composition may span the whole data asset rather than
         being fenced per collection or per agency (Keith, 2026-09-21).
         It is the only option supporting a check that spans agencies,
@@ -2571,7 +2583,7 @@ requirements:
         question, with the thing that matters already settled.
 
   - id: REQ-PIPE-038
-    title: qa_results is keyed per dataset, and existing history is rebuilt into that shape
+    title: qa_results is keyed per dataset, and today's history is regenerated
     date_written: "2026-09-21"
     story: >
       As whoever reads this QA history years from now, I want every
@@ -2583,9 +2595,9 @@ requirements:
     status: not_started
     source: >
       Keith, plans/publishing-and-history.md item 6, 2026-09-20 -
-      "qa_results/ keyed per dataset, which is where this item started",
-      plus his explicit approval to rebuild committed history for both
-      datasets as a one-off.
+      "qa_results/ keyed per dataset, which is where this item started".
+      Narrowed 2026-09-21 once he settled that the existing history is
+      deleted and regenerated rather than migrated.
     acceptance_criteria:
       - THE SYSTEM SHALL store every committed QA result under the
         dataset it describes.
@@ -2593,49 +2605,68 @@ requirements:
         cross-table scope rather than under a dataset.
       - THE SYSTEM SHALL key Child Protection and Birth Registrations by
         the same rule, with no per-dataset special case.
-      - THE SYSTEM SHALL rebuild the existing committed history for both
-        datasets into the new shape, once.
-      - THE SYSTEM SHALL perform that rebuild locally, and CI SHALL NOT
-        regenerate, open or query any data to do it.
-      - THE SYSTEM SHALL preserve each rebuilt run's original run_by and
-        run_timestamp, and SHALL additionally record that the file was
-        rebuilt and when.
-      - WHEN the rebuild has completed, THE SYSTEM SHALL leave no
+      - THE SYSTEM SHALL regenerate the committed history from scratch
+        under the new model, and SHALL NOT migrate, reshape or patch the
+        existing files.
+      - WHEN regeneration has completed, THE SYSTEM SHALL leave no
         committed results in the old shape.
-      - THE SYSTEM SHALL expose the rebuild as a mothman subcommand
+      - THE SYSTEM SHALL perform regeneration locally, and CI SHALL NOT
+        regenerate, open or query any data.
+      - THE SYSTEM SHALL expose regeneration as a mothman subcommand
         rather than a bare script.
     non_functional_requirements:
-      - This rebuild is a one-off exception to CLAUDE.md's rule that
-        nothing in qa_results/ is ever regenerated away. It is granted
-        for this restructure and generalises to nothing else - the
-        requirement should say so in as many words, because the next
-        session will read the precedent, not the permission.
+      - Deleting today's committed qa_results/ is a one-off exception to
+        CLAUDE.md's rule that nothing in it is ever regenerated away. It
+        is granted because this PoC's history is synthetic and two days
+        old, and it generalises to nothing - the requirement should say
+        so in as many words, because the next session will read the
+        precedent rather than the permission. In a real deployment the
+        history could not be regenerated at all, which is the whole
+        reason the rule exists.
       - The dashboard's activity feed derives "who QA'd what, when" from
-        run_by/run_timestamp plus git history. It must still build after
-        the rebuild, and the feed it produces should be inspected rather
-        than assumed.
-      - Measure committed size and file count before and after. CP goes
-        from 18 collection-level run directories to a per-dataset shape
-        while raw_output duplication disappears - both directions at
-        once, so the net is a real question rather than an obvious win.
-      - The rebuild must be idempotent and re-runnable, since it will be
-        got wrong at least once.
-      - Everything outside the genuinely changed shape should come out
-        equivalent. This repo is seeded and deterministic, so that is a
-        real proof rather than a smoke test.
+        run_by/run_timestamp plus git history. After regeneration it
+        will show one burst rather than the current spread. Inspect the
+        feed rather than assuming it survives.
+      - Measure committed size and file count before and after. Today it
+        is 1,850 files and 129MB - 1,760/118MB of it Birth
+        Registrations. raw_output is ~78% of a file's bytes and stops
+        being duplicated, while CP's 18 collection-level run directories
+        become a per-dataset shape, so the net is a real question rather
+        than an obvious win.
+      - Regeneration must be idempotent and re-runnable, since it will
+        be got wrong at least once.
+      - Seeded and deterministic, so regenerating twice produces the
+        same history and a diff stays a real correctness check.
     dependencies: [REQ-PIPE-034, REQ-PIPE-036, REQ-QAC-037]
     decisions:
-      - Decided rebuilt files carry BOTH their original run_by and
-        run_timestamp AND a record of the rebuild itself (Keith,
-        2026-09-21). Preserving the originals alone would have the
-        record quietly assert files were produced at times they were
-        not; stamping only the rebuild would collapse the activity feed
-        into one event. Two extra fields in ~1,850 JSON files is cheap.
-      - Measured before acting, so the exception's real cost is on
-        record - all 370 dataset_stats files carry a single run_by and
-        span about 26 hours on 2026-09-18 and 19. Machine-generated
-        history from one identity, not a long-accumulated multi-person
-        QA record.
+      - Decided to DELETE and regenerate rather than migrate (Keith,
+        2026-09-21, in as many words - "because the current data is all
+        synthetic, I'm happy to delete it all and regenerate it. We
+        don't need to do any migration or patching, just nuke it and
+        regenerate"). This is a PoC reset, not a migration pattern.
+      - That resolves a contradiction the earlier draft could not have
+        met. A CP run's raw_output is ONE scan document describing all
+        six tables - scanStartTimestamp, hasErrors and the rest apply to
+        the whole invocation - and it is 78% of the file. Splitting it
+        per dataset means either copying it into six files, each then
+        claiming a raw output that is not its own, or filtering a
+        document whose fields describe one invocation, which breaks the
+        genuinely-unmodified guarantee that makes raw_output worth
+        keeping. `verified` splits cleanly (12/13/11/10/7/6 for Soda);
+        raw_output does not.
+      - Rejected re-running the old runs to reshape them while calling
+        it a migration. That only works because the data is seeded and
+        synthetic - in a real deployment you cannot re-run a 2023
+        delivery - and a pipeline that is only safe because today's data
+        happens to be synthetic is the exact thing Keith rejected for
+        deploy-pages.yml. Deleting and regenerating is the same act
+        stated honestly, which is why it is acceptable and re-running-
+        as-migration would not have been.
+      - Note what regeneration is NOT doing. Birth Registrations' 1,760
+        files do not need re-keying - they are already under their own
+        dataset. What they need is the check_id rename from
+        REQ-QAC-039, which regeneration delivers for free rather than as
+        a rewrite of committed files.
 
   - id: REQ-QAC-039
     title: One hierarchy, stated once, including in a check's own identity

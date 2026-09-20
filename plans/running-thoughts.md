@@ -1493,3 +1493,46 @@ registrations), so there are candidates, but picking ones that stress
 the model differently - a single-table collection, a multi-table one, a
 different cadence - would tell us more than picking two that look like
 what exists.
+
+24. **[todo, 2026-09-21]** **[QA checks & contract]** Backfill a newly-added check across every historical supply.
+
+Keith, 2026-09-21, while working through `REQ-PIPE-038`, and it is the
+reason retention has a purpose rather than just a cost. His own framing:
+every version of every supply is already kept for operational reasons,
+but once a QA tool exists there is real value in the history - "we might
+want to add a new check to a table to pick up an issue that we identify
+downstream, and to do that we would also like to be able to rerun it
+against all of the historical supplies."
+
+So a new check is not only a forward-looking thing. Adding one should be
+able to answer "how long has this been wrong", which needs the check
+evaluated against supplies that arrived before it existed.
+
+**Tension to resolve before this is built**, flagged rather than
+resolved: `REQ-PIPE-035` records his own answer that a check is
+evaluated once against the composition current at the time and never
+recomputed. That was about an EXISTING check's result, which should
+stand as recorded. This is a NEW check evaluated against historical
+state, which is a different act - but it does require composing a
+warehouse as it was, which is the point-in-time composition that answer
+declined. The two are compatible only if the distinction is written
+down explicitly, and right now it is not.
+
+25. **[todo, 2026-09-21]** **[Pipeline & publishing]** A TUI entry point for loading a supply from S3 or the filesystem into Postgres, then running QA against it.
+
+Keith, 2026-09-21, thinking about where this tool sits operationally -
+"a world where this tool is also doing the loading into the database, so
+the user is choosing it from S3, it's loading into the database and then
+running QA, or indeed the automated version of that." A new `mothman`
+entry point alongside the existing ones.
+
+**His own words: not needed right now.** Logged so it is not
+rediscovered, not scoped.
+
+It matters to the item 6 work for one reason only, and that reason is
+already resolved: if the tool does the loading, a cross-table check can
+be reached before the table on its other side has been loaded. His
+resolution - all relevant data is loaded before QA runs, whether a human
+or an automation triggers it, and QA then runs against the latest
+version available of each table, whether that came from this supply or
+an earlier one.
