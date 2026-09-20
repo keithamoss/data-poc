@@ -498,6 +498,28 @@ Rough layout:
   bullet above: the failure mode is assuming a result still holds
   rather than confirming it does.
 
+  **The clock is the same rule, and broke the same way the same day.**
+  A session checked `TZ=Australia/Perth date` once at 15:12, then spent
+  the next several hours estimating the time from how much work had
+  happened instead of looking again - 5:40pm, 6:05pm, 7:10pm, "coming
+  up on 8pm" - and was over three hours out when Keith asked. It had
+  nudged him to stop working for the evening at what was actually
+  quarter to five.
+
+  This is worse than being wrong about the hour. The evening nudge a
+  few sections above exists because Keith asked for it, and a nudge
+  fired off an invented clock is one he learns to ignore - which costs
+  the real nudge later. Same for any date-sensitive write: a
+  `CHANGELOG.yaml` date or a `plans/*.md` entry stamped from a
+  remembered reading is wrong in a file, not just in a sentence.
+
+  So: **run the command, every time the answer matters.** Not once a
+  session, not when it feels like it might have got late - at each
+  natural pause, and always before saying a time out loud, nudging
+  about the hour, or writing a date into a file. It costs one command.
+  Estimating it from elapsed work feels reasonable and is exactly the
+  reasoning that produced a three-hour error.
+
 - **In a fresh session, do the environment setup UP FRONT - before
   running any test suite - rather than discovering what's missing from
   test failures.** Keith's own explicit ask, 2026-09-19, after watching
