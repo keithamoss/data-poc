@@ -281,20 +281,22 @@ def test_every_numbered_item_in_every_plans_file_is_parsed():
     count, so that a NEW plans file growing items cannot be forgotten
     the same way - which is exactly how this happened.
 
-    Scoped to items carrying the CURRENT `**[status, YYYY-MM-DD]**`
-    convention. Writing it caught a second, separate thing: 10 items
-    across three files still carry the pre-2026-09-18 shape
-    (`**[open, low]**`, `**[done]**` - a status and a PRIORITY, no date),
-    left behind by that convention's own retrofit. Those are a content
-    decision rather than a parser one, so they are tracked as such and
-    deliberately not asserted here."""
+    Writing it caught a second, separate thing: 10 items across three
+    files still carried the pre-2026-09-18 shape (`**[open, low]**`,
+    `**[done]**` - a status and a PRIORITY, no date), left behind by that
+    convention's own retrofit and silently unparsed for the same reason.
+    Those were retrofitted 2026-09-20, so this assertion is deliberately
+    UNSCOPED - anything shaped like a numbered item must parse, whatever
+    format it is in. An item written in some third shape should fail here
+    rather than vanish."""
     import re
     from pathlib import Path
     seen = {(i["file"], i["number"]) for i in parse_plans("plans")["items"]}
-    current_format = re.compile(r"^(\d+)\.\s+\*\*\[[a-z-]+,\s*\d{4}-\d{2}-\d{2}\]\*\*", re.M)
     missing = []
     for path in sorted(Path("plans").glob("*.md")):
-        for m in current_format.finditer(path.read_text()):
+        if path.name == "INDEX.md":
+            continue
+        for m in re.finditer(r"^(\d+)\.\s+\*\*\[", path.read_text(), re.M):
             if (path.stem, int(m.group(1))) not in seen:
                 missing.append(f"{path.name}#{m.group(1)}")
     assert not missing, f"{len(missing)} numbered items never parsed: {missing}"

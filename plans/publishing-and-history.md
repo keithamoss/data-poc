@@ -2579,7 +2579,9 @@ convention. Numbered independently from this file's own Thread/Phase
 structure above - these are discrete open questions, not part of any
 one Thread's narrative.
 
-1. **[todo, medium]** **[Pipeline & publishing]** No CI. Nothing re-runs
+1. **[todo, 2026-09-14]** **[Pipeline & publishing]** Medium priority (the
+   original tag's own word, preserved through the 2026-09-20 retrofit).
+   No CI. Nothing re-runs
    `qa_tools/bdm/orchestrate_bdm.py` against upstream tool releases, so a
    `dbt-core`/`soda-core-duckdb`/`datacontract-cli`/`evidently` update
    could silently break this and we wouldn't know. A scheduled job (even
@@ -2675,7 +2677,7 @@ one Thread's narrative.
    dates, same row counts), confirming the split is behaviour-preserving,
    not just a plausible-looking rewrite.
 
-3. **[done]** **[Pipeline & publishing]** `generator/`, `pipeline/`, and
+3. **[done, 2026-09-14]** **[Pipeline & publishing]** `generator/`, `pipeline/`, and
    `synthetic_data_generator/` got the same treatment `plans/qa-
    pipeline.md` #84 gave `real_tools/` -> `qa_tools/`: real Python
    packages (an `__init__.py` each, `-m` invocation, real absolute
@@ -2761,7 +2763,7 @@ one Thread's narrative.
    run by other people evaluating the PoC, on their own machines, not
    just the one it was built on.
 
-4. **[superseded]** **[Pipeline & publishing]** Versioning the checks
+4. **[superseded, 2026-09-16]** **[Pipeline & publishing]** Versioning the checks
    themselves, with that version flowing through to the results/data
    each check run captures - Keith's own framing, raised right after
    `plans/dashboard.md` #5's time-travel build: "a useful thing to have

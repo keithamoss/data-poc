@@ -28,7 +28,7 @@ separate subprocess calls (`dbt run` then `dbt test`).
 
 ## Done
 
-1. **[done, high]** Combine `dbt run` + `dbt test` into a single
+1. **[done, 2026-09-14]** **[Pipeline & publishing]** Combine `dbt run` + `dbt test` into a single
    `dbt build` call, in both `run_dbt_real.py` and `run_dbt_real_cp.py`.
    Same work (build the model(s), then run their tests) in about half the
    time — verified directly with isolated CLI timing on one CP run:
@@ -51,7 +51,7 @@ separate subprocess calls (`dbt run` then `dbt test`).
    which both files' existing parsing already silently skips (test-node
    lookups return `None` for anything that isn't a test).
 
-2. **[done, high]** Fixed a real, live bug found *while* implementing #1,
+2. **[done, 2026-09-14]** **[Pipeline & publishing]** Fixed a real, live bug found *while* implementing #1,
    not a hypothetical: `run_dbt_real.py`'s dbt invocation had no
    `--select` at all. This was fine when the dbt project only contained
    `stg_birth_registrations` (the whole project *was* the selection), but
@@ -69,7 +69,8 @@ separate subprocess calls (`dbt run` then `dbt test`).
 
 ## Open — filed away, not implemented
 
-3. **[investigated, low — no action taken]** datacontract-cli's ~6-7.6s/run
+3. **[done, 2026-09-14]** **[Pipeline & publishing]** Investigated, no
+   action taken. datacontract-cli's ~6-7.6s/run
    cost, profiled properly (2026-09-14) rather than left as a guess.
    Phase-by-phase timing of `evaluate_datacontract_real()` confirmed the
    cost is genuinely inside `.test()`, not import/setup: import 0.349s,
@@ -98,7 +99,7 @@ separate subprocess calls (`dbt run` then `dbt test`).
    this pays off"), now with real evidence behind that call rather than a
    guess.
 
-4. **[done, medium]** Parallelize across the independent runs
+4. **[done, 2026-09-14]** **[Pipeline & publishing]** Parallelize across the independent runs
    (multiprocessing — each run is its own isolated DuckDB file, no shared
    mutable state between runs by design). Scoped via questions first
    (2026-09-14): both `orchestrate_real.py` and `orchestrate_real_cp.py`
@@ -141,7 +142,9 @@ separate subprocess calls (`dbt run` then `dbt test`).
    worth it for occasional local/manual runs" framing turned out wrong -
    worth having by default regardless of how often this actually runs.
 
-5. **[open, low]** Smaller-scope parallelism: within a single run, run
+5. **[todo, 2026-09-14]** **[Pipeline & publishing]** Low priority (the
+   original tag's own word, preserved through the 2026-09-20 retrofit).
+   Smaller-scope parallelism: within a single run, run
    the dbt subprocess concurrently with the three in-process Python calls
    (Soda / datacontract-cli / Evidently) via a thread pool, since none of
    them touch each other's state. Avoids #4's `target/` collision problem

@@ -5359,15 +5359,34 @@ simplifications before any real tool ran, and nothing since has changed
 that assessment. Listed here so they don't get lost, not because they're
 urgent.
 
-7. **[open, low]** ODCS severity is single-tier (pass/fail or pass/warn,
+7. **[superseded, 2026-09-18]** **[QA checks & contract]** ODCS severity is single-tier (pass/fail or pass/warn,
    never a three-way band). `contract_engine.py` encodes that into the
    dashboard's two-threshold shape as warn==fail (error severity) or an
    unreachable fail ceiling (warning/info severity). Real, not a bug —
    revisit only if the dashboard's shape itself changes.
 
-8. **[open, low]** Soda's `row_count` check is a genuine two-sided range
+   **Marked superseded 2026-09-20**, during the retrofit of the 10 items
+   left carrying the pre-2026-09-18 tag shape. Two independent reasons,
+   either of which would do it. `contract_engine.py` no longer exists —
+   the whole `engines/` directory of hand-written stand-ins was removed
+   once real tool access arrived (item 83), so this describes code that
+   is gone. And the substance was resolved separately by item 74's fix:
+   the dashboard now carries each tool's OWN verdict rather than
+   re-deriving status from a warn/fail pair, which is precisely the
+   squeeze this item was describing.
+
+8. **[superseded, 2026-09-18]** **[QA checks & contract]** Soda's `row_count` check is a genuine two-sided range
    (too few *or* too many rows); `soda_engine.py`'s `_numeric_threshold()`
    reduces it to the upper bound only for display — the one place a piece
    of real information (the lower bound) is dropped for a single scalar.
    Would need a dashboard/schema change (a second threshold field) to fix
    properly, not just an engine change.
+
+   **Marked superseded 2026-09-20**, same retrofit and the same two
+   reasons as #7 — `soda_engine.py` is gone with the rest of `engines/`,
+   and item 74's fix addressed the substance. The specific remedy this
+   item asked for is now visible in the rendered card: a check with no
+   single-sided threshold shows *"status is this tool's own verdict"*
+   rather than a fabricated scalar. The lower bound is still not
+   displayed as a number, so if that specific gap matters it wants a new
+   item against the real Soda path rather than reviving this one.
