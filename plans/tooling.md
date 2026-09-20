@@ -1651,6 +1651,57 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     three actually moved the number, rather than doing all three and
     assuming.
 
+    **RESOLVED 2026-09-20, and mostly in the direction of "this is not a
+    problem".** Two things settled it.
+
+    **New evidence, from the same day's `delivery-architect` and
+    `delivery-dashboard-ux` runs.** Lever 3 was used on both without
+    labelling it a test - each was handed a 181-line extract in a
+    scratchpad file rather than told to go read `plans/qa-pipeline.md`
+    item 25. Neither got cheaper:
+
+    | agent | tokens | tool calls | wall clock |
+    |---|---|---|---|
+    | `delivery-scoper` (cold, no extract) | 97,907 | 29 | 5m21s |
+    | `delivery-architect` (given the extract) | 109,458 | 31 | 5m06s |
+    | `delivery-dashboard-ux` (given the extract) | 106,865 | 28 | 5m27s |
+
+    They skipped the ~58k file and spent it elsewhere, on reading real
+    code - which is what they are for. The architect's note cites line
+    numbers across a dozen files and found three config-hash traps
+    nobody had spotted; it earned those tokens. Honest limit on this
+    evidence - only totals are visible, since inspecting what each
+    agent actually read means pulling its transcript into the main
+    session and costs more than it tells us.
+
+    **So the reframe: ~100-130k and ~5 minutes is the price of a
+    thorough agent pass, not waste.** The levers move WHERE the context
+    goes, not how much of it there is.
+
+    **Keith's call, same day, on being shown that: latency is "definitely
+    not an impact".** That closes the speed motivation entirely, and
+    with it levers 1 and 3 as speed measures - lever 1 (splitting
+    `plans/qa-pipeline.md`) still stands on its own merits under #17,
+    which is about every session's start cost rather than agents.
+
+    **Lever 2 (`omitClaudeMd`) is formally CLOSED, not merely
+    deprioritised.** This item's own correction already showed it was
+    weak; the deciding evidence is that `delivery-scoper` visibly USED
+    `CLAUDE.md` on its first real run, citing the enumerate-every-
+    consumer convention, Thread D's settled "no CLI" call and the real
+    check-yaml quoting incident in its NFRs - none of which appear in
+    `docs/project-context-for-agents.md`. Dropping it would have cost
+    real output quality to save ~12k tokens nobody is short of.
+
+    **What remains live is a different lever this item never considered -
+    model choice**, which acts on generation, the half that actually
+    dominates. All 8 agents default to `model: opus`. Keith, same day -
+    "I'm open to experimenting with different model choices". Being set
+    up as a real controlled comparison rather than a guess, since the
+    2026-09-19 runs left high-quality Opus baselines on a task whose
+    answers are now known - see this item's own follow-up once the
+    result is in.
+
 16. **[done, 2026-09-19]** **[Testing & dev tooling]** **[Docs & process]**
     All 8 `delivery-*` agents declared a tool that can never work, and
     `docs/agent-orchestration.md` documents a workflow that cannot
