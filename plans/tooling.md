@@ -2118,14 +2118,45 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     clearly in `requirements.yaml`'s own header: "populated by the
     requirements-reviewer agent, not the scoper... a real paper trail
     distinct from just which tests pass." It has **zero uses**, and not
-    through neglect. The agent it names is now `delivery-critic`, whose
-    tools are `Read, Grep, Glob, Bash, mcp__playwright` - deliberately
-    read-only, recorded in `plans/wider.md` #10 as an explicit
-    divergence from the `zhsama/claude-sub-agent` precedent. **The field
-    was assigned to an agent constitutionally incapable of writing it**,
-    and a grep of every `.claude/agents/*.md` and `docs/*.md` finds not
-    one mention of the field, so nothing tells the main session to
-    transcribe it either.
+    through neglect.
+
+    **First diagnosis, and it was wrong.** This entry originally said
+    the field had been assigned to `delivery-critic`, which is
+    read-only, so nothing could write it. Keith corrected that the same
+    day: the main session does all the writing regardless, so write
+    permission was never the constraint. He is right, and the real
+    numbers make it plain. Of the five fields added in that one commit,
+    counted across the five requirements written since:
+
+    | field | used |
+    |---|---|
+    | `source` | 5/5 |
+    | `non_functional_requirements` | 5/5 |
+    | `dependencies` | 4/5 |
+    | `open_questions` | 2/5 |
+    | `evidence` | **0/5** |
+
+    Same author, same file, same commit, same session. Permission
+    explains none of that spread.
+
+    **What does explain it is the handoff FORMAT.** The four populated
+    fields are all ones `delivery-scoper` produces, and its output
+    contract is a YAML block that gets pasted straight in. `evidence` is
+    the only one assigned to a stage - the critic - whose output
+    contract is a **prose report**. It never arrives in a shape that
+    lands in the file, so it does not land. `open_questions` at 2/5
+    rather than 5/5 is honest absence (not every requirement has one);
+    `evidence` at 0/5 is not, because all five of those requirements
+    genuinely WERE verified against real code. The evidence existed and
+    had nowhere to go.
+
+    A grep of every `.claude/agents/*.md` and `docs/*.md` still finds
+    not one mention of the field, which is the same point from the other
+    side: no stage is told to emit it in a form anything can use.
+
+    The actionable version, then, is narrow and cheap: give the critic's
+    output contract a YAML fragment alongside its report, the way the
+    scoper's already has one. Whether that is worth doing at all is #20.
 
     Neither cited source prescribes it. EARS is purely a phrasing
     template set and has no opinion on attributes at all. The
@@ -2149,18 +2180,30 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     covered by CI-enforced fields (`linked_tests` for testing and
     demonstration, `implements` for inspection) and the fourth
     (analysis) already lands in `plans/*.md`/`CHANGELOG.md`. `evidence`
-    has zero uses across 27 requirements and, as #18 traces, was
-    assigned to a read-only agent that cannot write it.
+    has zero uses across 27 requirements - and, per #18's own corrected
+    diagnosis, that is a handoff-format problem rather than a
+    permissions one: it is the only optional field assigned to a stage
+    whose output is prose rather than a pasteable YAML block.
 
-    Three real options, none picked: **retire it** (a field nothing
-    fills is noise in a schema whose whole value is that its fields are
-    real); **give it a write path** (name which step populates it, the
-    way `implements` now has CI as its forcing function); or **narrow it
-    to analysis specifically** - the one method genuinely uncovered -
-    which would give it a reason to exist that it currently lacks.
-    Worth deciding rather than leaving a field that quietly teaches
-    whoever reads the schema next that optional fields here are
-    decorative.
+    Three real options, none picked:
+
+    - **Retire it.** A field nothing fills is noise in a schema whose
+      whole value is that its fields are real, and it quietly teaches
+      whoever reads the schema next that optional fields here are
+      decorative.
+    - **Give it a write path.** Concretely: add a YAML fragment to
+      `delivery-critic`'s output contract, the way `delivery-scoper`
+      already has one. Cheap, and it would work - the four fields the
+      scoper emits are at 4/5 or 5/5. The question is whether the
+      content is worth having once `implements` and `linked_tests`
+      cover inspection, testing and demonstration between them.
+    - **Narrow it to analysis specifically** - the one method genuinely
+      uncovered (a measurement or derivation that proves a requirement
+      holds without executing it). That would give it a reason to exist
+      that it currently lacks, and a much clearer authoring rule than
+      "what was checked and how", which today overlaps three fields.
+
+    Worth deciding rather than leaving as-is.
 
 19. **[todo, 2026-09-20]** **[Docs & process]**
     **PARKED by Keith, 2026-09-20**, same conversation as #18.
