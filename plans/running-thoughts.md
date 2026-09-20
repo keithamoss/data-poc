@@ -1105,3 +1105,42 @@ stays serial for easy single-test debugging. Whether to also enable
 `-n auto` in CI's own `test.yml` (lower risk there - no interactive
 debugging happening) is a real, deliberately unactioned follow-up, not
 decided here.
+
+13. **[todo, 2026-09-20]** **[Docs & process]** Make `plans/*.md` ephemeral and tie everything to requirements; make `CHANGELOG.md` shorter and human-first.
+
+Keith, in passing while deciding whether `requirements.yaml`'s
+`evidence` field survives (`plans/tooling.md` #20): *"I feel like I'm
+going to start making the plan files ephemeral and have everything tied
+to requirements... and also changelog will get a lot more shorter, a lot
+more for humans first."*
+
+Not scoped, and deliberately captured rather than acted on. But it is
+already load-bearing for a decision in flight, so it is not a
+someday-idea: **the main argument against keeping `evidence` was that
+its content is already recorded in `CLAUDE.md`, `plans/*.md` and
+`CHANGELOG.md`, so the field would be a second copy that drifts. If
+those three stop being the durable record, that argument collapses** -
+`requirements.yaml` becomes the permanent home and measured facts have
+nowhere else to live. See #20 for the version of that decision that
+accounts for this.
+
+Worth noting what this direction is consistent with, because it is not a
+whim: the third `plans/INDEX.md` proof (`plans/tooling.md` #17) found
+that an index over the plans files is a faithful index of *stale* text -
+`touches:` pointed at the wrong files for item 25 because that item's
+own prose was stale, and the pointers inherited the staleness while
+looking authoritative. Keith's own read at the time: requirements "point
+to the files involved... that's a better source than the plan files,
+which are going to be high level, kind of almost like ephemeral
+artifacts." `implemented_by` (#18) is the first real piece of that
+shift, not a standalone feature.
+
+Real questions this raises, none answered here: what happens to the ~80
+`done` write-ups that exist precisely so a session does not re-derive a
+settled decision (`CLAUDE.md`'s own stated reason for the
+read-everything rule); whether a requirement can carry that kind of
+narrative at all or needs a new field for it; whether the Plans tab and
+`plans/INDEX.md` survive the change or are replaced by the Requirements
+panel; and what "human-first" means concretely for `CHANGELOG.md`, which
+is currently long *because* it doubles as the project's own design
+record. Scope with Keith before building any of it.
