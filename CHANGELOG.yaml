@@ -29,6 +29,38 @@
 #   - Headlines can have some life in them. Mapa's are the bar:
 #     "Begone, weird highlighting bug", "No menu for you".
 #
+# LENGTH. Measured against Mapa's own live feed on 2026-09-20 (the
+# production branch - main was four versions stale, and reading it gave
+# numbers that were wrong by a third), 7 releases and 44 items:
+#
+#                     min   median   mean   p90   max
+#   item description   13      27     30.1    49    79
+#   headline            1       2      3.0     5    16
+#
+# So the targets here, and they are targets rather than limits - Mapa
+# has a 79-word item and it earns it:
+#
+#   - `description`: around 25-35 words. Up to 35 is comfortable; past
+#     that, ask what the extra words are doing. This file's own first
+#     ten items averaged 49 and ran to 85, which is what prompted
+#     measuring: "way too long... maybe 30% of the size" (Keith).
+#   - `headline`: 2-5 words. Mapa's median is 2. Ours were averaging
+#     6.5 - "Four things the register said we hadn't built" says in
+#     eight what "Four things we'd already built" says in four.
+#   - `summary`: REQUIRED here, and no more than 20 words (Keith,
+#     2026-09-20). Mapa leaves it out on six of its seven releases, so
+#     this is a deliberate divergence, not an imitation: we group by
+#     day rather than by named version, and a day needs a line telling
+#     a reader whether it is worth their time. Twenty words is the
+#     point where it stops being that line and starts being a
+#     paragraph.
+#
+# None of this is gated. Word count IS machine-checkable, unlike voice,
+# so it could be - it is not, because a hard cap would push an author
+# into dropping the word that carried the meaning rather than into
+# writing a better sentence, and because the one real outlier in
+# Mapa's own feed is a good entry. Review is what holds it.
+#
 # Where the engineering detail went, and why this is safe: every built
 # requirement in requirements.yaml now carries `evidence:` (what was
 # measured, with the number) and `decisions:` (what was decided, and what
