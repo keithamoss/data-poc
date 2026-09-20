@@ -1325,3 +1325,46 @@ adding a field is common and not obviously an error); whether this is
 one check per dataset or one per column; and which tool owns it, since
 the ODCS contract already declares the schema and datacontract-cli may
 already be able to assert it without a new check being written at all.
+
+18. **[todo, 2026-09-20]** **[Docs & process]** The check-metadata authoring guidance in `plans/publishing-and-history.md` Thread D is scheduled for deletion and ~95 things point at it.
+
+Surfaced while deciding where `REQ-QAC-024`'s plain-English authoring
+rules should live (Keith's own question: "whether they're actually
+encoded as part of rules anywhere, or whether they're just decisions
+attached to a requirement"). That question got answered - the rules now
+live in the new `docs/check-authoring-rules.md`. This is the adjacent
+problem it uncovered, which is not answered.
+
+Thread D's **"Authoring: no CLI - structured metadata lives directly in
+each check's own definition"** section is the only written account of
+how check-lifecycle metadata gets authored: the per-tool mechanics
+(dbt's `meta:`, Soda's `attributes:`, the contract's
+`customProperties:`, Evidently's plain dict), each one verified against
+the real installed package rather than assumed, plus the confirmed field
+set and the `check_id` format. That section is marked
+`**Status:** done (2026-09-16)`.
+
+Under the standing rule confirmed 2026-09-20 (`CLAUDE.md`: requirements
+are the permanent artifact, plans prose comes out as its requirements
+land), `done` prose is what gets deleted. But **a real grep counts 95
+references to `publishing-and-history.md` from outside `plans/`** -
+three GitHub Actions workflows, all four active `contract/*.yml` check
+files' own header comments, `pipeline/build_dashboard_data.py`,
+`generator/generate_runs.py`, `requirements.yaml` itself, and a long
+tail of tests. Those are not decorative: a contract file's header says
+"see Thread D" as the explanation for why an `attributes:` block is
+there at all.
+
+So the open question is narrow and worth settling before the
+back-catalogue deletion pass reaches this file, not during it: does the
+Thread D authoring content move somewhere durable (the obvious
+candidate is `docs/check-authoring-rules.md`, which now exists and
+already owns the prose half of the same subject), or does deleting it
+mean 95 pointers resolve to nothing? `REQ-QAC-006` is the requirement
+that covers check lifecycle, so its `decisions:` is the other
+candidate - but the per-tool mechanics are authoring instructions, not
+decisions about that requirement, which is exactly the distinction that
+sent the plain-English rules to `docs/` rather than to `decisions:`.
+
+Not scoped. Flagged rather than acted on because it is a judgement about
+the deletion pass as a whole, not about this one file.

@@ -5,6 +5,12 @@ module rather than living inside run_evidently_cp.py itself - see
 qa_tools/bdm/evidently_check_lifecycle.py's own docstring for why
 (Evidently's checks have no YAML definition of their own to carry
 metadata the way dbt/Soda/the contract do).
+
+Writing the reader-facing prose (description/failure_indicates/
+technical_note): docs/check-authoring-rules.md is the standing
+authoring standard - read it before adding or editing any of the
+three. The lifecycle gate only checks that failure_indicates is
+present; nothing enforces the wording rules.
 """
 from __future__ import annotations
 

@@ -35,6 +35,12 @@
 # its own vocabulary, and a real collision was found (and fixed) between
 # Soda's and the contract's identically-named checks on the BDM side
 # before this suffix convention was adopted - applied proactively here.
+#
+# Writing the reader-facing prose (description/failure_indicates/
+# technical_note): docs/check-authoring-rules.md is the standing
+# authoring standard - read it before adding or editing any of the
+# three. The lifecycle gate only checks that failure_indicates is
+# present; nothing enforces the wording rules.
 
 checks for cp_clients:
   - row_count:

@@ -25,6 +25,17 @@
 # - found by tracing why a 3.0.2-shaped `team:` kept failing lint even
 # though it matched the real odcs-3.0.2.schema.json's own `team` definition
 # exactly. Declaring v3.2.0 here matches what is actually enforced.
+#
+# Every quality rule below carries a `customProperties:` block with
+# check-lifecycle metadata (check_id/introduced_date/changelog) -
+# plans/publishing-and-history.md Thread D, Phase 1.
+#
+# Writing the reader-facing prose (description/failure_indicates/
+# technical_note): docs/check-authoring-rules.md is the standing
+# authoring standard - read it before adding or editing any of the
+# three. The lifecycle gate only checks that failure_indicates is
+# present; nothing enforces the wording rules.
+
 apiVersion: v3.2.0
 kind: DataContract
 id: bdm-birth-registrations

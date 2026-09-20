@@ -1345,58 +1345,40 @@ requirements:
         deliberately, not an unexamined default.
     decisions:
       - >
-        The authoring rules below were settled with Keith over 25 real
-        checks reviewed three at a time on 2026-09-20, not drafted up
-        front. Every one of them came from him rejecting a specific
-        draft, so they are recorded here rather than in a style guide
-        nobody reads - this is the memory of what "sounds right" means
-        for this project.
+        The plain-English authoring rules live in
+        docs/check-authoring-rules.md, not here. They were settled with
+        Keith over 25 real checks reviewed three at a time on
+        2026-09-20, each one from him rejecting a specific draft - but
+        they are a standing standard governing every check authored from
+        here on, across every tool and every dataset, not a record of
+        this requirement's own build. A one-off migration pass is the
+        wrong owner for a rule that outlives it: this requirement goes
+        `built` and is never opened again, while the next person adding
+        a check needs the rules and has no reason to look here. The doc
+        carries each rule together with the draft it replaced, and this
+        field deliberately does not restate any of it, so there is only
+        ever one copy to keep true.
       - >
-        No agency names in a description. "BDM's unique registration
-        identifier" became "Every registration identifier must be
-        unique" - the reader knows whose data they are looking at from
-        where they are standing in the dashboard.
+        Decided a standing docs/ reference rather than leaving the rules
+        as decisions on this requirement, or putting them in
+        check_lifecycle.py's CheckMetadata comment. docs/ is an existing,
+        proven third category the 2026-09-20 "requirements are permanent,
+        plans are ephemeral" rule never traded away - docs/components.md
+        is the precedent, a standing convention doc read at authoring
+        time and kept honest by a real CI test. CheckMetadata was
+        rejected as the home because someone editing a contract YAML is
+        not reading a Python dataclass; it keeps the field mechanics,
+        which is what code can actually express.
       - >
-        No enumerated value lists. "Sex must be one of the closed value
-        set M, F, or X" became "one of the values the contract allows".
-        The values already exist structurally in the check definition
-        and often on the column too, so prose is a third copy and the
-        only one that cannot be filtered, counted or validated. This is
-        what prompted plans/running-thoughts.md #16 - a histogram of
-        real value counts answers "which values" better than a sentence
-        restating the contract.
-      - >
-        For an invalid-values check specifically, do not restate the
-        check type's purpose - "must be one of the allowed values" is
-        what that check IS. State the TOLERANCE, which is what actually
-        differs between instances: one tolerates a few and fails on a
-        sustained rise, another tolerates none.
-      - >
-        "Most likely" is not a licence to guess. Author
-        `failure_indicates` only where the cause is genuinely known;
-        where the honest answer is a plausible-sounding story, the
-        value is `self-evident`. Two of the first three drafts were
-        rejected on this and both became self-evident. Roughly half of
-        the 25 reviewed did.
-      - >
-        Never leak synthetic-data or delivery mechanics into
-        reader-facing text. "within 7 days of this run's own
-        date_registered" assumes a run concept that will not exist in
-        production. Neither will "a day's registrations" - that assumes
-        a cadence. Compare against "the previous supply" instead.
-      - >
-        Say nothing about what to DO about a failure. Remediation
-        belongs to the ticket, which is a live thing with an owner and
-        a state; a check definition is a standing fact, and the two rot
-        at different rates.
-      - >
-        `technical_note` is KEPT but narrowed, and may well go unused
-        in this pass. It must not hold synthetic-data generation facts
-        - those are meaningless in production - and it must not hold
-        notes that really describe a GAP, which should be fixed
-        instead. Both rejected candidates failed on exactly those two
-        grounds, and the second became plans/running-thoughts.md #17,
-        QA'ing the schema itself.
+        Nothing enforces the wording rules, and that was accepted with
+        the consequence named. The lifecycle gate can only check that
+        failure_indicates is present - it cannot tell whether a
+        description names an agency or lists allowed values. This
+        project has already proved that a field with no forcing function
+        stays empty (`evidence` at 0/27 uses with a better spec than
+        most), so the mitigation is discoverability rather than
+        enforcement: the gate's own failure message names the doc, and
+        so do the contract files' header comments.
       - >
         A measured correction to this requirement's own reasoning: the
         NFR claiming "on the order of 8 distinct texts" justified the
@@ -1409,22 +1391,22 @@ requirements:
         other sets" - so nobody re-proposes dropping it without this
         context, or re-proposes it on the original, disproven count.
       - >
-        The dominant shape of the work is SPLITTING, not writing. Many
-        descriptions already carry the failure meaning welded on with
-        no statement of what the check verifies at all - "A
-        registration date earlier than the birth date indicates a
-        corrupt or misjoined record" never says the dates must be in
-        order. Splitting reuses wording already approved once, which is
-        faster and lower-risk than authoring fresh.
+        The dominant shape of THIS pass is splitting, not writing. Many
+        existing descriptions carry the failure meaning welded on with
+        no statement of what the check verifies at all, so the work is
+        mostly moving approved wording into the right field rather than
+        authoring fresh prose - faster and lower-risk than it looked
+        when scoped. The rule that falls out of it (a description states
+        what the check verifies; the failure meaning belongs in
+        failure_indicates) is in the doc.
       - >
-        Shared wording across tools is permission, not obligation, and
-        the difference matters. 182 of 257 active checks share
-        description text with a sibling, but some of that text papers
-        over a real difference: dbt's accepted_values is pass/fail,
-        Soda's invalid_percent tolerates up to 2%, and a third variant
-        scopes to the most recent supplies only. Same rule, three
-        different questions. Part of the pass is splitting wording
-        apart, not only collapsing it.
+        Measured before starting, as the real scale of the pass: 257
+        active checks, 140 distinct description texts, 6 with no
+        description at all, and 182 of 257 sharing description text with
+        a sibling. That last number is why "shared wording is permission,
+        not obligation" needed to be a rule - most of the corpus is
+        shared text, and some of it papers over a real difference in
+        what the sibling checks actually ask.
       - >
         Rewriting a description must never move the check. That is what
         REQ-QAC-023 fixed - name and column used to be recovered from

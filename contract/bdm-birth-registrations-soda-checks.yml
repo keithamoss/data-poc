@@ -21,6 +21,12 @@
 # SodaCL (confirmed against the installed soda-core package's own
 # SodaCL parser - see qa_tools/common/check_lifecycle.py's own
 # docstring), not something invented for this.
+#
+# Writing the reader-facing prose (description/failure_indicates/
+# technical_note): docs/check-authoring-rules.md is the standing
+# authoring standard - read it before adding or editing any of the
+# three. The lifecycle gate only checks that failure_indicates is
+# present; nothing enforces the wording rules.
 
 # --- Data drift: a row count that's structurally "fine" but wrong ----------
 # (a doubled or truncated file passes every column-level check; only a

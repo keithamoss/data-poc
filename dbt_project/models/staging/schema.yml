@@ -87,6 +87,12 @@ version: 2
 # anywhere and was silently invisible to check_lifecycle.validate() -
 # not failing the gate, just never seen by it at all. See
 # plans/qa-pipeline.md's own entry for the full account.
+#
+# Writing the reader-facing prose (description/failure_indicates/
+# technical_note): docs/check-authoring-rules.md is the standing
+# authoring standard - read it before adding or editing any of the
+# three. The lifecycle gate only checks that failure_indicates is
+# present; nothing enforces the wording rules.
 tests:
   - name: multiple_birth_sibling
     config:

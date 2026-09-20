@@ -141,6 +141,12 @@ class CheckMetadata:
     #
     # Both are outside the config hash for the same reason `description`
     # and `name` are.
+    #
+    # How to WRITE all three (and `description`) is a standing authoring
+    # standard, not a mechanical rule this dataclass can express:
+    # docs/check-authoring-rules.md. This comment defines the fields;
+    # that file defines what good prose in them looks like and what has
+    # already been rejected.
     failure_indicates: str | None = None
     technical_note: str | None = None
 

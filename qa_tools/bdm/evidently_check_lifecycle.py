@@ -8,6 +8,12 @@ have no YAML definition of their own to carry a `meta:`/`attributes:`
 block the way dbt/Soda/the contract do (see check_lifecycle.py's own
 docstring on this asymmetry), so this plain dict is where "alongside
 the check" means for this one tool.
+
+Writing the reader-facing prose (description/failure_indicates/
+technical_note): docs/check-authoring-rules.md is the standing
+authoring standard - read it before adding or editing any of the
+three. The lifecycle gate only checks that failure_indicates is
+present; nothing enforces the wording rules.
 """
 from __future__ import annotations
 
