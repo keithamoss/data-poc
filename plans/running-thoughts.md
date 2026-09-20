@@ -1279,3 +1279,27 @@ writing a changelog entry is now **lifted**, and the same-push rule has
 resumed in rewritten form. `plans/running-thoughts.md` #13's wider
 "plans files become ephemeral" shift is still open - this was one piece
 of it, not the whole thing.
+
+16. **[todo, 2026-09-20]** **[Dashboard UI]** Show an accepted-values check's real value distribution in the dashboard.
+
+Keith, 2026-09-20, raised while reviewing the first batch of
+`REQ-QAC-024` plain-English drafts. He did not want the allowed values
+spelled out as prose inside a check's own description ("I'm not crazy
+about the what also having to encode the really allowed values as
+text"), and the reason that wording existed at all is that there was
+nowhere else for a reader to see them.
+
+The idea: for an accepted-values check, expose a small histogram in the
+reporting dashboard showing what the accepted values are and how many
+of each arrived. That answers the question the prose was trying to
+answer, and answers it better - it shows the real distribution rather
+than restating the contract, so a reader can see that a value is
+technically allowed but has collapsed to almost nothing.
+
+Not scoped. Two things to settle with Keith before building. The
+counts would need to come from committed `qa_results/` history rather
+than a live query - `dataset_stats.json` already carries value-count
+distributions for exactly this kind of presentation data, so the data
+may already be there. And it is unclear whether this belongs in the
+check drawer, next to that check's own definition, or in the column
+view where a reader is already looking at that column.
