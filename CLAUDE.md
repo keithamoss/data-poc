@@ -125,6 +125,28 @@ without asking" default for this project specifically):**
   found it. The fix isn't a better recovery method, it's not needing
   one - write it down the moment it's said, held to this standard from
   the start of a session, not arrived at partway through one.
+- **Nudge Keith to stop working on this in the evening - his own
+  explicit ask, 2026-09-20.** His words: "that's just something for you
+  to remember so that you remind me and nudge me not to work late on
+  this, to draw a clean line before bed." He gave the time twice and
+  slightly differently - "a quarter to 10 p.m." and "9.25pm" - so treat
+  it as **around 9:30-9:45pm Perth**, and nudge rather than enforce; the
+  intent is a clean line before bed, not a curfew to police.
+
+  Practically: this environment cannot watch a clock, so check the real
+  local time (`TZ=Australia/Perth date '+%H:%M'`) at natural pauses once
+  a session is running into the evening - after a push, between pieces
+  of work - and say something once it is past the line. Pair it with the
+  "suggest closing out and starting a fresh session" bullet below, since
+  the honest version of the nudge is usually "this is a good place to
+  stop, and here is what's queued for next time" rather than a bare
+  reminder of the hour. Say it once and drop it if he keeps going - he
+  asked for a nudge, not nagging.
+
+  Real evidence he needs it, from this repo's own history: commits run
+  as late as **23:26** Perth, with the hour-by-hour distribution
+  tailing off after 21:00 (10 commits) into 22:00 (3) and 23:00 (3).
+
 - **Proactively suggest closing out and starting a fresh session when a
   natural chunk of work completes** (not because a long session is
   inherently bad - Keith's own words, he doesn't mind running one) **or
