@@ -2320,3 +2320,31 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     phases are consistently marked (`**Phase N (...)** - [DONE, date]:`),
     so promoting them to real entries is tractable; whether to do that
     in the parser or by splitting the source file is the open question.
+
+
+21. **[todo, 2026-09-20]** **[Testing & dev tooling]** Two real friction points hit while building `mothman check`.
+
+**Status:** todo · **Category:** Testing & dev tooling
+
+Both found live on 2026-09-20, neither serious enough to block
+anything, both certain to waste someone's time again.
+
+**`mothman check` runs the e2e tests without the browser path this
+sandbox needs.** The command runs a bare `uv run pytest`, so in a fresh
+remote container `tests/test_dashboard_e2e.py` reports 19 errors and
+the summary shows a red `pytest` gate - with nothing wrong with the
+code. `PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium` fixes it, as
+CLAUDE.md's own environment-setup bullet already says. The command
+makes this MORE visible than before, because it now reports a single
+red gate rather than a test-by-test failure list someone would read
+properly. Options: have the command detect the sandbox build and set
+it, have it notice the specific error and say what to do, or leave it
+to #11's SessionStart hook - which is the real fix and would cover all
+three setup steps at once.
+
+**`npm test -- <pattern>` crashes rather than filtering.** Passing a
+pattern through npm gives `Error: EISDIR: illegal operation on a
+directory, read` from vitest's own stack-trace parser - an error that
+looks like a broken test file and is not. `npx vitest run <path>` works
+correctly. Worth either documenting or wrapping, since the natural
+thing to type is the one that breaks.

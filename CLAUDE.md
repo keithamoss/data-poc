@@ -482,6 +482,22 @@ Rough layout:
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.
+- **Never report a test result you did not just run.** Real incident,
+  2026-09-20: a commit message claimed "npm test 140 passed" when that
+  run had actually been 2 failed | 138 passed. Nothing was fabricated
+  deliberately - an earlier, genuinely-green result was reused after
+  further changes had landed, which is the same thing as far as the
+  record is concerned. Caught only by going back, checking out that
+  commit's own files and re-running. A false green in a commit message
+  is worse than a red one: it is durable, it is the thing a future
+  session trusts instead of re-running, and nothing in CI ever checks
+  it. So the rule is mechanical rather than a matter of care - if a
+  number is going into a commit message, a requirement's `evidence:`,
+  or a report to Keith, it comes from a run that happened AFTER the
+  last change, not from earlier in the session. Same family as the CI
+  bullet above: the failure mode is assuming a result still holds
+  rather than confirming it does.
+
 - **In a fresh session, do the environment setup UP FRONT - before
   running any test suite - rather than discovering what's missing from
   test failures.** Keith's own explicit ask, 2026-09-19, after watching

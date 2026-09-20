@@ -1430,6 +1430,27 @@ requirements:
         REQ-QAC-023 fixed - name and column used to be recovered from
         the description prose - and it is the dependency that made this
         requirement safe to attempt at all.
+    open_questions:
+      - >
+        Where does measured VERIFICATION prose go when a description is
+        rewritten? Several existing descriptions carry real measured
+        results - "confirmed for real: 0 on clean runs, 1-3 on amber
+        runs, 6 on the red run" - which is neither a plain-English
+        what, nor a failure meaning, nor (per Keith, 2026-09-20) a
+        technical_note, since it is about synthetic runs. Left
+        unresolved deliberately: it reads like `evidence:` material on
+        a requirement, but there is no requirement it belongs to, and
+        the authoring pass will otherwise delete it. Decide before
+        rewriting the checks that carry it, not after.
+      - >
+        Should a check's real-world CONSEQUENCE weight show anywhere?
+        Raised against the carer-approval check - a child placed with
+        an unapproved carer is a compliance failure, not a
+        data-tidiness one - and never answered. The category and red
+        status may already carry it, or a steward triaging several reds
+        at once may have no way to tell which one matters most. Not
+        scoped; it would be a new field or a UI treatment, not
+        something the prose can fix.
     dependencies: [REQ-QAC-023]
     linked_tests: []
 
