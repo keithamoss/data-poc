@@ -109,77 +109,23 @@ releases:
           - headline: Checks know where they belong
             components: ["QA checks & contract"]
             description: >
-              Every quality check now sits against the column it actually
+              Every check now sits against the column it actually
               checks, so a rule about a carer's identifier appears under
-              that identifier rather than off to one side under the table.
-              Three cross-table rules that had been filed under "(table
-              level)" moved to where you would look for them.
-          - headline: Five checks that all had the same name
+              that identifier rather than off to one side under the
+              table. Three cross-table rules moved too.
+          - headline: Five checks, one name
             components: ["QA checks & contract", "Dashboard UI"]
             description: >
-              Five Birth Registrations checks were all displayed under one
-              identical name, which made them impossible to tell apart.
-              They now read as what they are - "Registered on or after
-              birth", "Multiple-birth sibling match", and so on.
-          - headline: Rewording an explanation no longer moves the check
+              Five Birth Registrations checks all displayed under one
+              name, impossible to tell apart. They now read as what they
+              are - "Registered on or after birth", "Multiple-birth
+              sibling match", and so on.
+          - headline: Safe to reword
             components: ["QA checks & contract"]
             description: >
-              A check's name and its column used to be read out of the
-              explanation written beneath it, so improving the wording
-              could quietly send a check somewhere else on the page.
-              Both now come from the check's own definition, and nothing
-              about a check moves when its explanation is improved.
-      - category: Fixed
-        items:
-          - headline: Five decisions that quietly disappeared
-            components: ["Docs & process"]
-            description: >
-              A stretch of the record explaining why some things were
-              built the way they were had been silently dropped when it
-              was written down twice. It is back, and the tool now
-              refuses to accept a file that could lose text that way.
-          - headline: A date check filed under the wrong heading
-            components: ["QA checks & contract", "Dashboard UI"]
-            description: >
-              The check that makes sure a date of birth is plausible was
-              being grouped with the checks that verify records point at
-              each other correctly. It now sits with the checks it
-              belongs to.
-      - category: New
-        items:
-          - headline: The tool now checks its own paperwork properly
-            components: ["Docs & process", "Testing & dev tooling"]
-            description: >
-              The rules about what a requirement or a release note must
-              contain are now written down as a specification rather
-              than scattered through code, and a standard linter catches
-              a whole class of mistake that used to slip through
-              silently. A misspelt field name is now an error instead
-              of being quietly ignored.
-          - headline: What's New, written for you
-            components: ["Docs & process", "Dashboard UI"]
-            description: >
-              This page used to be a build log - fifteen lines an entry,
-              full of file names and percentages. It is now a short,
-              plain-language account of what changed and what you can do
-              with it. If you want the detail behind any of it, the
-              Requirements panel has the reasoning and the numbers.
-          - headline: Four things the register said we hadn't built
-            components: ["Docs & process", "Dashboard UI"]
-            description: >
-              Readable web addresses, the Plans tab, the leaderboard and
-              the accept-or-reject decision on an amber supply were all
-              listed as not started, months after they shipped. They now
-              read as built, each with the tests and the reasoning
-              behind them.
-          - headline: Every requirement shows its working
-            components: ["Docs & process"]
-            description: >
-              The Requirements panel now shows, for each thing the tool
-              promises to do, where it lives in the code, what proves it
-              works, the measured result behind that, and what was decided
-              and rejected along the way. Nothing can be marked finished
-              without all four.
+              A check's name and column used to be read out of the
+              explanation beneath it, so improving the wording could
+              quietly move the check. No longer.
           - headline: One command to check everything
             components: ["Testing & dev tooling"]
             description: >
@@ -187,3 +133,46 @@ releases:
               JavaScript tests and the Python suite, so there's no
               working out which checks a given change needs. Anything
               that couldn't run says so rather than passing quietly.
+      - category: Fixed
+        items:
+          - headline: Five decisions that quietly disappeared
+            components: ["Docs & process"]
+            description: >
+              Part of the record explaining why things were built the
+              way they were had been silently dropped. It is back, and
+              cannot be lost that way again.
+          - headline: Filed under the wrong heading
+            components: ["QA checks & contract", "Dashboard UI"]
+            description: >
+              The date-of-birth plausibility check was grouped with the
+              ones that verify records point at each other correctly. It
+              now sits where it belongs.
+      - category: New
+        items:
+          - headline: Paperwork, properly checked
+            components: ["Docs & process", "Testing & dev tooling"]
+            description: >
+              The rules about what a requirement or a release note must
+              contain are now written down as a specification rather
+              than scattered through code. A misspelt field name is an
+              error, not something quietly ignored.
+          - headline: What's New, written for you
+            components: ["Docs & process", "Dashboard UI"]
+            description: >
+              This page used to be a build log - fifteen lines an entry,
+              full of file names and percentages. It is now a short
+              account of what changed and what you can do with it.
+          - headline: Four things we'd already built
+            components: ["Docs & process", "Dashboard UI"]
+            description: >
+              Readable web addresses, the Plans tab, the leaderboard and
+              the accept-or-reject decision on an amber supply were all
+              listed as not started, months after they shipped. They now
+              read as built.
+          - headline: Every requirement shows its working
+            components: ["Docs & process"]
+            description: >
+              For everything the tool promises, the Requirements panel
+              now shows where it lives in the code, what proves it
+              works, the measured result, and what was decided. Nothing
+              is marked finished without all four.
