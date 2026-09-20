@@ -57,7 +57,7 @@ edited for a punchier, friendlier read than a bare commit log.
 ## 2026-09-20
 
 ### Added
-- **11:48am** — **A Generated Index of the Project's Own Planning Memory** **[Docs & process]** **[Testing & dev tooling]**
+- **10:16am** — **A Generated Index of the Project's Own Planning Memory** **[Docs & process]** **[Testing & dev tooling]**
   `CLAUDE.md` tells every new session to read seven `plans/*.md` files
   "in full before doing anything else", and that now costs roughly
   **159,000 tokens before any work begins**. The awkward part is that
@@ -74,7 +74,7 @@ edited for a punchier, friendlier read than a bare commit log.
   (`plans-index --check`) fails if the committed copy stops matching
   its source.
 
-- **1:20pm** — **The Plans Index Now Points at the Code That Implements Each Entry** **[Docs & process]** **[Testing & dev tooling]**
+- **10:53am** — **The Plans Index Now Points at the Code That Implements Each Entry** **[Docs & process]** **[Testing & dev tooling]**
   Two real proof runs hit the same ceiling independently: the index
   covers `plans/` only, so it can't answer *"is this already built?"* —
   and both found the feature they were scoping had already shipped by
@@ -119,7 +119,7 @@ edited for a punchier, friendlier read than a bare commit log.
   summaries exist at all, so letting each run to its natural end cost
   8%, not 80%.
 
-- **11:41am** — **Thirteen Plans Items Were Invisible to the Plans Tab** **[Dashboard UI]**
+- **10:16am** — **Thirteen Plans Items Were Invisible to the Plans Tab** **[Dashboard UI]**
   `plans_md.py` carried an explicit allowlist of five files that carry
   numbered items. Two others had since grown them —
   `publishing-and-history.md` (8) and `performance.md` (5) — so 13 items
@@ -133,7 +133,7 @@ edited for a punchier, friendlier read than a bare commit log.
   next file to grow items can't be forgotten the same way.
 
 ### Fixed
-- **11:02am** — **Hyphenated Words Were Breaking Across Lines on the Published Site** **[Dashboard UI]** **[Testing & dev tooling]**
+- **10:09am** — **Hyphenated Words Were Breaking Across Lines on the Published Site** **[Dashboard UI]** **[Testing & dev tooling]**
   Both markdown parsers reassembled hard-wrapped source with a plain
   `" ".join(...)`, which is right for ordinary prose and wrong for a
   hyphenated word split across two lines. A wrapped `requirements-` /
