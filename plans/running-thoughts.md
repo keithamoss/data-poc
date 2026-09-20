@@ -1368,3 +1368,36 @@ sent the plain-English rules to `docs/` rather than to `decisions:`.
 
 Not scoped. Flagged rather than acted on because it is a judgement about
 the deletion pass as a whole, not about this one file.
+
+19. **[todo, 2026-09-20]** **[Dashboard UI]** The check drawer's own heading is jargon, and the prose rules forbid exactly what it says.
+
+Found 2026-09-20 while grounding `REQ-QAC-024`'s rule 4 in what the
+page actually shows. The drawer title is `check.name`, built by
+`pipeline/build_dashboard_data.py`'s `display_name()`, and the real
+values look like this:
+
+- `Invalid values — dbt:accepted_values (dbt-core)`
+- `Null rate — missing_count[all] (Soda Core)`
+- `Row count vs. previous run — evidently:row_count_growth (Evidently AI)`
+
+Only 16 of 257 active checks carry a hand-authored `name` in their own
+metadata (`Registered on or after birth`, `Closed-case hygiene`, and
+14 others). The other 241 get the generated label above.
+
+The tension is real and slightly funny: `docs/check-authoring-rules.md`
+rules 10 and 11 forbid naming a tool, macro or statistical method
+anywhere in a check's prose, because a data steward does not know which
+tool ran the check and should not need to. The heading sitting directly
+above that prose names the tool AND the macro. So the one line on the
+page that is guaranteed to be read is the one line held to no standard
+at all.
+
+Not scoped, and deliberately not fixed alongside the authoring pass -
+it is a different piece of work (a rendering change, not prose) and it
+interacts with real decisions already made. Things to settle with
+Keith first: whether the tool name belongs in the heading at all given
+this repo's whole purpose is a four-tool shootout, where a reader
+otherwise learns which tool found something; whether the answer is to
+hand-author a `name` for all 257 rather than change `display_name()`;
+and whether the heading should instead derive from the newly-authored
+`description`, which would make the authoring pass the input to it.
