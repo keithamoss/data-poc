@@ -35,6 +35,9 @@ from qa_tools.common.datacontract_common import (
     run_against_local_server, failing_sample_keys, check_id_from_quality_definition,
     fail_threshold_from_quality_definition,
 )
+from qa_tools.common.check_lifecycle import (
+    name_by_check_id, parse_contract_check_metadata,
+)
 from qa_tools.common.qa_results_writer import write_qa_result
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -55,24 +58,29 @@ _QUALITY_CHECK_TYPES = {
     "field_quality_sql", "row_count",
 }
 
-# The 2 custom_sql rules below get an explicit shared label: each is the
-# same real-world check as a dbt (and, for the sibling check, Soda)
-# counterpart under a different name - the label is what makes that
-# overlap visible on the dashboard, same rationale as run_dbt_bdm.py's
-# and run_soda_bdm.py's own versions of this dict. Matched by the
-# rule's own description prefix (this contract's own text, not a guess).
-_CUSTOM_SQL_LABEL = {
-    "Multiple-birth sibling match:": "Sibling record match",
-    "Extract timestamp ordering:": "Timestamp ordering",
-    "Freshness / relative-date check:": "Freshness",
+# Three custom_sql rules share a label with a dbt (and, for the sibling
+# check, Soda) counterpart - each is the same real-world check under a
+# different name, and the label is what makes that overlap visible on
+# the dashboard, same rationale as run_dbt_bdm.py's and run_soda_bdm.py's
+# own versions of this dict.
+#
+# REQ-QAC-023, 2026-09-20: keyed on the check_id's own tail, which is
+# structure. It used to be keyed on the rule's `description:` prefix, so
+# reformatting an explanation would silently drop the label and split one
+# real-world check into two unrelated-looking ones on the dashboard.
+_LABEL_BY_CHECK_TAIL = {
+    "sibling_match_datacontract": "Sibling record match",
+    "timestamp_ordering_datacontract": "Timestamp ordering",
+    "freshness_datacontract": "Freshness",
 }
 
-
-def _custom_sql_label(description: str) -> str | None:
-    for prefix, label in _CUSTOM_SQL_LABEL.items():
-        if description.startswith(prefix):
-            return label
-    return None
+# Authored display names, read once at import from the contract itself -
+# the same already-authoritative parse used elsewhere, not a second copy
+# maintained here. Before this, all five Birth Registrations SQL checks
+# rendered under the identical name "datacontract:custom_sql", because
+# the runner had no per-rule name to give them and the label dict only
+# covered three.
+CHECK_NAME_BY_ID = name_by_check_id(parse_contract_check_metadata(CONTRACT_PATH))
 
 
 def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str) -> list[dict]:
@@ -89,12 +97,24 @@ def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str
         row_count_total = diag.get("row_count")
         row_count_invalid = None if metric == "row_count" else diag.get("value")
 
-        label = _custom_sql_label(c.name) if metric == "custom_sql" else LABEL_BY_METRIC.get(metric)
-
         check_id = check_id_from_quality_definition(c.qualityDefinition)
         if check_id is None:
             raise ValueError(f"no check_id found in qualityDefinition for datacontract check {c.name!r} "
                               f"(type={c.type!r}) - the contract is missing customProperties.check_id for this rule")
+
+        if metric == "custom_sql":
+            authored = CHECK_NAME_BY_ID.get(check_id)
+            if not authored:
+                raise ValueError(
+                    f"datacontract SQL rule {check_id!r} has no authored "
+                    f"customProperties `name` - add one rather than letting its "
+                    f"display name come from its description")
+            check_name = f"datacontract:sql: {authored}"
+            label = next((lbl for tail, lbl in _LABEL_BY_CHECK_TAIL.items()
+                          if check_id.endswith(tail)), None)
+        else:
+            check_name = f"datacontract:{metric}"
+            label = LABEL_BY_METRIC.get(metric)
 
         results.append({
             "agency_id": AGENCY_ID,
@@ -102,7 +122,7 @@ def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str
             "dataset_id": DATASET_ID,
             "check_id": check_id,
             "column_name": c.field or "(table)",
-            "check_name": f"datacontract:{metric}",
+            "check_name": check_name,
             "dimension": c.dimension or DIMENSION_BY_METRIC.get(metric, ""),
             "label": label,
             "run_id": run_id,

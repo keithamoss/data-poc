@@ -28,6 +28,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+from qa_tools.common import check_id as cid
 from qa_tools.common import check_lifecycle as cl
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -116,10 +117,31 @@ def collect_checks(ref: str | None) -> list[cl.CheckMetadata]:
     return checks
 
 
+def _check_id_errors(checks: list[cl.CheckMetadata]) -> list[str]:
+    """REQ-QAC-023's three gates, all on the CURRENT tree only - unlike
+    the changelog rule above there is no old-vs-new comparison to make;
+    a check_id either matches the grammar or it does not.
+
+    Kept here, beside the existing gate, rather than in a separate
+    command: a contributor who broke one of these broke the same thing
+    the other rules protect, and finding that out in two places is
+    worse than finding it out in one."""
+    ids = [c.check_id for c in checks]
+    errors = cid.validate_grammar(ids)
+    errors += cid.validate_tail_uniqueness(ids)
+    for rel_path, parser in _YAML_SOURCES:
+        if parser is not cl.parse_contract_check_metadata:
+            continue  # only the ODCS contracts attach rules to a column
+        if not (ROOT / rel_path).exists():
+            continue
+        errors += cid.validate_column_matches(cl.contract_rule_attachments(ROOT / rel_path))
+    return errors
+
+
 def main() -> int:
     old_checks = collect_checks("HEAD~1")
     new_checks = collect_checks(None)
-    errors = cl.validate(old_checks, new_checks)
+    errors = cl.validate(old_checks, new_checks) + _check_id_errors(new_checks)
 
     if errors:
         print(f"check-lifecycle validation FAILED ({len(errors)} error(s)):", file=sys.stderr)

@@ -116,6 +116,12 @@ class CheckMetadata:
     retired_reason: str | None = None
     description: str | None = None
     changelog: list[dict] = field(default_factory=list)
+    # A hand-authored short display name (REQ-QAC-023). Only SQL-type
+    # contract rules carry one today - every other check kind already
+    # has a name its own tool gives it. Deliberately outside the config
+    # hash, same as `description`: renaming a check for readability is
+    # not a change to what it does.
+    name: str | None = None
 
 
 def _config_hash(config: dict) -> str:
@@ -144,6 +150,7 @@ def _lifecycle_fields(meta: dict) -> dict:
         "retired_reason": meta.get("retired_reason"),
         "description": meta.get("description"),
         "changelog": list(meta.get("changelog") or []),
+        "name": meta.get("name"),
     }
 
 
@@ -375,7 +382,35 @@ def _parse_contract_quality_rule(rule: dict, source: str, location: str) -> list
         # (an explicit override for this metadata specifically).
         description=meta.get("description") or native_description,
         changelog=changelog or [],
+        # REQ-QAC-023: authored, never derived from the rule's prose.
+        name=meta.get("name"),
     )]
+
+
+def contract_rule_attachments(contract_yaml_path: Path | str) -> list[tuple[str, str | None]]:
+    """`[(check_id, column_or_None)]` - the column each quality rule is
+    ACTUALLY attached to in the contract's schema.
+
+    REQ-QAC-023. This is the structural fact the runners now read a
+    check's column from, instead of regex-matching the rule's own
+    description prose. Exposed separately so the CI gate can assert that
+    a check_id's column segment agrees with where its rule really sits -
+    the two were free to disagree before, and nothing would have said
+    so."""
+    with open(contract_yaml_path) as f:
+        doc = yaml.safe_load(f) or {}
+    out: list[tuple[str, str | None]] = []
+    for table in doc.get("schema", []) or []:
+        for rule in table.get("quality", []) or []:
+            meta = _custom_properties_to_dict(rule.get("customProperties") or [])
+            if meta.get("check_id"):
+                out.append((meta["check_id"], None))
+        for prop in table.get("properties", []) or []:
+            for rule in prop.get("quality", []) or []:
+                meta = _custom_properties_to_dict(rule.get("customProperties") or [])
+                if meta.get("check_id"):
+                    out.append((meta["check_id"], prop.get("name")))
+    return out
 
 
 def parse_contract_check_metadata(contract_yaml_path: Path | str) -> list[CheckMetadata]:
@@ -437,6 +472,24 @@ def category_by_check_id(checks: list[CheckMetadata]) -> dict[str, str]:
     already lives in each check's own meta/attributes/customProperties
     block this module already parses."""
     return {c.check_id: c.category for c in checks}
+
+
+def name_by_check_id(checks: list[CheckMetadata]) -> dict[str, str]:
+    """`{check_id: name}` for checks that carry a hand-authored name.
+
+    REQ-QAC-023. Before this, a SQL-type contract rule's display name was
+    recovered from its own `description:` prose - the first sentence for
+    Child Protection, a prefix match for Birth Registrations - so
+    rewording an explanation renamed the check and changed its URL. Two
+    real defects that shipped as a result: all five Birth Registrations
+    SQL checks rendered as the identical name `datacontract:custom_sql`,
+    and one Child Protection name had already been mangled into a
+    trailing bare full stop by the sentence split.
+
+    Absent for every other check kind, which already has a real name its
+    own tool gives it - so callers fall back rather than requiring one
+    everywhere."""
+    return {c.check_id: c.name for c in checks if c.name}
 
 
 # ---- Validation --------------------------------------------------------

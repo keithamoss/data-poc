@@ -277,6 +277,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.range_check_datacontract
+              - property: name
+                value: Date of birth in a plausible range
               - property: introduced_date
                 value: "2026-09-13"
               - property: changelog
@@ -324,6 +326,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.freshness_datacontract
+              - property: name
+                value: Recent births present
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
@@ -468,6 +472,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_registered.date_ordering_datacontract
+              - property: name
+                value: Registered on or after birth
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
@@ -604,6 +610,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.sibling_match_datacontract
+              - property: name
+                value: Multiple-birth sibling match
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog
@@ -675,6 +683,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.timestamp_ordering_datacontract
+              - property: name
+                value: Extract timestamp ordering
               - property: introduced_date
                 value: "2026-01-15"
               - property: changelog

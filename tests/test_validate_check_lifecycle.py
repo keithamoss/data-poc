@@ -26,6 +26,12 @@ def _init_repo(tmp_path):
     return repo
 
 
+# Fixture check_ids are real-shaped (REQ-QAC-023). They used to read
+# "a.b.c.not_null", which is shorter but does not match the grammar every
+# one of the repo's 258 real check_ids satisfies - and once the grammar
+# became a CI gate, a fixture that could never exist in the real repo
+# started failing it. Made realistic rather than exempted: a gate that
+# the tests exercising it are excused from is not really a gate.
 def _dbt_schema(check_id: str, extra_config: str = "") -> str:
     return textwrap.dedent(f"""\
         models:
@@ -74,15 +80,15 @@ def test_collect_checks_reads_old_and_new_from_real_git_history(tmp_path, monkey
     monkeypatch.setattr(vcl, "_YAML_SOURCES", [("schema.yml", vcl.cl.parse_dbt_check_metadata)])
     monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
 
-    (repo / "schema.yml").write_text(_dbt_schema("a.b.c.not_null"))
+    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.agency.dataset.tbl.col.not_null_dbt"))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "introduce the check")
 
     old_checks = vcl.collect_checks("HEAD")
     new_checks = vcl.collect_checks(None)
 
-    assert [c.check_id for c in old_checks] == ["a.b.c.not_null"]
-    assert [c.check_id for c in new_checks] == ["a.b.c.not_null"]
+    assert [c.check_id for c in old_checks] == ["data-asset-1.agency.dataset.tbl.col.not_null_dbt"]
+    assert [c.check_id for c in new_checks] == ["data-asset-1.agency.dataset.tbl.col.not_null_dbt"]
 
 
 def test_collect_checks_treats_a_missing_source_at_the_working_tree_as_no_checks(tmp_path, monkeypatch):
@@ -100,11 +106,11 @@ def test_collect_checks_treats_a_missing_source_at_the_working_tree_as_no_checks
         "evidently_check_lifecycle_retired.py",  # deliberately never created
     ])
 
-    (repo / "schema.yml").write_text(_dbt_schema("a.b.c.not_null"))
+    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.agency.dataset.tbl.col.not_null_dbt"))
 
     checks = vcl.collect_checks(None)
 
-    assert [c.check_id for c in checks] == ["a.b.c.not_null"]
+    assert [c.check_id for c in checks] == ["data-asset-1.agency.dataset.tbl.col.not_null_dbt"]
 
 
 def test_main_fails_on_an_undocumented_config_change(tmp_path, monkeypatch, capsys):
@@ -113,13 +119,13 @@ def test_main_fails_on_an_undocumented_config_change(tmp_path, monkeypatch, caps
     monkeypatch.setattr(vcl, "_YAML_SOURCES", [("schema.yml", vcl.cl.parse_dbt_check_metadata)])
     monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
 
-    (repo / "schema.yml").write_text(_dbt_schema("a.b.c.not_null"))
+    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.agency.dataset.tbl.col.not_null_dbt"))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "introduce the check")
 
     # change a real config value (error_if) with no new changelog entry,
     # committed - the exact scenario the CI gate exists to catch
-    (repo / "schema.yml").write_text(_dbt_schema("a.b.c.not_null", extra_config="error_if: \">95\""))
+    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.agency.dataset.tbl.col.not_null_dbt", extra_config="error_if: \">95\""))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "tighten the threshold, forgot the changelog")
 
@@ -144,7 +150,7 @@ def test_main_fails_when_a_check_id_is_deleted_outright(tmp_path, monkeypatch, c
     ])
     monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
 
-    (repo / "schema.yml").write_text(_dbt_schema("a.b.c.not_null"))
+    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.agency.dataset.tbl.col.not_null_dbt"))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "introduce the check")
 
@@ -158,7 +164,7 @@ def test_main_fails_when_a_check_id_is_deleted_outright(tmp_path, monkeypatch, c
     assert exit_code == 1
     stderr = capsys.readouterr().err
     assert "disappeared" in stderr
-    assert "a.b.c.not_null" in stderr
+    assert "data-asset-1.agency.dataset.tbl.col.not_null_dbt" in stderr
 
 
 def test_main_passes_when_a_check_is_properly_retired(tmp_path, monkeypatch, capsys):
@@ -174,7 +180,7 @@ def test_main_passes_when_a_check_is_properly_retired(tmp_path, monkeypatch, cap
     ])
     monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
 
-    (repo / "schema.yml").write_text(_dbt_schema("a.b.c.not_null"))
+    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.agency.dataset.tbl.col.not_null_dbt"))
     (repo / "schema-retired.yml").write_text("models: []\n")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "introduce the check")
@@ -189,7 +195,7 @@ def test_main_passes_when_a_check_is_properly_retired(tmp_path, monkeypatch, cap
                 tests:
                   - not_null:
                       meta:
-                        check_id: a.b.c.not_null
+                        check_id: data-asset-1.agency.dataset.tbl.col.not_null_dbt
                         category: completeness
                         changelog: []
                         retired_as_of: "2026-09-16"
@@ -213,7 +219,7 @@ def test_main_passes_when_nothing_changed(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(vcl, "_YAML_SOURCES", [("schema.yml", vcl.cl.parse_dbt_check_metadata)])
     monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
 
-    (repo / "schema.yml").write_text(_dbt_schema("a.b.c.not_null"))
+    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.agency.dataset.tbl.col.not_null_dbt"))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "introduce the check")
 
@@ -224,10 +230,10 @@ def test_main_passes_when_nothing_changed(tmp_path, monkeypatch, capsys):
 def test_evidently_dict_from_source_evals_the_module_source():
     source = textwrap.dedent("""\
         CHECK_LIFECYCLE = {
-            "a.b.c.drift_psi": {"introduced_date": "2026-01-01", "changelog": []},
+            "data-asset-1.agency.dataset.tbl.col.drift_psi_evidently": {"introduced_date": "2026-01-01", "changelog": []},
         }
         """)
 
     result = vcl._evidently_dict_from_source(source, "fake_evidently_check_lifecycle.py")
 
-    assert result == {"a.b.c.drift_psi": {"introduced_date": "2026-01-01", "changelog": []}}
+    assert result == {"data-asset-1.agency.dataset.tbl.col.drift_psi_evidently": {"introduced_date": "2026-01-01", "changelog": []}}

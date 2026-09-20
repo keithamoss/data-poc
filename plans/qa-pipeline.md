@@ -1240,34 +1240,15 @@ relative, not a schedule — this is weeks of work, not months.
     (inspection of all 41 suggested the veto would be correct today,
     Keith declined the extra rule - the author decides).
 
-    **REQ-QAC-023 exists because of a real, verified fragility, and it
-    ships first.** A contract rule's `description` is machine-parsed at
-    runtime: a regex reads the column out of it (`_fk_column_for`), a
-    prefix match picks the label, and a SQL rule's *name* is literally
-    its description's first sentence. Rewording silently reroutes checks
-    to the wrong dashboard column - no exception, no CI failure, nothing
-    notices. The fix went through three shapes before landing:
-    read the column from `check_id` (rejected - still string-parsing),
-    add an explicit `column` property (rejected - Keith asked whether the
-    contract could just say it), and finally **move the rules under the
-    property they are about**. The 7 FK rules and 3 business rules sit at
-    MODEL level, which is exactly why the column had to be recovered from
-    prose - at model level ODCS has no property to point at. Property-
-    level `type: sql` rules already work here (`cp_clients.date_of_birth`
-    has one), so moving them makes the column structural, needs no new
-    field, and makes the contract more correct: a rule about `carer_id`
-    currently sits where nobody would look for it.
-
-    **`check_id` parsing is fine, done properly** (Keith, after seeing
-    the real structure): one module owns the grammar
-    `<data-asset>.<agency>.<dataset>.<table>[.<column>].<check_name>` as
-    a real regex, CI validates every id against it, and anything needing
-    a segment goes through it - never a bare `.split(".")`. Worth more
-    than it sounds: **nothing manufactures a check_id today** (all are
-    hand-authored), the grammar exists only as a docstring comment at
-    `check_lifecycle.py:19`, and validation checks presence and
-    uniqueness but never shape. Distribution is clean - 243 six-segment
-    ids with a column, 15 table-level.
+    **REQ-QAC-023 is BUILT (2026-09-20) and its scoping prose has been
+    deleted from this item** - the fragility it fixed, the three shapes
+    the fix went through, the check_id grammar decision, the declined
+    builder and the `(table)`-versus-check_id inconsistency all now live
+    as `decisions:` on the requirement itself, which is the permanent
+    record. First application of `CLAUDE.md`'s own new rule that build
+    work deletes the plans text its requirements now cover. What remains
+    below belongs to REQ-QAC-024/025 and REQ-DASH-026/GHUB-027, which are
+    still open.
 
     **The contributor-rationale field was challenged and survived, with
     its boundary now written into the requirement** (Keith, 2026-09-20 -
@@ -1308,27 +1289,6 @@ relative, not a schedule — this is weeks of work, not months.
     **Field names settled** the same morning - `description` (existing,
     repurposed as the plain-English *what*), `failure_indicates` (new),
     `technical_note` (new). Two new fields, not three.
-
-    **A builder was considered and declined**, worth recording since
-    Keith raised it himself ("maybe it's worth having a little utility
-    that does that, that we share across all the tools, just for the
-    sake of clean code and rigor") and then reversed on the real
-    numbers the same morning: **254** check_ids are authored in YAML,
-    where a Python builder cannot help at authoring time, against **3**
-    in production Python (the two Evidently lifecycle modules) and 32 in
-    test fixtures. The grammar module therefore parses and validates
-    only. The argument that nearly carried it was not call-count but
-    drift-proofing - one module exposing build/parse/validate can be
-    property-tested so the three cannot disagree - and that is worth
-    revisiting only if Python-authored check definitions ever stop being
-    a rounding error.
-
-    **A live inconsistency found while checking that**, and now fixed by
-    REQ-QAC-023: the 3 cross-column business rules have check_ids naming
-    `notification_id`/`investigation_id`/`carer_id`, but the dashboard
-    renders them as `(table)`. The id says one thing and the page says
-    another, and nothing notices. They move to the column their own id
-    names, and the new shape-validation cross-checks the two.
 
 **Two real code findings from the scoping runs, verified at source
     and not covered by any of the five requirements' own text.**

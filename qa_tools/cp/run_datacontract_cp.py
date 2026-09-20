@@ -27,12 +27,14 @@ covered by datacontract-cli's include_failed_samples at all.
 """
 from __future__ import annotations
 import os
-import re
 
 from qa_tools.common.datacontract_common import (
     ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
     run_against_local_server, failing_sample_keys, check_id_from_quality_definition,
     fail_threshold_from_quality_definition,
+)
+from qa_tools.common.check_lifecycle import (
+    name_by_check_id, parse_contract_check_metadata,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
@@ -46,41 +48,33 @@ _QUALITY_CHECK_TYPES = {
     "field_quality_sql", "model_quality_sql", "row_count",
 }
 
-_FK_DESCRIPTION_RE = re.compile(r"^Every \w+'s (\w+) must reference an existing \w+ row\.")
+# REQ-QAC-023, 2026-09-20. Two description-parsing helpers used to live
+# here and are gone:
+#
+#   _fk_column_for()   regex-matched a rule's own `description:` prose
+#                      ("Every <table>'s <column> must reference an
+#                      existing <table> row.") to recover which column
+#                      the rule was about, because an ODCS table-level
+#                      `type: sql` rule had no per-property home. The
+#                      rules now sit UNDER their column, so the column
+#                      comes from the contract's schema structure and
+#                      arrives as `c.field` like every other check.
+#   _custom_sql_label() matched the description's opening words against
+#                      the three business-rule display names to decide
+#                      whether a rule was an FK check or a business rule.
+#
+# Both worked. Both meant rewording an explanation could silently move a
+# check to a different column, or rename it - and the check name is what
+# a dashboard URL keys on. Real damage that had already shipped: one CP
+# check's name had been mangled by the first-sentence split into a bare
+# trailing full stop.
+_FK_TOOLS_LABEL = "Referential integrity"
+_FK_TAIL = "relationships_datacontract"
 
-
-def _fk_column_for(description: str) -> str | None:
-    """The 7 FK checks' descriptions (this contract's own text, written by
-    hand, not a guess) all follow the exact same
-    "Every <table>'s <column> must reference an existing <table> row."
-    shape - so the column they're actually about is parsed straight out
-    of the rule's own words. Returns None for the 3 business rules, whose
-    descriptions don't match this shape at all.
-
-    Without this, every FK check lands under column_name="(table)" (since
-    ODCS has no per-property home for a table-level type: sql rule) and
-    gets grouped into the dashboard's "(table-level checks)" pseudo-
-    column - inconsistent with dbt's `relationships` tests and Soda's
-    `values in ... must exist in ...` checks for the exact same FK, which
-    the dashboard *does* attribute to the FK column itself. Keith asked
-    for this to be consistent across all three tools."""
-    m = _FK_DESCRIPTION_RE.match(description)
-    return m.group(1) if m else None
-
-
-def _custom_sql_label(description: str) -> str | None:
-    """custom_sql covers both the 7 FK checks and the 3 business rules -
-    distinguished here by whether the rule's own description (this
-    contract's own text, not a guess) opens with one of the 3 known
-    business-rule names. FK checks get "Referential integrity" (they
-    otherwise read as 7 unrelated one-off sentences); business rules get
-    None, since their own name already matches dbt's and Soda's names for
-    the same rule closely enough to read as the same thing without a
-    further prefix."""
-    for name in cp_common.BUSINESS_RULE_DISPLAY_NAME.values():
-        if description.startswith(name + ":"):
-            return None
-    return "Referential integrity"
+# Authored display names, read once at import from the contract itself -
+# the same already-authoritative parse `category_by_check_id()` uses, not
+# a second copy maintained here.
+CHECK_NAME_BY_ID = name_by_check_id(parse_contract_check_metadata(CONTRACT_PATH))
 
 
 def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
@@ -101,34 +95,45 @@ def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
         row_count_total = diag.get("row_count")
         row_count_invalid = None if metric == "row_count" else diag.get("value")
 
-        # "custom_sql" alone doesn't distinguish the 7 FK checks and 3
-        # business rules from each other (they're all type: sql) - c.name
-        # carries this rule's own `description:` text from the contract
-        # verbatim, which is genuinely distinct per rule but, for the 3
-        # business rules, several paragraphs long (see contract's
-        # comments) - only the first sentence is short and descriptive
-        # enough for a check_name label, so that's all that's kept here.
-        fk_column = None
-        if metric == "custom_sql":
-            first_sentence = c.name.split(". ", 1)[0].rstrip(".") + "."
-            check_name = f"datacontract:sql: {first_sentence}"
-            label = _custom_sql_label(c.name)
-            fk_column = _fk_column_for(c.name)
-        else:
-            check_name = f"datacontract:{metric}"
-            label = LABEL_BY_METRIC.get(metric)
-
         check_id = check_id_from_quality_definition(c.qualityDefinition)
         if check_id is None:
             raise ValueError(f"no check_id found in qualityDefinition for datacontract check {c.name!r} "
                               f"(type={c.type!r}) - the contract is missing customProperties.check_id for this rule")
+
+        if metric == "custom_sql":
+            # The AUTHORED name, never the rule's own prose. A rule with
+            # no authored name is a real authoring gap, and failing
+            # loudly beats falling back to the description - silently
+            # doing that is the behaviour this requirement removed.
+            authored = CHECK_NAME_BY_ID.get(check_id)
+            if not authored:
+                raise ValueError(
+                    f"datacontract SQL rule {check_id!r} has no authored "
+                    f"customProperties `name` - add one rather than letting its "
+                    f"display name come from its description")
+            check_name = f"datacontract:sql: {authored}"
+            # Only a `relationships_*` rule is an FK check. Decided from
+            # the check_id's own tail - structure - not by matching words
+            # in the description.
+            #
+            # The predecessor asked the question the other way round
+            # ("is this NOT one of the 3 business rules? then it is an
+            # FK check"), which was a real bug: cp_clients' date-of-birth
+            # range check is neither, and was labelled - and so grouped
+            # across tools - as referential integrity. `label` is what
+            # ties equivalent checks together, so that put a date-range
+            # rule in a group it has nothing to do with.
+            label = _FK_TOOLS_LABEL if check_id.endswith(_FK_TAIL) else None
+        else:
+            check_name = f"datacontract:{metric}"
+            label = LABEL_BY_METRIC.get(metric)
 
         results.append({
             "agency_id": cp_common.AGENCY_ID,
             "collection_id": cp_common.COLLECTION_ID,
             "dataset_id": cp_common.TABLE_DATASET_ID[table],
             "check_id": check_id,
-            "column_name": fk_column or c.field or "(table)",
+            "column_name": c.field or "(table)",
             "check_name": check_name,
             "dimension": c.dimension or DIMENSION_BY_METRIC.get(metric, ""),
             "label": label,

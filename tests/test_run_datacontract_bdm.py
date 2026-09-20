@@ -56,17 +56,33 @@ def test_place_of_birth_facility_keeps_its_real_configured_fail_threshold(monkey
     assert check["status"] == "pass"
 
 
-def test_custom_sql_rules_get_their_shared_label(monkeypatch, bdm_raw_dir):
-    """3 of the real custom_sql rules (sibling match, timestamp
-    ordering, freshness) are the same real-world checks as their dbt/
-    Soda counterparts under different names - _custom_sql_label() is
-    what makes that overlap visible on the dashboard, matched by each
-    rule's own real description prefix, not guessed. Other custom_sql
-    rules (date-of-birth range, registration/birth date ordering) have
-    no such counterpart and correctly get no label - only the 3 named
-    ones are asserted on here."""
+def test_sql_rules_get_their_shared_label_from_structure_not_prose(monkeypatch, bdm_raw_dir):
+    """3 of the real SQL rules (sibling match, timestamp ordering,
+    freshness) are the same real-world checks as their dbt/Soda
+    counterparts under different names, and the label is what makes that
+    overlap visible on the dashboard. The other 2 (date-of-birth range,
+    registration/birth date ordering) have no counterpart and correctly
+    get none.
+
+    Rewritten for REQ-QAC-023 (2026-09-20). The label used to be matched
+    on the rule's own `description:` PREFIX, so reformatting an
+    explanation would silently drop it and split one real-world check
+    into two unrelated-looking ones. It now comes from the check_id's
+    own tail, which is structure."""
     results = _run(monkeypatch, bdm_raw_dir, _REF_RUN_ID, f"{_REF_RUN_ID}.csv", "2026-01-01T06:30:00Z")
-    custom_sql = [r for r in results if r["check_name"] == "datacontract:custom_sql"]
-    assert custom_sql, "no custom_sql rules found - fixture/test drifted from the real contract"
-    labels = {r["label"] for r in custom_sql}
-    assert {"Freshness", "Sibling record match", "Timestamp ordering"} <= labels
+    sql = [r for r in results if r["check_name"].startswith("datacontract:sql:")]
+    assert sql, "no SQL rules found - fixture/test drifted from the real contract"
+    assert {r["label"] for r in sql} >= {"Freshness", "Sibling record match", "Timestamp ordering"}
+
+
+def test_every_sql_rule_has_its_own_authored_name(monkeypatch, bdm_raw_dir):
+    """A real defect REQ-QAC-023 fixed, not a hypothetical: with no
+    authored name to use, the runner fell back to the bare metric, so all
+    five Birth Registrations SQL checks rendered under the identical name
+    `datacontract:custom_sql` - indistinguishable on the dashboard, and
+    indistinguishable in the URL that keys on the name."""
+    results = _run(monkeypatch, bdm_raw_dir, _REF_RUN_ID, f"{_REF_RUN_ID}.csv", "2026-01-01T06:30:00Z")
+    sql = [r for r in results if r["check_name"].startswith("datacontract:sql:")]
+    names = [r["check_name"] for r in sql]
+    assert len(names) == len(set(names)), f"SQL checks sharing a name: {names}"
+    assert "datacontract:custom_sql" not in {r["check_name"] for r in results}

@@ -454,6 +454,7 @@ Rough layout:
   previous entry despite 20 more tests - no new hot spot.
   -> **~83s/680 tests (2026-09-20 morning)**. Flat again.
   -> **~84s/695 tests (2026-09-20 midday)**. Flat again, 15 more tests.
+  -> **~85s/719 tests (2026-09-20 afternoon, REQ-QAC-023)**. Flat again.
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.
