@@ -82,6 +82,11 @@ class _Strict(BaseModel):
         the optional fields, where the stripped value would otherwise be
         indistinguishable from the key being absent.
 
+        Absent is a separate question, answered per field by whether it
+        has a default. `source` has none (Keith, 2026-09-20) and so is
+        required; the rest may be left out entirely, just not left
+        empty.
+
         Keith's call, 2026-09-20, when an earlier draft of this module
         accepted `source: "   "` on the grounds that "I left it blank"
         and "I left it out" mean the same thing. They do not: a blank
@@ -96,7 +101,9 @@ class _Strict(BaseModel):
         was never supplied, so absent stays legal without a special
         case here."""
         if isinstance(v, str) and not v.strip():
-            raise ValueError("is present but blank - write something, or omit the key entirely")
+            # Deliberately does not advise omitting the key - this runs
+            # for required fields too, where that would be bad advice.
+            raise ValueError("is present but blank - write something real here")
         if isinstance(v, list) and any(isinstance(x, str) and not x.strip() for x in v):
             raise ValueError("list entries must be non-empty strings")
         return v
@@ -118,8 +125,16 @@ class Requirement(_Strict):
     evidence: list[str] = []
     decisions: list[str] = []
 
+    # Required, and non-blank (Keith, 2026-09-20). Every other field
+    # here describes what the requirement IS; this is the only one that
+    # says where it came from, and that is the part nobody can
+    # reconstruct later. The 22 pre-2026-09-19 entries were backfilled
+    # from what the plans files and git history actually record - one
+    # of them says plainly that its origin was not recorded, which is
+    # real provenance rather than a gap.
+    source: NonEmptyStr
+
     date_written: str = ""
-    source: str = ""
     non_functional_requirements: list[str] = []
     dependencies: list[str] = []
     open_questions: list[str] = []

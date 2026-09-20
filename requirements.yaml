@@ -81,14 +81,47 @@
 #                        a requirement can't claim to be built with
 #                        nothing real verifying it. May be empty for
 #                        not_started/in_progress.
+#   source:              REQUIRED, and not blank - free text saying
+#                        where this requirement came from ("Keith,
+#                        voice-dictated batch, 2026-09-19" /
+#                        "delivery-scoper, gap found while scoping
+#                        plans/qa-pipeline.md item 25"). Real
+#                        provenance, not a constrained enum.
 #
-# Six further OPTIONAL fields (2026-09-19, same work) - all default to
+#                        Made required 2026-09-20 (Keith: "it must be
+#                        there and it must not be white space only or
+#                        empty"). It had been optional on the reasoning
+#                        recorded just below - that backfilling the 22
+#                        pre-2026-09-19 entries would mean guessing.
+#                        That was answered by going and looking instead:
+#                        21 of the 22 trace to a real plans/*.md item, a
+#                        real Thread/Phase, or a quoted ask, and the
+#                        22nd (REQ-DASH-012) says plainly that its
+#                        origin was never recorded - which is real
+#                        provenance, and more useful than an absent
+#                        field, because it tells a reader not to go
+#                        looking. Every entry is a retrospective
+#                        reconstruction where it says so.
+#
+#                        Why this one and not the rest: it is the only
+#                        field nobody can rebuild later. What a
+#                        requirement does is in the code; what verifies
+#                        it is in the tests; why it was decided that way
+#                        is in `decisions`. Where it came from exists
+#                        only if someone wrote it down.
+#
+# Five further OPTIONAL fields (2026-09-19, same work; `source` was the
+# sixth until it became required - see above) - all default to
 # empty/absent for the many pre-existing entries below, which were not
 # retroactively backfilled (nothing enforces backfilling optional
-# fields, and guessing real provenance/evidence for old entries after
-# the fact would be dishonest - these are for the new requirements-
-# scoper/-architect/-reviewer agents to actually populate going
-# forward):
+# fields, and guessing real evidence for old entries after the fact
+# would be dishonest - these are for the new requirements-scoper/
+# -architect/-reviewer agents to actually populate going forward).
+#
+# A written-but-blank value is rejected for every field here, optional
+# ones included (2026-09-20, Keith): absent and empty look identical
+# once whitespace is stripped, but they mean different things - a blank
+# key is someone who started filling it in and stopped.
 #   date_written:        ISO date ("YYYY-MM-DD") this requirement was
 #                        actually drafted - Keith's own ask, so the
 #                        register has a real chronological trail, not
@@ -99,11 +132,6 @@
 #                        real Perth/AWST local date - see CLAUDE.md's
 #                        own "Who this is for" section for why bare
 #                        environment `date` can be wrong).
-#   source:              free text - where this requirement came from
-#                        ("Keith, voice-dictated batch, 2026-09-19" /
-#                        "Requirements-analysis review of REQ-DOCS-014,
-#                        gap found 2026-09-20"). Real provenance, not a
-#                        constrained enum.
 #   non_functional_requirements: list of real standing constraints this
 #                        requirement must also respect (this project's
 #                        own hard rules count - e.g. "CI must never
@@ -220,6 +248,13 @@ requirements:
       genuinely computed, not fabricated for a demo.
     moscow: must
     status: built
+    source: >
+      This PoC's own founding scope. The repo began in a claude.ai
+      session with no internet access, where the four tools were
+      hand-written Python/DuckDB stand-ins; a later Claude Code session
+      installed and ran the real ones, which is what made this a
+      requirement rather than an approximation. Register entry written
+      retrospectively 2026-09-18.
     acceptance_criteria:
       - Every check result traces back to a real tool run against a
         real generated CSV, never a hand-written stand-in.
@@ -260,6 +295,10 @@ requirements:
       same real QA rigor as a single-table feed.
     moscow: must
     status: built
+    source: >
+      The founding scope above, extended to a second, multi-table
+      collection so cross-table business rules were exercised rather
+      than assumed. Register entry written retrospectively 2026-09-18.
     acceptance_criteria:
       - Cross-table checks (referential integrity, business rules that
         span more than one table) run for real, not just per-table
@@ -299,6 +338,12 @@ requirements:
       without leaving the page.
     moscow: must
     status: built
+    source: >
+      The reporting dashboard's founding structure, from the same
+      original claude.ai design session - the agency-to-column
+      drill-down was the shape the whole page was built around, not a
+      feature added to it. Register entry written retrospectively
+      2026-09-18.
     acceptance_criteria:
       - A dataset's own status is the worst status among its columns;
         a column's is the worst among its own real checks.
@@ -332,6 +377,11 @@ requirements:
       years.
     moscow: must
     status: built
+    source: >
+      plans/publishing-and-history.md Thread B, scoped with Keith over
+      one long session on 2026-09-16: how QA results actually become
+      durable and shared, and how several people running QA across ~30
+      datasets avoid stepping on each other.
     acceptance_criteria:
       - qa_results/ is committed to git, never gitignored or pruned.
       - The dashboard can be rebuilt purely from that committed history,
@@ -371,6 +421,10 @@ requirements:
       dashboard build that skipped validation.
     moscow: must
     status: built
+    source: >
+      plans/publishing-and-history.md Thread A, same 2026-09-16 scoping
+      session. Keith's own call that there be no manual local-publish
+      path at all, rather than a discouraged one.
     acceptance_criteria:
       - There is no local "publish" command - only CI can deploy.
       - A structurally invalid or check-lifecycle-violating build never
@@ -404,6 +458,11 @@ requirements:
       "retired" never means "forgotten."
     moscow: must
     status: built
+    source: >
+      plans/publishing-and-history.md Thread D, same 2026-09-16 session
+      - how a check being retired, or having its definition changed,
+      should show up in the reporting UI without losing what it had
+      already found.
     acceptance_criteria:
       - Every real check across all 4 tools carries a globally-unique,
         permanent check_id.
@@ -444,6 +503,10 @@ requirements:
       as of this date" for a daily or a quarterly dataset alike.
     moscow: should
     status: built
+    source: >
+      plans/publishing-and-history.md Thread C, same 2026-09-16 session
+      - how a quarterly-cadence data asset should be presented
+      differently from a daily one.
     acceptance_criteria:
       - Staleness is computed from each dataset's own real cadence
         (daily/weekly/quarterly), not one flat day-count for everything.
@@ -481,6 +544,13 @@ requirements:
       labelled as such).
     moscow: should
     status: built
+    source: >
+      plans/conceptual-design.md Thread A, 2026-09-17. Keith's own
+      critique while a mislabelled-attempt-number bug was being
+      investigated: "suppliers won't actually label a resupply as
+      against the original supply. It will just appear at a certain
+      time. So I think something you're modeling about supplies and
+      resupplies doesn't make sense."
     acceptance_criteria:
       - A red arrival starts or continues a chain; the first amber or
         green arrival after it closes the chain.
@@ -508,6 +578,10 @@ requirements:
       activity across the whole data asset at a glance.
     moscow: should
     status: built
+    source: >
+      plans/publishing-and-history.md Phase 3/5a - the activity-feed
+      data and then its UI, built out of the committed run history
+      Thread B had just established.
     acceptance_criteria:
       - Every entry resolves a real committer, a real commit SHA, and a
         real run timestamp - never a placeholder.
@@ -538,6 +612,11 @@ requirements:
       have to read raw git log to understand how it evolved.
     moscow: could
     status: built
+    source: >
+      plans/qa-pipeline.md item 62, 2026-09-17 - "what changed about the
+      dashboard/tool itself over time", scoped explicitly against the
+      two things already built that sound similar and are not: the
+      activity feed and a single check's own definition history.
     acceptance_criteria:
       - Entries are real, dated, and categorized (Added/Fixed/Changed),
         not a mechanical commit dump.
@@ -569,6 +648,10 @@ requirements:
       end-to-end), so that a regression can't silently ship.
     moscow: must
     status: built
+    source: >
+      plans/publishing-and-history.md Phase 6, scoped 2026-09-17.
+      Keith's own words on the coverage floor - pytest-cov and a real
+      threshold "so we can't silently regress".
     acceptance_criteria:
       - CI runs the full suite, including real dbt-core/Soda Core/
         datacontract-cli/Evidently integration tests, on every push.
@@ -599,6 +682,14 @@ requirements:
       preference.
     moscow: could
     status: built
+    source: >
+      Not recorded at the time. Dark mode was built as part of the
+      dashboard's general UI work with no scoping item of its own, and
+      this entry was written retrospectively on 2026-09-18 from the
+      built behaviour. Kept honest rather than guessed - the later
+      decisions about it (that a shared ?theme= link never overrides the
+      recipient's own stored choice) are real and recorded, but they are
+      not where it came from.
     acceptance_criteria:
       - The choice persists across a reload.
     linked_tests:
@@ -627,6 +718,11 @@ requirements:
       with nothing but a browser.
     moscow: could
     status: built
+    source: >
+      plans/dashboard.md #5, 2026-09-16. Keith's own framing up front -
+      "think big, think architecturally, and consider this solution will
+      run for years" - and built through several explicit rounds of
+      scoping questions before any code, at his request.
     acceptance_criteria:
       - Each snapshot opens standalone, with no dependency on the live
         site or any other file.
@@ -654,6 +750,12 @@ requirements:
       trustworthy view of what's actually been delivered.
     moscow: should
     status: built
+    source: >
+      Keith, 2026-09-18 (plans/qa-pipeline.md item 75, and
+      plans/running-thoughts.md #7 for its dashboard panel): "having
+      like actual requirements... user stories, requirements, and
+      acceptance criteria... track MoSCoW status... have we implemented
+      them yet... tie them back to the actual tests"
     acceptance_criteria:
       - Every requirement's linked_tests are validated to actually
         exist in CI, not just asserted in prose.
@@ -716,6 +818,11 @@ requirements:
       somewhere real rather than living only in someone's head.
     moscow: should
     status: not_started
+    source: >
+      plans/running-thoughts.md #1, Keith's own voice-dictated batch of
+      2026-09-18. A decision rather than an idea by the time it landed -
+      GitHub Issues rather than a separate tool, "that's a really good
+      solution, it's an easy integration".
     acceptance_criteria:
       - A real GitHub Issue is opened/updated/commented on accurately
         by the pipeline for real QA events.
@@ -730,6 +837,10 @@ requirements:
       right person automatically.
     moscow: should
     status: not_started
+    source: >
+      plans/running-thoughts.md #2, same 2026-09-18 batch - who works on
+      this data asset, so remediation tickets can be routed to a real
+      person rather than to nobody.
     acceptance_criteria:
       - A real config file lists people, roles, and assignments.
     linked_tests: []
@@ -743,6 +854,10 @@ requirements:
       forever.
     moscow: should
     status: built
+    source: >
+      plans/running-thoughts.md #6, same 2026-09-18 batch, scoped with
+      Keith 2026-09-19 ("let's tackle item six") - the read-only tension
+      in accepting or rejecting an amber supply.
     acceptance_criteria:
       - A human decision on an amber result is recorded somewhere real
         and reflected back in the dashboard's own status.
@@ -791,6 +906,10 @@ requirements:
       delivery workflow, not a manually-kicked-off local script.
     moscow: should
     status: not_started
+    source: >
+      plans/running-thoughts.md #5, Thread B - deploy some version of
+      this pipeline to AWS, triggered by real S3 events, so QA happens
+      as part of the delivery rather than being kicked off by hand.
     acceptance_criteria:
       - A real S3 event triggers a real pipeline run with no manual
         step.
@@ -808,6 +927,11 @@ requirements:
       demonstrate against for a periodic, multi-table collection.
     moscow: could
     status: not_started
+    source: >
+      Keith, 2026-09-18, flagged alongside the running-thoughts batch
+      rather than in it. The gap was found while building the
+      resupply-chain redesign: Child Protection's generator had no
+      resupply concept at all, only periodic full-collection snapshots.
     acceptance_criteria:
       - Child Protection's generator can produce a red-then-recovered
         sequence across its own quarterly cadence.
@@ -821,6 +945,10 @@ requirements:
       opaque URL-encoded JSON blob.
     moscow: could
     status: built
+    source: >
+      plans/running-thoughts.md #9, same 2026-09-18 batch - a shareable
+      link to a specific view that a person can read, rather than a
+      URL-encoded JSON blob.
     acceptance_criteria:
       - A dataset-level URL reads as a real path, not encoded JSON.
     linked_tests:
@@ -857,6 +985,10 @@ requirements:
       parked, or still open.
     moscow: could
     status: built
+    source: >
+      plans/running-thoughts.md #10, same 2026-09-18 batch - browse this
+      project's own planning files from inside the dashboard instead of
+      leaving it to see what is done, parked or still open.
     acceptance_criteria:
       - Each planning file's own items are browsable with a real status
         indicator, not just raw markdown text.
@@ -899,6 +1031,10 @@ requirements:
       dashboard, so that good QA practice is visibly recognized.
     moscow: could
     status: built
+    source: >
+      plans/running-thoughts.md #3, same 2026-09-18 batch - staff who
+      turn QA around quickly or consistently produce clean data being
+      visibly recognised.
     acceptance_criteria:
       - THE SYSTEM SHALL show, per person, a streak of consecutive QA
         ticket resolutions that were never reopened.
@@ -1599,6 +1735,9 @@ requirements:
       - WHEN an optional field is written with a blank or whitespace-only
         value, THE SYSTEM SHALL reject it, WHILE continuing to accept
         the field being absent.
+      - THE SYSTEM SHALL require every requirement to record where it
+        came from, and SHALL reject a blank or whitespace-only value
+        for it.
       - WHEN a file fails the schema, THE SYSTEM SHALL report every
         problem in the file in one run rather than stopping at the
         first.
@@ -1673,6 +1812,27 @@ requirements:
         down and is not. Implemented as a before-validator, since with
         whitespace stripping an after-validator cannot tell a blank
         value from an empty one.
+      - >
+        `source` is required, not optional. It is the only field nobody
+        can rebuild later - what a requirement does is in the code, what
+        verifies it is in the tests, why it was decided that way is in
+        `decisions`, but where it came from exists only if someone wrote
+        it down. It had been optional because backfilling the 22
+        pre-2026-09-19 entries was judged to mean guessing; that was
+        answered by going and looking instead of guessing.
+      - >
+        21 of those 22 trace to a real plans/*.md item, Thread, Phase or
+        quoted ask. The 22nd, REQ-DASH-012, records that its origin was
+        never written down - kept as an honest statement rather than a
+        plausible-sounding reconstruction, because the reader who most
+        needs that field is the one deciding whether to go looking.
+      - >
+        Three entries (REQ-GHUB-015, REQ-GHUB-016, REQ-GEN-019) were
+        found still marked not_started while the code they describe
+        exists - the same staleness four others had already been caught
+        with. Left alone here deliberately: correcting a status pulls in
+        linked_tests, implemented_by, evidence and decisions for each,
+        which is real work and not what this change is.
     dependencies: [REQ-DOCS-014]
     linked_tests:
       - tests/test_schemas.py
@@ -1708,3 +1868,7 @@ requirements:
         2026-09-20: yamllint reports zero findings across this repo's
         own YAML with key-duplicates enabled, and catches a planted
         duplicate at the exact line.
+      - >
+        2026-09-20: all 30 requirements carry a non-blank source, and
+        the gate was confirmed to report both an absent one and a
+        whitespace-only one against the requirement that carries it.

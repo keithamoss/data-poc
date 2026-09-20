@@ -26,6 +26,7 @@ requirements:
     story: As a user, I want X, so that Y.
     moscow: must
     status: built
+    source: A real person, on a real date.
     acceptance_criteria:
       - It does the thing.
     linked_tests:
@@ -46,8 +47,9 @@ def test_parses_a_full_entry(tmp_path):
         "id": "REQ-DASH-001", "title": "A real feature",
         "story": "As a user, I want X, so that Y.",
         "moscow": "must", "status": "built",
+        "source": "A real person, on a real date.",
         "acceptance_criteria": ["It does the thing."], "linked_tests": ["tests/test_x.py"],
-        "date_written": "", "source": "", "non_functional_requirements": [], "dependencies": [],
+        "date_written": "", "non_functional_requirements": [], "dependencies": [],
         "open_questions": [], "evidence": [], "implemented_by": [],
         "decisions": [],
     }
@@ -86,19 +88,25 @@ def test_a_misspelt_field_name_raises_rather_than_being_ignored(tmp_path):
 
 
 def test_a_present_but_blank_optional_field_raises(tmp_path):
-    """Keith's call, 2026-09-20. A blank `source` is someone who started
+    """Keith's call, 2026-09-20. A blank value is someone who started
     filling it in and stopped; it is not the same as omitting the key,
-    and the file should be able to say so."""
-    path = _write(tmp_path, _FULL + '    source: "   "\n')
+    and the file should be able to say so.
+
+    Uses `date_written` rather than `source`, which became required
+    later the same day - the rule being tested here is about OPTIONAL
+    fields, where absent is legal and blank still is not."""
+    path = _write(tmp_path, _FULL + '    date_written: "   "\n')
     with pytest.raises(ValidationError) as exc:
         parse_requirements(path)
-    assert "source" in str(exc.value)
+    assert "date_written" in str(exc.value)
 
 
 def test_omitted_optional_fields_default(tmp_path):
-    """Absent stays legal - only blank-when-written is rejected."""
+    """Absent stays legal - only blank-when-written is rejected.
+
+    `source` is not among them any more: it became required the same
+    day, since it is the only field nobody can reconstruct later."""
     req = parse_requirements(_write(tmp_path, _FULL))[0]
-    assert req["source"] == ""
     assert req["date_written"] == ""
     assert req["open_questions"] == []
 
@@ -146,6 +154,7 @@ requirements:
       so that Y.
     moscow: must
     status: not_started
+    source: A real person, on a real date.
     acceptance_criteria:
       - It does the thing.
 """)

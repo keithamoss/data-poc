@@ -22,7 +22,8 @@ from qa_tools.common.vocab import (
 )
 
 _REQ = dict(id="REQ-QAC-001", title="T", story="S", moscow="must",
-            status="not_started", acceptance_criteria=["A real criterion."])
+            status="not_started", acceptance_criteria=["A real criterion."],
+            source="Keith, voice-dictated batch, 2026-09-19")
 _ITEM = {"headline": "H", "description": "D", "components": ["Dashboard UI"]}
 _FEED = {"releases": [{"date": "2026-09-20", "summary": "A day.",
                        "changes": [{"category": "Fixed", "items": [_ITEM]}]}]}
@@ -128,6 +129,16 @@ def test_the_vocabularies_have_one_home():
 
 # ---- a key written with nothing in it (Keith's call, 2026-09-20) -----
 
+def test_source_is_required():
+    """Keith, 2026-09-20 - "it must be there and it must not be white
+    space only or empty". The only field that records where a
+    requirement came from, which is the part that cannot be
+    reconstructed from the code later."""
+    with pytest.raises(ValidationError) as exc:
+        Requirement(**{k: v for k, v in _REQ.items() if k != "source"})
+    assert "source" in str(exc.value)
+
+
 @pytest.mark.parametrize("blank", ["", "   ", "\n  \n"])
 def test_an_optional_field_written_blank_is_rejected(blank):
     """"I'm not sure about accepting that" - Keith, on an earlier cut
@@ -139,7 +150,7 @@ def test_an_optional_field_written_blank_is_rejected(blank):
     stopped, and a file that cannot say so has the same silent shape as
     the duplicate mapping key that prompted this work."""
     with pytest.raises(ValidationError) as exc:
-        Requirement(**_REQ, source=blank)
+        Requirement(**{**_REQ, "date_written": blank})
     assert "blank" in str(exc.value)
 
 
@@ -147,7 +158,7 @@ def test_an_omitted_optional_field_is_still_perfectly_legal():
     """The other half of the rule, and the reason it is a
     before-validator: pydantic does not validate a field that was never
     supplied, so absent needs no special case."""
-    assert Requirement(**_REQ).source == ""
+    assert Requirement(**_REQ).date_written == ""
 
 
 def test_a_required_field_written_blank_is_rejected():

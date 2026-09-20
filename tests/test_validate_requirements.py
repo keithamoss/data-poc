@@ -18,6 +18,9 @@ def _valid_entry(**overrides):
         "story": "As a user, I want X, so that Y.",
         "moscow": "must",
         "status": "built",
+        # Required since 2026-09-20 - the one field nobody can
+        # reconstruct after the fact, so the fixture has to carry it.
+        "source": "Keith, voice-dictated batch, 2026-09-19",
         "acceptance_criteria": ["It does the thing."],
         "linked_tests": ["tests/test_resupply.py::test_add_business_days_skips_weekends"],
         # Both required once `status` is "built" (2026-09-20) - so the
@@ -152,8 +155,21 @@ def test_python_symbol_exists_returns_false_for_a_missing_file():
 
 # ---- 5 new optional fields (2026-09-19, plans/wider.md #10) ---------
 
-def test_source_is_optional_and_absent_is_fine():
-    assert validate([_valid_entry()]) == []
+def test_source_is_required():
+    """Keith, 2026-09-20: "I'm happy to make the source field a required
+    field. As in, it must be there and it must not be white space only
+    or empty."
+
+    It was optional until then because backfilling real provenance for
+    the 22 pre-2026-09-19 entries after the fact would have meant
+    guessing. That was answered by going and finding it instead - 21
+    trace to a real plans/*.md item or a quoted ask, and the 22nd says
+    plainly that its origin was not recorded, which is itself real
+    provenance."""
+    entry = _valid_entry()
+    del entry["source"]
+    errors = validate([entry])
+    assert any("source" in e and "required" in e.lower() for e in errors), errors
 
 
 def test_source_written_as_an_empty_string_is_rejected():
