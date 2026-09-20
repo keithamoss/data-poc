@@ -341,3 +341,72 @@ def test_a_violation_count_checks_zero_tolerance_is_not_regressed(tmp_path, monk
 
     assert [h["status"] for h in check["history"]] == ["green", "red"]
     assert check["current_status"] == "red"
+
+
+# ---- REQ-QAC-024: the two new authored fields ------------------------
+
+def _build_with_authored_check(tmp_path, monkeypatch, **authored):
+    """Builds the real dashboard JSON with one check carrying whatever
+    authored prose a test wants, and returns that check as the page
+    would receive it."""
+    check_id = ("data-asset-1.bdm.birth_registrations.stg_birth_registrations"
+                ".sex.accepted_values_dbt")
+    meta = CheckMetadata(check_id=check_id, category="validity", tool="dbt",
+                         config_hash="abc123", source_file="schema.yml",
+                         description="Sex must be one of the values the contract allows.",
+                         **authored)
+    monkeypatch.setattr(bdd, "collect_checks", lambda ref: [meta])
+    results_path = tmp_path / "results_bdm.json"
+    results_path.write_text(json.dumps({
+        "runs": FIXTURE_RUNS,
+        "results": [_check("run_02_2026-09-02", "sex", 0, status="pass",
+                           check_id=check_id)],
+        "dataset_stats": FIXTURE_DATASET_STATS,
+    }))
+    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(results_path))
+    col = next(c for c in bdd.build()["columns"] if c["name"] == "sex")
+    return next(c for c in col["checks"] if c.get("check_id") == check_id)
+
+
+def test_failure_indicates_reaches_the_page_alongside_description(tmp_path, monkeypatch):
+    """`description` says WHAT a check verifies; `failure_indicates`
+    says what a failure most likely means happened upstream. Both are
+    written for whoever is reading the dashboard, so both have to
+    actually arrive there - asserted on the built output rather than by
+    reading the builder's source, since a field can be assigned and
+    still be dropped by a later transform."""
+    check = _build_with_authored_check(
+        tmp_path, monkeypatch,
+        failure_indicates="The upstream extract probably ran before the day closed.")
+
+    assert check["description"] == "Sex must be one of the values the contract allows."
+    assert check["failure_indicates"] == (
+        "The upstream extract probably ran before the day closed.")
+
+
+def test_technical_note_never_reaches_the_page(tmp_path, monkeypatch):
+    """The one authored field that must NOT reach a viewer.
+
+    REQ-QAC-024 splits the prose three ways and the third is
+    deliberately for contributors - cross-references between checks, and
+    why a check behaves as it does by construction. This data is
+    published to a public site, so the field's absence is a requirement
+    being met, not something someone forgot to wire up.
+
+    Asserted against the whole built payload, not just this check's own
+    dict: the way this would really break is someone copying the field
+    through somewhere else for symmetry with `description`."""
+    check = _build_with_authored_check(
+        tmp_path, monkeypatch,
+        technical_note="Paired with the Soda check on the same column.")
+
+    assert "technical_note" not in check
+    assert "Paired with the Soda check" not in json.dumps(bdd.build())
+
+
+def test_a_check_with_no_authored_prose_still_builds(tmp_path, monkeypatch):
+    """Both fields are optional. `technical_note` is sparse by design -
+    on the order of 8 texts across 258 checks - and `failure_indicates`
+    may be declared self-evident, so the common case is neither."""
+    check = _build_with_authored_check(tmp_path, monkeypatch)
+    assert check["failure_indicates"] is None

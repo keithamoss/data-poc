@@ -224,6 +224,17 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                 "retired_as_of": lifecycle.retired_as_of if lifecycle else None,
                 "retired_reason": lifecycle.retired_reason if lifecycle else None,
                 "description": lifecycle.description if lifecycle else None,
+                # REQ-QAC-024. `description` is the plain-English WHAT;
+                # this is the plain-English SO-WHAT - what a failure most
+                # likely means happened upstream.
+                #
+                # `technical_note` is deliberately NOT here and must not
+                # be added. It is the one authored field written for
+                # contributors rather than viewers ("standing facts a
+                # contributor needs and a viewer must not see"), and this
+                # dict is published to a public site. Its absence is the
+                # requirement being met, not an oversight.
+                "failure_indicates": lifecycle.failure_indicates if lifecycle else None,
                 "changelog": lifecycle.changelog if lifecycle else [],
             })
 
