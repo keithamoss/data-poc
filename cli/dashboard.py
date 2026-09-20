@@ -87,6 +87,38 @@ def validate_requirements_command() -> None:
     _validate_requirements()
 
 
+INDEX_PATH = "plans/INDEX.md"
+
+
+def _plans_index(check: bool = False) -> None:
+    """Regenerates plans/INDEX.md, or (with --check) fails if the committed
+    copy has gone stale. Same shape as this group's other gates - a
+    generated artifact that IS committed needs something that notices when
+    it stops matching its source, or it quietly becomes a lie."""
+    from pathlib import Path
+    from dashboard.plans_index import build_index
+
+    generated = build_index("plans")
+    path = Path(INDEX_PATH)
+    current = path.read_text() if path.exists() else None
+    if check:
+        if current != generated:
+            raise click.ClickException(
+                f"{INDEX_PATH} is out of date with plans/*.md - "
+                "run `mothman dashboard plans-index` and commit the result.")
+        console.print(f"{INDEX_PATH} is current.", style="green")
+        return
+    path.write_text(generated)
+    console.print(f"Wrote {INDEX_PATH} ({len(generated.splitlines())} lines).", style="green")
+
+
+@dashboard_group.command("plans-index")
+@click.option("--check", is_flag=True, help="Fail if the committed index is stale; don't rewrite it.")
+def plans_index_command(check: bool) -> None:
+    """Regenerate plans/INDEX.md, the one-line-per-entry table of contents."""
+    _plans_index(check=check)
+
+
 def _check_renders() -> None:
     from dashboard.check_dashboard_renders import main as check_main
     if check_main() != 0:

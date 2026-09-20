@@ -76,12 +76,25 @@ _LIST_MARKER_RE = re.compile(r"^(?:[-*]\s+|\d+\.\s+)")
 # the short "file" id the dashboard's URL/filter state uses - deliberately
 # not just the filename stem, so a rename of the .md file itself doesn't
 # silently change every embedded id.
+# Every plans file that carries numbered items. publishing-and-history
+# and performance were MISSING here until 2026-09-20 - both were
+# classified as essay/thread files when this was written and both had
+# since grown numbered items (8 and 5), so 13 items were invisible to
+# the dashboard's Plans tab, including publishing-and-history #6, the
+# HIGH-priority per-dataset architecture work. A file appearing here AND
+# in THREAD_FILES is fine and intended - parse_plans() walks the two
+# independently, and publishing-and-history genuinely has both shapes.
+# tests/test_plans_md.py asserts generically that no numbered item in
+# any plans/*.md goes unparsed, rather than checking this list, so the
+# next file to grow items cannot be forgotten the same way.
 NUMBERED_FILES = {
     "wider": "wider.md",
     "qa-pipeline": "qa-pipeline.md",
+    "publishing-and-history": "publishing-and-history.md",
     "dashboard": "dashboard.md",
     "data-generation": "data-generation.md",
     "tooling": "tooling.md",
+    "performance": "performance.md",
 }
 THREAD_FILES = {
     "publishing-and-history": "publishing-and-history.md",

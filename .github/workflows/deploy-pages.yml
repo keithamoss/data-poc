@@ -270,6 +270,13 @@ jobs:
       - name: Gate - requirements validation (item 75)
         run: uv run mothman dashboard validate-requirements
 
+      # plans/INDEX.md is generated from plans/*.md but committed, so it
+      # can drift the moment anyone edits a plans file without
+      # regenerating. A committed generated artifact nobody checks is
+      # worse than none - a session reads it INSTEAD of the files.
+      - name: Check the plans index is current
+        run: uv run mothman dashboard plans-index --check
+
       - name: Gate - dashboard structural + real-browser render check
         run: uv run mothman dashboard check-renders
 

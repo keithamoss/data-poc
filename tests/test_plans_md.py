@@ -224,11 +224,18 @@ def test_parse_plans_reads_all_files_and_returns_the_combined_shape(tmp_path):
     (plans_dir / "conceptual-design.md").write_text(
         "## Thread A - a thread\n\n**Status:** parked (2026-09-17) · **Category:** QA checks & contract\n\nBody.\n"
     )
+    # Both added to NUMBERED_FILES 2026-09-20 - publishing-and-history
+    # legitimately carries BOTH numbered items and threads, and
+    # performance.md was never listed at all.
+    (plans_dir / "performance.md").write_text(
+        "1. **[done, 2026-09-18]** **[Testing & dev tooling]** A perf item.\n"
+    )
     (plans_dir / "running-thoughts.md").write_text("### 1. A raw idea\n\nBody.\n")
 
     result = parse_plans(plans_dir)
-    assert len(result["items"]) == 5
-    assert {i["file"] for i in result["items"]} == {"wider", "qa-pipeline", "dashboard", "data-generation", "tooling"}
+    assert len(result["items"]) == 6
+    assert {i["file"] for i in result["items"]} == {
+        "wider", "qa-pipeline", "dashboard", "data-generation", "tooling", "performance"}
     assert len(result["threads"]) == 2
     assert {t["file"] for t in result["threads"]} == {"publishing-and-history", "conceptual-design"}
     assert len(result["notes"]) == 1
@@ -258,3 +265,36 @@ def test_a_real_dash_between_words_keeps_its_spaces():
     assert join_wrapped(["a real bug -", "not a design gap"]) == "a real bug - not a design gap"
     assert join_wrapped(["requirements-", "analysis subagent"]) == "requirements-analysis subagent"
     assert join_wrapped(["plain", "words"]) == "plain words"
+
+
+def test_every_numbered_item_in_every_plans_file_is_parsed():
+    """Real bug, found 2026-09-20 while building the plans index
+    (plans/tooling.md #17): NUMBERED_FILES was an allowlist of five
+    files, and two others had since grown numbered items -
+    publishing-and-history.md (8) and performance.md (5). All 13 were
+    invisible to the dashboard's Plans tab, which presents itself as the
+    browsable view of this project's memory and was silently showing 138
+    of 151. Among the missing was publishing-and-history #6, the
+    HIGH-priority per-dataset architecture item.
+
+    Asserted generically against the real files rather than against a
+    count, so that a NEW plans file growing items cannot be forgotten
+    the same way - which is exactly how this happened.
+
+    Scoped to items carrying the CURRENT `**[status, YYYY-MM-DD]**`
+    convention. Writing it caught a second, separate thing: 10 items
+    across three files still carry the pre-2026-09-18 shape
+    (`**[open, low]**`, `**[done]**` - a status and a PRIORITY, no date),
+    left behind by that convention's own retrofit. Those are a content
+    decision rather than a parser one, so they are tracked as such and
+    deliberately not asserted here."""
+    import re
+    from pathlib import Path
+    seen = {(i["file"], i["number"]) for i in parse_plans("plans")["items"]}
+    current_format = re.compile(r"^(\d+)\.\s+\*\*\[[a-z-]+,\s*\d{4}-\d{2}-\d{2}\]\*\*", re.M)
+    missing = []
+    for path in sorted(Path("plans").glob("*.md")):
+        for m in current_format.finditer(path.read_text()):
+            if (path.stem, int(m.group(1))) not in seen:
+                missing.append(f"{path.name}#{m.group(1)}")
+    assert not missing, f"{len(missing)} numbered items never parsed: {missing}"
