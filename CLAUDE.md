@@ -613,6 +613,40 @@ Rough layout:
   2026-09-20 on, so a change does not add to the pile while that is
   pending.
 
+- **No building begins on a requirement until Keith has signed it off.**
+  His own standing instruction, 2026-09-20. A requirement existing in
+  `requirements.yaml` is not the same as a requirement he has agreed to
+  - drafting one, whether by hand or via `delivery-scoper`, produces a
+  PROPOSAL.
+
+  **What sign-off looks like**: present the requirement to him in prose
+  he can react to - the story, the acceptance criteria, the non-
+  functional constraints, and any open questions - not a YAML dump. He
+  gives input, criteria change, and he says yes. Then building starts.
+  Unresolved `open_questions:` are a particular signal: if one of them
+  would change what gets built, it is not ready to build.
+
+  **This applies whether or not the `delivery-*` agents were used.** The
+  gate is on the requirement, not on which route produced it, and the
+  route that skips the agents is the one most likely to skip the gate
+  too.
+
+  **Why it exists, from the day it was written.** Three requirements
+  were built without anyone reading them. `REQ-QAC-024` and
+  `REQ-QAC-025` were built from `plans/running-thoughts.md` notes, and
+  only afterwards turned out to have had requirements specifying them
+  all along - `REQ-QAC-025` had seven acceptance criteria, of which the
+  build met five, and one of the two it missed was a criterion actively
+  decided against without being read ("apply these rules to retired
+  checks on the same terms as active ones"). `REQ-DASH-026` was worse:
+  the work went the OPPOSITE way to a criterion, deleting information
+  the requirement asked to have demoted rather than removed.
+
+  That is the failure this closes, and note what it is NOT - none of it
+  was a disagreement about what to build. It was building without
+  looking, which a sign-off step makes structurally impossible because
+  the requirement has to be read aloud to be signed.
+
 - **Never change an authoring standard without Keith's explicit
   approval - propose the exact wording, get a yes, then edit.** His own
   standing instruction, 2026-09-20. It covers two files:

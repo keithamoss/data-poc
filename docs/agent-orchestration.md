@@ -26,6 +26,12 @@ roster doesn't just sit there unexplained.
                     delivery-scoper
                     (Keith's raw idea -> structured requirement)
                             |
+              KEITH SIGNS OFF THE REQUIREMENT ITSELF
+              (presented as prose he can react to - story,
+               acceptance criteria, NFRs, open questions.
+               He gives input, criteria change, he says yes.
+               Nothing downstream starts until he has.)
+                            |
               +-------------+-------------+
               |                           |
       delivery-architect      delivery-dashboard-ux  OR  delivery-cli-ux
@@ -53,6 +59,17 @@ roster doesn't just sit there unexplained.
    THEN (not parallel - see below)
    delivery-dashboard-visual-critic
 ```
+
+**The sign-off is a real stage, not a courtesy.** Added 2026-09-20 on
+Keith's own instruction, after three requirements were built without
+anyone reading them - two from `plans/*.md` notes whose requirements
+already existed, and one that went the opposite way to a criterion it
+had never been checked against. See `CLAUDE.md`'s own bullet for the
+full account.
+
+It applies whether or not these agents were used at all. The gate is on
+the requirement, not on the route that produced it - and the route that
+skips the agents is the one most likely to skip the gate too.
 
 **Pre-build parallelism**: `delivery-architect` and the relevant UX
 reviewer (`delivery-dashboard-ux` or `delivery-cli-ux`) both only need

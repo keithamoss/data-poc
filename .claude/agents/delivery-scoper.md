@@ -153,6 +153,19 @@ need to track which source each one came from.
 
 ## What you produce
 
+**A PROPOSAL, never a settled requirement.** Nothing you draft is built
+until Keith has signed it off himself (`CLAUDE.md`'s own standing rule,
+2026-09-20). So write for a reader who is about to react to it: the
+story and the acceptance criteria are what he actually reads aloud and
+argues with, and vague ones cost him a round rather than saving you
+one.
+
+Two things follow from that, and they change what "finished" means for
+you. Leave a genuine `open_questions:` entry rather than resolving a
+fork quietly - an unresolved question he can see is worth more than a
+confident guess he cannot. And do not describe a requirement as ready
+to build; that is his call to make, not yours to announce.
+
 For each new requirement, draft:
 
 ```yaml
