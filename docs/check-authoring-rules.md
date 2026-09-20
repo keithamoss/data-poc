@@ -129,6 +129,19 @@ did. **Expect the sentinel to be the common case, not the exception** -
 reaching for it is the correct instinct, not a failure to try hard
 enough.
 
+**What the sentinel does to the page:** nothing shows. The drawer omits
+the "What a failure means" heading entirely, exactly as it does for a
+check that has no value at all, so that heading only ever appears with
+something real underneath it. The authored string does travel through
+to the built page data - it is resolved in the template rather than at
+the builders (Keith, 2026-09-20) - so it is visible in page source, and
+that is fine: it is an authoring marker, not contributor prose. Unlike
+`technical_note`, it is not something a viewer must not see.
+
+Write it as a plain scalar. A `>` block scalar folds a trailing newline
+onto it, which the template trims for exactly this reason, but a plain
+scalar is what the rest of the tooling expects.
+
 ### Say what a failure indicates, not what the check verifies in other words
 
 If the sentence you have written is the description rephrased, the

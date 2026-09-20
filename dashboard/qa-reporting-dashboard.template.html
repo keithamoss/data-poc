@@ -2939,10 +2939,39 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   // That field is authored for contributors, not viewers, and this page
   // is published publicly - it is excluded at the builders so it never
   // reaches the browser at all (pipeline/build_dashboard_data.py).
-  const failureMeansBlock = check.failure_indicates ? `
+  // `self-evident` is a real AUTHORED value, not an absent one: it
+  // records that a human looked and decided the cause adds nothing to
+  // what the check already verifies. Roughly half of all checks land
+  // there, so it is the common case rather than the exception, and
+  // rendering the literal string would put the word "self-evident"
+  // under a heading on half the drawers in the dashboard.
+  //
+  // Keith's call, 2026-09-20: it renders as nothing at all, so this
+  // heading only ever appears with something real underneath it - the
+  // same treatment an absent value already gets, and the behaviour the
+  // comment above always described.
+  //
+  // Resolved HERE rather than at the builders, also his call. The
+  // authored value travels through to the built data intact, so what a
+  // check definition says and what the page receives never diverge, and
+  // changing what the sentinel LOOKS like later is a template edit
+  // rather than a full data rebuild. Unlike `technical_note`, the
+  // string is harmless in page source - it is an authoring marker, not
+  // contributor prose.
+  //
+  // Trimmed and lowercased before comparing, deliberately: the YAML
+  // these are authored in folds a `>` block scalar to a trailing
+  // newline, so an author following the block-scalar advice in
+  // docs/check-authoring-rules.md would otherwise produce a value that
+  // is the sentinel in every sense except ===, and the failure mode is
+  // a leak onto a public page rather than an error anyone would see.
+  const failureIndicates =
+    String(check.failure_indicates || "").trim().toLowerCase() === "self-evident"
+      ? "" : check.failure_indicates;
+  const failureMeansBlock = failureIndicates ? `
     <div class="drawer-section">
       <h4>What a failure means</h4>
-      <div style="font-size:13px; color:var(--ink-muted);">${check.failure_indicates}</div>
+      <div style="font-size:13px; color:var(--ink-muted);">${failureIndicates}</div>
     </div>` : "";
 
   // Phase 5c: check.changelog is the hand-authored history of documented

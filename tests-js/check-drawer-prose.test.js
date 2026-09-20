@@ -71,6 +71,37 @@ describe("the check drawer's authored prose", () => {
     expect(html).not.toContain("What a failure means");
   });
 
+  it("renders nothing for the self-evident sentinel, not the word itself", () => {
+    // `self-evident` is an authored value that reaches the page intact
+    // (resolved in the template, not at the builders - Keith, 2026-09-20),
+    // so the render layer is the only thing standing between it and a
+    // heading reading "self-evident" on roughly half the drawers.
+    const html = drawerHtmlFor({
+      description: "Sex must be one of the values the contract allows.",
+      failure_indicates: "self-evident",
+    });
+    expect(html).toContain("What this check does");
+    expect(html).not.toContain("What a failure means");
+    expect(html).not.toContain("self-evident");
+  });
+
+  it("still suppresses the sentinel when YAML has folded a newline onto it", () => {
+    // docs/check-authoring-rules.md tells authors to use `>` block
+    // scalars for these fields, and a folded scalar clips to a trailing
+    // newline - so the most likely real spelling of the sentinel is not
+    // === the sentinel. Getting this wrong leaks onto a public page
+    // rather than raising anything, which is why it is asserted rather
+    // than left to the plain-scalar case above.
+    for (const spelling of ["self-evident\n", "  self-evident  ", "Self-Evident"]) {
+      const html = drawerHtmlFor({
+        description: "Sex must be one of the values the contract allows.",
+        failure_indicates: spelling,
+      });
+      expect(html).not.toContain("What a failure means");
+      expect(html.toLowerCase()).not.toContain("self-evident");
+    }
+  });
+
   it("never renders a technical note, even if one reaches the browser", () => {
     const html = drawerHtmlFor({
       description: "Sex must be one of the values the contract allows.",

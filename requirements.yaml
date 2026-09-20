@@ -1428,6 +1428,35 @@ requirements:
         recomputable from committed `dataset_stats.json` whenever
         anyone wants them, so nothing is actually lost, only un-written.
       - >
+        The `self-evident` sentinel renders as nothing, and is resolved
+        in the template rather than at the dashboard builders (Keith,
+        2026-09-20, both calls). Rendering nothing matches what an
+        absent value already did and what the template's own comment
+        always claimed, so the "What a failure means" heading only ever
+        appears with something real under it - which matters because
+        roughly half of all checks are expected to carry the sentinel.
+        Resolving it in the template rather than at the builders was
+        the fork: it keeps the authored value travelling through to the
+        page intact, so a check definition and the data built from it
+        never diverge, and changing what the sentinel LOOKS like later
+        is a template edit rather than a data rebuild. Rejected
+        stripping it at the builders, which would have been the same
+        posture `technical_note` gets - but that exclusion exists
+        because a viewer must not see contributor prose, and an
+        authoring marker in page source is harmless.
+      - >
+        Found while wiring that up, and it would have shipped: the
+        render layer omitted the failure block only when the value was
+        ABSENT, so the first authored sentinel would have put the
+        literal words "self-evident" under a heading on a public page.
+        The plumbing was written before the sentinel was approved, and
+        the template's own comment already described the intended
+        behaviour, so this was the sentinel arriving late rather than a
+        disagreement. Two tests added and confirmed failing against the
+        unfixed template first - including the folded-block-scalar
+        spelling, since the authoring doc tells authors to use `>` and
+        a folded scalar is not `===` the sentinel.
+      - >
         The prose the open question was about is really TWO kinds, and
         only one of them was ever open. Counted against the real
         checks: 7 carry it, 7 distinct texts. Four are measured
