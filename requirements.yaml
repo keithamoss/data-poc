@@ -510,6 +510,10 @@ requirements:
       - WHEN check-lifecycle validation runs, IF a check_id's column
         segment names a column other than the one its rule is attached
         to, THEN THE SYSTEM SHALL exit non-zero and name it.
+      - WHEN check-lifecycle validation runs, IF two checks on the same
+        dataset and column share the final check_id segment, THEN THE
+        SYSTEM SHALL exit non-zero and name both, since that segment
+        alone identifies a check in a dashboard URL.
       - THE SYSTEM SHALL report every check against the same column it
         reports today, except the three cross-column business rules,
         which SHALL move from table level to the column their own
@@ -529,6 +533,20 @@ requirements:
         Python and 32 in tests. Correctness everywhere comes from the
         validator, not from a constructor serving 1% of cases.
       - Nothing here needs a live connection to data/ or any warehouse.
+      - The tail-uniqueness rule exists because global check_id
+        uniqueness does NOT imply it. Two checks could differ only in
+        their table segment, be globally unique, and still collide in a
+        URL that carries no table segment - whichever one the lookup
+        found first would win, silently, which is the failure this work
+        exists to remove. That cannot happen today only because every
+        dataset maps to exactly one table, which nothing enforces, so
+        the guarantee is stated directly rather than inherited from a
+        coincidence of the current data model.
+      - The rule is expressed in the same terms the URL keys on, and
+        lives in the same module as the grammar, so the two cannot drift
+        apart. A collision is a hard failure at authoring time - not a
+        fallback to the full check_id for the colliding check, which
+        would put two URL shapes on one page and hide the problem.
     dependencies: []
     linked_tests: []
     open_questions:
