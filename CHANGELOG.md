@@ -96,6 +96,29 @@ edited for a punchier, friendlier read than a bare commit log.
   costs.
 
 ### Fixed
+- **12:05pm** — **Index Lines Stopped One Clause Before the Decision** **[Docs & process]** **[Testing & dev tooling]**
+  A scoping run reported two index lines that cut off exactly where the
+  content began: Thread D's field list stopping immediately before
+  `description` — the one field that run needed — and
+  `plans/dashboard.md` #8's stopping at *"(category axis: a real
+  per-check"*.
+  Measuring first changed the fix. **72% of entry summaries and 98% of
+  sub-entries** are longer than the 120-character cap, so where the cut
+  lands is the normal case, not an edge case. Raising the cap was the
+  obvious move and the wrong one — 120 to 250 doubles the index and
+  spends it on ordinary prose that was never the problem. Both failures
+  were structural: a cut landing inside an **open bracket** is actively
+  misleading rather than merely short, since it promises a
+  qualification and then withholds it, and this project reliably puts
+  the decision inside the parenthetical — so the bracket is now carried
+  whole or dropped. And a **colon-ended header followed by a list** now
+  lists the item *terms* rather than the first item's prose:
+  "check_id, introduced_date, retired_as_of + retired_reason,
+  description, changelog" answers the question and is *shorter* than
+  the truncation it replaces. Only 21 term lists and 27 open-bracket
+  summaries exist at all, so letting each run to its natural end cost
+  8%, not 80%.
+
 - **11:41am** — **Thirteen Plans Items Were Invisible to the Plans Tab** **[Dashboard UI]**
   `plans_md.py` carried an explicit allowlist of five files that carry
   numbered items. Two others had since grown them —
