@@ -166,60 +166,62 @@ class TestCheckUrl:
         assert check_url("a", "b", "c", "d", "e").startswith("https://")
 
 
-class TestAgainstTheRealCommittedDashboard:
-    """Asserts a property that holds whatever happens to be failing
-    today, rather than today's failures."""
+class TestAgainstTheRealCommittedCheckDefinitions:
+    """Reads the committed check definitions, never reports/*.json.
 
-    def test_every_link_it_generates_points_at_a_check_that_really_exists(self):
-        from qa_tools.common.dataset_status import dataset_status
-        from qa_tools.common.ticket_sync import _load_scopes
+    The first version of this class read the built dashboard JSON, and
+    that was wrong in a way local runs could not show: reports/ is
+    gitignored, so it exists on a machine that has just built it and
+    not in a fresh CI checkout. It passed here and failed on GitHub
+    with a FileNotFoundError, which is the exact shape CLAUDE.md's own
+    "a passing local pytest is not evidence CI is green" bullet
+    describes.
 
-        checked = 0
-        for scope, ds in _load_scopes():
-            status = dataset_status(ds)
-            if status == "green":
-                continue
-            out = build_check_summary(ds, status, scope.agency_id,
-                                      scope.collection_id, scope.id)
-            real_keys = {ck["key"] for col in ds["columns"]
-                         for ck in col["checks"] if ck.get("key")}
-            for line in out.splitlines():
-                for part in line.split("/check/")[1:]:
-                    key = part.split(")")[0]
-                    assert key in real_keys, f"{scope.id}: {key} is not a real check key"
-                    checked += 1
-        assert checked > 0, "no non-green dataset to check against"
+    Reading the definitions is also the better layer for both claims
+    below: contract/, dbt_project/ and the Soda YAML are committed, and
+    they are where the values these tests are about actually originate.
+    """
 
-    def test_no_authored_sentence_reaches_a_ticket_with_stray_whitespace(self):
-        """REQ-GHUB-027's whitespace fix, asserted at the layer that
-        would have shown it. Fails against the pre-fix parser, where 210
-        sentinels and 40 contract descriptions carried a trailing
-        newline."""
-        for path in ("reports/birth_registrations_dashboard.json",
-                     "reports/child_protection_dashboard.json"):
-            doc = json.loads((ROOT / path).read_text())
-            stack = [doc]
-            while stack:
-                node = stack.pop()
-                if isinstance(node, dict):
-                    for key in ("name", "description", "failure_indicates"):
-                        value = node.get(key)
-                        if isinstance(value, str):
-                            assert value == value.strip(), f"{path}: {key} is {value!r}"
-                    stack.extend(node.values())
-                elif isinstance(node, list):
-                    stack.extend(node)
+    def test_no_authored_check_text_carries_stray_whitespace(self):
+        """REQ-GHUB-027's whitespace fix at its source. Fails against the
+        pre-fix parser, where 210 self-evident sentinels and 40 ODCS
+        descriptions arrived with a trailing newline from their YAML
+        block scalars."""
+        import qa_tools.common.validate_check_lifecycle as v
 
+        offenders = [
+            (c.check_id, field, value)
+            for c in v.collect_checks(None)
+            for field, value in (("name", c.name), ("description", c.description),
+                                 ("failure_indicates", c.failure_indicates),
+                                 ("technical_note", c.technical_note))
+            if isinstance(value, str) and value != value.strip()
+        ]
+        assert offenders == []
 
-def test_a_placeholder_row_for_a_column_with_no_rule_is_never_listed():
-    """The CP builder emits 11 of these, for columns no tool defines a
-    rule against. They carry no key, name or description. They are green
-    today, so a status filter alone would also exclude them - but "no
-    check exists here" is not a passing check, and a ticket saying it
-    failed would be nonsense."""
-    ds = _dataset(("placement_end", [{
-        "current": 1, "current_status": "red", "warn": None, "fail": None,
-        "note": "Neither the ODCS contract nor the Soda/dbt check files "
-                "define a rule for this column today",
-    }]))
-    assert _summary(ds) == ""
+    def test_the_self_evident_sentinel_is_recognised_on_every_check_that_uses_it(self):
+        """The consequence that made the whitespace matter. Before the
+        fix only 3 of 213 matched the sentinel exactly, so any consumer
+        comparing without trimming would have printed the literal word
+        into a ticket."""
+        import qa_tools.common.validate_check_lifecycle as v
+        from qa_tools.common.check_lifecycle import SELF_EVIDENT, is_self_evident
+
+        sentinels = [c for c in v.collect_checks(None) if is_self_evident(c.failure_indicates)]
+        assert sentinels, "expected some checks to declare their failure cause self-evident"
+        assert all(c.failure_indicates == SELF_EVIDENT for c in sentinels)
+
+    def test_every_real_check_id_yields_a_tool_ref_matching_its_url_key(self):
+        """The property the ticket links depend on, asserted across every
+        real check rather than a sample: what a ticket prints and what
+        the URL carries are the same string, tool moved to the front."""
+        import qa_tools.common.validate_check_lifecycle as v
+        from pipeline.dashboard_check_labels import tool_ref, url_key
+
+        checks = v.collect_checks(None)
+        assert len(checks) > 200, "expected the real corpus, not a fixture"
+        for check in checks:
+            key, ref = url_key(check.check_id), tool_ref(check.check_id)
+            tool, terse = ref.split(":", 1)
+            assert key == f"{terse}_{tool}", check.check_id
+            assert check_url("a", "b", "c", "col", key).endswith(f"/check/{key}")
