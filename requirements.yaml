@@ -2258,23 +2258,46 @@ requirements:
       "table level checks do deserve their own dataset level section".
     acceptance_criteria:
       - WHEN a viewer opens a dataset, THE SYSTEM SHALL present
-        supply-level and table-level checks in their own section,
-        distinct from the list of columns.
+        supply-level checks and table-level checks as two sections of
+        their own, each distinct from the list of columns.
+      - THE SYSTEM SHALL place those sections above the column grid.
+      - WHERE a dataset has no checks of one kind, THE SYSTEM SHALL omit
+        that section rather than render it empty.
+      - THE SYSTEM SHALL give each section its own status, by the same
+        rule a column tile already uses.
       - THE SYSTEM SHALL NOT render either pseudo-column among the real
-        columns once that section exists.
-      - THE SYSTEM SHALL keep every existing deep link to a check in
-        those groups working.
+        columns once those sections exist.
+      - THE SYSTEM SHALL address a check in those sections by a readable
+        URL segment rather than by the current bracketed pseudo-column
+        name.
       - THE SYSTEM SHALL continue to fold those checks into the
         dataset's own status exactly as it does today.
     non_functional_requirements:
-      - The pseudo-column names are currently real URL segments, so
-        changing the structure must not silently break a bookmark.
-      - Must be verified in a real browser, same as REQ-DASH-032.
+      - Must be verified in a real browser, same as REQ-DASH-032 - a
+        correct builder says nothing about a render layer with its own
+        transform.
+      - Birth Registrations has supply-level checks and no table-level
+        ones, so the omit-when-empty case is real on the current data
+        and must be covered, not hypothetical.
     dependencies: [REQ-DASH-032]
-    open_questions:
-      - Whether the section sits above or below the column grid, and
-        whether it carries its own status rollup, are presentation
-        calls better made against a real rendering than in advance.
+    decisions:
+      - Decided the sections sit ABOVE the column grid (Keith,
+        2026-09-20). Whether the right amount of recent data turned up
+        gates whether any column detail is worth reading, so it is
+        asked first.
+      - Decided on two separate sections rather than one with two
+        groups (Keith), keeping "is this supply the right size" and "do
+        these tables agree" as visibly different questions - the same
+        reasoning that produced two pseudo-columns rather than one in
+        REQ-DASH-032.
+      - Decided each section carries its own status rollup, matching
+        what every column tile already does.
+      - Decided to rename the URL segment rather than preserve the
+        bracketed pseudo-column names. The draft carried a criterion to
+        keep existing deep links working; it was dropped once the dates
+        were checked - those URLs came into existence the same day, so
+        nothing can have bookmarked one. Worth recording because the
+        answer would be different in a week.
 
   - id: REQ-DOCS-028
     title: A "What's New" feed written for the people who use the tool
