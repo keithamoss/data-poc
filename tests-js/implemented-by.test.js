@@ -1,5 +1,5 @@
 /**
- * Verifies the front-end half of `requirements.yaml`'s `implements:` field
+ * Verifies the front-end half of `requirements.yaml`'s `implemented_by:` field
  * (plans/tooling.md #18, Keith's call 2026-09-20).
  *
  * `qa_tools/common/validate_requirements.py` AST-verifies every `.py`
@@ -41,12 +41,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(__dirname, "..");
 const TEMPLATE_REL = "dashboard/qa-reporting-dashboard.template.html";
 
-/** Every `implements:` entry that names a symbol inside the template. */
+/** Every `implemented_by:` entry that names a symbol inside the template. */
 function templateSymbols() {
   const doc = parse(readFileSync(path.join(REPO_ROOT, "requirements.yaml"), "utf-8"));
   const found = [];
   for (const req of doc.requirements ?? []) {
-    for (const entry of req.implements ?? []) {
+    for (const entry of req.implemented_by ?? []) {
       const [file, ...qualname] = entry.split("::");
       if (file === TEMPLATE_REL && qualname.length) {
         found.push({ id: req.id, entry, symbol: qualname.join("::") });
@@ -56,7 +56,7 @@ function templateSymbols() {
   return found;
 }
 
-describe("requirements.yaml implements: front-end symbols", () => {
+describe("requirements.yaml implemented_by: front-end symbols", () => {
   let page;
   afterEach(() => {
     page?.close();

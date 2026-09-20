@@ -120,7 +120,7 @@
 #                        - structured, not buried in prose, and exactly
 #                        what should get escalated to a human rather
 #                        than guessed.
-#   implements:          list of real places this requirement is
+#   implemented_by:          list of real places this requirement is
 #                        IMPLEMENTED - as opposed to linked_tests, which
 #                        says what VERIFIES it. Added 2026-09-20 (Keith,
 #                        plans/tooling.md #18). REQUIRED once `status` is
@@ -139,7 +139,7 @@
 #                        A front-end path (`.html`/`.js`/`.ts`) may be
 #                        bare, since there's no JS parser on the Python
 #                        side; a `::` on one IS allowed and IS verified,
-#                        by tests-js/implements.test.js, which loads the
+#                        by tests-js/implemented_by.test.js, which loads the
 #                        real template into jsdom and checks the symbol
 #                        resolves - real execution, so a name appearing
 #                        only in a comment cannot pass. Any other file
@@ -179,7 +179,7 @@ requirements:
       - tests/test_run_soda_bdm.py
       - tests/test_run_datacontract_bdm.py
       - tests/test_run_evidently_bdm.py
-    implements:
+    implemented_by:
       - qa_tools/bdm/orchestrate_bdm.py::run_pipeline
       - qa_tools/bdm/run_dbt_bdm.py::evaluate_dbt_bdm
       - qa_tools/bdm/run_soda_bdm.py::evaluate_soda_bdm
@@ -207,7 +207,7 @@ requirements:
       - tests/test_run_soda_cp.py
       - tests/test_run_datacontract_cp.py
       - tests/test_run_evidently_cp_real.py
-    implements:
+    implemented_by:
       - qa_tools/cp/orchestrate_cp.py::run_pipeline_cp
       - qa_tools/cp/run_dbt_cp.py::evaluate_dbt_cp
       - qa_tools/cp/run_soda_cp.py::evaluate_soda_cp
@@ -232,7 +232,7 @@ requirements:
     linked_tests:
       - tests-js/status-rollups.test.js
       - tests-js/navigation.test.js
-    implements:
+    implemented_by:
       - dashboard/qa-reporting-dashboard.template.html::rollupStatuses
       - dashboard/qa-reporting-dashboard.template.html::navigate
       - qa_tools/common/dataset_status.py::dataset_status
@@ -256,7 +256,7 @@ requirements:
       - tests/test_qa_results_writer.py
       - tests/test_qa_results_reader.py
       - tests/test_build_results_from_history.py
-    implements:
+    implemented_by:
       - qa_tools/common/qa_results_writer.py::write_qa_result
       - qa_tools/common/qa_results_reader.py::read_qa_results
       - qa_tools/bdm/build_results_from_history.py::build_results_from_history
@@ -277,7 +277,7 @@ requirements:
     linked_tests:
       - tests/test_check_dashboard_renders.py
       - tests/test_dashboard_e2e.py::TestBuiltDashboardRenders
-    implements:
+    implemented_by:
       - .github/workflows/deploy-pages.yml
       - dashboard/check_dashboard_renders.py::main
       - qa_tools/common/validate_check_lifecycle.py::main
@@ -301,7 +301,7 @@ requirements:
     linked_tests:
       - tests/test_check_lifecycle.py
       - tests/test_validate_check_lifecycle.py
-    implements:
+    implemented_by:
       - qa_tools/common/check_lifecycle.py::CheckMetadata
       - qa_tools/common/check_lifecycle.py::parse_dbt_check_metadata
       - qa_tools/common/check_lifecycle.py::parse_soda_check_metadata
@@ -325,7 +325,7 @@ requirements:
     linked_tests:
       - tests/test_cadence.py
       - tests/test_dashboard_e2e.py::TestAsOfDatePicking::test_a_date_before_any_real_history_shows_no_data
-    implements:
+    implemented_by:
       - pipeline/cadence.py::parse_cadence_from_contract
       - pipeline/cadence.py::cycle_start
       - pipeline/cadence.py::classify_arrival
@@ -349,7 +349,7 @@ requirements:
         red/amber/green status.
     linked_tests:
       - tests-js/supply-history.test.js
-    implements:
+    implemented_by:
       - dashboard/qa-reporting-dashboard.template.html::renderSupplyHistorySection
       - pipeline/build_dashboard_data.py::build
 
@@ -366,7 +366,7 @@ requirements:
         real run timestamp - never a placeholder.
     linked_tests:
       - tests/test_changelog.py
-    implements:
+    implemented_by:
       - qa_tools/common/changelog.py::build_changelog
       - qa_tools/common/git_identity.py::get_run_by
       - dashboard/embed_dashboard_data.py::embed
@@ -384,7 +384,7 @@ requirements:
         not a mechanical commit dump.
     linked_tests:
       - tests/test_changelog_md.py
-    implements:
+    implemented_by:
       - dashboard/changelog_md.py::parse_changelog
       - dashboard/embed_dashboard_data.py::embed
       - CHANGELOG.md
@@ -405,7 +405,7 @@ requirements:
         aspiration.
     linked_tests:
       - tests/test_dashboard_e2e.py::TestBuiltDashboardRenders::test_renders_with_zero_console_errors_and_a_populated_view
-    implements:
+    implemented_by:
       - .github/workflows/test.yml
       - pyproject.toml
       - tests-js/support/loadDashboard.js
@@ -422,7 +422,7 @@ requirements:
       - The choice persists across a reload.
     linked_tests:
       - tests/test_dashboard_e2e.py::TestDarkModeToggle::test_toggling_dark_mode_persists_across_a_reload
-    implements:
+    implemented_by:
       - dashboard/qa-reporting-dashboard.template.html::applyTheme
 
   - id: REQ-DASH-013
@@ -439,7 +439,7 @@ requirements:
         site or any other file.
     linked_tests:
       - tests/test_snapshot_dashboard.py
-    implements:
+    implemented_by:
       - dashboard/snapshot_dashboard.py::take_snapshot
       - dashboard/snapshot_dashboard.py::sync_local_snapshots
 
@@ -459,7 +459,7 @@ requirements:
     linked_tests:
       - tests/test_validate_requirements.py
       - tests/test_requirements_yaml.py
-    implements:
+    implemented_by:
       - requirements.yaml
       - dashboard/requirements_yaml.py::parse_requirements
       - qa_tools/common/validate_requirements.py::validate

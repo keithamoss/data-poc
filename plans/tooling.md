@@ -2040,6 +2040,21 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     22 already-built requirements need backfilling before CI can go
     green, so this cannot land incrementally.
 
+    **Named `implemented_by`, not `implements` (Keith, 2026-09-20).**
+    It shipped as `implements:` and he caught the direction the same
+    hour: "REQ-QAC-006 implements `check_lifecycle.py::CheckMetadata`"
+    is backwards - the code implements the requirement, not the
+    reverse, exactly as "class X implements interface Y" puts the
+    implementer in the subject position. The rename also fixed an
+    inconsistency shipped alongside it: the panel label already read
+    "Implemented in:" while the field said the opposite. It now reads
+    "Implemented by:" directly above `linked_tests`' existing "Verified
+    by:", so the two render as a matched pair - where it lives, what
+    proves it works. Renamed 30 minutes after landing, across 14
+    entries, the validator, the JS test (and its filename), the
+    template label, the parser default and the header docs; both
+    break-it proofs re-run afterwards.
+
     **Symbols, decided 2026-09-20** (Keith: "let's definitely go
     symbols... CI validates the files and the symbols with an AST pass").
     The rule, and the asymmetry in it, is the whole point:
@@ -2057,7 +2072,7 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
       probably end up with a separate TypeScript or JavaScript file, and
       maybe we can take it up later."
     - A `::` on a front-end file IS allowed and IS verified - just in
-      the Node toolchain, by the new `tests-js/implements.test.js`. It
+      the Node toolchain, by the new `tests-js/implemented-by.test.js`. It
       reuses `tests-js/support/loadDashboard.js`, which already loads
       the real committed template into a real jsdom window with
       `runScripts: "dangerously"`, so every top-level `function foo(){}`
@@ -2070,14 +2085,14 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
 
     Both halves were proven by breaking them on purpose rather than
     assumed: renaming a real Python symbol produced
-    `REQ-QAC-006: implements entry '...::parse_contract_check_metadataX'
+    `REQ-QAC-006: implemented_by entry '...::parse_contract_check_metadataX'
     names no real function/class/method in that file`, and typo-ing a
     template symbol failed `npm test` naming `REQ-DASH-012` and the
     exact entry.
 
     All **14** `built` requirements backfilled in the same change, since
     "required once built" cannot land incrementally. The panel renders
-    "Implemented in:" directly above "Verified by:" - verified in a real
+    "Implemented by:" directly above "Verified by:" - verified in a real
     browser, 14 rendered blocks, zero console errors - because they are
     two halves of one question and reading them apart is what let the
     register answer only the second for a year.
@@ -2166,7 +2181,7 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     amendment to `requirements.md`. The field is this project's own
     invention.
 
-    **That is why `implements` is required rather than optional.** A
+    **That is why `implemented_by` is required rather than optional.** A
     field with no forcing function stays empty however well its schema
     is written - `evidence` proves it, with a better spec than most.
     Keith's "required once built" call supplies the forcing function,
@@ -2175,10 +2190,10 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
 20. **[todo, 2026-09-20]** **[Docs & process]**
     Decide whether `requirements.yaml`'s `evidence` field survives.
 
-    Raised by #18's own build, not a fresh idea: with `implements`
+    Raised by #18's own build, not a fresh idea: with `implemented_by`
     landed, three of the four recognised verification methods are
     covered by CI-enforced fields (`linked_tests` for testing and
-    demonstration, `implements` for inspection) and the fourth
+    demonstration, `implemented_by` for inspection) and the fourth
     (analysis) already lands in `plans/*.md`/`CHANGELOG.md`. `evidence`
     has zero uses across 27 requirements - and, per #18's own corrected
     diagnosis, that is a handoff-format problem rather than a
@@ -2195,7 +2210,7 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
       `delivery-critic`'s output contract, the way `delivery-scoper`
       already has one. Cheap, and it would work - the four fields the
       scoper emits are at 4/5 or 5/5. The question is whether the
-      content is worth having once `implements` and `linked_tests`
+      content is worth having once `implemented_by` and `linked_tests`
       cover inspection, testing and demonstration between them.
     - **Narrow it to analysis specifically** - the one method genuinely
       uncovered (a measurement or derivation that proves a requirement

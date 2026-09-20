@@ -22,7 +22,7 @@ def _valid_entry(**overrides):
         "linked_tests": ["tests/test_resupply.py::test_add_business_days_skips_weekends"],
         # Required once `status` is "built" (2026-09-20) - so the base
         # fixture, which IS built, has to carry one to stay valid.
-        "implements": ["qa_tools/common/validate_requirements.py::validate"],
+        "implemented_by": ["qa_tools/common/validate_requirements.py::validate"],
     }
     entry.update(overrides)
     return entry
@@ -243,7 +243,7 @@ def test_dependencies_referencing_a_nonexistent_id_is_an_error():
     assert any("dependencies entry 'REQ-QAC-999' does not match any real requirement id" in e for e in errors)
 
 
-# ---- implements ------------------------------------------------------
+# ---- implemented_by ------------------------------------------------------
 #
 # Keith's call, 2026-09-20 (plans/tooling.md #18). The register already
 # says which TESTS verify a requirement; it never said where the thing
@@ -255,11 +255,11 @@ def test_dependencies_referencing_a_nonexistent_id_is_an_error():
 # requirement is `built` and CI refuses to pass without it.
 
 def test_a_built_requirement_must_say_where_it_is_implemented():
-    errors = validate([_valid_entry(implements=[])])
-    assert any("implements" in e for e in errors), errors
+    errors = validate([_valid_entry(implemented_by=[])])
+    assert any("implemented_by" in e for e in errors), errors
 
 
-def test_implements_is_optional_until_a_requirement_is_valid_entry():
+def test_implemented_by_is_optional_until_a_requirement_is_built():
     assert validate([_valid_entry(status="not_started", linked_tests=[])]) == []
 
 
@@ -271,18 +271,18 @@ def test_a_python_entry_must_name_a_symbol_not_just_a_file():
     guarantee that let plans/*.md `touches:` lines rot while looking
     authoritative. A symbol is AST-verified, so a rename breaks the
     build and names the requirement that claimed it."""
-    errors = validate([_valid_entry(implements=["qa_tools/common/validate_requirements.py"])])
+    errors = validate([_valid_entry(implemented_by=["qa_tools/common/validate_requirements.py"])])
     assert any("symbol" in e.lower() for e in errors), errors
 
 
 def test_a_python_symbol_that_does_not_exist_is_an_error():
-    errors = validate([_valid_entry(implements=[
+    errors = validate([_valid_entry(implemented_by=[
         "qa_tools/common/validate_requirements.py::no_such_function"])])
     assert any("no_such_function" in e for e in errors), errors
 
 
 def test_a_real_python_symbol_resolves():
-    assert validate([_valid_entry(implements=[
+    assert validate([_valid_entry(implemented_by=[
         "qa_tools/common/check_lifecycle.py::parse_contract_check_metadata",
         "qa_tools/common/check_lifecycle.py::CheckMetadata"])]) == []
 
@@ -291,8 +291,8 @@ def test_a_front_end_path_may_be_bare():
     """No AST parser for the template's inline JS on the Python side, so
     a bare path is allowed there rather than pretending to a rigour this
     toolchain does not have. The JS symbol form is checked by the Node
-    toolchain instead - tests-js/implements.test.js."""
-    assert validate([_valid_entry(implements=[
+    toolchain instead - tests-js/implemented_by.test.js."""
+    assert validate([_valid_entry(implemented_by=[
         "dashboard/qa-reporting-dashboard.template.html"])]) == []
 
 
@@ -300,11 +300,11 @@ def test_a_symbol_on_a_file_neither_python_nor_front_end_is_rejected():
     """Nothing verifies a `::` on a YAML or SQL file, so accepting one
     would record an unchecked claim in a field whose whole point is that
     it is checked."""
-    errors = validate([_valid_entry(implements=[
+    errors = validate([_valid_entry(implemented_by=[
         "contract/data-asset.yaml::data_asset_id"])])
     assert any("contract/data-asset.yaml" in e for e in errors), errors
 
 
-def test_an_implements_path_that_does_not_exist_is_an_error():
-    errors = validate([_valid_entry(implements=["qa_tools/common/nope.py::thing"])])
+def test_an_implemented_by_path_that_does_not_exist_is_an_error():
+    errors = validate([_valid_entry(implemented_by=["qa_tools/common/nope.py::thing"])])
     assert any("nope.py" in e for e in errors), errors

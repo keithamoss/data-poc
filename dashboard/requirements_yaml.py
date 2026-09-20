@@ -42,7 +42,7 @@ _DEFAULTS = {
     # actually implemented, as opposed to linked_tests' what verifies
     # it. Required once `status` is "built"; see requirements.yaml's own
     # header comment and validate_requirements.py for the real rules.
-    "implements": [],
+    "implemented_by": [],
 }
 
 

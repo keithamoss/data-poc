@@ -3300,9 +3300,9 @@ function renderRequirementsPanel(){
     // they are the two halves of the same question (where it lives, what
     // proves it works), and reading them apart is what let the register
     // answer only the second one for a year.
-    const impl = (r.implements||[]).length
+    const impl = (r.implemented_by||[]).length
       ? `<div style="margin-top:10px; font-size:12px; color:var(--ink-muted);">
-          Implemented in: ${r.implements.map(i=>`<code>${i}</code>`).join(", ")}
+          Implemented by: ${r.implemented_by.map(i=>`<code>${i}</code>`).join(", ")}
         </div>`
       : "";
     const evidence = (r.evidence||[]).length

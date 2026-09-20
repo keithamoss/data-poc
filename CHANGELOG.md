@@ -98,7 +98,7 @@ edited for a punchier, friendlier read than a bare commit log.
 - **12:23pm** — **A Requirement Now Says Where It Is Implemented, Not Just What Tests It** **[Docs & process]** **[Testing & dev tooling]**
   `requirements.yaml` has always said which *tests* verify a
   requirement, AST-verified so a renamed test breaks the build. It never
-  said where the thing actually **lives**. A new `implements:` field
+  said where the thing actually **lives**. A new `implemented_by:` field
   does, and CI checks it the same way.
   The rules are deliberately asymmetric. A Python entry **must** name a
   symbol — `check_lifecycle.py::parse_contract_check_metadata` — and a
@@ -118,7 +118,7 @@ edited for a punchier, friendlier read than a bare commit log.
   A field with no forcing function stays empty however well it's
   specified; CI refusing to go green is one. All 14 built requirements
   were backfilled in the same change, and the Requirements panel now
-  shows "Implemented in:" directly above "Verified by:".
+  shows "Implemented by:" directly above "Verified by:".
 
 ### Fixed
 - **12:05pm** — **Index Lines Stopped One Clause Before the Decision** **[Docs & process]** **[Testing & dev tooling]**
