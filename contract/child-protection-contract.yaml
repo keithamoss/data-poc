@@ -119,9 +119,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Every client record must carry a client ID."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - metric: duplicateValues
             dimension: uniqueness
             mustBe: 0
@@ -151,9 +155,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "A client's given name must be recorded."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
       - name: family_name
         logicalType: string
         physicalType: varchar(200)
@@ -170,9 +178,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "A client's family name must be recorded."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
       - name: date_of_birth
         logicalType: date
         physicalType: date
@@ -188,9 +200,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "A client record must carry a date of birth."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           # Reverse gap, closed 2026-09-15 (plans/qa-pipeline.md's full-
           # triplication pass): both Soda (a `failed rows` check) and dbt
           # (tests/cp_client_date_of_birth_range.sql) already implement
@@ -261,9 +277,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "A client's suburb must be recorded."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
       - name: postcode
         logicalType: string
         physicalType: varchar(4)
@@ -279,9 +299,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "A client's postcode must be recorded."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           # Closed value set - generator/names_au.py's SUBURBS pool's own
           # postcodes (49 distinct values paired with the 51 suburb names),
           # same real-and-bounded rationale as BDM's place_of_birth_suburb
@@ -316,9 +340,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "A client record must carry the date its case was opened."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
       - name: case_status
         logicalType: string
         physicalType: varchar(10)
@@ -384,9 +412,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Every notification must carry a notification ID."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - metric: duplicateValues
             dimension: uniqueness
             mustBe: 0
@@ -448,9 +480,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Every notification must reference a client."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - type: sql
             dimension: consistency
             query: "SELECT COUNT(*) FROM {model} n LEFT JOIN cp_clients c ON n.cp_client_id = c.cp_client_id WHERE c.cp_client_id IS NULL"
@@ -481,9 +517,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Every notification must carry the date it was made."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
       - name: source_type
         logicalType: string
         physicalType: varchar(30)
@@ -567,9 +607,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Every notification must be assigned to a case worker."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - type: sql
             dimension: consistency
             query: "SELECT COUNT(*) FROM {model} n LEFT JOIN cp_case_workers w ON n.assigned_worker_id = w.worker_id WHERE w.worker_id IS NULL"
@@ -647,9 +691,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Every investigation record must carry an investigation ID."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - metric: duplicateValues
             dimension: uniqueness
             mustBe: 0
@@ -708,9 +756,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Every investigation must reference the notification that escalated into it."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - type: sql
             dimension: consistency
             query: "SELECT COUNT(*) FROM {model} i LEFT JOIN cp_notifications n ON i.notification_id = n.notification_id WHERE n.notification_id IS NULL"
@@ -741,9 +793,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Every investigation must reference a client."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - type: sql
             dimension: consistency
             query: "SELECT COUNT(*) FROM {model} i LEFT JOIN cp_clients c ON i.cp_client_id = c.cp_client_id WHERE c.cp_client_id IS NULL"
@@ -774,9 +830,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Every investigation must carry the date it started."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
       - name: end_date
         logicalType: date
         physicalType: date
@@ -817,9 +877,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Every investigation must have a lead case worker assigned."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - type: sql
             dimension: consistency
             query: "SELECT COUNT(*) FROM {model} i LEFT JOIN cp_case_workers w ON i.lead_worker_id = w.worker_id WHERE w.worker_id IS NULL"
@@ -877,9 +941,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Every placement record must carry a placement ID."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - metric: duplicateValues
             dimension: uniqueness
             mustBe: 0
@@ -908,9 +976,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Every placement must reference a client."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - type: sql
             dimension: consistency
             query: "SELECT COUNT(*) FROM {model} p LEFT JOIN cp_clients c ON p.cp_client_id = c.cp_client_id WHERE c.cp_client_id IS NULL"
@@ -961,9 +1033,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Every placement must have a carer assigned."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - type: sql
             dimension: consistency
             query: "SELECT COUNT(*) FROM {model} p LEFT JOIN cp_carers c ON p.carer_id = c.carer_id WHERE c.carer_id IS NULL"
@@ -1023,9 +1099,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Every placement must carry the date it started."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
       - name: placement_end
         logicalType: date
         physicalType: date
@@ -1046,9 +1126,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Every placement must carry the suburb it's located in."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
       - name: extract_timestamp
         logicalType: date
         physicalType: timestamp
@@ -1091,9 +1175,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Every carer record must carry a carer ID."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - metric: duplicateValues
             dimension: uniqueness
             mustBe: 0
@@ -1123,9 +1211,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "A carer's given name must be recorded."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
       - name: family_name
         logicalType: string
         physicalType: varchar(200)
@@ -1142,9 +1234,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "A carer's family name must be recorded."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
       - name: carer_type
         logicalType: string
         physicalType: varchar(20)
@@ -1227,9 +1323,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Every case worker record must carry a worker ID."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - metric: duplicateValues
             dimension: uniqueness
             mustBe: 0
@@ -1259,9 +1359,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "A case worker's given name must be recorded."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
       - name: family_name
         logicalType: string
         physicalType: varchar(200)
@@ -1278,9 +1382,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "A case worker's family name must be recorded."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
       - name: team_region
         logicalType: string
         physicalType: varchar(30)

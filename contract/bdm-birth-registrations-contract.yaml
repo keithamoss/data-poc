@@ -129,7 +129,8 @@ schema:
             dimension: completeness
             mustBe: 0
             severity: error
-            description: Every record must carry a registration number.
+            description: >
+              This value must never be empty.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.nullValues_datacontract
@@ -137,6 +138,9 @@ schema:
                 value: "2026-01-15"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - metric: invalidValues
             dimension: conformity
             arguments:
@@ -186,9 +190,7 @@ schema:
             mustBeLessThan: 1
             severity: error
             description: >
-              Allows a small non-zero null rate (data-entry lag at source)
-              but alerts if it creeps up - this is the "null rate creeping
-              up" failure mode named as a real, recurring problem.
+              This value must never be empty.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.nullValues_datacontract
@@ -196,6 +198,9 @@ schema:
                 value: "2026-01-15"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - metric: invalidValues
             dimension: conformity
             arguments:
@@ -237,9 +242,13 @@ schema:
               - property: introduced_date
                 value: "2026-01-15"
               - property: description
-                value: "A child's family name must be recorded, with a small tolerance for data-entry lag."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - metric: invalidValues
             dimension: conformity
             arguments:
@@ -270,9 +279,13 @@ schema:
               - property: introduced_date
                 value: "2026-01-15"
               - property: description
-                value: "A birth registration must carry a date of birth."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - type: sql
             dimension: conformity
             # mustBeBetween is numeric-only in the real ODCS model (no date
@@ -384,9 +397,13 @@ schema:
               - property: introduced_date
                 value: "2026-09-15"
               - property: description
-                value: "Suburb of birth must be recorded - tighter tolerance than most other required columns."
+                value: >
+                  A few empty values are tolerated; a sustained rise fails.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - metric: invalidValues
             dimension: conformity
             arguments:
@@ -465,9 +482,13 @@ schema:
               - property: introduced_date
                 value: "2026-01-15"
               - property: description
-                value: "A birth registration must carry the date it was registered."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - type: sql
             # a cross-field logical rule, not a format/pattern match -
             # ODCS's "consistency" dimension (not "conformity") fits a
@@ -581,9 +602,13 @@ schema:
               - property: introduced_date
                 value: "2026-01-15"
               - property: description
-                value: "Whether a birth was part of a multiple birth must always be recorded, never left unset."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - type: sql
             dimension: consistency
             # A self-join within one model - datacontract-cli's {model}
@@ -678,9 +703,13 @@ schema:
               - property: introduced_date
                 value: "2026-01-15"
               - property: description
-                value: "Every record must carry the timestamp it was extracted at."
+                value: >
+                  This value must never be empty.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - type: sql
             dimension: consistency
             query: "SELECT COUNT(*) FROM {model} WHERE extract_timestamp < date_registered OR extract_timestamp > date_registered + INTERVAL 1 DAY"

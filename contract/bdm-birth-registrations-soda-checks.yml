@@ -57,7 +57,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.missing_count_soda
         category: completeness
         introduced_date: "2026-01-15"
-        description: "Date of birth must be present - a silent column rename would show up as this going to 100% missing."
+        description: >
+          This value must never be empty.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # --- Full-triplication pass (2026-09-15, plans/qa-pipeline.md) -----------
@@ -77,7 +80,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.missing_count_soda
         category: completeness
         introduced_date: "2026-09-15"
-        description: "Every birth registration must carry a registration number."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - duplicate_count(registration_number):
@@ -99,7 +105,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.missing_count_soda
         category: completeness
         introduced_date: "2026-09-15"
-        description: "A child's given names must be recorded."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(child_family_name):
@@ -110,7 +119,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.missing_count_soda
         category: completeness
         introduced_date: "2026-09-15"
-        description: "A child's family name must be recorded."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # mustBeLessThan: 2 in the contract (up to 1 null tolerated, 2+ fails) -
@@ -123,7 +135,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.missing_count_soda
         category: completeness
         introduced_date: "2026-09-15"
-        description: "Suburb of birth must be recorded - tighter tolerance than most other required columns."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(date_registered):
@@ -134,7 +149,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_registered.missing_count_soda
         category: completeness
         introduced_date: "2026-09-15"
-        description: "A birth registration must carry the date it was registered."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(extract_timestamp):
@@ -145,7 +163,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.missing_count_soda
         category: completeness
         introduced_date: "2026-09-15"
-        description: "Every record must carry the timestamp it was extracted at."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # These two mirror the contract's own explicit, wider tolerances

@@ -69,7 +69,10 @@ checks for cp_clients:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every client record must carry a client ID."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - duplicate_count(cp_client_id):
@@ -91,7 +94,10 @@ checks for cp_clients:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.given_name.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "A client's given name must be recorded."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(family_name):
@@ -102,7 +108,10 @@ checks for cp_clients:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.family_name.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "A client's family name must be recorded."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(date_of_birth):
@@ -113,7 +122,10 @@ checks for cp_clients:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "A client record must carry a date of birth."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - invalid_percent(sex):
@@ -140,7 +152,10 @@ checks for cp_clients:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.suburb.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "A client's suburb must be recorded."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(case_opened_date):
@@ -151,7 +166,10 @@ checks for cp_clients:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.case_opened_date.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "A client record must carry the date its case was opened."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # Closed value set - the same postcode pool paired with
@@ -177,7 +195,10 @@ checks for cp_clients:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "A client's postcode must be recorded."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # Out-of-range date_of_birth - a "failed rows" check (not invalid_count/
@@ -235,7 +256,10 @@ checks for cp_notifications:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every notification must carry a notification ID."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - duplicate_count(notification_id):
@@ -257,7 +281,10 @@ checks for cp_notifications:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every notification must reference a client."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(notification_date):
@@ -268,7 +295,10 @@ checks for cp_notifications:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_date.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every notification must carry the date it was made."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - invalid_percent(source_type):
@@ -319,7 +349,10 @@ checks for cp_notifications:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every notification must be assigned to a case worker."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - invalid_percent(outcome):
@@ -400,7 +433,10 @@ checks for cp_investigations:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every investigation record must carry an investigation ID."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - duplicate_count(investigation_id):
@@ -422,7 +458,10 @@ checks for cp_investigations:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every investigation must reference the notification that escalated into it."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(cp_client_id):
@@ -433,7 +472,10 @@ checks for cp_investigations:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every investigation must reference a client."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(lead_worker_id):
@@ -444,7 +486,10 @@ checks for cp_investigations:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every investigation must have a lead case worker assigned."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(start_date):
@@ -455,7 +500,10 @@ checks for cp_investigations:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.start_date.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every investigation must carry the date it started."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - invalid_percent(substantiated):
@@ -530,7 +578,10 @@ checks for cp_placements:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every placement record must carry a placement ID."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - duplicate_count(placement_id):
@@ -552,7 +603,10 @@ checks for cp_placements:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every placement must reference a client."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - invalid_percent(placement_type):
@@ -575,7 +629,10 @@ checks for cp_placements:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every placement must have a carer assigned."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(placement_start):
@@ -586,7 +643,10 @@ checks for cp_placements:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_start.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every placement must carry the date it started."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(placement_suburb):
@@ -597,7 +657,10 @@ checks for cp_placements:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_suburb.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every placement must carry the suburb it's located in."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - values in (cp_client_id) must exist in cp_clients (cp_client_id):
@@ -669,7 +732,10 @@ checks for cp_carers:
         check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every carer record must carry a carer ID."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - duplicate_count(carer_id):
@@ -691,7 +757,10 @@ checks for cp_carers:
         check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.given_name.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "A carer's given name must be recorded."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(family_name):
@@ -702,7 +771,10 @@ checks for cp_carers:
         check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.family_name.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "A carer's family name must be recorded."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - invalid_percent(carer_type):
@@ -750,7 +822,10 @@ checks for cp_case_workers:
         check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every case worker record must carry a worker ID."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - duplicate_count(worker_id):
@@ -772,7 +847,10 @@ checks for cp_case_workers:
         check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.given_name.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "A case worker's given name must be recorded."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(family_name):
@@ -783,7 +861,10 @@ checks for cp_case_workers:
         check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.family_name.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "A case worker's family name must be recorded."
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - invalid_percent(team_region):

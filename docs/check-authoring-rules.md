@@ -41,12 +41,15 @@ quoting it.
    "a sustained rise fails", never "a rise past 3% fails". All three
    already exist structurally in the check.
 4. Where the check's TYPE already states the rule - an allowed-values
-   check, a not-null check - give the tolerance instead of the purpose,
-   not as well as it. "Must be one of the allowed values" restates the
-   type, so it tells a reader nothing that distinguishes this instance
-   from the three siblings sitting beside it. Say how much it
-   tolerates, qualitatively (rule 3): "A single unrecognised value
-   fails" / "A few are tolerated; a sustained rise fails".
+   check, a not-null check - never say the purpose AND the tolerance.
+   Say whichever tells a reader more. Where the check tolerates some,
+   that is always the tolerance, because the tolerance is what differs
+   between the siblings beside it: "A few empty values are tolerated;
+   a sustained rise fails". Where it tolerates none, the two are the
+   same fact stated twice, so pick the plainer sentence - and that is
+   not the same answer every time. "This value must never be empty"
+   beats "A single empty value fails"; "A single unrecognised value
+   fails" beats restating what an allowed-values check is.
 
 **`failure_indicates` - what a failure means upstream**
 
@@ -220,6 +223,22 @@ The tolerance is the whole description:
 
 > A single unrecognised concern type fails.
 > A few unrecognised concern types are tolerated; a sustained rise fails.
+
+**Where the check tolerates none, pick the plainer sentence** (Keith,
+2026-09-20). At zero tolerance *"this must never happen"* and *"a single
+one fails"* are the same fact, so there is no purpose-versus-tolerance
+tension to resolve - only a readability choice, and it does not go the
+same way for every check type. An allowed-values check's heading already
+reads "Invalid values", so restating the purpose adds nothing and the
+tolerance form wins. A not-null check's heading reads "Null rate", which
+is jargon a steward may not parse at all, so *"This value must never be
+empty"* tells them something the tolerance form leaves out: empty OF
+WHAT.
+
+That second half has a shelf life worth knowing about -
+`plans/running-thoughts.md` #19 records that the drawer heading is
+jargon and is due to be fixed. If it stops saying "Null rate", revisit
+this.
 
 **Qualitatively, with no figure** (same call). *"a sustained rise past
 3% fails"* becomes *"a sustained rise fails"*, for the reason rule 3
