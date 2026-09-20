@@ -35,7 +35,8 @@ CHECK_LIFECYCLE = {
         # cross-run logical consistency concern, not a new category.
         "category": "consistency",
         "introduced_date": "2026-01-15",
-        "description": "Population Stability Index on sex's value distribution vs. the reference run - flags a real distribution shift.",
+        "description": "The spread of values must stay close to the reference supply.",
+        "failure_indicates": "self-evident",
         "changelog": [],
     },
     ROW_COUNT_GROWTH_CHECK_ID: {
@@ -44,7 +45,8 @@ CHECK_LIFECYCLE = {
         # time concern read as timeliness, not completeness.
         "category": "timeliness",
         "introduced_date": "2026-01-15",
-        "description": "Row count should mostly grow run over run - a real drop signals a broken/partial extract.",
+        "description": "The number of rows must not drop sharply against the previous supply.",
+        "failure_indicates": "self-evident",
         "changelog": [],
     },
 }

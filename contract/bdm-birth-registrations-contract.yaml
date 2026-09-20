@@ -148,8 +148,7 @@ schema:
             mustBe: 0
             severity: error
             description: >
-              Catches upstream ID-format changes (e.g. a source-system
-              migration) before they reach consumers as silent garbage.
+              This value must be in the expected format.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.invalidValues_datacontract
@@ -157,6 +156,9 @@ schema:
                 value: "2026-01-15"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - metric: duplicateValues
             dimension: uniqueness
             mustBe: 0
@@ -212,15 +214,7 @@ schema:
             mustBe: 0
             severity: error
             description: >
-              A name should be letters, spaces, periods, and hyphens only
-              - a digit or a symbol like "/" means a form was submitted
-              incomplete (e.g. "N/A") or a test/dummy record leaked into
-              the real feed (e.g. "Baby1"). Honest limitation: this is a
-              character-set check, not a dictionary of known junk words -
-              DuckDB's regex engine (RE2, the same engine Soda's checks
-              compile down to) has no lookahead support, so a purely
-              alphabetic junk word like a bare "TEST" or "UNKNOWN" with no
-              digit or symbol in it would NOT be caught by this rule alone.
+              This value must be in the expected format.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.invalidValues_datacontract
@@ -228,6 +222,9 @@ schema:
                 value: "2026-09-15"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
 
       - name: child_family_name
         logicalType: string
@@ -259,7 +256,8 @@ schema:
               pattern: "^[A-Za-z][A-Za-z. -]*$"
             mustBe: 0
             severity: error
-            description: Same format rule as child_given_names - see that property's description.
+            description: >
+              This value must be in the expected format.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.invalidValues_datacontract
@@ -267,6 +265,9 @@ schema:
                 value: "2026-09-15"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
 
       - name: date_of_birth
         logicalType: date
@@ -298,10 +299,7 @@ schema:
             mustBe: 0
             severity: error
             description: >
-              Guards against a type/format change upstream (e.g. a
-              datetime-with-timezone field arriving where a plain date is
-              expected) turning into silently unparseable or nonsensical
-              dates downstream.
+              This value must be a plausible real date, neither in the future nor absurdly old.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.range_check_datacontract
@@ -311,6 +309,9 @@ schema:
                 value: "2026-09-13"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - type: sql
             # "timeliness" (not "conformity"/"consistency" like this
             # column's other 2 rules) - the real ODCS dimension enum's word
@@ -332,25 +333,7 @@ schema:
             mustBe: 0
             severity: error
             description: >
-              Freshness / relative-date check: if no record in this batch
-              has a date_of_birth within 7 days of THIS RUN's own
-              date_registered, the upstream feed has likely gone stale -
-              still delivering files, but with old or replayed data.
-              Phase 5f (plans/qa-pipeline.md #61, 2026-09-17): previously
-              compared against real wall-clock CURRENT_DATE instead,
-              which made this check permanently red as real time drifted
-              from this fixture's fixed dates - anchoring to
-              date_registered fixes that (every row's date_registered is
-              exactly this run's own run_date by construction - see
-              daily_batch.py's own comment), same fix as the dbt/Soda
-              versions of this check. Anchoring alone isn't enough on its
-              own, though: ordinary registration lag (0-9 days on every
-              row, independent of any defect) already puts most rows
-              within the 7-day window, so this would trivially always
-              pass without generator/dirty.py's new inject_stale_delivery
-              - an occasional whole-run defect that pushes every row's
-              date_of_birth 15-45 days before date_registered, giving
-              this check something genuine to occasionally catch.
+              Each supply must contain recent records rather than only old ones.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.freshness_datacontract
@@ -360,6 +343,9 @@ schema:
                 value: "2026-01-15"
               - property: changelog
                 value: '[{"date": "2026-09-17T00:00:00Z", "description": "Anchored to this run''s own date_registered instead of real wall-clock CURRENT_DATE, which is why this check was permanently red. Paired with a new inject_stale_delivery generator defect so the check has something genuine to catch.", "author": "Keith Moss", "breaking": true}]'
+              - property: failure_indicates
+                value: >
+                  self-evident
 
       - name: sex
         logicalType: string
@@ -424,11 +410,7 @@ schema:
             mustBe: 0
             severity: error
             description: >
-              A closed value set - the generator's own reference pool of
-              real WA suburb names (see generator/names_au.py's SUBURBS).
-              An unrecognised suburb means a data-entry typo or a source-
-              system change, not a legitimately new WA suburb appearing
-              mid-fixture.
+              A single unrecognised value fails.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.invalidValues_datacontract
@@ -436,6 +418,9 @@ schema:
                 value: "2026-01-15"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
 
       - name: place_of_birth_facility
         logicalType: string
@@ -459,10 +444,7 @@ schema:
             mustBeLessThan: 35
             severity: error
             description: >
-              Mirrors missing_percent(place_of_birth_facility)'s fail band
-              in the Soda checks file - some null rate is expected (home
-              births without a recorded facility), but a rate this high
-              signals a genuine upstream problem, not normal variation.
+              This value is often empty for good reason; the check only fails if that becomes much more common.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_facility.nullValues_datacontract
@@ -470,6 +452,9 @@ schema:
                 value: "2026-09-15"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
 
       - name: date_registered
         logicalType: date
@@ -505,7 +490,8 @@ schema:
             query: "SELECT COUNT(*) FROM {model} WHERE date_registered < date_of_birth"
             mustBe: 0
             severity: error
-            description: A registration date earlier than the birth date indicates a corrupt or misjoined record.
+            description: >
+              A registration must not be dated earlier than the birth it records.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_registered.date_ordering_datacontract
@@ -515,6 +501,9 @@ schema:
                 value: "2026-01-15"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  The record is corrupt, or two different registrations have been joined together into one.
 
       - name: registering_parent_1_name
         logicalType: string
@@ -533,16 +522,21 @@ schema:
               - property: introduced_date
                 value: "2026-01-15"
               - property: description
-                value: "Parent 1's name is expected on most registrations, tolerated null up to ~5%; a rate this high (real observed range: 0.9-3.3%) signals a genuine upstream problem, not normal variation. Mirrors this same real-world check's own Soda copy (item 74, plans/qa-pipeline.md)."
+                value: >
+                  This value is often empty for good reason; the check only fails if that becomes much more common.
               - property: changelog
                 value: '[{"date": "2026-09-18T00:00:00Z", "description": "Bumped severity warning->error with a real mustBeLessThan:15 (was mustBeLessThan:5, warning) - item 74 (plans/qa-pipeline.md): a warning/info-severity rule always has warn_threshold=None (ODCS is single-tier) AND, before this, fail_threshold=None too, which the dashboard silently defaulted to 0 - making this check read red on almost every run despite datacontract-cli itself correctly reporting pass. Matches place_of_birth_facility''s own established pattern (severity:error + a real non-zero mustBeLessThan) and this same real-world check''s own Soda copy, already fixed the same way.", "author": "Keith Moss", "breaking": true}]'
+              - property: failure_indicates
+                value: >
+                  self-evident
           - metric: invalidValues
             dimension: conformity
             arguments:
               pattern: "^[A-Za-z][A-Za-z. -]*$"
             mustBe: 0
             severity: error
-            description: Same format rule as child_given_names - see that property's description.
+            description: >
+              This value must be in the expected format.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.invalidValues_datacontract
@@ -550,6 +544,9 @@ schema:
                 value: "2026-09-15"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
 
       - name: registering_parent_2_name
         logicalType: string
@@ -562,7 +559,8 @@ schema:
             unit: percent
             mustBeLessThan: 50
             severity: error
-            description: Higher tolerance - single-parent registrations are legitimately common. A rate this high (real observed range 24.8-30.7%) would mean half of all registrations have no second parent recorded, a genuine anomaly.
+            description: >
+              This value is often empty for good reason; the check only fails if that becomes much more common.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.nullValues_datacontract
@@ -570,13 +568,17 @@ schema:
                 value: "2026-01-15"
               - property: changelog
                 value: '[{"date": "2026-09-18T00:00:00Z", "description": "Bumped severity info->error with a real mustBeLessThan:50 (was mustBeLessThan:30, info) - item 74 (plans/qa-pipeline.md): an info-severity rule always has warn_threshold=None (ODCS is single-tier) AND, before this, fail_threshold=None too, which the dashboard silently defaulted to 0 - making this check read red on almost every run despite datacontract-cli itself correctly reporting pass. Matches place_of_birth_facility''s own established pattern (severity:error + a real non-zero mustBeLessThan) and this same real-world check''s own Soda copy, already fixed the same way.", "author": "Keith Moss", "breaking": true}]'
+              - property: failure_indicates
+                value: >
+                  self-evident
           - metric: invalidValues
             dimension: conformity
             arguments:
               pattern: "^[A-Za-z][A-Za-z. -]*$"
             mustBe: 0
             severity: error
-            description: Same format rule as child_given_names - see that property's description.
+            description: >
+              This value must be in the expected format.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.invalidValues_datacontract
@@ -584,6 +586,9 @@ schema:
                 value: "2026-09-15"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
 
       - name: is_multiple_birth
         logicalType: boolean
@@ -647,7 +652,8 @@ schema:
                 )
             mustBe: 0
             severity: error
-            description: "Multiple-birth sibling match: every is_multiple_birth record must have a matching sibling row from the same birth event."
+            description: >
+              Every record flagged as a multiple birth must have a matching sibling in the same supply.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.sibling_match_datacontract
@@ -657,6 +663,9 @@ schema:
                 value: "2026-01-15"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
 
       - name: source_system_record_id
         logicalType: string
@@ -686,7 +695,8 @@ schema:
               pattern: "^SRC-[0-9]{9}$"
             mustBe: 0
             severity: error
-            description: Catches an upstream ID-format change, same rationale as registration_number's own pattern rule.
+            description: >
+              This value must be in the expected format.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.invalidValues_datacontract
@@ -694,6 +704,9 @@ schema:
                 value: "2026-01-15"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
 
       - name: extract_timestamp
         logicalType: date
@@ -724,11 +737,7 @@ schema:
             mustBe: 0
             severity: error
             description: >
-              Extract timestamp ordering: an extract must be timestamped
-              on or after its own record's date_registered, and within the
-              24h latency SLA (see slaProperties below) - anything else
-              indicates clock skew or a backfilled record misdated at
-              extraction.
+              A record must be timestamped on or after the registration it describes, and delivered inside the agreed window.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.timestamp_ordering_datacontract
@@ -738,6 +747,9 @@ schema:
                 value: "2026-01-15"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
 
     quality:
       # the duplicateCheck rule that used to live here moved to
@@ -750,11 +762,7 @@ schema:
         mustBeBetween: [500, 20000]
         severity: warning
         description: >
-          A rough daily-volume sanity band. Catches a truncated or
-          accidentally-empty extract (well below the low end) as well as a
-          duplicated/double-loaded file (well above the high end) - the
-          "data drift" failure mode that a schema-only check would miss
-          entirely, since a doubled file has a perfectly valid schema.
+          The number of rows in the supply must fall inside the expected band.
         customProperties:
           - property: check_id
             value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.rowCount_datacontract
@@ -762,6 +770,9 @@ schema:
             value: "2026-01-15"
           - property: changelog
             value: "[]"
+          - property: failure_indicates
+            value: >
+              self-evident
 
 slaProperties:
   - property: frequency

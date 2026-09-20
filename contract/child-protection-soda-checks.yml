@@ -52,7 +52,10 @@ checks for cp_clients:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.row_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Client row count should stay in a plausible band."
+        description: >
+          The number of rows in the supply must fall inside the expected band.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # --- Full-triplication pass (2026-09-15, plans/qa-pipeline.md) ---------
@@ -187,7 +190,10 @@ checks for cp_clients:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
-        description: "Postcode must be one of the closed value set paired with the suburb reference pool."
+        description: >
+          A few unrecognised values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
         changelog: []
 
   - missing_count(postcode):
@@ -229,7 +235,10 @@ checks for cp_clients:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.range_check_soda
         category: conformity
         introduced_date: "2023-01-15"
-        description: "Date of birth must not be implausibly old."
+        description: >
+          This value must be a plausible real date, neither in the future nor absurdly old.
+        failure_indicates: >
+          self-evident
         changelog: []
 
 checks for cp_notifications:
@@ -242,7 +251,10 @@ checks for cp_notifications:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.row_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Notification row count should stay in a plausible band."
+        description: >
+          The number of rows in the supply must fall inside the expected band.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # --- Full-triplication pass (2026-09-15, plans/qa-pipeline.md) ---------
@@ -316,7 +328,10 @@ checks for cp_notifications:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.source_type.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
-        description: "Notification source must be one of the closed value set."
+        description: >
+          A few unrecognised values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
         changelog: []
 
   - invalid_percent(concern_type):
@@ -344,7 +359,10 @@ checks for cp_notifications:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.risk_rating.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
-        description: "Risk rating must be one of the closed value set."
+        description: >
+          A few unrecognised values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
         changelog: []
 
   - missing_count(assigned_worker_id):
@@ -370,7 +388,10 @@ checks for cp_notifications:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.outcome.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
-        description: "Notification outcome must be one of the closed value set."
+        description: >
+          A few unrecognised values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
         changelog: []
 
   # --- 2 of the 7 real foreign-key relationships (the rest are on the ---
@@ -390,7 +411,10 @@ checks for cp_notifications:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.relationships_soda
         category: consistency
         introduced_date: "2023-01-15"
-        description: "A notification's client_id must reference a real, existing client record."
+        description: >
+          Every value must match an existing client.
+        failure_indicates: >
+          self-evident
         changelog: []
   - values in (assigned_worker_id) must exist in cp_case_workers (worker_id):
       samples limit: 5
@@ -398,7 +422,10 @@ checks for cp_notifications:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.relationships_soda
         category: consistency
         introduced_date: "2023-01-15"
-        description: "The assigned worker_id must reference a real, existing case worker record."
+        description: >
+          Every value must match an existing case worker.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # --- Business rule 1 of 3: escalation completeness ---------------------
@@ -426,7 +453,10 @@ checks for cp_notifications:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.escalation_completeness_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every notification with outcome 'Investigation opened' must have a matching investigation record."
+        description: >
+          Every notification escalated to an investigation must have that investigation recorded.
+        failure_indicates: >
+          self-evident
         changelog: []
 
 checks for cp_investigations:
@@ -524,7 +554,10 @@ checks for cp_investigations:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.substantiated.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
-        description: "Investigation outcome must be one of the closed value set."
+        description: >
+          A few unrecognised values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
         changelog: []
 
   - values in (notification_id) must exist in cp_notifications (notification_id):
@@ -533,7 +566,10 @@ checks for cp_investigations:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.relationships_soda
         category: consistency
         introduced_date: "2023-01-15"
-        description: "An investigation's notification_id must reference a real, existing notification record."
+        description: >
+          Every value must match an existing notification.
+        failure_indicates: >
+          self-evident
         changelog: []
   - values in (cp_client_id) must exist in cp_clients (cp_client_id):
       samples limit: 5
@@ -541,7 +577,10 @@ checks for cp_investigations:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.relationships_soda
         category: consistency
         introduced_date: "2023-01-15"
-        description: "An investigation's client_id must reference a real, existing client record."
+        description: >
+          Every value must match an existing client.
+        failure_indicates: >
+          self-evident
         changelog: []
   - values in (lead_worker_id) must exist in cp_case_workers (worker_id):
       samples limit: 5
@@ -549,7 +588,10 @@ checks for cp_investigations:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.relationships_soda
         category: consistency
         introduced_date: "2023-01-15"
-        description: "The lead_worker_id must reference a real, existing case worker record."
+        description: >
+          Every value must match an existing case worker.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # --- Business rule 2 of 3: closed-case investigation hygiene -----------
@@ -574,7 +616,10 @@ checks for cp_investigations:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.closed_case_hygiene_soda
         category: consistency
         introduced_date: "2023-01-15"
-        description: "A closed case's investigations must all have an end date - none should still be open."
+        description: >
+          An investigation must not still be open once its client's case has been closed.
+        failure_indicates: >
+          self-evident
         changelog: []
 
 checks for cp_placements:
@@ -630,7 +675,10 @@ checks for cp_placements:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_type.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
-        description: "Placement type must be one of the closed value set."
+        description: >
+          A few unrecognised values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
         changelog: []
 
   - missing_count(carer_id):
@@ -681,7 +729,10 @@ checks for cp_placements:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.relationships_soda
         category: consistency
         introduced_date: "2023-01-15"
-        description: "A placement's client_id must reference a real, existing client record."
+        description: >
+          Every value must match an existing client.
+        failure_indicates: >
+          self-evident
         changelog: []
   - values in (carer_id) must exist in cp_carers (carer_id):
       samples limit: 5
@@ -689,7 +740,10 @@ checks for cp_placements:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.relationships_soda
         category: consistency
         introduced_date: "2023-01-15"
-        description: "The carer_id must reference a real, existing carer record."
+        description: >
+          Every value must match an existing carer.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # --- Business rule 3 of 3: placement/carer approval compliance ---------
@@ -715,7 +769,10 @@ checks for cp_placements:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.approval_compliance_soda
         category: consistency
         introduced_date: "2023-01-15"
-        description: "A placement's carer must have Approved status."
+        description: >
+          A placement's carer must hold an approved status.
+        failure_indicates: >
+          self-evident
         changelog: []
 
 # --- Full-triplication pass (2026-09-15, plans/qa-pipeline.md) -------------
@@ -733,7 +790,10 @@ checks for cp_carers:
         check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.row_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Carer row count should stay in a plausible band."
+        description: >
+          The number of rows in the supply must fall inside the expected band.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(carer_id):
@@ -801,7 +861,10 @@ checks for cp_carers:
         check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_type.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
-        description: "Carer type must be one of the closed value set."
+        description: >
+          A few unrecognised values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
         changelog: []
 
   - invalid_percent(approval_status):
@@ -813,7 +876,10 @@ checks for cp_carers:
         check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.approval_status.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
-        description: "Approval status must be one of the closed value set."
+        description: >
+          A few unrecognised values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
         changelog: []
 
 checks for cp_case_workers:
@@ -826,7 +892,10 @@ checks for cp_case_workers:
         check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.row_count_soda
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Case worker row count should stay in a plausible band."
+        description: >
+          The number of rows in the supply must fall inside the expected band.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(worker_id):
@@ -894,5 +963,8 @@ checks for cp_case_workers:
         check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.team_region.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
-        description: "Team region must be one of the closed value set of WA regions."
+        description: >
+          A few unrecognised values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
         changelog: []

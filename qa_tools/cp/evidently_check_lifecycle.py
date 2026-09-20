@@ -29,7 +29,8 @@ CHECK_LIFECYCLE = {
         # "dimension": "consistency" in run_evidently_cp.py.
         "category": "consistency",
         "introduced_date": "2023-01-15",
-        "description": "Population Stability Index on concern_type's value distribution vs. the reference run - this collection's own traffic-light demo column.",
+        "description": "The spread of values must stay close to the reference supply.",
+        "failure_indicates": "self-evident",
         "changelog": [],
     },
 }

@@ -1408,6 +1408,15 @@ requirements:
         shared text, and some of it papers over a real difference in
         what the sibling checks actually ask.
       - >
+        The gate enforces over the WORKING TREE only, never over the
+        previous commit, which `validate_check_lifecycle.py` also
+        parses. Enforcing at parse time instead would have made the
+        commit before this one unparseable and broken CI on the very
+        push that introduced the fields - flagged as a trap while
+        scoping, and the reason the check lives beside `validate()`'s
+        own results rather than inside the parser. It also removed the
+        only real argument for a warn-first rollout.
+      - >
         Rewriting a description must never move the check. That is what
         REQ-QAC-023 fixed - name and column used to be recovered from
         the description prose - and it is the dependency that made this
@@ -1504,7 +1513,51 @@ requirements:
         scoped; it would be a new field or a UI treatment, not
         something the prose can fix.
     dependencies: [REQ-QAC-023]
-    linked_tests: []
+    implemented_by:
+      - docs/check-authoring-rules.md
+      - qa_tools/common/check_lifecycle.py::is_self_evident
+      - qa_tools/common/check_lifecycle.py::_lifecycle_fields
+      - qa_tools/common/validate_check_lifecycle.py::_failure_indicates_errors
+      - qa_tools/common/validate_check_lifecycle.py::_looks_like_sentinel
+      - pipeline/build_dashboard_data.py::build
+      - pipeline/build_cp_dashboard_data.py::build_one_table
+      - dashboard/qa-reporting-dashboard.template.html::openCheckPanel
+    linked_tests:
+      - tests/test_check_lifecycle.py::test_parse_contract_check_metadata_reads_failure_indicates_and_technical_note
+      - tests/test_validate_check_lifecycle.py::test_an_active_check_with_no_failure_indicates_is_an_error
+      - tests/test_validate_check_lifecycle.py::test_the_self_evident_sentinel_satisfies_the_gate
+      - tests/test_validate_check_lifecycle.py::test_a_near_miss_spelling_of_the_sentinel_is_rejected
+      - tests/test_validate_check_lifecycle.py::test_real_prose_is_never_mistaken_for_a_near_miss
+      - tests/test_validate_check_lifecycle.py::test_the_gate_is_off_by_default_and_fatal_only_when_asked
+      - tests-js/check-drawer-prose.test.js
+    evidence:
+      - >
+        2026-09-20: all 257 active checks across four tools and both
+        datasets carry an authored description and a failure_indicates,
+        measured by parsing the real check definitions. The CI gate is
+        switched on (deploy-pages.yml runs
+        validate-check-lifecycle --require-failure-indicates), so the
+        count cannot silently regress.
+      - >
+        2026-09-20: 129 of the 257 use the self-evident sentinel rather
+        than authored prose - 50%, against the "roughly half" this
+        requirement predicted before any check was written.
+      - >
+        2026-09-20: all 258 check config_hashes byte-identical before
+        and after the pass, captured from a git worktree at the
+        pre-pass commit and compared against the working tree. 105
+        prose edits in one batch, zero hash changes.
+      - >
+        2026-09-20: a mechanical audit of all 257 authored texts
+        against the rules returned zero violations - no tool, macro or
+        statistical method named; no check naming its own column; no
+        figure in any description; no agency name; no run, extract or
+        cadence mechanics.
+      - >
+        2026-09-20: 244 of 257 reach the built dashboard carrying their
+        description, and technical_note reaches it zero times. The 13
+        that do not render are table-level checks, a pre-existing gap
+        recorded as plans/running-thoughts.md #20.
 
   - id: REQ-QAC-025
     title: No check ships without a plain-English explanation

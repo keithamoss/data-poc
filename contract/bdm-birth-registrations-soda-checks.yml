@@ -42,7 +42,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.row_count_soda
         category: completeness
         introduced_date: "2026-01-15"
-        description: "Row count should stay in a plausible band - catches a doubled or truncated extract file."
+        description: >
+          The number of rows in the supply must fall inside the expected band.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # --- Column rename / type change: missing_count on a required column ----
@@ -188,7 +191,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.missing_percent_soda
         category: completeness
         introduced_date: "2026-01-15"
-        description: "Parent 1's name is expected on most registrations, tolerated null up to ~5%; a rate this high (real observed range: 0.9-3.3%) signals a genuine upstream problem, not normal variation."
+        description: >
+          This value is often empty for good reason; the check only fails if that becomes much more common.
+        failure_indicates: >
+          self-evident
         changelog:
           - date: "2026-09-18T00:00:00Z"
             description: "Added a real fail threshold (>15%) - previously warn-only (item 74, plans/qa-pipeline.md): a missing fail threshold silently defaulted to 0 in the dashboard-build code, making this check read red on almost every run despite never being designed to fail at all."
@@ -203,7 +209,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.missing_percent_soda
         category: completeness
         introduced_date: "2026-01-15"
-        description: "Parent 2's name is optional - single-parent registrations are common - tolerated null up to ~30%; a rate this high (real observed range: 24.8-30.7%) would mean half of all registrations have no second parent recorded, a genuine anomaly, not normal variation."
+        description: >
+          This value is often empty for good reason; the check only fails if that becomes much more common.
+        failure_indicates: >
+          self-evident
         changelog:
           - date: "2026-09-18T00:00:00Z"
             description: "Added a real fail threshold (>50%) - previously warn-only (item 74, plans/qa-pipeline.md): a missing fail threshold silently defaulted to 0 in the dashboard-build code, making this check read red on almost every run despite never being designed to fail at all."
@@ -244,7 +253,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_facility.missing_percent_soda
         category: completeness
         introduced_date: "2026-01-15"
-        description: "Facility should usually be captured - home births are the expected exception."
+        description: >
+          This value is often empty for good reason; the check only fails if that becomes much more common.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # --- source_system_record_id: uniqueness + format ------------------------
@@ -274,7 +286,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.invalid_percent_soda
         category: conformity
         introduced_date: "2026-01-15"
-        description: "Catches upstream internal-ID-format changes before they reach consumers as silent garbage."
+        description: >
+          A few badly-formatted values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # --- Text field format/junk checks ----------------------------------------
@@ -294,7 +309,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.invalid_percent_soda
         category: conformity
         introduced_date: "2026-09-15"
-        description: "Given names should look like a name, not garbage/mis-parsed data."
+        description: >
+          A few badly-formatted values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - invalid_percent(child_family_name):
@@ -306,7 +324,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.invalid_percent_soda
         category: conformity
         introduced_date: "2026-09-15"
-        description: "Family names should look like a name, not garbage/mis-parsed data."
+        description: >
+          A few badly-formatted values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # Closed value set (generator/names_au.py's SUBURBS pool, 51 real WA
@@ -321,7 +342,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.invalid_percent_soda
         category: conformity
         introduced_date: "2026-01-15"
-        description: "Suburb of birth must be one of the real WA suburbs in the closed value set."
+        description: >
+          A few unrecognised values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
         changelog: []
 
   - invalid_percent(registering_parent_1_name):
@@ -333,7 +357,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.invalid_percent_soda
         category: conformity
         introduced_date: "2026-09-15"
-        description: "Parent 1's name should look like a name, not garbage/mis-parsed data."
+        description: >
+          A few badly-formatted values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - invalid_percent(registering_parent_2_name):
@@ -345,7 +372,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.invalid_percent_soda
         category: conformity
         introduced_date: "2026-09-15"
-        description: "Parent 2's name should look like a name, not garbage/mis-parsed data."
+        description: >
+          A few badly-formatted values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # --- Date-of-birth range (item 28's decision) -----------------------------
@@ -379,7 +409,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.range_check_soda
         category: conformity
         introduced_date: "2026-09-13"
-        description: "Date of birth must be a plausible real date, not in the future or absurdly old."
+        description: >
+          This value must be a plausible real date, neither in the future nor absurdly old.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # --- Registration/birth date ordering ---------------------------------
@@ -395,7 +428,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_registered.date_ordering_soda
         category: consistency
         introduced_date: "2026-01-15"
-        description: "A registration date earlier than the birth date indicates a corrupt or misjoined record."
+        description: >
+          A registration must not be dated earlier than the birth it records.
+        failure_indicates: >
+          The record is corrupt, or two different registrations have been joined together into one.
         changelog: []
 
   # --- Extract timestamp ordering -------------------------------------------
@@ -412,7 +448,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.timestamp_ordering_soda
         category: consistency
         introduced_date: "2026-01-15"
-        description: "An extract timestamp must fall in a sane window relative to the registration date."
+        description: >
+          A record must be timestamped on or after the registration it describes, and delivered inside the agreed window.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # --- Multiple-birth sibling match -----------------------------------------
@@ -441,7 +480,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.sibling_match_soda
         category: consistency
         introduced_date: "2026-01-15"
-        description: "Every record flagged as a multiple birth should have a matching sibling row for the same birth event."
+        description: >
+          Every record flagged as a multiple birth must have a matching sibling in the same supply.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   # --- Freshness / relative-date check ---------------------------------------
@@ -479,7 +521,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.freshness_soda
         category: timeliness
         introduced_date: "2026-01-15"
-        description: "At least one birth registration should have a date_of_birth within 7 days of this run's own date_registered."
+        description: >
+          Each supply must contain recent records rather than only old ones.
+        failure_indicates: >
+          self-evident
         changelog:
           - date: "2026-09-17T00:00:00Z"
             description: "Anchored to this run's own date_registered instead of real wall-clock CURRENT_DATE, which is why this check was permanently red. Paired with a new inject_stale_delivery generator defect so the check has something genuine to catch."
