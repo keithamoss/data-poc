@@ -15,9 +15,17 @@
 #   - Write what someone can now DO, in second person. "You can now see
 #     which column a check belongs to" - never "moved 10 sql rules to
 #     property level".
-#   - No file paths, function names, tool names, measurements or internal
-#     references. If a sentence only makes sense to someone who has read
-#     the code, it belongs in requirements.yaml, not here.
+#   - No file paths, function names, measurements or internal references.
+#     If a sentence only makes sense to someone who has read the code, it
+#     belongs in requirements.yaml, not here.
+#   - Name a tool only where the name IS the information - something a
+#     reader types, or a check they would recognise in their own output.
+#     Refined 2026-09-20 on Keith's own ask, against an entry that said a
+#     command "runs every check it has" and left the reader none the
+#     wiser: "be good if you explained a little bit more about what
+#     actually, what it's checking". The test is who the name helps, not
+#     whether it sounds technical - the tools someone runs are part of
+#     their day; the function that calls them is not.
 #   - Headlines can have some life in them. Mapa's are the bar:
 #     "Begone, weird highlighting bug", "No menu for you".
 #
@@ -141,8 +149,11 @@ releases:
           - headline: One command to check everything
             components: ["Testing & dev tooling"]
             description: >
-              If you run the tool yourself, there is now a single command
-              that runs every check it has and tells you which ones
-              passed. No more knowing which set of checks a given change
-              needs - and a check that could not run is reported as
-              exactly that, never quietly counted as a pass.
+              If you run the tool yourself, a single command now runs
+              every check it has - ruff and yamllint over the code and
+              the config files, the two gates over the requirements and
+              these release notes, the dashboard's own JavaScript tests,
+              and the full Python test suite - and tells you which ones
+              passed. No more working out which set of checks a given
+              change needs, and a check that could not run is reported
+              as exactly that rather than quietly counted as a pass.
