@@ -8,7 +8,7 @@ of 6 dataset objects, one per CP table, all sharing one collection
 (Department for Child Protection and Family Support > Child Protection).
 
 A check whose column_name is "(table)" - the 3 cross-table business rules
-- is attached to a synthetic pseudo-column ("(table-level checks)"), since
+- is attached to a synthetic pseudo-column ("Table-level checks"), since
 none of those are about a single column; the 7 FK checks land on their own
 FK column instead (e.g. cp_client_id) since "this column's values must
 reference another table" genuinely is a statement about that column. This
@@ -51,12 +51,16 @@ ENGINE_SHORT = {
     "Evidently 0.7": "Evidently AI",
 }
 
-BUSINESS_RULE_PSEUDO_COLUMN = "(table-level checks)"
+BUSINESS_RULE_PSEUDO_COLUMN = "Table-level checks"
 
 # Row-count checks get their own home rather than sharing the one above
 # (Keith, 2026-09-20): "is this supply the right size" is a different
 # question from "do these tables agree with each other".
-SUPPLY_LEVEL_PSEUDO_COLUMN = "(supply-level checks)"
+SUPPLY_LEVEL_PSEUDO_COLUMN = "Supply-level checks"
+# The one definition of both slugs lives in the Birth Registrations
+# builder; imported rather than restated so the two files cannot
+# drift into disagreeing about what a URL segment says.
+from pipeline.build_dashboard_data import COLUMN_SCOPE_KEY  # noqa: E402
 SUPPLY_LEVEL_META = (
     "supply-level",
     "Checks on the supply as a whole rather than on any one column - whether it "
@@ -329,6 +333,11 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
 
         columns_out.append({
             "name": col, "logicalType": logical_type, "description": desc,
+            # REQ-DASH-033 - see build_dashboard_data.py's own
+            # COLUMN_SCOPE_KEY for why a column has a key distinct from
+            # its name, and why only these two differ.
+            "key": COLUMN_SCOPE_KEY.get(col, col),
+            "scope": COLUMN_SCOPE_KEY.get(col),
             "checks": checks_out, "stats": stats,
         })
 

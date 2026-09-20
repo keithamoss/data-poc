@@ -323,6 +323,22 @@ button{font:inherit; color:inherit;}
    they do everywhere else on the web. color/text-decoration are reset
    because the card is a link that must not look like body-text prose
    with an underline through it. */
+/* REQ-DASH-033 - the two supply/table sections, above the column grid.
+   Deliberately NOT styled as col-tiles: they are a different kind of
+   thing from a column, and looking identical to one is what the
+   pseudo-columns were doing wrong. Rows rather than tiles, so the
+   checks read without a click - there are only one to three of them. */
+.scope-section{border:1px solid var(--line); border-radius:var(--radius-md); padding:14px 16px; margin-bottom:12px; background:var(--surface);}
+.scope-section .head{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:2px;}
+.scope-section .head h3{margin:0; font-size:14px;}
+.scope-section .blurb{font-size:12px; color:var(--ink-muted); margin-bottom:10px;}
+.scope-check{display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; text-align:left; background:none; border:0; border-top:1px solid var(--line); padding:9px 2px; cursor:pointer; color:inherit; font:inherit;}
+.scope-check:hover, .scope-check:focus-visible{background:var(--surface-alt);}
+.scope-check:focus-visible{outline:2px solid var(--accent); outline-offset:-2px;}
+.scope-check .label{min-width:0;}
+.scope-check .label .nm{font-weight:600; font-size:13px;}
+.scope-check .label .tr{font-size:11px; color:var(--ink-faint); font-family:"IBM Plex Mono",monospace; margin-left:8px;}
+.scope-check .label .ds{font-size:12px; color:var(--ink-muted); margin-top:2px;}
 .check-card{display:block; color:inherit; text-decoration:none; border:1px solid var(--line); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:8px; cursor:pointer;}
 .check-card:hover, .check-card:focus-visible{border-color:var(--line-strong); background:var(--surface-alt);}
 .check-card:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
@@ -1053,7 +1069,15 @@ function buildRealDataset(d){
       // reads in preference to threshold math.
       history: ck.history.map((h,i)=>({ ...h, idx:i, date: toDate(h.run_date) })),
     }));
-    return { name: col.name, logicalType: col.logicalType, description: col.description, checks, stats: col.stats };
+    // Spread-then-override here too, and this is why it matters rather
+    // than being tidy: the comment at the top of this function explains
+    // the hand-maintained-allowlist failure in detail and the fix was
+    // applied to the CHECK map above - while the COLUMN map one line
+    // below stayed an allowlist. REQ-DASH-033 added `key` and `scope`
+    // to both builders, both were silently dropped here, and the
+    // symptom was two sections that simply never rendered with no
+    // error anywhere. Exactly the shape described, one level up.
+    return { ...col, checks };
   });
   // A retired check must never be able to turn a column/dataset/agency
   // status pill red or amber on its own (Keith's call, Phase 5b) - it's
@@ -2169,6 +2193,28 @@ function pathToState(raw){
   }
   return state;
 }
+// REQ-DASH-033. A column's URL-facing identity, same name/key split a
+// check already has. Equal to the name for a real column - so no real
+// column URL moved - and "supply"/"table" for the two sections, which
+// were encoding as %28supply-level%20checks%29 before.
+//
+// Falls back to the name for a dataset built before `key` existed,
+// which is what a snapshot from last week is.
+function columnKey(column){ return (column && column.key) || (column && column.name) || ""; }
+
+// The two sections, split off the column list by their own `scope`
+// field rather than by matching a display name - the display name is
+// prose now and prose gets reworded, which is the same lesson
+// REQ-DASH-026 applied to check headings.
+const COLUMN_SCOPES = [
+  {scope:"supply", title:"Supply-level checks",
+   blurb:"Did the right amount of data arrive, and is it current?"},
+  {scope:"table", title:"Table-level checks",
+   blurb:"Rules that span the whole table rather than any one column."},
+];
+function scopedColumns(ds, scope){ return (ds.columns||[]).filter(c=> c.scope===scope); }
+function realColumns(ds){ return (ds.columns||[]).filter(c=> !c.scope); }
+
 function stateToHash(state){ return "#" + stateToPath(state); }
 function hashToState(){
   try {
@@ -2229,7 +2275,7 @@ function resolveContext(state){
 function renderFromState(){
   render();
   const ctx = STATE.columnName && resolveContext(STATE);
-  const column = ctx && ctx.ds.columns.find(c=>c.name===STATE.columnName);
+  const column = ctx && ctx.ds.columns.find(c=>columnKey(c)===STATE.columnName);
   if(column){
     openColumnDrawer(ctx.ag, ctx.col, ctx.ds, column, {pushHistory:false});
     const check = STATE.checkKey && column.checks.find(c=>c.key===STATE.checkKey);
@@ -2516,6 +2562,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       <span><i class="green"></i>Green</span><span><i class="amber"></i>Amber</span><span><i class="red"></i>Red</span>
       <span style="color:var(--ink-faint);">— click a column for the full check-by-check breakdown, run-over-run comparison, and history</span>
     </div>
+    <div id="scope-sections"></div>
     <div class="col-grid" id="col-grid"></div>
     <div id="supply-history-wrap"></div>
   `;
@@ -2523,7 +2570,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   // Item 57 brought Tier 2's sparkline down to Tier 3, narrower still -
   // Phase 5e (#60) redesigned what it shows (see aggregateSparkline()'s
   // own comment), scoped here to just this one column's own checks.
-  grid.innerHTML = ds.columns.map(c=> {
+  grid.innerHTML = realColumns(ds).map(c=> {
     const colSpark = aggregateSparkline([c]);
     return `
     <button class="col-tile" data-status="${c.status}" data-col="${c.name}">
@@ -2534,6 +2581,56 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     </button>`;
   }).join("");
   grid.querySelectorAll(".col-tile").forEach(btn=> btn.addEventListener("click", ()=> openColumnDrawer(ag, col, ds, ds.columns.find(c=>c.name===btn.dataset.col))));
+
+  // REQ-DASH-033. The supply/table sections, rendered above the grid.
+  // Each one is omitted entirely when the dataset has no checks of that
+  // kind, which is not hypothetical: Birth Registrations has
+  // supply-level checks and no table-level ones.
+  //
+  // A row opens that check's own panel directly rather than the column
+  // drawer in between. The drawer exists to pick one check out of a
+  // column's many; a section with two checks in it has already done
+  // that, and the extra click was the thing that made these read as
+  // one more column.
+  const scopeWrap = document.getElementById("scope-sections");
+  scopeWrap.innerHTML = COLUMN_SCOPES.map(sc=>{
+    const columns = scopedColumns(ds, sc.scope);
+    const checks = columns.flatMap(c=> (c.checks||[]).filter(ck=> !ck.retired));
+    if(!checks.length) return "";
+    // Same rollup rule a column tile uses - the worst status among its
+    // own checks - so a section reads as part of the same page rather
+    // than as a special case with its own arithmetic.
+    const worst = checks.reduce((acc, ck)=>
+      STATUS_ORDER[checkStatus(ck)] > STATUS_ORDER[acc] ? checkStatus(ck) : acc, "green");
+    const rows = columns.flatMap(c=> (c.checks||[]).filter(ck=> !ck.retired).map(ck=> `
+      <button class="scope-check" data-col="${columnKey(c)}" data-check="${ck.key}">
+        <span class="label"><span class="nm"></span><span class="tr"></span><span class="ds"></span></span>
+        ${pill(checkStatus(ck),"sm")}
+      </button>`)).join("");
+    return `<div class="scope-section" data-scope="${sc.scope}">
+      <div class="head"><h3>${sc.title}</h3>${pill(worst,"sm")}</div>
+      <div class="blurb">${sc.blurb}</div>
+      ${rows}
+    </div>`;
+  }).join("");
+  // Authored prose set as text, never interpolated - same rule
+  // REQ-DASH-026 established for the check card and its panel.
+  scopeWrap.querySelectorAll(".scope-check").forEach(btn=>{
+    const column = ds.columns.find(c=> columnKey(c)===btn.dataset.col);
+    const check = (column.checks||[]).find(ck=> ck.key===btn.dataset.check);
+    btn.querySelector(".nm").textContent = check.name;
+    // Without this a section reads as three identical rows: the same
+    // real-world check asked by three tools shares one name by design
+    // (rule 19 of docs/check-authoring-rules.md), and on a check card
+    // it is the tool_ref line that tells them apart. Same job here.
+    btn.querySelector(".tr").textContent = check.tool_ref || "";
+    btn.querySelector(".ds").textContent = check.description || "";
+    btn.setAttribute("aria-label", `${check.name} — view current and historical run detail`);
+    btn.addEventListener("click", ()=>{
+      STATE = {...STATE, columnName: columnKey(column)};
+      openCheckPanel(ag, col, ds, column, check);
+    });
+  });
 
   // Phase 5j Stage 2 - "a final view of how the refresh period went."
   // Needs the RAW (unclipped, full-history) dataset object, not `ds`
@@ -2565,7 +2662,7 @@ function openColumnDrawer(ag, col, ds, column, opts){
     // always passes pushHistory:false) is a complete state on its own -
     // built from scratch rather than spread from the old STATE, so a
     // stale checkKey from whatever was open before can't leak through.
-    STATE = {tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id, columnName:column.name};
+    STATE = {tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id, columnName:columnKey(column)};
     history.pushState(STATE, "", stateToHash(STATE));
   }
   document.getElementById("drawer-eyebrow").innerHTML = `<span>${ag.name} / ${col.name} / ${ds.name}</span>${ds.isReal?` <span class="pill tag sm"><span class="ico"></span>Real</span>`:""}`;
@@ -2629,7 +2726,7 @@ function openColumnDrawer(ag, col, ds, column, opts){
   //      textContent cannot be forgotten by a field added later.
   const checkHref = ck => stateToHash({
     tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id,
-    columnName: column.name, checkKey: ck.key,
+    columnName: columnKey(column), checkKey: ck.key,
   });
   const renderCheckCard = ck => {
     const st = checkStatus(ck);

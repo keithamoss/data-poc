@@ -81,8 +81,23 @@ COLUMN_META = {
 # these tables agree with each other", and lumping them together made a
 # grab-bag. Child Protection already had the second one under this exact
 # name, so that name is reused rather than invented.
-SUPPLY_LEVEL_PSEUDO_COLUMN = "(supply-level checks)"
-TABLE_LEVEL_PSEUDO_COLUMN = "(table-level checks)"
+SUPPLY_LEVEL_PSEUDO_COLUMN = "Supply-level checks"
+TABLE_LEVEL_PSEUDO_COLUMN = "Table-level checks"
+
+# REQ-DASH-033. These two stopped being columns-in-disguise and became
+# real sections of the dataset page, so they need a name a person reads
+# (above) and a slug a URL carries (here) - which a bracketed
+# "(supply-level checks)" was doing badly as both: it rendered as a
+# column called something no column is called, and it encoded into
+# %28supply-level%20checks%29 in the address bar.
+#
+# Every column carries a `key` now, equal to its own name for a real
+# one, so nothing about real column URLs changes. Only these two differ
+# from their display name.
+COLUMN_SCOPE_KEY = {
+    SUPPLY_LEVEL_PSEUDO_COLUMN: "supply",
+    TABLE_LEVEL_PSEUDO_COLUMN: "table",
+}
 
 COLUMN_META[SUPPLY_LEVEL_PSEUDO_COLUMN] = (
     "supply-level",
@@ -325,6 +340,15 @@ def build() -> dict:
 
         columns_out.append({
             "name": col, "logicalType": logical_type, "description": desc,
+            # The URL-facing identity of a column, same split `key` vs
+            # `name` REQ-DASH-026 gave a check. Equal to the name for a
+            # real column, so no real column URL moves.
+            "key": COLUMN_SCOPE_KEY.get(col, col),
+            # Present only on the two section pseudo-columns, and what
+            # the dataset view keys its own split on - never a string
+            # match against a display name, which is what the bracketed
+            # names were being used for before.
+            "scope": COLUMN_SCOPE_KEY.get(col),
             "checks": checks_out, "stats": stats,
         })
 

@@ -942,3 +942,93 @@ class TestAuthoredProseCannotAlterTheDetailPanel:
         for t in annotations:
             assert self._SCRIPTY in t
             assert t.endswith(self._QUOTED)
+
+
+class TestSupplyAndTableLevelSections:
+    """REQ-DASH-033. Driven in a real browser because most of what this
+    requirement asks for only exists in a layout: where a section sits
+    relative to the column grid, whether it is absent rather than empty,
+    and what its own rollup pill says."""
+
+    _CP = {"tier": "dataset", "agencyId": "child-protection-family-support",
+           "collectionId": "child-protection", "datasetId": "cp-placements"}
+
+    def _sections(self, page):
+        return page.evaluate("""() => [...document.querySelectorAll('.scope-section')].map(s => ({
+            scope: s.dataset.scope,
+            title: s.querySelector('h3').textContent,
+            status: s.querySelector('.head .pill').textContent.trim(),
+            rows: [...s.querySelectorAll('.scope-check')].map(r => ({
+                name: r.querySelector('.nm').textContent,
+                tool: r.querySelector('.tr').textContent,
+            })),
+        }))""")
+
+    def test_both_sections_render_above_the_column_grid(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, self._CP)
+
+        sections = self._sections(clean_page)
+        assert [s["scope"] for s in sections] == ["supply", "table"]
+        assert clean_page.evaluate("""() => {
+            const wrap = document.getElementById('scope-sections');
+            const grid = document.getElementById('col-grid');
+            return !!(wrap.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING);
+        }""")
+
+    def test_a_section_is_omitted_rather_than_rendered_empty(
+            self, clean_page, built_dashboard_html):
+        """Real on today's data, not hypothetical - Birth Registrations
+        has supply-level checks and no table-level ones. This is the
+        case that choosing two sections over one grouped section made
+        load-bearing."""
+        _goto(clean_page, built_dashboard_html, _BDM)
+
+        assert [s["scope"] for s in self._sections(clean_page)] == ["supply"]
+
+    def test_each_section_carries_its_own_status(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, self._CP)
+
+        by_scope = {s["scope"]: s["status"] for s in self._sections(clean_page)}
+        assert set(by_scope) == {"supply", "table"}
+        for status in by_scope.values():
+            assert status in {"Green", "Amber", "Red"}
+        # they are genuinely rolled up independently, not both showing
+        # the dataset's own status
+        assert by_scope["supply"] != by_scope["table"]
+
+    def test_the_pseudo_columns_no_longer_appear_among_the_real_columns(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, self._CP)
+
+        names = clean_page.locator("#col-grid .col-tile .name").all_text_contents()
+        assert names, "the column grid should still have real columns in it"
+        assert not [n for n in names if "level checks" in n.lower()]
+
+    def test_rows_sharing_a_name_are_told_apart_by_their_tool(
+            self, clean_page, built_dashboard_html):
+        """Three tools ask cp-placements' carer-approval question and
+        share one name by design (rule 19). Without the tool reference
+        the section reads as three identical rows."""
+        _goto(clean_page, built_dashboard_html, self._CP)
+
+        rows = [r for s in self._sections(clean_page) for r in s["rows"]]
+        repeated = [r for r in rows if sum(1 for x in rows if x["name"] == r["name"]) > 1]
+        assert repeated, "expected at least one name shared across tools"
+        assert len({r["tool"] for r in repeated}) == len(repeated)
+
+    def test_a_row_opens_that_check_directly_with_a_readable_url(
+            self, clean_page, built_dashboard_html):
+        """The column drawer exists to pick one check out of a column's
+        many; a section with three has already done that. And the URL
+        segment is the point of the rename - it used to encode as
+        %28table-level%20checks%29."""
+        _goto(clean_page, built_dashboard_html, self._CP)
+
+        clean_page.locator(".scope-section[data-scope='table'] .scope-check").first.click()
+        clean_page.wait_for_timeout(400)
+
+        assert clean_page.locator("#check-panel-title").inner_text()
+        assert not clean_page.evaluate(
+            "() => document.getElementById('drawer').classList.contains('open')")
+        assert "/column/table/check/" in clean_page.url
+        assert "%28" not in clean_page.url

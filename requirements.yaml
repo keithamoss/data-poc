@@ -2251,7 +2251,10 @@ requirements:
       the first question I ask about an arriving supply is not filed as
       one more row in a list of columns.
     moscow: should
-    status: not_started
+    status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       The one fork REQ-DASH-032 left open, carried out of
       plans/running-thoughts.md #20 and settled by Keith on 2026-09-20 -
@@ -2280,7 +2283,38 @@ requirements:
         ones, so the omit-when-empty case is real on the current data
         and must be covered, not hypothetical.
     dependencies: [REQ-DASH-032]
+    linked_tests:
+      - tests-js/table-level-checks.test.js
+      - tests/test_dashboard_e2e.py::TestSupplyAndTableLevelSections
+    implemented_by:
+      - pipeline/build_dashboard_data.py::COLUMN_SCOPE_KEY
+      - pipeline/build_cp_dashboard_data.py::build_one_table
+      - dashboard/qa-reporting-dashboard.template.html::columnKey
+      - dashboard/qa-reporting-dashboard.template.html::scopedColumns
+    evidence:
+      - >
+        2026-09-20: cp-placements renders both sections above the grid,
+        supply green and table red - independently rolled up, not both
+        echoing the dataset. Birth Registrations renders one, the table
+        section absent rather than empty. Measured in a real browser.
+      - >
+        2026-09-20: the column grid drops from 10 tiles to 8 on
+        cp-placements and 14 to 13 on Birth Registrations, with no tile
+        named for either section.
+      - >
+        2026-09-20: a check URL in those sections is
+        /column/table/check/placement_carer_approval_dbt, against
+        /column/%28table-level%20checks%29/... before.
     decisions:
+      - Decided each row opens its check's own panel directly rather
+        than the column drawer in between. The drawer exists to pick one
+        check out of a column's many; a section holding one to three has
+        already done that, and the extra click was part of what made
+        these read as one more column.
+      - Each row carries its tool reference, for the same reason a check
+        card does - three tools ask cp-placements' carer-approval
+        question and share one name by design, so without it the
+        section reads as three identical rows.
       - Decided the sections sit ABOVE the column grid (Keith,
         2026-09-20). Whether the right amount of recent data turned up
         gates whether any column detail is worth reading, so it is

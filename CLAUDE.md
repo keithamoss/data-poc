@@ -497,6 +497,7 @@ Rough layout:
   fix)**. Flat.
   -> **~96s/833 tests (2026-09-20 night, REQ-GHUB-027)**. Flat, 21 more
   tests.
+  -> **~98s/839 tests (2026-09-20 night, REQ-DASH-033)**. Flat.
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.
