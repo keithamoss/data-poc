@@ -2973,14 +2973,98 @@ one Thread's narrative.
    between two designs so much as a decision about which of the two the
    system should stop pretending not to have.
 
-   So the real question for this work is narrower than it first looks:
-   not "collection or no collection", but whether the storage layer
-   should follow the presentation layer (split `qa_results/` per dataset,
-   retiring `TABLE_DATASET_ID`), or the presentation layer should follow
-   storage (a dataset legitimately holds multiple tables, and collection
-   becomes purely an organisational grouping above it). Either answer
-   then settles findings 1-3 as a consequence rather than as three
-   separate cleanups.
+   **DECIDED 2026-09-20, and the framing changed on the way there.**
+   The question started as "which layer gives way" - split `qa_results/`
+   per dataset, or accept that a dataset holds several tables. Keith's
+   first answer was storage follows presentation ("I'm not keen on
+   splitting things out via the hand maintained table dataset ID map").
+   Then he asked a better question that reframed the whole item, and it
+   is the one to carry forward: **what does a partial resupply
+   require?**
+
+   His scenario - some CP tables come back clean, two of the six get
+   resupplied. Can the tools run against just those two, keep the
+   original good four, and still evaluate the referential-integrity
+   checks between them?
+
+   **Checked against the real code: no, on every path, and by design.**
+   - A local run's warehouse is a self-contained snapshot of one
+     delivery - `data/cp_duckdb_runs/<run_id>.duckdb`, "each containing
+     that run's 6 tables". Nothing composes a warehouse from two new
+     tables plus four from an earlier run.
+   - CP's resupply simulation treats a delivery as whole - "CP's own
+     payload is a whole delivery's worth of tables at once" - so a
+     resupply re-sends all six.
+   - The AWS event-driven path enforces the same rule explicitly, via
+     `qa_tools/cp/completion_tracker.py`. Worth being precise, since an
+     earlier draft of this entry overstated it - that module is imported
+     ONLY by `aws/lambda_handlers/cp_ingest_handler.py` and the CDK
+     stack. It constrains nothing you can run locally. It is a third
+     expression of the same intent, not a third live constraint.
+
+   And the referential-integrity half specifically: running against only
+   the two resupplied tables would evaluate `placements.carer_id ->
+   carers` against a warehouse where `carers` is absent. Not a check
+   that quietly passes - an error or a false red on every row. Which is
+   exactly the "incomplete/wrong cross-table-check result" the
+   completion signal was built to prevent.
+
+   **Keith's decision, in his own words: "we're going to have to move to
+   a model where the shape is per dataset runs against a shared
+   warehouse composed of the current good version of every table,
+   because that's just the reality of how it works."**
+
+   That is a stronger basis for this work than tidiness. Partial
+   resupply is ordinary in the real world - one agency resends one file
+   - and it is *impossible* while results are stored per collection,
+   because a single `run_id` would have to mean different things for
+   different tables.
+
+   **What the model requires:**
+   - Per-table lineage - each table has its own arrival history and its
+     own current version, rather than sharing one delivery's `run_id`.
+   - A composed warehouse - assembled from the current version of every
+     table, not a snapshot of one delivery.
+   - Per-dataset QA runs, each triggered by its own table's arrival.
+   - Cross-table checks running against that composed warehouse, so they
+     see real current data on both sides.
+   - `qa_results/` keyed per dataset, which is where this item started.
+   - `TABLE_DATASET_ID` retires.
+
+   **What falls out for free:** the `raw_output` problem disappears. It
+   is 75% of each run's bytes and cannot be split per dataset without
+   either duplicating it six times or filtering a document whose
+   `metadata`/`elapsed_time`/`args` describe one whole invocation -
+   which would break the "genuinely unmodified tool output" guarantee
+   that makes it worth keeping. If the tools run per dataset, its output
+   is per dataset already. Nothing to duplicate, nothing to filter.
+   Birth Registrations is unaffected throughout (one table), which is a
+   good sign - the model generalises rather than special-casing CP.
+
+   **Three real questions this opens, flagged not resolved:**
+   1. **What does "good" mean in "current good version"?** If
+      `cp-placements` arrives red, does the warehouse use it - it is
+      what the agency actually sent - or hold the last green one? A QA
+      tool that quietly substitutes older data for bad data is not
+      reporting reality. The likely answer is "current version" full
+      stop, with status reported rather than acted on, which makes
+      "good" the wrong word. This is adjacent to
+      `plans/conceptual-design.md` Thread A's amber accept/reject
+      governance and should be settled with it, not separately.
+   2. **A check result stops being a pure function of one run.** If
+      `placements` is resupplied and `carers` is not, the FK check
+      re-runs and may change answer later when `carers` is resupplied -
+      without `placements` changing at all. So a cross-table check's
+      result depends on two tables' versions. Which dataset's history
+      records it, and what a viewer is told when it changes without its
+      own dataset changing, both need deciding.
+   3. **What a "run" means, and what that does to supply history.**
+      Today `run_id` is one delivery across six tables; Phase 7's
+      resupply-chain redesign derives chain membership from per-run
+      aggregate status. Per-table arrivals change what a chain is - six
+      independent timelines rather than one. Worth checking whether the
+      existing supply-history UI genuinely survives that, given Thread A
+      claims it is "dataset-agnostic by construction".
 
 7. **[done, 2026-09-19]** **[Pipeline & publishing]** Both GitHub Actions
    workflows are pinned to a single, hardcoded session branch name -
