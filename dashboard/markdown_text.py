@@ -1,6 +1,6 @@
 """Shared text helpers for this project's own markdown parsers -
 `dashboard/plans_md.py` (plans/*.md, the Plans tab) and
-`dashboard/changelog_md.py` (CHANGELOG.md, the Release Notes panel).
+`dashboard/changelog_yaml.py` (CHANGELOG.yaml, the Release Notes panel) until that file became structured YAML on 2026-09-20 and stopped needing line-joining at all.
 
 Exists because of one real, live bug they both had (found 2026-09-20).
 Both reassembled hard-wrapped markdown with a plain `" ".join(...)`,

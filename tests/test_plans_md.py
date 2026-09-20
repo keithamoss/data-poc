@@ -110,7 +110,7 @@ def test_an_item_in_the_old_untagged_format_is_silently_skipped(tmp_path):
     """Real content: qa-pipeline.md's own "Held over from the original
     (equivalent-only) build" section restarts its own numbering in the
     OLD, pre-retrofit tag format - this parser doesn't retrofit-match it,
-    same "skip what doesn't match" philosophy as changelog_md.py's own
+    same "skip what doesn't match" philosophy the changelog parser has always had
     optional fields."""
     text = "7. **[open]** An old-format item with no date/component tags.\n"
     assert _parse_numbered_items(text, "qa-pipeline") == []

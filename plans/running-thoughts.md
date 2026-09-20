@@ -1263,92 +1263,19 @@ with Keith before building - this depends on #13's rewrite landing
 first, and its shape should probably be decided as part of it rather
 than bolted onto today's changelog.
 
-15. **[todo, 2026-09-20]** **[Docs & process]** Rewrite `CHANGELOG.md` from the ground up - human-first, structured, modelled on Mapa's "What's New".
+15. **[done, 2026-09-20]** **[Docs & process]** Rewrite `CHANGELOG.md` from the ground up - human-first, structured, modelled on Mapa's "What's New".
 
-The concrete version of #13's "changelog will get a lot more shorter, a
-lot more for humans first". Keith pointed at his own
-`keithamoss/mapa` repo as the model - specifically
-`frontend/src/features/whatsNew/whatsNew.json`, rendered as an in-app
-"What's New" page that also tracks how many releases each user has
-already seen.
+**BUILT 2026-09-20 as `REQ-DOCS-028`**, and this item's own scoping
+prose has been deleted in the same change, per `CLAUDE.md`'s rule that
+build work removes the plans text its requirements now cover. The
+format comparison against Mapa, the reasoning for YAML over JSON, the
+declined release names, the emoji scoping and the decision to scrap the
+existing entries all live as `decisions:` on that requirement, which is
+the permanent record.
 
-**What Mapa does, read at source (commit 1d0738b) rather than
-described:**
-
-```json
-{
-  "version": "Cradle of Fur",
-  "date": "17 May, 2024",
-  "summary": "Several major new features, a few smaller features, and a whole pile of bug fixes.",
-  "changes": {
-    "highlights": [["Head west, young lady", "The map now lets you choose whether you want to follow your heading / compass bearing (the default), or whether the map should stay pointed to the north."]],
-    "bugs fixed":  [["Begone, weird highlighting bug", "Long-pressing on the part of the map where your GPS location marker is shown no longer weirdly highlights the whole map as if it was a piece of text."]]
-  }
-}
-```
-
-Five things it does that this project's `CHANGELOG.md` does not:
-releases are **named, not numbered** ("Cradle of Fur"); a single
-`summary` sentence characterises the whole release so a reader can stop
-there; categories are **human words** (`highlights`, `bugs fixed`) not
-Keep-a-Changelog's `Added`/`Fixed`/`Changed`; every entry is a
-**[headline, description] pair** with a playful, memorable headline
-("Missing heros", "No menu for you", "What's in a name?"); and the
-voice is **second person and outcome-only** - "You can now quickly add
-symbols right from the map" - one or two sentences, never how it was
-built.
-
-**Decided by Keith, 2026-09-20:**
-- **Same audience, same tone.** "The audience is the same. Real end
-  users in this case are my colleagues, but we can use the same kind of
-  tone and language as Mapa does, that's fine."
-- **It becomes structured data.** "I don't care if it's JSON or YAML or
-  whatever, but structure would be good." Note `CHANGELOG.md` is
-  already effectively a data source wearing a Markdown coat -
-  `dashboard/changelog_md.py` parses it into `RELEASE_NOTES` for the
-  Release Notes panel, extracting headline, components and prose. Mapa
-  just skipped the coat.
-
-**All four open questions answered the same day (Keith):**
-- **Component tags stay. The per-component emojis go.** So the
-  taxonomy keeps its meaning as a filter/label while losing the
-  decoration - `COMPONENT_ICON` in the template's own inline JS is what
-  comes out. And the components stay **CI-checked** ("obviously"),
-  which they already are:
-  `tests/test_component_taxonomy_consistency.py` fails if
-  `validate_requirements.py`'s codes, the template's two consts and
-  `docs/components.md`'s headers ever disagree. Whatever replaces
-  `changelog_md.py`'s parse has to keep feeding that check, not sit
-  outside it.
-- **No release names.** Mapa's "Cradle of Fur" is not copied. **Keep
-  grouping by day**, exactly as `CHANGELOG.md` does now - so the `date`
-  is the grouping key and there is no `version` field at all.
-- **One feed, no per-tier mapping for now.** Despite the six tiers in
-  #2 - explicitly deferred rather than decided against.
-- **The existing ~100 entries are scrapped outright**, not migrated.
-  "That's fine." This removes what looked like the rewrite's biggest
-  cost, and it is only safe because the engineering detail in them now
-  lives in `evidence:`/`decisions:` on the requirements (see below).
-
-**So the shape is settled enough to build:** day-grouped, one feed,
-component-tagged, no emojis, no version names, [headline, description]
-pairs in Mapa's second-person outcome-only voice, structured data
-rather than Markdown prose, existing entries discarded.
-
-**Still genuinely open:** the category vocabulary (Mapa uses
-`highlights`/`bugs fixed`; this file uses Keep-a-Changelog's
-`Added`/`Fixed`/`Changed`), and the storage format itself - JSON like
-Mapa's, YAML like `requirements.yaml`, or something else. Keith: "I
-don't care", so pick one and say why rather than asking again.
-
-**What makes this safe to do at all** is that the engineering detail
-currently in `CHANGELOG.md` now has a better home: `evidence:` holds
-measured results and `decisions:` holds the reasoning, both CI-required
-on every built requirement (`plans/tooling.md` #18/#20). So the rewrite
-drops that detail rather than needing to relocate it. Do not start
-before checking that holds for the entries being rewritten.
-
-**A standing hold is in force until this lands** - `CLAUDE.md` carries
-a bullet telling every session to PAUSE before writing a new
-`CHANGELOG.md` entry and ask Keith first, explicitly overriding the
-same-push rule below it. Delete that bullet as part of this work.
+Kept here, because it is about this file rather than about the feature:
+the standing `CLAUDE.md` hold that told every session to pause before
+writing a changelog entry is now **lifted**, and the same-push rule has
+resumed in rewritten form. `plans/running-thoughts.md` #13's wider
+"plans files become ephemeral" shift is still open - this was one piece
+of it, not the whole thing.

@@ -46,7 +46,7 @@ name: Sync QA status to GitHub Issues
 # anyway, accepting that those first real tickets may reflect real,
 # not-yet-diagnosed problems rather than something already understood.
 # Paths mirror deploy-pages.yml's own trigger (same build chain this
-# job reads), minus dashboard/**/CHANGELOG.md/requirements.yaml - this
+# job reads), minus dashboard/**/CHANGELOG.yaml/requirements.yaml - this
 # job never touches the dashboard itself.
 on:
   push:

@@ -291,14 +291,19 @@ class TestRequirementsPanel:
 
 
 class TestReleaseNotesPanel:
-    def test_opening_it_shows_real_entries_with_a_leading_timestamp(self, clean_page, built_dashboard_html):
-        """The 2026-09-18 CHANGELOG.md timestamp retrofit (plans/qa-
-        pipeline.md): every entry now carries a real AWST commit time,
-        parsed by dashboard/changelog_md.py and rendered by
-        renderChangelogPanel() ahead of the entry's own text - assert a
-        real `H:MMam`/`H:MMpm` timestamp actually renders, not just that
-        the panel has content (which the pre-timestamp version already
-        passed)."""
+    def test_it_reads_as_a_whats_new_page_not_an_engineering_log(self, clean_page, built_dashboard_html):
+        """Rewritten 2026-09-20 when CHANGELOG.md became CHANGELOG.yaml.
+
+        The previous version asserted a per-item `H:MMam` timestamp
+        rendered - a real assertion about the format that existed then,
+        and exactly the kind of detail the rewrite removed: entries are
+        grouped by day for an audience that does not need the minute.
+
+        What replaces it asserts what the new feed actually promises to a
+        reader: a dated day, one summary sentence they can stop at, real
+        headlines, and component tags. Plus the absence of the emoji that
+        used to lead each item - Keith's own call, and worth asserting
+        because nothing else would notice it creeping back."""
         _goto(clean_page, built_dashboard_html)
 
         clean_page.locator("#changelog-btn").click()
@@ -306,8 +311,15 @@ class TestReleaseNotesPanel:
         rows_text = body.inner_text()
 
         assert "No release notes yet" not in rows_text
-        assert re.search(r"\b\d{1,2}:\d{2}(am|pm)\b", rows_text), \
-            f"no real timestamp rendered in the release notes panel: {rows_text[:200]!r}"
+        assert re.search(r"\b\d{4}-\d{2}-\d{2}\b", rows_text), \
+            f"no dated day rendered in the release notes panel: {rows_text[:200]!r}"
+        # A category heading and at least one component tag - the two
+        # things the rewrite explicitly KEPT.
+        assert any(c in rows_text for c in ("NEW", "IMPROVED", "FIXED")), rows_text[:300]
+        assert "QA checks & contract" in rows_text or "Docs & process" in rows_text
+
+        emoji = re.findall(r"[\U0001F300-\U0001FAFF]", rows_text)
+        assert not emoji, f"per-component emoji is back in the release notes: {emoji}"
 
 
 @pytest.fixture

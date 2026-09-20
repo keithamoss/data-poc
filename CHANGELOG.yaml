@@ -1,0 +1,116 @@
+# What's New - this project's own development history, written for the
+# people who use it rather than the people who build it.
+#
+# Replaced the hand-written Keep-a-Changelog CHANGELOG.md on 2026-09-20.
+# That file had become an engineering log: entries ran fifteen lines,
+# carried config hashes and file paths and measured percentages, and were
+# addressed to whoever would maintain the code next. Useful, but not to a
+# director, a manager, or someone in client services trying to stay across
+# a refresh cycle - and that is who reads this.
+#
+# The model is Keith's own `keithamoss/mapa`, whose in-app "What's New"
+# page this deliberately imitates:
+#
+#   - Every item is a HEADLINE plus one or two sentences. Not a paragraph.
+#   - Write what someone can now DO, in second person. "You can now see
+#     which column a check belongs to" - never "moved 10 sql rules to
+#     property level".
+#   - No file paths, function names, tool names, measurements or internal
+#     references. If a sentence only makes sense to someone who has read
+#     the code, it belongs in requirements.yaml, not here.
+#   - Headlines can have some life in them. Mapa's are the bar:
+#     "Begone, weird highlighting bug", "No menu for you".
+#
+# Where the engineering detail went, and why this is safe: every built
+# requirement in requirements.yaml now carries `evidence:` (what was
+# measured, with the number) and `decisions:` (what was decided, and what
+# was rejected). Both are CI-enforced. So the detail that used to justify
+# a long changelog entry has a better home, and this file does not need
+# to carry it.
+#
+# Structure notes:
+#   - Grouped by DAY, newest first. No release names or version numbers.
+#   - `category` is one of: New, Improved, Fixed.
+#   - `components` are the project's own 7-part taxonomy, by full name,
+#     CI-checked against docs/components.md and the dashboard's own
+#     consts. They render as tags; the per-component emoji was dropped
+#     from this feed on 2026-09-20 (the Plans tab keeps its own).
+#   - `summary` is one sentence for the whole day. A reader should be
+#     able to stop there.
+#   - `time` is optional per item and usually omitted - day-grouping is
+#     the point, and a to-the-minute timestamp is detail this audience
+#     does not need.
+#
+# YAML rather than Mapa's JSON, deliberately: this repo already
+# hand-authors prose in YAML with `>` block scalars, which handle
+# multi-sentence text far better than JSON's escaped strings; the
+# check-yaml pre-commit hook already validates every staged .yaml; and
+# comments like this one are possible at all. Mapa used JSON because its
+# reader is TypeScript. Ours is Python, which reads YAML natively.
+
+intro: >
+  What's changed in the data quality tool, newest first. Everything here
+  is written for the people who use it - if you want the reasoning, the
+  measurements or the code behind a change, the Requirements panel has
+  all three.
+
+releases:
+  - date: "2026-09-20"
+    summary: >
+      A quieter day under the surface than on it: checks now know which
+      column they belong to without anyone having to read their
+      description, and the tool's own record of what it does became
+      something you can actually check.
+    changes:
+      - category: Improved
+        items:
+          - headline: Checks know where they belong
+            components: ["QA checks & contract"]
+            description: >
+              Every quality check now sits against the column it actually
+              checks, so a rule about a carer's identifier appears under
+              that identifier rather than off to one side under the table.
+              Three cross-table rules that had been filed under "(table
+              level)" moved to where you would look for them.
+          - headline: Five checks that all had the same name
+            components: ["QA checks & contract", "Dashboard UI"]
+            description: >
+              Five Birth Registrations checks were all displayed under one
+              identical name, which made them impossible to tell apart.
+              They now read as what they are - "Registered on or after
+              birth", "Multiple-birth sibling match", and so on.
+          - headline: Rewording an explanation no longer moves the check
+            components: ["QA checks & contract"]
+            description: >
+              A check's name and its column used to be read out of the
+              explanation written beneath it, so improving the wording
+              could quietly send a check somewhere else on the page.
+              Both now come from the check's own definition, and nothing
+              about a check moves when its explanation is improved.
+      - category: Fixed
+        items:
+          - headline: A date check filed under the wrong heading
+            components: ["QA checks & contract", "Dashboard UI"]
+            description: >
+              The check that makes sure a date of birth is plausible was
+              being grouped with the checks that verify records point at
+              each other correctly. It now sits with the checks it
+              belongs to.
+      - category: New
+        items:
+          - headline: What's New, written for you
+            components: ["Docs & process", "Dashboard UI"]
+            description: >
+              This page used to be a build log - fifteen lines an entry,
+              full of file names and percentages. It is now a short,
+              plain-language account of what changed and what you can do
+              with it. If you want the detail behind any of it, the
+              Requirements panel has the reasoning and the numbers.
+          - headline: Every requirement shows its working
+            components: ["Docs & process"]
+            description: >
+              The Requirements panel now shows, for each thing the tool
+              promises to do, where it lives in the code, what proves it
+              works, the measured result behind that, and what was decided
+              and rejected along the way. Nothing can be marked finished
+              without all four.

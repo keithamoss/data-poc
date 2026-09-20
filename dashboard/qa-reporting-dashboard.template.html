@@ -3195,8 +3195,13 @@ const COMPONENT_ICON = {
   "Docs & process": "📝",
 };
 function componentIcon(c){ return COMPONENT_ICON[c] || "🔧"; }
+// No emoji here, deliberately (2026-09-20, Keith's call when the
+// changelog was rewritten human-first). The Plans tab's own filter chips
+// keep theirs - there an icon helps you re-find a chip you have used
+// before, in a row of seven. In a release note it decorated a tag that
+// already said the same thing in words.
 function componentBadge(c){
-  return `<span class="pill tag sm" style="gap:5px;"><span aria-hidden="true">${componentIcon(c)}</span>${c}</span>`;
+  return `<span class="pill tag sm">${c}</span>`;
 }
 function renderChangelogPanel(){
   const body = document.getElementById("changelog-panel-body");
@@ -3217,11 +3222,10 @@ function renderChangelogPanel(){
         <ul style="margin:0; padding-left:0; list-style:none; font-size:13px; line-height:1.55;">
           ${s.items.map(item=>{
             const time = item.time ? `<span class="mono" style="color:var(--ink-faint); font-size:11.5px; margin-right:7px;">${item.time}</span>` : "";
-            const icon = item.components.length ? `<span aria-hidden="true" style="margin-right:5px;">${componentIcon(item.components[0])}</span>` : "";
             const headline = item.headline ? `<strong>${item.headline}</strong>` : "";
             const badges = item.components.map(componentBadge).join(" ");
             return `<li style="margin-bottom:12px;">
-              <div style="margin-bottom:4px;">${time}${icon}${headline}</div>
+              <div style="margin-bottom:4px;">${time}${headline}</div>
               ${badges ? `<div style="margin-bottom:5px; display:flex; gap:5px; flex-wrap:wrap;">${badges}</div>` : ""}
               <div>${mdInlineCode(item.text)}</div>
             </li>`;
@@ -3231,7 +3235,8 @@ function renderChangelogPanel(){
     ).join("");
     return `
       <div style="margin-bottom:24px; padding-bottom:20px; border-bottom:1px solid var(--line);">
-        <div style="font:700 15px 'IBM Plex Mono',monospace; margin-bottom:12px;">${e.date}</div>
+        <div style="font:700 15px 'IBM Plex Mono',monospace; margin-bottom:6px;">${e.date}</div>
+        ${e.summary ? `<div style="font-size:13px; color:var(--ink-muted); margin-bottom:12px; line-height:1.5;">${e.summary}</div>` : ""}
         ${sections}
       </div>`;
   }).join("");

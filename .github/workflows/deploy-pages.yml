@@ -170,12 +170,12 @@ on:
       - "qa_tools/**"
       - "pipeline/**"
       - "dashboard/**"
-      - "CHANGELOG.md" # item 62's "Release notes" panel embeds this file's own content at build time
+      - "CHANGELOG.yaml" # the "What's New" feed the Release Notes panel embeds at build time
       - "requirements.yaml" # item 75's "Requirements" panel embeds this file's own content at build time
       # plans/**: the Plans TAB embeds every plans/*.md file's own
       # content at build time (dashboard/plans_md.py's parse_plans(),
       # via embed_dashboard_data.py's PLANS_DIR -> `const PLANS`), for
-      # exactly the same reason CHANGELOG.md and requirements.yaml are
+      # exactly the same reason CHANGELOG.yaml and requirements.yaml are
       # listed above. Missed when that tab was built (2026-09-18,
       # plans/running-thoughts.md #10), so for a day every plans-only
       # commit silently failed to republish and the live Plans tab drifted
@@ -269,6 +269,9 @@ jobs:
 
       - name: Gate - requirements validation (item 75)
         run: uv run mothman dashboard validate-requirements
+
+      - name: Validate CHANGELOG.yaml (schema + component tags)
+        run: uv run mothman dashboard validate-changelog
 
       # plans/INDEX.md is generated from plans/*.md but committed, so it
       # can drift the moment anyone edits a plans file without

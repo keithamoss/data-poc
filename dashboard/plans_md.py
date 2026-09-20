@@ -2,7 +2,7 @@
 Parses `plans/*.md` - the project's own persistent planning memory
 (CLAUDE.md's own orientation section) - into structured data the
 dashboard's "Plans" tab (running-thoughts.md #10) can render, filter, and
-search, mirroring dashboard/changelog_md.py's narrow line-based style
+search, mirroring the narrow line-based style dashboard/changelog_md.py used before CHANGELOG became structured YAML
 rather than pulling in a real markdown library.
 
 There are two real, deliberately different tag placements in these files
@@ -50,7 +50,7 @@ headings rather than through a separate record type.
 
 Every parsed body/text field keeps real markdown (bold, inline code, `-`/
 `*` bullet lists, blank-line paragraph breaks) as a plain string - unlike
-changelog_md.py's single-line items, these can be long multi-paragraph
+a changelog item, these can be long multi-paragraph
 essays, so the dashboard's own JS does a slightly richer (but still not
 full-CommonMark) markdown-to-HTML pass at render time, not this module.
 """

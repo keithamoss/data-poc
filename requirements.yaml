@@ -542,7 +542,7 @@ requirements:
       - Entries are real, dated, and categorized (Added/Fixed/Changed),
         not a mechanical commit dump.
     linked_tests:
-      - tests/test_changelog_md.py
+      - tests/test_changelog_yaml.py
     evidence:
       - >
         2026-09-20: parse_changelog() extracts 8 dated release sections from
@@ -552,11 +552,13 @@ requirements:
       - >
         Kept the tool's own development history as a separate feed from the QA-publish activity feed. They answer different questions and merging them would have buried both.
       - >
-        CHANGELOG.md stays hand-curated prose rather than a generated commit dump, so not every commit earns an entry.
+        The feed stays hand-curated rather than a generated commit dump, so not every commit earns an entry.
+      - >
+        Superseded its own original form on 2026-09-20 (REQ-DOCS-028): hand-written Keep-a-Changelog Markdown became structured YAML written for readers rather than maintainers. This requirement is still what the panel exists for; only the source format and voice changed.
     implemented_by:
-      - dashboard/changelog_md.py::parse_changelog
+      - dashboard/changelog_yaml.py::parse_changelog
       - dashboard/embed_dashboard_data.py::embed
-      - CHANGELOG.md
+      - CHANGELOG.yaml
 
   - id: REQ-TEST-011
     title: Real automated test coverage with an enforced floor
@@ -1221,3 +1223,108 @@ requirements:
         the text to a named dataset and date.
     dependencies: [REQ-QAC-024]
     linked_tests: []
+
+  - id: REQ-DOCS-028
+    title: A "What's New" feed written for the people who use the tool
+    date_written: "2026-09-20"
+    story: >
+      As a director, manager or someone in client services, I want to
+      read what changed in plain language, so that I can stay across the
+      tool without having to understand how it is built.
+    moscow: should
+    status: built
+    source: >
+      Keith, 2026-09-20, modelled on his own keithamoss/mapa repo's
+      in-app "What's New" page (frontend/src/features/whatsNew).
+    acceptance_criteria:
+      - THE SYSTEM SHALL hold its own development history as structured
+        data rather than prose, grouped by day, newest first, with no
+        version or release names.
+      - THE SYSTEM SHALL state, for each day, a single summary sentence
+        that a reader can stop at.
+      - WHERE a change is listed, THE SYSTEM SHALL give it a headline and
+        a description of one or two sentences, and SHALL tag it with one
+        or more of the project's own seven components.
+      - WHEN the publishing CI gate runs, IF any component tag is not one
+        of those seven, THEN THE SYSTEM SHALL exit non-zero and name it.
+      - WHEN the publishing CI gate runs, IF a day has no summary, an item
+        has no headline or description, a category is outside the closed
+        vocabulary, or a date appears twice, THEN THE SYSTEM SHALL exit
+        non-zero and name the offending entry.
+      - THE SYSTEM SHALL render the feed without a per-component emoji,
+        while continuing to render the component tags themselves.
+    non_functional_requirements:
+      - Nothing here needs a live connection to data/ or any warehouse -
+        the feed is a committed file read at build time, like every other
+        embedded const.
+      - The voice standard (second person, outcome-only, no file paths,
+        tool names or measurements) is stated in CHANGELOG.yaml's own
+        header and is deliberately NOT machine-checked. A proxy for it
+        would be gamed within a week and wrong more often than right.
+      - The component vocabulary is taken from validate_requirements.py's
+        own codes rather than restated, so adding a component to the
+        taxonomy cannot leave this gate behind.
+    decisions:
+      - >
+        YAML rather than Mapa's JSON. This repo already hand-authors
+        prose in YAML with block scalars, which handle multi-sentence
+        text far better than JSON's escaped strings; the check-yaml
+        pre-commit hook already validates every staged .yaml; and
+        comments are possible at all. Mapa used JSON because its reader
+        is TypeScript - ours is Python, which reads YAML natively.
+      - >
+        Categories are New/Improved/Fixed - plain words rather than Keep
+        a Changelog's Added/Changed/Fixed, which read as a spec for a
+        maintainer. Closed and validated, because an open vocabulary
+        drifts into six near-synonyms within a month.
+      - >
+        The existing ~100 Markdown entries were scrapped outright rather
+        than migrated (Keith: "that's fine"). Only safe because the
+        engineering detail in them now lives in evidence: and decisions:
+        on the requirements, both CI-enforced - a week earlier the same
+        deletion would have destroyed the only record.
+      - >
+        Emojis were dropped from this feed only, not from the Plans tab's
+        filter chips. On a filter chip an icon helps you re-find one you
+        have used before in a row of seven; in a release note it
+        decorated a tag that already said the same thing in words. It
+        also keeps COMPONENT_ICON alive, so the taxonomy CI check keeps
+        all three representations it cross-references.
+      - >
+        Per-item timestamps went. Day-grouping is the point, and a
+        to-the-minute time is detail this audience does not need. The
+        field survives as optional in the shape so the renderer needs no
+        change if one item ever wants one.
+      - >
+        Release names were considered and declined. Mapa names its
+        releases ("Cradle of Fur"); Keith's call was to keep grouping by
+        day, so the date is the only key and there is no version field.
+      - >
+        One feed, with per-tier mapping explicitly deferred rather than
+        declined - six real user tiers exist (plans/running-thoughts.md
+        #2) and an executive plainly wants different entries from a data
+        engineer, but splitting the feed before anyone has read a single
+        entry would be designing for a problem nobody has reported.
+    linked_tests:
+      - tests/test_changelog_yaml.py
+      - tests/test_dashboard_e2e.py::TestReleaseNotesPanel::test_it_reads_as_a_whats_new_page_not_an_engineering_log
+    implemented_by:
+      - CHANGELOG.yaml
+      - dashboard/changelog_yaml.py::parse_changelog
+      - qa_tools/common/validate_changelog.py::validate
+      - dashboard/embed_dashboard_data.py::embed
+      - dashboard/qa-reporting-dashboard.template.html::renderChangelogPanel
+      - cli/dashboard.py::validate_changelog_command
+      - .github/workflows/deploy-pages.yml
+    evidence:
+      - >
+        2026-09-20: the rewrite replaced 1 file of ~100 hand-written
+        Markdown entries with 1 structured feed of 5 items across 1 day,
+        and deleted 2 modules (the Markdown parser and its tests). The
+        validator reports 1 day, 5 items, zero errors.
+      - >
+        2026-09-20: the rendered panel measured in a real browser -
+        zero console errors, zero emoji characters, and the Plans tab
+        re-checked in the same run to confirm its own 10 chip icons
+        survived, since the emoji removal was deliberately scoped to one
+        surface of two.

@@ -4,7 +4,7 @@ plans/qa-pipeline.md) - real user stories tracked with MoSCoW priority,
 implementation status, and (enforced by qa_tools/common/
 validate_requirements.py, not this module) real linked tests. Keith's
 own scoping call: structured YAML with typed fields, not hand-prose
-like CHANGELOG.md - so unlike dashboard/changelog_md.py, this module
+like the old Markdown CHANGELOG - so, like dashboard/changelog_yaml.py, this module
 does almost no interpretation of its own; requirements.yaml's own shape
 already IS the shape the dashboard renders, this just loads it and
 normalizes it into a stable, predictable list (never raising on a

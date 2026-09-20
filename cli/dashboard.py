@@ -87,6 +87,18 @@ def validate_requirements_command() -> None:
     _validate_requirements()
 
 
+def _validate_changelog() -> None:
+    from qa_tools.common.validate_changelog import main as validate_main
+    if validate_main() != 0:
+        raise click.ClickException("changelog validation failed - see output above.")
+
+
+@dashboard_group.command("validate-changelog")
+def validate_changelog_command() -> None:
+    """Gate: CHANGELOG.yaml's schema and component tags stay valid."""
+    _validate_changelog()
+
+
 INDEX_PATH = "plans/INDEX.md"
 
 
@@ -162,7 +174,7 @@ def snapshot_command(site_dir: str | None) -> None:
 @dashboard_group.command("rebuild")
 def rebuild_command() -> None:
     """Human-facing convenience: rebuild-results -> build-data -> embed -> validate-check-lifecycle ->
-    validate-requirements -> check-renders, in one go. CI calls the individual steps above instead, for
+    validate-requirements -> validate-changelog -> check-renders, in one go. CI calls the individual steps above instead, for
     clear per-step pass/fail in the Actions log - this is for a local "just make my dashboard current"."""
     console.print("Rebuilding check results from committed qa_results/ history...", style="dim")
     _rebuild_results()
@@ -174,6 +186,7 @@ def rebuild_command() -> None:
     _validate_check_lifecycle()
     console.print("Gate - requirements validation...", style="dim")
     _validate_requirements()
+    _validate_changelog()
     console.print("Gate - dashboard structural + real-browser render check...", style="dim")
     _check_renders()
     console.print("Rebuilt -> dashboard/qa-reporting-dashboard.html", style="green")

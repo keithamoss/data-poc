@@ -43,11 +43,11 @@ And `const RELEASE_NOTES` (item 62, plans/qa-pipeline.md - Phase 5h) -
 different feed from CHANGELOG_FEED above (that one is data-QA-activity,
 built from qa_results/; this one is the tool's own development
 history). Deliberately NOT derived from qa_results/ or real git commit
-messages - Keith's own call was a hand-maintained file (../CHANGELOG.md,
+messages - Keith's own call was a hand-maintained file (../CHANGELOG.yaml,
 repo root), edited alongside real work, so a human curates what's
 presentable rather than every commit surfacing verbatim. This script's
 only job is parsing that file's Keep-a-Changelog-style markdown into
-something renderable (dashboard/changelog_md.py's parse_changelog()) -
+something renderable (dashboard/changelog_yaml.py's parse_changelog()) -
 same "placeholder here, real data only in the built output" treatment
 as everything else on this page.
 
@@ -57,7 +57,7 @@ implementation status, real CI-enforced test linkage), scoped via
 AskUserQuestion at Keith's own request. Same hand-maintained-file
 pattern as RELEASE_NOTES, but structured YAML (../requirements.yaml,
 repo root) rather than prose markdown - Keith's own explicit choice
-here, unlike CHANGELOG.md's. Parsed by dashboard/requirements_yaml.py's
+here, like CHANGELOG.yaml's. Parsed by dashboard/requirements_yaml.py's
 parse_requirements(); schema/linkage enforcement is a SEPARATE CI gate
 (qa_tools/common/validate_requirements.py), not this script's job.
 
@@ -177,7 +177,7 @@ import json
 import os
 import re
 
-from dashboard.changelog_md import parse_changelog
+from dashboard.changelog_yaml import parse_changelog
 from dashboard.plans_md import parse_plans
 from dashboard.requirements_yaml import parse_requirements
 from qa_tools.common.acceptance_sync import build_decisions
@@ -191,7 +191,7 @@ from qa_tools.common.ticket_sync import DATASET_AGENCY
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 TEMPLATE_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.template.html")
 DASHBOARD_HTML = os.path.join(os.path.dirname(__file__), "qa-reporting-dashboard.html")
-CHANGELOG_MD = os.path.join(ROOT, "CHANGELOG.md")
+CHANGELOG_YAML = os.path.join(ROOT, "CHANGELOG.yaml")
 PLANS_DIR = os.path.join(ROOT, "plans")
 DEMO_CAST_PATH = os.path.join(os.path.dirname(__file__), "demos", "qa_wizard.cast")
 REQUIREMENTS_YAML = os.path.join(ROOT, "requirements.yaml")
@@ -267,7 +267,7 @@ def embed() -> None:
     html = _replace_const(html, "CHANGELOG_FEED", json.dumps(changelog_feed, separators=(",", ":")))
     print(f"Re-embedded CHANGELOG_FEED = {len(changelog_feed)} entries")
 
-    release_notes = parse_changelog(CHANGELOG_MD)
+    release_notes = parse_changelog(CHANGELOG_YAML)
     html = _replace_const(html, "RELEASE_NOTES", json.dumps(release_notes, separators=(",", ":")))
     print(f"Re-embedded RELEASE_NOTES = {len(release_notes['entries'])} dated entries")
 
