@@ -577,6 +577,15 @@ requirements:
         contributor-facing rationale, distinct from both plain-English
         statements, and SHALL preserve any superseded technical wording
         there rather than discard it.
+      - THE SYSTEM SHALL confine that third field to standing facts a
+        contributor needs and a viewer must not see - cross-references
+        between checks, and notes explaining why a check behaves as it
+        does by construction.
+      - THE SYSTEM SHALL NOT use that third field for dated definition
+        changes, which belong in the check's own changelog.
+      - WHEN an existing description contains dated definition-change
+        history, THE SYSTEM SHALL move that history into the check's
+        changelog rather than into the contributor-rationale field.
       - WHEN any of a check's three authored text fields is edited with
         no change to that check's own config, THE SYSTEM SHALL NOT
         report the check as changed and SHALL NOT require a changelog
@@ -584,7 +593,19 @@ requirements:
     non_functional_requirements:
       - Three authored text fields per check (Keith, 2026-09-19/20). The
         existing `description` becomes by definition the plain-English
-        "what"; the other two are new.
+        "what"; the other two are new. Names settled by Keith on
+        2026-09-20 - `description` (existing, repurposed),
+        `failure_indicates` (new), `technical_note` (new).
+      - The contributor-rationale field is sparse by design - on the
+        order of 8 distinct texts across 258 checks - which is why it
+        stays optional and CI never requires it.
+      - The boundary against `changelog` is load-bearing and was tested
+        against the real text before the field was kept. A changelog
+        entry carries a date, an author and a breaking flag. A standing
+        fact has none of those, so forcing one into the changelog means
+        inventing a date and an author for something that never
+        happened, corrupting the one field whose job is who changed what
+        when.
       - No authoring standard (Keith's explicit call) - no reading-age
         target, no length cap, no external guideline. The bar is "sounds
         right to a non-technical colleague" and the check's own

@@ -1269,6 +1269,46 @@ relative, not a schedule — this is weeks of work, not months.
     uniqueness but never shape. Distribution is clean - 243 six-segment
     ids with a column, 15 table-level.
 
+    **The contributor-rationale field was challenged and survived, with
+    its boundary now written into the requirement** (Keith, 2026-09-20 -
+    "I do wonder if it's duplication with... the field we have that has
+    the changelog"). A fair challenge, and testing it against the real
+    text rather than arguing it split the contributor-voiced
+    descriptions three ways:
+
+    1. **Genuinely changelog material** - e.g. `freshness_datacontract`'s
+       "Phase 5f (plans/qa-pipeline.md #61, 2026-09-17), previously
+       compared against...". Dated, attributable, describes a change.
+       Keith's call, same day - **redirect this into the changelog as
+       part of the migration**, rather than carrying dated history into
+       a new field and baking the existing confusion into the new
+       structure. That it currently sits in a description is a small
+       pre-existing bug.
+    2. **Standing cross-references** - "Same format rule as
+       child_given_names, see that property's description" (x3). Nothing
+       happened; it is a permanent fact about how one check relates to
+       another.
+    3. **Behaviour-by-construction notes** - e.g.
+       `approval_compliance_datacontract`'s "Passes 0/0 on every clean
+       run, child_protection.py only ever assigns an Approved carer to a
+       placement, so this holds by construction". Explains why a check
+       looks like it does nothing. A contributor needs it; a steward
+       must never see it.
+
+    **The argument that decided it:** a `changelog` entry carries a
+    date, an author and a `breaking` flag. Buckets 2 and 3 have none of
+    those - no date because nothing happened, no author because it is
+    not a decision - so forcing them into the changelog means inventing
+    both, corrupting the one field whose whole job is who changed what
+    when. The field is sparse (roughly 8 distinct texts across 258
+    checks), which is why it stays optional with CI never requiring it,
+    and the requirement now states what it is NOT for as well as what it
+    is.
+
+    **Field names settled** the same morning - `description` (existing,
+    repurposed as the plain-English *what*), `failure_indicates` (new),
+    `technical_note` (new). Two new fields, not three.
+
     **A builder was considered and declined**, worth recording since
     Keith raised it himself ("maybe it's worth having a little utility
     that does that, that we share across all the tools, just for the
