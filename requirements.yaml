@@ -2350,6 +2350,464 @@ requirements:
         protecting it buys nothing real. That changes the day this
         becomes something people depend on, and not before.
 
+  - id: REQ-PIPE-034
+    title: Each dataset has its own arrival history
+    date_written: "2026-09-21"
+    story: >
+      As an agency data owner watching one table, I want that table's
+      arrivals recorded as its own history, so that a file my agency
+      resent on Tuesday appears on its own timeline rather than folded
+      into a delivery of five other tables that did not change.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/publishing-and-history.md item 6 - "per dataset runs
+      against a shared warehouse composed of the current good version of
+      every table, because that's just the reality of how it works",
+      2026-09-20. Scoped by delivery-scoper, forks settled with Keith
+      2026-09-21.
+    acceptance_criteria:
+      - THE SYSTEM SHALL record each arrival of a dataset's data as an
+        arrival of that dataset alone, carrying its own identifier and
+        its own arrival timestamp.
+      - THE SYSTEM SHALL hold, for every dataset, the identity of its
+        current version - the one that arrived most recently.
+      - WHEN one dataset in a collection receives an arrival, THE SYSTEM
+        SHALL NOT create or imply an arrival for any other dataset.
+      - THE SYSTEM SHALL NOT require the datasets in a collection to
+        share an arrival identifier.
+      - WHERE several datasets arrived together as one delivery, THE
+        SYSTEM SHALL record the delivery they shared, so that a whole-
+        collection delivery stays distinguishable from several
+        coincidental ones.
+      - THE SYSTEM SHALL present a dataset's arrival history without
+        reference to any other dataset's arrivals.
+    non_functional_requirements:
+      - Birth Registrations must come out behaviourally unchanged - one
+        table, one dataset, and its 352 committed runs are the control
+        proving this model generalises rather than special-casing Child
+        Protection.
+      - No read-committed-history path may need a live connection to
+        anything under data/ to answer "when did this dataset last
+        arrive".
+      - Must stay cheap once a dataset has years of arrivals rather than
+        today's 18 - no walk of every arrival ever received to find the
+        current one.
+      - Any new entry point gets a mothman subcommand in the same change.
+    dependencies: [REQ-GEN-040]
+    decisions:
+      - Decided each arrival carries both its own per-dataset identifier
+        AND the delivery it came in, rather than per-dataset ids alone
+        (Keith, 2026-09-21). "The agency sent all six on Tuesday" cannot
+        be reconstructed later if it is not recorded now, and without it
+        a real whole-collection delivery is indistinguishable from six
+        coincidental arrivals.
+
+  - id: REQ-PIPE-035
+    title: QA runs against a warehouse composed of every table's current version
+    date_written: "2026-09-21"
+    story: >
+      As whoever maintains this pipeline, I want the warehouse the tools
+      run against assembled from the current version of every table, so
+      that a check comparing placements to carers reads what the agency
+      actually sent for both, rather than one delivery's frozen snapshot
+      or a warehouse missing half its tables.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/publishing-and-history.md item 6, 2026-09-20 - the
+      composed-warehouse half of the decided model, plus his own
+      correction that "good" is the wrong word.
+    acceptance_criteria:
+      - THE SYSTEM SHALL compose the warehouse a QA run executes against
+        from the current version of every table in scope.
+      - THE SYSTEM SHALL treat a table's most recent arrival as its
+        current version, whatever that arrival's QA status.
+      - THE SYSTEM SHALL NOT substitute an earlier version of a table on
+        the grounds that the current one failed its checks.
+      - THE SYSTEM SHALL record, for every QA run, which version of each
+        table it was composed from.
+      - IF a table a check depends on has never received an arrival,
+        THEN THE SYSTEM SHALL report that check as having no data,
+        naming the missing table, rather than evaluating it against an
+        absent table.
+      - THE SYSTEM SHALL evaluate a check once, against the composition
+        current at that moment, and SHALL NOT recompute it for a
+        historical arrival.
+      - THE SYSTEM SHALL permit composition to span the whole data
+        asset, across agencies and collections.
+    non_functional_requirements:
+      - CI must never compose, open or query a warehouse. Composition is
+        real-run-time work only, the same rule dataset_stats.py follows -
+        anything a later read needs is computed once while a legitimate
+        live connection exists, and committed.
+      - Composition cost must scale with the number of tables in scope,
+        not with the number of versions ever received.
+      - Seeded and deterministic, so a regenerate-and-diff stays a real
+        correctness check rather than noise.
+      - A whole-data-asset warehouse is the single most sensitive
+        artefact this design creates - in a real deployment it holds
+        Birth Registrations and Child Protection records together. Today
+        the data is synthetic; the requirement should say plainly what
+        it would be otherwise.
+    dependencies: [REQ-PIPE-034]
+    decisions:
+      - Decided the warehouse holds the CURRENT version always, never
+        the last green one (Keith, 2026-09-20). A red table is still the
+        table the agency sent. Holding one back would let the warehouse
+        and the real delivery disagree silently, and a green dashboard
+        built on last week's data is the worst failure this system could
+        have. "Good" was the wrong word in the original framing.
+      - Decided checks are evaluated once against the composition
+        current at the time, never recomputed point-in-time (Keith,
+        2026-09-21). Closest to how a real pipeline behaves. The cost,
+        accepted - a rebuild from committed history can replay recorded
+        results but cannot re-derive them.
+      - Decided composition may span the whole data asset rather than
+        being fenced per collection or per agency (Keith, 2026-09-21).
+        It is the only option supporting a check that spans agencies,
+        which is arguably the point of a multi-agency data asset.
+        Rejected per-collection, which covers every cross-table check
+        that exists today and would have kept the sensitive surface
+        smallest.
+
+  - id: REQ-PIPE-036
+    title: A dataset's own arrival triggers its own QA run
+    date_written: "2026-09-21"
+    story: >
+      As a data team leader, I want the checks for my dataset to run
+      when my dataset arrives, so that I am not waiting on five other
+      tables from other teams before I learn whether mine is any good.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/publishing-and-history.md item 6, 2026-09-20 - "per
+      dataset QA runs, each triggered by its own table's arrival".
+    acceptance_criteria:
+      - WHEN a dataset receives an arrival, THE SYSTEM SHALL run that
+        dataset's own checks against the composed warehouse.
+      - THE SYSTEM SHALL scope each tool invocation to the arriving
+        dataset, so that the tool's raw output describes that dataset
+        alone and needs neither duplicating nor filtering to be stored
+        per dataset.
+      - THE SYSTEM SHALL NOT require every table in a collection to have
+        arrived before running an arriving dataset's own single-table
+        checks.
+      - IF a QA run fails partway through, THEN THE SYSTEM SHALL fail
+        loudly, naming the dataset and the tool, and SHALL NOT record a
+        partial run as a complete one.
+      - THE SYSTEM SHALL keep each tool's raw output genuinely
+        unmodified, exactly as it does today.
+    non_functional_requirements:
+      - Whole-pipeline runtime must not materially regress from today's
+        ~45s for both datasets. Per-dataset runs multiply the number of
+        invocations, which is the obvious place for this to go wrong.
+      - Parallel per-dataset runs must not collide on shared scratch
+        paths. The dbt target_path race is the worked precedent, and
+        per-dataset runs create more of exactly that shape.
+      - Removing raw_output duplication is a measurable outcome -
+        raw_output is ~75% of each run's bytes today. Measure committed
+        size before and after rather than assuming.
+      - Invoked through mothman only.
+    dependencies: [REQ-PIPE-034, REQ-PIPE-035, REQ-GEN-040]
+
+  - id: REQ-QAC-037
+    title: A cross-table check belongs to the cross-table scope, not to one dataset
+    date_written: "2026-09-21"
+    story: >
+      As a data engineer looking at carers, I want a check about the
+      relationship between placements and carers filed with the checks
+      that span tables, so that I never see a check change on my
+      dataset's history on a day my dataset did not change.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/publishing-and-history.md item 6 answer 2,
+      2026-09-20 - rejected recording against the triggering dataset,
+      and rejected duplicating against every table a check touches.
+    acceptance_criteria:
+      - THE SYSTEM SHALL record a check spanning more than one dataset
+        against a cross-table scope of its own, not against any one of
+        the datasets it touches.
+      - THE SYSTEM SHALL NOT duplicate a cross-table check's result
+        against each dataset it touches.
+      - THE SYSTEM SHALL evaluate cross-table checks against the
+        composed warehouse, so that both sides are real current data.
+      - WHEN a dataset a cross-table check depends on receives an
+        arrival, THE SYSTEM SHALL re-evaluate that check, and SHALL NOT
+        re-evaluate cross-table checks that do not depend on it.
+      - THE SYSTEM SHALL record, against each cross-table result, which
+        version of each participating dataset it was evaluated against.
+      - WHEN a cross-table check's result changes without the dataset a
+        viewer is looking at having changed, THE SYSTEM SHALL name the
+        arrival that caused the re-evaluation.
+      - THE SYSTEM SHALL continue to present cross-table checks in the
+        section of their own that REQ-DASH-033 gives them.
+    non_functional_requirements:
+      - A cross-table result stops being a pure function of one arrival.
+        Its record must carry enough to reconstruct which versions it
+        saw, or the history becomes unreadable after the fact.
+      - No live data access from any path that reads this history back.
+      - This changes the shape of a stored result, so enumerate every
+        consumer mechanically and assert at the last transform before
+        the user - CLAUDE.md's standing lesson from item 74, where a
+        green data layer hid a false green in the render layer.
+    dependencies: [REQ-PIPE-035, REQ-PIPE-036, REQ-QAC-039]
+    decisions:
+      - Decided a cross-table result belongs to its own scope (Keith,
+        2026-09-20). Rejected recording it against the triggering
+        dataset, since a viewer of carers would never see a check
+        concerning carers change; and rejected duplicating it against
+        every table it touches, which means two records to keep in step
+        and a result appearing in a dataset's history without that
+        dataset changing.
+      - Decided re-evaluation is triggered by an arrival of a table the
+        check actually depends on, not by any arrival in the collection
+        and not on its own cadence (Keith, 2026-09-21). Precise, with no
+        re-evaluations recorded that nothing caused.
+    open_questions:
+      - Where the cross-table scope physically lives in qa_results/ and
+        what it is called. Left for delivery-architect - a storage-shape
+        question, with the thing that matters already settled.
+
+  - id: REQ-PIPE-038
+    title: qa_results is keyed per dataset, and existing history is rebuilt into that shape
+    date_written: "2026-09-21"
+    story: >
+      As whoever reads this QA history years from now, I want every
+      run's files under the dataset they actually describe, so that
+      finding one table's history is opening a directory rather than
+      opening a collection-level file and filtering it through a map
+      somebody maintained by hand.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/publishing-and-history.md item 6, 2026-09-20 -
+      "qa_results/ keyed per dataset, which is where this item started",
+      plus his explicit approval to rebuild committed history for both
+      datasets as a one-off.
+    acceptance_criteria:
+      - THE SYSTEM SHALL store every committed QA result under the
+        dataset it describes.
+      - THE SYSTEM SHALL store a cross-table result under its own
+        cross-table scope rather than under a dataset.
+      - THE SYSTEM SHALL key Child Protection and Birth Registrations by
+        the same rule, with no per-dataset special case.
+      - THE SYSTEM SHALL rebuild the existing committed history for both
+        datasets into the new shape, once.
+      - THE SYSTEM SHALL perform that rebuild locally, and CI SHALL NOT
+        regenerate, open or query any data to do it.
+      - THE SYSTEM SHALL preserve each rebuilt run's original run_by and
+        run_timestamp, and SHALL additionally record that the file was
+        rebuilt and when.
+      - WHEN the rebuild has completed, THE SYSTEM SHALL leave no
+        committed results in the old shape.
+      - THE SYSTEM SHALL expose the rebuild as a mothman subcommand
+        rather than a bare script.
+    non_functional_requirements:
+      - This rebuild is a one-off exception to CLAUDE.md's rule that
+        nothing in qa_results/ is ever regenerated away. It is granted
+        for this restructure and generalises to nothing else - the
+        requirement should say so in as many words, because the next
+        session will read the precedent, not the permission.
+      - The dashboard's activity feed derives "who QA'd what, when" from
+        run_by/run_timestamp plus git history. It must still build after
+        the rebuild, and the feed it produces should be inspected rather
+        than assumed.
+      - Measure committed size and file count before and after. CP goes
+        from 18 collection-level run directories to a per-dataset shape
+        while raw_output duplication disappears - both directions at
+        once, so the net is a real question rather than an obvious win.
+      - The rebuild must be idempotent and re-runnable, since it will be
+        got wrong at least once.
+      - Everything outside the genuinely changed shape should come out
+        equivalent. This repo is seeded and deterministic, so that is a
+        real proof rather than a smoke test.
+    dependencies: [REQ-PIPE-034, REQ-PIPE-036, REQ-QAC-037]
+    decisions:
+      - Decided rebuilt files carry BOTH their original run_by and
+        run_timestamp AND a record of the rebuild itself (Keith,
+        2026-09-21). Preserving the originals alone would have the
+        record quietly assert files were produced at times they were
+        not; stamping only the rebuild would collapse the activity feed
+        into one event. Two extra fields in ~1,850 JSON files is cheap.
+      - Measured before acting, so the exception's real cost is on
+        record - all 370 dataset_stats files carry a single run_by and
+        span about 26 hours on 2026-09-18 and 19. Machine-generated
+        history from one identity, not a long-accumulated multi-person
+        QA record.
+
+  - id: REQ-QAC-039
+    title: One hierarchy, stated once, including in a check's own identity
+    date_written: "2026-09-21"
+    story: >
+      As someone adding the next dataset, I want agency, collection and
+      dataset to mean one thing stated in one place, so that a check's
+      id, its dashboard URL and its stored results agree instead of each
+      carrying a different half of the truth.
+    moscow: must
+    status: not_started
+    source: >
+      Keith's own question, 2026-09-20 - "what is it that actually
+      groups Child Protection data together as a collection?" - and the
+      four inconsistencies the answer turned up, all re-verified against
+      real code. plans/publishing-and-history.md item 6.
+    acceptance_criteria:
+      - THE SYSTEM SHALL define each dataset's place in the hierarchy in
+        exactly one place, and SHALL resolve every consumer's need for
+        those identifiers through it.
+      - THE SYSTEM SHALL model a collection for Birth Registrations by
+        the same mechanism Child Protection uses, rather than skipping
+        the level or restating it in each tool module.
+      - THE SYSTEM SHALL carry exactly one identifier and one display
+        name for a collection, and SHALL NOT leave the contract's own
+        id, name and domain disagreeing with it.
+      - THE SYSTEM SHALL NOT retain a hand-maintained table-to-dataset
+        map.
+      - THE SYSTEM SHALL carry a collection segment in a check's own
+        identity, so that a check's collection is derivable from it.
+      - THE SYSTEM SHALL drop the separate table segment from a check's
+        identity, and SHALL NOT carry the data-asset segment in a
+        dashboard URL.
+      - WHEN check-lifecycle validation runs, IF a check's identity
+        disagrees with the single hierarchy definition, THEN THE SYSTEM
+        SHALL exit non-zero and name every offending check.
+      - THE SYSTEM SHALL change every affected check identity exactly
+        once, in the same change as the history rebuild, and SHALL NOT
+        leave two id shapes in committed history.
+    non_functional_requirements:
+      - Renaming a check_id needs its own explicit, recorded exception
+        to the 2026-09-16 rule that a check_id is permanently unique and
+        must never be changed - on the same terms as the qa_results
+        rebuild, not inherited from it by implication. 1,850 committed
+        history files, 129MB, carry today's ids.
+      - Every check's config_hash must be accounted for. REQ-QAC-023's
+        bar was byte-identical hashes; if a rename changes them, say so
+        up front rather than discovering it as "every check in the repo
+        reports as changed".
+      - check_id.py builds its regex from _SEGMENTS precisely so a
+        grammar change is one edit that propagates. Keep that property.
+      - Retiring the table-to-dataset map removes real ongoing upkeep -
+        the point, not a side effect.
+      - Nothing here needs a live connection to data/ or any warehouse.
+    dependencies: []
+    decisions:
+      - Decided to rename check_ids once, carrying BOTH the new
+        collection segment and running-thoughts item 22's own changes -
+        dropping the table segment and the data-asset prefix from the
+        URL (Keith, 2026-09-21). The history rebuild is the only moment
+        a rename is cheap, so doing it once beats justifying a second
+        rename later when it is not. Rejected renaming for collection
+        alone, and rejected leaving ids untouched and resolving
+        collection through the hierarchy definition - which would keep
+        the permanence rule intact but leave the id skipping a level the
+        rest of the system models.
+      - Recorded because the prose it replaces got it wrong - Birth
+        Registrations does NOT lack a collection in code. All four
+        qa_tools/bdm/run_*_bdm.py modules declare
+        COLLECTION_ID = "civil-registration", copy-pasted four times,
+        while orchestrate_bdm.py and build_results_from_history.py
+        declare only agency and dataset. BDM names its collection and
+        never passes it to write_qa_result, which is why it vanishes at
+        the storage layer. A duplication problem as much as an omission.
+    open_questions:
+      - validate_tail_uniqueness() guards a per-column tail collision.
+        Whether that stays meaningful once dataset and table collapse
+        should be settled while the grammar is open.
+
+  - id: REQ-GEN-040
+    title: The generator can deliver one table at a time
+    date_written: "2026-09-21"
+    story: >
+      As whoever is testing this, I want the synthetic generator able to
+      resend two of six tables and leave the other four alone, so that
+      the partial resupply this whole model exists for can actually be
+      exercised rather than only described.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/publishing-and-history.md item 6, 2026-09-20 - "yes,
+      that should be part of this work", on generate_cp_runs.py emitting
+      a whole delivery's worth of tables at once.
+    acceptance_criteria:
+      - THE SYSTEM SHALL generate an arrival for one dataset without
+        generating one for any other dataset in the same collection.
+      - THE SYSTEM SHALL generate at least one scenario in which some of
+        a collection's tables are resupplied and the rest are not.
+      - THE SYSTEM SHALL record each generated arrival against its own
+        dataset, and SHALL record the delivery it belonged to where it
+        belonged to one.
+      - WHERE a whole-collection delivery is what is being simulated,
+        THE SYSTEM SHALL still be able to generate one.
+      - THE SYSTEM SHALL keep generation seeded and reproducible - the
+        same seed produces the same arrivals in the same order.
+      - THE SYSTEM SHALL keep Birth Registrations' own daily generation
+        behaviourally unchanged.
+    non_functional_requirements:
+      - Determinism is the correctness check for this whole repo. A
+        change to arrival scheduling must keep a regenerate-and-diff
+        meaningful rather than turning every run into noise.
+      - The per-table dirty-injection presets must keep working when
+        only some tables are generated - the CP presets run over all six
+        on an amber or red run today, and a sibling call site has
+        already drifted out of step with that signature once.
+      - Generation runtime should not blow out - CP builds a
+        70,000-person population once per run today.
+      - Invoked through mothman only.
+    dependencies: []
+    open_questions:
+      - Whether the resupply chain model becomes per-table. A per-table
+        chain is the honest reading of partial resupply, but it is a
+        bigger change to a module Birth Registrations shares.
+
+  - id: REQ-DASH-041
+    title: Supply history and as-of viewing hold up under per-dataset arrivals
+    date_written: "2026-09-21"
+    story: >
+      As a data owner using the as-of picker, I want the supply history
+      to still read correctly when each table arrives on its own
+      schedule, so that the feature that survived a chain-building test
+      in the lab also survives on the page.
+    moscow: must
+    status: not_started
+    source: >
+      The stated limit of item 6's own verification, 2026-09-20 -
+      buildSupplyHistory was driven in a real browser against a doctored
+      dataset and held up, but whether the as-of picker and the rendered
+      supply-history UI also hold up is untested.
+    acceptance_criteria:
+      - WHEN a collection's datasets have different arrival histories,
+        THE SYSTEM SHALL render each dataset's supply history from that
+        dataset's own arrivals alone.
+      - THE SYSTEM SHALL offer as-of viewing across datasets whose
+        arrival dates do not line up.
+      - WHEN a viewer picks an as-of date, THE SYSTEM SHALL show each
+        dataset as at its own most recent arrival on or before that
+        date.
+      - IF a dataset has no arrival on or before the chosen as-of date,
+        THEN THE SYSTEM SHALL say so plainly rather than render an empty
+        or stale panel.
+      - THE SYSTEM SHALL render all of this with zero console errors in
+        a real browser.
+    non_functional_requirements:
+      - Verify at the render layer in a real browser, not at the data
+        layer. A correct builder says nothing about a template with its
+        own transform - the lesson REQ-DASH-032 and item 74 both landed
+        on, and the reason this requirement exists separately at all.
+      - Covered by both toolchains - tests-js for the template's inline
+        logic, tests/test_dashboard_e2e.py for the built page.
+      - The dashboard build path must stay a pure function of committed
+        qa_results history, with no live data access.
+      - A collection whose tables arrive on six different schedules
+        should not look like a bug.
+    dependencies: [REQ-PIPE-034, REQ-PIPE-038]
+    decisions:
+      - The chain-building half was verified before this was written -
+        buildSupplyHistory reads only the dataset object it is handed,
+        and cp-placements cut to 9 of its 18 runs produced 7 well-formed
+        chains carrying all 9 entries, zero console errors. This
+        requirement covers what that check did not reach.
+
   - id: REQ-DOCS-028
     title: A "What's New" feed written for the people who use the tool
     date_written: "2026-09-20"
