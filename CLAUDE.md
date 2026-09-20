@@ -498,35 +498,35 @@ Rough layout:
      *plus* vague high-level plan thoughts describing the same thing, where
      the two can disagree and nothing says which wins.
 
-  **Is deleting safe? For preservation yes, for RETRIEVAL only with one
-  extra step - so take the extra step.** Keith raised this directly
-  ("we can always reconstruct them from Git history, I guess. Does that
-  seem safe?"). Git does hold every deleted word, permanently, on a
-  public remote. But the real failure mode this project has already hit
-  is not "the text is gone", it is "nobody knew to go looking" - the
-  third `plans/INDEX.md` proof (`plans/tooling.md` #17) watched an agent
-  miss a decision that was sitting one level below what it read, and it
-  only recovered by luck. Finding a deleted plans entry needs
-  `git log -S"<phrase>"`, which needs you to already suspect the phrase,
-  which is nothing like grepping a live file. So: **the requirement that
-  replaces a deleted write-up names, in its own `source:` field, the
-  commit SHA the full text was deleted in.** Zero new machinery, and it
-  turns "search git and hope" into a direct pointer - the same move
-  `implemented_by` makes for code.
+  **Is deleting safe? Yes - but only because `decisions:` exists.**
+  Keith raised this directly ("we can always reconstruct them from Git
+  history, I guess. Does that seem safe?"). Git does hold every deleted
+  word permanently on a public remote, so nothing is lost. But the
+  failure this project has already hit is not "the text is gone", it is
+  "nobody knew to go looking" - the third `plans/INDEX.md` proof
+  (`plans/tooling.md` #17) watched an agent miss a decision sitting one
+  level below what it read, recovering only by luck. Finding deleted
+  prose needs `git log -S"<phrase>"` with a phrase you must already
+  suspect, which is nothing like grepping a live file.
 
-  **The other real risk, which the SHA does not fix: requirements must
-  absorb the REASONING, not just the behaviour.** A requirement holds
-  what the system shall do. A `done` write-up in this project routinely
-  holds why a different approach was rejected, what bug was found on the
-  way, and what was verified and how - and `CLAUDE.md`'s own reason for
-  the read-everything rule is "don't re-derive a decision that's already
-  recorded there". `acceptance_criteria` will not carry that;
-  `non_functional_requirements`, `open_questions`, `evidence` and
-  `source` carry some of it. **Before deleting, read the write-up and
-  ask what it knows that the requirement does not** - if the answer is
-  "the reason we did not do it the other way", that belongs in the
-  requirement before the prose goes. Deleting is cheap to do and
-  expensive to notice you got wrong.
+  His own answer to that, the same conversation, and it is the thing
+  that makes this work: **`requirements.yaml`'s `decisions:` field** -
+  short items recording what was decided and what was rejected, "our
+  collective memory of the thinking that went into that requirement, so
+  it doesn't have to be taken back out of git history or kept in a
+  massive plan file." Required once a requirement is `built`, CI-gated,
+  no exceptions.
+
+  So the rule when deleting is concrete rather than a matter of care:
+  **read the write-up and move anything it knows that the requirement
+  does not into `decisions:` BEFORE the prose goes.** A requirement
+  holds what the system shall do; a `done` write-up routinely holds why
+  a different approach was rejected, which is exactly what gets
+  re-derived otherwise - `CLAUDE.md`'s own reason for the
+  read-everything rule is "don't re-derive a decision that's already
+  recorded there". If a decision only exists in the prose, deleting the
+  prose deletes it in practice even though git has the bytes. Deleting
+  is cheap to do and expensive to notice you got wrong.
 
   Sequencing (Keith's own words, `plans/running-thoughts.md` #13):
   requirements first, deletion second, and the `CHANGELOG.md` rewrite as

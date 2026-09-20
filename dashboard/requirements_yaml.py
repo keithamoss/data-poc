@@ -43,6 +43,10 @@ _DEFAULTS = {
     # it. Required once `status` is "built"; see requirements.yaml's own
     # header comment and validate_requirements.py for the real rules.
     "implemented_by": [],
+    # 2026-09-20 (Keith) - decisions taken and pathways rejected, so the
+    # reasoning lives with the requirement instead of in a plans file
+    # that is now deleted once its requirements exist.
+    "decisions": [],
 }
 
 

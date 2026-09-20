@@ -262,7 +262,8 @@ def validate(requirements: list[dict]) -> list[str]:
             errors.append(f"{where}: date_written {date_written!r}, if present, must be a real "
                            f"\"YYYY-MM-DD\" date")
 
-        for field_name in ("non_functional_requirements", "open_questions", "evidence"):
+        for field_name in ("non_functional_requirements", "open_questions", "evidence",
+                           "decisions"):
             errors.extend(_valid_string_list(r.get(field_name), field_name, where))
 
         # `implemented_by` - where the requirement actually LIVES, as opposed
@@ -272,6 +273,19 @@ def validate(requirements: list[dict]) -> list[str]:
         # with no forcing function stays at zero use however well its
         # schema is written. A CI gate that will not go green IS the
         # forcing function.
+        # `decisions` - what was decided and what was rejected, in the
+        # requirement itself rather than in a plans write-up. Required
+        # once `built` (Keith, 2026-09-20, no exceptions) because this is
+        # the field that makes deleting plans prose safe rather than
+        # merely reversible: git preserves a deleted write-up, but
+        # finding one needs `git log -S"<phrase>"` with a phrase you must
+        # already suspect. Sits opposite `open_questions` - that holds
+        # the forks NOT resolved, this holds the ones that were.
+        if status == "built" and not (r.get("decisions") or []):
+            errors.append(f"{where}: status is 'built' but decisions is empty - "
+                           f"a built requirement needs to record what was decided "
+                           f"and what was rejected on the way")
+
         # `evidence` - a MEASURED result showing the requirement holds.
         # Required once `built` too (Keith, 2026-09-20, asked directly
         # whether a requirement with no obvious measurement should get an

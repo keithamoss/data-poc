@@ -3296,6 +3296,14 @@ function renderRequirementsPanel(){
           <b>Open questions:</b>
           <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${r.open_questions.map(q=>`<li>${q}</li>`).join("")}</ul>
         </div>` : "";
+    // Decisions render before the evidence/tests/links block: they are
+    // the reasoning, and a reader scanning a requirement wants to know
+    // WHY it looks like this before being told what proves it works.
+    const decisions = (r.decisions||[]).length
+      ? `<div style="margin-top:10px; padding:8px 10px; background:var(--surface-alt); border-radius:6px; font-size:12px;">
+          <b>Decisions:</b>
+          <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${r.decisions.map(d=>`<li>${d}</li>`).join("")}</ul>
+        </div>` : "";
     // "Implemented in" sits directly above "Verified by" deliberately -
     // they are the two halves of the same question (where it lives, what
     // proves it works), and reading them apart is what let the register
@@ -3320,6 +3328,7 @@ function renderRequirementsPanel(){
         <div style="font-size:13px; color:var(--ink-muted); margin-bottom:10px;">${r.story}</div>
         <ul style="margin:0; padding-left:18px; font-size:12.5px; line-height:1.5;">${criteria}</ul>
         ${nfrs}
+        ${decisions}
         ${impl}
         ${tests}
         ${evidence}

@@ -24,6 +24,8 @@ def _valid_entry(**overrides):
         # base fixture, which IS built, has to carry them to stay valid.
         "implemented_by": ["qa_tools/common/validate_requirements.py::validate"],
         "evidence": ["2026-09-20: 27 requirements validate with zero errors."],
+        "decisions": ["Kept the register as YAML rather than a database, so it "
+                      "diffs and reviews like the code it describes."],
     }
     entry.update(overrides)
     return entry
@@ -332,3 +334,31 @@ def test_a_built_requirement_must_carry_a_measured_result():
 def test_evidence_is_optional_until_a_requirement_is_built():
     assert validate([_valid_entry(status="not_started", linked_tests=[],
                                    implemented_by=[], evidence=[])]) == []
+
+
+# ---- decisions -------------------------------------------------------
+#
+# Keith's idea, 2026-09-20, and the thing that makes deleting plans prose
+# safe rather than merely reversible. Git preserves a deleted write-up,
+# but finding one needs `git log -S"<phrase>"` with a phrase you must
+# already suspect. This field moves the reasoning INTO the requirement -
+# "decisions taken, other pathways rejected... our collective memory of
+# the thinking that went into that requirement" - so it does not have to
+# be recovered from history or kept in a massive plans file.
+#
+# It sits opposite `open_questions`: that field holds the forks NOT
+# resolved, this one holds the forks that were.
+
+def test_a_built_requirement_must_record_its_decisions():
+    errors = validate([_valid_entry(decisions=[])])
+    assert any("decisions" in e for e in errors), errors
+
+
+def test_decisions_is_optional_until_a_requirement_is_built():
+    assert validate([_valid_entry(status="not_started", linked_tests=[],
+                                   implemented_by=[], evidence=[], decisions=[])]) == []
+
+
+def test_decisions_must_be_a_list_of_non_empty_strings():
+    errors = validate([_valid_entry(decisions=["   "])])
+    assert any("decisions" in e for e in errors), errors

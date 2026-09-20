@@ -145,6 +145,37 @@
 #                        only in a comment cannot pass. Any other file
 #                        type may be a bare path only: a `::` on it is
 #                        rejected rather than silently unchecked.
+#   decisions:           what was DECIDED and what was REJECTED on the
+#                        way - short one-or-two-sentence items, a list.
+#                        Added 2026-09-20 (Keith): "decisions taken,
+#                        other pathways rejected... our collective
+#                        memory of the thinking that went into that
+#                        requirement, so it doesn't have to be taken
+#                        back out of git history or kept in a massive
+#                        plan file."
+#                        REQUIRED once `status` is "built", no
+#                        exceptions. This is the field that makes
+#                        deleting superseded plans prose SAFE rather
+#                        than merely reversible: git preserves a deleted
+#                        write-up, but finding one needs
+#                        `git log -S"<phrase>"` with a phrase you must
+#                        already suspect, which is nothing like grepping
+#                        a live file.
+#                        It sits opposite open_questions - that holds
+#                        the forks NOT resolved, this holds the ones
+#                        that were. Prefer "Decided X rather than Y,
+#                        because Z": a rejected alternative is the part
+#                        a future reader will otherwise re-derive.
+#                        Deliberately FLAT, not nested. Every other list
+#                        field here is flat strings, and nesting buys an
+#                        authoring judgement per entry that one-or-two
+#                        sentence items do not need.
+#                        Distinct from non_functional_requirements,
+#                        which holds CONSTRAINTS the requirement must
+#                        respect. Several entries there were really
+#                        decisions, filed under NFR because there was
+#                        nowhere else for them; those moved here on
+#                        2026-09-20.
 #   evidence:            a MEASURED result that shows this requirement
 #                        holds - narrowed to that, deliberately, on
 #                        2026-09-20 (Keith). Verification has four
@@ -205,6 +236,11 @@ requirements:
         qa_results/registry-services/birth-registrations/, each holding real
         output from all four tools. 133 Birth Registrations check
         definitions parse across dbt, Soda and the ODCS contract.
+    decisions:
+      - >
+        Ran the four real tools rather than reimplementing their logic. An earlier engines/ directory of hand-written Python/DuckDB stand-ins was deleted once it drifted out of sync with the real tools it imitated.
+      - >
+        Switched to dbt_utils macros (accepted_range, expression_is_true, recency) rather than hand-written equivalents, accepting a one-time `dbt deps` setup step as the cost.
     implemented_by:
       - qa_tools/bdm/orchestrate_bdm.py::run_pipeline
       - qa_tools/bdm/run_dbt_bdm.py::evaluate_dbt_bdm
@@ -240,6 +276,11 @@ requirements:
         Child Protection check definitions parsing across Soda and the ODCS
         contract - including 10 cross-table sql rules (7 referential-integrity,
         3 business rules) that no single-table check could express.
+    decisions:
+      - >
+        Modelled Child Protection as one collection of six tables, with qa_results/ nesting kept at dataset level rather than table level - so a collection reads as one thing that was QA'd, not six.
+      - >
+        Kept cross-table rules (referential integrity, business rules) as real checks rather than deferring them, since a multi-table collection whose only checks are per-column would not have tested the thing that makes it different from a single feed.
     implemented_by:
       - qa_tools/cp/orchestrate_cp.py::run_pipeline_cp
       - qa_tools/cp/run_dbt_cp.py::evaluate_dbt_cp
@@ -270,6 +311,11 @@ requirements:
         2026-09-19: 30,561 statuses rendered on the live published site,
         each compared against the verdict its own tool recorded. Zero
         disagreements; zero results missing a verdict.
+    decisions:
+      - >
+        A check's status is whatever its own tool recorded, never recomputed downstream from thresholds. The alternative silently rendered a check with 14 real violations green - a false green, introduced by the fix meant to prevent one.
+      - >
+        Chose one drill-down spine (Agency to Collection to Dataset to Column) over per-tool views, so a column's disagreeing tools sit side by side rather than in separate tabs.
     implemented_by:
       - dashboard/qa-reporting-dashboard.template.html::rollupStatuses
       - dashboard/qa-reporting-dashboard.template.html::navigate
@@ -304,6 +350,13 @@ requirements:
         data/, manifest.json and results_bdm.json diffed - byte-identical,
         confirming the rebuild is deterministic rather than coincidentally
         equal on one run.
+    decisions:
+      - >
+        Scope is tool RESULTS only, never the underlying data records - confirmed explicitly rather than assumed, since storing rows would make the history a second copy of the data.
+      - >
+        Retention is forever, and the format is each tool's own native output, so a future reader is not dependent on a reshaping step written today still being understood.
+      - >
+        Stores raw_output AND a resolved `verified` block side by side. dbt's known-bad failure counts and Soda's missing row totals only resolve correctly through a live warehouse connection, which will not exist once the run is over.
     implemented_by:
       - qa_tools/common/qa_results_writer.py::write_qa_result
       - qa_tools/common/qa_results_reader.py::read_qa_results
@@ -330,6 +383,13 @@ requirements:
         2026-09-16: the whole rebuild sequence rehearsed in an isolated clean
         git clone with no local state, matching a real CI checkout. Both gate
         scripts passed end to end.
+    decisions:
+      - >
+        No manual publish-from-local path exists, in any form - not as a routine mechanism and not as a break-glass, because a break-glass path is the one that gets used under pressure.
+      - >
+        CI deploys but never commits back to git. The earlier commit-back step was removed after it raced with human pushes.
+      - >
+        CI must never open or query anything under data/, even though this PoC's data is synthetic. A pipeline that is only safe because today's data happens to be fake is one accident away from not being safe.
     implemented_by:
       - .github/workflows/deploy-pages.yml
       - dashboard/check_dashboard_renders.py::main
@@ -359,6 +419,15 @@ requirements:
         2026-09-20: check-lifecycle validation parses 258 check definitions
         across all four tools and both datasets, reporting zero errors - no
         duplicate check_id, no config change without a changelog entry.
+    decisions:
+      - >
+        Retirement is an explicit declaration, never inferred from a check's absence in a recent run - absence is ambiguous, and a check that silently stopped running looks identical to one that was retired.
+      - >
+        A check with no check_id is a hard error rather than a silent skip, so the gate cannot be bypassed by omission.
+      - >
+        Cosmetic fields (name, description) are deliberately outside the config hash, so proofreading an explanation does not read as a definition change needing a changelog entry.
+      - >
+        check_ids are tool-qualified by default rather than only where a collision happened, so the scheme does not depend on noticing collisions.
     implemented_by:
       - qa_tools/common/check_lifecycle.py::CheckMetadata
       - qa_tools/common/check_lifecycle.py::parse_dbt_check_metadata
@@ -390,6 +459,11 @@ requirements:
         minutes' latency, Child Protection quarterly (Feb/May/Aug/Nov, day 1)
         at 09:00 with 480. One code path, two real cadences, so the handling
         is cadence-aware rather than daily-only with an exception.
+    decisions:
+      - >
+        A single global as-of day-count was tried, corrected from per-dataset to data-asset-level, then removed entirely - a flat day-count was the wrong shape, not the wrong number. A quarterly dataset's real ~92-day delivery gap made it read 'no data' for roughly two-thirds of every quarter.
+      - >
+        Replaced by per-dataset cadence declared in each dataset's own ODCS contract, so 'no data' means nothing has landed in the CURRENT expected cycle rather than the last delivery being more than N days old.
     implemented_by:
       - pipeline/cadence.py::parse_cadence_from_contract
       - pipeline/cadence.py::cycle_start
@@ -419,6 +493,9 @@ requirements:
         2026-09-18: build_results_from_history.py's history-only rebuild
         produced byte-identical counts to the live orchestrator run, for
         both datasets.
+    decisions:
+      - >
+        Derived resupply chains from real, observable facts in the data rather than from the synthetic generator's own bookkeeping, so the logic would still work against a real feed that has no generator behind it.
     implemented_by:
       - dashboard/qa-reporting-dashboard.template.html::renderSupplyHistorySection
       - pipeline/build_dashboard_data.py::build
@@ -443,6 +520,11 @@ requirements:
         each carrying run_by and run_timestamp from file content and
         commit_sha/committed_at from a single walk of that dataset's git
         history.
+    decisions:
+      - >
+        Grouped feed events by run_timestamp rather than by git commit, since one commit can legitimately bundle several datasets' runs.
+      - >
+        committed_at and commit_sha are resolved by walking git history rather than self-recorded before pushing, because a locally-made commit can still be rebased and have its SHA and date rewritten before it reaches the shared branch.
     implemented_by:
       - qa_tools/common/changelog.py::build_changelog
       - qa_tools/common/git_identity.py::get_run_by
@@ -466,6 +548,11 @@ requirements:
         2026-09-20: parse_changelog() extracts 8 dated release sections from
         CHANGELOG.md, embedded at build time so the panel needs no runtime
         fetch.
+    decisions:
+      - >
+        Kept the tool's own development history as a separate feed from the QA-publish activity feed. They answer different questions and merging them would have buried both.
+      - >
+        CHANGELOG.md stays hand-curated prose rather than a generated commit dump, so not every commit earns an entry.
     implemented_by:
       - dashboard/changelog_md.py::parse_changelog
       - dashboard/embed_dashboard_data.py::embed
@@ -492,6 +579,11 @@ requirements:
         2026-09-19: real CI coverage command (--cov=qa_tools --cov=pipeline
         --cov=generator --cov=dashboard) measured 94.76%, against the 92%
         floor pyproject.toml enforces.
+    decisions:
+      - >
+        The coverage floor is a measured number rather than a guessed round one, so it cannot be quietly satisfied by a threshold nobody checked against reality.
+      - >
+        Parallel test execution became the default once the reason for staying serial - debuggability - turned out not to hold, since pytest-xdist silently falls back to serial when --pdb is passed.
     implemented_by:
       - .github/workflows/test.yml
       - pyproject.toml
@@ -516,6 +608,11 @@ requirements:
         measured by resolving getComputedStyle on the real built page in both
         themes and diffing - zero tokens fall through to their light value, so
         the theme is complete rather than partial.
+    decisions:
+      - >
+        Dark mode is a real toggle with a stored preference rather than only following the OS setting, so a viewer can override their system on one device.
+      - >
+        A shared ?theme= link never forces the visitor's theme - localStorage stays the single source of truth for what renders on load.
     implemented_by:
       - dashboard/qa-reporting-dashboard.template.html::applyTheme
 
@@ -537,6 +634,11 @@ requirements:
       - >
         2026-09-20: 6 committed .html.gz snapshots, each a self-contained copy
         openable years later with nothing but a browser.
+    decisions:
+      - >
+        Snapshots are committed and accumulate, deliberately unlike every other generated artifact in this repo, because their whole purpose is to still exist years later.
+      - >
+        Each snapshot is fully self-contained and openable from a plain file:// path with no server and no network, so it survives the tooling that produced it.
     implemented_by:
       - dashboard/snapshot_dashboard.py::take_snapshot
       - dashboard/snapshot_dashboard.py::sync_local_snapshots
@@ -562,6 +664,11 @@ requirements:
         2026-09-20: 27 requirements validate with zero errors, every
         linked_tests and implemented_by entry resolving to a real file or a
         real AST-verified symbol.
+    decisions:
+      - >
+        Linkage to tests is enforced by CI against a real AST parse rather than a string match, because a decorative reference to a test that does not exist is the exact failure this register was built to prevent.
+      - >
+        The register describes the PRODUCT, not this project's own working process, so conventions about how we work stay in plans files rather than becoming pseudo-requirements.
     implemented_by:
       - requirements.yaml
       - dashboard/requirements_yaml.py::parse_requirements
@@ -719,16 +826,6 @@ requirements:
       - Every check's config_hash must be byte-identical before and
         after. This repo is seeded and deterministic, so that is a real
         correctness proof rather than a smoke test.
-      - No new hand-authored field beyond the SQL-rule name - the column
-        comes from schema structure, not from a new property (Keith's
-        own call, 2026-09-20, after establishing the contract can
-        express it natively).
-      - The grammar module parses and validates only - it does NOT build
-        check_ids. Keith raised a builder and then declined it on the
-        real numbers on 2026-09-20 - 254 check_ids are authored in YAML
-        where a Python builder cannot help, against 3 in production
-        Python and 32 in tests. Correctness everywhere comes from the
-        validator, not from a constructor serving 1% of cases.
       - Nothing here needs a live connection to data/ or any warehouse.
       - KNOWN GAP, deliberately not resolved here - the grammar this
         defines has no collection segment, while a dashboard URL is
@@ -753,6 +850,18 @@ requirements:
         apart. A collision is a hard failure at authoring time - not a
         fallback to the full check_id for the colliding check, which
         would put two URL shapes on one page and hide the problem.
+    decisions:
+      - >
+        Took the column from the contract's own schema structure rather
+        than adding a new hand-authored property - considered and
+        rejected once the contract was confirmed able to express it
+        natively (Keith, 2026-09-20).
+      - >
+        Rejected a check_id BUILDER in favour of a validator only. Keith
+        raised it, then declined it on the real numbers: 254 check_ids
+        are authored in YAML where a Python constructor cannot help,
+        against 3 in production Python. Correctness everywhere comes
+        from validation, not from a constructor serving 1% of cases.
     dependencies: []
     linked_tests: []
     open_questions:

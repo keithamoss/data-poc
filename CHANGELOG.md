@@ -142,6 +142,29 @@ edited for a punchier, friendlier read than a bare commit log.
   was checked against its source, and none was invented to make the
   gate pass.
 
+- **12:57pm** — **Requirements Now Carry the Reasoning, Not Just the Rules** **[Docs & process]**
+  A requirement said what the system shall do, what verifies it, where
+  it lives and what measured result proves it. It never said **why it
+  looks like that** — which approach was taken, and which was rejected.
+  That reasoning lived in long `plans/*.md` write-ups, and the plan is
+  to delete those once requirements exist for everything.
+  A new `decisions:` field holds it: short items recording what was
+  decided and what was rejected, in Keith's words *"our collective
+  memory of the thinking that went into that requirement, so it doesn't
+  have to be taken back out of git history or kept in a massive plan
+  file."* Required once a requirement is `built`, CI-gated, no
+  exceptions — because this is the field that makes deleting superseded
+  prose **safe** rather than merely reversible. Git preserves a deleted
+  write-up, but finding one needs `git log -S` with a phrase you must
+  already suspect.
+  It sits opposite `open_questions:` — that holds the forks not
+  resolved, this holds the ones that were. It also had real content
+  waiting: several entries filed under `non_functional_requirements`
+  were decisions in disguise, including a check_id *builder* that was
+  raised and then declined on the numbers — 254 ids authored in YAML
+  where a Python constructor cannot help, against 3 in production
+  Python. Those moved across. All 14 built requirements backfilled.
+
 ### Fixed
 - **12:05pm** — **Index Lines Stopped One Clause Before the Decision** **[Docs & process]** **[Testing & dev tooling]**
   A scoping run reported two index lines that cut off exactly where the
