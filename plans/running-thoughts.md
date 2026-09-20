@@ -132,6 +132,34 @@ this item's own roles (today just labels driving ticket assignment/the
 does). Captured here so it survives compaction - ask him for this
 directly next time it's relevant, don't let it quietly drop.
 
+**PART-ANSWERED 2026-09-20 (Keith, in passing, while settling the
+changelog rewrite's audience).** The real user tiers, in his own words
+and roughly in seniority order:
+
+1. **Executive** - the tier the dashboard's own top level is already
+   named after.
+2. **Director** - Keith himself.
+3. **Manager**.
+4. **Senior staff** - "so like senior data engineers".
+5. **Operators** - "the actual operators of the tools, so the data
+   engineers".
+6. **Client services / customer service** - flagged as a *maybe*
+   ("there's maybe another audience"), not confirmed. Genuinely
+   different from the other five: not a producer or reviewer of data
+   quality, but someone fielding questions from whoever consumes it.
+   Worth confirming before designing anything for them.
+
+Still a list of labels, not personas - what is missing is what each
+actually DOES day to day, which is the part Keith's original offer
+above covers and this does not. But it settles the shape: **six tiers,
+not the three role labels `contract/people.yaml` carries today**, and
+the dashboard's existing Executive/Agency/Dataset/Column tiers are a
+VIEW hierarchy that happens to share a word with tier 1, not a user
+model. Do not assume those two line up.
+
+Landed here rather than in a new item because it is the direct answer
+to this item's own open offer.
+
 3. **[done, 2026-09-18]** **[Dashboard UI]** Gamification MVP on the reporting dashboard.
 
 A small MVP that celebrates staff turning QA around fast, or
@@ -1217,3 +1245,71 @@ the kind of thing a human-first document does not want prominent. Scope
 with Keith before building - this depends on #13's rewrite landing
 first, and its shape should probably be decided as part of it rather
 than bolted onto today's changelog.
+
+15. **[todo, 2026-09-20]** **[Docs & process]** Rewrite `CHANGELOG.md` from the ground up - human-first, structured, modelled on Mapa's "What's New".
+
+The concrete version of #13's "changelog will get a lot more shorter, a
+lot more for humans first". Keith pointed at his own
+`keithamoss/mapa` repo as the model - specifically
+`frontend/src/features/whatsNew/whatsNew.json`, rendered as an in-app
+"What's New" page that also tracks how many releases each user has
+already seen.
+
+**What Mapa does, read at source (commit 1d0738b) rather than
+described:**
+
+```json
+{
+  "version": "Cradle of Fur",
+  "date": "17 May, 2024",
+  "summary": "Several major new features, a few smaller features, and a whole pile of bug fixes.",
+  "changes": {
+    "highlights": [["Head west, young lady", "The map now lets you choose whether you want to follow your heading / compass bearing (the default), or whether the map should stay pointed to the north."]],
+    "bugs fixed":  [["Begone, weird highlighting bug", "Long-pressing on the part of the map where your GPS location marker is shown no longer weirdly highlights the whole map as if it was a piece of text."]]
+  }
+}
+```
+
+Five things it does that this project's `CHANGELOG.md` does not:
+releases are **named, not numbered** ("Cradle of Fur"); a single
+`summary` sentence characterises the whole release so a reader can stop
+there; categories are **human words** (`highlights`, `bugs fixed`) not
+Keep-a-Changelog's `Added`/`Fixed`/`Changed`; every entry is a
+**[headline, description] pair** with a playful, memorable headline
+("Missing heros", "No menu for you", "What's in a name?"); and the
+voice is **second person and outcome-only** - "You can now quickly add
+symbols right from the map" - one or two sentences, never how it was
+built.
+
+**Decided by Keith, 2026-09-20:**
+- **Same audience, same tone.** "The audience is the same. Real end
+  users in this case are my colleagues, but we can use the same kind of
+  tone and language as Mapa does, that's fine."
+- **It becomes structured data.** "I don't care if it's JSON or YAML or
+  whatever, but structure would be good." Note `CHANGELOG.md` is
+  already effectively a data source wearing a Markdown coat -
+  `dashboard/changelog_md.py` parses it into `RELEASE_NOTES` for the
+  Release Notes panel, extracting headline, components and prose. Mapa
+  just skipped the coat.
+
+**Still open, not decided:** whether the `**[Component]**` tags survive
+(the dashboard renders a per-component emoji today, and the taxonomy is
+CI-checked against `docs/components.md` by
+`tests/test_component_taxonomy_consistency.py` - so dropping them from
+the changelog is not free); whether releases are named per-release the
+way Mapa's are, and who names them; whether the six user tiers logged
+in #2 above mean ONE feed or several, since an executive and a data
+engineer plainly want different entries; and what happens to the
+existing ~100 entries, which is the rewrite's real cost.
+
+**What makes this safe to do at all** is that the engineering detail
+currently in `CHANGELOG.md` now has a better home: `evidence:` holds
+measured results and `decisions:` holds the reasoning, both CI-required
+on every built requirement (`plans/tooling.md` #18/#20). So the rewrite
+drops that detail rather than needing to relocate it. Do not start
+before checking that holds for the entries being rewritten.
+
+**A standing hold is in force until this lands** - `CLAUDE.md` carries
+a bullet telling every session to PAUSE before writing a new
+`CHANGELOG.md` entry and ask Keith first, explicitly overriding the
+same-push rule below it. Delete that bullet as part of this work.
