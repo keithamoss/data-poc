@@ -13,6 +13,7 @@ import textwrap
 import pytest
 
 import yaml
+from pydantic import ValidationError
 
 from dashboard.changelog_yaml import parse_changelog
 from qa_tools.common.validate_changelog import (
@@ -75,25 +76,29 @@ def test_parses_a_day_into_the_shape_the_dashboard_renders(tmp_path):
 def test_the_files_own_order_is_never_re_sorted(tmp_path):
     """Authored newest-first, which IS the intended reading order - the
     same convention requirements_yaml.py follows."""
-    feed = parse_changelog(_write(tmp_path, """
-        releases:
-          - date: "2026-09-20"
-            summary: Later.
-            changes: []
-          - date: "2026-09-18"
-            summary: Earlier.
-            changes: []
-    """))
+    feed = parse_changelog(_write(
+        tmp_path, _ONE_DAY + _ONE_DAY.split("releases:")[1].replace(
+            "2026-09-20", "2026-09-18")))
     assert [e["date"] for e in feed["entries"]] == ["2026-09-20", "2026-09-18"]
 
 
-def test_a_missing_optional_field_defaults_rather_than_raising(tmp_path):
-    """This module renders whatever is really there; enforcing the
-    schema is validate_changelog.py's job, as its own CI gate."""
-    feed = parse_changelog(_write(tmp_path, 'releases:\n  - date: "2026-09-20"\n'))
-    (entry,) = feed["entries"]
-    assert entry["summary"] == ""
-    assert entry["sections"] == []
+def test_a_half_written_day_raises_rather_than_rendering_empty(tmp_path):
+    """The behaviour change, 2026-09-20 (Keith: "I don't mind if the
+    parsers would choke and throw an error"). This used to default a
+    missing summary to "" and a missing `changes` to [], so a day with
+    nothing in it rendered as a day with nothing in it - which reads to
+    a colleague as "nothing happened", not "someone forgot to finish
+    writing this"."""
+    with pytest.raises(ValidationError) as exc:
+        parse_changelog(_write(tmp_path, 'releases:\n  - date: "2026-09-20"\n'))
+    assert "summary" in str(exc.value)
+
+
+def test_a_misspelt_field_name_raises_rather_than_being_ignored(tmp_path):
+    with pytest.raises(ValidationError) as exc:
+        parse_changelog(_write(tmp_path, _ONE_DAY.replace(
+            "description:", "descrpition:")))
+    assert "descrpition" in str(exc.value)
 
 
 # ---- validation ------------------------------------------------------

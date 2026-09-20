@@ -124,3 +124,47 @@ def test_the_vocabularies_have_one_home():
     assert MOSCOW == ("must", "should", "could", "wont")
     assert REQUIREMENT_STATUSES == ("not_started", "in_progress", "built")
     assert CHANGELOG_CATEGORIES == ("New", "Improved", "Fixed")
+
+
+# ---- a key written with nothing in it (Keith's call, 2026-09-20) -----
+
+@pytest.mark.parametrize("blank", ["", "   ", "\n  \n"])
+def test_an_optional_field_written_blank_is_rejected(blank):
+    """"I'm not sure about accepting that" - Keith, on an earlier cut
+    that let `source: "   "` through.
+
+    The argument for accepting it was that whitespace stripping makes it
+    identical to an absent field, so the intent must be identical too.
+    It is not: a blank key is someone who started filling it in and
+    stopped, and a file that cannot say so has the same silent shape as
+    the duplicate mapping key that prompted this work."""
+    with pytest.raises(ValidationError) as exc:
+        Requirement(**_REQ, source=blank)
+    assert "blank" in str(exc.value)
+
+
+def test_an_omitted_optional_field_is_still_perfectly_legal():
+    """The other half of the rule, and the reason it is a
+    before-validator: pydantic does not validate a field that was never
+    supplied, so absent needs no special case."""
+    assert Requirement(**_REQ).source == ""
+
+
+def test_a_required_field_written_blank_is_rejected():
+    with pytest.raises(ValidationError) as exc:
+        Requirement(**{**_REQ, "title": "  "})
+    assert "title" in str(exc.value)
+
+
+def test_a_blank_entry_inside_a_list_is_rejected():
+    with pytest.raises(ValidationError) as exc:
+        Requirement(**{**_REQ, "acceptance_criteria": ["A real one.", "  "]})
+    assert "acceptance_criteria" in str(exc.value)
+
+
+def test_a_blank_changelog_field_is_rejected():
+    """The rule lives on the shared base, so it covers both files rather
+    than being restated per model."""
+    with pytest.raises(ValidationError) as exc:
+        Changelog(**_FEED, intro="   ")
+    assert "blank" in str(exc.value)

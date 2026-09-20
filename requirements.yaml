@@ -1478,6 +1478,93 @@ requirements:
         survived, since the emoji removal was deliberately scoped to one
         surface of two.
 
+  - id: REQ-TEST-030
+    title: One command that runs every gate this repo has
+    date_written: "2026-09-20"
+    story: >
+      As someone about to push a change, I want a single command that
+      runs every check this repo has, so that a suite I did not think to
+      run is not mistaken for a suite that passed.
+    moscow: should
+    status: built
+    source: >
+      Keith, 2026-09-20, after a session found that the JavaScript suite
+      does not exercise what CI exercises and kept being skipped -
+      "happy to add in npm test as a default thing that we run", and,
+      on the obvious alternative, "I don't want to maintain file lists
+      and so forth. That's messy."
+    acceptance_criteria:
+      - THE SYSTEM SHALL provide a single command that runs the Python
+        linter, the YAML linter, both register gates, the JavaScript
+        suite and the Python suite.
+      - WHEN a gate fails, THE SYSTEM SHALL continue running the
+        remaining gates and then name every gate that failed.
+      - WHEN a required toolchain is not installed, THE SYSTEM SHALL
+        report that gate as not run, and SHALL NOT report the overall
+        result as a pass.
+      - WHERE the Python suite has already been run selectively, THE
+        SYSTEM SHALL offer a way to skip it WHILE still running every
+        other gate.
+      - THE SYSTEM SHALL show each gate's own output as it runs, not
+        only a summary afterwards.
+    non_functional_requirements:
+      - Runs the same gates CI runs, so a green result here is real
+        evidence about CI rather than a different set of checks that
+        shares some names.
+      - Adding a gate is one edit in one place.
+      - Skipping the Python suite leaves a pass that still completes in
+        seconds, so the cheap path stays worth taking.
+    decisions:
+      - >
+        Rejected the obvious mechanism - a rule mapping changed files to
+        the suites they affect - on Keith's explicit instruction. Such a
+        list is wrong the moment someone adds a file and nothing tells
+        you it has gone stale, which is the same rot this project
+        already watched happen to the `touches:` lines in plans/*.md.
+        A command that always runs everything has nothing to keep up to
+        date.
+      - >
+        Every gate runs even after one fails, rather than stopping at
+        the first. Fixing four things you were told about at once is one
+        pass; finding them one command at a time is four, and the last
+        three are invisible while the first is unfixed.
+      - >
+        A missing toolchain reports as "not run" and suppresses the
+        all-passed line entirely. Found by its own test, which caught
+        the first version printing "incomplete" and "Every gate passed"
+        one after the other - a summary that overstates its coverage is
+        the exact failure this command exists to prevent.
+      - >
+        Gate output streams rather than being captured for the summary.
+        A table saying the Python suite failed, with the failure itself
+        discarded, would be worse than no command at all.
+      - >
+        Ordered cheapest-first with the Python suite last, so the fast
+        gates report while the slow one is still ahead of you.
+      - >
+        Not a substitute for checking the real CI run. CI's environment
+        can diverge from local on things no local command can see, which
+        this project has already been bitten by - the command's own
+        docstring says so rather than letting a green table imply
+        otherwise.
+    dependencies: [REQ-TEST-011]
+    linked_tests:
+      - tests/test_cli_check.py
+    implemented_by:
+      - cli/check.py::check_command
+      - cli/check.py::_GATES
+      - cli/app.py::cli
+    evidence:
+      - >
+        2026-09-20: a real run reports six gates - linter, YAML linter,
+        both register gates, 140 JavaScript tests and the Python suite -
+        from one command.
+      - >
+        2026-09-20: a deliberately failing gate was confirmed not to
+        stop the ones after it, and a missing toolchain was confirmed to
+        suppress the all-passed line rather than being counted as a
+        pass.
+
   - id: REQ-DOCS-029
     title: Declared schemas and a standard linter for this repo's own YAML
     date_written: "2026-09-20"
@@ -1507,6 +1594,14 @@ requirements:
         and every dependency against a real id in the same file.
       - THE SYSTEM SHALL run the duplicate-key check in CI as well as at
         commit time.
+      - THE SYSTEM SHALL validate both files against the same declared
+        schema whether they are being gated or being rendered.
+      - WHEN an optional field is written with a blank or whitespace-only
+        value, THE SYSTEM SHALL reject it, WHILE continuing to accept
+        the field being absent.
+      - WHEN a file fails the schema, THE SYSTEM SHALL report every
+        problem in the file in one run rather than stopping at the
+        first.
     non_functional_requirements:
       - No behaviour change to what is accepted, beyond the two
         deliberate ones recorded in decisions - every rule the previous
@@ -1535,10 +1630,25 @@ requirements:
         files are hand-authored prose that wraps to suit the sentence,
         and leaving those on would bury the one rule that matters.
       - >
-        The schemas are used by the VALIDATORS, not by the dashboard's
-        own parsers. Those have the opposite documented job - render
-        whatever is really there and never raise, so a half-written file
-        still shows - and merging the two would have destroyed that.
+        The schemas are used by the dashboard's own parsers as well as
+        by the validators - one declaration of each file's shape, not
+        two. The first cut kept them apart on the grounds that a parser
+        should render whatever is really there and never raise, so a
+        half-written file still shows. Keith overruled it ("I don't mind
+        if the parsers would choke and throw an error") and the
+        reasoning holds: a requirement missing its story rendered as a
+        requirement whose story is the empty string, which a reader
+        cannot tell apart from one that genuinely has nothing to say.
+        The parsers' own _DEFAULTS dicts were a second, hand-maintained
+        statement of the same shape, free to drift from the real one.
+      - >
+        The requirements gate now reads the raw YAML itself instead of
+        going through the parser, which it had always done. Necessary
+        once the parser raises: a gate that stops at the first problem
+        makes an author fix a batch one run at a time. It is also a
+        better gate - the parser used to fill in every missing field
+        before the gate saw it, so an absent required field arrived as
+        an empty one and was reported as the wrong kind of error.
       - >
         Kept the cross-reference checks in Python, as Keith expected. A
         schema can say linked_tests is a list of strings; only an AST
@@ -1552,16 +1662,23 @@ requirements:
         value, and losing that would have made the errors worse in
         exchange for tidier code.
       - >
-        Deliberate behaviour change - a whitespace-only `source` is now
-        accepted rather than rejected. The schema strips it to "", which
-        is exactly the value an absent source already has, and there is
-        no difference in intent between leaving a field blank and
-        leaving it out.
+        A field written with nothing in it is rejected, for every
+        optional field rather than just `source`. An earlier cut of this
+        work accepted it, reasoning that the stripped value is identical
+        to an absent one so the intent must be identical too. Keith
+        disagreed and was right: a blank key is someone who started
+        filling it in and stopped, and that is worth being able to tell
+        apart. Accepting it is the same silent shape as the duplicate
+        mapping key that prompted this work - text that looks written
+        down and is not. Implemented as a before-validator, since with
+        whitespace stripping an after-validator cannot tell a blank
+        value from an empty one.
     dependencies: [REQ-DOCS-014]
     linked_tests:
       - tests/test_schemas.py
       - tests/test_validate_requirements.py
       - tests/test_changelog_yaml.py
+      - tests/test_requirements_yaml.py
       - tests/test_component_taxonomy_consistency.py
     implemented_by:
       - qa_tools/common/schemas.py::Requirement
@@ -1569,7 +1686,10 @@ requirements:
       - qa_tools/common/schemas.py::format_error
       - qa_tools/common/vocab.py::COMPONENT_CODES
       - qa_tools/common/validate_requirements.py::validate
+      - qa_tools/common/validate_requirements.py::main
       - qa_tools/common/validate_changelog.py::validate
+      - dashboard/requirements_yaml.py::parse_requirements
+      - dashboard/changelog_yaml.py::parse_changelog
       - .yamllint
       - .pre-commit-config.yaml
       - .github/workflows/test.yml

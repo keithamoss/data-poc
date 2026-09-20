@@ -28,12 +28,20 @@ Those stay in `validate_requirements.py`/`validate_changelog.py`, which
 now do schema-validation-then-cross-reference rather than everything by
 hand.
 
-Note these models are used by the VALIDATORS, not by
-`dashboard/requirements_yaml.py`/`changelog_yaml.py`. Those parsers have
-a different documented job - render whatever is really there, never
-raise, so a half-written file still shows in the dashboard - which is
-the opposite of what a schema does. Keeping them apart preserves that
-split rather than blurring it.
+These models are the single definition of both files' shape, used by
+the validators AND by `dashboard/requirements_yaml.py`/`changelog_yaml.py`.
+
+That is a deliberate change from how this landed (2026-09-20, Keith:
+"I don't mind if the parsers would choke and throw an error"). The
+parsers used to keep their own `_DEFAULTS` dict and render whatever was
+really there, never raising, on the reasoning that a half-written file
+should still show in the dashboard. In practice that is a worse
+outcome, not a kinder one: a requirement missing its `story` renders as
+a requirement with no story, which reads as a requirement that has no
+story - and the CI gate that would have caught it runs against the same
+file a moment earlier anyway. Now there is one declaration of the shape
+instead of two that can drift, and a file that cannot be rendered
+honestly stops the build rather than being quietly rendered wrong.
 """
 from __future__ import annotations
 
@@ -49,8 +57,10 @@ from qa_tools.common.vocab import (
     REQUIREMENT_STATUSES,
 )
 
-# A non-empty string once stripped - the shape almost every authored
-# field here really has. `min_length=1` alone would accept "   ".
+# A REQUIRED non-empty string. The blank-rejection itself lives on
+# `_Strict` below and covers every string field, optional ones
+# included; this type adds the one thing that rule cannot say, which is
+# that the key has to be there at all.
 NonEmptyStr = Annotated[str, Field(min_length=1)]
 
 _ID_PATTERN = r"^REQ-(?:" + "|".join(COMPONENT_CODES) + r")-\d{3}$"
@@ -65,9 +75,28 @@ class _Strict(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    @field_validator("*", mode="after")
+    @field_validator("*", mode="before")
     @classmethod
-    def _no_blank_strings_in_lists(cls, v):
+    def _no_blank_strings(cls, v):
+        """A key written with nothing in it is rejected - including for
+        the optional fields, where the stripped value would otherwise be
+        indistinguishable from the key being absent.
+
+        Keith's call, 2026-09-20, when an earlier draft of this module
+        accepted `source: "   "` on the grounds that "I left it blank"
+        and "I left it out" mean the same thing. They do not: a blank
+        key is someone who started filling it in and stopped, and the
+        file should be able to say so. Accepting it is the same silent
+        shape as the duplicate mapping key that prompted this work -
+        text that looks written down and is not.
+
+        `mode="before"` matters. With `str_strip_whitespace=True` an
+        after-validator would see `""` and could not tell a blank value
+        from an empty one; and pydantic does not validate a field that
+        was never supplied, so absent stays legal without a special
+        case here."""
+        if isinstance(v, str) and not v.strip():
+            raise ValueError("is present but blank - write something, or omit the key entirely")
         if isinstance(v, list) and any(isinstance(x, str) and not x.strip() for x in v):
             raise ValueError("list entries must be non-empty strings")
         return v

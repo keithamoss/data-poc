@@ -156,26 +156,27 @@ def test_source_is_optional_and_absent_is_fine():
     assert validate([_valid_entry()]) == []
 
 
-def test_source_defaulted_to_empty_string_by_the_real_parser_is_fine():
-    """Real bug found live, 2026-09-19: dashboard/requirements_yaml.py's
-    parse_requirements() defaults an unset `source` to `""` (falsy),
-    not `None` - and main() below always runs against parser output,
-    never a raw dict. An earlier version of this check used `is not
-    None`, which treated that real default as "present but invalid",
-    failing all 22 real requirements.yaml entries at once. Confirmed
-    failing against the pre-fix code by actually running `python3 -m
-    qa_tools.common.validate_requirements` against the real committed
-    file before this fix."""
-    assert validate([_valid_entry(source="")]) == []
+def test_source_written_as_an_empty_string_is_rejected():
+    """Keith's call, 2026-09-20: "I'm not sure about accepting that."
+
+    A blank `source` is someone who started filling it in and stopped.
+    That is a different thing from omitting the key, and the file should
+    be able to tell you so - accepting it is the same silent shape as
+    the duplicate mapping key that prompted this work.
+
+    There is real history behind why it was ever accepted, worth keeping
+    so it isn't re-introduced by the same route: until 2026-09-20 this
+    gate ran against `parse_requirements()` OUTPUT, which filled every
+    unset optional field with `""`, so rejecting `""` here failed all 22
+    real entries at once. `main()` now reads the raw YAML itself, so an
+    absent key never reaches the schema at all and blank means blank."""
+    errors = validate([_valid_entry(source="")])
+    assert any("source" in e and "blank" in e for e in errors), errors
 
 
-def test_source_if_present_must_be_a_non_empty_string():
-    # Behaviour CHANGED deliberately 2026-09-20 (REQ-DOCS-029). The
-    # schema strips whitespace, so "   " becomes "" - which is exactly
-    # the value an ABSENT source already has, and source is optional.
-    # Erroring on it was noise for no benefit: there is no difference in
-    # intent between "I left it blank" and "I left it out".
-    assert validate([_valid_entry(source="   ")]) == []
+def test_source_written_as_whitespace_only_is_rejected():
+    errors = validate([_valid_entry(source="   ")])
+    assert any("source" in e and "blank" in e for e in errors), errors
 
 
 def test_source_can_be_real_free_text():
@@ -186,11 +187,11 @@ def test_date_written_is_optional_and_absent_is_fine():
     assert validate([_valid_entry()]) == []
 
 
-def test_date_written_defaulted_to_empty_string_by_the_real_parser_is_fine():
-    """Same real-parser-default treatment as `source` above -
-    dashboard/requirements_yaml.py's parse_requirements() also defaults
-    an unset `date_written` to `""`, not `None`."""
-    assert validate([_valid_entry(date_written="")]) == []
+def test_date_written_written_as_an_empty_string_is_rejected():
+    """Same treatment as `source` above - the rule is about any field
+    written with nothing in it, not about one field in particular."""
+    errors = validate([_valid_entry(date_written="")])
+    assert any("date_written" in e and "blank" in e for e in errors), errors
 
 
 def test_date_written_accepts_a_real_iso_date():

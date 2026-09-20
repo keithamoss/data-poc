@@ -46,9 +46,9 @@ import ast
 import sys
 from pathlib import Path
 
+import yaml
 from pydantic import ValidationError
 
-from dashboard.requirements_yaml import parse_requirements
 from qa_tools.common.schemas import Requirement, format_error
 from qa_tools.common.vocab import COMPONENT_CODES
 
@@ -242,7 +242,20 @@ def validate(requirements: list[dict]) -> list[str]:
 
 
 def main() -> int:
-    requirements = parse_requirements(REQUIREMENTS_YAML)
+    """Reads the raw YAML rather than going through
+    `dashboard/requirements_yaml.py`.
+
+    That parser validates against the same schema and RAISES on the
+    first problem it meets (2026-09-20) - fine for a build, wrong for a
+    gate. An author fixing a batch of entries should see the whole list
+    in one run, not one error per run, so this keeps its own read and
+    catches per entry."""
+    if not REQUIREMENTS_YAML.exists():
+        print(f"requirements.yaml not found at {REQUIREMENTS_YAML}", file=sys.stderr)
+        return 1
+    with open(REQUIREMENTS_YAML) as f:
+        doc = yaml.safe_load(f) or {}
+    requirements = [r or {} for r in (doc.get("requirements") or [])]
     errors = validate(requirements)
 
     if errors:

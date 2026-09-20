@@ -33,6 +33,16 @@ own renderer needed no restructuring:
 `summary` is the one genuinely new field - one sentence per day, so a
 reader can stop there. Mapa's own What's New page is where that idea
 comes from.
+
+**This raises on a feed that does not match the schema** (2026-09-20,
+Keith: "I don't mind if the parsers would choke and throw an error").
+The shape is declared once, in `qa_tools/common/schemas.py`, and both
+this and the CI gate read it from there. What is left here is purely
+the rename from the file's own field names to the renderer's -
+`description` becomes `text`, `changes` becomes `sections` - which is
+the only difference between the two shapes and not worth changing the
+authored file to remove, since `description` is the clearer word in a
+file people write by hand.
 """
 from __future__ import annotations
 
@@ -40,24 +50,15 @@ from pathlib import Path
 
 import yaml
 
-# The closed set of categories. Plain words rather than Keep a
-# Changelog's Added/Changed/Fixed, which read as a spec for a
-# maintainer; these read as a sentence for a reader. Validated, because
-# an open vocabulary drifts into six near-synonyms within a month.
-CATEGORIES = ("New", "Improved", "Fixed")
+from qa_tools.common.schemas import Changelog
+from qa_tools.common.vocab import CHANGELOG_CATEGORIES
 
-
-def _item(raw: dict) -> dict:
-    return {
-        "headline": (raw.get("headline") or "").strip(),
-        "components": list(raw.get("components") or []),
-        "text": (raw.get("description") or "").strip(),
-        # Optional and normally absent - day-grouping is the point, and a
-        # to-the-minute timestamp is detail this audience does not need.
-        # Kept in the shape so the renderer needs no change if one day a
-        # single item genuinely wants one.
-        "time": raw.get("time"),
-    }
+# Re-exported under this module's own name for the dashboard build,
+# which imports categories from here rather than reaching into
+# qa_tools/. Plain words rather than Keep a Changelog's
+# Added/Changed/Fixed, which read as a spec for a maintainer; these read
+# as a sentence for a reader.
+CATEGORIES = CHANGELOG_CATEGORIES
 
 
 def parse_changelog(path: str | Path) -> dict:
@@ -65,26 +66,44 @@ def parse_changelog(path: str | Path) -> dict:
 
     Never re-sorted here: the file is authored newest-first and that is
     the intended reading order, same convention `requirements_yaml.py`
-    follows. Missing optional fields default rather than raise - this
-    module renders whatever is really there, and
-    `qa_tools/common/validate_changelog.py` is what enforces the schema,
-    as its own CI gate."""
+    follows.
+
+    Raises pydantic's ValidationError if the file does not match the
+    schema. `qa_tools/common/validate_changelog.py` remains the CI gate,
+    and still reads the raw YAML itself rather than going through this,
+    so it can report every problem in one run instead of stopping at the
+    first."""
     with open(path) as f:
         doc = yaml.safe_load(f) or {}
 
-    intro = doc.get("intro") or ""
-    intro_paragraphs = [p.strip() for p in intro.split("\n\n") if p.strip()]
+    feed = Changelog(**(doc or {}))
+    intro_paragraphs = [p.strip() for p in feed.intro.split("\n\n") if p.strip()]
 
-    entries = []
-    for release in doc.get("releases") or []:
-        sections = [
-            {"category": (s.get("category") or "").strip(),
-             "items": [_item(i) for i in (s.get("items") or [])]}
-            for s in (release.get("changes") or [])
-        ]
-        entries.append({
-            "date": str(release.get("date") or ""),
-            "summary": (release.get("summary") or "").strip(),
-            "sections": sections,
-        })
+    entries = [
+        {
+            "date": release.date,
+            "summary": release.summary,
+            "sections": [
+                {
+                    "category": section.category,
+                    "items": [
+                        {
+                            "headline": item.headline,
+                            "components": list(item.components),
+                            "text": item.description,
+                            # Optional and normally absent - day-grouping
+                            # is the point, and a to-the-minute timestamp
+                            # is detail this audience does not need. Kept
+                            # in the shape so the renderer needs no change
+                            # if one day a single item genuinely wants one.
+                            "time": item.time,
+                        }
+                        for item in section.items
+                    ],
+                }
+                for section in release.changes
+            ],
+        }
+        for release in feed.releases
+    ]
     return {"intro": intro_paragraphs, "entries": entries}

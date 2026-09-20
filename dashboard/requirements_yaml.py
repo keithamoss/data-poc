@@ -1,15 +1,32 @@
 """
 Parses the repo's own hand-maintained requirements.yaml (item 75,
 plans/qa-pipeline.md) - real user stories tracked with MoSCoW priority,
-implementation status, and (enforced by qa_tools/common/
-validate_requirements.py, not this module) real linked tests. Keith's
-own scoping call: structured YAML with typed fields, not hand-prose
-like the old Markdown CHANGELOG - so, like dashboard/changelog_yaml.py, this module
-does almost no interpretation of its own; requirements.yaml's own shape
-already IS the shape the dashboard renders, this just loads it and
-normalizes it into a stable, predictable list (never raising on a
-missing optional field - that's validate_requirements.py's job, run as
-its own separate CI gate, not this module's).
+implementation status, and real linked tests.
+
+This module does almost no interpretation of its own. requirements.yaml's
+own shape already IS the shape the dashboard renders, so this loads it,
+validates it against the declared schema in qa_tools/common/schemas.py,
+and hands back a plain list of dicts in the file's own top-to-bottom
+order (never re-sorted here - that order is the intended reading order).
+
+**It raises on a file that does not match the schema** (2026-09-20,
+Keith's own call - "I don't mind if the parsers would choke and throw an
+error"). Until then it carried its own `_DEFAULTS` dict and filled in
+whatever was missing, so a half-written file still rendered. Two reasons
+that changed:
+
+  - A requirement missing its `story` rendered as a requirement whose
+    story is the empty string, which a reader cannot tell apart from a
+    requirement that genuinely has nothing to say. Failing the build is
+    the more honest of the two.
+  - `_DEFAULTS` was a second, hand-maintained statement of the file's
+    shape sitting next to the real one. The schema now says it once.
+
+The schema/linkage CI gate (qa_tools/common/validate_requirements.py)
+still exists and still does the heavier work - AST-verifying every
+`linked_tests`/`implemented_by` symbol, resolving `dependencies`. It
+reads the raw YAML itself rather than going through this module, so it
+can report EVERY problem in one run instead of stopping at the first.
 
 See requirements.yaml's own top-of-file comment for the full schema.
 """
@@ -18,56 +35,18 @@ from pathlib import Path
 
 import yaml
 
-# Fields every requirement is expected to carry - missing ones default
-# rather than error here, since THIS module's job is "render whatever
-# is really there," not enforce the schema (that's validate_
-# requirements.py, run as its own CI gate against the same file).
-_DEFAULTS = {
-    "id": "",
-    "title": "",
-    "story": "",
-    "moscow": "could",
-    "status": "not_started",
-    "acceptance_criteria": [],
-    "linked_tests": [],
-    # 6 further optional fields (2026-09-19, plans/wider.md #10) - see
-    # requirements.yaml's own header comment for the full rationale.
-    "date_written": "",
-    "source": "",
-    "non_functional_requirements": [],
-    "dependencies": [],
-    "open_questions": [],
-    "evidence": [],
-    # 2026-09-20 (plans/tooling.md #18) - where the requirement is
-    # actually implemented, as opposed to linked_tests' what verifies
-    # it. Required once `status` is "built"; see requirements.yaml's own
-    # header comment and validate_requirements.py for the real rules.
-    "implemented_by": [],
-    # 2026-09-20 (Keith) - decisions taken and pathways rejected, so the
-    # reasoning lives with the requirement instead of in a plans file
-    # that is now deleted once its requirements exist.
-    "decisions": [],
-}
+from qa_tools.common.schemas import Requirement
 
 
 def parse_requirements(path: str | Path) -> list[dict]:
-    """Returns a list of requirement dicts, each with every _DEFAULTS
-    key present (defaulted if the file didn't set it), in the file's
-    own top-to-bottom order (never re-sorted here - the file's own
-    order is the intended reading/display order)."""
+    """Returns a list of requirement dicts, each carrying every field
+    the schema declares (defaulted where the file legitimately omits an
+    optional one), in the file's own order.
+
+    Raises pydantic's ValidationError if the file does not match the
+    schema - see this module's own docstring for why that is preferred
+    to rendering something half-formed."""
     with open(path) as f:
         doc = yaml.safe_load(f) or {}
-    raw = doc.get("requirements") or []
-    out = []
-    for r in raw:
-        entry = dict(_DEFAULTS)
-        entry.update(r or {})
-        # requirements.yaml's own `story` uses YAML's `>` folded-scalar
-        # style for readability in the source file - collapses to one
-        # line with a single trailing newline; strip it so the
-        # rendered/embedded text doesn't carry that trailing newline
-        # through into the dashboard.
-        if isinstance(entry["story"], str):
-            entry["story"] = entry["story"].strip()
-        out.append(entry)
-    return out
+    return [Requirement(**(r or {})).model_dump()
+            for r in (doc.get("requirements") or [])]

@@ -9,7 +9,7 @@ from __future__ import annotations
 import rich_click as click
 from rich.console import Console
 
-from . import bdm, common, cp, dashboard, debug, github, pipeline, population
+from . import bdm, check, common, cp, dashboard, debug, github, pipeline, population
 from .banner import print_banner
 
 click.rich_click.TEXT_MARKUP = "rich"
@@ -88,6 +88,7 @@ cli.add_command(github.github_group)
 cli.add_command(debug.debug_group)
 cli.add_command(pipeline.pipeline_group)
 cli.add_command(population.population_command)
+cli.add_command(check.check_command)
 
 
 def main() -> None:
