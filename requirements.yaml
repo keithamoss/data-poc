@@ -1963,36 +1963,151 @@ requirements:
     date_written: "2026-09-20"
     story: >
       As whoever picks up a QA remediation ticket, I want the ticket
-      itself to say in plain English what was failing and why it
-      matters, so that I can act on it without first going back to the
-      dashboard.
+      itself to say in plain English what is failing and why it matters,
+      so that I can act on it without first going back to the dashboard.
     moscow: could
-    status: not_started
+    status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
-      Keith, 2026-09-19; parked 2026-09-20 until the core lands, after
+      Keith, 2026-09-19; parked 2026-09-20 until the core landed, after
       delivery-architect found the drafted premise did not match the
-      real ticket model.
+      real ticket model. Rescoped against that model and signed off the
+      same evening, once REQ-QAC-024 and REQ-DASH-026 had both landed
+      and the real sentences could be judged in place.
     acceptance_criteria:
-      - PARKED - not to be built until REQ-QAC-024 and REQ-DASH-026 have
-        landed and their real sentences can be judged in place.
-      - THE SYSTEM SHALL, when built, include the plain-English
-        statements of the checks actually driving a dataset's status in
-        that dataset's ticket - not of a single check, since tickets are
-        one per dataset keyed off the aggregate status.
+      - WHEN a ticket is opened for a dataset, THE SYSTEM SHALL name in
+        its body every check on that dataset that is not green, grouped
+        so that checks sharing a name and description appear once.
+      - THE SYSTEM SHALL separate the checks matching the ticket's own
+        status from the rest, so that a reader can tell what is driving
+        the status from what is merely also not green.
+      - WHERE checks are grouped, THE SYSTEM SHALL state how many checks
+        and which columns that group covers.
+      - THE SYSTEM SHALL present each group as the check's hand-authored
+        name and its plain-English description, unaltered and
+        unsupplemented.
+      - THE SYSTEM SHALL link every check in a group to that check's own
+        page on the live dashboard, as generated metadata alongside the
+        authored prose rather than woven into it.
+      - THE SYSTEM SHALL NOT include the contributor-facing technical
+        note anywhere in a ticket.
+      - WHEN a run posts a comment on an already-open ticket, THE SYSTEM
+        SHALL include the list as it stands at that run, and SHALL post
+        it even when it is identical to the previous comment's.
+      - THE SYSTEM SHALL NOT edit a ticket's body after the ticket is
+        opened.
+      - THE SYSTEM SHALL list every group, with no cap and no
+        truncation.
+      - WHEN a dataset resolves to green, THE SYSTEM SHALL post its
+        existing resolved comment with no check list.
+      - THE SYSTEM SHALL NOT list a placeholder row standing for a
+        column that no tool defines a rule against.
+      - THE SYSTEM SHALL strip surrounding whitespace from every
+        hand-authored check text at the point it is parsed, so that no
+        consumer can fail to recognise the self-evident sentinel.
+      - THE SYSTEM SHALL derive the list solely from the already-built
+        dashboard JSON, never from data/ or a live warehouse
+        connection.
     non_functional_requirements:
-      - The drafted premise was wrong - ticket_sync.py opens at most one
-        open issue per dataset, keyed off dataset_status(), and its body
-        deliberately defers check detail to the dashboard. Reframing
-        that is a real change of stance, not a small addition.
-      - Sizing for whenever this is picked up - at the latest run
-        cp-carers had 3 checks not green and cp-placements 21, but those
-        21 collapse to 9 distinct questions.
-      - This is where the public-repo exposure of Keith's "no
-        sensitivity limit" decision actually lands, since a ticket ties
-        the text to a named dataset and date.
-    dependencies: [REQ-QAC-024]
-    linked_tests: []
-
+      - No new exposure - every sentence this adds is already published
+        on the dashboard. What is new is that a ticket ties it to a
+        named dataset and a date, which is where the public-repo
+        consequence of the "no sensitivity limit" decision actually
+        lands.
+      - Comment volume is the real cost and is accepted deliberately - a
+        dataset broken for weeks accumulates a long, near-identical list
+        on every run.
+      - Grouping must not depend on the order checks arrive in.
+      - ticket-sync.yml is the only write-permitted workflow and stays
+        that way; nothing here goes near deploy-pages.yml.
+      - Normalising authored text must not change any check's
+        config_hash, or every check in the repo would report as changed
+        and demand a changelog entry.
+    dependencies: [REQ-QAC-024, REQ-DASH-026]
+    linked_tests:
+      - tests/test_ticket_check_summary.py
+      - tests/test_ticket_sync.py::test_a_new_tickets_body_names_what_is_actually_failing
+      - tests/test_ticket_sync.py::test_every_still_red_comment_carries_the_current_list
+      - tests/test_ticket_sync.py::test_the_list_is_posted_again_even_when_it_has_not_changed
+      - tests/test_ticket_sync.py::test_a_dataset_resolved_to_green_gets_no_list
+      - tests/test_ticket_sync.py::test_an_amber_check_is_listed_under_a_red_ticket
+    implemented_by:
+      - qa_tools/common/ticket_check_summary.py::build_check_summary
+      - qa_tools/common/ticket_check_summary.py::check_url
+      - qa_tools/common/ticket_sync.py::_check_section
+      - qa_tools/common/check_lifecycle.py::_authored
+    evidence:
+      - >
+        2026-09-20: cp-placements, the worst real dataset, renders 17
+        failing and 4 warning checks as 5 and 2 grouped entries. Birth
+        Registrations renders 3 checks as 1 entry, cp-carers 2 as 1.
+        Measured against the real committed dashboard JSON.
+      - >
+        2026-09-20: every deep link the builder generates resolves to a
+        check key that really exists in that dataset, asserted across
+        all three non-green datasets rather than sampled.
+      - >
+        2026-09-20: zero of the 258 config_hashes change when authored
+        text is stripped at parse time, compared against the same parse
+        from HEAD. Zero values reach the dashboard JSON with stray
+        whitespace afterwards, against 210 sentinels and 40 contract
+        descriptions before.
+      - >
+        2026-09-20: 11 placeholder rows exist across the six Child
+        Protection tables, carrying no key, name or description. All 11
+        are green today, so a status filter alone would exclude them;
+        they are excluded explicitly regardless.
+    decisions:
+      - Decided every not-green check is listed, not only those matching
+        the ticket's status (Keith, 2026-09-20, amending his own earlier
+        answer). An amber check under a red ticket is worth seeing while
+        somebody is already looking. They go under a separate heading,
+        because a flat list answers neither "why is this red" nor "what
+        else should I know".
+      - Decided against a cap with "and N more" (Keith). A genuinely
+        broken dataset produces a long ticket, and that is the honest
+        outcome - hiding the tail hides it from the one person who
+        opened the ticket to fix it.
+      - Decided the body is written once and each run comment carries
+        the current list, rather than rewriting the body each run. The
+        thread becomes a real record of the failure set shrinking; the
+        cost, stated and accepted, is repetition on a long-running
+        ticket.
+      - Decided the list repeats even when identical to the previous
+        comment (Keith, resolving the open question this shipped with).
+        Skipping unchanged lists was the only real lever on volume and
+        would have traded away the every-run-on-the-record property.
+      - Decided to show name and description only, not the failure-cause
+        statement. That removed a live trap rather than merely
+        simplifying - 210 of 213 self-evident sentinels reached the
+        dashboard JSON as "self-evident\n", and only the template's
+        own .trim().toLowerCase() stopped it rendering. A ticket builder
+        comparing exactly would have printed the literal word
+        "self-evident" into 210 GitHub issues.
+      - Decided to fix that whitespace at _lifecycle_fields(), the one
+        place every parser reads authored text from, rather than at each
+        consumer. Safe because _NON_CONFIG_FIELDS is derived from that
+        function's own keys, so those values are excluded from
+        config_hash by construction - verified across all 258 rather
+        than assumed. A second source was missed on the first attempt,
+        the ODCS rules' own native description:, and was caught only by
+        re-measuring the built JSON.
+      - Decided to grow ticket_sync's dataset mapping to carry a
+        collection id rather than consolidating the four copies of that
+        mapping now. This is the fourth copy, which is the exact
+        condition the module's own comment set for consolidating - the
+        refactor is real and does not belong inside a ticket-body
+        change.
+      - Rejected rewriting a ticket's body on each run. It would always
+        be accurate, but loses what the ticket looked like on day one,
+        and the per-run comments already carry the current truth.
+    open_questions:
+      - Whether the run comment should be skipped when its list is
+        identical to the previous one was asked and answered - do not
+        skip. Worth revisiting only after watching a real long-running
+        ticket, since it is the only lever on comment volume.
   - id: REQ-DOCS-028
     title: A "What's New" feed written for the people who use the tool
     date_written: "2026-09-20"

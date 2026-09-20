@@ -495,6 +495,8 @@ Rough layout:
   more per test than the rest of the suite. No new hot spot.
   -> **~91s/812 tests (2026-09-20 evening, the detail-panel authored-text
   fix)**. Flat.
+  -> **~96s/833 tests (2026-09-20 night, REQ-GHUB-027)**. Flat, 21 more
+  tests.
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.

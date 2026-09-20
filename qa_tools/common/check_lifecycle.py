@@ -194,16 +194,42 @@ def _require_category(meta: dict, error_prefix: str) -> str:
     return category
 
 
+def _authored(meta: dict, key: str) -> str | None:
+    """One hand-authored text field, with surrounding whitespace removed.
+
+    REQ-GHUB-027. These are written as YAML block scalars, and a `>` or
+    `|` block keeps the trailing newline - so `failure_indicates` for 210
+    of the 213 self-evident checks really arrives as "self-evident\n".
+    Nothing had noticed because the one consumer that compares it
+    against the sentinel, the dashboard template, happens to
+    `.trim().toLowerCase()` first. The next consumer would not have: a
+    ticket builder comparing exactly would have printed the literal word
+    "self-evident" into 210 GitHub issues.
+
+    Fixed here rather than at each consumer because this function is the
+    single place every parser reads these fields from, and because
+    `_NON_CONFIG_FIELDS` is derived from its own keys - so these values
+    are excluded from `config_hash` by construction, and normalising
+    them cannot report a check as changed. Verified, not assumed: all
+    258 hashes are byte-identical across this change.
+
+    A field that is genuinely absent stays None rather than becoming "",
+    since absent and blank mean different things everywhere else in this
+    project."""
+    value = meta.get(key)
+    return value.strip() if isinstance(value, str) else value
+
+
 def _lifecycle_fields(meta: dict) -> dict:
     return {
         "introduced_date": meta.get("introduced_date"),
         "retired_as_of": meta.get("retired_as_of"),
-        "retired_reason": meta.get("retired_reason"),
-        "description": meta.get("description"),
+        "retired_reason": _authored(meta, "retired_reason"),
+        "description": _authored(meta, "description"),
         "changelog": list(meta.get("changelog") or []),
-        "name": meta.get("name"),
-        "failure_indicates": meta.get("failure_indicates"),
-        "technical_note": meta.get("technical_note"),
+        "name": _authored(meta, "name"),
+        "failure_indicates": _authored(meta, "failure_indicates"),
+        "technical_note": _authored(meta, "technical_note"),
     }
 
 
@@ -434,6 +460,7 @@ def _parse_contract_quality_rule(rule: dict, source: str, location: str) -> list
     category = _require_category({"category": rule.get("dimension")},
                                   f"{source}: {location}: quality rule (check_id={check_id!r})")
     native_description = rule.pop("description", None)
+    rule_meta = {"description": native_description}
     changelog = meta.get("changelog")
     if isinstance(changelog, str):
         changelog = json.loads(changelog)  # ODCS customProperties values are scalar - a list gets stored as a JSON string
@@ -453,7 +480,14 @@ def _parse_contract_quality_rule(rule: dict, source: str, location: str) -> list
     # every rule to duplicate the same text into customProperties
     # too. customProperties' own `description` wins if both exist
     # (an explicit override for this metadata specifically).
-    fields["description"] = fields["description"] or native_description
+    # Normalised the same way _authored() does for everything it reads.
+    # This is the one authored string that does not come through that
+    # helper, and it was missed on the first pass of REQ-GHUB-027's
+    # whitespace fix - 40 real descriptions still reached the dashboard
+    # JSON with a trailing newline afterwards. Found by re-measuring the
+    # built output rather than by re-reading the change, which is the
+    # only reason it is not still there.
+    fields["description"] = fields["description"] or _authored(rule_meta, "description")
     # customProperties values are scalar, so a changelog list arrives as
     # a JSON string and has already been decoded above.
     fields["changelog"] = changelog or []

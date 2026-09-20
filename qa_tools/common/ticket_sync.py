@@ -74,6 +74,7 @@ from dataclasses import dataclass
 
 from qa_tools.common.dataset_status import dataset_status
 from qa_tools.common.people import PEOPLE_YAML, github_usernames_for, parse_people_config
+from qa_tools.common.ticket_check_summary import build_check_summary
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 BDM_DASHBOARD_JSON = os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")
@@ -96,15 +97,29 @@ TICKET_LABEL = "qa-ticket"
 # QA_RESULTS_SCOPE_FOR_DATASET) - not consolidated into one shared
 # module in this pass (a real, deliberate scope call, not an oversight -
 # worth doing if a 4th copy is ever needed).
-DATASET_AGENCY = {
-    "birth-registrations": "registry-services",
-    "cp-clients": "child-protection-family-support",
-    "cp-notifications": "child-protection-family-support",
-    "cp-investigations": "child-protection-family-support",
-    "cp-placements": "child-protection-family-support",
-    "cp-carers": "child-protection-family-support",
-    "cp-case-workers": "child-protection-family-support",
+# REQ-GHUB-027 grew this from dataset -> agency to dataset -> (agency,
+# collection), because a real dashboard deep link carries all three.
+# That makes this the fourth place the same mapping lives, which is the
+# exact condition the note above set for consolidating it - flagged,
+# deliberately not done here, because merging four modules' copies is a
+# refactor of its own and does not belong inside a ticket-body change.
+DATASET_SCOPE = {
+    "birth-registrations": ("registry-services", "civil-registration"),
+    "cp-clients": ("child-protection-family-support", "child-protection"),
+    "cp-notifications": ("child-protection-family-support", "child-protection"),
+    "cp-investigations": ("child-protection-family-support", "child-protection"),
+    "cp-placements": ("child-protection-family-support", "child-protection"),
+    "cp-carers": ("child-protection-family-support", "child-protection"),
+    "cp-case-workers": ("child-protection-family-support", "child-protection"),
 }
+
+# The dataset -> agency view of the mapping above, kept because two real
+# callers want only that half - dashboard/embed_dashboard_data.py and,
+# through it, qa_tools/common/leaderboard.py. Derived rather than a
+# second literal, so the two cannot disagree; when this and DATASET_SCOPE
+# are eventually merged with the copies in github_links.py and
+# acceptance_sync.py, this goes with them.
+DATASET_AGENCY = {dataset: agency for dataset, (agency, _collection) in DATASET_SCOPE.items()}
 
 
 @dataclass
@@ -112,6 +127,7 @@ class DatasetScope:
     id: str
     name: str
     agency_id: str
+    collection_id: str
 
 
 def _load_scopes() -> list[tuple[DatasetScope, dict]]:
@@ -122,13 +138,19 @@ def _load_scopes() -> list[tuple[DatasetScope, dict]]:
     scopes: list[tuple[DatasetScope, dict]] = []
     with open(BDM_DASHBOARD_JSON) as f:
         bdm = json.load(f)
-    scopes.append((DatasetScope(id=bdm["id"], name=bdm["name"], agency_id=DATASET_AGENCY[bdm["id"]]), bdm))
+    scopes.append((_scope_for(bdm), bdm))
 
     with open(CP_DASHBOARD_JSON) as f:
         cp = json.load(f)
     for ds in cp["datasets"]:
-        scopes.append((DatasetScope(id=ds["id"], name=ds["name"], agency_id=DATASET_AGENCY[ds["id"]]), ds))
+        scopes.append((_scope_for(ds), ds))
     return scopes
+
+
+def _scope_for(dataset: dict) -> DatasetScope:
+    agency_id, collection_id = DATASET_SCOPE[dataset["id"]]
+    return DatasetScope(id=dataset["id"], name=dataset["name"],
+                        agency_id=agency_id, collection_id=collection_id)
 
 
 def _dataset_label(dataset_id: str) -> str:
@@ -175,7 +197,8 @@ def _ensure_label(owner: str, repo: str, name: str, description: str) -> None:
 _EMPTY_PEOPLE_CONFIG = {"people": {}, "agency_assignments": {}, "dataset_assignments": {}}
 
 
-def open_ticket(owner: str, repo: str, scope: DatasetScope, status: str, people_config: dict | None = None) -> int:
+def open_ticket(owner: str, repo: str, scope: DatasetScope, status: str,
+                people_config: dict | None = None, dataset: dict | None = None) -> int:
     _ensure_label(owner, repo, TICKET_LABEL, "Opened automatically by this project's real QA pipeline")
     _ensure_label(owner, repo, _dataset_label(scope.id), f"Real QA tickets for {scope.name}")
 
@@ -207,6 +230,12 @@ def open_ticket(owner: str, repo: str, scope: DatasetScope, status: str, people_
             "acknowledgment badge shows next to it."
             if status == "amber" else ""
         )
+        # REQ-GHUB-027. The paragraph above still points at the dashboard,
+        # and deliberately so - this section answers "what is wrong" where
+        # the dashboard answers "and what has it been doing for a month".
+        # Appended rather than replacing anything: a ticket that names its
+        # failing checks is still a ticket about a dataset's status.
+        + _check_section(scope, status, dataset)
     )
     args = [
         "issue", "create", "--repo", f"{owner}/{repo}",
@@ -222,6 +251,21 @@ def open_ticket(owner: str, repo: str, scope: DatasetScope, status: str, people_
     return int(out.strip().rsplit("/", 1)[-1])
 
 
+
+def _check_section(scope: DatasetScope, status: str, dataset: dict | None) -> str:
+    """The REQ-GHUB-027 block, ready to append to a body or a comment.
+
+    Returns "" for a green dataset, which has nothing not-green to list,
+    and for a caller that did not pass the dataset at all - open_ticket()
+    is public and was callable without it before this.
+    """
+    if not dataset:
+        return ""
+    summary = build_check_summary(
+        dataset, status, scope.agency_id, scope.collection_id, scope.id)
+    return f"\n\n---\n\n{summary}" if summary else ""
+
+
 def comment(owner: str, repo: str, issue_number: int, body: str) -> None:
     _run_gh(["issue", "comment", str(issue_number), "--repo", f"{owner}/{repo}", "--body", body])
 
@@ -233,21 +277,29 @@ def sync_dataset(owner: str, repo: str, scope: DatasetScope, dataset: dict, peop
     status = dataset_status(dataset)
     existing = find_open_ticket(owner, repo, scope.id)
 
+
     if existing is None:
         if status in ("red", "amber"):
-            issue_number = open_ticket(owner, repo, scope, status, people_config)
+            issue_number = open_ticket(owner, repo, scope, status, people_config, dataset)
             return f"{scope.id}: opened #{issue_number} ({status})"
         return f"{scope.id}: {status}, no open ticket - nothing to do"
 
+    # REQ-GHUB-027: every run's comment carries the list as it stands at
+    # that run, and posts it even when it is word-for-word what the last
+    # comment said. Keith's own call, with the repetition stated: the
+    # thread is then a real record of the failure set shrinking, and a
+    # reader never has to scroll up to find the most recent one.
     if status == "red":
         comment(owner, repo, existing,
-                f"Still **red** as of this run - {scope.name} continues to fail its own checks.")
+                f"Still **red** as of this run - {scope.name} continues to fail its own checks."
+                + _check_section(scope, status, dataset))
         return f"{scope.id}: #{existing} still red, commented"
 
     comment(owner, repo, existing,
             f"Resolved to **{status}** as of this run. This ticket does NOT "
             f"auto-close - close it once you've confirmed the fix, or leave "
-            f"it open if follow-up is still needed.")
+            f"it open if follow-up is still needed."
+            + _check_section(scope, status, dataset))
     return f"{scope.id}: #{existing} resolved to {status}, commented (not closed)"
 
 

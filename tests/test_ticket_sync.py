@@ -55,7 +55,8 @@ def _amber_dataset():
 
 @pytest.fixture
 def scope():
-    return DatasetScope(id="birth-registrations", name="Birth Registrations", agency_id="registry-services")
+    return DatasetScope(id="birth-registrations", name="Birth Registrations",
+                        agency_id="registry-services", collection_id="civil-registration")
 
 
 def test_no_open_ticket_and_red_opens_a_new_one(monkeypatch, scope):
@@ -199,3 +200,101 @@ def test_open_ticket_parses_the_issue_number_from_gh_own_url_output(monkeypatch,
     fake = FakeGh(create_url="https://github.com/o/r/issues/123")
     monkeypatch.setattr(ticket_sync, "_run_gh", fake)
     assert ticket_sync.open_ticket("o", "r", scope, "red") == 123
+
+
+# ---------------------------------------------------------------------
+# REQ-GHUB-027 - the plain-English check list now reaching the ticket
+# itself. The rendering is covered in full by
+# tests/test_ticket_check_summary.py; these assert the wiring, which is
+# the part that decides whether anyone ever sees it.
+# ---------------------------------------------------------------------
+
+def _authored_dataset(status_value: float):
+    """One real, named, described check, so the section has something to
+    render. The fixtures above deliberately carry none of that - they
+    predate this and test status arithmetic only."""
+    return {"columns": [{"name": "sex", "checks": [{
+        "key": "not_null_dbt", "tool_ref": "dbt:not_null",
+        "name": "Null rate", "description": "This value must never be empty.",
+        "current": status_value, "warn": 1, "fail": 2, "retired_as_of": None,
+    }]}]}
+
+
+def _body_of(calls, kind):
+    call = next(c for c in calls if c[:2] == ["issue", kind])
+    return call[call.index("--body") + 1]
+
+
+def test_a_new_tickets_body_names_what_is_actually_failing(monkeypatch, scope):
+    fake = FakeGh(list_response=[])
+    monkeypatch.setattr(ticket_sync, "_run_gh", fake)
+
+    sync_dataset("o", "r", scope, _authored_dataset(5))
+
+    body = _body_of(fake.calls, "create")
+    assert "## Failing checks" in body
+    assert "This value must never be empty." in body
+    assert "/check/not_null_dbt)" in body
+    # the original paragraph still points at the dashboard - this adds
+    # to the ticket rather than replacing what was there
+    assert "live dashboard" in body
+
+
+def test_every_still_red_comment_carries_the_current_list(monkeypatch, scope):
+    fake = FakeGh(list_response=[{"number": 7}])
+    monkeypatch.setattr(ticket_sync, "_run_gh", fake)
+
+    sync_dataset("o", "r", scope, _authored_dataset(5))
+
+    body = _body_of(fake.calls, "comment")
+    assert "Still **red**" in body
+    assert "This value must never be empty." in body
+
+
+def test_the_list_is_posted_again_even_when_it_has_not_changed(monkeypatch, scope):
+    """Keith's own call, 2026-09-20, with the repetition stated: the
+    thread is then a real record of the failure set shrinking run by
+    run, and the most recent list is always the last thing in it."""
+    fake = FakeGh(list_response=[{"number": 7}])
+    monkeypatch.setattr(ticket_sync, "_run_gh", fake)
+
+    sync_dataset("o", "r", scope, _authored_dataset(5))
+    sync_dataset("o", "r", scope, _authored_dataset(5))
+
+    comments = [c[c.index("--body") + 1] for c in fake.calls if c[:2] == ["issue", "comment"]]
+    assert len(comments) == 2
+    assert comments[0] == comments[1]
+
+
+def test_a_dataset_resolved_to_green_gets_no_list(monkeypatch, scope):
+    fake = FakeGh(list_response=[{"number": 7}])
+    monkeypatch.setattr(ticket_sync, "_run_gh", fake)
+
+    sync_dataset("o", "r", scope, _authored_dataset(0))
+
+    body = _body_of(fake.calls, "comment")
+    assert "Resolved to **green**" in body
+    assert "## Failing checks" not in body
+    assert "must never be empty" not in body
+
+
+def test_an_amber_check_is_listed_under_a_red_ticket(monkeypatch, scope):
+    """Keith's amendment: a red ticket still lists the amber checks,
+    under their own heading."""
+    dataset = {"columns": [{"name": "sex", "checks": [
+        {"key": "unique_dbt", "tool_ref": "dbt:unique", "name": "Duplicate rate",
+         "description": "This value must be unique.",
+         "current": 5, "warn": 1, "fail": 2, "retired_as_of": None},
+        {"key": "duplicate_count_soda", "tool_ref": "soda:duplicate_count",
+         "name": "Duplicate rate", "description": "A few duplicates are tolerated.",
+         "current": 1.5, "warn": 1, "fail": 2, "retired_as_of": None},
+    ]}]}
+    fake = FakeGh(list_response=[])
+    monkeypatch.setattr(ticket_sync, "_run_gh", fake)
+
+    sync_dataset("o", "r", scope, dataset)
+
+    body = _body_of(fake.calls, "create")
+    assert "## Failing checks" in body
+    assert "## Checks in warning" in body
+    assert "A few duplicates are tolerated." in body
