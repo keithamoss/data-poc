@@ -182,7 +182,14 @@
 #                        back out of git history or kept in a massive
 #                        plan file."
 #                        REQUIRED once `status` is "built", no
-#                        exceptions. This is the field that makes
+#                        exceptions. Unlike `linked_tests`,
+#                        `implemented_by` and `evidence`, it is NOT
+#                        rejected on a requirement that is not built:
+#                        it is scoping material and legitimately grows
+#                        before any code does (REQ-QAC-024 accumulated
+#                        fourteen over a day of forks settled one at a
+#                        time, while correctly reading not_started).
+#                        This is the field that makes
 #                        deleting superseded plans prose SAFE rather
 #                        than merely reversible: git preserves a deleted
 #                        write-up, but finding one needs

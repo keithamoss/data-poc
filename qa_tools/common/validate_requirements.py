@@ -216,6 +216,10 @@ def _cross_reference_errors(requirements: list[Requirement]) -> list[str]:
     for r in requirements:
         for field in r.missing_when_built():
             errors.append(f"{r.id}: status is 'built' but {field} is empty")
+        for field in r.present_but_not_built():
+            errors.append(f"{r.id}: has {field} but status is {r.status!r} - a requirement "
+                           f"cannot carry that before the work exists. Set status to 'built', "
+                           f"or remove it")
 
         for entry in r.linked_tests:
             if not _linked_test_exists(entry):

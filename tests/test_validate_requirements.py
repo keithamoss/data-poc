@@ -103,7 +103,11 @@ def test_validate_rejects_a_built_requirement_with_no_linked_tests():
 
 
 def test_validate_allows_not_started_with_no_linked_tests():
-    errors = validate([_valid_entry(status="not_started", linked_tests=[])])
+    # Also clears implemented_by and evidence: since 2026-09-20 a
+    # not_started requirement may not carry those either, so a fixture
+    # keeping them would be asserting something the schema now forbids
+    # rather than the optionality this test is about.
+    errors = validate([_valid_entry(status="not_started", linked_tests=[], implemented_by=[], evidence=[])])
     assert errors == []
 
 
@@ -284,7 +288,7 @@ def test_a_built_requirement_must_say_where_it_is_implemented():
 
 
 def test_implemented_by_is_optional_until_a_requirement_is_built():
-    assert validate([_valid_entry(status="not_started", linked_tests=[])]) == []
+    assert validate([_valid_entry(status="not_started", linked_tests=[], implemented_by=[], evidence=[])]) == []
 
 
 def test_a_python_entry_must_name_a_symbol_not_just_a_file():
@@ -398,3 +402,49 @@ def test_a_module_level_constant_counts_as_a_symbol():
     file."""
     assert _python_symbol_exists("qa_tools/common/vocab.py", ["COMPONENT_CODES"]) is True
     assert _python_symbol_exists("qa_tools/common/vocab.py", ["NOT_A_REAL_CONST"]) is False
+
+
+# ---------------------------------------------------------------------
+# The inverse rule: a requirement carrying built-only evidence while
+# claiming not to have started.
+#
+# Found for real on 2026-09-20. REQ-QAC-024 was finished - 257 of 257
+# checks authored, the CI gate live - and its status field still read
+# `not_started`, because the edit meant to flip it matched nothing and
+# failed silently. Nothing caught it: implemented_by, linked_tests,
+# evidence and decisions are only DEMANDED once status is "built", so a
+# requirement could carry every one of them and still report that no
+# work had begun. It was caught by Keith asking whether the work was
+# finished, which is not a control.
+# ---------------------------------------------------------------------
+
+def test_a_not_started_requirement_cannot_claim_where_it_is_implemented():
+    errors = validate([_valid_entry(status="not_started")])
+    assert any("implemented_by" in e and "but status is" in e for e in errors), errors
+
+
+def test_a_not_started_requirement_cannot_carry_tests_or_evidence():
+    errors = validate([_valid_entry(status="not_started")])
+    assert any("linked_tests" in e and "but status is" in e for e in errors), errors
+    assert any("evidence" in e and "but status is" in e for e in errors), errors
+
+
+def test_in_progress_is_caught_too_not_just_not_started():
+    """The rule is about what the fields claim, not about one status
+    value - a requirement half-built cannot have a measured result
+    either."""
+    errors = validate([_valid_entry(status="in_progress")])
+    assert any("but status is 'in_progress'" in e for e in errors), errors
+
+
+def test_decisions_may_precede_the_work_and_are_not_flagged():
+    """Deliberately excluded from the rule above (Keith, 2026-09-20).
+
+    `decisions` is scoping material and legitimately grows before any
+    code does: REQ-QAC-024 accumulated fourteen of them over a day of
+    forks settled one at a time, while correctly reading `not_started`.
+    A rule covering it would have failed CI on every one of those
+    pushes, which is the opposite of recording a decision the moment it
+    is settled."""
+    entry = _valid_entry(status="not_started", linked_tests=[], implemented_by=[], evidence=[])
+    assert validate([entry]) == []

@@ -157,6 +157,32 @@ class Requirement(_Strict):
         return [name for name in ("linked_tests", "implemented_by", "evidence", "decisions")
                 if not getattr(self, name)]
 
+    def present_but_not_built(self) -> list[str]:
+        """Fields that cannot honestly precede the work, on a requirement
+        that does not claim to be built.
+
+        The inverse of the rule above, and it exists because the rule
+        above has a blind spot that bit for real (Keith, 2026-09-20):
+        REQ-QAC-024 carried a full set of all four fields while still
+        reading `not_started`, because the edit meant to flip its status
+        matched nothing and failed silently. Nothing looked, since those
+        fields are only demanded ONCE status is "built" - so a
+        requirement could hold every piece of evidence that it was
+        finished and still report that it had not begun.
+
+        `decisions` is deliberately NOT in this list. It is scoping
+        material and legitimately grows before any code does - this very
+        requirement accumulated fourteen of them over a day of forks
+        settled one at a time, and a rule covering it would have failed
+        CI on every one of those pushes. The other three each name
+        something that cannot exist yet: code that implements it, tests
+        that verify it, a measurement taken against it.
+        """
+        if self.status == "built":
+            return []
+        return [name for name in ("linked_tests", "implemented_by", "evidence")
+                if getattr(self, name)]
+
 
 class ChangelogItem(_Strict):
     headline: NonEmptyStr
