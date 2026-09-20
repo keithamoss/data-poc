@@ -2920,6 +2920,31 @@ function openCheckPanel(ag, col, ds, column, check, opts){
       <div style="font-size:13px; color:var(--ink-muted);">${check.description}</div>
     </div>` : "";
 
+  // REQ-QAC-024. The so-what to whatItDoesBlock's what: not what the
+  // check looks for, but what a failure most likely means happened
+  // upstream - the question a data steward who does not know dbt or
+  // Soda actually has when something goes red.
+  //
+  // Deliberately says nothing about what to DO about it. Remediation
+  // belongs to the ticket, which is a live thing with an owner and a
+  // state; a check definition is a standing fact, and the two rot at
+  // different rates.
+  //
+  // Omitted rather than shown empty when absent, same as the block
+  // above. Many checks will legitimately never have one: where the
+  // failure cause is self-evident from what the check verifies,
+  // authoring a sentence would be restating it in other words.
+  //
+  // There is no `technical_note` block here and there must never be.
+  // That field is authored for contributors, not viewers, and this page
+  // is published publicly - it is excluded at the builders so it never
+  // reaches the browser at all (pipeline/build_dashboard_data.py).
+  const failureMeansBlock = check.failure_indicates ? `
+    <div class="drawer-section">
+      <h4>What a failure means</h4>
+      <div style="font-size:13px; color:var(--ink-muted);">${check.failure_indicates}</div>
+    </div>` : "";
+
   // Phase 5c: check.changelog is the hand-authored history of documented
   // definition changes (check_lifecycle.py's changelog field) - newest
   // first, each carries date/description/author/breaking. Only shown
@@ -2943,7 +2968,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
         </div>`).join("")}
     </div>` : "";
 
-  body.innerHTML = descBlock + whatItDoesBlock + compareBlock + rowDetailBlock + trendBlock + changelogBlock;
+  body.innerHTML = descBlock + whatItDoesBlock + failureMeansBlock + compareBlock + rowDetailBlock + trendBlock + changelogBlock;
   document.getElementById("check-backdrop").classList.add("open");
   document.getElementById("check-panel").classList.add("open");
   document.getElementById("check-panel").setAttribute("aria-hidden","false");
