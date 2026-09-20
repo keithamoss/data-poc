@@ -1035,19 +1035,12 @@ function buildRealDataset(d){
   const toDate = s => new Date(s.length>10 ? s.replace(" ","T")+"Z" : s+"T00:00:00Z");
 
   const columns = d.columns.map(col => {
-    // SPREAD-THEN-OVERRIDE, deliberately (plans/qa-pipeline.md item 74's
-    // follow-up, 2026-09-19). This used to be a hand-maintained allowlist
-    // of ~11 fields copied across one by one, and that shape has exactly
-    // one failure mode: add a field to the builders and forget it here,
-    // and it vanishes SILENTLY. That is not hypothetical - it shipped.
-    // current_status (each check's own real tool verdict) was dropped
-    // here, so the page fell back to threshold math, and with a null
-    // fail bound a dbt not_null check with 14 real violations rendered
-    // GREEN. Spreading first inverts the failure mode: a new field flows
-    // through by default, and you only write code to CHANGE something.
-    // Safe to spread - nothing anywhere iterates a check's own keys, so
-    // the raw twins left alongside their transformed versions (e.g.
-    // retired_as_of beside retiredAsOf) are inert.
+    // SPREAD-THEN-OVERRIDE, here and on the column below. Never list
+    // the fields to copy: an allowlist drops a new builder field
+    // silently, which this project has paid for twice - see
+    // REQ-DASH-032's decisions for both. Safe to spread; nothing
+    // iterates a check's own keys, so the raw twins left beside their
+    // transformed versions (retired_as_of beside retiredAsOf) are inert.
     const checks = col.checks.map(ck => ({
       ...ck,
       // Phase 5b (plans/publishing-and-history.md Thread D): a check is
@@ -1069,14 +1062,9 @@ function buildRealDataset(d){
       // reads in preference to threshold math.
       history: ck.history.map((h,i)=>({ ...h, idx:i, date: toDate(h.run_date) })),
     }));
-    // Spread-then-override here too, and this is why it matters rather
-    // than being tidy: the comment at the top of this function explains
-    // the hand-maintained-allowlist failure in detail and the fix was
-    // applied to the CHECK map above - while the COLUMN map one line
-    // below stayed an allowlist. REQ-DASH-033 added `key` and `scope`
-    // to both builders, both were silently dropped here, and the
-    // symptom was two sections that simply never rendered with no
-    // error anywhere. Exactly the shape described, one level up.
+    // Same rule as the check map above, and it was an allowlist until
+    // REQ-DASH-033 - which is how the fix for one got applied without
+    // the other.
     return { ...col, checks };
   });
   // A retired check must never be able to turn a column/dataset/agency

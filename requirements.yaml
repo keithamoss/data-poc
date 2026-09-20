@@ -2311,6 +2311,19 @@ requirements:
         check out of a column's many; a section holding one to three has
         already done that, and the extra click was part of what made
         these read as one more column.
+      - Decided every transform between a builder and the page spreads
+        the object it receives and overrides what it means to change,
+        rather than listing the fields to copy. Recorded here because it
+        had lived only in a code comment and a plans item, and this
+        requirement is what it bit. An allowlist has one failure mode -
+        add a field to a builder, forget the transform, and it vanishes
+        with no error - and this project has now paid for it twice. Once
+        when a check's own tool verdict was dropped and a check with 14
+        real violations rendered GREEN, and again when REQ-DASH-033's
+        `key` and `scope` were dropped and two whole sections silently
+        never rendered. The fix for the first was applied to the check
+        map and not to the column map one line below, which is exactly
+        how the second happened.
       - Each row carries its tool reference, for the same reason a check
         card does - three tools ask cp-placements' carer-approval
         question and share one name by design, so without it the
