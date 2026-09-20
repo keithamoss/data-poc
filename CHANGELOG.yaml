@@ -47,13 +47,17 @@
 #   - `headline`: 2-5 words. Mapa's median is 2. Ours were averaging
 #     6.5 - "Four things the register said we hadn't built" says in
 #     eight what "Four things we'd already built" says in four.
-#   - `summary`: REQUIRED here, and no more than 20 words (Keith,
-#     2026-09-20). Mapa leaves it out on six of its seven releases, so
-#     this is a deliberate divergence, not an imitation: we group by
-#     day rather than by named version, and a day needs a line telling
-#     a reader whether it is worth their time. Twenty words is the
-#     point where it stops being that line and starts being a
-#     paragraph.
+#   - `summary`: REQUIRED here. Around 20 words, and 40 at the outside
+#     - Keith, 2026-09-20, setting the ceiling and the condition on it
+#     in the same breath: 40 "would need to be like a lot of changes in
+#     one day". So the length is the day's, not the writer's. A quiet
+#     day that takes 40 words to summarise has been padded; a genuinely
+#     busy one has earned them.
+#
+#     Mapa leaves the summary out on six of its seven releases, so
+#     requiring it is a deliberate divergence, not an imitation: it
+#     groups by named version, we group by day, and a day needs a line
+#     telling a reader whether it is worth their time at all.
 #
 # None of this is gated. Word count IS machine-checkable, unlike voice,
 # so it could be - it is not, because a hard cap would push an author
@@ -97,10 +101,8 @@ intro: >
 releases:
   - date: "2026-09-20"
     summary: >
-      A quieter day under the surface than on it: checks now know which
-      column they belong to without anyone having to read their
-      description, and the tool's own record of what it does became
-      something you can actually check.
+      Checks now sit against the column they actually check, and the
+      tool's own records became something you can verify.
     changes:
       - category: Improved
         items:
@@ -181,11 +183,7 @@ releases:
           - headline: One command to check everything
             components: ["Testing & dev tooling"]
             description: >
-              If you run the tool yourself, a single command now runs
-              every check it has - ruff and yamllint over the code and
-              the config files, the two gates over the requirements and
-              these release notes, the dashboard's own JavaScript tests,
-              and the full Python test suite - and tells you which ones
-              passed. No more working out which set of checks a given
-              change needs, and a check that could not run is reported
-              as exactly that rather than quietly counted as a pass.
+              One command now runs ruff, yamllint, the dashboard's
+              JavaScript tests and the Python suite, so there's no
+              working out which checks a given change needs. Anything
+              that couldn't run says so rather than passing quietly.
