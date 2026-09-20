@@ -72,35 +72,39 @@ _NOTE_HEADING_RE = re.compile(r"^###\s+(?:(\d+)\.\s+)?(.+)$")
 # silently word-joined into one illegible paragraph).
 _LIST_MARKER_RE = re.compile(r"^(?:[-*]\s+|\d+\.\s+)")
 
-# The 5 numbered-item files and the 2 Thread/Phase essay files, keyed by
-# the short "file" id the dashboard's URL/filter state uses - deliberately
-# not just the filename stem, so a rename of the .md file itself doesn't
-# silently change every embedded id.
-# Every plans file that carries numbered items. publishing-and-history
-# and performance were MISSING here until 2026-09-20 - both were
-# classified as essay/thread files when this was written and both had
-# since grown numbered items (8 and 5), so 13 items were invisible to
-# the dashboard's Plans tab, including publishing-and-history #6, the
-# HIGH-priority per-dataset architecture work. A file appearing here AND
-# in THREAD_FILES is fine and intended - parse_plans() walks the two
-# independently, and publishing-and-history genuinely has both shapes.
-# tests/test_plans_md.py asserts generically that no numbered item in
-# any plans/*.md goes unparsed, rather than checking this list, so the
-# next file to grow items cannot be forgotten the same way.
-NUMBERED_FILES = {
-    "wider": "wider.md",
-    "qa-pipeline": "qa-pipeline.md",
-    "publishing-and-history": "publishing-and-history.md",
-    "dashboard": "dashboard.md",
-    "data-generation": "data-generation.md",
-    "tooling": "tooling.md",
-    "performance": "performance.md",
-}
-THREAD_FILES = {
-    "publishing-and-history": "publishing-and-history.md",
-    "conceptual-design": "conceptual-design.md",
-}
+# Every `plans/*.md` file is walked, and its `file` id is its filename
+# stem. Keith's own call, 2026-09-20: "I'm happy for it just to walk all
+# of the markdown files in a given directory - that's probably safer
+# because we will probably add more files as we go."
+#
+# This replaced two hardcoded allowlists, and the reason is a real bug
+# they caused: publishing-and-history.md and performance.md had both
+# grown numbered items after being classified as essay/thread files, so
+# 13 items - including the HIGH-priority per-dataset architecture work -
+# were invisible to the dashboard's Plans tab. Nothing looked wrong; the
+# tab just under-reported. An allowlist fails silently by construction,
+# which is the worst shape for a file that is meant to be this project's
+# own memory.
+#
+# What the old indirection bought, and what dropping it costs: a `file`
+# key decoupled from the filename meant renaming a .md file didn't
+# change every embedded id. Now it does. Judged acceptable - a rename is
+# a deliberate act that would want the dashboard's own filter chip
+# renamed too, and the template already falls back to the raw key
+# (`PLANS_FILE_LABEL[i.file] || i.file`), so an unlabelled file degrades
+# to showing its stem rather than breaking.
+#
+# Each file is parsed for BOTH numbered items and threads, since
+# publishing-and-history.md genuinely carries both shapes. Both have
+# strong, unambiguous signals (`N. **[status, YYYY-MM-DD]**`, and a `##`
+# heading followed by a `**Status:** ... · **Category:** ...` line), so
+# walking every file cannot invent entries that aren't there.
 NOTES_FILE = "running-thoughts.md"
+
+# Deliberately NOT walked: the generated index lives in the same
+# directory and is built FROM these files, so parsing it back in would
+# be circular.
+GENERATED_FILES = {"INDEX.md"}
 
 
 def _join_blocks(blocks: list[str]) -> str:
@@ -220,16 +224,26 @@ def _parse_notes(text: str) -> list[dict]:
 
 def parse_plans(plans_dir: str | Path) -> dict:
     """Returns {"items": [...], "threads": [...], "notes": [...]} across
-    every plans/*.md file - items/threads in each file's own top-to-bottom
-    order, grouped by file in NUMBERED_FILES/THREAD_FILES iteration order
-    (not re-sorted; the dashboard's own filters/sort are a rendering
-    concern, not this module's)."""
+    every `plans/*.md` file, walked from the directory rather than listed
+    - a new plans file needs no code change here. Items and threads come
+    back in each file's own top-to-bottom order, grouped by file in
+    filename order and not re-sorted; the dashboard's own filters and
+    sort are a rendering concern, not this module's."""
     plans_dir = Path(plans_dir)
     items: list[dict] = []
-    for key, fname in NUMBERED_FILES.items():
-        items.extend(_parse_numbered_items((plans_dir / fname).read_text(), key))
     threads: list[dict] = []
-    for key, fname in THREAD_FILES.items():
-        threads.extend(_parse_threads((plans_dir / fname).read_text(), key))
-    notes = _parse_notes((plans_dir / NOTES_FILE).read_text())
+    for path in sorted(plans_dir.glob("*.md")):
+        if path.name in GENERATED_FILES:
+            continue
+        text = path.read_text()
+        items.extend(_parse_numbered_items(text, path.stem))
+        threads.extend(_parse_threads(text, path.stem))
+    # Notes stay tied to their one named file rather than being walked
+    # for: a `### N. Title` heading has no status/category marker to
+    # disambiguate it, so walking would turn any numbered sub-heading in
+    # any file into a "note". running-thoughts.md is genuinely a single,
+    # structurally different file by design (CLAUDE.md describes it as
+    # the raw capture buffer), not one of a growing set.
+    notes_path = plans_dir / NOTES_FILE
+    notes = _parse_notes(notes_path.read_text()) if notes_path.exists() else []
     return {"items": items, "threads": threads, "notes": notes}

@@ -224,9 +224,9 @@ def test_parse_plans_reads_all_files_and_returns_the_combined_shape(tmp_path):
     (plans_dir / "conceptual-design.md").write_text(
         "## Thread A - a thread\n\n**Status:** parked (2026-09-17) · **Category:** QA checks & contract\n\nBody.\n"
     )
-    # Both added to NUMBERED_FILES 2026-09-20 - publishing-and-history
-    # legitimately carries BOTH numbered items and threads, and
-    # performance.md was never listed at all.
+    # publishing-and-history legitimately carries BOTH numbered items and
+    # threads; performance.md was never listed when this was an
+    # allowlist. Both are picked up by the directory walk now.
     (plans_dir / "performance.md").write_text(
         "1. **[done, 2026-09-18]** **[Testing & dev tooling]** A perf item.\n"
     )
@@ -298,3 +298,37 @@ def test_every_numbered_item_in_every_plans_file_is_parsed():
             if (path.stem, int(m.group(1))) not in seen:
                 missing.append(f"{path.name}#{m.group(1)}")
     assert not missing, f"{len(missing)} numbered items never parsed: {missing}"
+
+
+def test_a_brand_new_plans_file_is_picked_up_with_no_code_change(tmp_path):
+    """Keith's own call, 2026-09-20, on being shown that two files had
+    grown numbered items nobody had added to an allowlist: "I'm happy for
+    it just to walk all of the markdown files in a given directory -
+    that's probably safer because we will probably add more files as we
+    go."
+
+    The failure mode the allowlist had is the dangerous kind: a file it
+    didn't know about was skipped SILENTLY, so the dashboard's Plans tab
+    under-reported without anything looking wrong."""
+    (tmp_path / "running-thoughts.md").write_text("### 1. A raw idea\n\nBody.\n")
+    (tmp_path / "a-brand-new-topic.md").write_text(
+        "1. **[todo, 2026-09-20]** **[Dashboard UI]** An item in a file nobody listed.\n"
+    )
+    result = parse_plans(tmp_path)
+    assert [(i["file"], i["number"]) for i in result["items"]] == [("a-brand-new-topic", 1)]
+
+
+def test_the_generated_index_is_not_parsed_as_planning_content(tmp_path):
+    """plans/INDEX.md lives in the same directory and is generated FROM
+    these files - walking the directory must not read it back in, or the
+    index becomes self-referential."""
+    (tmp_path / "running-thoughts.md").write_text("### 1. A raw idea\n\nBody.\n")
+    (tmp_path / "real.md").write_text(
+        "1. **[todo, 2026-09-20]** **[Dashboard UI]** A real item.\n"
+    )
+    (tmp_path / "INDEX.md").write_text(
+        "## plans/real.md\n\n- **#1** `todo` 2026-09-20 - A real item.\n"
+    )
+    result = parse_plans(tmp_path)
+    assert {i["file"] for i in result["items"]} == {"real"}
+    assert not [t for t in result["threads"] if t["file"] == "INDEX"]
