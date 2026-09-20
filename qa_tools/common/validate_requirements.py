@@ -48,6 +48,7 @@ import sys
 from pathlib import Path
 
 from dashboard.requirements_yaml import parse_requirements
+from qa_tools.common.yaml_strict import find_duplicate_keys
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 REQUIREMENTS_YAML = ROOT / "requirements.yaml"
@@ -334,8 +335,12 @@ def validate(requirements: list[dict]) -> list[str]:
 
 
 def main() -> int:
+    # Before anything else: a duplicate key here is content already
+    # LOST by the time the file is a dict, so no downstream check can
+    # see it. See qa_tools/common/yaml_strict.py for the real incident.
+    duplicate_errors = find_duplicate_keys(REQUIREMENTS_YAML)
     requirements = parse_requirements(REQUIREMENTS_YAML)
-    errors = validate(requirements)
+    errors = duplicate_errors + validate(requirements)
 
     if errors:
         print(f"requirements validation FAILED ({len(errors)} error(s)):", file=sys.stderr)

@@ -660,8 +660,15 @@ requirements:
       - A "built" requirement can't ship with zero real linked tests.
     linked_tests:
       - tests/test_validate_requirements.py
+      - tests/test_yaml_strict.py
       - tests/test_requirements_yaml.py
     evidence:
+      - >
+        2026-09-20: the duplicate-key guard run against every
+        hand-authored YAML file in the repo found exactly one real
+        instance - two `decisions:` blocks on REQ-QAC-023, silently
+        costing 5 decisions - and zero false positives across the
+        changelog, the data-asset config and both ODCS contracts.
       - >
         2026-09-20: 27 requirements validate with zero errors, every
         linked_tests and implemented_by entry resolving to a real file or a
@@ -670,9 +677,16 @@ requirements:
       - >
         Linkage to tests is enforced by CI against a real AST parse rather than a string match, because a decorative reference to a test that does not exist is the exact failure this register was built to prevent.
       - >
+        A duplicate mapping key is rejected outright rather than left to
+        PyYAML's last-one-wins. It cost 5 real decisions before the guard
+        existed, and nothing in the Python stack noticed - safe_load, the
+        check-yaml hook and the whole test suite all passed. A second
+        parser happening to be stricter is luck, not a strategy.
+      - >
         The register describes the PRODUCT, not this project's own working process, so conventions about how we work stay in plans files rather than becoming pseudo-requirements.
     implemented_by:
       - requirements.yaml
+      - qa_tools/common/yaml_strict.py::find_duplicate_keys
       - dashboard/requirements_yaml.py::parse_requirements
       - qa_tools/common/validate_requirements.py::validate
 
@@ -970,37 +984,6 @@ requirements:
         apart. A collision is a hard failure at authoring time - not a
         fallback to the full check_id for the colliding check, which
         would put two URL shapes on one page and hide the problem.
-    decisions:
-      - >
-        Took the column from the contract's own schema structure rather
-        than adding a new hand-authored property - considered and
-        rejected once the contract was confirmed able to express it
-        natively (Keith, 2026-09-20).
-      - >
-        Rejected a check_id BUILDER in favour of a validator only. Keith
-        raised it, then declined it on the real numbers: 254 check_ids
-        are authored in YAML where a Python constructor cannot help,
-        against 3 in production Python and 32 in test fixtures.
-        Correctness everywhere comes from validation, not from a
-        constructor serving 1% of cases. The argument that nearly
-        carried it was not call-count but drift-proofing - one module
-        exposing build, parse and validate can be property-tested so the
-        three cannot disagree - so this is worth revisiting if
-        Python-authored check definitions ever stop being a rounding
-        error.
-      - >
-        Rejected two earlier shapes before moving the rules under their
-        column. Reading the column out of the check_id was rejected as
-        still being string-parsing; adding an explicit `column` property
-        was rejected once Keith asked whether the contract could simply
-        say it natively - which it can, because a property-level
-        `type: sql` rule already worked here.
-      - >
-        The three business rules had check_ids naming notification_id,
-        investigation_id and carer_id while the dashboard rendered them
-        as (table). The id said one thing and the page another, and
-        nothing noticed - which is why the new gate cross-checks the two
-        rather than only fixing the attribution once.
     dependencies: []
     linked_tests:
       - tests/test_check_id.py
@@ -1042,6 +1025,36 @@ requirements:
         confirmed to bite against a deliberately broken input rather than
         trusted on a green run.
     decisions:
+      - >
+        Took the column from the contract's own schema structure rather
+        than adding a new hand-authored property - considered and
+        rejected once the contract was confirmed able to express it
+        natively (Keith, 2026-09-20).
+      - >
+        Rejected a check_id BUILDER in favour of a validator only. Keith
+        raised it, then declined it on the real numbers: 254 check_ids
+        are authored in YAML where a Python constructor cannot help,
+        against 3 in production Python and 32 in test fixtures.
+        Correctness everywhere comes from validation, not from a
+        constructor serving 1% of cases. The argument that nearly
+        carried it was not call-count but drift-proofing - one module
+        exposing build, parse and validate can be property-tested so the
+        three cannot disagree - so this is worth revisiting if
+        Python-authored check definitions ever stop being a rounding
+        error.
+      - >
+        Rejected two earlier shapes before moving the rules under their
+        column. Reading the column out of the check_id was rejected as
+        still being string-parsing; adding an explicit `column` property
+        was rejected once Keith asked whether the contract could simply
+        say it natively - which it can, because a property-level
+        `type: sql` rule already worked here.
+      - >
+        The three business rules had check_ids naming notification_id,
+        investigation_id and carer_id while the dashboard rendered them
+        as (table). The id said one thing and the page another, and
+        nothing noticed - which is why the new gate cross-checks the two
+        rather than only fixing the attribution once.
       - >
         Moved the 10 table-level sql rules under their column rather than
         keeping a lookup from check_id to column. The contract can

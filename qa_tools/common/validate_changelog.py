@@ -36,6 +36,7 @@ from pathlib import Path
 
 from dashboard.changelog_yaml import CATEGORIES, parse_changelog
 from qa_tools.common.validate_requirements import _COMPONENT_CODES
+from qa_tools.common.yaml_strict import find_duplicate_keys
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 CHANGELOG_YAML = ROOT / "CHANGELOG.yaml"
@@ -112,8 +113,9 @@ def main() -> int:
     if not CHANGELOG_YAML.exists():
         print(f"CHANGELOG.yaml not found at {CHANGELOG_YAML}", file=sys.stderr)
         return 1
+    duplicate_errors = find_duplicate_keys(CHANGELOG_YAML)
     feed = parse_changelog(CHANGELOG_YAML)
-    errors = validate(feed)
+    errors = duplicate_errors + validate(feed)
     if errors:
         print(f"changelog validation FAILED ({len(errors)} error(s)):", file=sys.stderr)
         for e in errors:
