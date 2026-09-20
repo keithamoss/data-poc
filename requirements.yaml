@@ -1789,23 +1789,29 @@ requirements:
     title: Plain English as a check's primary headline
     date_written: "2026-09-20"
     story: >
-      As a data steward glancing at the dashboard between other work, I
-      want each check to lead with what it checks in plain English
-      rather than with the name of the tool that ran it, so that I can
-      tell what's wrong without decoding three tools' vocabularies
-      first.
+      As a data engineer using this dashboard during a refresh, I want
+      each check to lead with what it checks in plain English rather
+      than with the name of the tool that ran it, so that I can tell
+      what's wrong without decoding three tools' vocabularies first.
     moscow: should
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       Keith, plans/qa-pipeline.md item 25's third scoping question;
       answered 2026-09-19 and detailed with delivery-dashboard-ux's note
-      2026-09-20.
+      2026-09-20. Amended and signed off 2026-09-20 evening, after three
+      of its criteria were found to predate the fields they describe.
     acceptance_criteria:
-      - WHEN a check is displayed, THE SYSTEM SHALL use its plain-English
-        statement of what it verifies as the primary headline, in every
-        place a check's name is rendered today.
-      - THE SYSTEM SHALL render the check's engine and real check name as
-        secondary information on the same view, not hidden behind a
+      - WHEN a check is displayed, THE SYSTEM SHALL use its hand-authored
+        name as the primary headline, in every place a check's technical
+        name is rendered today.
+      - THE SYSTEM SHALL render the check's description on the card,
+        directly beneath the headline.
+      - THE SYSTEM SHALL render the check's tool and terse identifier as
+        secondary information on the same view, derived from its
+        check_id and formatted "tool:terse_name", not hidden behind a
         further click.
       - THE SYSTEM SHALL NOT render the shared category label on a check
         card.
@@ -1816,8 +1822,8 @@ requirements:
       - IF a check declares its failure cause self-evident, THEN THE
         SYSTEM SHALL omit that section and SHALL NOT render the
         declaration itself as viewer-facing text.
-      - IF a check has no plain-English statement, THEN THE SYSTEM SHALL
-        fall back to its existing technical name rather than render an
+      - IF a check has no hand-authored name, THEN THE SYSTEM SHALL fall
+        back to its existing technical name rather than render an
         untitled card.
       - THE SYSTEM SHALL key a check's URL segment on its check_id, and a
         deep link captured before a wording edit SHALL still resolve
@@ -1825,41 +1831,83 @@ requirements:
       - THE SYSTEM SHALL render a check card as a real link, so that
         middle-click, modifier-click and copy-link-address behave as they
         do for any other link on the page.
-      - THE SYSTEM SHALL clamp the card headline to at most two rendered
-        lines, with the full text rendered unclamped in the detail panel,
-        and the status pill SHALL sit at the same position regardless of
-        headline length.
+      - THE SYSTEM SHALL clamp the card description to at most two
+        rendered lines, with the full text rendered unclamped in the
+        detail panel, and the status pill SHALL sit at the same position
+        regardless of description length.
+      - THE SYSTEM SHALL set every hand-authored check field on a card as
+        element text rather than as interpolated markup, so that a value
+        containing a quote or an angle bracket cannot alter the card's
+        structure.
       - WHEN the dashboard is opened directly from the filesystem, THE
         SYSTEM SHALL render every explanation from embedded content with
         no network request.
     non_functional_requirements:
-      - The real cost here is layout, not payload - two sentences across
-        166 checks is roughly 80KB on an 8MB page, and headlines render
-        only inside an open column drawer, never at the executive,
-        agency or dataset tiers.
+      - The real cost here is layout, not payload - descriptions are
+        already embedded for the detail panel, so putting them on the
+        card adds rendering rather than bytes, and cards render only
+        inside an open column drawer, never at the executive, agency or
+        dataset tiers.
       - There is deliberately no authored length cap, so the UI cannot
-        assume short headlines and "keep them short" is not available as
-        a mitigation.
+        assume short descriptions and "keep them short" is not available
+        as a mitigation.
       - The render and e2e fixtures must include at least one check whose
-        statement exceeds 250 characters, or the clamp and panel-header
-        criteria are untestable - every real check today is short.
-      - The template interpolates check text into innerHTML and into an
-        unescaped aria-label attribute. Promoting authored prose to every
-        headline widens where that matters; an apostrophe-heavy sentence
-        containing a double quote breaks out of the attribute.
-      - Both audiences read the same page at different depths, so
-        promoting the steward's headline must not cost the pipeline
+        description exceeds 250 characters, or the clamp and
+        panel-header criteria are untestable - the longest real
+        description today is 156.
+      - Two audiences read the same page at different depths, so
+        promoting the plain-English headline must not cost the pipeline
         maintainer the tool trace they use to find a root cause.
       - Must keep the zero-console-errors bar and the existing Playwright
         e2e suite green.
     dependencies: [REQ-QAC-024]
     linked_tests: []
+    decisions:
+      - Decided the headline is the check's short hand-authored `name`
+        rather than its fuller `description`. The criterion originally
+        said "plain-English statement", written at 09:04 on 2026-09-20
+        when `description` was the only plain-English field a check had;
+        `name` arrived at 13:17 that day and rule 19 of
+        docs/check-authoring-rules.md made it the heading that evening.
+        Measured over all 257 checks - `name` runs 9-36 characters,
+        `description` 27-156 - so the criterion was pointing at the
+        wrong one of two fields rather than being wrong in intent.
+      - Decided the description goes on the card under the headline
+        rather than staying in the detail panel (Keith, 2026-09-20,
+        choosing between the two). Leaving it in the panel would put the
+        plain English one click away from the reader this requirement
+        exists for.
+      - Decided the secondary line is derived mechanically from the
+        check_id tail as "tool:terse_name", rejecting three alternatives.
+        Printing each tool's own check name raw was rejected because 20
+        of 54 exceed 40 characters - datacontract's SQL rules reach 200,
+        restating the description in tool-speak. Truncating to
+        "tool:kind" alone was rejected because eleven different SQL rules
+        would all read "datacontract:sql". Hand-authoring 20 short names
+        (Keith's own proposal) was rejected once the check_id tails
+        turned out to already be exactly that - hand-written, 23
+        characters median, and already CI-gated unique per column by
+        REQ-QAC-023's validate_tail_uniqueness(). A second set would be
+        a mapping that rots.
+      - Decided the card line and the URL segment resolve to the same
+        string, so what a reader sees is what they can deep-link to and
+        grep the contract for.
+      - Decided hand-authored fields are set as element text rather than
+        escaped on their way into an HTML string. An esc() helper only
+        works where someone remembers to call it, which is the same
+        silent-omission shape as the gap it would be fixing; textContent
+        cannot be bypassed by a field added later.
+      - Decided the primary user is a data engineer working a refresh,
+        not a data steward (Keith, 2026-09-20 - stewards never look at
+        this dashboard, so that user does not exist). A team lead
+        glancing at it between other work is the real secondary reader,
+        and is what the two-line clamp and the scannable headline are
+        for.
     open_questions:
       - The card-as-real-link criterion closes half of
         plans/dashboard.md item 15. The rest of that item - per-view
         document.title, focus handling after a route change, an ARIA
         live region - stays its own work.
-
   - id: REQ-GHUB-027
     title: Check explanations in the tickets raised from a failure
     date_written: "2026-09-20"
