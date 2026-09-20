@@ -3089,6 +3089,45 @@ one Thread's narrative.
       rendered supply-history UI also hold up is untested and worth
       checking when this is built.
 
+   **Two scope answers, 2026-09-20 evening (Keith), settled because
+   `delivery-scoper` cannot resolve either from the files and cannot
+   follow a thread adaptively mid-run:**
+
+   - **The committed `qa_results/` history may be REBUILT for both
+     datasets. An explicit, approved exception to a hard rule**, in his
+     words: "given we're making big structural changes, I'm happy to
+     make an exception and approve rebuilding what's there for child
+     protection and obviously for BDM as well." `CLAUDE.md` otherwise
+     states that `qa_results/` is the permanent source of truth and that
+     nothing in it should ever be deleted or regenerated away, so this
+     is a one-off for this restructure, granted for it, and does not
+     generalise to any other work.
+
+     What it actually costs, measured rather than assumed before
+     acting: all 370 `dataset_stats.json` files carry a single
+     `run_by`, and their `run_timestamp` values span 2026-09-18T04:01
+     to 2026-09-19T06:16 - about 26 hours, two days before the
+     decision. So this is machine-generated history from one identity,
+     not a long-accumulated multi-person QA record, and what a rebuild
+     rewrites is the dashboard's own activity feed
+     (`qa_tools/common/changelog.py` derives "who QA'd what, when" from
+     exactly those two fields plus git history). Nothing irreplaceable.
+     Note also that a rebuild is necessarily LOCAL - it re-runs the real
+     tools against regenerated data, which CI must never do.
+
+   - **The synthetic generator is IN SCOPE.**
+     `generator/generate_cp_runs.py` currently emits "a whole delivery's
+     worth of tables at once", so per-table arrival cannot even be
+     exercised without changing it. Keith: "yes, that should be part of
+     this work." It is not a separate follow-up.
+
+   **NOT needed before scoping, deliberately**: which of the three
+   shapes is right (data-driven off each dataset's own config, a
+   per-tool plugin/registry, or collapsing only the mechanical Phase 1/2
+   additions). That is an architecture question and belongs to
+   `delivery-architect` AFTER scoping - `delivery-scoper` needs to know
+   what is in scope, not how it is built.
+
    **Still to do**: turn the decided model plus these three answers into
    real requirements for sign-off. Nothing here is built.
 
