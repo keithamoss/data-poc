@@ -522,6 +522,12 @@ requirements:
         comes from schema structure, not from a new property (Keith's
         own call, 2026-09-20, after establishing the contract can
         express it natively).
+      - The grammar module parses and validates only - it does NOT build
+        check_ids. Keith raised a builder and then declined it on the
+        real numbers on 2026-09-20 - 254 check_ids are authored in YAML
+        where a Python builder cannot help, against 3 in production
+        Python and 32 in tests. Correctness everywhere comes from the
+        validator, not from a constructor serving 1% of cases.
       - Nothing here needs a live connection to data/ or any warehouse.
     dependencies: []
     linked_tests: []
@@ -599,6 +605,16 @@ requirements:
       - All three fields must be plumbed through all four parsers and
         both dashboard builders, not just the one they were first
         authored in.
+      - Authoring hazard, with real evidence. This adds two prose fields
+        to ~258 checks, most of them hand-edited into YAML, and plain
+        English carries apostrophes, colons and hashes that terse
+        technical text does not. Two real breakages happened in a single
+        morning just writing this register - a continuation line
+        beginning with a hash parsed as a comment, and a colon-space
+        inside a plain scalar. Use block scalars for the new fields. The
+        check-yaml pre-commit hook catches unparseable YAML but NOT a
+        mangled-but-still-valid string, which is the more dangerous
+        outcome and has bitten this project before.
       - Text is published on a public site. Keith's explicit, informed
         decision - no limit on what a failure's consequence may say,
         made with that consequence named. If this is ever pointed at

@@ -1269,6 +1269,20 @@ relative, not a schedule — this is weeks of work, not months.
     uniqueness but never shape. Distribution is clean - 243 six-segment
     ids with a column, 15 table-level.
 
+    **A builder was considered and declined**, worth recording since
+    Keith raised it himself ("maybe it's worth having a little utility
+    that does that, that we share across all the tools, just for the
+    sake of clean code and rigor") and then reversed on the real
+    numbers the same morning: **254** check_ids are authored in YAML,
+    where a Python builder cannot help at authoring time, against **3**
+    in production Python (the two Evidently lifecycle modules) and 32 in
+    test fixtures. The grammar module therefore parses and validates
+    only. The argument that nearly carried it was not call-count but
+    drift-proofing - one module exposing build/parse/validate can be
+    property-tested so the three cannot disagree - and that is worth
+    revisiting only if Python-authored check definitions ever stop being
+    a rounding error.
+
     **A live inconsistency found while checking that**, and now fixed by
     REQ-QAC-023: the 3 cross-column business rules have check_ids naming
     `notification_id`/`investigation_id`/`carer_id`, but the dashboard
