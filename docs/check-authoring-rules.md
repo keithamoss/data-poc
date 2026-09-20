@@ -27,8 +27,10 @@ quoting it.
    what a failure MEANS, that clause belongs in `failure_indicates`.
 2. Name no agency. "Every registration identifier must be unique", not
    "BDM's unique registration identifier".
-3. List no values. "one of the values the contract allows", never
-   "M, F, or X".
+3. List no values, and no numeric bands. "one of the values the
+   contract allows", never "M, F, or X"; "inside the expected band for
+   this table", never "[300, 900]". Both already exist structurally in
+   the check.
 4. On an invalid-values check, state the TOLERANCE rather than the check
    type's purpose. "Must be one of the allowed values" is what that
    check already IS; what differs between instances is how much it
@@ -61,7 +63,10 @@ quoting it.
 12. Real column and table names ARE allowed, and are often the clearest
     way to say it.
 13. Assume no run, no cadence and no delivery shape. "the previous
-    supply", never "this run" or "a day's registrations".
+    supply", never "this run" or "a day's registrations". Say **supply**,
+    never "extract" or "file" - standardised 2026-09-20. The one
+    exception is the real column `extract_timestamp`, where "extract" is
+    its name rather than a word for a delivery (rule 12).
 14. Drop measured results; keep the rule they justify. "tolerated null
     up to ~5%" stays, "(real observed range 0.9-3.3%)" goes.
 15. Identical wording across tools is allowed, never required. Check
@@ -166,6 +171,19 @@ This is the rule that prompted `plans/running-thoughts.md` #16: a
 histogram of real arrived value counts answers "which values" far
 better than a sentence restating the contract, because it shows a value
 that is technically allowed but has collapsed to almost nothing.
+
+**A numeric band is a value list too** (Keith, 2026-09-20, asked
+directly). Each table's row-count rule carries a real pair -
+`[300, 900]`, `[600, 1600]`, `[80, 350]` - and the same reasoning
+applies: the band is already structural in the check, so prose would be
+a third copy that cannot be filtered or counted. Write "inside the
+expected band for this table".
+
+The argument the other way was put and lost: unlike a value list, a
+band is not visible to a reader anywhere else on the page today. That
+is a gap in what the dashboard shows, not a reason to write the number
+into prose - the same answer rule 3 already gives for values, where
+`plans/running-thoughts.md` #16 is the real fix.
 
 ### For an invalid-values check, state the tolerance, not the purpose
 
@@ -292,6 +310,20 @@ concept that will not exist in production. Neither will *"a day's
 registrations"* - that assumes a cadence this data asset does not
 guarantee. Compare against **"the previous supply"** instead, which is
 true regardless of how often data arrives or what triggered the check.
+
+**The word is "supply".** Standardised 2026-09-20 on Keith's own call -
+"standardised on supply now rather than using extract anywhere". Before
+that, check prose used "extract", "file" and "supply" interchangeably
+for the same thing, which is three names for one concept in a body of
+text whose whole job is to be read by someone learning the system.
+"Supply" is also what the rest of the dashboard already says.
+
+The one real exception is `extract_timestamp`, a genuine column on
+Birth Registrations. Five checks sit on it, and there "extract" is the
+column's name, not a word for a delivery - rule 12 governs, and the
+name stays as it is. The distinction is worth making rather than
+find-replacing: of the eleven checks whose prose said "extract", five
+were naming that column and six were naming a delivery.
 
 ### Drop measured results; keep the rule they justify
 
