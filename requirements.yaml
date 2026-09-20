@@ -1517,7 +1517,7 @@ requirements:
       - docs/check-authoring-rules.md
       - qa_tools/common/check_lifecycle.py::is_self_evident
       - qa_tools/common/check_lifecycle.py::_lifecycle_fields
-      - qa_tools/common/validate_check_lifecycle.py::_failure_indicates_errors
+      - qa_tools/common/validate_check_lifecycle.py::_explanation_errors
       - qa_tools/common/validate_check_lifecycle.py::_looks_like_sentinel
       - pipeline/build_dashboard_data.py::build
       - pipeline/build_cp_dashboard_data.py::build_one_table
@@ -1567,7 +1567,7 @@ requirements:
       check that has no plain-English explanation, so that coverage
       can't quietly rot the way it would if the field stayed optional.
     moscow: should
-    status: not_started
+    status: built
     source: >
       delivery-scoper, gap found while scoping plans/qa-pipeline.md item
       25; mechanism and exemptions settled with Keith 2026-09-20.
@@ -1609,8 +1609,66 @@ requirements:
         present and that a "why" was consciously decided; by design it
         cannot enforce that either is good.
       - Runs inside the existing CI gate rather than as a new workflow.
+    implemented_by:
+      - qa_tools/common/validate_check_lifecycle.py::_explanation_errors
+      - qa_tools/common/validate_check_lifecycle.py::_looks_like_sentinel
+      - qa_tools/common/check_lifecycle.py::is_self_evident
+      - cli/dashboard.py::validate_check_lifecycle_command
+      - .github/workflows/deploy-pages.yml
+    linked_tests:
+      - tests/test_validate_check_lifecycle.py::test_a_check_with_no_description_is_an_error
+      - tests/test_validate_check_lifecycle.py::test_an_active_check_with_no_failure_indicates_is_an_error
+      - tests/test_validate_check_lifecycle.py::test_the_self_evident_sentinel_satisfies_the_gate
+      - tests/test_validate_check_lifecycle.py::test_a_near_miss_spelling_of_the_sentinel_is_rejected
+      - tests/test_validate_check_lifecycle.py::test_a_retired_check_is_held_to_the_same_terms
+      - tests/test_validate_check_lifecycle.py::test_both_halves_are_reported_in_one_run
+      - tests/test_validate_check_lifecycle.py::test_the_gate_is_off_by_default_and_fatal_only_when_asked
+    evidence:
+      - >
+        2026-09-20: the gate passes over all 258 checks with
+        --require-explanations on, and is live in deploy-pages.yml, so
+        the result cannot silently regress. Removing one check's
+        description in memory produces exactly 1 error naming that
+        check_id, confirming the rule bites rather than passing
+        vacuously.
+      - >
+        2026-09-20: 1 of the 258 is retired, and it was authored rather
+        than excused - the count of checks exempt from these rules is
+        zero.
+    decisions:
+      - >
+        Shipped OFF first, as a count rather than a gate, and switched
+        on only once REQ-QAC-024's authoring pass reached 257 of 257.
+        The counting half was what made that pass tractable - "257
+        checks to write" became a number that visibly moved - and it
+        still runs for anyone invoking the command locally mid-change.
+      - >
+        Retired checks are held to the same terms as active ones, which
+        reverses how this was first built. The first version exempted
+        them on the reasoning that they are history nobody reads in
+        anger. That is wrong twice over: this requirement says
+        otherwise in as many words, and a retired check still renders
+        behind the dashboard's own retired-checks toggle, so a reader
+        can still meet its prose. There was exactly one, and it was
+        authored.
+      - >
+        The gate checks the WORKING TREE only, never the previous
+        commit that validate_check_lifecycle.py also parses. Enforcing
+        at parse time would have made the commit before this one
+        unparseable and broken CI on the very push introducing the
+        fields.
+      - >
+        A near-miss spelling of the sentinel is rejected outright
+        ("self evident", "Self_Evident"). The rule proper accepts any
+        non-empty value, so a typo would satisfy it and then render
+        verbatim under a heading on the published page - the gate is
+        the only layer that can tell a typo from prose someone meant.
+      - >
+        Named --require-explanations rather than
+        --require-failure-indicates, which is what it shipped as. The
+        original name described half the rule, and the half it named
+        was the half this requirement did NOT originally enforce.
     dependencies: [REQ-QAC-024]
-    linked_tests: []
 
   - id: REQ-DASH-026
     title: Plain English as a check's primary headline

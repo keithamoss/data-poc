@@ -427,6 +427,7 @@ checks for birth_registrations:
       samples limit: 100000
       attributes:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_registered.date_ordering_soda
+        name: Registered on or after birth
         category: consistency
         introduced_date: "2026-01-15"
         description: >
@@ -447,6 +448,7 @@ checks for birth_registrations:
       samples limit: 100000
       attributes:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.timestamp_ordering_soda
+        name: Extract timestamp ordering
         category: consistency
         introduced_date: "2026-01-15"
         description: >
@@ -479,6 +481,7 @@ checks for birth_registrations:
       samples limit: 100000
       attributes:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.sibling_match_soda
+        name: Multiple-birth sibling match
         category: consistency
         introduced_date: "2026-01-15"
         description: >
@@ -520,6 +523,7 @@ checks for birth_registrations:
       name: recent birth dates present (freshness)
       attributes:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.freshness_soda
+        name: Recent births present
         category: timeliness
         introduced_date: "2026-01-15"
         description: >

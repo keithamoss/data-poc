@@ -98,6 +98,7 @@ tests:
     config:
       meta:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.multiple_birth_sibling_dbt
+        name: Multiple-birth sibling match
         category: consistency
         introduced_date: "2026-01-15"
         description: >
@@ -109,6 +110,7 @@ tests:
     config:
       meta:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.recency_dbt
+        name: Recent births present
         category: timeliness
         introduced_date: "2026-09-15"
         description: >
@@ -171,6 +173,7 @@ models:
       - dbt_utils.expression_is_true:
           meta:
             check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.expression_is_true_dbt
+            name: Registered on or after birth
             category: consistency
             introduced_date: "2026-09-15"
             description: >
@@ -342,6 +345,7 @@ models:
               max_value: "CURRENT_DATE"
               meta:
                 check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.accepted_range_dbt
+                name: Date of birth in a plausible range
                 category: conformity
                 introduced_date: "2026-09-15"
                 description: >
@@ -639,6 +643,7 @@ models:
               min_value: "DATE '1900-01-01'"
               meta:
                 check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.accepted_range_dbt
+                name: Date of birth in a plausible range
                 category: conformity
                 introduced_date: "2023-01-15"
                 description: >
@@ -808,6 +813,7 @@ models:
               field: cp_client_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.relationships_dbt
+                name: Client reference
                 category: consistency
                 introduced_date: "2023-01-15"
                 description: >
@@ -901,6 +907,7 @@ models:
               field: worker_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.relationships_dbt
+                name: Assigned worker reference
                 category: consistency
                 introduced_date: "2023-01-15"
                 description: >
@@ -968,6 +975,7 @@ models:
               field: notification_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.relationships_dbt
+                name: Notification reference
                 category: consistency
                 introduced_date: "2023-01-15"
                 description: >
@@ -992,6 +1000,7 @@ models:
               field: cp_client_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.relationships_dbt
+                name: Client reference
                 category: consistency
                 introduced_date: "2023-01-15"
                 description: >
@@ -1045,6 +1054,7 @@ models:
               field: worker_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.relationships_dbt
+                name: Lead worker reference
                 category: consistency
                 introduced_date: "2023-01-15"
                 description: >
@@ -1095,6 +1105,7 @@ models:
               field: cp_client_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.relationships_dbt
+                name: Client reference
                 category: consistency
                 introduced_date: "2023-01-15"
                 description: >
@@ -1136,6 +1147,7 @@ models:
               field: carer_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.relationships_dbt
+                name: Carer reference
                 category: consistency
                 introduced_date: "2023-01-15"
                 description: >

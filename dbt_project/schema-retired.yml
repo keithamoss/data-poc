@@ -37,7 +37,10 @@ models:
                   consumer reads it. Format validation on a field nothing
                   downstream relies on isn't worth keeping as an active gate;
                   the not_null test on this column stays active.
-                description: "Catches upstream internal-ID-format changes before they reach consumers as silent garbage."
+                description: >
+                  This value must be in the expected format.
+                failure_indicates: >
+                  self-evident
                 changelog:
                   - date: "2026-09-17T00:00:00Z"
                     description: "Retired - low-value check on an internal-only trace field, no downstream consumer."

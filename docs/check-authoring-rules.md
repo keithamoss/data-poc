@@ -1,7 +1,9 @@
 # Check authoring rules
 
-How to write the three hand-authored prose fields every QA check
-carries: `description`, `failure_indicates` and `technical_note`. These
+How to write the hand-authored prose every QA check carries: the three
+fields a reader meets - `description`, `failure_indicates` and the
+heading, `name` - plus `technical_note`, which is for contributors and
+is never published. These
 are the fields a data steward actually reads in the dashboard's check
 drawer, so they are the only part of a check definition written for
 someone who does not know dbt, Soda, datacontract-cli or Evidently.
@@ -102,6 +104,16 @@ quoting it.
     the published page.
 18. Editing any of the three changes nothing else: no config-hash
     change, no changelog entry, no audit trail.
+
+**`name` - the heading, where the default is not good enough**
+
+19. A check's `name` is its heading, and the same real-world check must
+    read identically across tools. Keep it to a few words, no verb
+    needed: "Carer reference", "Registered on or after birth". Rules 2,
+    3, 10, 11 and 13 apply to it exactly as they do to the other three
+    fields - no agency, no figures, no tool or macro, no delivery
+    mechanics. Where a check already has a sibling with a `name`, reuse
+    that sibling's wording rather than writing a second one.
 
 ---
 
@@ -435,6 +447,27 @@ threshold. Check the config before deciding which case a check is in.
 So splitting wording **apart** is as much part of authoring as reusing
 it. Check what the check actually does before copying its sibling's
 text.
+
+---
+
+## Naming a check
+
+Most checks need no `name` at all - the heading falls back to the label
+each tool's own runner writes (`Invalid values`, `Null rate`), which is
+already plain. Author one only where that fallback would show something
+a steward cannot read: a raw macro (`dbt:escalation_completeness`), or a
+tool's own generated sentence (*"values in (carer_id) must exist in
+cp_carers (carer_id)"*).
+
+**The heading is not the identity.** It was once, which is why headings
+used to carry the tool and macro - they had to stay unique within a
+column. The URL keys on the `check_id`'s final segment now, so a heading
+can be reworded freely and a bookmark still resolves.
+
+**Say it the same way across tools.** The same real-world check is
+usually implemented three times, and three headings for one rule reads
+as three rules. The 13 names authored on 2026-09-20 each reused the
+wording their datacontract sibling already carried, for that reason.
 
 ---
 

@@ -61,10 +61,9 @@ def test_validate_check_lifecycle_raises_click_exception_on_nonzero_exit(monkeyp
 
     # Takes the flag REQ-QAC-024 added, defaulted here rather than
     # swallowed with *_: the bare command must still pass False, which
-    # is what keeps the failure_indicates gate off until the authoring
-    # pass is done.
+    # is what keeps the explanations gate off unless asked for.
     monkeypatch.setattr(validate_check_lifecycle, "main",
-                        lambda require_failure_indicates=False: 1)
+                        lambda require_explanations=False: 1)
 
     result = _runner.invoke(dashboard_cli.dashboard_group, ["validate-check-lifecycle"])
 
@@ -77,10 +76,9 @@ def test_validate_check_lifecycle_succeeds_on_zero_exit(monkeypatch):
 
     # Takes the flag REQ-QAC-024 added, defaulted here rather than
     # swallowed with *_: the bare command must still pass False, which
-    # is what keeps the failure_indicates gate off until the authoring
-    # pass is done.
+    # is what keeps the explanations gate off unless asked for.
     monkeypatch.setattr(validate_check_lifecycle, "main",
-                        lambda require_failure_indicates=False: 0)
+                        lambda require_explanations=False: 0)
 
     result = _runner.invoke(dashboard_cli.dashboard_group, ["validate-check-lifecycle"])
 

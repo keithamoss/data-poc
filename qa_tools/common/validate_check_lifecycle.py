@@ -146,27 +146,39 @@ def _looks_like_sentinel(value: str) -> bool:
     return re.sub(r"[^a-z]", "", value.lower()) == "selfevident"
 
 
-def _failure_indicates_errors(checks: list[cl.CheckMetadata]) -> list[str]:
-    """REQ-QAC-024: every ACTIVE check must say what a failure means, or
-    say explicitly that the cause is self-evident from what the check
-    verifies. An absent value is neither - it is a field nobody filled
-    in, and the whole point of the `self-evident` sentinel is to make
-    that distinguishable from a deliberate decision.
+def _explanation_errors(checks: list[cl.CheckMetadata]) -> list[str]:
+    """REQ-QAC-025: no check ships without a plain-English explanation.
 
-    Retired checks are exempt. They are history, kept so a past run
-    still resolves its own check_ids, and nobody reads their prose in
-    anger - demanding an author now would mean writing an explanation
-    for a check that has not run in months.
+    Two separate requirements, both reported in the same pass so a
+    contributor fixing a batch sees the whole list rather than one at a
+    time:
 
-    Off by default, and that is deliberate rather than timid: this
-    cannot be switched on until all 257 active checks are authored, so
-    until then it runs as a progress count rather than a gate. Flipping
-    it on is one flag on deploy-pages.yml's own step.
+    - every check states what it VERIFIES (`description`);
+    - every check either states what a failure INDICATES, or declares
+      explicitly that the cause is self-evident from what it verifies.
+
+    An absent `failure_indicates` is neither of those - it is a field
+    nobody filled in, and the whole point of the `self-evident`
+    sentinel is to make a deliberate decision distinguishable from an
+    unfilled one.
+
+    RETIRED CHECKS ARE INCLUDED, on the same terms as active ones. An
+    earlier version of this exempted them, reasoning that they are
+    history nobody reads - but REQ-QAC-025 says otherwise in as many
+    words, and it is right: a retired check still renders in the
+    dashboard behind the retired-checks toggle, so a reader can still
+    meet its prose. There is exactly one retired check today and it was
+    authored rather than excused.
+
+    `technical_note` is never required (REQ-QAC-025 again) - it is
+    sparse by design.
     """
     errors = []
     for c in sorted(checks, key=lambda c: c.check_id):
-        if c.retired_as_of:
-            continue
+        if not (c.description or "").strip():
+            errors.append(
+                f"{c.check_id}: no description. Every check must say in plain English "
+                f"what it verifies - see docs/check-authoring-rules.md")
         value = (c.failure_indicates or "").strip()
         if not value:
             errors.append(
@@ -188,23 +200,22 @@ def _failure_indicates_errors(checks: list[cl.CheckMetadata]) -> list[str]:
     return errors
 
 
-def main(require_failure_indicates: bool = False) -> int:
+def main(require_explanations: bool = False) -> int:
     old_checks = collect_checks("HEAD~1")
     new_checks = collect_checks(None)
     errors = cl.validate(old_checks, new_checks) + _check_id_errors(new_checks)
 
-    # Always counted, only sometimes fatal - the count is the useful
-    # half while REQ-QAC-024's authoring pass is still in flight, since
-    # it turns "257 checks to write" into a number that visibly moves.
-    unauthored = _failure_indicates_errors(new_checks)
-    if require_failure_indicates:
+    # Always counted, only sometimes fatal. The counting half was what
+    # made REQ-QAC-024's authoring pass tractable - "257 checks to
+    # write" became a number that visibly moved - and it stays useful
+    # for anyone running the command locally mid-change.
+    unauthored = _explanation_errors(new_checks)
+    if require_explanations:
         errors += unauthored
     elif unauthored:
-        active = sum(1 for c in new_checks if not c.retired_as_of)
-        print(f"  note: {len(unauthored)} of {active} active checks have no "
-              f"failure_indicates yet (REQ-QAC-024). Not failing the build - "
-              f"pass --require-failure-indicates once the pass is complete.",
-              file=sys.stderr)
+        print(f"  note: {len(unauthored)} plain-English explanation(s) missing "
+              f"(REQ-QAC-025). Not failing the build - pass "
+              f"--require-explanations to make this a gate.", file=sys.stderr)
 
     if errors:
         print(f"check-lifecycle validation FAILED ({len(errors)} error(s)):", file=sys.stderr)
@@ -218,4 +229,4 @@ def main(require_failure_indicates: bool = False) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main("--require-failure-indicates" in sys.argv[1:]))
+    sys.exit(main("--require-explanations" in sys.argv[1:]))
