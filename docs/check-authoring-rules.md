@@ -455,9 +455,9 @@ text.
 Most checks need no `name` at all - the heading falls back to the label
 each tool's own runner writes (`Invalid values`, `Null rate`), which is
 already plain. Author one only where that fallback would show something
-a data engineer cannot read: a raw macro
-(`dbt:escalation_completeness`), or a tool's own generated sentence
-(*"values in (carer_id) must exist in cp_carers (carer_id)"*).
+that only makes sense to someone who knows the tool that produced it: a
+raw macro (`dbt:escalation_completeness`), or a tool's own generated
+sentence (*"values in (carer_id) must exist in cp_carers (carer_id)"*).
 
 **The heading is not the identity.** It was once, which is why headings
 used to carry the tool and macro - they had to stay unique within a

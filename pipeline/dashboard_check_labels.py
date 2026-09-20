@@ -91,10 +91,10 @@ def display_name(check_name: str, engine_short: str, label: str | None) -> str:
     dbt:accepted_values (dbt-core)". Both are gone (Keith, 2026-09-20,
     plans/running-thoughts.md #19): rules 10 and 11 of
     docs/check-authoring-rules.md forbid naming a tool or a macro
-    anywhere in a check's prose, on the grounds that a data engineer
-    does not know which tool ran the check - and the heading directly
-    above that prose was doing exactly that, on every check in the
-    dashboard.
+    anywhere in a check's prose, on the grounds that a check's
+    explanation should not assume the reader knows which tool ran it -
+    and the heading directly above that prose was doing exactly that, on
+    every check in the dashboard.
 
     Nothing is lost by dropping the tool. Every check card and drawer
     already carries `note` - "Computed by dbt-core against this run's
