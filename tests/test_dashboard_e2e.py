@@ -849,3 +849,96 @@ class TestAuthoredProseCannotAlterTheCard:
 
         label = clean_page.locator(".check-card").first.get_attribute("aria-label")
         assert label.startswith(self._HOSTILE["name"])
+
+
+class TestAuthoredProseCannotAlterTheDetailPanel:
+    """The card's own version of this is above. The panel has six more
+    hand-authored fields, and one of them is why an esc() helper was the
+    wrong shape: five were found by reading the panel's block builders,
+    and the sixth - the trend chart's SVG <title> annotations - was found
+    only by driving the real page and noticing a real <img> had appeared.
+    A helper protects the call sites somebody remembers to wrap, which is
+    the set you already know about.
+
+    Confirmed failing against the pre-fix build first: 1 injected <img>,
+    1 injected <b>, and window.__pwned set to 2 by the onerror handler.
+    An <img> inside an SVG <title> really does load.
+    """
+
+    _SCRIPTY = '</div><script>window.__pwned=1</script><img src=x onerror="window.__pwned=2">'
+    _QUOTED = 'Quote " and <b>bold</b>'
+
+    def _open_hostile_check(self, page):
+        page.evaluate("""([d, f]) => {
+          const ctx = resolveContext(STATE);
+          const col = ctx.ds.columns.find(c => c.checks && c.checks.length);
+          const ck = col.checks[0];
+          ck.description = d;
+          ck.failure_indicates = f;
+          // Two entries so BOTH chart annotations render - the breaking
+          // one draws a glyph between points, the non-breaking one a
+          // marker on a point, and they are built by separate code.
+          ck.changelog = [
+            {date: ck.history[Math.floor(ck.history.length / 2)].date,
+             description: d, author: f, breaking: true},
+            {date: ck.history[1].date, description: d, author: f, breaking: false},
+          ];
+          openColumnDrawer(ctx.ag, ctx.col, ctx.ds, col);
+          openCheckPanel(ctx.ag, ctx.col, ctx.ds, col, ck);
+        }""", [self._SCRIPTY, self._QUOTED])
+        page.wait_for_timeout(600)
+
+    def test_nothing_authored_can_inject_an_element_into_the_panel(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        self._open_hostile_check(clean_page)
+
+        counts = clean_page.evaluate("""() => {
+          const body = document.getElementById('check-panel-body');
+          return {img: body.querySelectorAll('img').length,
+                  bold: body.querySelectorAll('b').length,
+                  script: body.querySelectorAll('script').length,
+                  pwned: window.__pwned ?? null};
+        }""")
+        assert counts == {"img": 0, "bold": 0, "script": 0, "pwned": None}
+
+    def test_the_authored_sections_still_show_their_real_text(
+            self, clean_page, built_dashboard_html):
+        """Rendering nothing would also pass the test above. The point is
+        that the prose appears, in full, as itself."""
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        self._open_hostile_check(clean_page)
+
+        shown = clean_page.evaluate("""() => {
+          const body = document.getElementById('check-panel-body');
+          const after = h => {
+            const head = [...body.querySelectorAll('h4')].find(x => x.textContent.includes(h));
+            return head ? head.nextElementSibling.textContent : null;
+          };
+          return {what: after('What this check does'),
+                  fail: after('What a failure means'),
+                  changelog_desc: body.querySelector('.changelog-desc').textContent,
+                  changelog_author: body.querySelector('.changelog-author').textContent};
+        }""")
+        assert shown["what"] == self._SCRIPTY
+        assert shown["fail"] == self._QUOTED
+        assert shown["changelog_desc"] == self._SCRIPTY
+        assert shown["changelog_author"].endswith(self._QUOTED)
+
+    def test_the_charts_own_annotations_hold_the_text_literally(
+            self, clean_page, built_dashboard_html):
+        """The one that was missed by reading the code. Both the breaking
+        glyph and the non-breaking marker build an SVG <title> from the
+        same authored description and author."""
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        self._open_hostile_check(clean_page)
+
+        titles = clean_page.locator("#check-panel-body svg title").all_text_contents()
+        annotations = [t for t in titles if t.startswith("Definition changed")]
+        assert len(annotations) == 2, titles
+        for t in annotations:
+            assert self._SCRIPTY in t
+            assert t.endswith(self._QUOTED)

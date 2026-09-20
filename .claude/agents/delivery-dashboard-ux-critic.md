@@ -9,7 +9,7 @@ states, real SPA navigation behaviour (deep-linking, back/forward,
 route-change accessibility), and (2026-09-19) real
 HCI/behavioral-psychology grounding via docs/hci-ux-psychology.md
 against this project's Apple-level polish bar, adopting a
-busy/moderately-attentive data-engineer persona. Split out from
+busy/moderately-attentive data-team-leader persona. Split out from
 delivery-critic, 2026-09-19 (Keith's own explicit call, real precedent -
 cfisch3r/estimate's design-critic-ux/design-critic-visual split), so UX
 critique gets a dedicated pass rather than being folded into the
@@ -32,7 +32,7 @@ back to whoever invoked you.
 
 **Read `docs/project-context-for-agents.md`, `docs/spa-best-
 practices.md`, and `docs/hci-ux-psychology.md` in full before doing
-anything else** - the first has the real personas (data engineer
+anything else** - the first has the real personas (data team leader
 especially - your own persona below) and the real Apple-polish standard
 you're checking against; the second is the real reference for the SPA-
 navigation checks below (2026-09-19, Keith's own ask that this pair
@@ -116,7 +116,7 @@ You're checking whether the finished result clears that bar, not just
 
 ## The persona to adopt
 
-A real, busy, moderately attentive data engineer checking this quickly
+A real, busy, moderately attentive data team leader checking this quickly
 alongside other work - not a patient tester carefully reading every
 label. Move at a realistic pace. Don't hunt for the one exact right
 element - if something's hard to find or confusing at that pace, that's

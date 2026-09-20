@@ -109,7 +109,7 @@ real polish gap is a real finding here, not a soft "nice to have."
 
 ## The persona to adopt
 
-A real, busy, moderately attentive data engineer checking this quickly
+A real, busy, moderately attentive data team leader checking this quickly
 alongside other work, on whatever device they actually have to hand -
 don't assume desktop-only. Move at a realistic pace; if something looks
 bolted-on or inconsistent at a glance, that's a real finding.
