@@ -70,6 +70,38 @@ COLUMN_META = {
     "extract_timestamp": ("timestamp", "When the record was extracted at BDM's source system."),
 }
 
+# Two pseudo-columns, so a check that belongs to the whole table rather
+# than to any one column still has somewhere to live. Before these, the
+# builder dropped every "(table)" result on the floor - 13 real checks
+# across both datasets, carrying prose nobody could read
+# (plans/running-thoughts.md #20).
+#
+# Deliberately TWO rather than one (Keith, 2026-09-20). "Is this supply
+# the right size and current enough" is a different question from "do
+# these tables agree with each other", and lumping them together made a
+# grab-bag. Child Protection already had the second one under this exact
+# name, so that name is reused rather than invented.
+SUPPLY_LEVEL_PSEUDO_COLUMN = "(supply-level checks)"
+TABLE_LEVEL_PSEUDO_COLUMN = "(table-level checks)"
+
+COLUMN_META[SUPPLY_LEVEL_PSEUDO_COLUMN] = (
+    "supply-level",
+    "Checks on the supply as a whole rather than on any one column - whether it "
+    "arrived the right size, and whether it is current.")
+COLUMN_META[TABLE_LEVEL_PSEUDO_COLUMN] = (
+    "table-level",
+    "Rules that span the whole table rather than any one column.")
+
+# datacontract-cli and Soda each spell the row-count check differently.
+_SUPPLY_LEVEL_CHECK_NAMES = {"row_count", "row_count[all]", "datacontract:row_count"}
+_PSEUDO_COLUMNS = (SUPPLY_LEVEL_PSEUDO_COLUMN, TABLE_LEVEL_PSEUDO_COLUMN)
+
+
+def _pseudo_column_for(check_name: str) -> str:
+    return (SUPPLY_LEVEL_PSEUDO_COLUMN if check_name in _SUPPLY_LEVEL_CHECK_NAMES
+            else TABLE_LEVEL_PSEUDO_COLUMN)
+
+
 ALL_COLUMNS = list(COLUMN_META.keys())
 
 
@@ -93,11 +125,21 @@ def build() -> dict:
     for r in results:
         col = r["column_name"]
         if col == "(table)":
-            continue
-        key = (r["engine"], r["check_name"])
+            col = _pseudo_column_for(r["check_name"])
+        # Keyed on check_id, NOT (engine, check_name). Those two are a
+        # DISPLAY name, and two different checks can genuinely share one:
+        # datacontract-cli reports every `type: sql` rule as
+        # "datacontract:custom_sql", so date_of_birth's range check and
+        # its freshness check collided here and one silently swallowed
+        # the other - while both kept writing into the survivor's own
+        # by_run values, which disagree on 166 of the 352 committed runs.
+        # check_id is the identity this system already guarantees unique
+        # (REQ-QAC-023's grammar and tail-uniqueness gates).
+        key = r["check_id"]
         slot = by_column.setdefault(col, {}).setdefault(key, {
             "unit": r["unit"], "warn": r["warn_threshold"], "fail": r["fail_threshold"],
             "dimension": r["dimension"], "label": r.get("label"), "check_id": r["check_id"],
+            "engine": r["engine"], "check_name": r["check_name"],
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
             "status_by_run": {},
         })
@@ -125,7 +167,8 @@ def build() -> dict:
         agg_spec = AGGREGATE_SPEC.get(col)
 
         checks_out = []
-        for (engine, check_name), slot in checks_for_col.items():
+        for slot in checks_for_col.values():
+            engine, check_name = slot["engine"], slot["check_name"]
             attach_aggregate = agg_spec is not None and check_name in agg_spec["check_names"]
             history = []
             for run_id in run_ids_in_order:
@@ -179,6 +222,11 @@ def build() -> dict:
                 "changelog": lifecycle.changelog if lifecycle else [],
             })
 
+        if not checks_out and col in _PSEUDO_COLUMNS:
+            # A real column with no checks says so honestly below. A
+            # pseudo-column with none simply does not exist for this
+            # dataset, and an empty tile would be noise.
+            continue
         if not checks_out:
             # honest placeholder - no rule anywhere covers this column today
             checks_out = [{

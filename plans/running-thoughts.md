@@ -1402,7 +1402,7 @@ hand-author a `name` for all 257 rather than change `display_name()`;
 and whether the heading should instead derive from the newly-authored
 `description`, which would make the authoring pass the input to it.
 
-20. **[todo, 2026-09-20]** **[Dashboard UI]** 13 active checks never reach the dashboard at all, and they are all table-level.
+20. **[done, 2026-09-20]** **[Dashboard UI]** 13 active checks never reach the dashboard at all, and they are all table-level.
 
 Found 2026-09-20 by verifying that `REQ-QAC-024`'s first authored batch
 actually rendered, rather than assuming the builders carried it. Five
@@ -1428,6 +1428,50 @@ right size" - arguably the first question a steward asks about an
 arriving supply - has nowhere to live in it. That is the same
 shape-of-data-asset question `plans/wider.md` #9 raises, just hit from
 a different direction.
+
+**BUILT 2026-09-20. All 257 active checks now render.** The diagnosis
+above was right about the symptom and wrong about the cause, which
+turned out to be three separate things rather than one structural
+quirk:
+
+1. **A bare `continue` on `column_name == "(table)"`** in the Birth
+   Registrations builder. Both pseudo-columns below replace it.
+2. **A deliberate row-count exclusion in BOTH builders, guarding a bug
+   that no longer exists.** Its comment states the reason: a row-count
+   check's severity is "warning", so its `fail_threshold` is None,
+   `checks_out` defaulted a missing one to 0, and `checkStatus()`
+   (`current > fail`) would read any healthy positive row count as RED.
+   Item 74 fixed that at the source - `checkStatus()` returns the
+   tool's own `current_status` first now - so the workaround outlived
+   its bug by long enough to hide 12 real checks.
+3. **A collision that was corrupting the page, not just hiding from
+   it** - see the separate note at the end of this item.
+
+Two pseudo-columns rather than one, Keith's call: `(supply-level
+checks)` for row-count and freshness, `(table-level checks)` for
+cross-table rules. "Is this supply the right size" is a different
+question from "do these tables agree", and Child Protection already had
+the second under that exact name, so it was reused rather than
+invented.
+
+**The third cause was the serious one, and it was live.** The Birth
+Registrations builder keyed its slots on `(engine, check_name)` - a
+DISPLAY name, not an identity. datacontract-cli reports every
+`type: sql` rule as `datacontract:custom_sql`, so `date_of_birth`'s
+range check and its freshness check shared one key: one vanished, and
+both kept writing into the survivor's own values. They genuinely
+disagree on **166 of the 352 committed runs**, so the published
+"plausible range" tile had been showing a mix of two different checks.
+Now keyed on `check_id`, which REQ-QAC-023's grammar and
+tail-uniqueness gates already guarantee unique. Child Protection was
+never affected - its builder is per-table, and scoping by `dataset_id`
+gives zero collisions.
+
+Verified in a real browser rather than at the data layer, which is the
+whole lesson of item 74: BDM shows 1 supply-level column and CP 6, 12
+checks between them, every one green, zero console errors. Locked in by
+`tests-js/table-level-checks.test.js` at the render layer and by two
+new builder tests, the collision one confirmed failing first.
 
 **Keith's call, same day: fix it, but after the current loop of
 building finishes.** So two of the three forks below are already

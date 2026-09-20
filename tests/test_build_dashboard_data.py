@@ -87,7 +87,12 @@ def test_build_produces_one_entry_per_known_column(tmp_path, monkeypatch):
 
     data = bdd.build()
 
-    assert [col["name"] for col in data["columns"]] == bdd.ALL_COLUMNS
+    # Every REAL column, in order. The two pseudo-columns are in
+    # ALL_COLUMNS too but only appear when the dataset actually has a
+    # table-level check to put in them - this fixture has none, and an
+    # empty "(supply-level checks)" tile would be noise.
+    real_columns = [c for c in bdd.ALL_COLUMNS if c not in bdd._PSEUDO_COLUMNS]
+    assert [col["name"] for col in data["columns"]] == real_columns
     assert data["rowCount"] == 4  # latest run (run_02)'s n_rows_generated
     assert data["prevRowCount"] == 3
 
@@ -410,3 +415,99 @@ def test_a_check_with_no_authored_prose_still_builds(tmp_path, monkeypatch):
     may be declared self-evident, so the common case is neither."""
     check = _build_with_authored_check(tmp_path, monkeypatch)
     assert check["failure_indicates"] is None
+
+
+# ---------------------------------------------------------------------
+# Two checks that differ only by check_id.
+#
+# Found 2026-09-20 on the real data, not invented: Birth Registrations'
+# range_check_datacontract and freshness_datacontract both sit on
+# date_of_birth and datacontract-cli reports BOTH as check_name
+# "datacontract:custom_sql", because it does not distinguish one
+# `type: sql` rule from another. The builder keyed its slots on
+# (engine, check_name), so the two collapsed into one - and they
+# genuinely disagree on 166 of the 352 committed runs, so the surviving
+# tile was showing the other check's numbers under its own name.
+#
+# check_id is the identity the rest of this system already guarantees
+# unique (REQ-QAC-023's own grammar and tail-uniqueness gates), so it is
+# what the slot key has to be.
+# ---------------------------------------------------------------------
+
+def _custom_sql(run_id, value, status, check_id):
+    return _check(run_id, "date_of_birth", value, status=status,
+                  check_name="datacontract:custom_sql",
+                  engine="datacontract-cli 1.2.0",
+                  check_id=check_id)
+
+
+RANGE_ID = ("data-asset-1.registry-services.birth-registrations."
+            "stg_birth_registrations.date_of_birth.range_check_datacontract")
+FRESH_ID = ("data-asset-1.registry-services.birth-registrations."
+            "stg_birth_registrations.date_of_birth.freshness_datacontract")
+
+
+def test_two_checks_sharing_a_display_name_stay_separate(tmp_path, monkeypatch):
+    _no_retired_checks(monkeypatch)
+    results_path = tmp_path / "results_bdm.json"
+    results_path.write_text(json.dumps({
+        "runs": FIXTURE_RUNS,
+        "results": [
+            _custom_sql("run_01_2026-09-01", 5, "fail", RANGE_ID),
+            _custom_sql("run_01_2026-09-01", 0, "pass", FRESH_ID),
+            _custom_sql("run_02_2026-09-02", 0, "pass", RANGE_ID),
+            _custom_sql("run_02_2026-09-02", 1, "fail", FRESH_ID),
+        ],
+        "dataset_stats": FIXTURE_DATASET_STATS,
+    }))
+    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(results_path))
+
+    dob = next(c for c in bdd.build()["columns"] if c["name"] == "date_of_birth")
+    by_id = {c["check_id"]: c for c in dob["checks"]}
+
+    assert RANGE_ID in by_id and FRESH_ID in by_id, "one check swallowed the other"
+
+    # ...and each keeps its OWN values, rather than whichever result was
+    # written to the shared slot last.
+    def value(check, run_id):
+        return next(h["value"] for h in check["history"] if h["run_id"] == run_id)
+
+    assert value(by_id[RANGE_ID], "run_01_2026-09-01") == 5
+    assert value(by_id[FRESH_ID], "run_01_2026-09-01") == 0
+    assert value(by_id[RANGE_ID], "run_02_2026-09-02") == 0
+    assert value(by_id[FRESH_ID], "run_02_2026-09-02") == 1
+
+
+def test_a_table_level_check_lands_in_a_pseudo_column(tmp_path, monkeypatch):
+    """plans/running-thoughts.md #20: "(table)" results used to be dropped
+    on the floor - a bare `continue` - so 13 real checks across both
+    datasets rendered nowhere at all, prose and all.
+
+    Two pseudo-columns rather than one (Keith, 2026-09-20): a row-count
+    check answers "is this supply the right size", which is not the same
+    question as a cross-table rule's "do these tables agree".
+    """
+    _no_retired_checks(monkeypatch)
+    results_path = tmp_path / "results_bdm.json"
+    results_path.write_text(json.dumps({
+        "runs": FIXTURE_RUNS,
+        "results": [
+            _check("run_01_2026-09-01", "(table)", 3, check_name="datacontract:row_count",
+                   engine="datacontract-cli 1.2.0", check_id="a.b.c.d.rowCount_datacontract"),
+            _check("run_02_2026-09-02", "(table)", 4, check_name="datacontract:row_count",
+                   engine="datacontract-cli 1.2.0", check_id="a.b.c.d.rowCount_datacontract"),
+            _check("run_01_2026-09-01", "(table)", 0, check_name="dbt:escalation_completeness",
+                   check_id="a.b.c.d.escalation_completeness_dbt"),
+            _check("run_02_2026-09-02", "(table)", 0, check_name="dbt:escalation_completeness",
+                   check_id="a.b.c.d.escalation_completeness_dbt"),
+        ],
+        "dataset_stats": FIXTURE_DATASET_STATS,
+    }))
+    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(results_path))
+
+    by_name = {c["name"]: c for c in bdd.build()["columns"]}
+
+    supply = by_name[bdd.SUPPLY_LEVEL_PSEUDO_COLUMN]
+    table = by_name[bdd.TABLE_LEVEL_PSEUDO_COLUMN]
+    assert [c["check_id"] for c in supply["checks"]] == ["a.b.c.d.rowCount_datacontract"]
+    assert [c["check_id"] for c in table["checks"]] == ["a.b.c.d.escalation_completeness_dbt"]

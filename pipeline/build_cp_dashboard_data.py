@@ -53,6 +53,16 @@ ENGINE_SHORT = {
 
 BUSINESS_RULE_PSEUDO_COLUMN = "(table-level checks)"
 
+# Row-count checks get their own home rather than sharing the one above
+# (Keith, 2026-09-20): "is this supply the right size" is a different
+# question from "do these tables agree with each other".
+SUPPLY_LEVEL_PSEUDO_COLUMN = "(supply-level checks)"
+SUPPLY_LEVEL_META = (
+    "supply-level",
+    "Checks on the supply as a whole rather than on any one column - whether it "
+    "arrived the right size, and whether it is current.")
+_SUPPLY_LEVEL_CHECK_NAMES = {"row_count", "row_count[all]", "datacontract:row_count"}
+
 TABLE_META = {
     "cp_clients": "One row per child with a Child Protection casework history, per quarterly snapshot extract.",
     "cp_notifications": "One row per notification (a report of concern about a child) - 1-4 per client, more for children with a higher-risk history.",
@@ -75,6 +85,7 @@ COLUMN_META = {
         "case_status": ("string · varchar(10)", "Open or Closed — derived from investigation state, not independently random (see child_protection.py)."),
         "extract_timestamp": ("timestamp", "When this snapshot was extracted from the casework system."),
         BUSINESS_RULE_PSEUDO_COLUMN: ("table-level", "No cross-table business rule is anchored on this table today."),
+        SUPPLY_LEVEL_PSEUDO_COLUMN: SUPPLY_LEVEL_META,
     },
     "cp_notifications": {
         "notification_id": ("string · varchar(20)", "Primary key. dirty(amber/red) presets inject near-duplicates here."),
@@ -87,6 +98,7 @@ COLUMN_META = {
         "outcome": ("string · varchar(30)", "Closed value set — 'Investigation opened' is what the escalation-completeness rule checks."),
         "extract_timestamp": ("timestamp", "When this snapshot was extracted from the casework system."),
         BUSINESS_RULE_PSEUDO_COLUMN: ("table-level", "Escalation completeness — see that check's own note for the real numbers."),
+        SUPPLY_LEVEL_PSEUDO_COLUMN: SUPPLY_LEVEL_META,
     },
     "cp_investigations": {
         "investigation_id": ("string · varchar(20)", "Primary key."),
@@ -98,6 +110,7 @@ COLUMN_META = {
         "lead_worker_id": ("string · varchar(20)", "Foreign key → cp_case_workers.worker_id."),
         "extract_timestamp": ("timestamp", "When this snapshot was extracted from the casework system."),
         BUSINESS_RULE_PSEUDO_COLUMN: ("table-level", "Closed-case investigation hygiene — see that check's own note for the real numbers."),
+        SUPPLY_LEVEL_PSEUDO_COLUMN: SUPPLY_LEVEL_META,
     },
     "cp_placements": {
         "placement_id": ("string · varchar(20)", "Primary key."),
@@ -109,6 +122,7 @@ COLUMN_META = {
         "placement_suburb": ("string · varchar(100)", "Required."),
         "extract_timestamp": ("timestamp", "When this snapshot was extracted from the casework system."),
         BUSINESS_RULE_PSEUDO_COLUMN: ("table-level", "Placement/carer approval compliance — see that check's own note for the real numbers."),
+        SUPPLY_LEVEL_PSEUDO_COLUMN: SUPPLY_LEVEL_META,
     },
     "cp_carers": {
         "carer_id": ("string · varchar(20)", "Primary key."),
@@ -118,6 +132,7 @@ COLUMN_META = {
         "approval_status": ("string · varchar(20)", "Closed value set — what the placement/carer approval compliance rule checks placements against."),
         "extract_timestamp": ("timestamp", "When this snapshot was extracted from the casework system."),
         BUSINESS_RULE_PSEUDO_COLUMN: ("table-level", "No cross-table business rule is anchored on this table today."),
+        SUPPLY_LEVEL_PSEUDO_COLUMN: SUPPLY_LEVEL_META,
     },
     "cp_case_workers": {
         "worker_id": ("string · varchar(20)", "Primary key."),
@@ -126,6 +141,7 @@ COLUMN_META = {
         "team_region": ("string · varchar(30)", "Closed value set."),
         "extract_timestamp": ("timestamp", "When this snapshot was extracted from the casework system."),
         BUSINESS_RULE_PSEUDO_COLUMN: ("table-level", "No cross-table business rule is anchored on this table today."),
+        SUPPLY_LEVEL_PSEUDO_COLUMN: SUPPLY_LEVEL_META,
     },
 }
 
@@ -138,21 +154,21 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
 
     by_column: dict[str, dict[tuple, dict]] = {}
     for r in results:
-        if r["check_name"] in ("row_count", "datacontract:row_count"):
-            # excluded from the per-column checks, same as
-            # build_dashboard_data.py's birth-registrations equivalent:
-            # rowCount only ever feeds the dataset's own rowCount/
-            # prevRowCount fields below, never a column tile. Necessary
-            # here specifically (birth-registrations never hit this) -
-            # this check's severity is "warning" not "error", so its real
-            # fail_threshold is None, and the dashboard's checks_out
-            # construction defaults a missing fail_threshold to 0 - which
-            # would make checkStatus() (current > fail) read any healthy
-            # positive row count as red. A real display bug, caught by
-            # actually rendering this in a browser before calling Phase 3
-            # done, not a fabricated concern.
-            continue
-        col = BUSINESS_RULE_PSEUDO_COLUMN if r["column_name"] == "(table)" else r["column_name"]
+        # Row-count checks used to be skipped outright here, and the
+        # reason was real at the time: this check's severity is "warning"
+        # so its fail_threshold is None, checks_out defaulted a missing
+        # one to 0, and checkStatus() (current > fail) would read any
+        # healthy positive row count as RED. Item 74 fixed that at the
+        # source - checkStatus() now returns the tool's own
+        # current_status first and only falls back to threshold maths -
+        # so the workaround outlived its bug, and the cost of keeping it
+        # was 12 real checks rendering nowhere
+        # (plans/running-thoughts.md #20).
+        if r["column_name"] == "(table)":
+            col = (SUPPLY_LEVEL_PSEUDO_COLUMN if r["check_name"] in _SUPPLY_LEVEL_CHECK_NAMES
+                   else BUSINESS_RULE_PSEUDO_COLUMN)
+        else:
+            col = r["column_name"]
         if col not in column_meta:
             continue
         key = (r["engine"], r["check_name"])
