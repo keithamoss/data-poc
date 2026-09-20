@@ -319,3 +319,18 @@ def test_multiple_components_survive_a_wrap_between_them(tmp_path):
     item = parse_changelog(path)["entries"][0]["sections"][0]["items"][0]
     assert item["components"] == ["Dashboard UI", "Testing & dev tooling"]
     assert item["text"] == "Body text."
+
+
+def test_a_hyphenated_word_wrapped_across_lines_is_rejoined_without_a_space():
+    """Same real bug as tests/test_plans_md.py's own case - changelog_md.py
+    joins an entry's wrapped lines with " ".join too, so "256-\ncolour"
+    renders as "256- colour" in the live Release Notes panel. 9 occurrences
+    when this test was written, one of them in an entry written the
+    previous night - the symptom had been patched in the source text once
+    before without the cause being fixed, so it simply recurred."""
+    import re
+    d = parse_changelog("CHANGELOG.md")
+    bad = [m.group(0)
+           for e in d["entries"] for s in e["sections"] for it in s["items"]
+           for m in re.finditer(r"\w+- \w+", it["text"])]
+    assert not bad, f"{len(bad)} hyphen-wrap artifacts, e.g. {bad[:5]}"

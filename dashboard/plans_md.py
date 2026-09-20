@@ -51,6 +51,8 @@ full-CommonMark) markdown-to-HTML pass at render time, not this module.
 """
 from __future__ import annotations
 import re
+
+from dashboard.markdown_text import join_wrapped
 from pathlib import Path
 
 _ITEM_RE = re.compile(
@@ -130,20 +132,20 @@ def _parse_numbered_items(text: str, file_key: str) -> list[dict]:
             stripped = lines[i].strip()
             if not stripped:
                 if cur_words:
-                    blocks.append(" ".join(cur_words))
+                    blocks.append(join_wrapped(cur_words))
                     cur_words = []
             elif _LIST_MARKER_RE.match(stripped):
                 if cur_words:
-                    blocks.append(" ".join(cur_words))
+                    blocks.append(join_wrapped(cur_words))
                     cur_words = []
                 blocks.append(stripped)
             elif blocks and _LIST_MARKER_RE.match(blocks[-1]) and not cur_words:
-                blocks[-1] += " " + stripped
+                blocks[-1] = join_wrapped([blocks[-1], stripped])
             else:
                 cur_words.extend(stripped.split())
             i += 1
         if cur_words:
-            blocks.append(" ".join(cur_words))
+            blocks.append(join_wrapped(cur_words))
         items.append({
             "file": file_key, "number": number, "status": status, "date": date,
             "components": components, "section": section, "text": _join_blocks(blocks),

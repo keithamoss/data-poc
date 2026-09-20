@@ -56,6 +56,8 @@ shape this constrained.
 """
 from __future__ import annotations
 import re
+
+from dashboard.markdown_text import join_wrapped
 from pathlib import Path
 
 _ITEM_TIME_RE = re.compile(r"^\*\*(\d{1,2}:\d{2}(?:am|pm))\*\* — (.*)$")
@@ -113,7 +115,7 @@ def parse_changelog(path: str | Path) -> dict:
 
     def flush_para():
         if current_para:
-            intro_paragraphs.append(" ".join(current_para))
+            intro_paragraphs.append(join_wrapped(current_para))
             current_para.clear()
 
     def flush_item():
@@ -122,7 +124,7 @@ def parse_changelog(path: str | Path) -> dict:
         nonlocal pending_item
         if pending_item is not None:
             pending_item["section"]["items"].append(
-                _parse_item(" ".join(pending_item["lines"]))
+                _parse_item(join_wrapped(pending_item["lines"]))
             )
             pending_item = None
 

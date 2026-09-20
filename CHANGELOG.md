@@ -54,6 +54,28 @@ edited for a punchier, friendlier read than a bare commit log.
   concurrently - real evidence from the verification session's own
   report), and how Keith can invoke it.
 
+## 2026-09-20
+
+### Fixed
+- **11:02am** — **Hyphenated Words Were Breaking Across Lines on the Published Site** **[Dashboard UI]** **[Testing & dev tooling]**
+  Both markdown parsers reassembled hard-wrapped source with a plain
+  `" ".join(...)`, which is right for ordinary prose and wrong for a
+  hyphenated word split across two lines. `A dedicated requirements-` /
+  `analysis subagent system` rendered as **"requirements- analysis"** —
+  195 times across 74 of the 137 plans items, and 9 more in the Release
+  Notes panel. Both live on the published dashboard.
+  Worth recording why it survived: the symptom had been patched once, in
+  the CHANGELOG source text during an unrelated rename, without the
+  cause being touched — so it came straight back, and one of the nine
+  was in an entry written the same night as that "fix". The real fix is
+  one shared helper (`dashboard/markdown_text.py`) used by both parsers,
+  because two copies of this rule is precisely the drift the DRY pass
+  exists to stop. The tricky half is that this project uses `" - "` as a
+  dash constantly, so a trailing hyphen only closes a word when it is
+  attached to one — all 986 legitimate dashes survive untouched. Found
+  incidentally while checking whether a generated index line would be
+  legible.
+
 ### Fixed
 - **11:34pm** — **Eight Agents Declared a Tool None of Them Could Call** **[Testing & dev tooling]** **[Docs & process]**
   The whole `delivery-*` subagent roster was designed around agents

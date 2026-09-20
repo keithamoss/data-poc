@@ -233,3 +233,28 @@ def test_parse_plans_reads_all_files_and_returns_the_combined_shape(tmp_path):
     assert {t["file"] for t in result["threads"]} == {"publishing-and-history", "conceptual-design"}
     assert len(result["notes"]) == 1
     assert result["notes"][0]["title"] == "A raw idea"
+
+
+def test_a_hyphenated_word_wrapped_across_lines_is_rejoined_without_a_space():
+    """Real bug, found 2026-09-20 while checking whether a generated index
+    line would be legible: plans_md.py joins wrapped lines with " ".join,
+    so a hyphenated word split across two source lines ("requirements-\n
+    analysis") comes back as "requirements- analysis". It renders that way
+    in the live dashboard's Plans tab. 195 occurrences across 74 of 137
+    items when this test was written."""
+    import re
+    items = parse_plans("plans")["items"]
+    bad = [(i["file"], i["number"], m.group(0))
+           for i in items for m in re.finditer(r"\w+- \w+", i["text"])]
+    assert not bad, f"{len(bad)} hyphen-wrap artifacts, e.g. {bad[:5]}"
+
+
+def test_a_real_dash_between_words_keeps_its_spaces():
+    """The other half of the same fix, and the reason it can't just strip
+    every trailing hyphen: this project uses ' - ' as a dash constantly
+    ("a real bug - not a design gap"). A line ending in a standalone
+    hyphen is punctuation, not a wrapped word, and must keep its space."""
+    from dashboard.markdown_text import join_wrapped
+    assert join_wrapped(["a real bug -", "not a design gap"]) == "a real bug - not a design gap"
+    assert join_wrapped(["requirements-", "analysis subagent"]) == "requirements-analysis subagent"
+    assert join_wrapped(["plain", "words"]) == "plain words"
