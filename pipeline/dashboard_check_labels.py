@@ -52,6 +52,7 @@ from __future__ import annotations
 # exactly TWO implementations - one JS, one Python - not four. This is
 # the Python one's only home; the JS one is guarded against it by a real
 # shared-fixture cross-check (tests/test_status_parity.py).
+from qa_tools.common.check_id import try_parse
 from qa_tools.common.dataset_status import (  # noqa: F401
     STATUS_ORDER,
     dashboard_status,
@@ -84,10 +85,48 @@ def rank_for_headline(checks_out: list[dict]) -> None:
 
 
 def display_name(check_name: str, engine_short: str, label: str | None) -> str:
-    """The full string shown as a check card's title. `label` comes
-    straight from the check result's own `label` field (see module
-    docstring) - None means the check's own name is already plain enough
-    (a hand-written Soda `name:`, or a business-rule description that's
-    already a full sentence), so no prefix is added."""
-    base = f"{check_name} ({engine_short})"
-    return f"{label} — {base}" if label else base
+    """The string shown as a check card's title.
+
+    The tool and its macro used to be appended - "Invalid values -
+    dbt:accepted_values (dbt-core)". Both are gone (Keith, 2026-09-20,
+    plans/running-thoughts.md #19): rules 10 and 11 of
+    docs/check-authoring-rules.md forbid naming a tool or a macro
+    anywhere in a check's prose, on the grounds that a steward does not
+    know which tool ran the check - and the heading directly above that
+    prose was doing exactly that, on every check in the dashboard.
+
+    Nothing is lost by dropping the tool. Every check card and drawer
+    already carries `note` - "Computed by dbt-core against this run's
+    real data" - so the tool is still one line below, in a sentence
+    rather than in brackets.
+
+    This is only safe because the URL no longer keys on this string; see
+    `url_key()`. While it did, the heading had to stay unique within a
+    column, which is what the macro suffix was really buying.
+
+    `label` is None where the check's own name is already plain (a
+    hand-written Soda `name:`, or a business rule whose name is a full
+    sentence) - that name is used as-is.
+    """
+    return label or check_name
+
+
+def url_key(check_id: str) -> str:
+    """The stable, URL-facing identity of a check.
+
+    The dashboard used to key its /check/ URLs on the DISPLAY name, which
+    made every heading change a broken bookmark and required the heading
+    to stay unique within a column - which is most of why headings read
+    "Invalid values - dbt:accepted_values (dbt-core)" rather than
+    something a steward would recognise (plans/running-thoughts.md #19).
+
+    REQ-QAC-023 already built the guarantee this needs and then left it
+    unused: `validate_tail_uniqueness()` exists precisely because "a
+    dashboard URL carries agency, collection, dataset and column but no
+    table, keying the check on its tail alone". This is that wiring.
+
+    Falls back to the raw check_id for anything that does not parse, so a
+    malformed id degrades to an ugly URL rather than an absent one.
+    """
+    parsed = try_parse(check_id)
+    return parsed.tail if parsed else check_id

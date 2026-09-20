@@ -40,6 +40,30 @@ describe("stateToHash / hashToState round-trip", () => {
     expect(w.stateToHash(state)).toBe("#/agency/registry-services/collection/civil-registration/dataset/birth-registrations");
   });
 
+  it("keys a check URL on its stable key, never on its display heading", () => {
+    // plans/running-thoughts.md #19. The URL used to carry the check's
+    // DISPLAY name, which is why headings read "Invalid values -
+    // dbt:accepted_values (dbt-core)": the heading had to stay unique
+    // within a column, because it WAS the identity.
+    //
+    // It is now the check_id's final segment, which REQ-QAC-023's
+    // validate_tail_uniqueness() already guarantees unique per column -
+    // a gate written for exactly this and left unwired until now. The
+    // point of the test is that rewording a heading must not move a URL.
+    const w = load();
+    const state = {
+      tier: "dataset", agencyId: "registry-services", collectionId: "civil-registration",
+      datasetId: "birth-registrations", columnName: "sex",
+      checkKey: "invalid_percent_soda",
+    };
+    const hash = w.stateToHash(state);
+    expect(hash).toContain("/check/invalid_percent_soda");
+    // and nothing tool-shaped leaks into it
+    expect(hash).not.toMatch(/dbt|soda-core|datacontract-cli/i);
+    w.location.hash = hash;
+    expect(w.hashToState().checkKey).toBe("invalid_percent_soda");
+  });
+
   it("round-trips a column+check drill-down, including names with spaces and slashes", () => {
     const w = load();
     const state = {

@@ -150,6 +150,13 @@ releases:
               to one agreed standard rather than to whoever happened to
               write them, so they read consistently across every check
               and dataset as new ones arrive.
+          - headline: Checks say what they are
+            components: ["Dashboard UI"]
+            description: >
+              Check headings read "Invalid values" and "Registered on or
+              after birth" now, instead of "Invalid values —
+              dbt:accepted_values (dbt-core)". Which tool ran it is
+              still there, in the line underneath.
           - headline: The missing thirteen
             components: ["Dashboard UI"]
             description: >

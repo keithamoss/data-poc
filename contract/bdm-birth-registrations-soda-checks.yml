@@ -407,6 +407,7 @@ checks for birth_registrations:
       samples limit: 100000
       attributes:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.range_check_soda
+        name: Date of birth in a plausible range
         category: conformity
         introduced_date: "2026-09-13"
         description: >
@@ -549,6 +550,7 @@ checks for birth_registrations [recent]:
       samples limit: 5
       attributes:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.invalid_percent_recent_soda
+        name: Invalid values, recent supplies only
         category: conformity
         introduced_date: "2026-01-15"
         description: >

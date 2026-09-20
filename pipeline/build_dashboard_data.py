@@ -32,7 +32,7 @@ from datetime import date, datetime
 from qa_tools.bdm.dataset_stats import AGGREGATE_SPEC
 from qa_tools.common.validate_check_lifecycle import collect_checks
 from pipeline.cadence import classify_arrival, parse_cadence_from_contract
-from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status
+from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, url_key
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 REAL_RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
@@ -191,7 +191,17 @@ def build() -> dict:
             lifecycle = lifecycle_by_id.get(slot["check_id"])
             checks_out.append({
                 "check_id": slot["check_id"],
-                "name": display_name(check_name, engine_short, slot["label"]),
+                # A hand-authored `name` in the check's own metadata wins
+                # over the derived label (plans/running-thoughts.md #19).
+                # The field already existed and was parsed but rendered
+                # nowhere - 16 checks carried one, and they are exactly
+                # the headings a reader wants: "Registered on or after
+                # birth", "Carer approval compliance".
+                "name": (lifecycle.name if lifecycle and lifecycle.name
+                         else display_name(check_name, engine_short, slot["label"])),
+                # The URL-facing identity, stable across heading rewrites
+                # (plans/running-thoughts.md #19). Never `name`.
+                "key": url_key(slot["check_id"]),
                 "dimension": slot["dimension"],
                 "unit": slot["unit"],
                 # item 74 Bug A: None stays None - it means "this check has

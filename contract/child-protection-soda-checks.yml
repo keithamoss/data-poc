@@ -233,6 +233,7 @@ checks for cp_clients:
       samples limit: 100000
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.range_check_soda
+        name: Date of birth in a plausible range
         category: conformity
         introduced_date: "2023-01-15"
         description: >
@@ -409,6 +410,7 @@ checks for cp_notifications:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.relationships_soda
+        name: Client reference
         category: consistency
         introduced_date: "2023-01-15"
         description: >
@@ -420,6 +422,7 @@ checks for cp_notifications:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.relationships_soda
+        name: Assigned worker reference
         category: consistency
         introduced_date: "2023-01-15"
         description: >
@@ -564,6 +567,7 @@ checks for cp_investigations:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.relationships_soda
+        name: Notification reference
         category: consistency
         introduced_date: "2023-01-15"
         description: >
@@ -575,6 +579,7 @@ checks for cp_investigations:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.relationships_soda
+        name: Client reference
         category: consistency
         introduced_date: "2023-01-15"
         description: >
@@ -586,6 +591,7 @@ checks for cp_investigations:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.relationships_soda
+        name: Lead worker reference
         category: consistency
         introduced_date: "2023-01-15"
         description: >
@@ -727,6 +733,7 @@ checks for cp_placements:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.relationships_soda
+        name: Client reference
         category: consistency
         introduced_date: "2023-01-15"
         description: >
@@ -738,6 +745,7 @@ checks for cp_placements:
       samples limit: 5
       attributes:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.relationships_soda
+        name: Carer reference
         category: consistency
         introduced_date: "2023-01-15"
         description: >

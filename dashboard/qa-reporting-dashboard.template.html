@@ -2175,7 +2175,7 @@ function renderFromState(){
   const column = ctx && ctx.ds.columns.find(c=>c.name===STATE.columnName);
   if(column){
     openColumnDrawer(ctx.ag, ctx.col, ctx.ds, column, {pushHistory:false});
-    const check = STATE.checkKey && column.checks.find(c=>c.name===STATE.checkKey);
+    const check = STATE.checkKey && column.checks.find(c=>c.key===STATE.checkKey);
     if(check) openCheckPanel(ctx.ag, ctx.col, ctx.ds, column, check, {pushHistory:false});
     else hideCheckPanel();
   } else {
@@ -2745,7 +2745,13 @@ function openCheckPanel(ag, col, ds, column, check, opts){
     // over. Left untouched when pushHistory is false (re-rendering
     // after setCompareIdx(), or restoring from popstate/reload) so the
     // chosen comparison survives exactly those two cases.
-    STATE = {...STATE, checkKey:check.name, compareIdx:undefined};
+    // Keyed on check.key (the check_id's final segment), never on
+    // check.name. The heading is prose now and prose gets reworded;
+    // an URL that moves when someone improves a sentence is not a
+    // URL (plans/running-thoughts.md #19). check.key is unique within
+    // a column by a real CI gate - validate_tail_uniqueness(), which
+    // REQ-QAC-023 wrote for exactly this use and left unwired.
+    STATE = {...STATE, checkKey:check.key, compareIdx:undefined};
     history.pushState(STATE, "", stateToHash(STATE));
   }
   document.getElementById("check-panel-eyebrow").innerHTML = `<span>${ag.name} / ${col.name} / ${ds.name} / ${column.name}</span>`;

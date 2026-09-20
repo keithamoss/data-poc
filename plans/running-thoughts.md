@@ -1369,7 +1369,7 @@ sent the plain-English rules to `docs/` rather than to `decisions:`.
 Not scoped. Flagged rather than acted on because it is a judgement about
 the deletion pass as a whole, not about this one file.
 
-19. **[todo, 2026-09-20]** **[Dashboard UI]** The check drawer's own heading is jargon, and the prose rules forbid exactly what it says.
+19. **[done, 2026-09-20]** **[Dashboard UI]** The check drawer's own heading is jargon, and the prose rules forbid exactly what it says.
 
 Found 2026-09-20 while grounding `REQ-QAC-024`'s rule 4 in what the
 page actually shows. The drawer title is `check.name`, built by
@@ -1391,6 +1391,57 @@ tool ran the check and should not need to. The heading sitting directly
 above that prose names the tool AND the macro. So the one line on the
 page that is guaranteed to be read is the one line held to no standard
 at all.
+
+**BUILT 2026-09-20.** Zero jargon headings remain, down from 14
+distinct ones. What the forks below could not anticipate is that the
+heading was not only a label: it was the deep-link URL key AND the
+lookup key (`column.checks.find(c => c.name === STATE.checkKey)`). So
+it had to stay unique within a column, and the macro suffix was what
+bought that uniqueness. Rewording it was never a cosmetic change.
+
+`REQ-QAC-023` had already built the answer and left it unwired.
+`validate_tail_uniqueness()`'s own docstring says a dashboard URL
+"carries agency, collection, dataset and column but no table, keying
+the check on its tail alone" - a guarantee written for a URL shape that
+did not exist yet. The URL now keys on that tail
+(`/check/invalid_percent_soda`), so a heading can be reworded without
+moving a bookmark, which it could not before.
+
+Three of the forks resolved themselves once the facts were checked:
+
+- **Does the tool name belong in the heading, given the four-tool
+  shootout?** It does not need to: every card and drawer already
+  carries `note` - "Computed by dbt-core against this run's real
+  data" - so the tool is still there, one line down, in a sentence
+  rather than in brackets. Nothing was lost.
+- **Hand-author a `name` for all 257?** Not needed. The field already
+  existed, was parsed, and was rendered NOWHERE - 16 checks carried one
+  and they were exactly right ("Registered on or after birth", "Carer
+  approval compliance"). Wiring it in cleared 4 of the 14; 13 more were
+  authored by hand, each reusing the wording its datacontract sibling
+  already had so the same real-world check reads identically across
+  tools.
+- **Derive the heading from the new `description`?** No - dbt and Soda
+  deliberately share description wording where they ask the same
+  question, so it does not identify a check.
+
+Verified with a cold deep link in a real browser, not just a unit test:
+`.../column/sex/check/invalid_percent_soda` opens the right check,
+heading reads "Invalid values", breadcrumb right, tool still stated in
+the body, zero console errors. All 258 config hashes byte-identical.
+
+**One thing deliberately accepted**: existing `/check/<heading>` links
+break. They already broke on any heading edit, so keying on the tail
+makes URLs more stable rather than less.
+
+**Left as cosmetic**: a few sibling checks still read slightly
+differently across tools ("Date range" / "Date-of-birth range" / "Date
+of birth in a plausible range"; "Closed-case hygiene" /
+"Closed-case investigation hygiene"), and one authored name still says
+"Extract timestamp ordering" where "extract" is the word standardised
+away on 2026-09-20. Worth a tidy pass, not worth blocking on.
+
+Original scoping below.
 
 Not scoped, and deliberately not fixed alongside the authoring pass -
 it is a different piece of work (a rendering change, not prose) and it
