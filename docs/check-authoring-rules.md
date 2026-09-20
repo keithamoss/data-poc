@@ -11,6 +11,75 @@ authored from here on, across all four tools and every dataset - not
 just to the checks `REQ-QAC-024` rewrote. Read it before adding a check
 or editing any of the three fields.
 
+---
+
+## The rules
+
+Hold a draft against this list. Each rule is expanded further down,
+under the same grouping, carrying the draft it replaced and why that
+draft was rejected - this list is WHAT to do, those sections are why.
+The numbers are stable, so a review can say "rule 9" rather than
+quoting it.
+
+**`description` - what the check verifies**
+
+1. State what the check verifies, and nothing else. If a clause explains
+   what a failure MEANS, that clause belongs in `failure_indicates`.
+2. Name no agency. "Every registration identifier must be unique", not
+   "BDM's unique registration identifier".
+3. List no values. "one of the values the contract allows", never
+   "M, F, or X".
+4. On an invalid-values check, state the TOLERANCE rather than the check
+   type's purpose. "Must be one of the allowed values" is what that
+   check already IS; what differs between instances is how much it
+   tolerates.
+
+**`failure_indicates` - what a failure means upstream**
+
+5. Author one only where the upstream cause is genuinely known.
+   Otherwise write exactly `self-evident`. Expect roughly half of all
+   checks to land there - it is the common case, not a cop-out.
+6. Say what a failure indicates, never the description rephrased. If
+   what you have written is a rephrasing, the answer is `self-evident`.
+7. Say nothing about what to DO about it. Remediation belongs to the
+   ticket.
+
+**`technical_note` - contributor-facing, never published**
+
+8. Use it only for cross-references between checks, and for why a check
+   behaves as it does by construction.
+9. Never for generator or synthetic-data facts; never for a note that
+   really describes a GAP (fix the gap); never for dated definition
+   changes (those are `changelog`).
+
+**All three fields**
+
+10. Name no tool, macro or statistical method. No `accepted_values`, no
+    `invalid_percent`, no "two-sample K-S test".
+11. Cross-reference nothing a reader cannot follow - no file paths, no
+    check ids, no "see the rowCount rule".
+12. Real column and table names ARE allowed, and are often the clearest
+    way to say it.
+13. Assume no run, no cadence and no delivery shape. "the previous
+    supply", never "this run" or "a day's registrations".
+14. Drop measured results; keep the rule they justify. "tolerated null
+    up to ~5%" stays, "(real observed range 0.9-3.3%)" goes.
+15. Identical wording across tools is allowed, never required. Check
+    what the sibling actually does before copying its text - the same
+    rule is often three different questions.
+
+**Mechanics**
+
+16. Use `>` block scalars. Plain English carries apostrophes, colons and
+    hashes that break a plain YAML scalar.
+17. Spell the sentinel exactly `self-evident`. Near-misses are rejected
+    by the lifecycle gate, because any other value renders verbatim on
+    the published page.
+18. Editing any of the three changes nothing else: no config-hash
+    change, no changelog entry, no audit trail.
+
+---
+
 **Where the rules came from.** They were settled with Keith on
 2026-09-20 over 25 real checks, reviewed three at a time. Every rule
 below came from him rejecting a specific draft, which is why each one
