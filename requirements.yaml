@@ -1648,12 +1648,20 @@ requirements:
         datasets carry an authored description and a failure_indicates,
         measured by parsing the real check definitions. The CI gate is
         switched on (deploy-pages.yml runs
-        validate-check-lifecycle --require-failure-indicates), so the
-        count cannot silently regress.
+        validate-check-lifecycle --require-explanations), so the count
+        cannot silently regress. The flag was named
+        --require-failure-indicates when this was first written and is
+        recorded under its real name here; re-measured at the end of the
+        day, 258 checks parse with zero errors, the one retired check
+        included.
       - >
-        2026-09-20: 129 of the 257 use the self-evident sentinel rather
-        than authored prose - 50%, against the "roughly half" this
-        requirement predicted before any check was written.
+        2026-09-20: 213 of the 257 use the self-evident sentinel rather
+        than authored prose - 83% - with 44 carrying authored failure
+        prose. This entry first recorded 129 and 50%, which was true
+        when taken but was taken BEFORE the final pass authoring the
+        remaining 113 checks, most of which landed on the sentinel. The
+        requirement predicted "roughly half" before any check was
+        written; the real answer is four in five.
       - >
         2026-09-20: all 258 check config_hashes byte-identical before
         and after the pass, captured from a git worktree at the
@@ -1666,10 +1674,13 @@ requirements:
         figure in any description; no agency name; no run, extract or
         cadence mechanics.
       - >
-        2026-09-20: 244 of 257 reach the built dashboard carrying their
-        description, and technical_note reaches it zero times. The 13
-        that do not render are table-level checks, a pre-existing gap
-        recorded as plans/running-thoughts.md #20.
+        2026-09-20: 257 of 257 reach the built dashboard carrying their
+        description, and technical_note reaches it zero times as data -
+        its only occurrences in the built page are this register's own
+        prose about the field. This entry first recorded 244 of 257: the
+        13 missing were table-level checks with no column to render
+        under, and routing them to the two supply/table-level pseudo-
+        columns the same day closed that gap.
 
   - id: REQ-QAC-025
     title: No check ships without a plain-English explanation
