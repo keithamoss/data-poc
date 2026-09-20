@@ -32,9 +32,9 @@ def test_every_parsed_entry_appears_in_the_index():
         assert f"**#{item['number']}**" in text
     for thread in parsed["threads"]:
         assert thread["heading"].split(" - ")[0] in text
-    lines = [ln for ln in text.splitlines() if ln.startswith("- ")]
+    top_level = [ln for ln in text.splitlines() if ln.startswith("- ")]
     expected = len(parsed["items"]) + len(parsed["threads"])
-    assert len(lines) == expected, f"{len(lines)} index lines for {expected} entries"
+    assert len(top_level) == expected, f"{len(top_level)} index lines for {expected} entries"
 
 
 def test_every_index_line_says_something():
@@ -54,3 +54,35 @@ def test_the_index_never_claims_to_replace_the_files():
     text = build_index("plans")
     assert "Nothing here replaces the files" in text
     assert "do not hand-edit" in text
+
+
+def test_a_thread_advertises_what_is_actually_inside_it():
+    """Encodes a real incident rather than a hypothetical.
+
+    A `delivery-scoper` run on 2026-09-20 was given an index WITHOUT
+    sub-entries and asked to scope a feature that Thread D had already
+    designed. Thread D's whole index line was "check lifecycle:
+    retirement + definition changes (build together with B)", and the
+    agent reported back: "Too thin to judge relevance from... Had I
+    trusted the index line, I'd have skipped the single most relevant
+    document in the repo and drafted requirements for something already
+    built." It only got there via a cross-reference in an unrelated item.
+
+    A one-line summary of a multi-thousand-word design essay is not
+    enough to decide whether to open it. Sub-entries are what make the
+    index safe to route from, so this asserts the specific thing that
+    would have saved that run."""
+    text = build_index("plans")
+    thread_d = text.split("**Thread D**")[1].split("\n- ")[0]
+    assert "Confirmed field set for the metadata" in thread_d, (
+        "Thread D's index entry no longer advertises the field design it contains")
+
+
+def test_phases_inside_a_build_order_thread_are_individually_listed():
+    """The same failure in its other form - Phase 5c built a shipped UI
+    feature, and lived inside a thread whose own one-line summary was
+    about the section's renumbering housekeeping."""
+    text = build_index("plans")
+    build_order = text.split("**Build order**")[1].split("\n- ")[0]
+    for phase in ("Phase 1", "Phase 2", "Phase 3", "Phase 4", "Phase 5", "Phase 6"):
+        assert phase in build_order, f"{phase} missing from the Build order sub-entries"
