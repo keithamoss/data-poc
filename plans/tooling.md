@@ -1276,7 +1276,21 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     2+ engines, so it was doing real work right up until the sentence
     took over.
 
-    **The rubric matters more than the findings, and is the part to
+**A second real candidate, found 2026-09-20 while scoping check
+    explanations.** `pipeline/build_dashboard_data.py`'s `COLUMN_META`
+    hand-maintains a prose description per column, duplicating the ODCS
+    contract's own property descriptions. They have already drifted -
+    the contract says *"BDM's unique registration identifier. Primary
+    key of the feed."*, `COLUMN_META` says *"BDM's unique registration
+    identifier - primary key of the feed."* Identical content, two
+    hand-maintained copies, and only punctuation separating them so far.
+    Sorts as (a) an accidental copy under this item's own rubric, since
+    the contract is the obvious single source and the dashboard builder
+    is already reading that file for other reasons - but check whether
+    the contract's own descriptions are complete enough to replace
+    `COLUMN_META` wholesale before assuming it collapses cleanly.
+
+        **The rubric matters more than the findings, and is the part to
     settle first.** Today's incident is NOT an argument that duplication
     is bad: `pipeline/cadence.py` duplicates real logic into the
     dashboard's own JS deliberately and correctly (a static site has no

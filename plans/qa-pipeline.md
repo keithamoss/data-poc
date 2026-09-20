@@ -1330,7 +1330,34 @@ relative, not a schedule — this is weeks of work, not months.
     another, and nothing notices. They move to the column their own id
     names, and the new shape-validation cross-checks the two.
 
-    **`label` becomes dead data.** Its only consumer was
+**Two real code findings from the scoping runs, verified at source
+    and not covered by any of the five requirements' own text.**
+
+    First, and it is a live defect rather than a design gap:
+    `check_lifecycle.py`'s contract parser ends
+    `description=meta.get("description") or native_description`, so an
+    ODCS rule's own native `description:` silently becomes the
+    reader-facing text when no `customProperties` one exists. Three
+    checks currently show a data steward *"Same format rule as
+    child_given_names - see that property's description."* - a
+    cross-reference the dashboard cannot resolve, presented as the
+    explanation. A fourth shows a paragraph about RE2 lacking lookahead
+    support. REQ-QAC-024's rewrite would fix the text; nothing currently
+    names the fallback that lets contributor notes reach a viewer at
+    all, so fixing the wording alone would leave the mechanism in place
+    for the next one.
+
+    Second: there is no HTML-escaping helper anywhere in the template -
+    a grep for `escapeHtml`/`function esc` returns nothing - and check
+    text reaches the page through both `innerHTML` interpolation and an
+    unescaped `aria-label` attribute. Repo-authored text, so not an
+    attacker path, but an apostrophe-heavy plain-English sentence
+    containing a double quote breaks out of that attribute, and a `<`
+    silently mangles the panel. Carried as an NFR on REQ-DASH-026;
+    recorded here too because it is a property of the template rather
+    than of that one requirement.
+
+        **`label` becomes dead data.** Its only consumer was
     `display_name(check_name, engine_short, label)` - the card headline
     the plain-English sentence now replaces. Nothing else reads it. Two
     of the three description-parsing sites existed purely to compute it

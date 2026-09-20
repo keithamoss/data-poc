@@ -356,7 +356,7 @@ one when this line suggests it matters.
 - **#11** `todo` 2026-09-19 - A real .claude/settings.json with a SessionStart hook, so a fresh session doesn't start from a half-configured sandbox.
   - *touches:* `dashboard/check_dashboard_renders.py`
 - **#12** `todo` 2026-09-19 - Priority: HIGH - to FIX, not just to record (2026-09-19, Keith's own explicit ask, in as many words: "this is a...
-  - *touches:* `pipeline/dashboard_check_labels.py`, `pipeline/cadence.py`, `qa_tools/common/ticket_sync.py`, `cli/bdm.py`, `cli/cp.py`, `tests/test_dashboard_e2e.py`
+  - *touches:* `pipeline/dashboard_check_labels.py`, `pipeline/build_dashboard_data.py`, `pipeline/cadence.py`, `qa_tools/common/ticket_sync.py`, `cli/bdm.py`, `cli/cp.py` +1 more
 - **#13** `done` 2026-09-19 - The QA wizard goes completely silent for ~13.5 seconds while the real check chain runs.
   - *touches:* `cli/bdm.py`, `cli/cp.py`, `tests/test_chain_progress.py`, `tests/test_cli_cp.py`
 - **#14** `done` 2026-09-19 - Confirming a Promote ended the flow the same way declining it did.
