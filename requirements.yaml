@@ -2294,10 +2294,14 @@ requirements:
         what every column tile already does.
       - Decided to rename the URL segment rather than preserve the
         bracketed pseudo-column names. The draft carried a criterion to
-        keep existing deep links working; it was dropped once the dates
-        were checked - those URLs came into existence the same day, so
-        nothing can have bookmarked one. Worth recording because the
-        answer would be different in a week.
+        keep existing deep links working and it was dropped, on two
+        grounds. The narrow one - those URLs came into existence the
+        same day, so nothing can have bookmarked one - would expire in a
+        week. Keith's own is the standing one, 2026-09-20 - "no one has
+        bookmarked those, this is not production". URL stability is a
+        cost this PoC does not have to pay yet, and a criterion
+        protecting it buys nothing real. That changes the day this
+        becomes something people depend on, and not before.
 
   - id: REQ-DOCS-028
     title: A "What's New" feed written for the people who use the tool
