@@ -1574,3 +1574,58 @@ failure turned out to be and has an owner and a state. And it would
 want a real authoring rule of its own, since "record the kinds of
 issues found" is exactly the loose invitation that produced the prose
 this whole requirement is rewriting.
+
+22. **[parked, 2026-09-20]** **[QA checks & contract]** `dataset` and `table` are the same thing in every check_id, and only one of them should exist.
+
+Keith's question while reviewing the new `/check/` URL shape: "where is
+dataset different to table?" Checked against the real ids rather than
+the prose, and the answer is nowhere. Seven datasets, seven tables,
+strictly 1:1 - the table segment is the dataset segment with `stg_`
+prefixed and hyphens swapped for underscores:
+
+| dataset | table |
+|---|---|
+| `birth-registrations` | `stg_birth_registrations` |
+| `cp-carers` | `stg_cp_carers` |
+| `cp-clients` | `stg_cp_clients` |
+
+**His call: they are always going to be the same thing, it should be
+called `dataset`, and the data-asset segment does not belong in the URL
+either.** Parked rather than done, and revisited alongside the wider
+question of how to model a dataset that is the only thing in its
+collection.
+
+**Why it is parked rather than a quick edit.** Removing `table` from
+`check_id.py`'s `_SEGMENTS` is genuinely one line - the grammar is
+built from that list precisely so a change is one edit. The cost is
+everywhere else: it renames all 258 check_ids, and that collides head
+on with Keith's own standing rule from 2026-09-16, that a `check_id`
+once introduced is PERMANENTLY unique and must never be changed or
+deleted even once retired. That rule came from his own question at the
+time - "if that was real data, we wouldn't want to have to backfill it
+in" - and there are 1,480 committed history files, 129MB, carrying
+those ids. Doing it now would be breaking the rule precisely because
+the data is synthetic and we CAN, which is the lesson the rule exists
+to prevent.
+
+**A real documentation drift found alongside it, worth fixing whenever
+this is picked up.** `CLAUDE.md` describes Child Protection as "one
+collection/dataset, six distinct tables", and gives that as the reason
+`dataset` and `table` are separate segments. The ids say otherwise:
+each CP table is its own DATASET, and the six are grouped by
+COLLECTION - which does not appear in the check_id grammar at all.
+So the two identity schemes overlap on agency + dataset + column, and
+each carries one thing the other does not: the URL adds collection, the
+check_id adds data-asset and table.
+
+That asymmetry is the actual question to settle here, and it is the
+same one `plans/wider.md` #9 raises from the other direction - what a
+data asset looks like when it is not one table per dataset.
+
+One consequence worth knowing: `validate_tail_uniqueness()` currently
+guards a collision that is structurally impossible, and its own
+docstring says so ("it cannot happen today only because every dataset
+maps to exactly one table, and nothing enforces that"). It is not dead
+weight - the `/check/` URL now really does key on the tail, so the
+guarantee is load-bearing the moment a dataset ever gains a second
+table.
