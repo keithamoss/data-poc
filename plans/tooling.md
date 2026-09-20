@@ -1960,3 +1960,105 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     "category axis: a real per-check". The truncation is not random; the
     interesting part of a line of this project's prose tends to be near
     its end.
+
+    **Truncation FIXED 2026-09-20 (Keith's own call - do this one, park
+    the other two).** Measured first rather than guessed, and the
+    measurement changed the fix: **72% of entry summaries and 98% of
+    sub-entries are longer than the 120-character cap**, so where the
+    cut lands is the normal case, not an edge case. Raising the cap was
+    the obvious move and the wrong one - 120 -> 250 would have doubled
+    the index (~7,000 -> ~12,600 tokens) and spent almost all of it on
+    ordinary prose that was never the problem. The two real failures
+    were both structural, and both cheap to fix directly:
+
+    - **A cut that lands inside an open bracket.** This project's prose
+      habitually puts the decision inside a parenthetical - `dashboard.md`
+      #8's entire outcome (the category axis AND the UI surface) is
+      inside one. An unclosed bracket is the one truncation that is
+      actively misleading rather than merely short: it promises a
+      qualification and then withholds it. Now the parenthetical is
+      either carried whole or dropped entirely.
+    - **A colon-ended header followed by a list.** Carrying the
+      following prose verbatim spends the whole budget naming the FIRST
+      member and none of the others - which is exactly how Thread D's
+      field list stopped before `description`. Now the item TERMS are
+      listed instead: "check_id, introduced_date, retired_as_of +
+      retired_reason, description, changelog". It answers the question
+      and is *shorter* than the truncation it replaces.
+
+    Only 21 sub-entries are term lists and only 27 summaries would stop
+    inside a bracket, so letting each run to its natural end cost ~8%
+    (45,297 -> 49,068 bytes), not the ~80% a bigger cap would have.
+
+    Two real bugs found in that fix, both caught by a test written to
+    fail first: a per-term cap that sliced mid-word ("a real visual
+    gap/sp"), and a clause splitter that broke at any `.`, renaming
+    `CLAUDE.md` to `CLAUDE` and `qa_results_writer.py` to
+    `qa_results_writer` - a term list of filenames whose filenames had
+    silently lost their extensions.
+
+18. **[todo, 2026-09-20]** **[Docs & process]**
+    **PARKED by Keith, 2026-09-20** - raised and deliberately deferred in
+    the same conversation, so it is logged rather than lost.
+
+    Point a requirement at the code that implements it, not just at the
+    tests that verify it. `requirements.yaml` has `linked_tests`, which
+    CI resolves against a real AST parse - `tests/test_x.py::TestY::test_z`
+    fails the build if that method does not exist. There is no
+    equivalent for implementation. The full field set today is `id`,
+    `title`, `story`, `moscow`, `status`, `acceptance_criteria`,
+    `linked_tests`, `source`, `date_written`,
+    `non_functional_requirements`, `open_questions`, `dependencies`,
+    `evidence` - and `evidence`, the only free-text candidate, is used
+    by **zero of the 27** requirements.
+
+    **Why this came up, and why it probably matters more than the
+    alternative it displaced.** The third index proof (#17 above) found
+    that `touches:` pointed at the wrong files for item 25 - honestly
+    derived from that item's own prose, but the prose was stale, so the
+    pointers inherited the staleness while looking like ground truth.
+    The obvious response was a manual backfill of `touches:` across
+    ~150 plans entries. Keith's own reaction, and it reframes the
+    problem: *"now that I say it, going forward we're going to have
+    requirements for everything and the requirements point to the files
+    involved, right? Because that's a better source than the plan
+    files, which are going to be high level, kind of almost like
+    ephemeral artifacts."*
+
+    That is the right split. A plans entry is a narrative written at a
+    moment in time and never revisited; a requirement is checked against
+    reality by CI. `linked_tests` already proves the mechanism works. A
+    hand-backfilled `touches:` would be a second, unverified copy of
+    something a requirement could hold authoritatively - so the backfill
+    is parked with this, not scheduled alongside it.
+
+    **Decided in advance (Keith, 2026-09-20), so the build does not have
+    to re-ask:** the field is **required once `status` is `built`** -
+    the same rule `linked_tests` already carries. That is the stronger
+    of the two options considered and it has a real, known cost: all
+    22 already-built requirements need backfilling before CI can go
+    green, so this cannot land incrementally.
+
+    Still open when it is picked up: whether an entry may name a symbol
+    (`qa_tools/common/check_lifecycle.py::parse_contract_check_metadata`,
+    AST-verified like a test node id) or only a file path. Keith's own
+    words leaned toward symbols - "perhaps even the pointers in the
+    file, or at least method names or classes."
+
+19. **[todo, 2026-09-20]** **[Docs & process]**
+    **PARKED by Keith, 2026-09-20**, same conversation as #18.
+
+    `plans/publishing-and-history.md`'s `## Build order` section is one
+    heading over **1,711 lines** - 53% of that whole file - containing
+    Phases 1 through 7, each with its own full build write-up. The index
+    parser keys threads on `##`, so all of it collapses to a single
+    entry: one `done` line, ~44 sub-entries, and a `touches:` list
+    ending "+34 more". In practice that is a "read the whole file"
+    pointer.
+
+    It is not really an index bug. That section is structurally seven
+    sections wearing one heading, and Phase 5c - the sub-heading a real
+    proof run needed and never found - sits three levels inside it. The
+    phases are consistently marked (`**Phase N (...)** - [DONE, date]:`),
+    so promoting them to real entries is tractable; whether to do that
+    in the parser or by splitting the source file is the open question.

@@ -71,6 +71,56 @@ _TEMPLATE = "dashboard/qa-reporting-dashboard.template.html"
 _MAX_PATHS = 6
 _MD_NOISE_RE = re.compile(r"[*`]")
 _MAX_SUMMARY = 120
+# A markdown list directly under a sub-entry's own bold header, and the
+# leading term of each of its items. See _list_leads() for why the terms
+# alone beat the first item's full prose.
+_LIST_ITEM_RE = re.compile(r"(?:^|\n)\s*-\s+(.+?)(?=\n\s*-\s|\Z)", re.S)
+# A clause boundary INSIDE a list item. `\.\s` and not a bare `\.`
+# deliberately: a term is very often a real filename, and splitting
+# `qa_results_writer.py` or `CLAUDE.md` at its extension renames it
+# to something that does not exist.
+_LEAD_SPLIT_RE = re.compile(r"\s+-\s|\.\s|[,;(]")
+_MAX_LEAD = 48
+_MAX_LEADS = 10
+# Two deliberate overruns past _MAX_SUMMARY, both measured rather than
+# guessed (2026-09-20). Only 21 sub-entries in the whole index are term
+# lists and only 27 summaries would otherwise stop inside an open
+# bracket, so carrying each one to its natural end costs ~1,900 tokens
+# on a ~7,000-token index. Raising _MAX_SUMMARY itself to cover the same
+# two cases would have cost three times that, and spent it mostly on
+# ordinary prose that was not the problem.
+_MAX_TERM_LINE = 280
+_MAX_PAREN_CLOSE = 280
+
+
+def _clip(text: str, cap: int) -> str:
+    """Truncate to roughly `cap`, but never stop inside an open bracket.
+
+    Measured 2026-09-20: 72% of entry summaries and 98% of sub-entries
+    are longer than the cap, so where the cut lands is not an edge case,
+    it is the normal case. And this project's prose habitually puts the
+    decision inside a parenthetical - `plans/dashboard.md` #8 reads
+    "...scoped via AskUserQuestion before building (category axis: a real
+    per-check metadata field...; UI surface: grouped collapsible
+    sections...)", where everything that was actually decided is inside
+    the brackets. Cutting at a fixed 120 characters landed on "(category
+    axis: a real per-check", which a real proof run reported as giving no
+    outcome at all - it names the axis of the decision and then stops.
+
+    So when the cut would leave a bracket open, either take the whole
+    parenthetical (if it closes within a modest overrun) or drop it
+    entirely and end on the clause before. An unclosed bracket is the one
+    place a truncation is actively misleading rather than merely short:
+    it promises a qualification it then withholds."""
+    if len(text) <= cap:
+        return text
+    cut = text[:cap].rsplit(" ", 1)[0]
+    if cut.count("(") > cut.count(")"):
+        close = text.find(")", len(cut))
+        if close != -1 and close < _MAX_PAREN_CLOSE:
+            return text[:close + 1] + ("..." if close + 1 < len(text) else "")
+        cut = cut[:cut.rfind("(")].rstrip(" ,;-")
+    return cut + "..."
 
 
 def _summarise(text: str) -> str:
@@ -81,10 +131,7 @@ def _summarise(text: str) -> str:
     the whole point is deciding whether to go and read the real thing."""
     flat = " ".join(text.split())
     first = _SENTENCE_END_RE.split(flat, 1)[0] if flat else ""
-    first = _MD_NOISE_RE.sub("", first).strip()
-    if len(first) > _MAX_SUMMARY:
-        first = first[:_MAX_SUMMARY].rsplit(" ", 1)[0] + "..."
-    return first
+    return _clip(_MD_NOISE_RE.sub("", first).strip(), _MAX_SUMMARY)
 
 
 def _sub_entries(body: str) -> list[str]:
@@ -120,13 +167,50 @@ def _sub_entries(body: str) -> list[str]:
         # which names no fields, in the one sub-entry whose contents were
         # the entire subject of that agent's task. Its own words: "carry no
         # information about what was decided, only that something was."
+        leads = _list_leads(m.group(2))
+        if leads:
+            # A term list gets the longer budget: every character is a
+            # field/option NAME, which is the densest thing the index
+            # ever carries, and stopping one term short is precisely the
+            # failure this whole path exists to fix.
+            text = _MD_NOISE_RE.sub("", lead).rstrip(":") + ": " + ", ".join(leads)
+            out.append(_clip(text, _MAX_TERM_LINE))
+            continue
         rest = " ".join(m.group(2).split())
-        text = f"{lead} {rest}".strip() if rest else lead
-        text = _MD_NOISE_RE.sub("", text)
-        if len(text) > _MAX_SUMMARY:
-            text = text[:_MAX_SUMMARY].rsplit(" ", 1)[0] + "..."
-        out.append(text)
+        text = _MD_NOISE_RE.sub("", f"{lead} {rest}".strip() if rest else lead)
+        out.append(_clip(text, _MAX_SUMMARY))
     return out
+
+
+def _list_leads(rest: str) -> list[str] | None:
+    """The leading term of each item, when a header introduces a list.
+
+    A header ending in a colon is announcing a set, and the set is the
+    answer. Carrying the following prose verbatim spends the whole
+    character budget on the FIRST member and names none of the others:
+    "Confirmed field set for the metadata, each check gets: - check_id -
+    human-entered, must be globally unique (CI-enforced). Format
+    confirmed 2026-09-16..." is what a real proof run got, and it
+    reported back that the line "names no fields" - in the one sub-entry
+    whose contents were the entire subject of its task. Listing the terms
+    instead yields "check_id, introduced_date, retired_as_of +
+    retired_reason, description, changelog", which answers the question
+    and is SHORTER than the truncation it replaces.
+
+    Returns None for anything that isn't a real list of 2+ items, so a
+    header followed by ordinary prose keeps the old behaviour."""
+    items = _LIST_ITEM_RE.findall(rest)
+    if len(items) < 2:
+        return None
+    leads: list[str] = []
+    for item in items:
+        term = _LEAD_SPLIT_RE.split(" ".join(item.split()), 1)[0]
+        term = _MD_NOISE_RE.sub("", term).strip()
+        if len(term) > _MAX_LEAD:
+            term = term[:_MAX_LEAD].rsplit(" ", 1)[0].rstrip()
+        if term and term not in leads:
+            leads.append(term)
+    return leads[:_MAX_LEADS] or None
 
 
 def _touches(text: str, repo_root: Path) -> list[str]:

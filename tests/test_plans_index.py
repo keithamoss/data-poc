@@ -9,7 +9,7 @@ lists still exists in full in its own file.
 from __future__ import annotations
 from pathlib import Path
 
-from dashboard.plans_index import build_index
+from dashboard.plans_index import _list_leads, build_index
 from dashboard.plans_md import parse_plans
 
 
@@ -138,3 +138,32 @@ def test_every_listed_path_actually_exists():
     for m in re.finditer(r"\*touches:\*(.+)", build_index("plans")):
         for path in re.findall(r"`([^`]+)`", m.group(1)):
             assert Path(path).exists(), f"index points at a non-existent file: {path}"
+
+
+def test_a_term_list_never_cuts_a_term_mid_word():
+    """A term list exists to name things, so a half-named thing is worse
+    than a missing one. The first version capped each term with a bare
+    slice, which produced "a real visual gap/sp" and "drop out of the
+    main current-sta" in the real index - debris a reader cannot resolve
+    back to whichever word it was."""
+    leads = _list_leads(
+        "\n- a genuinely long term that runs well past the per-term cap "
+        "and keeps going\n- second")
+    assert leads is not None
+    assert not leads[0].endswith("goin")
+    assert leads[0].split()[-1] in (
+        "a genuinely long term that runs well past the per-term cap "
+        "and keeps going").split(), f"cut mid-word: {leads[0]!r}"
+
+
+def test_a_dotted_filename_survives_term_extraction():
+    """`CLAUDE.md` and `qa_results_writer.py` are single terms. Splitting
+    a term at any `.` truncated both to their stems, which reads as a
+    different thing - a module rather than a file, and in `CLAUDE.md`'s
+    case a word that names nothing. Only a period that actually ends a
+    sentence (period-then-space) is a boundary."""
+    leads = _list_leads(
+        "\n- `qa_tools/common/qa_results_writer.py` - writes each file\n"
+        "- This reverses CLAUDE.md's earlier wording. And a new sentence.")
+    assert leads == ["qa_tools/common/qa_results_writer.py",
+                     "This reverses CLAUDE.md's earlier wording"], leads
