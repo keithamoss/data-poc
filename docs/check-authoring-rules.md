@@ -11,6 +11,12 @@ authored from here on, across all four tools and every dataset - not
 just to the checks `REQ-QAC-024` rewrote. Read it before adding a check
 or editing any of the three fields.
 
+> **These rules are not changed without Keith's explicit approval.**
+> Standing instruction, 2026-09-20, and it covers the wording, not just
+> the substance: propose the exact replacement text, get a yes, then
+> edit. A rule agreed in conversation is not yet a rule in this file.
+> Adding, removing, renumbering or reinterpreting one is the same act.
+
 ---
 
 ## The rules

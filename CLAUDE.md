@@ -613,6 +613,27 @@ Rough layout:
   2026-09-20 on, so a change does not add to the pile while that is
   pending.
 
+- **Never change an authoring standard without Keith's explicit
+  approval - propose the exact wording, get a yes, then edit.** His own
+  standing instruction, 2026-09-20. It covers two files:
+  `docs/check-authoring-rules.md` (how a check's three prose fields are
+  written) and `CHANGELOG.yaml`'s own header (how a release note is
+  written). Adding a rule, removing one, renumbering, or rewriting one
+  to mean something slightly different are all the same act.
+
+  **Approval of the substance is not approval of the wording.** The
+  distinction is the point of the rule rather than pedantry: these are
+  standards that hundreds of hand-authored texts get held against, and
+  a clause that reads one way to the person who agreed it and another
+  way to the session applying it across 257 checks is exactly how a
+  corpus ends up consistent with the wrong thing. It happened the day
+  this rule was written - a fork was settled in conversation, the rules
+  were edited to match, and the edit turned out to carry a reading
+  nobody had signed off on.
+
+  Writing a check's prose, or a changelog entry, is ordinary work and
+  needs none of this. Only the rules themselves are gated.
+
 - **A push that ships anything release-note-worthy gets a `CHANGELOG.yaml`
   entry in the SAME push, not backfilled later.** Rewritten 2026-09-20
   (REQ-DOCS-028) when the hand-written Markdown `CHANGELOG.md` was
