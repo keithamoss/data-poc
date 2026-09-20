@@ -144,18 +144,35 @@ and roughly in seniority order:
 5. **Operators** - "the actual operators of the tools, so the data
    engineers".
 6. **Client services / customer service** - flagged as a *maybe*
-   ("there's maybe another audience"), not confirmed. Genuinely
-   different from the other five: not a producer or reviewer of data
-   quality, but someone fielding questions from whoever consumes it.
-   Worth confirming before designing anything for them.
+   ("there's maybe another audience"). Genuinely different from the
+   other five, and **not in the way first guessed here.** The initial
+   note said they field questions from whoever consumes the data;
+   Keith corrected that the same day: *"the intent for client services
+   is not to field questions. It's for them to just be aware of and
+   across what is happening during a refresh cycle."* So their need is
+   **situational awareness on a cadence**, not lookup - closer to a
+   subscriber than a user. Worth holding on to, because "awareness of
+   a refresh cycle" is a genuinely different UI from anything this
+   dashboard does today, which is all drill-down from a current state.
 
 Still a list of labels, not personas - what is missing is what each
 actually DOES day to day, which is the part Keith's original offer
 above covers and this does not. But it settles the shape: **six tiers,
-not the three role labels `contract/people.yaml` carries today**, and
-the dashboard's existing Executive/Agency/Dataset/Column tiers are a
-VIEW hierarchy that happens to share a word with tier 1, not a user
-model. Do not assume those two line up.
+not the three role labels `contract/people.yaml` carries today.**
+
+**The name clash is resolved (Keith, 2026-09-20).** The dashboard's own
+view hierarchy had a "Tier 1 / Executive", which collided with tier 1
+of this user model while meaning something entirely different - a view
+level, not an audience. His call on that being flagged: **rename the
+dashboard's Tier 1 to "Home"**, and leave Agency, Dataset and Column
+as they are. That frees "Executive" to mean only the user tier.
+
+Scoped before logging: the rename is **label-only**, which is better
+than it first looked. Four user-visible occurrences in the template's
+rail and heading, plus comments; the internal state key stays `exec`
+and tier 1's URL is already `/` rather than `/executive`, so no route,
+bookmark or state shape changes. One `tests-js/navigation.test.js` test
+name mentions "executive tier" and should follow for clarity.
 
 Landed here rather than in a new item because it is the direct answer
 to this item's own open offer.
@@ -1292,15 +1309,37 @@ built.
   Release Notes panel, extracting headline, components and prose. Mapa
   just skipped the coat.
 
-**Still open, not decided:** whether the `**[Component]**` tags survive
-(the dashboard renders a per-component emoji today, and the taxonomy is
-CI-checked against `docs/components.md` by
-`tests/test_component_taxonomy_consistency.py` - so dropping them from
-the changelog is not free); whether releases are named per-release the
-way Mapa's are, and who names them; whether the six user tiers logged
-in #2 above mean ONE feed or several, since an executive and a data
-engineer plainly want different entries; and what happens to the
-existing ~100 entries, which is the rewrite's real cost.
+**All four open questions answered the same day (Keith):**
+- **Component tags stay. The per-component emojis go.** So the
+  taxonomy keeps its meaning as a filter/label while losing the
+  decoration - `COMPONENT_ICON` in the template's own inline JS is what
+  comes out. And the components stay **CI-checked** ("obviously"),
+  which they already are:
+  `tests/test_component_taxonomy_consistency.py` fails if
+  `validate_requirements.py`'s codes, the template's two consts and
+  `docs/components.md`'s headers ever disagree. Whatever replaces
+  `changelog_md.py`'s parse has to keep feeding that check, not sit
+  outside it.
+- **No release names.** Mapa's "Cradle of Fur" is not copied. **Keep
+  grouping by day**, exactly as `CHANGELOG.md` does now - so the `date`
+  is the grouping key and there is no `version` field at all.
+- **One feed, no per-tier mapping for now.** Despite the six tiers in
+  #2 - explicitly deferred rather than decided against.
+- **The existing ~100 entries are scrapped outright**, not migrated.
+  "That's fine." This removes what looked like the rewrite's biggest
+  cost, and it is only safe because the engineering detail in them now
+  lives in `evidence:`/`decisions:` on the requirements (see below).
+
+**So the shape is settled enough to build:** day-grouped, one feed,
+component-tagged, no emojis, no version names, [headline, description]
+pairs in Mapa's second-person outcome-only voice, structured data
+rather than Markdown prose, existing entries discarded.
+
+**Still genuinely open:** the category vocabulary (Mapa uses
+`highlights`/`bugs fixed`; this file uses Keep-a-Changelog's
+`Added`/`Fixed`/`Changed`), and the storage format itself - JSON like
+Mapa's, YAML like `requirements.yaml`, or something else. Keith: "I
+don't care", so pick one and say why rather than asking again.
 
 **What makes this safe to do at all** is that the engineering detail
 currently in `CHANGELOG.md` now has a better home: `evidence:` holds
