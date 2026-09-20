@@ -1257,6 +1257,25 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     rendered page. That was found by chasing one bug, not by looking -
     so the question is what else is sitting there unfound.
 
+    **One real candidate already found and waiting, 2026-09-20:** the
+    `label` field (`pipeline/dashboard_check_labels.py`'s shared
+    cross-tool vocabulary - "Duplicate rate", "Null rate", "Invalid
+    values") becomes **dead data** once `plans/qa-pipeline.md` item 25's
+    REQ-DASH-026 lands. Its only consumer is
+    `display_name(check_name, engine_short, label)` in the two dashboard
+    builders - i.e. the card headline the plain-English sentence
+    replaces. Nothing else reads it, confirmed by grep. It is still SET
+    by all 8 `run_*.py` modules (dbt/Soda via lookup dicts, which are
+    fine; the two datacontract ones derive it from description text and
+    die as part of REQ-QAC-023). Removing the field itself is a real
+    cleanup across 8 modules plus both builders - deliberately kept out
+    of item 25's scope rather than smuggled in, and logged here instead.
+    Worth checking when this pass runs whether the cross-tool
+    equivalence signal it provided should be preserved some other way or
+    genuinely dropped: 85 of 105 (column, label) groups are checked by
+    2+ engines, so it was doing real work right up until the sentence
+    took over.
+
     **The rubric matters more than the findings, and is the part to
     settle first.** Today's incident is NOT an argument that duplication
     is bad: `pipeline/cadence.py` duplicates real logic into the

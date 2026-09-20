@@ -477,3 +477,295 @@ requirements:
     acceptance_criteria:
       - Not yet scoped - shape (leaderboard, badges, streaks) undecided.
     linked_tests: []
+
+  - id: REQ-QAC-023
+    title: Check metadata comes from data, never from prose
+    date_written: "2026-09-20"
+    story: >
+      As someone maintaining these checks, I want a check's column and
+      name to be stated as data rather than recovered by parsing its
+      description, so that rewording an explanation can never silently
+      move a check to the wrong place on the dashboard.
+    moscow: must
+    status: not_started
+    source: >
+      Found by delivery-architect while checking technical fit for
+      REQ-QAC-024, verified at source, scoped with Keith 2026-09-20.
+      Priority inherited from REQ-QAC-024, which cannot be done safely
+      until this lands.
+    acceptance_criteria:
+      - WHEN a contract quality rule concerns a single column, THE SYSTEM
+        SHALL express it as a property-level rule under that column, and
+        SHALL determine its column from the contract's own schema
+        structure rather than from the rule's description text.
+      - THE SYSTEM SHALL hold a hand-authored short name for every
+        SQL-type quality rule, and SHALL NOT derive any check's name from
+        its description text.
+      - THE SYSTEM SHALL define the check_id grammar in exactly one
+        place as a pattern, and SHALL resolve any check_id segment
+        through it rather than by ad hoc string splitting.
+      - WHEN check-lifecycle validation runs, IF a check_id does not
+        match that grammar, THEN THE SYSTEM SHALL exit non-zero and name
+        every offending check_id.
+      - WHEN check-lifecycle validation runs, IF a check_id's column
+        segment names a column other than the one its rule is attached
+        to, THEN THE SYSTEM SHALL exit non-zero and name it.
+      - THE SYSTEM SHALL report every check against the same column it
+        reports today, except the three cross-column business rules,
+        which SHALL move from table level to the column their own
+        check_id already names.
+    non_functional_requirements:
+      - Every check's config_hash must be byte-identical before and
+        after. This repo is seeded and deterministic, so that is a real
+        correctness proof rather than a smoke test.
+      - No new hand-authored field beyond the SQL-rule name - the column
+        comes from schema structure, not from a new property (Keith's
+        own call, 2026-09-20, after establishing the contract can
+        express it natively).
+      - Nothing here needs a live connection to data/ or any warehouse.
+    dependencies: []
+    linked_tests: []
+    open_questions:
+      - Whether datacontract-cli runs a property-level sql rule
+        identically to a model-level one. The contract already has one
+        working property-level sql rule (cp_clients.date_of_birth), so
+        the mechanism is proven, but all 10 moved rules need verifying.
+
+  - id: REQ-QAC-024
+    title: Plain-English explanation of what every QA check does
+    date_written: "2026-09-20"
+    story: >
+      As a data steward who doesn't know dbt, Soda or Evidently, I want
+      every check to say in plain English what it looks for and what it
+      means if it fails, so that I can tell what's actually wrong with
+      my data without asking the person who built the pipeline.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, flagged as near-term work in plans/qa-pipeline.md item 25,
+      2026-09-18; scoped via delivery-scoper 2026-09-19 and walked
+      through fork by fork with Keith 2026-09-20.
+    acceptance_criteria:
+      - THE SYSTEM SHALL hold, for every active check across all four
+        tools and both real datasets, a hand-authored plain-English
+        statement of what that check verifies, in the check's own
+        definition alongside its existing check_id and category.
+      - THE SYSTEM SHALL hold, separately addressable from that
+        statement, either a hand-authored plain-English statement of
+        what a failure most likely indicates has happened upstream, or
+        an explicit declaration that this check's failure cause is
+        self-evident from what it verifies.
+      - WHERE that second statement is authored, THE SYSTEM SHALL say
+        what a failure indicates rather than restate what the check
+        verifies in other words.
+      - THE SYSTEM SHALL express both statements without naming any
+        tool, macro or statistical method, and without cross-referencing
+        another check or file that a reader cannot follow.
+      - THE SYSTEM SHALL permit real column and table names in either
+        statement where they are the clearest way to say what is being
+        checked.
+      - THE SYSTEM SHALL NOT state what a reader should do about a
+        failure; remediation belongs to the ticket, not to the check
+        definition.
+      - THE SYSTEM SHALL provide a third, explicitly-named field for
+        contributor-facing rationale, distinct from both plain-English
+        statements, and SHALL preserve any superseded technical wording
+        there rather than discard it.
+      - WHEN any of a check's three authored text fields is edited with
+        no change to that check's own config, THE SYSTEM SHALL NOT
+        report the check as changed and SHALL NOT require a changelog
+        entry.
+    non_functional_requirements:
+      - Three authored text fields per check (Keith, 2026-09-19/20). The
+        existing `description` becomes by definition the plain-English
+        "what"; the other two are new.
+      - No authoring standard (Keith's explicit call) - no reading-age
+        target, no length cap, no external guideline. The bar is "sounds
+        right to a non-technical colleague" and the check's own
+        maintainer authors it, with no review step.
+      - No audit trail when wording changes (Keith's explicit call) -
+        out of the config hash, out of the changelog, however material.
+        Committed dashboard/snapshots/*.html.gz become the de facto
+        record of what wording was live when.
+      - Where two tools genuinely check the same thing, their statements
+        MAY be identical. Per-engine wording is permission to differ
+        where the checks differ, not a requirement to diverge (Keith,
+        2026-09-20).
+      - None of the three fields may alter any check's config_hash.
+        VERIFIED TRAP - Evidently's parser excludes config-hash fields
+        by an explicit name list (check_lifecycle.py:415-417), unlike
+        dbt/Soda which exclude the whole metadata block, so that list
+        must be updated or every Evidently check's hash changes.
+      - All three fields must be plumbed through all four parsers and
+        both dashboard builders, not just the one they were first
+        authored in.
+      - Text is published on a public site. Keith's explicit, informed
+        decision - no limit on what a failure's consequence may say,
+        made with that consequence named. If this is ever pointed at
+        real production data, that is a decision to revisit
+        deliberately, not an unexamined default.
+    dependencies: [REQ-QAC-023]
+    linked_tests: []
+
+  - id: REQ-QAC-025
+    title: No check ships without a plain-English explanation
+    date_written: "2026-09-20"
+    story: >
+      As the person maintaining this pipeline, I want CI to refuse a
+      check that has no plain-English explanation, so that coverage
+      can't quietly rot the way it would if the field stayed optional.
+    moscow: should
+    status: not_started
+    source: >
+      delivery-scoper, gap found while scoping plans/qa-pipeline.md item
+      25; mechanism and exemptions settled with Keith 2026-09-20.
+    acceptance_criteria:
+      - WHEN check-lifecycle validation runs, IF any check is missing its
+        plain-English statement of what it verifies, THEN THE SYSTEM
+        SHALL exit non-zero and name every offending check_id.
+      - WHEN check-lifecycle validation runs, IF any check neither states
+        what a failure indicates nor explicitly declares that its failure
+        cause is self-evident, THEN THE SYSTEM SHALL exit non-zero and
+        name every offending check_id.
+      - THE SYSTEM SHALL apply these rules to retired checks on the same
+        terms as active ones.
+      - THE SYSTEM SHALL treat the contributor-rationale field as
+        optional and SHALL NOT report its absence as an error.
+      - THE SYSTEM SHALL report every offending check in one run rather
+        than stopping at the first.
+      - THE SYSTEM SHALL evaluate these rules only against the checks in
+        the current working tree, never against those parsed from an
+        earlier commit.
+      - THE SYSTEM SHALL NOT substitute a generated, inferred or
+        placeholder explanation for a missing one.
+    non_functional_requirements:
+      - Hard failure from day one, no warning phase. The only argument
+        for softening was the HEAD~1 parse problem, which the validate()
+        placement removes.
+      - VERIFIED TRAP - validate_check_lifecycle.py parses both the
+        working tree and HEAD~1, so making these fields mandatory at
+        PARSE time would make the previous commit's own files
+        unparseable and break the gate on the very push that introduces
+        it. Enforcement belongs in validate(), over new checks only.
+      - No category-based rule. CI does not refuse the self-evident
+        declaration on any category; the check's author decides
+        (Keith's explicit call, 2026-09-20, declining a proposed veto on
+        consistency/timeliness checks).
+      - This gate is the only thing between the register and unusable
+        explanations, since there is deliberately no authoring standard
+        and no audit trail. It can enforce that an explanation is
+        present and that a "why" was consciously decided; by design it
+        cannot enforce that either is good.
+      - Runs inside the existing CI gate rather than as a new workflow.
+    dependencies: [REQ-QAC-024]
+    linked_tests: []
+
+  - id: REQ-DASH-026
+    title: Plain English as a check's primary headline
+    date_written: "2026-09-20"
+    story: >
+      As a data steward glancing at the dashboard between other work, I
+      want each check to lead with what it checks in plain English
+      rather than with the name of the tool that ran it, so that I can
+      tell what's wrong without decoding three tools' vocabularies
+      first.
+    moscow: should
+    status: not_started
+    source: >
+      Keith, plans/qa-pipeline.md item 25's third scoping question;
+      answered 2026-09-19 and detailed with delivery-dashboard-ux's note
+      2026-09-20.
+    acceptance_criteria:
+      - WHEN a check is displayed, THE SYSTEM SHALL use its plain-English
+        statement of what it verifies as the primary headline, in every
+        place a check's name is rendered today.
+      - THE SYSTEM SHALL render the check's engine and real check name as
+        secondary information on the same view, not hidden behind a
+        further click.
+      - THE SYSTEM SHALL NOT render the shared category label on a check
+        card.
+      - WHEN a viewer opens a check's detail panel, THE SYSTEM SHALL show
+        what a failure indicates under its own heading, in the same
+        position and with the same styling whether the check currently
+        passes or fails.
+      - IF a check declares its failure cause self-evident, THEN THE
+        SYSTEM SHALL omit that section and SHALL NOT render the
+        declaration itself as viewer-facing text.
+      - IF a check has no plain-English statement, THEN THE SYSTEM SHALL
+        fall back to its existing technical name rather than render an
+        untitled card.
+      - THE SYSTEM SHALL key a check's URL segment on its check_id, and a
+        deep link captured before a wording edit SHALL still resolve
+        after it.
+      - THE SYSTEM SHALL render a check card as a real link, so that
+        middle-click, modifier-click and copy-link-address behave as they
+        do for any other link on the page.
+      - THE SYSTEM SHALL clamp the card headline to at most two rendered
+        lines, with the full text rendered unclamped in the detail panel,
+        and the status pill SHALL sit at the same position regardless of
+        headline length.
+      - WHEN the dashboard is opened directly from the filesystem, THE
+        SYSTEM SHALL render every explanation from embedded content with
+        no network request.
+    non_functional_requirements:
+      - The real cost here is layout, not payload - two sentences across
+        166 checks is roughly 80KB on an 8MB page, and headlines render
+        only inside an open column drawer, never at the executive,
+        agency or dataset tiers.
+      - There is deliberately no authored length cap, so the UI cannot
+        assume short headlines and "keep them short" is not available as
+        a mitigation.
+      - The render and e2e fixtures must include at least one check whose
+        statement exceeds 250 characters, or the clamp and panel-header
+        criteria are untestable - every real check today is short.
+      - The template interpolates check text into innerHTML and into an
+        unescaped aria-label attribute. Promoting authored prose to every
+        headline widens where that matters; an apostrophe-heavy sentence
+        containing a double quote breaks out of the attribute.
+      - Both audiences read the same page at different depths, so
+        promoting the steward's headline must not cost the pipeline
+        maintainer the tool trace they use to find a root cause.
+      - Must keep the zero-console-errors bar and the existing Playwright
+        e2e suite green.
+    dependencies: [REQ-QAC-024]
+    linked_tests: []
+    open_questions:
+      - The card-as-real-link criterion closes half of
+        plans/dashboard.md item 15. The rest of that item - per-view
+        document.title, focus handling after a route change, an ARIA
+        live region - stays its own work.
+
+  - id: REQ-GHUB-027
+    title: Check explanations in the tickets raised from a failure
+    date_written: "2026-09-20"
+    story: >
+      As whoever picks up a QA remediation ticket, I want the ticket
+      itself to say in plain English what was failing and why it
+      matters, so that I can act on it without first going back to the
+      dashboard.
+    moscow: could
+    status: not_started
+    source: >
+      Keith, 2026-09-19; parked 2026-09-20 until the core lands, after
+      delivery-architect found the drafted premise did not match the
+      real ticket model.
+    acceptance_criteria:
+      - PARKED - not to be built until REQ-QAC-024 and REQ-DASH-026 have
+        landed and their real sentences can be judged in place.
+      - THE SYSTEM SHALL, when built, include the plain-English
+        statements of the checks actually driving a dataset's status in
+        that dataset's ticket - not of a single check, since tickets are
+        one per dataset keyed off the aggregate status.
+    non_functional_requirements:
+      - The drafted premise was wrong - ticket_sync.py opens at most one
+        open issue per dataset, keyed off dataset_status(), and its body
+        deliberately defers check detail to the dashboard. Reframing
+        that is a real change of stance, not a small addition.
+      - Sizing for whenever this is picked up - at the latest run
+        cp-carers had 3 checks not green and cp-placements 21, but those
+        21 collapse to 9 distinct questions.
+      - This is where the public-repo exposure of Keith's "no
+        sensitivity limit" decision actually lands, since a ticket ties
+        the text to a named dataset and date.
+    dependencies: [REQ-QAC-024]
+    linked_tests: []

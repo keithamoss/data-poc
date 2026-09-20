@@ -1128,7 +1128,7 @@ relative, not a schedule — this is weeks of work, not months.
     including resupplies) and Child Protection (10 straightforward
     weekly runs, no resupply concept) the same way.
 
-25. **[todo, 2026-09-18]** **[QA checks & contract]** Layperson-friendly, human-readable English explanations of
+25. **[todo, 2026-09-18]** **[QA checks & contract]** **[Dashboard UI]** **[GitHub workflow & people]** Layperson-friendly, human-readable English explanations of
     what each check actually does - recorded on the check (or the
     contract) and surfaced in the dashboard/reporting, not just in
     code/config comments - near-term work Keith flagged, not scoped yet.
@@ -1156,6 +1156,145 @@ relative, not a schedule — this is weeks of work, not months.
     across three separately-authored check files; and where in the
     dashboard it surfaces - the check card, the check-detail panel, or
     both.
+
+    **Scoped 2026-09-19 (delivery-scoper / delivery-architect /
+    delivery-dashboard-ux), then walked through fork by fork with Keith
+    2026-09-20. Every question is now answered; five requirements are in
+    `requirements.yaml` as REQ-QAC-023/024/025, REQ-DASH-026 and
+    REQ-GHUB-027.** This was also this project's first real end-to-end
+    run of the `delivery-*` pipeline - see `plans/tooling.md` #15/#16 for
+    what that exercise itself turned up.
+
+    **Three of this item's own findings above are now stale - corrected
+    here rather than edited out, so the drift stays visible.** Soda
+    checks are no longer description-free (26 check_ids/29 descriptions
+    in BDM's file, 59/59 in Child Protection's); a real lifecycle
+    `description` field has existed on every check across all 4 tools
+    since Thread D Phase 1 and is parsed by `check_lifecycle.py`; and it
+    has surfaced in the dashboard since Phase 5c (2026-09-17) as the
+    check-detail panel's "What this check does" section. What this item
+    was written against - no field, nowhere surfaced - was already
+    half-built by the time it was logged.
+
+    **What the gap actually was:** inconsistent voice (~5 checks still
+    read technically, e.g. "Population Stability Index on sex's value
+    distribution"), no coverage enforcement (`description` is optional
+    where `check_id`/`category` are hard errors), reach (detail panel
+    only - cards showed a technical string), and unguarded cross-engine
+    wording drift.
+
+    **Keith's decisions, all of them:**
+    - *Field shape*: three named text fields. `description` becomes by
+      definition the plain-English **what it verifies**; a new field
+      carries **what a failure indicates**; a third carries contributor
+      rationale. Nothing is deleted - superseded technical wording moves
+      rather than disappears.
+    - *Content*: what + why, purely descriptive. Remediation advice is
+      explicitly out and stays with the ticket, so the two can't drift.
+    - *Column and table names ARE allowed* in the plain-English text
+      where they are the clearest way to say it (his own correction, and
+      a real narrowing of the drafted criterion - the ban is on tool
+      vocabulary and unfollowable cross-references, not on domain
+      identifiers).
+    - *The "why" is conditional*: required where a failure has a
+      non-obvious cause, not where it would only restate the what. The
+      mechanism is that **the field is never absent** - it holds either a
+      real statement or an explicit self-evident declaration, so there is
+      no missing state for CI to tolerate or an author to drift into, and
+      the honest "there isn't one here" costs a token rather than
+      inviting invention. Two findings decided it: only **9 of 172**
+      existing descriptions say anything about what a failure implies,
+      and those 9 share a voice that is about what happened *upstream*
+      ("catches a doubled or truncated extract file"), which is the
+      framing that is almost never tautological.
+    - *Per-engine wording is permission, not obligation.* Where two tools
+      genuinely check the same thing their sentences may be identical -
+      "this is about testing different tools and ultimately we will
+      reduce it to one tool doing that particular check."
+    - *Surfacing*: the **what** replaces the technical headline; the
+      panel carries the **why** under "What it means if this fails", same
+      position and styling green or red (colouring static definition text
+      would imply a live finding - item 74's own class of bug).
+    - *No shared category label on the card.* Decided with the
+      counter-evidence in view: 85 of 105 (column, label) groups are
+      checked by 2+ engines, so a column can show three same-question
+      cards distinguished only by engine. Accepted, because the tools are
+      being compared deliberately and will be reduced later.
+    - *No authoring standard, and no audit trail* when wording changes.
+    - *No sensitivity limit* on what a failure's consequence may say,
+      taken with the consequence named explicitly (public repo, public
+      issues). **If this is ever pointed at real production data that is
+      a decision to revisit deliberately, not an unexamined default.**
+    - *Retired checks* take the same rule, no carve-out - they render in
+      the dashboard, so an exempt one would be a visible card with
+      nothing explaining it.
+    - *Card links*: `plans/dashboard.md` #15's card-as-real-link half is
+      folded in, since the card is being rewritten and the URL key
+      defined in the same change. The rest of #15 stays its own item.
+
+    **Three things were drafted and consciously NOT taken - don't
+    re-propose them:** cross-engine consistency enforcement (per-engine
+    differences are information); explanations in `mothman`'s own run
+    output (tickets only, and now parked); and a CI veto refusing the
+    self-evident declaration on `consistency`/`timeliness` checks
+    (inspection of all 41 suggested the veto would be correct today,
+    Keith declined the extra rule - the author decides).
+
+    **REQ-QAC-023 exists because of a real, verified fragility, and it
+    ships first.** A contract rule's `description` is machine-parsed at
+    runtime: a regex reads the column out of it (`_fk_column_for`), a
+    prefix match picks the label, and a SQL rule's *name* is literally
+    its description's first sentence. Rewording silently reroutes checks
+    to the wrong dashboard column - no exception, no CI failure, nothing
+    notices. The fix went through three shapes before landing:
+    read the column from `check_id` (rejected - still string-parsing),
+    add an explicit `column` property (rejected - Keith asked whether the
+    contract could just say it), and finally **move the rules under the
+    property they are about**. The 7 FK rules and 3 business rules sit at
+    MODEL level, which is exactly why the column had to be recovered from
+    prose - at model level ODCS has no property to point at. Property-
+    level `type: sql` rules already work here (`cp_clients.date_of_birth`
+    has one), so moving them makes the column structural, needs no new
+    field, and makes the contract more correct: a rule about `carer_id`
+    currently sits where nobody would look for it.
+
+    **`check_id` parsing is fine, done properly** (Keith, after seeing
+    the real structure): one module owns the grammar
+    `<data-asset>.<agency>.<dataset>.<table>[.<column>].<check_name>` as
+    a real regex, CI validates every id against it, and anything needing
+    a segment goes through it - never a bare `.split(".")`. Worth more
+    than it sounds: **nothing manufactures a check_id today** (all are
+    hand-authored), the grammar exists only as a docstring comment at
+    `check_lifecycle.py:19`, and validation checks presence and
+    uniqueness but never shape. Distribution is clean - 243 six-segment
+    ids with a column, 15 table-level.
+
+    **A live inconsistency found while checking that**, and now fixed by
+    REQ-QAC-023: the 3 cross-column business rules have check_ids naming
+    `notification_id`/`investigation_id`/`carer_id`, but the dashboard
+    renders them as `(table)`. The id says one thing and the page says
+    another, and nothing notices. They move to the column their own id
+    names, and the new shape-validation cross-checks the two.
+
+    **`label` becomes dead data.** Its only consumer was
+    `display_name(check_name, engine_short, label)` - the card headline
+    the plain-English sentence now replaces. Nothing else reads it. Two
+    of the three description-parsing sites existed purely to compute it
+    and die for free; removing the field itself across all 8 `run_*.py`
+    modules is a real cleanup that belongs with `plans/tooling.md` #12's
+    DRY pass, not smuggled in here.
+
+    **Two more verified traps for whoever builds REQ-QAC-024/025:**
+    `validate_check_lifecycle.py` parses both the working tree and
+    `HEAD~1`, so making the new fields mandatory *at parse time* would
+    make the previous commit's files unparseable and break the gate on
+    the very push that introduces it - enforcement belongs in
+    `validate()`, over new checks only, which also removes the only real
+    argument for a warn-first phase. And Evidently's parser excludes
+    config-hash fields by an **explicit name list**
+    (`check_lifecycle.py:415-417`), not the wholesale metadata-block
+    exclusion dbt and Soda get, so new fields added there change every
+    affected check's `config_hash` and fail CI as an undocumented change.
 
 26. **[todo, 2026-09-15]** **[QA checks & contract]** A real bug found
     while auditing every check for item 23's "duplicated-logic drift
