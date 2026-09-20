@@ -1444,3 +1444,38 @@ unchanged. Worth settling before building - the second is much less
 work and the first is probably the better answer, since "is this supply
 the right size" is a different question from anything in the column
 list rather than one more row in it.
+
+21. **[todo, 2026-09-20]** **[QA checks & contract]** Let `technical_note` accumulate the real causes a check has actually turned out to have.
+
+Keith, 2026-09-20, in passing while approving `self-evident` for the
+completeness family: *"over time, we might, as humans, update the
+technical note field to record the kind of issues that we found
+potentially."*
+
+Worth keeping because it is a genuine widening of that field, not a
+restatement of it. `technical_note` is currently narrowed to STANDING
+facts - cross-references between checks, and why a check behaves as it
+does by construction (`docs/check-authoring-rules.md`, rules 8 and 9).
+What this describes is different in kind: an accumulating record of
+what has actually gone wrong, written after the fact, growing each time
+someone investigates a real failure.
+
+Why it is interesting rather than just another field use: it is the
+natural counterpart to `self-evident`. That sentinel exists because the
+cause of a failure is often genuinely unknown at authoring time, and
+rule 5 forbids guessing. But "unknown now" is not "unknowable" - a
+steward who investigates three red runs on the same check learns
+something real, and today there is nowhere for it to go. This would
+turn the sentinel from a permanent admission into a starting state.
+
+Not scoped, and it needs care on at least four things. It reopens the
+standing/dated boundary that `technical_note` was narrowed to protect -
+"we saw this in March" has a date, which is what `changelog` is for.
+It is contributor-facing and never published, so a steward would be
+writing into a field they cannot see on the page, which is either the
+point or a fatal flaw depending on who is meant to write it. It
+overlaps the ticketing system, which already records what a real
+failure turned out to be and has an owner and a state. And it would
+want a real authoring rule of its own, since "record the kinds of
+issues found" is exactly the loose invitation that produced the prose
+this whole requirement is rewriting.
