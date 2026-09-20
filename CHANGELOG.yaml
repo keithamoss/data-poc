@@ -74,6 +74,10 @@
 #
 # Structure notes:
 #   - Grouped by DAY, newest first. No release names or version numbers.
+#     Add to a day's existing `date:` block rather than starting a
+#     second one - the validator rejects two blocks for one day, and
+#     the reason is the reader, not the schema: they would see the
+#     date twice with no way to tell which is authoritative.
 #   - `category` is one of: New, Improved, Fixed.
 #   - `components` are the project's own 7-part taxonomy, by full name,
 #     CI-checked against docs/components.md and the dashboard's own

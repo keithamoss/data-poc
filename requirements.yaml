@@ -1745,6 +1745,23 @@ requirements:
         releases ("Cradle of Fur"); Keith's call was to keep grouping by
         day, so the date is the only key and there is no version field.
       - >
+        The authoring standard lives in `CHANGELOG.yaml`'s own header
+        comment, not in a standalone doc (Keith, 2026-09-20, asked
+        directly whether it should move out alongside
+        docs/check-authoring-rules.md). The two cases look identical and
+        are not: check definitions live across six files and none of
+        them could own the rules, which is why those needed a doc; a
+        changelog entry cannot be written without opening the one file
+        those rules already sit at the top of, which is better placement
+        than a doc rather than worse. What did get fixed is the real
+        second copy - CLAUDE.md had been restating the voice rules and
+        the mechanics in 45 lines while saying in the same breath that
+        the header "states the standard in full", and is now cut back to
+        whether and when an entry is owed, which is genuinely its own
+        job. The one thing CLAUDE.md held that the header did not - add
+        to a day's existing block rather than opening a second one -
+        moved into the header rather than being dropped.
+      - >
         One feed, with per-tier mapping explicitly deferred rather than
         declined - six real user tiers exist (plans/running-thoughts.md
         #2) and an executive plainly wants different entries from a data

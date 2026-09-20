@@ -614,49 +614,34 @@ Rough layout:
   pending.
 
 - **A push that ships anything release-note-worthy gets a `CHANGELOG.yaml`
-  entry in the SAME push, not backfilled later - and it is written for a
-  READER, not a maintainer.** Rewritten 2026-09-20 (REQ-DOCS-028) when
-  the hand-written Markdown `CHANGELOG.md` was replaced by structured
-  YAML. The standing hold that sat here pending that conversation is
-  gone; this is the rule that resumed.
+  entry in the SAME push, not backfilled later.** Rewritten 2026-09-20
+  (REQ-DOCS-028) when the hand-written Markdown `CHANGELOG.md` was
+  replaced by structured YAML. The standing hold that sat here pending
+  that conversation is gone; this is the rule that resumed.
 
-  **The voice is the part that needs care**, because nothing checks it.
-  `CHANGELOG.yaml`'s own header states the standard in full; in short:
-  a headline plus one or two sentences, second person, describing what
-  someone can now DO. No file paths, function names, tool names,
-  measurements or internal item references - if a sentence only makes
-  sense to someone who has read the code, it belongs in the
-  requirement's `decisions:`/`evidence:`, which is exactly where the
-  detail that used to bloat this file now lives. The audience is Keith's
-  own colleagues across six real tiers (`plans/running-thoughts.md` #2),
-  not a future session.
+  **How to write one is deliberately not here.** `CHANGELOG.yaml`'s own
+  header carries that standard in full - voice, the measured length
+  targets, structure - and it is the single copy on purpose (Keith,
+  2026-09-20; the reasoning is on `REQ-DOCS-028`). This bullet covers
+  only WHETHER and WHEN, which is genuinely this file's job.
 
-  Mechanics: grouped by day, newest first, no version or release names;
-  one `summary` sentence per day a reader can stop at; `category` is
-  `New`/`Improved`/`Fixed`; `components` are the project's own seven, by
-  full name. `mothman dashboard validate-changelog` gates all of that in
-  CI, so a bad component tag or a missing headline fails the build - but
-  the voice is review's job, not the gate's. "Release-note-worthy"
-  is the same bar `CHANGELOG.yaml`'s own header and item 62's original
-  scoping already set (`plans/qa-pipeline.md`): a real feature, fix, or
-  architectural change to the PoC itself - the whole repo's real
-  history, not dashboard-features-only - curated prose, not a
-  mechanical commit dump, so not every commit needs one (a `plans/*.md`
-  update, a wording tweak, or this file's own conventions don't - those
-  belong in the relevant `plans/*.md` file, not here). Add to that day's
-  own `date:` block if one already exists rather than starting a second
-  one, which the validator rejects anyway: two blocks for one day means
-  a reader sees the date twice and cannot tell which is authoritative. Real incident, 2026-09-18: a full day of Phase 6/7
+  **The bar** is a real feature, fix, or architectural change to the PoC
+  itself - the whole repo's real history, not dashboard-features-only.
+  Curated prose, not a mechanical commit dump, so not every commit needs
+  one: a `plans/*.md` update, a wording tweak, or this file's own
+  conventions don't, and those belong in the relevant `plans/*.md` file
+  instead.
+
+  **The timing** is a real step, not something to remember when
+  reminded: before every commit that isn't purely `plans/*.md`/
+  process-only, ask "does this meet the bar", the same way `pytest`/
+  `ruff` already are. Real incident, 2026-09-18: a full day of Phase 6/7
   work (test coverage, the resupply-chain redesign, two real CI fixes)
-  shipped with zero changelog entries, only caught when Keith asked
-  for them directly - the STANDING fix is this bullet, not just that
-  one-off backfill. Concretely: before every commit that isn't purely
-  `plans/*.md`/process-only, ask "does this meet the bar above" as a
-  real step, the same way `pytest`/`ruff` are already a real step before
-  considering a change done - not something to remember only when
-  reminded. If the release-notes scope itself ever seems unclear for a
-  specific change, ask Keith rather than guessing either way (include
-  something too granular, or skip something real).
+  shipped with zero changelog entries, caught only when Keith asked for
+  them directly - the STANDING fix is this bullet, not that one-off
+  backfill. If the scope seems genuinely unclear for a specific change,
+  ask him rather than guessing either way (including something too
+  granular, or skipping something real).
 - **CI (and any "read committed history" code path - `qa_tools/*/
   build_results_from_history.py`, `pipeline/build_*_dashboard_data.py`)
   must never depend on live data access, real or synthetic.** Not "must
