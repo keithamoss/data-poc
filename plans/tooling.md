@@ -1887,3 +1887,76 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     Measure before and after, same standing lesson as #15 and the
     `pytest --durations` work: a real token count on one identical task
     is the way to tell whether a change helped.
+
+    **BUILT 2026-09-20 - the generated-digest option, and three real
+    proof runs against it.** `plans/INDEX.md`, built by `dashboard/
+    plans_index.py` from the same parser the Plans tab already uses, one
+    entry per numbered item and per Thread/Phase, CI-gated by `mothman
+    dashboard plans-index --check` so the committed copy cannot drift
+    from its source. Nothing is deleted - Keith's own condition when
+    this was scoped - every entry still exists in full in its own file.
+    Grew over the day as each proof found a real limit: sub-entries for
+    the two essay files (a Thread was one line for 400 lines of prose),
+    sub-entry headers that carry the text they introduce rather than
+    truncating at the colon, and - Keith's own suggestion - a `touches:`
+    line per entry naming the source files that entry's own text refers
+    to. Final shape: 358 lines, ~6,945 tokens, 92 `touches:` lines,
+    against the ~159,000 the read-everything instruction costs.
+
+    **The third proof was the decisive one**, and it is worth recording
+    honestly because it did not simply confirm the thing was working.
+    Method: a pristine git worktree at the pre-scoping commit, a
+    `delivery-scoper` run on item 25 with only the index as its entry
+    point, scored on three questions set before it ran. Its own account,
+    in full, plus the tool trace it left:
+
+    - **The index did what it was built for.** The agent never opened a
+      `plans/*.md` file in full. Its entire plans reading was two slices
+      of `qa-pipeline.md` (items 25 and 43) and ~40 lines of
+      `publishing-and-history.md`. It ruled out four whole files -
+      `data-generation.md`, `conceptual-design.md`, `wider.md`,
+      `tooling.md` - from their index lines alone, correctly. That is
+      most of a 159k read avoided for two wrong turns.
+    - **But neither of the two findings that actually mattered came from
+      the index.** The decisive one - that item 25's feature was already
+      ~70% built - came from opening item 43 on a judgement call, off a
+      summary line that never mentions descriptions. The index pointed
+      at a door without saying what was behind it. The second - Phase
+      5c's real build of the "What this check does" panel - did not come
+      from the index at all: the agent found it by grepping the
+      template, then grepped `publishing-and-history.md` for the string
+      it had found. At step 172 of 183.
+    - **`touches:` was useful, useless and misleading, all three.**
+      Genuinely useful on `dashboard.md` #8 and Thread D, where it gave
+      an accurate multi-file map the agent reasoned from without opening
+      anything. Useless but harmless on `done` items already ruled out.
+      And **misleading by omission in the one place it mattered most**:
+      item 25's `touches:` names `dbt_project/models/staging/schema.yml`
+      and `pipeline/dashboard_check_labels.py`, both honest readings of
+      that item's own text, neither anywhere near where the mechanism
+      actually lives. The agent read `dashboard_check_labels.py` in full
+      and found it was about card titles and status ranking. The
+      field's contract is "files this entry's text refers to", which is
+      exactly why a stale entry yields stale pointers - `touches:`
+      inherits the staleness of the prose it is derived from, while
+      looking like ground truth.
+
+    **The conclusion, stated plainly: an index over stale text is a
+    faithful index of stale text.** Every current-state fact in that
+    run's report - the real description counts, `cli/bdm.py:241`'s raw
+    `check_id`, `COLUMN_META`'s third hardcoded copy, `description`
+    being unvalidated while `check_id`/`category` are hard errors - came
+    from reading the code, not the plans. The index makes the plans
+    cheap to navigate. It does not make them true, and this run's most
+    valuable output was catching that they weren't.
+
+    Two concrete follow-ups the run named, both still open: the
+    `Build order` entry in `publishing-and-history.md` is one `done`
+    line with ~44 sub-entries and a `touches:` list ending "+34 more" -
+    in practice a "read the whole file" pointer, and Phase 5c is not
+    named anywhere in it. And several sub-entries truncate one clause
+    short of the decision they record - Thread D's field list stops
+    immediately before `description`, `dashboard.md` #8's stops at
+    "category axis: a real per-check". The truncation is not random; the
+    interesting part of a line of this project's prose tends to be near
+    its end.
