@@ -9,15 +9,10 @@ green. The one test that does read the real files asserts a property
 that must hold whatever is failing."""
 from __future__ import annotations
 
-import json
-from pathlib import Path
 
 from qa_tools.common.ticket_check_summary import (
     DASHBOARD_BASE_URL, build_check_summary, check_url,
 )
-
-ROOT = Path(__file__).resolve().parent.parent
-
 
 def _check(key, name, description, status, tool_ref=None, **over):
     check = {

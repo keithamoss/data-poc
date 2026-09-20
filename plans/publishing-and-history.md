@@ -3043,6 +3043,55 @@ one Thread's narrative.
    Birth Registrations is unaffected throughout (one table), which is a
    good sign - the model generalises rather than special-casing CP.
 
+   **ALL THREE ANSWERED 2026-09-20 evening (Keith), and the four
+   hierarchy findings above re-verified against the real code first
+   rather than trusted from this prose.** Verification: CP's collection
+   really does carry four names (`COLLECTION_ID = "child-protection"`,
+   contract `id: child-protection-casework`, `name: Child Protection
+   Casework Collection`, `domain: child-and-family-safety`), while Birth
+   Registrations' contract `domain: civil-registration` exactly matches
+   its dashboard collection id; the BDM side really carries only
+   `AGENCY_ID` + `DATASET_ID`; `_SEGMENTS` really is
+   data_asset/agency/dataset/table/column with no collection; and
+   `qa_results/` really does key CP at collection level (18 run dirs)
+   against BDM at dataset level (352). All six CP datasets share the
+   same 18 run_ids today - one collection-level timeline.
+
+   1. **"Good" is the wrong word - it is the CURRENT version, always.**
+      The composed warehouse holds what the agency actually sent, and
+      status is reported rather than acted on. A red table is still the
+      table. Rejected holding the last green version: the warehouse and
+      the real delivery would silently disagree, and every downstream
+      number would inherit that - a green dashboard built on last week's
+      data is the worst failure this system could have. This no longer
+      waits on `plans/conceptual-design.md` Thread A; Thread A decides
+      what a human may DO about an amber supply, which is a different
+      question from what the warehouse contains.
+   2. **A cross-table check result belongs to its own cross-table
+      scope, not to any one dataset.** Rejected recording it against the
+      triggering dataset (a viewer of `carers` would never see a check
+      concerning `carers` change) and rejected duplicating it against
+      every table it touches (two records to keep in step, and a check
+      appearing in a dataset's history without that dataset changing).
+      This matches what these checks already are on the page:
+      REQ-DASH-033 gave them their own section for exactly this reason,
+      so the lineage follows the presentation rather than fighting it.
+   3. **Supply history survives per-table lineage - VERIFIED, not
+      assumed.** `buildSupplyHistory(d)` reads only the dataset object
+      it is handed (`d.runs`, plus `statusByRun`/`arrivalByRun` keyed by
+      run_id), so six timelines are six calls. Driven in a real browser
+      against the built page: `cp-placements` doctored down to 9 of its
+      18 runs, as a table resupplied on its own schedule would be,
+      produced 7 well-formed chains carrying all 9 entries, zero console
+      errors. Thread A's "dataset-agnostic by construction" claim is
+      real. Scope of that check, stated so it is not over-read: it
+      covers the chain-building logic. Whether the as-of picker and the
+      rendered supply-history UI also hold up is untested and worth
+      checking when this is built.
+
+   **Still to do**: turn the decided model plus these three answers into
+   real requirements for sign-off. Nothing here is built.
+
    **Three real questions this opens, flagged not resolved:**
    1. **What does "good" mean in "current good version"?** If
       `cp-placements` arrives red, does the warehouse use it - it is
