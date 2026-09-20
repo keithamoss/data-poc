@@ -1135,6 +1135,23 @@ which are going to be high level, kind of almost like ephemeral
 artifacts." `implemented_by` (#18) is the first real piece of that
 shift, not a standalone feature.
 
+**The concrete sequence, Keith's own words later the same
+conversation** - this is no longer just a direction, it is an order of
+operations: *"we will rewrite changelog from ground up later, and we
+will do some work to write requirements for everything, and then get
+rid of all of the done items from tooling and other plan files."*
+
+So: requirements first, deletion second, changelog rewrite its own
+piece. That ordering matters and is worth not losing - the `done`
+write-ups can only go once whatever is worth keeping in them has been
+captured as real requirements, which is the opposite of trimming for
+size. It also already has teeth: `plans/tooling.md` #19 (splitting the
+1,711-line `Build order` section into real index entries) was
+superseded rather than parked on exactly this basis - careful work on
+text that is scheduled for deletion. The same test applies to the ~53
+`CHANGELOG.md` entries currently filed under the wrong date, which
+Keith explicitly said to leave alone for the same reason.
+
 Real questions this raises, none answered here: what happens to the ~80
 `done` write-ups that exist precisely so a session does not re-derive a
 settled decision (`CLAUDE.md`'s own stated reason for the

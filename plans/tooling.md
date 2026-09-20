@@ -2187,8 +2187,9 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     Keith's "required once built" call supplies the forcing function,
     because CI refusing to go green is one.
 
-20. **[todo, 2026-09-20]** **[Docs & process]**
-    Decide whether `requirements.yaml`'s `evidence` field survives.
+20. **[done, 2026-09-20]** **[Docs & process]**
+    Decide whether `requirements.yaml`'s `evidence` field survives -
+    **DECIDED: keep it, narrowed to analysis.**
 
     Raised by #18's own build, not a fresh idea: with `implemented_by`
     landed, three of the four recognised verification methods are
@@ -2218,10 +2219,63 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
       that it currently lacks, and a much clearer authoring rule than
       "what was checked and how", which today overlaps three fields.
 
-    Worth deciding rather than leaving as-is.
+    **Decided 2026-09-20 (Keith): narrow it to analysis. No digit
+    check.**
 
-19. **[todo, 2026-09-20]** **[Docs & process]**
-    **PARKED by Keith, 2026-09-20**, same conversation as #18.
+    What changed the answer was not the options themselves - it was
+    Keith saying, in the same conversation, that he intends to make the
+    plans files ephemeral, tie everything to requirements, and rewrite
+    `CHANGELOG.md` short and human-first (`plans/running-thoughts.md`
+    #13). The strongest argument for retiring `evidence` had been that
+    its content already lives in `CLAUDE.md`, `plans/*.md` and
+    `CHANGELOG.md`, so the field would be a second copy that drifts.
+    **If those three stop being the durable record, that argument
+    collapses**: `requirements.yaml` becomes the permanent home, and a
+    measured verification result has nowhere else to live. "94.76%
+    against a 92% floor" is exactly what a human-first changelog should
+    not carry and an ephemeral plans file cannot.
+
+    The authoring rule, now in `requirements.yaml`'s own header: each
+    entry says WHAT was measured, THE NUMBER, WHAT IT WAS MEASURED
+    AGAINST, and WHEN. No figure means it does not belong - a
+    walkthrough is `linked_tests`, a file-and-line reference is
+    `implemented_by`. That is what rules out the three shapes the old
+    "what was actually checked and how" wording invited, each of which
+    overlapped a field that already existed.
+
+    **Deliberately NOT CI-enforced** beyond the existing "list of
+    non-empty strings" (Keith's explicit call). A digit check was
+    offered as a crude forcing function and declined. Worth naming the
+    risk that leaves rather than pretending it away: this is now the
+    only field in the register with no verification of its own, which
+    is precisely the shape that left it at zero use before. The
+    mitigation is that the rule is narrow enough to be obviously broken
+    at a glance, where "what was checked and how" was not.
+
+    **Backfilled the same day, from real measurements already recorded
+    elsewhere** - 0 uses to 5, across 4 requirements, rather than
+    re-specifying an empty field and calling it done. Each was checked
+    against its source before being written, not recalled:
+    REQ-TEST-011 (94.76% against the 92% floor), REQ-DASH-003 (30,561
+    live statuses compared against each tool's own verdict, zero
+    disagreements), REQ-PIPE-004 (two separate byte-identical diffs -
+    the history-only rebuild against a live run, and two generation
+    runs against each other, which is what makes it determinism rather
+    than one lucky match), REQ-QAC-008 (byte-identical counts for both
+    datasets).
+
+19. **[superseded, 2026-09-20]** **[Docs & process]**
+    **NOT DOING THIS - Keith, 2026-09-20.** Superseded rather than
+    parked, and by something larger: the plan is to write real
+    requirements for everything, then delete every `done` item from
+    `tooling.md` and the other plans files, and rewrite `CHANGELOG.md`
+    from the ground up as a short, human-first document (see
+    `plans/running-thoughts.md` #13). `Build order` is ~1,700 lines of
+    `done` write-ups. Splitting it into seven index entries is careful
+    work on text that is scheduled for deletion.
+
+    Kept as a record of the finding, because the finding itself is real
+    and outlives the fix that was proposed for it.
 
     `plans/publishing-and-history.md`'s `## Build order` section is one
     heading over **1,711 lines** - 53% of that whole file - containing

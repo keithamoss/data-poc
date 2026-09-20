@@ -145,13 +145,33 @@
 #                        only in a comment cannot pass. Any other file
 #                        type may be a bare path only: a `::` on it is
 #                        rejected rather than silently unchecked.
-#   evidence:            list of real strings describing what was
-#                        actually checked and how, populated by the
-#                        requirements-reviewer agent, not the scoper -
-#                        ("Playwright walkthrough 2026-09-20, confirmed
-#                        X renders correctly"; "Read qa_tools/common/
-#                        foo.py:42-88") - a real paper trail distinct
-#                        from just which tests pass.
+#   evidence:            a MEASURED result that shows this requirement
+#                        holds - narrowed to that, deliberately, on
+#                        2026-09-20 (Keith). Verification has four
+#                        recognised methods: analysis, inspection,
+#                        testing and demonstration. linked_tests covers
+#                        testing AND demonstration (a committed
+#                        Playwright run that drives the real browser IS
+#                        the demonstration); implemented_by covers
+#                        inspection. Analysis - deriving that something
+#                        holds by measuring rather than executing - is
+#                        the one method nothing else holds, and it is
+#                        all this field is for.
+#                        Each entry says WHAT was measured, THE NUMBER,
+#                        WHAT IT WAS MEASURED AGAINST, and WHEN. If you
+#                        cannot put a figure in it, it does not belong
+#                        here: a walkthrough belongs in linked_tests, a
+#                        file-and-line reference in implemented_by.
+#                        Not CI-enforced beyond "non-empty strings"
+#                        (Keith's explicit call, 2026-09-20 - no digit
+#                        check). The rule above is the authoring
+#                        standard, and it is narrow enough to be
+#                        obvious when it is broken.
+#                        This field originally read "what was actually
+#                        checked and how", which accepted all three of
+#                        the above, overlapped three other fields, and
+#                        went unused on all 27 requirements for the day
+#                        and a half it existed in that form.
 #
 # This describes the PRODUCT (the QA dashboard/pipeline this PoC
 # delivers), not this project's own working process - things like "a
@@ -232,6 +252,11 @@ requirements:
     linked_tests:
       - tests-js/status-rollups.test.js
       - tests-js/navigation.test.js
+    evidence:
+      - >
+        2026-09-19: 30,561 statuses rendered on the live published site,
+        each compared against the verdict its own tool recorded. Zero
+        disagreements; zero results missing a verdict.
     implemented_by:
       - dashboard/qa-reporting-dashboard.template.html::rollupStatuses
       - dashboard/qa-reporting-dashboard.template.html::navigate
@@ -256,6 +281,16 @@ requirements:
       - tests/test_qa_results_writer.py
       - tests/test_qa_results_reader.py
       - tests/test_build_results_from_history.py
+    evidence:
+      - >
+        2026-09-16: results_bdm.json rebuilt from committed qa_results/
+        history alone, diffed against the live orchestrator run -
+        byte-identical, generated_at aside.
+      - >
+        2026-09-16: the synthetic-generation step run twice from an empty
+        data/, manifest.json and results_bdm.json diffed - byte-identical,
+        confirming the rebuild is deterministic rather than coincidentally
+        equal on one run.
     implemented_by:
       - qa_tools/common/qa_results_writer.py::write_qa_result
       - qa_tools/common/qa_results_reader.py::read_qa_results
@@ -349,6 +384,11 @@ requirements:
         red/amber/green status.
     linked_tests:
       - tests-js/supply-history.test.js
+    evidence:
+      - >
+        2026-09-18: build_results_from_history.py's history-only rebuild
+        produced byte-identical counts to the live orchestrator run, for
+        both datasets.
     implemented_by:
       - dashboard/qa-reporting-dashboard.template.html::renderSupplyHistorySection
       - pipeline/build_dashboard_data.py::build
@@ -405,6 +445,11 @@ requirements:
         aspiration.
     linked_tests:
       - tests/test_dashboard_e2e.py::TestBuiltDashboardRenders::test_renders_with_zero_console_errors_and_a_populated_view
+    evidence:
+      - >
+        2026-09-19: real CI coverage command (--cov=qa_tools --cov=pipeline
+        --cov=generator --cov=dashboard) measured 94.76%, against the 92%
+        floor pyproject.toml enforces.
     implemented_by:
       - .github/workflows/test.yml
       - pyproject.toml
