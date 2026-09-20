@@ -1458,3 +1458,38 @@ maps to exactly one table, and nothing enforces that"). It is not dead
 weight - the `/check/` URL now really does key on the tail, so the
 guarantee is load-bearing the moment a dataset ever gains a second
 table.
+
+23. **[todo, 2026-09-20]** **[Pipeline & publishing]** Adding two more datasets is the trigger for resolving the file-per-dataset shape.
+
+Keith, 2026-09-20 night, immediately after authorising the
+`delivery-scoper` run on `plans/publishing-and-history.md` item 6: once
+that item's restructure is done, add another couple of datasets, and
+**that** is what triggers looking at the copy-paste problem properly.
+
+Worth being precise about which half of item 6 this sequences, because
+the item contains two things. Its FIRST piece of work - the
+agency/collection/dataset/table hierarchy and the per-dataset-runs
+model - is what `delivery-scoper` is scoping now. Its SECOND, still
+genuinely unscoped, is which file-architecture shape is right:
+data-driven off each dataset's own config, a per-tool plugin/registry,
+or collapsing only the mechanical Phase 1/2 additions. That second
+question was deliberately excluded from the scoper's brief and handed to
+`delivery-architect`. This note says WHEN it gets answered.
+
+Why the ordering is good rather than just a deferral: you cannot tell
+which abstraction is right from two datasets. The shape that looks
+obviously correct at two is routinely wrong at four, and item 6 already
+carries `plans/qa-pipeline.md` #84's finding that the per-dataset LOGIC
+is genuinely different rather than boilerplate - so guessing the
+abstraction before there is enough variation to see it is how this gets
+built twice. Adding real datasets first makes the copy-paste cost
+concrete and shows which parts actually repeat.
+
+Open, and for Keith: WHICH two datasets. The dashboard's own tree
+already carries illustrative agencies with no real data behind them
+(immunisation, hospital discharge, driver licensing, vehicle
+registration, school enrolment, assessment results, business
+registrations), so there are candidates, but picking ones that stress
+the model differently - a single-table collection, a multi-table one, a
+different cadence - would tell us more than picking two that look like
+what exists.
