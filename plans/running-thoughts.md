@@ -1303,3 +1303,25 @@ distributions for exactly this kind of presentation data, so the data
 may already be there. And it is unclear whether this belongs in the
 check drawer, next to that check's own definition, or in the column
 view where a reader is already looking at that column.
+
+17. **[todo, 2026-09-20]** **[QA checks & contract]** QA the schema itself - check the columns we receive are exactly the ones we expect.
+
+Keith, 2026-09-20, raised while reviewing `REQ-QAC-024` drafts.
+**His own timeframe: "let's try and do that in the next day or two."**
+
+Where it came from, which is the useful part. A Soda completeness check
+on `date_of_birth` carried a trailing clause explaining that a silently
+renamed column would show up here as 100% missing rather than as a
+schema failure. That was offered as the first `technical_note`, and
+Keith's response was that the note is really describing a GAP: the
+reason a rename surfaces as a weird completeness reading is that
+nothing checks the column set itself. Fix the gap and the note stops
+needing to exist. So the clause was dropped rather than preserved, and
+this item is what replaces it.
+
+Not scoped - to settle with Keith before building: whether "exactly"
+means a new column is a failure as well as a missing one (a supplier
+adding a field is common and not obviously an error); whether this is
+one check per dataset or one per column; and which tool owns it, since
+the ODCS contract already declares the schema and datacontract-cli may
+already be able to assert it without a new check being written at all.
