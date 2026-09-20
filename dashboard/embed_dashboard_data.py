@@ -149,7 +149,7 @@ contract/people.yaml entry ever appear, by name/nickname - resolved by
 real GitHub LOGIN now (whoever closed the ticket), not by email.
 
 And `const PLANS` (running-thoughts.md #10, "Plans" tab, 2026-09-18) -
-`{items: [...], threads: [...], notes: [...]}`, this project's own
+`{items: [...], threads: [...]}`, this project's own
 plans/*.md planning memory, parsed by dashboard/plans_md.py's
 parse_plans() straight from the committed plans/ directory - same
 "placeholder here, real data only in the built output" treatment as
@@ -330,8 +330,8 @@ def embed() -> None:
 
     plans = parse_plans(PLANS_DIR)
     html = _replace_const(html, "PLANS", json.dumps(plans, separators=(",", ":")))
-    print(f"Re-embedded PLANS = {len(plans['items'])} items, {len(plans['threads'])} threads, "
-          f"{len(plans['notes'])} notes")
+    print(f"Re-embedded PLANS = {len(plans['items'])} items, "
+          f"{len(plans['threads'])} threads")
 
     if os.path.exists(DEMO_CAST_PATH):
         with open(DEMO_CAST_PATH) as f:

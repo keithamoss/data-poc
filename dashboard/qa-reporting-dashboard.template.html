@@ -961,17 +961,18 @@ const LEADERBOARD = [];
 // real data only in the built output" treatment as every other const
 // above. Shape: {items: [{file, number, status, date, components,
 // section, text}, ...], threads: [{file, heading, status, date,
-// category, body}, ...], notes: [{number, title, body}, ...]} - items
-// come from the 5 numbered-item files (wider/qa-pipeline/dashboard/
-// data-generation/tooling.md), threads from the 2 Thread/Phase essay files
-// (publishing-and-history/conceptual-design.md), notes from running-
-// thoughts.md (deliberately untagged - Keith's own call, "just a looser
-// feed the dashboard shows as-is"). Unlike every other const here, this
+// category, body}, ...]} - every plans/*.md is walked, so items come
+// from any file carrying them and threads from any file carrying those.
+// running-thoughts.md used to be a third, untagged "notes" shape; it
+// became ordinary numbered items on 2026-09-20 (Keith's own call once
+// the generated index showed 10 of its 12 entries were actually done
+// and displaying as untagged), and that parser path is gone. Unlike
+// every other const here, this
 // is its OWN top-level tier (STATE.tier==="plans"), not a header side-
 // panel - Keith's explicit choice (AskUserQuestion) given the real
 // content volume (100+ items/threads/notes) doesn't fit a cramped
 // drawer.
-const PLANS = {items:[], threads:[], notes:[]};
+const PLANS = {items:[], threads:[]};
 
 // DEMO_CAST — plans/tooling.md #1 Phase 6's "Demo" tab: a real recording
 // of the actual mothman CLI/TUI (Quality Assurance wizard, Birth
@@ -3444,13 +3445,7 @@ const PLANS_ENTRIES = (function(){
     title:t.heading, status:t.status, date:t.date,
     components:[t.category], body:t.body,
   }));
-  const notes = PLANS.notes.map(n => ({
-    id:`running-thoughts-${n.number!=null?n.number:n.title}`, kind:"note",
-    file:"running-thoughts",
-    title: n.number!=null ? `#${n.number} — ${n.title}` : n.title,
-    status:null, date:null, components:[], body:n.body,
-  }));
-  return [...items, ...threads, ...notes];
+  return [...items, ...threads];
 })();
 
 const PLANS_ALL_STATUSES = ["done","in-progress","investigate","todo","parked","superseded"];

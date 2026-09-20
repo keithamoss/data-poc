@@ -4,7 +4,7 @@ test), not the real committed plans/*.md files - those change over time
 and aren't what this module's own correctness depends on."""
 from __future__ import annotations
 
-from dashboard.plans_md import _parse_numbered_items, _parse_notes, _parse_threads, parse_plans
+from dashboard.plans_md import _parse_numbered_items, _parse_threads, parse_plans
 
 
 def test_parses_a_single_numbered_item_with_one_component(tmp_path):
@@ -169,48 +169,6 @@ Second body.
     assert [t["heading"] for t in threads] == ["Thread B - first", "Thread A - second"]
 
 
-def test_parses_a_numbered_note_with_title_and_body(tmp_path):
-    text = """### 4. GitHub Issues -> Microsoft Teams integration (research first)
-
-Some raw prose, no status/component tags at all - running-thoughts.md
-keeps its own simpler shape by design.
-
-Second paragraph.
-"""
-    notes = _parse_notes(text)
-    assert len(notes) == 1
-    assert notes[0]["number"] == 4
-    assert notes[0]["title"] == "GitHub Issues -> Microsoft Teams integration (research first)"
-    assert notes[0]["body"] == (
-        "Some raw prose, no status/component tags at all - running-thoughts.md\n"
-        "keeps its own simpler shape by design.\n\nSecond paragraph."
-    )
-
-
-def test_a_note_heading_with_no_leading_number_still_parses(tmp_path):
-    text = "### Untitled idea with no number\n\nBody.\n"
-    notes = _parse_notes(text)
-    assert notes[0]["number"] is None
-    assert notes[0]["title"] == "Untitled idea with no number"
-
-
-def test_note_body_stops_at_the_next_two_hash_batch_heading(tmp_path):
-    text = """### 1. First idea
-
-Body of the first idea.
-
-## Also flagged, queued separately
-
-### 2. Second idea
-
-Body of the second idea.
-"""
-    notes = _parse_notes(text)
-    assert len(notes) == 2
-    assert notes[0]["body"] == "Body of the first idea."
-    assert notes[1]["body"] == "Body of the second idea."
-
-
 def test_parse_plans_reads_all_files_and_returns_the_combined_shape(tmp_path):
     plans_dir = tmp_path
     (plans_dir / "wider.md").write_text("1. **[done, 2026-09-18]** **[Dashboard UI]** A wider item.\n")
@@ -230,7 +188,6 @@ def test_parse_plans_reads_all_files_and_returns_the_combined_shape(tmp_path):
     (plans_dir / "performance.md").write_text(
         "1. **[done, 2026-09-18]** **[Testing & dev tooling]** A perf item.\n"
     )
-    (plans_dir / "running-thoughts.md").write_text("### 1. A raw idea\n\nBody.\n")
 
     result = parse_plans(plans_dir)
     assert len(result["items"]) == 6
@@ -238,8 +195,6 @@ def test_parse_plans_reads_all_files_and_returns_the_combined_shape(tmp_path):
         "wider", "qa-pipeline", "dashboard", "data-generation", "tooling", "performance"}
     assert len(result["threads"]) == 2
     assert {t["file"] for t in result["threads"]} == {"publishing-and-history", "conceptual-design"}
-    assert len(result["notes"]) == 1
-    assert result["notes"][0]["title"] == "A raw idea"
 
 
 def test_a_hyphenated_word_wrapped_across_lines_is_rejoined_without_a_space():
@@ -312,7 +267,6 @@ def test_a_brand_new_plans_file_is_picked_up_with_no_code_change(tmp_path):
     The failure mode the allowlist had is the dangerous kind: a file it
     didn't know about was skipped SILENTLY, so the dashboard's Plans tab
     under-reported without anything looking wrong."""
-    (tmp_path / "running-thoughts.md").write_text("### 1. A raw idea\n\nBody.\n")
     (tmp_path / "a-brand-new-topic.md").write_text(
         "1. **[todo, 2026-09-20]** **[Dashboard UI]** An item in a file nobody listed.\n"
     )
@@ -324,7 +278,6 @@ def test_the_generated_index_is_not_parsed_as_planning_content(tmp_path):
     """plans/INDEX.md lives in the same directory and is generated FROM
     these files - walking the directory must not read it back in, or the
     index becomes self-referential."""
-    (tmp_path / "running-thoughts.md").write_text("### 1. A raw idea\n\nBody.\n")
     (tmp_path / "real.md").write_text(
         "1. **[todo, 2026-09-20]** **[Dashboard UI]** A real item.\n"
     )

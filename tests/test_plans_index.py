@@ -33,7 +33,7 @@ def test_every_parsed_entry_appears_in_the_index():
     for thread in parsed["threads"]:
         assert thread["heading"].split(" - ")[0] in text
     lines = [ln for ln in text.splitlines() if ln.startswith("- ")]
-    expected = len(parsed["items"]) + len(parsed["threads"]) + len(parsed["notes"])
+    expected = len(parsed["items"]) + len(parsed["threads"])
     assert len(lines) == expected, f"{len(lines)} index lines for {expected} entries"
 
 

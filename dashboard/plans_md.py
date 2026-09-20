@@ -37,11 +37,16 @@ plans/running-thoughts.md #10's own write-up):
    **Category:** ...` line immediately under it is simply not captured
    as a thread, same "skip what doesn't match" philosophy as above.
 
-`running-thoughts.md` is deliberately NOT part of either tagged scheme
-(Keith's own call, recorded in plans/running-thoughts.md #10 fork 2: "no
-forced status field... just a looser feed the dashboard shows as-is") -
-`parse_notes()` only extracts each `### N. Title` item's number, title,
-and body, with no status/component parsing at all.
+`running-thoughts.md` used to be a third, untagged shape - `### N. Title`
+headings parsed by their own `parse_notes()`, with no status or
+component at all (Keith's original call, plans/running-thoughts.md #10
+fork 2: "no forced status field... just a looser feed the dashboard
+shows as-is"). Reversed 2026-09-20 at his own suggestion once the
+generated index made the cost visible: 10 of its 12 entries were
+actually done, and showing them untagged was misleading rather than
+loose. They are now ordinary numbered items, the third parser path is
+gone, and the file keeps its character through its own prose and section
+headings rather than through a separate record type.
 
 Every parsed body/text field keeps real markdown (bold, inline code, `-`/
 `*` bullet lists, blank-line paragraph breaks) as a plain string - unlike
@@ -64,7 +69,6 @@ _THREAD_HEADING_RE = re.compile(r"^##\s+(.+)$")
 _THREAD_STATUS_RE = re.compile(
     r"^\*\*Status:\*\*\s*([a-z-]+)\s*\((\d{4}-\d{2}-\d{2})\)\s*·\s*\*\*Category:\*\*\s*(.+)$"
 )
-_NOTE_HEADING_RE = re.compile(r"^###\s+(?:(\d+)\.\s+)?(.+)$")
 # A list-item marker within an item's own body - either a "- "/"* " bullet
 # or a "1. "/"2. " ordered marker (real bug, found via Keith's own
 # dashboard report 2026-09-19: only bullets were recognised, so a numbered
@@ -99,8 +103,6 @@ _LIST_MARKER_RE = re.compile(r"^(?:[-*]\s+|\d+\.\s+)")
 # strong, unambiguous signals (`N. **[status, YYYY-MM-DD]**`, and a `##`
 # heading followed by a `**Status:** ... · **Category:** ...` line), so
 # walking every file cannot invent entries that aren't there.
-NOTES_FILE = "running-thoughts.md"
-
 # Deliberately NOT walked: the generated index lives in the same
 # directory and is built FROM these files, so parsing it back in would
 # be circular.
@@ -201,29 +203,8 @@ def _parse_threads(text: str, file_key: str) -> list[dict]:
     return threads
 
 
-def _parse_notes(text: str) -> list[dict]:
-    lines = text.splitlines()
-    notes: list[dict] = []
-    i, n = 0, len(lines)
-    while i < n:
-        h = _NOTE_HEADING_RE.match(lines[i])
-        if not h:
-            i += 1
-            continue
-        number = int(h.group(1)) if h.group(1) else None
-        title = h.group(2).strip()
-        i += 1
-        body_lines: list[str] = []
-        while i < n and not _NOTE_HEADING_RE.match(lines[i]) and not lines[i].startswith("## "):
-            body_lines.append(lines[i])
-            i += 1
-        body = "\n".join(body_lines).strip("\n")
-        notes.append({"number": number, "title": title, "body": body})
-    return notes
-
-
 def parse_plans(plans_dir: str | Path) -> dict:
-    """Returns {"items": [...], "threads": [...], "notes": [...]} across
+    """Returns {"items": [...], "threads": [...]} across
     every `plans/*.md` file, walked from the directory rather than listed
     - a new plans file needs no code change here. Items and threads come
     back in each file's own top-to-bottom order, grouped by file in
@@ -238,12 +219,4 @@ def parse_plans(plans_dir: str | Path) -> dict:
         text = path.read_text()
         items.extend(_parse_numbered_items(text, path.stem))
         threads.extend(_parse_threads(text, path.stem))
-    # Notes stay tied to their one named file rather than being walked
-    # for: a `### N. Title` heading has no status/category marker to
-    # disambiguate it, so walking would turn any numbered sub-heading in
-    # any file into a "note". running-thoughts.md is genuinely a single,
-    # structurally different file by design (CLAUDE.md describes it as
-    # the raw capture buffer), not one of a growing set.
-    notes_path = plans_dir / NOTES_FILE
-    notes = _parse_notes(notes_path.read_text()) if notes_path.exists() else []
-    return {"items": items, "threads": threads, "notes": notes}
+    return {"items": items, "threads": threads}
