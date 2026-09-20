@@ -29,6 +29,10 @@ def _valid_entry(**overrides):
         "evidence": ["2026-09-20: 27 requirements validate with zero errors."],
         "decisions": ["Kept the register as YAML rather than a database, so it "
                       "diffs and reviews like the code it describes."],
+        # Required from the moment status leaves "not_started"
+        # (2026-09-20), so the base fixture carries it for the same
+        # reason it carries the four above.
+        "signed_off": {"by": "Keith", "date": "2026-09-20"},
     }
     entry.update(overrides)
     return entry
@@ -448,3 +452,69 @@ def test_decisions_may_precede_the_work_and_are_not_flagged():
     is settled."""
     entry = _valid_entry(status="not_started", linked_tests=[], implemented_by=[], evidence=[])
     assert validate([entry]) == []
+
+
+# ---------------------------------------------------------------------
+# Sign-off. Keith's standing instruction, 2026-09-20: a requirement is
+# presented to him and agreed BEFORE building starts. The written
+# convention landed the same day and is not the control - REQ-DASH-026
+# sat in the register with ten acceptance criteria while work went ahead
+# against one of them backwards, because nothing required anyone to open
+# it. These are the control.
+# ---------------------------------------------------------------------
+
+def test_a_built_requirement_must_be_signed_off():
+    entry = _valid_entry()
+    del entry["signed_off"]
+    errors = validate([entry])
+    assert any("signed it off" in e for e in errors), errors
+
+
+def test_an_in_progress_requirement_must_be_signed_off():
+    """The rule is about building having STARTED, not having finished -
+    so in_progress is exactly as covered as built."""
+    entry = _valid_entry(status="in_progress", linked_tests=[],
+                         implemented_by=[], evidence=[], decisions=[])
+    del entry["signed_off"]
+    errors = validate([entry])
+    assert any("signed it off" in e for e in errors), errors
+
+
+def test_sign_off_is_optional_while_a_requirement_is_not_started():
+    """Deliberately allowed, and not an oversight: signed-off-then-built
+    is the whole shape of the rule, so a requirement that has been
+    agreed but not begun is the normal resting state between the two."""
+    entry = _valid_entry(status="not_started", linked_tests=[],
+                         implemented_by=[], evidence=[], decisions=[])
+    del entry["signed_off"]
+    assert validate([entry]) == []
+
+
+def test_a_not_started_requirement_may_still_carry_a_sign_off():
+    assert validate([_valid_entry(status="not_started", linked_tests=[],
+                                   implemented_by=[], evidence=[],
+                                   decisions=[])]) == []
+
+
+def test_sign_off_must_carry_both_a_name_and_a_date():
+    assert any("date" in e for e in validate([_valid_entry(signed_off={"by": "Keith"})]))
+    assert any("by" in e for e in validate([_valid_entry(signed_off={"date": "2026-09-20"})]))
+
+
+def test_sign_off_rejects_a_date_that_is_not_a_real_iso_date():
+    errors = validate([_valid_entry(signed_off={"by": "Keith", "date": "yesterday"})])
+    assert any("date" in e for e in errors), errors
+
+
+def test_sign_off_rejects_a_blank_name():
+    errors = validate([_valid_entry(signed_off={"by": "   ", "date": "2026-09-20"})])
+    assert any("by" in e for e in errors), errors
+
+
+def test_sign_off_rejects_an_undeclared_field():
+    """`extra="forbid"` reaches the nested model too - a typo'd
+    `signed_off: {name: ...}` would otherwise sit there looking signed
+    while carrying no name at all."""
+    errors = validate([_valid_entry(signed_off={"by": "Keith", "date": "2026-09-20",
+                                                "note": "looks good"})])
+    assert any("note" in e for e in errors), errors

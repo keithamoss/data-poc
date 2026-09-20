@@ -51,7 +51,7 @@ def test_parses_a_full_entry(tmp_path):
         "acceptance_criteria": ["It does the thing."], "linked_tests": ["tests/test_x.py"],
         "date_written": "", "non_functional_requirements": [], "dependencies": [],
         "open_questions": [], "evidence": [], "implemented_by": [],
-        "decisions": [],
+        "decisions": [], "signed_off": None,
     }
 
 

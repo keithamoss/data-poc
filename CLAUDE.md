@@ -488,6 +488,8 @@ Rough layout:
   symptom is a `FileNotFoundError` on a dbt `manifest.json`, which does
   not name `dbt_utils` anywhere. Check `dbt_project/dbt_packages/`
   exists before reading that shape of failure as a regression.
+  -> **~87s/792 tests (2026-09-20 evening, the requirements sign-off
+  gate)**. Flat again, 20 more tests.
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.

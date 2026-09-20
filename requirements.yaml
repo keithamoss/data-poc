@@ -122,6 +122,49 @@
 # ones included (2026-09-20, Keith): absent and empty look identical
 # once whitespace is stripped, but they mean different things - a blank
 # key is someone who started filling it in and stopped.
+#   signed_off:          Keith's own sign-off on this requirement,
+#                        BEFORE any building started - `by:` (a name)
+#                        and `date:` ("YYYY-MM-DD"), both required if
+#                        the key is present at all. REQUIRED from the
+#                        moment `status` moves past "not_started", and
+#                        deliberately optional while it is still
+#                        not_started: signed-off-then-built is the whole
+#                        shape of the rule, so a signed but not-yet-
+#                        started requirement is the normal resting state
+#                        between the two, not an error.
+#
+#                        Added 2026-09-20 (Keith: "update your
+#                        instructions so that you get me to sign off on
+#                        requirements before building begins... you
+#                        presenting them to me and me providing input
+#                        and sign off"). A field rather than only the
+#                        written convention, because the convention was
+#                        written first, the same day, and prose is
+#                        exactly what had just failed: REQ-DASH-026 sat
+#                        here with ten acceptance criteria while work
+#                        went ahead against one of them BACKWARDS,
+#                        because nothing required anyone to open it.
+#                        Nothing in CI could tell a signed-off
+#                        requirement from an unsigned one.
+#
+#                        `by` is not constrained to one name on
+#                        purpose - hard-coding "Keith" into a schema is
+#                        the kind of thing that quietly breaks the day
+#                        somebody else signs one.
+#
+#                        THE 24 ALREADY-BUILT ENTRIES BELOW ARE
+#                        BACKFILLED, all dated 2026-09-20, the day the
+#                        field was introduced. Read that date for what
+#                        it is: Keith accepting the register as it
+#                        stands, not a sign-off that preceded the
+#                        build. It could not have preceded the build for
+#                        most of them - the register itself was written
+#                        retrospectively in 2026-09-18 for the first 22.
+#                        Same treatment, and the same reasoning, as the
+#                        `source:` backfill above: a field that says
+#                        plainly it is a reconstruction is worth more
+#                        than an absent one. Everything from here on
+#                        carries a real date, signed before the work.
 #   date_written:        ISO date ("YYYY-MM-DD") this requirement was
 #                        actually drafted - Keith's own ask, so the
 #                        register has a real chronological trail, not
@@ -255,6 +298,11 @@ requirements:
       genuinely computed, not fabricated for a demo.
     moscow: must
     status: built
+    # Backfilled, along with the other 23 already-built entries - see
+    # this file's header for what that date does and does not claim.
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       This PoC's own founding scope. The repo began in a claude.ai
       session with no internet access, where the four tools were
@@ -302,6 +350,9 @@ requirements:
       same real QA rigor as a single-table feed.
     moscow: must
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       The founding scope above, extended to a second, multi-table
       collection so cross-table business rules were exercised rather
@@ -345,6 +396,9 @@ requirements:
       without leaving the page.
     moscow: must
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       The reporting dashboard's founding structure, from the same
       original claude.ai design session - the agency-to-column
@@ -384,6 +438,9 @@ requirements:
       years.
     moscow: must
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       plans/publishing-and-history.md Thread B, scoped with Keith over
       one long session on 2026-09-16: how QA results actually become
@@ -428,6 +485,9 @@ requirements:
       dashboard build that skipped validation.
     moscow: must
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       plans/publishing-and-history.md Thread A, same 2026-09-16 scoping
       session. Keith's own call that there be no manual local-publish
@@ -465,6 +525,9 @@ requirements:
       "retired" never means "forgotten."
     moscow: must
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       plans/publishing-and-history.md Thread D, same 2026-09-16 session
       - how a check being retired, or having its definition changed,
@@ -510,6 +573,9 @@ requirements:
       as of this date" for a daily or a quarterly dataset alike.
     moscow: should
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       plans/publishing-and-history.md Thread C, same 2026-09-16 session
       - how a quarterly-cadence data asset should be presented
@@ -551,6 +617,9 @@ requirements:
       labelled as such).
     moscow: should
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       plans/conceptual-design.md Thread A, 2026-09-17. Keith's own
       critique while a mislabelled-attempt-number bug was being
@@ -585,6 +654,9 @@ requirements:
       activity across the whole data asset at a glance.
     moscow: should
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       plans/publishing-and-history.md Phase 3/5a - the activity-feed
       data and then its UI, built out of the committed run history
@@ -619,6 +691,9 @@ requirements:
       have to read raw git log to understand how it evolved.
     moscow: could
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       plans/qa-pipeline.md item 62, 2026-09-17 - "what changed about the
       dashboard/tool itself over time", scoped explicitly against the
@@ -655,6 +730,9 @@ requirements:
       end-to-end), so that a regression can't silently ship.
     moscow: must
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       plans/publishing-and-history.md Phase 6, scoped 2026-09-17.
       Keith's own words on the coverage floor - pytest-cov and a real
@@ -689,6 +767,9 @@ requirements:
       preference.
     moscow: could
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       Not recorded at the time. Dark mode was built as part of the
       dashboard's general UI work with no scoping item of its own, and
@@ -725,6 +806,9 @@ requirements:
       with nothing but a browser.
     moscow: could
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       plans/dashboard.md #5, 2026-09-16. Keith's own framing up front -
       "think big, think architecturally, and consider this solution will
@@ -757,6 +841,9 @@ requirements:
       trustworthy view of what's actually been delivered.
     moscow: should
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       Keith, 2026-09-18 (plans/qa-pipeline.md item 75, and
       plans/running-thoughts.md #7 for its dashboard panel): "having
@@ -861,6 +948,9 @@ requirements:
       forever.
     moscow: should
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       plans/running-thoughts.md #6, same 2026-09-18 batch, scoped with
       Keith 2026-09-19 ("let's tackle item six") - the read-only tension
@@ -952,6 +1042,9 @@ requirements:
       opaque URL-encoded JSON blob.
     moscow: could
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       plans/running-thoughts.md #9, same 2026-09-18 batch - a shareable
       link to a specific view that a person can read, rather than a
@@ -992,6 +1085,9 @@ requirements:
       parked, or still open.
     moscow: could
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       plans/running-thoughts.md #10, same 2026-09-18 batch - browse this
       project's own planning files from inside the dashboard instead of
@@ -1038,6 +1134,9 @@ requirements:
       dashboard, so that good QA practice is visibly recognized.
     moscow: could
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       plans/running-thoughts.md #3, same 2026-09-18 batch - staff who
       turn QA around quickly or consistently produce clean data being
@@ -1087,6 +1186,9 @@ requirements:
       move a check to the wrong place on the dashboard.
     moscow: must
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       Found by delivery-architect while checking technical fit for
       REQ-QAC-024, verified at source, scoped with Keith 2026-09-20.
@@ -1256,6 +1358,9 @@ requirements:
       my data without asking the person who built the pipeline.
     moscow: must
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       Keith, flagged as near-term work in plans/qa-pipeline.md item 25,
       2026-09-18; scoped via delivery-scoper 2026-09-19 and walked
@@ -1575,6 +1680,9 @@ requirements:
       can't quietly rot the way it would if the field stayed optional.
     moscow: should
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       delivery-scoper, gap found while scoping plans/qa-pipeline.md item
       25; mechanism and exemptions settled with Keith 2026-09-20.
@@ -1796,6 +1904,9 @@ requirements:
       tool without having to understand how it is built.
     moscow: should
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       Keith, 2026-09-20, modelled on his own keithamoss/mapa repo's
       in-app "What's New" page (frontend/src/features/whatsNew).
@@ -1918,6 +2029,9 @@ requirements:
       run is not mistaken for a suite that passed.
     moscow: should
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       Keith, 2026-09-20, after a session found that the JavaScript suite
       does not exercise what CI exercises and kept being skipped -
@@ -2006,6 +2120,9 @@ requirements:
       instead of being silently accepted.
     moscow: should
     status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
     source: >
       Keith, 2026-09-20 - "can't we use a YAML schema validation library
       and give it a spec for this kind of stuff rather than writing these

@@ -3350,6 +3350,14 @@ function renderRequirementsPanel(){
       ? `<span class="mono" style="font-size:11px; color:var(--ink-faint);">${r.date_written}</span>` : "";
     const source = r.source
       ? `<div style="margin-top:8px; font-size:11.5px; color:var(--ink-faint);">Source: ${r.source}</div>` : "";
+    // Sits in the pill row rather than down with source/dates, because
+    // it answers the same question the status pill does - "has anyone
+    // agreed to this?" is not a footnote next to "is it built?". An
+    // unsigned requirement renders nothing here rather than a warning:
+    // that is the normal resting state for one still being drafted, and
+    // CI already refuses to let it reach any other status unsigned.
+    const signedOff = r.signed_off
+      ? `<span style="font-size:11.5px; color:var(--ink-faint);">Signed off by ${r.signed_off.by}, <span class="mono">${r.signed_off.date}</span></span>` : "";
     const nfrs = (r.non_functional_requirements||[]).length
       ? `<div style="margin-top:10px; font-size:12px;"><b>Non-functional:</b>
           <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${r.non_functional_requirements.map(n=>`<li>${n}</li>`).join("")}</ul>
@@ -3389,7 +3397,7 @@ function renderRequirementsPanel(){
           <b style="font-size:14px;">${r.title}</b>
           ${dateWritten}
         </div>
-        <div style="display:flex; gap:6px; margin-bottom:8px;">${moscowPill(r.moscow)}${requirementStatusPill(r.status)}</div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">${moscowPill(r.moscow)}${requirementStatusPill(r.status)}${signedOff}</div>
         <div style="font-size:13px; color:var(--ink-muted); margin-bottom:10px;">${r.story}</div>
         <ul style="margin:0; padding-left:18px; font-size:12.5px; line-height:1.5;">${criteria}</ul>
         ${nfrs}

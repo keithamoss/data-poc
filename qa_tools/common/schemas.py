@@ -109,6 +109,32 @@ class _Strict(BaseModel):
         return v
 
 
+class SignOff(_Strict):
+    """Keith's own sign-off on a requirement, before any building starts.
+
+    His standing instruction, 2026-09-20: a requirement existing in the
+    register is not one he has agreed to. Drafting one - by hand or via
+    `delivery-scoper` - produces a proposal, and the proposal is
+    presented to him as prose he can react to before anything downstream
+    begins.
+
+    A structured pair rather than free text ("Keith, 2026-09-20") so the
+    date is actually checkable. `by` is deliberately unconstrained: this
+    is a small team today and hard-coding one name into a schema is the
+    kind of thing that quietly breaks the day someone else signs one.
+    """
+
+    by: NonEmptyStr
+    date: str
+
+    @field_validator("date")
+    @classmethod
+    def _real_date(cls, v: str) -> str:
+        if not re.match(_DATE_PATTERN, v):
+            raise ValueError('must be a real "YYYY-MM-DD" date')
+        return v
+
+
 class Requirement(_Strict):
     id: str = Field(pattern=_ID_PATTERN)
     title: NonEmptyStr
@@ -135,6 +161,20 @@ class Requirement(_Strict):
     source: NonEmptyStr
 
     date_written: str = ""
+
+    # Absent until Keith signs the requirement off, and required from
+    # the moment its status moves past `not_started` - the rule lives in
+    # missing_when_built()'s sibling below, since it is about the whole
+    # record rather than this field alone.
+    #
+    # Why a field and not just the written convention: the convention
+    # was written first, the same day, and prose is exactly what had
+    # just failed. REQ-DASH-026 sat in this register with ten acceptance
+    # criteria while work went ahead against one of them backwards,
+    # because nothing required anyone to open it. Nothing in CI could
+    # tell a signed-off requirement from an unsigned one.
+    signed_off: SignOff | None = None
+
     non_functional_requirements: list[str] = []
     dependencies: list[str] = []
     open_questions: list[str] = []
@@ -156,6 +196,17 @@ class Requirement(_Strict):
             return []
         return [name for name in ("linked_tests", "implemented_by", "evidence", "decisions")
                 if not getattr(self, name)]
+
+    def needs_sign_off(self) -> bool:
+        """True when this requirement has moved past `not_started`
+        without Keith having signed it off.
+
+        Deliberately allowed while `not_started`: signing off and then
+        building is the whole shape of the rule, so a signed but
+        not-yet-started requirement is the normal resting state between
+        the two, not an error.
+        """
+        return self.status != "not_started" and self.signed_off is None
 
     def present_but_not_built(self) -> list[str]:
         """Fields that cannot honestly precede the work, on a requirement

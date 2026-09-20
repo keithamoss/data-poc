@@ -272,6 +272,20 @@ class TestRequirementsPanel:
         assert any(label in rows_text for label in ("Built", "In progress", "Not started"))
         assert "tests/" in rows_text or "tests-js/" in rows_text
 
+    def test_a_built_requirement_shows_who_signed_it_off(self, clean_page, built_dashboard_html):
+        """2026-09-20. Sign-off is enforced in CI, but CI is not where
+        anyone reads the register - the panel is, and a rule nobody can
+        see is the shape of the failure that prompted the field in the
+        first place. Asserted at the layer a human actually looks at,
+        per CLAUDE.md's own standing rule about verifying at the last
+        transform rather than the first."""
+        _goto(clean_page, built_dashboard_html)
+
+        clean_page.locator("#requirements-btn").click()
+        rows_text = clean_page.locator("#requirements-panel-body").inner_text()
+
+        assert "Signed off by" in rows_text
+
     def test_opening_it_is_a_real_history_entry_that_the_back_button_closes(self, clean_page, built_dashboard_html):
         """The 4 header side panels used to be DOM-only, outside browser
         history entirely - now unified under STATE.panel/?panel= (2026-09-18,
