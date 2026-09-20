@@ -83,10 +83,15 @@ _VALID_MOSCOW = {"must", "should", "could", "wont"}
 _VALID_STATUS = {"not_started", "in_progress", "built"}
 
 
-def _python_test_exists(rel_path: str, qualname: list[str]) -> bool:
+def _python_symbol_exists(rel_path: str, qualname: list[str]) -> bool:
     """qualname is ["function"] or ["Class", "method"] - real AST parse
     of the referenced file (never a regex/string match, which could be
-    fooled by a comment or a docstring mentioning the same name)."""
+    fooled by a comment or a docstring mentioning the same name).
+
+    Used by BOTH `linked_tests` and `implements` (2026-09-20). It was
+    named `_python_test_exists` while tests were its only caller; the
+    mechanism was never test-specific, and pointing it at production
+    code is exactly what makes `implements` worth more than a path."""
     full_path = ROOT / rel_path
     if not full_path.exists():
         return False
@@ -128,9 +133,52 @@ def _linked_test_exists(entry: str) -> bool:
         file_part, *qualname = entry.split("::")
         if not file_part.endswith(".py"):
             return False
-        return _python_test_exists(file_part, qualname)
+        return _python_symbol_exists(file_part, qualname)
     full_path = ROOT / entry
     return full_path.exists()
+
+
+# Files whose symbols this toolchain can actually verify, and files
+# where a bare path is the honest limit of what it can claim.
+#
+# Keith's call, 2026-09-20: Python MUST name a symbol; front-end code may
+# be a bare path "for now - for the HTML we'll probably end up with a
+# separate TypeScript or JavaScript file, and maybe we can take it up
+# later". A `::` on a `.html` file IS allowed and IS verified, just not
+# here - tests-js/implements.test.js loads the real template into jsdom
+# and checks the symbol actually resolves, which is stronger than an AST
+# parse because it is real execution rather than a reading of the source.
+_FRONT_END_SUFFIXES = (".html", ".js", ".ts")
+
+
+def _implements_errors(entry: str, where: str) -> list[str]:
+    """One `implements` entry: a path, or `path::Symbol` /
+    `path::Class::method`.
+
+    The asymmetry between Python and everything else is deliberate and
+    is the whole point of the field. `Path.exists()` stays green while a
+    module is gutted, stubbed, or renamed-and-recreated - which is
+    precisely how `touches:` lines in plans/*.md rotted while continuing
+    to look authoritative. An AST-verified symbol cannot: delete
+    `parse_contract_check_metadata` and CI names the requirement that
+    claimed it."""
+    file_part, *qualname = entry.split("::")
+    if not (ROOT / file_part).exists():
+        return [f"{where}: implements entry {entry!r} names a file that does not exist"]
+    if file_part.endswith(".py"):
+        if not qualname:
+            return [f"{where}: implements entry {entry!r} is a bare Python path - "
+                    f"name a symbol (file.py::function or file.py::Class::method), "
+                    f"since a path alone stays valid while the code inside it goes away"]
+        if not _python_symbol_exists(file_part, qualname):
+            return [f"{where}: implements entry {entry!r} names no real "
+                    f"function/class/method in that file"]
+        return []
+    if qualname and not file_part.endswith(_FRONT_END_SUFFIXES):
+        return [f"{where}: implements entry {entry!r} qualifies a {Path(file_part).suffix or 'n extensionless'} "
+                f"file with '::' - nothing verifies that, and an unchecked claim in a "
+                f"checked field is worse than a plain path"]
+    return []
 
 
 def _valid_string_list(value, field_name: str, where: str) -> list[str]:
@@ -216,6 +264,23 @@ def validate(requirements: list[dict]) -> list[str]:
 
         for field_name in ("non_functional_requirements", "open_questions", "evidence"):
             errors.extend(_valid_string_list(r.get(field_name), field_name, where))
+
+        # `implements` - where the requirement actually LIVES, as opposed
+        # to `linked_tests`' what verifies it. Required once `built`, by
+        # Keith's own explicit call (2026-09-20), for a reason the
+        # `evidence` field demonstrated the hard way: an optional field
+        # with no forcing function stays at zero use however well its
+        # schema is written. A CI gate that will not go green IS the
+        # forcing function.
+        implements = r.get("implements") or []
+        shape_errors = _valid_string_list(implements, "implements", where)
+        errors.extend(shape_errors)
+        if status == "built" and not implements:
+            errors.append(f"{where}: status is 'built' but implements is empty - "
+                           f"a built requirement needs to say where it is implemented")
+        if not shape_errors:
+            for entry in implements:
+                errors.extend(_implements_errors(entry, where))
 
         # dependencies gets the same "is it a real list of strings" check
         # as the other 3, PLUS its own extra rule below (each entry must

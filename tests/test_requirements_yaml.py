@@ -36,7 +36,7 @@ requirements:
         "moscow": "must", "status": "built",
         "acceptance_criteria": ["It does the thing."], "linked_tests": ["tests/test_x.py"],
         "date_written": "", "source": "", "non_functional_requirements": [], "dependencies": [],
-        "open_questions": [], "evidence": [],
+        "open_questions": [], "evidence": [], "implements": [],
     }
 
 

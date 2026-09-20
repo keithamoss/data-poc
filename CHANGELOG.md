@@ -95,6 +95,31 @@ edited for a punchier, friendlier read than a bare commit log.
   Index is ~7,500 tokens against the ~159,000 that reading the files
   costs.
 
+- **12:23pm** — **A Requirement Now Says Where It Is Implemented, Not Just What Tests It** **[Docs & process]** **[Testing & dev tooling]**
+  `requirements.yaml` has always said which *tests* verify a
+  requirement, AST-verified so a renamed test breaks the build. It never
+  said where the thing actually **lives**. A new `implements:` field
+  does, and CI checks it the same way.
+  The rules are deliberately asymmetric. A Python entry **must** name a
+  symbol — `check_lifecycle.py::parse_contract_check_metadata` — and a
+  bare Python path is rejected, because `exists()` stays true while the
+  code inside a file is gutted or renamed. Front-end paths may be bare
+  (there's no JS parser on the Python side), but a symbol on the
+  template **is** verified, in the Node toolchain: `npm test` loads the
+  real template into a real jsdom window and checks the name actually
+  resolves — real execution, so a name appearing only in a comment can't
+  pass. A `::` on any other file type is rejected outright, since an
+  unchecked claim inside a checked field is worse than a plain path.
+  It's **required once a requirement is `built`**, which is the whole
+  design. The neighbouring `evidence:` field shipped a day earlier with
+  an equally clear spec, stayed optional, and sits at zero uses across
+  27 requirements — it was assigned to a reviewer agent that is
+  read-only and so cannot write it, and nothing tells anyone else to.
+  A field with no forcing function stays empty however well it's
+  specified; CI refusing to go green is one. All 14 built requirements
+  were backfilled in the same change, and the Requirements panel now
+  shows "Implemented in:" directly above "Verified by:".
+
 ### Fixed
 - **12:05pm** — **Index Lines Stopped One Clause Before the Decision** **[Docs & process]** **[Testing & dev tooling]**
   A scoping run reported two index lines that cut off exactly where the

@@ -120,6 +120,31 @@
 #                        - structured, not buried in prose, and exactly
 #                        what should get escalated to a human rather
 #                        than guessed.
+#   implements:          list of real places this requirement is
+#                        IMPLEMENTED - as opposed to linked_tests, which
+#                        says what VERIFIES it. Added 2026-09-20 (Keith,
+#                        plans/tooling.md #18). REQUIRED once `status` is
+#                        "built" - CI fails without it, deliberately: the
+#                        `evidence` field below shipped the day before
+#                        with an equally clear spec, was optional, and sat
+#                        at zero use because nothing ever forced the
+#                        issue. Each entry is a repo-relative path, or
+#                        `path::Symbol` / `path::Class::method`.
+#                        A `.py` entry MUST name a symbol and is checked
+#                        by a real AST parse - a bare Python path is
+#                        rejected, because `exists()` stays true while the
+#                        code inside the file is gutted or renamed, which
+#                        is exactly how `touches:` lines in plans/*.md
+#                        rotted while still looking authoritative.
+#                        A front-end path (`.html`/`.js`/`.ts`) may be
+#                        bare, since there's no JS parser on the Python
+#                        side; a `::` on one IS allowed and IS verified,
+#                        by tests-js/implements.test.js, which loads the
+#                        real template into jsdom and checks the symbol
+#                        resolves - real execution, so a name appearing
+#                        only in a comment cannot pass. Any other file
+#                        type may be a bare path only: a `::` on it is
+#                        rejected rather than silently unchecked.
 #   evidence:            list of real strings describing what was
 #                        actually checked and how, populated by the
 #                        requirements-reviewer agent, not the scoper -
@@ -154,6 +179,15 @@ requirements:
       - tests/test_run_soda_bdm.py
       - tests/test_run_datacontract_bdm.py
       - tests/test_run_evidently_bdm.py
+    implements:
+      - qa_tools/bdm/orchestrate_bdm.py::run_pipeline
+      - qa_tools/bdm/run_dbt_bdm.py::evaluate_dbt_bdm
+      - qa_tools/bdm/run_soda_bdm.py::evaluate_soda_bdm
+      - qa_tools/bdm/run_datacontract_bdm.py::evaluate_datacontract_bdm
+      - qa_tools/bdm/run_evidently_bdm.py::evaluate_evidently_bdm
+      - dbt_project/models/staging/schema.yml
+      - contract/bdm-birth-registrations-contract.yaml
+      - contract/bdm-birth-registrations-soda-checks.yml
 
   - id: REQ-QAC-002
     title: Real multi-tool QA checks against Child Protection
@@ -173,6 +207,14 @@ requirements:
       - tests/test_run_soda_cp.py
       - tests/test_run_datacontract_cp.py
       - tests/test_run_evidently_cp_real.py
+    implements:
+      - qa_tools/cp/orchestrate_cp.py::run_pipeline_cp
+      - qa_tools/cp/run_dbt_cp.py::evaluate_dbt_cp
+      - qa_tools/cp/run_soda_cp.py::evaluate_soda_cp
+      - qa_tools/cp/run_datacontract_cp.py::evaluate_datacontract_cp
+      - qa_tools/cp/run_evidently_cp.py::evaluate_evidently_cp
+      - contract/child-protection-contract.yaml
+      - contract/child-protection-soda-checks.yml
 
   - id: REQ-DASH-003
     title: Drill-down status rollup (Agency -> Collection -> Dataset -> Column)
@@ -190,6 +232,12 @@ requirements:
     linked_tests:
       - tests-js/status-rollups.test.js
       - tests-js/navigation.test.js
+    implements:
+      - dashboard/qa-reporting-dashboard.template.html::rollupStatuses
+      - dashboard/qa-reporting-dashboard.template.html::navigate
+      - qa_tools/common/dataset_status.py::dataset_status
+      - pipeline/build_dashboard_data.py::build
+      - pipeline/build_cp_dashboard_data.py::build
 
   - id: REQ-PIPE-004
     title: Committed, permanent QA history
@@ -208,6 +256,11 @@ requirements:
       - tests/test_qa_results_writer.py
       - tests/test_qa_results_reader.py
       - tests/test_build_results_from_history.py
+    implements:
+      - qa_tools/common/qa_results_writer.py::write_qa_result
+      - qa_tools/common/qa_results_reader.py::read_qa_results
+      - qa_tools/bdm/build_results_from_history.py::build_results_from_history
+      - qa_tools/cp/build_results_from_history.py::build_results_from_history
 
   - id: REQ-PIPE-005
     title: CI-gated publish, no manual publish path
@@ -224,6 +277,11 @@ requirements:
     linked_tests:
       - tests/test_check_dashboard_renders.py
       - tests/test_dashboard_e2e.py::TestBuiltDashboardRenders
+    implements:
+      - .github/workflows/deploy-pages.yml
+      - dashboard/check_dashboard_renders.py::main
+      - qa_tools/common/validate_check_lifecycle.py::main
+      - dashboard/snapshot_dashboard.py::prepare_deploy_site
 
   - id: REQ-QAC-006
     title: Check lifecycle - retirement without losing history
@@ -243,6 +301,13 @@ requirements:
     linked_tests:
       - tests/test_check_lifecycle.py
       - tests/test_validate_check_lifecycle.py
+    implements:
+      - qa_tools/common/check_lifecycle.py::CheckMetadata
+      - qa_tools/common/check_lifecycle.py::parse_dbt_check_metadata
+      - qa_tools/common/check_lifecycle.py::parse_soda_check_metadata
+      - qa_tools/common/check_lifecycle.py::parse_contract_check_metadata
+      - qa_tools/common/check_lifecycle.py::parse_evidently_check_metadata
+      - qa_tools/common/validate_check_lifecycle.py::collect_checks
 
   - id: REQ-PIPE-007
     title: Cadence-aware "as of" viewing
@@ -260,6 +325,11 @@ requirements:
     linked_tests:
       - tests/test_cadence.py
       - tests/test_dashboard_e2e.py::TestAsOfDatePicking::test_a_date_before_any_real_history_shows_no_data
+    implements:
+      - pipeline/cadence.py::parse_cadence_from_contract
+      - pipeline/cadence.py::cycle_start
+      - pipeline/cadence.py::classify_arrival
+      - contract/data-asset.yaml
 
   - id: REQ-QAC-008
     title: Resupply chains derived from real, observable signals
@@ -279,6 +349,9 @@ requirements:
         red/amber/green status.
     linked_tests:
       - tests-js/supply-history.test.js
+    implements:
+      - dashboard/qa-reporting-dashboard.template.html::renderSupplyHistorySection
+      - pipeline/build_dashboard_data.py::build
 
   - id: REQ-DASH-009
     title: "Recent activity: who published what QA, when"
@@ -293,6 +366,10 @@ requirements:
         real run timestamp - never a placeholder.
     linked_tests:
       - tests/test_changelog.py
+    implements:
+      - qa_tools/common/changelog.py::build_changelog
+      - qa_tools/common/git_identity.py::get_run_by
+      - dashboard/embed_dashboard_data.py::embed
 
   - id: REQ-DASH-010
     title: "Release notes: the tool's own development history"
@@ -307,6 +384,10 @@ requirements:
         not a mechanical commit dump.
     linked_tests:
       - tests/test_changelog_md.py
+    implements:
+      - dashboard/changelog_md.py::parse_changelog
+      - dashboard/embed_dashboard_data.py::embed
+      - CHANGELOG.md
 
   - id: REQ-TEST-011
     title: Real automated test coverage with an enforced floor
@@ -324,6 +405,10 @@ requirements:
         aspiration.
     linked_tests:
       - tests/test_dashboard_e2e.py::TestBuiltDashboardRenders::test_renders_with_zero_console_errors_and_a_populated_view
+    implements:
+      - .github/workflows/test.yml
+      - pyproject.toml
+      - tests-js/support/loadDashboard.js
 
   - id: REQ-DASH-012
     title: Dark mode
@@ -337,6 +422,8 @@ requirements:
       - The choice persists across a reload.
     linked_tests:
       - tests/test_dashboard_e2e.py::TestDarkModeToggle::test_toggling_dark_mode_persists_across_a_reload
+    implements:
+      - dashboard/qa-reporting-dashboard.template.html::applyTheme
 
   - id: REQ-DASH-013
     title: "Time travel: point-in-time dashboard snapshots"
@@ -352,6 +439,9 @@ requirements:
         site or any other file.
     linked_tests:
       - tests/test_snapshot_dashboard.py
+    implements:
+      - dashboard/snapshot_dashboard.py::take_snapshot
+      - dashboard/snapshot_dashboard.py::sync_local_snapshots
 
   - id: REQ-DOCS-014
     title: A live requirements register, tied to real tests
@@ -369,6 +459,10 @@ requirements:
     linked_tests:
       - tests/test_validate_requirements.py
       - tests/test_requirements_yaml.py
+    implements:
+      - requirements.yaml
+      - dashboard/requirements_yaml.py::parse_requirements
+      - qa_tools/common/validate_requirements.py::validate
 
   - id: REQ-GHUB-015
     title: GitHub Issues as the QA remediation ticketing system

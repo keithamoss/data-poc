@@ -1997,9 +1997,10 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     `qa_results_writer` - a term list of filenames whose filenames had
     silently lost their extensions.
 
-18. **[todo, 2026-09-20]** **[Docs & process]**
-    **PARKED by Keith, 2026-09-20** - raised and deliberately deferred in
-    the same conversation, so it is logged rather than lost.
+18. **[done, 2026-09-20]** **[Docs & process]**
+    **BUILT 2026-09-20** - parked earlier the same day, then unparked
+    once the verification-methods question below settled what it was
+    actually for.
 
     Point a requirement at the code that implements it, not just at the
     tests that verify it. `requirements.yaml` has `linked_tests`, which
@@ -2039,11 +2040,127 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     22 already-built requirements need backfilling before CI can go
     green, so this cannot land incrementally.
 
-    Still open when it is picked up: whether an entry may name a symbol
-    (`qa_tools/common/check_lifecycle.py::parse_contract_check_metadata`,
-    AST-verified like a test node id) or only a file path. Keith's own
-    words leaned toward symbols - "perhaps even the pointers in the
-    file, or at least method names or classes."
+    **Symbols, decided 2026-09-20** (Keith: "let's definitely go
+    symbols... CI validates the files and the symbols with an AST pass").
+    The rule, and the asymmetry in it, is the whole point:
+
+    - A `.py` entry **must** name a symbol (`file.py::function` or
+      `file.py::Class::method`) and is AST-verified. A bare Python path
+      is rejected outright. `Path.exists()` stays green while a module
+      is gutted, stubbed, or renamed-and-recreated - which is precisely
+      how `touches:` rotted while continuing to look authoritative.
+    - A front-end path (`.html`/`.js`/`.ts`) may be bare, since there is
+      no JS parser on the Python side and this project's own validator
+      docstring rules out a regex for exactly this job ("never a regex/
+      string match, which could be fooled by a comment or a docstring
+      mentioning the same name"). Keith's framing: "for the HTML we'll
+      probably end up with a separate TypeScript or JavaScript file, and
+      maybe we can take it up later."
+    - A `::` on a front-end file IS allowed and IS verified - just in
+      the Node toolchain, by the new `tests-js/implements.test.js`. It
+      reuses `tests-js/support/loadDashboard.js`, which already loads
+      the real committed template into a real jsdom window with
+      `runScripts: "dangerously"`, so every top-level `function foo(){}`
+      genuinely becomes `window.foo`. That is **stronger** than the AST
+      check it stands in for, not weaker: it is real execution, so a
+      name appearing only in a comment cannot pass.
+    - A `::` on anything else (`.yaml`, `.sql`) is rejected. Nothing
+      verifies it, and an unchecked claim inside a checked field is
+      worse than a plain path.
+
+    Both halves were proven by breaking them on purpose rather than
+    assumed: renaming a real Python symbol produced
+    `REQ-QAC-006: implements entry '...::parse_contract_check_metadataX'
+    names no real function/class/method in that file`, and typo-ing a
+    template symbol failed `npm test` naming `REQ-DASH-012` and the
+    exact entry.
+
+    All **14** `built` requirements backfilled in the same change, since
+    "required once built" cannot land incrementally. The panel renders
+    "Implemented in:" directly above "Verified by:" - verified in a real
+    browser, 14 rendered blocks, zero console errors - because they are
+    two halves of one question and reading them apart is what let the
+    register answer only the second for a year.
+
+    **The four verification methods, and what this means for
+    `evidence`.** Recognised practice has four: analysis, inspection,
+    testing, demonstration. Keith's own read, 2026-09-20, and it holds
+    up better than the framing it corrected:
+
+    - **Testing** - `linked_tests`, already.
+    - **Demonstration** - also `linked_tests`. `tests/
+      test_dashboard_e2e.py` drives a real browser through the real
+      flow. Once a demonstration is automated and committed it stops
+      being a separate method and becomes a test; the distinction is
+      about who watches, not about what is verified.
+    - **Inspection** - this field, with one honest caveat: it gives the
+      *object* of inspection, not a record that one happened. That is
+      the better half to hold, though. A prose note saying "read lines
+      42-88 on 2026-09-20" is an unverifiable claim about the past that
+      decays silently; a CI-verified pointer stays true or breaks the
+      build.
+    - **Analysis** - the genuine remainder. Deriving that a requirement
+      holds by measurement rather than execution (the 72%/98%
+      truncation figures, the token-cost tables, REQ-QAC-023's
+      byte-identical `config_hash` proof) has no field. In practice it
+      already lands in `plans/*.md` and `CHANGELOG.md`, which is a
+      reasonable home.
+
+    So `evidence` is now largely redundant - three of the four methods
+    are covered by fields that CI enforces, and the fourth has a home
+    elsewhere. **Not retired here**, deliberately: removing a field is a
+    separate decision from adding one, and it is Keith's to make. Logged
+    as #20 below.
+
+    **Provenance of `evidence`, traced 2026-09-20 at Keith's ask**,
+    because the lesson shaped this field's design. It arrived in
+    `6cc10f1` (2026-09-19) as one of five optional fields, spec'd
+    clearly in `requirements.yaml`'s own header: "populated by the
+    requirements-reviewer agent, not the scoper... a real paper trail
+    distinct from just which tests pass." It has **zero uses**, and not
+    through neglect. The agent it names is now `delivery-critic`, whose
+    tools are `Read, Grep, Glob, Bash, mcp__playwright` - deliberately
+    read-only, recorded in `plans/wider.md` #10 as an explicit
+    divergence from the `zhsama/claude-sub-agent` precedent. **The field
+    was assigned to an agent constitutionally incapable of writing it**,
+    and a grep of every `.claude/agents/*.md` and `docs/*.md` finds not
+    one mention of the field, so nothing tells the main session to
+    transcribe it either.
+
+    Neither cited source prescribes it. EARS is purely a phrasing
+    template set and has no opinion on attributes at all. The
+    `zhsama/claude-sub-agent` precedent (README fetched and read, not
+    assumed) has no `evidence` concept: its `spec-validator` outputs
+    "Validation report, quality score" - a *separate artifact*, never an
+    amendment to `requirements.md`. The field is this project's own
+    invention.
+
+    **That is why `implements` is required rather than optional.** A
+    field with no forcing function stays empty however well its schema
+    is written - `evidence` proves it, with a better spec than most.
+    Keith's "required once built" call supplies the forcing function,
+    because CI refusing to go green is one.
+
+20. **[todo, 2026-09-20]** **[Docs & process]**
+    Decide whether `requirements.yaml`'s `evidence` field survives.
+
+    Raised by #18's own build, not a fresh idea: with `implements`
+    landed, three of the four recognised verification methods are
+    covered by CI-enforced fields (`linked_tests` for testing and
+    demonstration, `implements` for inspection) and the fourth
+    (analysis) already lands in `plans/*.md`/`CHANGELOG.md`. `evidence`
+    has zero uses across 27 requirements and, as #18 traces, was
+    assigned to a read-only agent that cannot write it.
+
+    Three real options, none picked: **retire it** (a field nothing
+    fills is noise in a schema whose whole value is that its fields are
+    real); **give it a write path** (name which step populates it, the
+    way `implements` now has CI as its forcing function); or **narrow it
+    to analysis specifically** - the one method genuinely uncovered -
+    which would give it a reason to exist that it currently lacks.
+    Worth deciding rather than leaving a field that quietly teaches
+    whoever reads the schema next that optional fields here are
+    decorative.
 
 19. **[todo, 2026-09-20]** **[Docs & process]**
     **PARKED by Keith, 2026-09-20**, same conversation as #18.

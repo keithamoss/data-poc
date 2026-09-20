@@ -3296,6 +3296,15 @@ function renderRequirementsPanel(){
           <b>Open questions:</b>
           <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${r.open_questions.map(q=>`<li>${q}</li>`).join("")}</ul>
         </div>` : "";
+    // "Implemented in" sits directly above "Verified by" deliberately -
+    // they are the two halves of the same question (where it lives, what
+    // proves it works), and reading them apart is what let the register
+    // answer only the second one for a year.
+    const impl = (r.implements||[]).length
+      ? `<div style="margin-top:10px; font-size:12px; color:var(--ink-muted);">
+          Implemented in: ${r.implements.map(i=>`<code>${i}</code>`).join(", ")}
+        </div>`
+      : "";
     const evidence = (r.evidence||[]).length
       ? `<div style="margin-top:8px; font-size:12px; color:var(--ink-muted);"><b>Evidence:</b>
           <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${r.evidence.map(e=>`<li>${e}</li>`).join("")}</ul>
@@ -3311,6 +3320,7 @@ function renderRequirementsPanel(){
         <div style="font-size:13px; color:var(--ink-muted); margin-bottom:10px;">${r.story}</div>
         <ul style="margin:0; padding-left:18px; font-size:12.5px; line-height:1.5;">${criteria}</ul>
         ${nfrs}
+        ${impl}
         ${tests}
         ${evidence}
         ${deps}

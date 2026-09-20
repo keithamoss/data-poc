@@ -8,7 +8,7 @@ the whole point of this gate is confirming a REAL file/test exists, not
 just that some string matches some other string."""
 from __future__ import annotations
 
-from qa_tools.common.validate_requirements import _linked_test_exists, _python_test_exists, validate
+from qa_tools.common.validate_requirements import _linked_test_exists, _python_symbol_exists, validate
 
 
 def _valid_entry(**overrides):
@@ -20,6 +20,9 @@ def _valid_entry(**overrides):
         "status": "built",
         "acceptance_criteria": ["It does the thing."],
         "linked_tests": ["tests/test_resupply.py::test_add_business_days_skips_weekends"],
+        # Required once `status` is "built" (2026-09-20) - so the base
+        # fixture, which IS built, has to carry one to stay valid.
+        "implements": ["qa_tools/common/validate_requirements.py::validate"],
     }
     entry.update(overrides)
     return entry
@@ -108,7 +111,7 @@ def test_validate_rejects_a_linked_test_naming_a_real_file_but_fake_function():
     assert any("does not resolve" in e for e in errors)
 
 
-# ---- _linked_test_exists() / _python_test_exists() - against REAL repo files --
+# ---- _linked_test_exists() / _python_symbol_exists() - against REAL repo files --
 
 def test_real_module_level_test_function_resolves():
     assert _linked_test_exists("tests/test_resupply.py::test_add_business_days_skips_weekends") is True
@@ -140,8 +143,8 @@ def test_method_name_that_does_not_exist_in_a_real_class_does_not_resolve():
     assert _linked_test_exists("tests/test_dashboard_e2e.py::TestDarkModeToggle::test_nonexistent") is False
 
 
-def test_python_test_exists_returns_false_for_a_missing_file():
-    assert _python_test_exists("tests/does_not_exist.py", ["test_x"]) is False
+def test_python_symbol_exists_returns_false_for_a_missing_file():
+    assert _python_symbol_exists("tests/does_not_exist.py", ["test_x"]) is False
 
 
 # ---- 5 new optional fields (2026-09-19, plans/wider.md #10) ---------
@@ -238,3 +241,70 @@ def test_dependencies_referencing_a_real_id_in_the_same_file_is_fine():
 def test_dependencies_referencing_a_nonexistent_id_is_an_error():
     errors = validate([_valid_entry(id="REQ-QAC-001", dependencies=["REQ-QAC-999"])])
     assert any("dependencies entry 'REQ-QAC-999' does not match any real requirement id" in e for e in errors)
+
+
+# ---- implements ------------------------------------------------------
+#
+# Keith's call, 2026-09-20 (plans/tooling.md #18). The register already
+# says which TESTS verify a requirement; it never said where the thing
+# lives. The lesson driving the shape is the `evidence` field sitting at
+# zero use a day after it shipped, despite a well-written spec: it was
+# assigned to an agent that is read-only and so cannot write it, and no
+# instruction anywhere tells anyone to populate it. A field with no
+# forcing function stays empty, so this one is required once a
+# requirement is `built` and CI refuses to pass without it.
+
+def test_a_built_requirement_must_say_where_it_is_implemented():
+    errors = validate([_valid_entry(implements=[])])
+    assert any("implements" in e for e in errors), errors
+
+
+def test_implements_is_optional_until_a_requirement_is_valid_entry():
+    assert validate([_valid_entry(status="not_started", linked_tests=[])]) == []
+
+
+def test_a_python_entry_must_name_a_symbol_not_just_a_file():
+    """Keith's explicit call: "Python code must have a symbol."
+
+    A bare path is verified only by `Path.exists()`, which stays green
+    while the file is gutted, stubbed, or emptied - the same weak
+    guarantee that let plans/*.md `touches:` lines rot while looking
+    authoritative. A symbol is AST-verified, so a rename breaks the
+    build and names the requirement that claimed it."""
+    errors = validate([_valid_entry(implements=["qa_tools/common/validate_requirements.py"])])
+    assert any("symbol" in e.lower() for e in errors), errors
+
+
+def test_a_python_symbol_that_does_not_exist_is_an_error():
+    errors = validate([_valid_entry(implements=[
+        "qa_tools/common/validate_requirements.py::no_such_function"])])
+    assert any("no_such_function" in e for e in errors), errors
+
+
+def test_a_real_python_symbol_resolves():
+    assert validate([_valid_entry(implements=[
+        "qa_tools/common/check_lifecycle.py::parse_contract_check_metadata",
+        "qa_tools/common/check_lifecycle.py::CheckMetadata"])]) == []
+
+
+def test_a_front_end_path_may_be_bare():
+    """No AST parser for the template's inline JS on the Python side, so
+    a bare path is allowed there rather than pretending to a rigour this
+    toolchain does not have. The JS symbol form is checked by the Node
+    toolchain instead - tests-js/implements.test.js."""
+    assert validate([_valid_entry(implements=[
+        "dashboard/qa-reporting-dashboard.template.html"])]) == []
+
+
+def test_a_symbol_on_a_file_neither_python_nor_front_end_is_rejected():
+    """Nothing verifies a `::` on a YAML or SQL file, so accepting one
+    would record an unchecked claim in a field whose whole point is that
+    it is checked."""
+    errors = validate([_valid_entry(implements=[
+        "contract/data-asset.yaml::data_asset_id"])])
+    assert any("contract/data-asset.yaml" in e for e in errors), errors
+
+
+def test_an_implements_path_that_does_not_exist_is_an_error():
+    errors = validate([_valid_entry(implements=["qa_tools/common/nope.py::thing"])])
+    assert any("nope.py" in e for e in errors), errors
