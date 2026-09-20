@@ -76,6 +76,15 @@ def test_a_thread_advertises_what_is_actually_inside_it():
     thread_d = text.split("**Thread D**")[1].split("\n- ")[0]
     assert "Confirmed field set for the metadata" in thread_d, (
         "Thread D's index entry no longer advertises the field design it contains")
+    # A header alone is not enough, and that is not hypothetical either.
+    # A second run, against an index whose sub-entries stopped AT the
+    # colon, reported this exact line as still too thin - "a colon-ended
+    # fragment that names no fields... I reached it by grepping the file
+    # for 'description', not by following this line." So assert the
+    # sub-entry carries what the header introduces.
+    assert "check_id" in thread_d, (
+        "Thread D's sub-entry names no actual field - it is truncated before "
+        "the content begins, which is what made it useless twice")
 
 
 def test_phases_inside_a_build_order_thread_are_individually_listed():

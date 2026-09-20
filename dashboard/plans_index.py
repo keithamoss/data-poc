@@ -88,10 +88,17 @@ def _sub_entries(body: str) -> list[str]:
         lead = " ".join(m.group(1).split())
         if len(lead) < _MIN_BOLD_LEAD:
             continue
-        # A thin marker like "Decision:" says nothing on its own, so carry
-        # the sentence it introduces.
+        # ALWAYS carry the text the header introduces, however long the
+        # header itself is. An earlier version only did this for headers
+        # under 45 characters, and a real re-proof run (2026-09-20) showed
+        # that is exactly backwards: the longest headers are the ones that
+        # end in a colon and announce something, so truncating at the colon
+        # yields "Confirmed field set for the metadata, each check gets:" -
+        # which names no fields, in the one sub-entry whose contents were
+        # the entire subject of that agent's task. Its own words: "carry no
+        # information about what was decided, only that something was."
         rest = " ".join(m.group(2).split())
-        text = f"{lead} {rest}".strip() if len(lead) < 45 and rest else lead
+        text = f"{lead} {rest}".strip() if rest else lead
         text = _MD_NOISE_RE.sub("", text)
         if len(text) > _MAX_SUMMARY:
             text = text[:_MAX_SUMMARY].rsplit(" ", 1)[0] + "..."
