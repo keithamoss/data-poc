@@ -381,6 +381,50 @@ def test_parse_contract_check_metadata_reuses_native_description(tmp_path):
     assert checks[0].description == "A native ODCS description, not duplicated into customProperties."
 
 
+def test_parse_contract_check_metadata_reads_failure_indicates_and_technical_note(tmp_path):
+    """REQ-QAC-024's two prose fields, on the ODCS contract specifically.
+
+    Found 2026-09-20, before the authoring pass wrote a single one of
+    them: this parser built its CheckMetadata field list by hand rather
+    than through `_lifecycle_fields()` like the other four, so both new
+    fields were silently dropped - authored in the YAML, `None` on the
+    way out, no error anywhere. 89 of 257 active checks are
+    datacontract checks, so a third of the corpus would have been
+    written, committed, and quietly never rendered.
+
+    The hand-built list is the failure mode CLAUDE.md already names:
+    "a hand-maintained allowlist of copied fields drops new fields in
+    silence; spread-then-override carries them by default". This test
+    is what makes the next field added to CheckMetadata fail loudly
+    here instead.
+    """
+    path = _write(tmp_path, "contract.yaml", """\
+        schema:
+          - name: t
+            properties:
+              - name: c
+                quality:
+                  - metric: invalidValues
+                    dimension: conformity
+                    mustBe: 0
+                    description: "A single unrecognised value fails."
+                    customProperties:
+                      - property: check_id
+                        value: x.y.t.tbl.c.invalidValues
+                      - property: failure_indicates
+                        value: "The source system has started emitting a value that was never agreed."
+                      - property: technical_note
+                        value: "Paired with the Soda check on the same column."
+        """)
+
+    checks = cl.parse_contract_check_metadata(path)
+
+    assert checks[0].description == "A single unrecognised value fails."
+    assert checks[0].failure_indicates == (
+        "The source system has started emitting a value that was never agreed.")
+    assert checks[0].technical_note == "Paired with the Soda check on the same column."
+
+
 def test_parse_contract_check_metadata_covers_table_level_quality(tmp_path):
     path = _write(tmp_path, "contract.yaml", """\
         schema:

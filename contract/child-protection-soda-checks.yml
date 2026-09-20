@@ -288,7 +288,11 @@ checks for cp_notifications:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.concern_type.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
-        description: "Concern type must be one of the closed value set - this collection's own traffic-light demo column."
+        description: >
+          A few unrecognised values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          The source system has started emitting a value that was never agreed in the
+          contract, usually a new code introduced upstream without notice.
         changelog: []
 
   - invalid_percent(risk_rating):

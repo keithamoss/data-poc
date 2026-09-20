@@ -437,21 +437,29 @@ def _parse_contract_quality_rule(rule: dict, source: str, location: str) -> list
     changelog = meta.get("changelog")
     if isinstance(changelog, str):
         changelog = json.loads(changelog)  # ODCS customProperties values are scalar - a list gets stored as a JSON string
+    # Spread `_lifecycle_fields()` and override the two keys this tool
+    # genuinely handles differently, rather than listing every field by
+    # hand. That listing was a real bug (REQ-QAC-024, 2026-09-20): it
+    # predated `failure_indicates`/`technical_note` and silently dropped
+    # both, so 89 of 257 active checks would have had prose authored
+    # into their YAML that never reached anything, with no error. Every
+    # other parser already spreads this helper; this one is why the
+    # helper's whole point is that a new field arrives by default rather
+    # than needing four call sites updated.
+    fields = _lifecycle_fields(meta)
+    # ODCS quality rules already commonly carry their own native
+    # `description:` field (a real ODCS property, unlike dbt's/
+    # Soda's tool-specific config) - reuse it rather than requiring
+    # every rule to duplicate the same text into customProperties
+    # too. customProperties' own `description` wins if both exist
+    # (an explicit override for this metadata specifically).
+    fields["description"] = fields["description"] or native_description
+    # customProperties values are scalar, so a changelog list arrives as
+    # a JSON string and has already been decoded above.
+    fields["changelog"] = changelog or []
     return [CheckMetadata(
         check_id=check_id, category=category, tool="datacontract", config_hash=_config_hash(rule),
-        source_file=source,
-        introduced_date=meta.get("introduced_date"), retired_as_of=meta.get("retired_as_of"),
-        retired_reason=meta.get("retired_reason"),
-        # ODCS quality rules already commonly carry their own native
-        # `description:` field (a real ODCS property, unlike dbt's/
-        # Soda's tool-specific config) - reuse it rather than requiring
-        # every rule to duplicate the same text into customProperties
-        # too. customProperties' own `description` wins if both exist
-        # (an explicit override for this metadata specifically).
-        description=meta.get("description") or native_description,
-        changelog=changelog or [],
-        # REQ-QAC-023: authored, never derived from the rule's prose.
-        name=meta.get("name"),
+        source_file=source, **fields,
     )]
 
 

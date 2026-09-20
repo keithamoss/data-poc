@@ -1401,3 +1401,39 @@ otherwise learns which tool found something; whether the answer is to
 hand-author a `name` for all 257 rather than change `display_name()`;
 and whether the heading should instead derive from the newly-authored
 `description`, which would make the authoring pass the input to it.
+
+20. **[todo, 2026-09-20]** **[Dashboard UI]** 13 active checks never reach the dashboard at all, and they are all table-level.
+
+Found 2026-09-20 by verifying that `REQ-QAC-024`'s first authored batch
+actually rendered, rather than assuming the builders carried it. Five
+of the twelve checks written in that batch do not appear on the page.
+
+Measured against the real built JSON: **244 of 257 active checks reach
+the page, 13 do not.** Every one of the 13 is table-level rather than
+column-level - 7 `rowCount_datacontract`, 5 `row_count_soda`, 1
+`freshness_datacontract`.
+
+This is pre-existing, not caused by the authoring work. Birth
+Registrations' own `rowCount_datacontract` has carried a hand-written
+description since long before today and has never once been displayed.
+The cause is structural: `pipeline/build_dashboard_data.py` and its CP
+sibling assemble `checks_out` inside a per-COLUMN loop, and a
+table-level check has no column to be assembled under. The one
+exception proves it - `row_count_growth_evidently` does render, because
+it is attached to `registration_number` rather than to the table.
+
+Why it matters beyond tidiness: the dashboard's whole drill-down model
+is Agency -> Collection -> Dataset -> Column, so "is this supply the
+right size" - arguably the first question a steward asks about an
+arriving supply - has nowhere to live in it. That is the same
+shape-of-data-asset question `plans/wider.md` #9 raises, just hit from
+a different direction.
+
+Not scoped. Real forks to settle with Keith: whether table-level checks
+get a dataset-level section of their own above the column list, or get
+attached to a synthetic "whole table" pseudo-column that reuses the
+existing drawer; whether the 13 should be authored in the
+`REQ-QAC-024` pass at all while nothing displays them (they were, for
+the five in batch 1 - the prose is correct and simply invisible); and
+whether the `failure_indicates` CI gate should exempt them until they
+render, which would be the wrong way round if the fix is coming anyway.

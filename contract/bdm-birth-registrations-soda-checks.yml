@@ -201,7 +201,11 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.invalid_percent_soda
         category: conformity
         introduced_date: "2026-01-15"
-        description: "Sex must be one of the closed value set M, F, or X."
+        description: >
+          A few unrecognised values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          The source system has started emitting a value that was never agreed in the
+          contract, usually a new code introduced upstream without notice.
         changelog: []
 
   # --- Null rate creeping up, with a genuine amber band --------------------
@@ -475,5 +479,11 @@ checks for birth_registrations [recent]:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.invalid_percent_recent_soda
         category: conformity
         introduced_date: "2026-01-15"
-        description: "Sex validity, scoped to only the last 24 hours of extracts, so a fresh drift is caught fast."
+        description: >
+          A few unrecognised values are tolerated; a sustained rise fails, checked
+          against the most recent supplies only so a newly-introduced value is
+          caught early.
+        failure_indicates: >
+          The source system has started emitting a value that was never agreed in the
+          contract, usually a new code introduced upstream without notice.
         changelog: []

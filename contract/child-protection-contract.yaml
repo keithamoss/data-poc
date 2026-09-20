@@ -515,6 +515,8 @@ schema:
                             "Domestic violence exposure", "Parental substance use", "Parental mental health concern"]
             mustBe: 0
             severity: error
+            description: >
+              A single unrecognised value fails.
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.concern_type.invalidValues_datacontract
@@ -522,6 +524,9 @@ schema:
                 value: "2023-01-15"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
       - name: risk_rating
         logicalType: string
         physicalType: varchar(10)
@@ -604,6 +609,8 @@ schema:
         dimension: completeness
         mustBeBetween: [600, 1600]
         severity: warning
+        description: >
+          The number of rows in the supply must fall inside the expected band.
         customProperties:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.rowCount_datacontract
@@ -611,6 +618,9 @@ schema:
             value: "2023-01-15"
           - property: changelog
             value: "[]"
+          - property: failure_indicates
+            value: >
+              The supply arrived truncated or partly empty if it came in under the band, or the same data has been loaded twice if it came in over.
 
   - name: cp_investigations
     physicalType: table
@@ -829,6 +839,8 @@ schema:
         dimension: completeness
         mustBeBetween: [80, 350]
         severity: warning
+        description: >
+          The number of rows in the supply must fall inside the expected band.
         customProperties:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.rowCount_datacontract
@@ -836,6 +848,9 @@ schema:
             value: "2023-01-15"
           - property: changelog
             value: "[]"
+          - property: failure_indicates
+            value: >
+              The supply arrived truncated or partly empty if it came in under the band, or the same data has been loaded twice if it came in over.
 
   - name: cp_placements
     physicalType: table
@@ -1038,6 +1053,8 @@ schema:
         dimension: completeness
         mustBeBetween: [100, 450]
         severity: warning
+        description: >
+          The number of rows in the supply must fall inside the expected band.
         customProperties:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.rowCount_datacontract
@@ -1045,6 +1062,9 @@ schema:
             value: "2023-01-15"
           - property: changelog
             value: "[]"
+          - property: failure_indicates
+            value: >
+              The supply arrived truncated or partly empty if it came in under the band, or the same data has been loaded twice if it came in over.
 
   - name: cp_carers
     physicalType: table
@@ -1169,6 +1189,8 @@ schema:
         dimension: completeness
         mustBeBetween: [150, 500]
         severity: warning
+        description: >
+          The number of rows in the supply must fall inside the expected band.
         customProperties:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.rowCount_datacontract
@@ -1176,6 +1198,9 @@ schema:
             value: "2023-01-15"
           - property: changelog
             value: "[]"
+          - property: failure_indicates
+            value: >
+              The supply arrived truncated or partly empty if it came in under the band, or the same data has been loaded twice if it came in over.
 
   - name: cp_case_workers
     physicalType: table
@@ -1281,6 +1306,8 @@ schema:
         dimension: completeness
         mustBeBetween: [40, 80]
         severity: warning
+        description: >
+          The number of rows in the supply must fall inside the expected band.
         customProperties:
           - property: check_id
             value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.rowCount_datacontract
@@ -1288,6 +1315,9 @@ schema:
             value: "2023-01-15"
           - property: changelog
             value: "[]"
+          - property: failure_indicates
+            value: >
+              The supply arrived truncated or partly empty if it came in under the band, or the same data has been loaded twice if it came in over.
 
 slaProperties:
   # frequency here was stale at "7 d" (weekly) - a leftover from before

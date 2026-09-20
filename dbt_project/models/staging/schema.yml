@@ -249,7 +249,11 @@ models:
                 check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.accepted_values_dbt
                 category: conformity
                 introduced_date: "2026-01-15"
-                description: "Sex must be one of the closed value set M, F, or X."
+                description: >
+                  A few unrecognised values are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never agreed in the
+                  contract, usually a new code introduced upstream without notice.
                 changelog: []
               config:
                 # accepted_values' own main_sql (see dbt-core's
@@ -717,7 +721,11 @@ models:
                 check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.concern_type.accepted_values_dbt
                 category: conformity
                 introduced_date: "2023-01-15"
-                description: "Concern type must be one of the closed value set - this collection's own traffic-light demo column."
+                description: >
+                  A few unrecognised values are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never agreed in the
+                  contract, usually a new code introduced upstream without notice.
                 changelog: []
               config:
                 fail_calc: "coalesce(sum(n_records), 0)"

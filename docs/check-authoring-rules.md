@@ -40,12 +40,13 @@ quoting it.
    "inside the expected band for this table", never "[300, 900]";
    "a sustained rise fails", never "a rise past 3% fails". All three
    already exist structurally in the check.
-4. On an invalid-values check, give the tolerance INSTEAD OF the
-   purpose, not as well as it. "Must be one of the allowed values" is
-   what that check already IS, so saying it tells a reader nothing that
-   distinguishes this instance from any other. Say how much it
-   tolerates, and say it qualitatively (rule 3): "A single unrecognised
-   value fails" / "A few are tolerated; a sustained rise fails".
+4. Where the check's TYPE already states the rule - an allowed-values
+   check, a not-null check - give the tolerance instead of the purpose,
+   not as well as it. "Must be one of the allowed values" restates the
+   type, so it tells a reader nothing that distinguishes this instance
+   from the three siblings sitting beside it. Say how much it
+   tolerates, qualitatively (rule 3): "A single unrecognised value
+   fails" / "A few are tolerated; a sustained rise fails".
 
 **`failure_indicates` - what a failure means upstream**
 
@@ -71,8 +72,13 @@ quoting it.
     `invalid_percent`, no "two-sample K-S test".
 11. Cross-reference nothing a reader cannot follow - no file paths, no
     check ids, no "see the rowCount rule".
-12. Real column and table names ARE allowed, and are often the clearest
-    way to say it.
+12. Never name the column the check is on, in any of the three fields.
+    The drawer's breadcrumb ends in that column name directly above
+    what you are writing, so repeating it spends words on something
+    already on screen. Naming a DIFFERENT column or table is allowed
+    and is sometimes the only way to state the rule - "on or after
+    `date_of_birth`" on a check that sits on `date_registered` - and
+    that is the case this rule permits.
 13. Assume no run, no cadence and no delivery shape. "the previous
     supply", never "this run" or "a day's registrations". Say **supply**,
     never "extract" or "file" - standardised 2026-09-20. The one
@@ -330,11 +336,25 @@ No "see the rowCount rule", no file paths, no check ids. A cross-
 reference between checks is the one thing `technical_note` is legitimately
 for, because that field is never published.
 
-### Real column and table names are fine
+### Never name the column the check is on
 
-Where a real column or table name is the clearest way to say what is
-being checked, use it. This is a deliberate exception to the "no jargon"
-rule - `date_of_birth` is clearer to a steward than a paraphrase of it,
+Keith's call, 2026-09-20: "we're already looking at the column name".
+Verified against the real template rather than assumed - the drawer's
+eyebrow renders `${ag.name} / ${col.name} / ${ds.name} / ${column.name}`
+directly above the title and prose, so a reader of a check on `sex`
+has "Registry Services / Births / Birth Registrations / sex" on screen
+while they read it. *"A single unrecognised concern type fails"* becomes
+*"A single unrecognised value fails"*.
+
+**Naming a different column or table is the case this rule permits.**
+Where the rule genuinely involves another column, there is no way to
+state it without the name: *"on or after `date_of_birth`"* on a check
+that sits on `date_registered`. That is real - the `extract_timestamp`
+ordering checks cannot be written without referring to
+`date_registered` - and it is why this rule is about the check's OWN
+column rather than about column names generally.
+
+A real column name is otherwise clearer to a steward than a paraphrase,
 because it is the name they see on the data itself.
 
 ### Never leak run, cadence or delivery mechanics
