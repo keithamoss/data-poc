@@ -1,4 +1,4 @@
-// plans/running-thoughts.md #20 - table-level checks, and the stale
+// REQ-DASH-032 - table-level checks, and the stale
 // workaround that hid them.
 //
 // Row-count checks were skipped by both dashboard builders for a reason

@@ -74,7 +74,7 @@ COLUMN_META = {
 # than to any one column still has somewhere to live. Before these, the
 # builder dropped every "(table)" result on the floor - 13 real checks
 # across both datasets, carrying prose nobody could read
-# (plans/running-thoughts.md #20).
+# (REQ-DASH-032).
 #
 # Deliberately TWO rather than one (Keith, 2026-09-20). "Is this supply
 # the right size and current enough" is a different question from "do
@@ -192,7 +192,7 @@ def build() -> dict:
             checks_out.append({
                 "check_id": slot["check_id"],
                 # A hand-authored `name` in the check's own metadata wins
-                # over the derived label (plans/running-thoughts.md #19).
+                # over the derived label (REQ-DASH-026).
                 # The field already existed and was parsed but rendered
                 # nowhere - 16 checks carried one, and they are exactly
                 # the headings a reader wants: "Registered on or after
@@ -200,7 +200,7 @@ def build() -> dict:
                 "name": (lifecycle.name if lifecycle and lifecycle.name
                          else display_name(check_name, engine_short, slot["label"])),
                 # The URL-facing identity, stable across heading rewrites
-                # (plans/running-thoughts.md #19). Never `name`.
+                # (REQ-DASH-026). Never `name`.
                 "key": url_key(slot["check_id"]),
                 # REQ-DASH-026: the terse "dbt:not_null" line under
                 # the headline. Same string as `key` above, tool

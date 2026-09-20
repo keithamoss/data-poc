@@ -2857,7 +2857,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
     // Keyed on check.key (the check_id's final segment), never on
     // check.name. The heading is prose now and prose gets reworded;
     // an URL that moves when someone improves a sentence is not a
-    // URL (plans/running-thoughts.md #19). check.key is unique within
+    // URL (REQ-DASH-026). check.key is unique within
     // a column by a real CI gate - validate_tail_uniqueness(), which
     // REQ-QAC-023 wrote for exactly this use and left unwired.
     STATE = {...STATE, checkKey:check.key, compareIdx:undefined};

@@ -41,7 +41,7 @@ describe("stateToHash / hashToState round-trip", () => {
   });
 
   it("keys a check URL on its stable key, never on its display heading", () => {
-    // plans/running-thoughts.md #19. The URL used to carry the check's
+    // REQ-DASH-026. The URL used to carry the check's
     // DISPLAY name, which is why headings read "Invalid values -
     // dbt:accepted_values (dbt-core)": the heading had to stay unique
     // within a column, because it WAS the identity.

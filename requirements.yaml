@@ -2108,6 +2108,177 @@ requirements:
         identical to the previous one was asked and answered - do not
         skip. Worth revisiting only after watching a real long-running
         ticket, since it is the only lever on comment volume.
+  - id: REQ-PIPE-031
+    title: A check's identity is its check_id, never its display name
+    date_written: "2026-09-20"
+    story: >
+      As a data engineer reading a check's history, I want each check's
+      results to belong to that check alone, so that a tile I am looking
+      at is not silently blending two different checks' numbers.
+    moscow: must
+    status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
+    source: >
+      Found 2026-09-20 while fixing the table-level rendering gap
+      below; recorded until now only in plans/running-thoughts.md #20,
+      which is why this entry exists - the most serious defect found
+      that day had no requirement at all.
+    acceptance_criteria:
+      - THE SYSTEM SHALL key each check's accumulated per-run values on
+        its check_id, never on a display name or a tool-reported check
+        name.
+      - IF two checks on the same column would share a tool-reported
+        name, THEN THE SYSTEM SHALL still report each one's own values
+        separately.
+    non_functional_requirements:
+      - The fix must not alter any check's config_hash, or every check
+        in the repo would report as changed.
+      - Must hold for both dataset builders, not only the one where the
+        collision was observed.
+    dependencies: [REQ-QAC-023]
+    linked_tests:
+      - tests/test_build_dashboard_data.py
+      - tests-js/table-level-checks.test.js
+    implemented_by:
+      - pipeline/build_dashboard_data.py::build
+      - pipeline/dashboard_check_labels.py::url_key
+    evidence:
+      - >
+        2026-09-20: the two colliding Birth Registrations checks
+        genuinely disagree on 166 of 352 committed runs, so the
+        published "plausible range" tile had been showing a blend of a
+        range check and a freshness check. Measured against the real
+        committed qa_results history.
+      - >
+        2026-09-20: zero collisions across both datasets after the fix,
+        with the regression test confirmed failing against the
+        pre-fix builder first.
+    decisions:
+      - The Birth Registrations builder keyed its slots on (engine,
+        check_name). datacontract-cli reports every sql-type rule as
+        `datacontract:custom_sql`, so date_of_birth's range check and
+        its freshness check shared one key - one vanished from the page
+        and both kept writing into the survivor's values. This was live
+        on the published site, not a latent risk.
+      - Decided to key on check_id, whose grammar and per-column tail
+        uniqueness REQ-QAC-023 already gates in CI, rather than making
+        the tool-reported name unique. A display name is not an
+        identity, which is the same lesson REQ-DASH-026 applies to
+        URLs.
+      - Child Protection was never affected - its builder is per-table
+        and scoping by dataset_id gives zero collisions - so the fix
+        was applied to the Birth Registrations builder only.
+
+  - id: REQ-DASH-032
+    title: Supply- and table-level checks reach the dashboard
+    date_written: "2026-09-20"
+    story: >
+      As a data engineer checking an arriving supply, I want the checks
+      that apply to the whole supply rather than to one column to appear
+      on the page, so that "is this supply the right size" is a question
+      the dashboard can answer at all.
+    moscow: must
+    status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
+    source: >
+      Found 2026-09-20 by verifying that REQ-QAC-024's first authored
+      batch actually rendered rather than assuming the builders carried
+      it; recorded only in plans/running-thoughts.md #20 until now.
+    acceptance_criteria:
+      - THE SYSTEM SHALL render every active check, including those that
+        apply to a whole supply or table rather than to one column.
+      - THE SYSTEM SHALL separate checks about the size and timeliness
+        of a supply from checks about whether tables agree with each
+        other.
+      - THE SYSTEM SHALL NOT exclude a check from the page on the
+        grounds of a status-calculation bug that no longer exists.
+    non_functional_requirements:
+      - Must be verified in a real browser rather than at the data
+        layer - a correct builder says nothing about a render layer with
+        its own transform.
+    dependencies: [REQ-QAC-024]
+    linked_tests:
+      - tests-js/table-level-checks.test.js
+      - tests/test_build_dashboard_data.py
+    implemented_by:
+      - pipeline/build_dashboard_data.py::SUPPLY_LEVEL_PSEUDO_COLUMN
+      - pipeline/build_cp_dashboard_data.py::build_one_table
+      - dashboard/qa-reporting-dashboard.template.html
+    evidence:
+      - >
+        2026-09-20: 244 of 257 active checks reached the page before
+        this; 257 of 257 after. The 13 were 7 rowCount_datacontract, 5
+        row_count_soda and 1 freshness_datacontract.
+      - >
+        2026-09-20: verified in a real browser - Birth Registrations
+        shows 1 supply-level column and Child Protection 6, 12 checks
+        between them, every one green, zero console errors.
+    decisions:
+      - Three separate causes, not the one structural quirk first
+        diagnosed - a bare `continue` on the "(table)" column name, a
+        deliberate row-count exclusion, and the identity collision that
+        is now REQ-PIPE-031.
+      - The row-count exclusion was guarding a bug that no longer
+        existed. Its own comment gave the reason - a warning-severity
+        check has no fail threshold, a missing one defaulted to 0, and
+        the status rule read any healthy positive row count as red.
+        That was fixed at source when checkStatus() started preferring
+        the tool's own verdict, so the workaround outlived its bug by
+        long enough to hide 12 real checks.
+      - Decided on two pseudo-columns rather than one (Keith,
+        2026-09-20) - "(supply-level checks)" for row-count and
+        freshness, "(table-level checks)" for cross-table rules. Is
+        this supply the right size is a different question from do
+        these tables agree, and Child Protection already used the
+        second name, so it was reused rather than invented.
+      - Decided to fix this after the authoring loop finished rather
+        than during it (Keith). Two consequences followed - the 13 kept
+        being authored like every other check, since the prose was
+        correct and would simply start rendering; and the explanation
+        gate did not exempt them, which would have been the wrong way
+        round with a fix already coming.
+
+  - id: REQ-DASH-033
+    title: Supply-level checks get their own section, not a pseudo-column
+    date_written: "2026-09-20"
+    story: >
+      As a data engineer opening a dataset, I want the checks about the
+      supply as a whole presented as their own part of the page, so that
+      the first question I ask about an arriving supply is not filed as
+      one more row in a list of columns.
+    moscow: should
+    status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-09-20"
+    source: >
+      The one fork REQ-DASH-032 left open, carried out of
+      plans/running-thoughts.md #20 and settled by Keith on 2026-09-20 -
+      "table level checks do deserve their own dataset level section".
+    acceptance_criteria:
+      - WHEN a viewer opens a dataset, THE SYSTEM SHALL present
+        supply-level and table-level checks in their own section,
+        distinct from the list of columns.
+      - THE SYSTEM SHALL NOT render either pseudo-column among the real
+        columns once that section exists.
+      - THE SYSTEM SHALL keep every existing deep link to a check in
+        those groups working.
+      - THE SYSTEM SHALL continue to fold those checks into the
+        dataset's own status exactly as it does today.
+    non_functional_requirements:
+      - The pseudo-column names are currently real URL segments, so
+        changing the structure must not silently break a bookmark.
+      - Must be verified in a real browser, same as REQ-DASH-032.
+    dependencies: [REQ-DASH-032]
+    open_questions:
+      - Whether the section sits above or below the column grid, and
+        whether it carries its own status rollup, are presentation
+        calls better made against a real rendering than in advance.
+
   - id: REQ-DOCS-028
     title: A "What's New" feed written for the people who use the tool
     date_written: "2026-09-20"

@@ -479,7 +479,7 @@ def test_two_checks_sharing_a_display_name_stay_separate(tmp_path, monkeypatch):
 
 
 def test_a_table_level_check_lands_in_a_pseudo_column(tmp_path, monkeypatch):
-    """plans/running-thoughts.md #20: "(table)" results used to be dropped
+    """REQ-DASH-032: "(table)" results used to be dropped
     on the floor - a bare `continue` - so 13 real checks across both
     datasets rendered nowhere at all, prose and all.
 

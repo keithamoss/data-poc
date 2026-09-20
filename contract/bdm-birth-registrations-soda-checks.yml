@@ -436,7 +436,7 @@ checks for birth_registrations:
           The record is corrupt, or two different registrations have been joined together into one.
         changelog: []
 
-  # --- Extract timestamp ordering -------------------------------------------
+  # --- Supply timestamp ordering --------------------------------------------
   # A "failed rows" check with a custom fail condition - real SodaCL, not a
   # column metric, so run_soda_real.py routes this custom-named check to
   # the extract_timestamp column explicitly (it has no natural `column`
@@ -448,7 +448,7 @@ checks for birth_registrations:
       samples limit: 100000
       attributes:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.timestamp_ordering_soda
-        name: Extract timestamp ordering
+        name: Supply timestamp ordering
         category: consistency
         introduced_date: "2026-01-15"
         description: >

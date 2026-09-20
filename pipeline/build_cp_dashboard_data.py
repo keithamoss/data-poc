@@ -163,7 +163,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         # current_status first and only falls back to threshold maths -
         # so the workaround outlived its bug, and the cost of keeping it
         # was 12 real checks rendering nowhere
-        # (plans/running-thoughts.md #20).
+        # (REQ-DASH-032).
         if r["column_name"] == "(table)":
             col = (SUPPLY_LEVEL_PSEUDO_COLUMN if r["check_name"] in _SUPPLY_LEVEL_CHECK_NAMES
                    else BUSINESS_RULE_PSEUDO_COLUMN)
@@ -224,7 +224,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
             checks_out.append({
                 "check_id": slot["check_id"],
                 # A hand-authored `name` in the check's own metadata wins
-                # over the derived label (plans/running-thoughts.md #19).
+                # over the derived label (REQ-DASH-026).
                 # The field already existed and was parsed but rendered
                 # nowhere - 16 checks carried one, and they are exactly
                 # the headings a reader wants: "Registered on or after
@@ -232,7 +232,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                 "name": (lifecycle.name if lifecycle and lifecycle.name
                          else display_name(check_name, engine_short, slot["label"])),
                 # The URL-facing identity, stable across heading rewrites
-                # (plans/running-thoughts.md #19). Never `name`.
+                # (REQ-DASH-026). Never `name`.
                 "key": url_key(slot["check_id"]),
                 # REQ-DASH-026: the terse "dbt:not_null" line under
                 # the headline. Same string as `key` above, tool
