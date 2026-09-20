@@ -482,15 +482,21 @@ Rough layout:
   done. Automating this properly (a `.claude/settings.json` SessionStart
   hook) is scoped as `plans/tooling.md` #11 - until it exists, this
   bullet is the process fix.
-- **Every piece of build work emits real requirements, and deletes the
-  `plans/*.md` text it supersedes - in the same change.** Keith's own
-  explicit ask, 2026-09-20, and it applies whether or not the
-  `delivery-*` subagents were used. Two obligations, both non-optional:
+- **`requirements.yaml` is the permanent artifact. `plans/*.md` is
+  working material that gets deleted as its requirements land.** Keith's
+  own framing, confirmed as a standing rule 2026-09-20 ("requirements
+  are the permanent artifact... and then the plan file entries get
+  deleted as we go"), and it applies whether or not the `delivery-*`
+  subagents were used. This is a real inversion of how this project
+  worked until now - the plans files used to BE the memory - so read
+  it as replacing, not supplementing, any older guidance that treats a
+  `plans/*.md` write-up as the durable record. Two obligations, both
+  non-optional:
   1. **Emit requirements.** Build work that ships behaviour adds or
      updates real `requirements.yaml` entries - with `acceptance_criteria`,
-     and, once `status` is `built`, `linked_tests`, `implemented_by` and
-     `evidence` (all three CI-enforced). Not a plans note that says what
-     was built.
+     and, once `status` is `built`, `linked_tests`, `implemented_by`,
+     `evidence` and `decisions` (all four CI-enforced). Not a plans note
+     that says what was built.
   2. **Delete what it supersedes.** Any `plans/*.md` prose the new
      requirements now cover comes OUT of the plans file in that same
      change. Not archived to another file, not left tagged `done`.
@@ -534,6 +540,20 @@ Rough layout:
   a deliberate, separate job - this bullet governs NEW work from
   2026-09-20 on, so a change does not add to the pile while that is
   pending.
+
+- **PAUSE BEFORE THE NEXT `CHANGELOG.md` ENTRY - ask Keith first
+  (standing hold, set 2026-09-20).** His own explicit ask: he has
+  context to give on making the changelog human-readable, from the same
+  conversation that made requirements the permanent artifact, and he
+  wants to walk through it before any more entries get written in
+  today's style. **This overrides the same-push rule immediately
+  below** - do not write the entry and then mention it; stop, say a
+  changelog entry is due, and wait. The wider plan is to rewrite
+  `CHANGELOG.md` from the ground up, shorter and human-first
+  (`plans/running-thoughts.md` #13), so writing more long entries in
+  the meantime just adds to what has to be rewritten.
+  **Delete this bullet once that conversation has happened** and the
+  rule below resumes, amended by whatever comes out of it.
 
 - **A push that ships anything release-note-worthy gets a `CHANGELOG.md`
   entry in the SAME push, not backfilled later.** "Release-note-worthy"

@@ -1152,6 +1152,22 @@ text that is scheduled for deletion. The same test applies to the ~53
 `CHANGELOG.md` entries currently filed under the wrong date, which
 Keith explicitly said to leave alone for the same reason.
 
+**Confirmed as a standing rule, 2026-09-20**, later the same
+conversation: *"as we go forward, let's apply this rule of requirements
+are the permanent artifact... and then the plan file entries get
+deleted as we go."* Now written into `CLAUDE.md`'s own conventions, and
+the mechanism that makes it safe exists - `requirements.yaml`'s
+`decisions:` field (`plans/tooling.md` #20's sibling work), required on
+every `built` requirement and CI-gated, holds the reasoning that used
+to only live in a plans write-up.
+
+**Also confirmed the same day: the changelog half is on hold pending a
+conversation.** Keith asked for a pause before the next `CHANGELOG.md`
+entry so he can give the context behind "human readable" before any
+more get written in today's style. That hold is recorded in `CLAUDE.md`
+as a bullet that explicitly overrides the same-push changelog rule, and
+is to be deleted once the conversation has happened.
+
 Real questions this raises, none answered here: what happens to the ~80
 `done` write-ups that exist precisely so a session does not re-derive a
 settled decision (`CLAUDE.md`'s own stated reason for the
