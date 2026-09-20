@@ -190,6 +190,54 @@ class TestDarkModeToggle:
         assert after_reload == after_click
         assert clean_page.evaluate("localStorage.getItem('theme')") == after_click
 
+    def test_dark_mode_actually_renders_dark(self, clean_page, built_dashboard_html):
+        """The two tests either side of this one check that an ATTRIBUTE
+        flips and survives a reload. Neither checks that anything
+        renders differently - `data-theme="dark"` could be set on a page
+        whose CSS ignored it entirely and both would still pass.
+
+        Keith asked for this directly, 2026-09-20, after the same gap
+        turned up from the other end: REQ-DASH-012's only acceptance
+        criterion is that the choice persists, so the register could
+        claim dark mode was built and verified without anything ever
+        having looked at a colour.
+
+        So this measures real, resolved pixels in both themes -
+        `getComputedStyle` on `body`, via the WCAG relative-luminance
+        formula - and asserts the page is genuinely dark in one and
+        genuinely light in the other, with the text inverting to match.
+        """
+        _goto(clean_page, built_dashboard_html)
+
+        def render(theme: str) -> dict:
+            clean_page.evaluate(
+                "t => document.documentElement.setAttribute('data-theme', t)", theme)
+            clean_page.wait_for_timeout(250)
+            return clean_page.evaluate("""() => {
+              const lum = (s) => {
+                const [r, g, b] = s.match(/[\d.]+/g).slice(0, 3).map(Number);
+                const ch = (c) => {
+                  c = c / 255;
+                  return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+                };
+                return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b);
+              };
+              const cs = getComputedStyle(document.body);
+              return {bg: lum(cs.backgroundColor), ink: lum(cs.color)};
+            }""")
+
+        light, dark = render("light"), render("dark")
+
+        # Genuinely dark/light, not merely different - a theme that
+        # swapped one mid-grey for another would pass a bare inequality.
+        assert dark["bg"] < 0.05, f"dark background is not dark (luminance {dark['bg']:.3f})"
+        assert light["bg"] > 0.5, f"light background is not light (luminance {light['bg']:.3f})"
+
+        # And the text inverts with it, rather than staying put and
+        # becoming unreadable against the new background.
+        assert dark["ink"] > dark["bg"], "dark mode renders dark text on a dark background"
+        assert light["ink"] < light["bg"], "light mode renders light text on a light background"
+
     def test_a_theme_url_param_never_overrides_localstorage_on_load(self, clean_page, built_dashboard_html):
         """Human-friendlier URLs (2026-09-18, running-thoughts.md #9) added
         a ?theme= query param the toggle writes for display/bookmark

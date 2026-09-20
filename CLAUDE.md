@@ -482,6 +482,59 @@ Rough layout:
   done. Automating this properly (a `.claude/settings.json` SessionStart
   hook) is scoped as `plans/tooling.md` #11 - until it exists, this
   bullet is the process fix.
+- **Every piece of build work emits real requirements, and deletes the
+  `plans/*.md` text it supersedes - in the same change.** Keith's own
+  explicit ask, 2026-09-20, and it applies whether or not the
+  `delivery-*` subagents were used. Two obligations, both non-optional:
+  1. **Emit requirements.** Build work that ships behaviour adds or
+     updates real `requirements.yaml` entries - with `acceptance_criteria`,
+     and, once `status` is `built`, `linked_tests`, `implemented_by` and
+     `evidence` (all three CI-enforced). Not a plans note that says what
+     was built.
+  2. **Delete what it supersedes.** Any `plans/*.md` prose the new
+     requirements now cover comes OUT of the plans file in that same
+     change. Not archived to another file, not left tagged `done`.
+     The point is to stop accumulating a growing corpus of requirements
+     *plus* vague high-level plan thoughts describing the same thing, where
+     the two can disagree and nothing says which wins.
+
+  **Is deleting safe? For preservation yes, for RETRIEVAL only with one
+  extra step - so take the extra step.** Keith raised this directly
+  ("we can always reconstruct them from Git history, I guess. Does that
+  seem safe?"). Git does hold every deleted word, permanently, on a
+  public remote. But the real failure mode this project has already hit
+  is not "the text is gone", it is "nobody knew to go looking" - the
+  third `plans/INDEX.md` proof (`plans/tooling.md` #17) watched an agent
+  miss a decision that was sitting one level below what it read, and it
+  only recovered by luck. Finding a deleted plans entry needs
+  `git log -S"<phrase>"`, which needs you to already suspect the phrase,
+  which is nothing like grepping a live file. So: **the requirement that
+  replaces a deleted write-up names, in its own `source:` field, the
+  commit SHA the full text was deleted in.** Zero new machinery, and it
+  turns "search git and hope" into a direct pointer - the same move
+  `implemented_by` makes for code.
+
+  **The other real risk, which the SHA does not fix: requirements must
+  absorb the REASONING, not just the behaviour.** A requirement holds
+  what the system shall do. A `done` write-up in this project routinely
+  holds why a different approach was rejected, what bug was found on the
+  way, and what was verified and how - and `CLAUDE.md`'s own reason for
+  the read-everything rule is "don't re-derive a decision that's already
+  recorded there". `acceptance_criteria` will not carry that;
+  `non_functional_requirements`, `open_questions`, `evidence` and
+  `source` carry some of it. **Before deleting, read the write-up and
+  ask what it knows that the requirement does not** - if the answer is
+  "the reason we did not do it the other way", that belongs in the
+  requirement before the prose goes. Deleting is cheap to do and
+  expensive to notice you got wrong.
+
+  Sequencing (Keith's own words, `plans/running-thoughts.md` #13):
+  requirements first, deletion second, and the `CHANGELOG.md` rewrite as
+  its own separate piece. The back-catalogue of existing `done` items is
+  a deliberate, separate job - this bullet governs NEW work from
+  2026-09-20 on, so a change does not add to the pile while that is
+  pending.
+
 - **A push that ships anything release-note-worthy gets a `CHANGELOG.md`
   entry in the SAME push, not backfilled later.** "Release-note-worthy"
   is the same bar `CHANGELOG.md`'s own intro and item 62's original

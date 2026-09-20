@@ -1150,7 +1150,22 @@ common/check_lifecycle.py`'s own `check_id` convention.
     de-emphasis colour, and de-emphasis was presumably pushed until it
     looked right rather than until it measured right.
 
-    **Not fixed here, deliberately.** Changing a design token is a
+    **Directly caused a real test to be written, 2026-09-20.** Keith's
+    response on seeing this: "just write a test that checks that it
+    actually flips to dark mode."
+    `tests/test_dashboard_e2e.py::TestDarkModeToggle::
+    test_dark_mode_actually_renders_dark` now measures `body`'s resolved
+    background and text luminance in both themes and asserts the page is
+    genuinely dark in one and genuinely light in the other, with the text
+    inverting to match - rather than merely different, which a swap of
+    one mid-grey for another would satisfy. Proven by breaking it:
+    disabling the dark-theme CSS block made the new test fail with
+    `dark background is not dark (luminance 0.889)` while **both
+    pre-existing dark-mode tests still passed** - the attribute flipped,
+    survived a reload, and the page stayed light. That is the gap in
+    exact terms.
+
+    **The contrast ratios themselves are not fixed here, deliberately.** Changing a design token is a
     visual decision across 47 usages, not a mechanical one, and
     `REQ-DASH-012`'s own acceptance criterion is narrowly "the choice
     persists across a reload" - contrast is genuinely out of that

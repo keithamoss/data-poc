@@ -1161,3 +1161,43 @@ narrative at all or needs a new field for it; whether the Plans tab and
 panel; and what "human-first" means concretely for `CHANGELOG.md`, which
 is currently long *because* it doubles as the project's own design
 record. Scope with Keith before building any of it.
+
+14. **[todo, 2026-09-20]** **[Docs & process]** A way to tie a set of requirements together into one piece of work - a "sprint" - and record which requirements a change actually delivered.
+
+Keith, 2026-09-20, in the same conversation as #13's ephemeral-plans
+shift and dependent on it: *"I'm also thinking we need something that
+ties requirements together into a, like a, a sprint we work on
+together. I guess they can live in the plan files while we're doing the
+work and then can then be captured, I don't know, maybe in the revised
+changelog potentially. So kind of have a field there which lists the
+requirements that were implemented as part of that change."*
+
+Two distinct halves, worth keeping apart because they have different
+lifespans:
+
+- **In flight** - a grouping of requirements being worked on together.
+  Lives in a plans file while the work is happening. This is the one
+  genuinely new thing; nothing in the register expresses "these five go
+  together as one piece of work". `dependencies` expresses ordering
+  between requirements, which is related but not the same: 023 blocks
+  024, but that is a constraint, not a decision to do them together.
+- **After the fact** - a `CHANGELOG.md` entry naming the requirement ids
+  it delivered. That half is cheap and mostly mechanical, and it is the
+  missing return leg of the traceability loop the register already has
+  going forwards: a requirement points at its tests (`linked_tests`),
+  its code (`implemented_by`) and its measured result (`evidence`), but
+  nothing points from a shipped change back to the requirements it
+  satisfied.
+
+Real questions, none answered: whether the in-flight grouping is a
+field on each requirement (a `sprint:`/`milestone:` name) or a separate
+document listing ids - the first survives the plans files going
+ephemeral, the second does not; whether a requirement can belong to more
+than one; whether the changelog field is authored by hand or derived
+from which requirements changed `status` in that push; and how any of
+this interacts with #13's "rewrite CHANGELOG.md from the ground up,
+shorter and human-first", since a machine-readable id list is exactly
+the kind of thing a human-first document does not want prominent. Scope
+with Keith before building - this depends on #13's rewrite landing
+first, and its shape should probably be decided as part of it rather
+than bolted onto today's changelog.

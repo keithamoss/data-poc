@@ -509,6 +509,7 @@ requirements:
       - The choice persists across a reload.
     linked_tests:
       - tests/test_dashboard_e2e.py::TestDarkModeToggle::test_toggling_dark_mode_persists_across_a_reload
+      - tests/test_dashboard_e2e.py::TestDarkModeToggle::test_dark_mode_actually_renders_dark
     evidence:
       - >
         2026-09-20: all 21 colour tokens are redefined under the dark theme,
