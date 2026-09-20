@@ -95,3 +95,46 @@ def test_phases_inside_a_build_order_thread_are_individually_listed():
     build_order = text.split("**Build order**")[1].split("\n- ")[0]
     for phase in ("Phase 1", "Phase 2", "Phase 3", "Phase 4", "Phase 5", "Phase 6"):
         assert phase in build_order, f"{phase} missing from the Build order sub-entries"
+
+
+def test_entries_point_at_the_code_that_implements_them():
+    """Keith's own suggestion, and it closes a ceiling two real proof runs
+    hit independently.
+
+    The index covers `plans/` only, so it cannot answer "is this already
+    built?" - and both runs found that the feature they were scoping had
+    already shipped by grepping the CODE, not through the index. His
+    question on being told that: "What if the index pointed to
+    implementation in code?"
+
+    It works because the prose already names the files: 61% of entries
+    mention at least one real, resolvable path, so this costs no
+    authoring. The decisive case is Thread D - an agent scoping a
+    dashboard-facing feature, seeing Thread D touches the dashboard
+    template, has the signal both runs needed and neither got."""
+    text = build_index("plans")
+    thread_d = text.split("**Thread D**")[1].split("\n- ")[0]
+    assert "*touches:*" in thread_d, "Thread D lists no implementation files"
+    assert "qa-reporting-dashboard.template.html" in thread_d, (
+        "Thread D no longer points at the dashboard template - the single "
+        "signal that would have told two scoping runs the feature was built")
+
+
+def test_a_touches_path_never_points_at_a_gitignored_build_artifact():
+    """`dashboard/qa-reporting-dashboard.html` is generated and gitignored;
+    prose naming it means the template. Sending a reader to a file that
+    may not exist in their checkout would make the pointer worse than
+    none."""
+    assert "`dashboard/qa-reporting-dashboard.html`" not in build_index("plans")
+
+
+def test_every_listed_path_actually_exists():
+    """A pointer to a file that isn't there is worse than no pointer. Plans
+    entries do legitimately cite removed code (`engines/` is the standing
+    example), so unresolvable paths are dropped rather than failing the
+    build - this asserts that dropping actually happens."""
+    import re
+    from pathlib import Path
+    for m in re.finditer(r"\*touches:\*(.+)", build_index("plans")):
+        for path in re.findall(r"`([^`]+)`", m.group(1)):
+            assert Path(path).exists(), f"index points at a non-existent file: {path}"

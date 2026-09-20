@@ -74,6 +74,27 @@ edited for a punchier, friendlier read than a bare commit log.
   (`plans-index --check`) fails if the committed copy stops matching
   its source.
 
+- **1:20pm** — **The Plans Index Now Points at the Code That Implements Each Entry** **[Docs & process]** **[Testing & dev tooling]**
+  Two real proof runs hit the same ceiling independently: the index
+  covers `plans/` only, so it can't answer *"is this already built?"* —
+  and both found the feature they were scoping had already shipped by
+  **grepping the code**, not through the index. Keith's question on
+  being shown that: *"What if the index pointed to implementation in
+  code?"*
+  It works because the prose already names the files — 61% of entries
+  mention at least one real, resolvable path (352 mentions across 171
+  entries), so it costs no authoring at all. The decisive case is
+  Thread D, which now declares it touches
+  `dashboard/qa-reporting-dashboard.template.html` — the single signal
+  both runs needed and neither got. Paths are ordered by first mention
+  rather than alphabetically (alphabetical put six `*-retired.yaml`
+  files at the front of the longest entry and buried
+  `check_lifecycle.py`), unresolvable paths are dropped rather than
+  failing the build since entries legitimately cite removed code, and a
+  mention of the gitignored built dashboard resolves to the template.
+  Index is ~7,500 tokens against the ~159,000 that reading the files
+  costs.
+
 ### Fixed
 - **11:41am** — **Thirteen Plans Items Were Invisible to the Plans Tab** **[Dashboard UI]**
   `plans_md.py` carried an explicit allowlist of five files that carry

@@ -27,6 +27,8 @@ quietly go stale either.
 from __future__ import annotations
 import re
 
+from pathlib import Path
+
 from dashboard.plans_md import parse_plans
 
 # Files in the order CLAUDE.md's own orientation section introduces them,
@@ -46,6 +48,27 @@ _SENTENCE_END_RE = re.compile(r"(?<=[.!?])\s")
 # Surfacing these is the whole point of sub-entries (see build_index).
 _BOLD_LEAD_RE = re.compile(r"^\*\*(.+?)\*\*(.*)$", re.S)
 _MIN_BOLD_LEAD = 8
+
+# Real source paths named in an entry's own prose. 61% of entries already
+# name at least one that resolves on disk (352 mentions across 171
+# entries, measured 2026-09-20), so this costs no authoring at all - it
+# just surfaces what someone already wrote down.
+#
+# This exists because of a ceiling two real proof runs hit independently.
+# The index covers plans/ only, so it cannot answer "is this already
+# built?" - and both runs found that the feature they were scoping had
+# already shipped by GREPPING THE CODE, not through the index. Keith's
+# own suggestion on being told that: "what if the index pointed to
+# implementation in code?" Thread D's entry names the dashboard template,
+# which is exactly the signal both runs needed and neither got.
+_SRC_ROOTS = ("qa_tools", "pipeline", "dashboard", "generator", "cli", "contract",
+              "tests", "dbt_project", "scripts", "aws", "synthetic_data_generator")
+_PATH_RE = re.compile(
+    r"\b((?:" + "|".join(_SRC_ROOTS) + r")/[A-Za-z0-9_./-]+\.(?:py|html|yml|yaml|sql|js|md))")
+# The built dashboard is gitignored - prose naming it means the template.
+_BUILD_OUTPUT = "dashboard/qa-reporting-dashboard.html"
+_TEMPLATE = "dashboard/qa-reporting-dashboard.template.html"
+_MAX_PATHS = 6
 _MD_NOISE_RE = re.compile(r"[*`]")
 _MAX_SUMMARY = 120
 
@@ -106,24 +129,48 @@ def _sub_entries(body: str) -> list[str]:
     return out
 
 
+def _touches(text: str, repo_root: Path) -> list[str]:
+    """Source files an entry's own prose names, that actually exist.
+
+    Only resolvable paths are listed, which quietly does something useful:
+    a superseded item citing a since-deleted module simply shows fewer
+    paths rather than pointing a reader at a file that is gone. Not a
+    validation gate - plans entries legitimately reference removed code
+    (`engines/` is the standing example), and failing on that would be
+    wrong.
+
+    Ordered by FIRST MENTION, not alphabetically. Alphabetical put six
+    `*-retired.yaml` files at the front of the longest entry and hid
+    `check_lifecycle.py` behind a "+34 more" - the order an author
+    introduces files in tracks how central they are far better than
+    their names do."""
+    found: list[str] = []
+    for raw in _PATH_RE.findall(text):
+        path = _TEMPLATE if raw == _BUILD_OUTPUT else raw
+        if path not in found and (repo_root / path).exists():
+            found.append(path)
+    return found
+
+
 def _file_sort_key(name: str) -> tuple[int, str]:
     return (_FILE_ORDER.index(name), "") if name in _FILE_ORDER else (len(_FILE_ORDER), name)
 
 
 def build_index(plans_dir: str = "plans") -> str:
     parsed = parse_plans(plans_dir)
+    root = Path(plans_dir).resolve().parent
     items, threads = parsed["items"], parsed["threads"]
 
     by_file: dict[str, list[tuple]] = {}
     for it in items:
         by_file.setdefault(it["file"], []).append(
             (it["number"], f"#{it['number']}", it["status"], it.get("date"),
-             _summarise(it["text"]), []))
+             _summarise(it["text"]), [], _touches(it["text"], root)))
     for th in threads:
         by_file.setdefault(th["file"], []).append(
             (10_000, th["heading"].split(" - ")[0], th["status"], th.get("date"),
              _summarise(th["heading"].split(" - ", 1)[-1] if " - " in th["heading"] else th["body"]),
-             _sub_entries(th["body"])))
+             _sub_entries(th["body"]), _touches(th["body"], root)))
     live = sum(1 for i in items if i["status"] in ("todo", "investigate", "in-progress"))
     out = [
         "# plans/ index",
@@ -144,13 +191,17 @@ def build_index(plans_dir: str = "plans") -> str:
         rows = sorted(by_file[name], key=lambda r: r[0])
         out.append(f"## plans/{name}.md")
         out.append("")
-        for _, label, status, date, summary, subs in rows:
+        for _, label, status, date, summary, subs, touches in rows:
             bits = [f"**{label}**"]
             if status:
                 bits.append(f"`{status}`")
             if date:
                 bits.append(date)
             out.append(f"- {' '.join(bits)} - {summary}")
+            if touches:
+                shown = touches[:_MAX_PATHS]
+                more = f" +{len(touches) - len(shown)} more" if len(touches) > len(shown) else ""
+                out.append(f"  - *touches:* {', '.join(f'`{t}`' for t in shown)}{more}")
             out.extend(f"  - {sub}" for sub in subs)
         out.append("")
     return "\n".join(out).rstrip() + "\n"
