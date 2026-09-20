@@ -63,16 +63,19 @@ def embed_command() -> None:
     _embed()
 
 
-def _validate_check_lifecycle() -> None:
+def _validate_check_lifecycle(require_failure_indicates: bool = False) -> None:
     from qa_tools.common.validate_check_lifecycle import main as validate_main
-    if validate_main() != 0:
+    if validate_main(require_failure_indicates) != 0:
         raise click.ClickException("check-lifecycle validation failed - see output above.")
 
 
 @dashboard_group.command("validate-check-lifecycle")
-def validate_check_lifecycle_command() -> None:
+@click.option("--require-failure-indicates", is_flag=True,
+              help="Also fail if an active check has no failure_indicates "
+                   "(REQ-QAC-024). Off until every active check is authored.")
+def validate_check_lifecycle_command(require_failure_indicates: bool) -> None:
     """Gate: no check_id's config changed without a matching changelog entry (Thread D)."""
-    _validate_check_lifecycle()
+    _validate_check_lifecycle(require_failure_indicates)
 
 
 def _validate_requirements() -> None:

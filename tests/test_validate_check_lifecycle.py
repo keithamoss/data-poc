@@ -237,3 +237,126 @@ def test_evidently_dict_from_source_evals_the_module_source():
     result = vcl._evidently_dict_from_source(source, "fake_evidently_check_lifecycle.py")
 
     assert result == {"data-asset-1.agency.dataset.tbl.col.drift_psi_evidently": {"introduced_date": "2026-01-01", "changelog": []}}
+
+
+# ---------------------------------------------------------------------
+# REQ-QAC-024: the failure_indicates gate.
+#
+# Built before the authoring pass that makes it satisfiable, so it ships
+# OFF - a count rather than a gate. That is the part worth testing
+# carefully: a gate nobody can turn on yet is easy to write wrong and
+# discover months later, when turning it on is urgent.
+# ---------------------------------------------------------------------
+
+def _dbt_schema_with_prose(check_id: str, failure_indicates: str | None) -> str:
+    fi = "" if failure_indicates is None else f"\n                        failure_indicates: {failure_indicates}"
+    return textwrap.dedent(f"""\
+        models:
+          - name: m
+            columns:
+              - name: c
+                tests:
+                  - not_null:
+                      meta:
+                        check_id: {check_id}
+                        category: completeness
+                        changelog: []{fi}
+                      config:
+                        warn_if: ">90"
+        """)
+
+
+def _one_check(tmp_path, monkeypatch, failure_indicates):
+    """A repo holding exactly one active check with the given value."""
+    repo = _init_repo(tmp_path)
+    monkeypatch.setattr(vcl, "ROOT", repo)
+    monkeypatch.setattr(vcl, "_YAML_SOURCES", [("schema.yml", vcl.cl.parse_dbt_check_metadata)])
+    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    (repo / "schema.yml").write_text(
+        _dbt_schema_with_prose("data-asset-1.ag.ds.m.c.not_null_dbt", failure_indicates))
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "one")
+    return vcl.collect_checks(None)
+
+
+def test_an_active_check_with_no_failure_indicates_is_an_error(tmp_path, monkeypatch):
+    errors = vcl._failure_indicates_errors(_one_check(tmp_path, monkeypatch, None))
+    assert len(errors) == 1
+    # The message has to be actionable on its own: whoever trips this is
+    # looking at a check definition, not at this requirement.
+    assert "no failure_indicates" in errors[0]
+    assert "self-evident" in errors[0]
+    assert "docs/check-authoring-rules.md" in errors[0]
+
+
+def test_the_self_evident_sentinel_satisfies_the_gate(tmp_path, monkeypatch):
+    # The sentinel's whole purpose: an explicit decision that reads as
+    # authored, not as a field nobody filled in.
+    assert vcl._failure_indicates_errors(_one_check(tmp_path, monkeypatch, "self-evident")) == []
+
+
+def test_a_folded_scalar_sentinel_still_satisfies_the_gate(tmp_path, monkeypatch):
+    # docs/check-authoring-rules.md tells authors to use `>` block
+    # scalars, and a folded scalar clips a trailing newline on. The gate
+    # itself would accept that for a trivial reason - any non-empty
+    # value passes - so what this really guards is that the trailing
+    # newline does not make it read as a sentinel NEAR-MISS and get
+    # rejected by the rule below.
+    assert vcl._failure_indicates_errors(
+        _one_check(tmp_path, monkeypatch, ">\n                          self-evident")) == []
+
+
+def test_a_near_miss_spelling_of_the_sentinel_is_rejected(tmp_path, monkeypatch):
+    # The hole this closes: the gate accepts ANY non-empty value, so
+    # "self evident" satisfies it and then renders verbatim under a
+    # heading on a public page - the same leak the template's own
+    # normalisation prevents for the correct spelling. The gate is the
+    # only layer that can tell a typo from prose someone meant.
+    for typo in ['"self evident"', '"Self_Evident"', '"selfevident"', '"Self-evident."']:
+        errors = vcl._failure_indicates_errors(_one_check(tmp_path, monkeypatch, typo))
+        assert len(errors) == 1, typo
+        assert "reads as the sentinel but is not it" in errors[0]
+
+
+def test_real_prose_is_never_mistaken_for_a_near_miss(tmp_path, monkeypatch):
+    # The rule above must not fire on an authored sentence that happens
+    # to use the words - otherwise it blocks legitimate prose.
+    assert vcl._failure_indicates_errors(_one_check(
+        tmp_path, monkeypatch,
+        '"The cause is self-evident once you see which column failed."')) == []
+
+
+def test_real_authored_prose_satisfies_the_gate(tmp_path, monkeypatch):
+    assert vcl._failure_indicates_errors(
+        _one_check(tmp_path, monkeypatch, "The upstream extract ran before the day closed.")) == []
+
+
+def test_a_whitespace_only_value_is_not_authored(tmp_path, monkeypatch):
+    # Same reasoning requirements.yaml applies to its own blank fields:
+    # absent and empty look identical once stripped, but a blank value
+    # is someone who started and stopped.
+    assert len(vcl._failure_indicates_errors(_one_check(tmp_path, monkeypatch, '"   "'))) == 1
+
+
+def test_a_retired_check_is_exempt(tmp_path, monkeypatch):
+    checks = _one_check(tmp_path, monkeypatch, None)
+    checks[0].retired_as_of = "2026-01-01"
+    assert vcl._failure_indicates_errors(checks) == []
+
+
+def test_the_gate_is_off_by_default_and_fatal_only_when_asked(tmp_path, monkeypatch, capsys):
+    repo = _init_repo(tmp_path)
+    monkeypatch.setattr(vcl, "ROOT", repo)
+    monkeypatch.setattr(vcl, "_YAML_SOURCES", [("schema.yml", vcl.cl.parse_dbt_check_metadata)])
+    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    (repo / "schema.yml").write_text(
+        _dbt_schema_with_prose("data-asset-1.ag.ds.m.c.not_null_dbt", None))
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "one")
+    _git(repo, "commit", "-q", "--allow-empty", "-m", "two")
+
+    assert vcl.main() == 0
+    assert "1 of 1 active checks have no failure_indicates" in capsys.readouterr().err
+
+    assert vcl.main(require_failure_indicates=True) == 1
+    assert "no failure_indicates" in capsys.readouterr().err

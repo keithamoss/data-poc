@@ -1445,6 +1445,29 @@ requirements:
         because a viewer must not see contributor prose, and an
         authoring marker in page source is harmless.
       - >
+        The CI gate ships OFF, as a count rather than a gate, behind an
+        explicit `--require-failure-indicates` flag on `mothman
+        dashboard validate-check-lifecycle`. It cannot be switched on
+        until all 257 active checks are authored, and the alternatives
+        for bridging that gap were worse: an allowlist that shrinks
+        needs maintaining and goes stale, and not building it until the
+        end means writing the gate under time pressure. Meanwhile the
+        count is the useful half - it turns "257 checks to write" into a
+        number that visibly moves. Flipping it on at the end is one flag
+        on deploy-pages.yml's own step.
+      - >
+        A second, narrower rule was added to that gate once writing its
+        tests exposed the hole: a near-miss spelling of the sentinel
+        ("self evident", "Self_Evident") is rejected outright. The gate
+        proper accepts any non-empty value, so a typo would satisfy it
+        and then render verbatim under a heading on the published page -
+        the same leak the template's own normalisation prevents for the
+        correct spelling, and the gate is the only layer that can tell a
+        typo from prose someone meant. Found because a test written to
+        cover the folded-block-scalar case passed with the normalisation
+        deliberately removed, which meant it was not testing what its
+        own name claimed.
+      - >
         Found while wiring that up, and it would have shipped: the
         render layer omitted the failure block only when the value was
         ABSENT, so the first authored sentinel would have put the

@@ -479,8 +479,8 @@ Rough layout:
   -> **~85s/719 tests (2026-09-20 afternoon, REQ-QAC-023)**. Flat again.
   -> **~86s/754 tests (2026-09-20 afternoon, REQ-DOCS-029/REQ-TEST-030)**.
   Flat again, 35 more tests.
-  -> **~85s/763 tests (2026-09-20 evening, REQ-QAC-024's authoring-rules
-  doc)**. Flat again. Worth knowing for the next fresh sandbox: the run
+  -> **~85s/772 tests (2026-09-20 evening, REQ-QAC-024's authoring-rules
+  doc and failure_indicates gate)**. Flat again. Worth knowing for the next fresh sandbox: the run
   before this one reported 20 failures across `test_run_dbt_*`,
   `test_cli_*` and `test_orchestrate_single_run.py`, all from the
   documented missing `dbt deps` step rather than any code fault - more

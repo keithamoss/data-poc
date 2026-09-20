@@ -23,6 +23,7 @@ checkout with at least 2 commits of history (`fetch-depth: 2` in CI).
 """
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import tempfile
@@ -138,10 +139,72 @@ def _check_id_errors(checks: list[cl.CheckMetadata]) -> list[str]:
     return errors
 
 
-def main() -> int:
+def _looks_like_sentinel(value: str) -> bool:
+    """True for a value that MEANS the sentinel but is not spelled as
+    it - "self evident", "Self_Evident", "selfevident". Letters only,
+    lowercased, so spacing, punctuation and case all collapse."""
+    return re.sub(r"[^a-z]", "", value.lower()) == "selfevident"
+
+
+def _failure_indicates_errors(checks: list[cl.CheckMetadata]) -> list[str]:
+    """REQ-QAC-024: every ACTIVE check must say what a failure means, or
+    say explicitly that the cause is self-evident from what the check
+    verifies. An absent value is neither - it is a field nobody filled
+    in, and the whole point of the `self-evident` sentinel is to make
+    that distinguishable from a deliberate decision.
+
+    Retired checks are exempt. They are history, kept so a past run
+    still resolves its own check_ids, and nobody reads their prose in
+    anger - demanding an author now would mean writing an explanation
+    for a check that has not run in months.
+
+    Off by default, and that is deliberate rather than timid: this
+    cannot be switched on until all 257 active checks are authored, so
+    until then it runs as a progress count rather than a gate. Flipping
+    it on is one flag on deploy-pages.yml's own step.
+    """
+    errors = []
+    for c in sorted(checks, key=lambda c: c.check_id):
+        if c.retired_as_of:
+            continue
+        value = (c.failure_indicates or "").strip()
+        if not value:
+            errors.append(
+                f"{c.check_id}: no failure_indicates. Author one, or set it to "
+                f"'{cl.SELF_EVIDENT}' if the cause adds nothing to what the check "
+                f"verifies - see docs/check-authoring-rules.md")
+        elif _looks_like_sentinel(value) and not cl.is_self_evident(value):
+            # Any non-empty value satisfies the rule above, so a
+            # near-miss spelling passes the gate AND renders verbatim on
+            # a public page - "self evident" under a heading, which is
+            # the exact leak the template's own normalisation prevents
+            # for the correct spelling. Caught here because the gate is
+            # the only layer that can tell a typo from real prose.
+            errors.append(
+                f"{c.check_id}: failure_indicates is {value!r}, which reads as the "
+                f"sentinel but is not it. Spell it exactly '{cl.SELF_EVIDENT}' - "
+                f"anything else is treated as authored prose and rendered as-is "
+                f"on the published page.")
+    return errors
+
+
+def main(require_failure_indicates: bool = False) -> int:
     old_checks = collect_checks("HEAD~1")
     new_checks = collect_checks(None)
     errors = cl.validate(old_checks, new_checks) + _check_id_errors(new_checks)
+
+    # Always counted, only sometimes fatal - the count is the useful
+    # half while REQ-QAC-024's authoring pass is still in flight, since
+    # it turns "257 checks to write" into a number that visibly moves.
+    unauthored = _failure_indicates_errors(new_checks)
+    if require_failure_indicates:
+        errors += unauthored
+    elif unauthored:
+        active = sum(1 for c in new_checks if not c.retired_as_of)
+        print(f"  note: {len(unauthored)} of {active} active checks have no "
+              f"failure_indicates yet (REQ-QAC-024). Not failing the build - "
+              f"pass --require-failure-indicates once the pass is complete.",
+              file=sys.stderr)
 
     if errors:
         print(f"check-lifecycle validation FAILED ({len(errors)} error(s)):", file=sys.stderr)
@@ -155,4 +218,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main("--require-failure-indicates" in sys.argv[1:]))

@@ -42,6 +42,30 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
+# REQ-QAC-024. The literal value `failure_indicates` carries when a
+# human looked and decided the cause of a failure adds nothing to what
+# the check already verifies - an authored decision, not an unfilled
+# field, which is the whole reason it exists rather than just leaving
+# the field blank. Roughly half of all checks are expected to carry it.
+#
+# Spelled once here so the CI gate and the dashboard template agree.
+# They cannot literally share a constant across Python and JS, so the
+# template holds its own copy beside `failureMeansBlock` - if this value
+# ever changes, that is the other place to change.
+SELF_EVIDENT = "self-evident"
+
+
+def is_self_evident(value: str | None) -> bool:
+    """True when `value` is the sentinel rather than authored prose.
+
+    Trimmed and lowercased on purpose: docs/check-authoring-rules.md
+    tells authors to use `>` block scalars for these fields, and a
+    folded scalar clips to a trailing newline, so the most likely real
+    spelling of the sentinel is not `==` the sentinel. The template
+    normalises identically, for the same reason.
+    """
+    return (value or "").strip().lower() == SELF_EVIDENT
+
 
 class MissingCheckIdError(ValueError):
     """Raised when a check has no check_id in its metadata. Mandatory,

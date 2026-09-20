@@ -142,6 +142,13 @@ Write it as a plain scalar. A `>` block scalar folds a trailing newline
 onto it, which the template trims for exactly this reason, but a plain
 scalar is what the rest of the tooling expects.
 
+**Spell it exactly.** `self evident`, `Self_Evident` and `selfevident`
+are all rejected by the lifecycle gate rather than quietly accepted.
+They have to be: any non-empty value satisfies the "say something" rule,
+so a near-miss would pass the gate and then render verbatim under a
+heading on the public page - which is the one thing the sentinel exists
+to prevent.
+
 ### Say what a failure indicates, not what the check verifies in other words
 
 If the sentence you have written is the description rephrased, the
