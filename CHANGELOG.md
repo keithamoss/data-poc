@@ -60,10 +60,10 @@ edited for a punchier, friendlier read than a bare commit log.
 - **11:02am** — **Hyphenated Words Were Breaking Across Lines on the Published Site** **[Dashboard UI]** **[Testing & dev tooling]**
   Both markdown parsers reassembled hard-wrapped source with a plain
   `" ".join(...)`, which is right for ordinary prose and wrong for a
-  hyphenated word split across two lines. `A dedicated requirements-` /
-  `analysis subagent system` rendered as **"requirements- analysis"** —
-  195 times across 74 of the 137 plans items, and 9 more in the Release
-  Notes panel. Both live on the published dashboard.
+  hyphenated word split across two lines. A wrapped `requirements-` /
+  `analysis` rendered with a stray space after the hyphen — 195 times
+  across 74 of the 137 plans items, and 9 more in the Release Notes
+  panel. Both live on the published dashboard.
   Worth recording why it survived: the symptom had been patched once, in
   the CHANGELOG source text during an unrelated rename, without the
   cause being touched — so it came straight back, and one of the nine
