@@ -52,7 +52,7 @@ from __future__ import annotations
 # exactly TWO implementations - one JS, one Python - not four. This is
 # the Python one's only home; the JS one is guarded against it by a real
 # shared-fixture cross-check (tests/test_status_parity.py).
-from qa_tools.common.check_id import try_parse
+from qa_tools.common.check_id import TOOLS, try_parse
 from qa_tools.common.dataset_status import (  # noqa: F401
     STATUS_ORDER,
     dashboard_status,
@@ -130,3 +130,44 @@ def url_key(check_id: str) -> str:
     """
     parsed = try_parse(check_id)
     return parsed.tail if parsed else check_id
+
+
+def tool_ref(check_id: str) -> str:
+    """The terse "which tool, which check" line shown under a card's
+    plain-English headline - "dbt:not_null", "soda:missing_count",
+    "datacontract:closed_case_hygiene".
+
+    REQ-DASH-026. The criterion originally asked for the tool's own
+    check name verbatim, which does not survive contact with two of the
+    four tools: 20 of 54 real names exceed 40 characters, and
+    datacontract's SQL rules reach 200 - a full sentence restating, in
+    tool vocabulary, the description printed directly above it.
+
+    So this is derived from the check_id's own tail instead, which is
+    already a hand-authored terse name, already unique within a column
+    (REQ-QAC-023's validate_tail_uniqueness gates that in CI), and
+    already what url_key() puts in the address bar. Card and URL
+    therefore resolve to the same string, which is the point: what a
+    reader sees is what they can deep-link to and grep the contract for.
+    Hand-authoring a second set of short names was the alternative, and
+    it would have been a mapping with nothing keeping it honest.
+
+    The tail is "<terse_name>_<tool>"; this moves the tool to the front
+    with a colon, reusing check_id.TOOLS rather than restating it. That
+    matters more than it looks: the grammar ALREADY requires the tail to
+    end in one of those four (see check_id.py's own `tail` pattern), so
+    a second list here would be a copy that can only ever drift out of
+    agreement with the thing actually enforcing it - and the symptom
+    would be a card silently reading "some_check_greatexpectations"
+    while the id parsed fine.
+
+    An id that does not parse at all falls through to url_key()'s own
+    raw-id fallback, so an unfamiliar shape reads oddly rather than
+    being mangled into a wrong tool name.
+    """
+    key = url_key(check_id)
+    for tool in TOOLS:
+        suffix = "_" + tool
+        if key.endswith(suffix) and len(key) > len(suffix):
+            return f"{tool}:{key[:-len(suffix)]}"
+    return key

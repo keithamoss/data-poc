@@ -32,7 +32,7 @@ from datetime import date, datetime
 from qa_tools.bdm.dataset_stats import AGGREGATE_SPEC
 from qa_tools.common.validate_check_lifecycle import collect_checks
 from pipeline.cadence import classify_arrival, parse_cadence_from_contract
-from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, url_key
+from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, tool_ref, url_key
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 REAL_RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
@@ -202,6 +202,11 @@ def build() -> dict:
                 # The URL-facing identity, stable across heading rewrites
                 # (plans/running-thoughts.md #19). Never `name`.
                 "key": url_key(slot["check_id"]),
+                # REQ-DASH-026: the terse "dbt:not_null" line under
+                # the headline. Same string as `key` above, tool
+                # moved to the front - deliberately, so the card and
+                # the address bar agree.
+                "tool_ref": tool_ref(slot["check_id"]),
                 "dimension": slot["dimension"],
                 "unit": slot["unit"],
                 # item 74 Bug A: None stays None - it means "this check has

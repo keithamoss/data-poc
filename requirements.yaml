@@ -1794,7 +1794,7 @@ requirements:
       than with the name of the tool that ran it, so that I can tell
       what's wrong without decoding three tools' vocabularies first.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-09-20"
@@ -1861,7 +1861,46 @@ requirements:
       - Must keep the zero-console-errors bar and the existing Playwright
         e2e suite green.
     dependencies: [REQ-QAC-024]
-    linked_tests: []
+    linked_tests:
+      - tests/test_dashboard_check_labels.py::test_tool_ref_moves_the_tool_token_to_the_front
+      - tests/test_dashboard_check_labels.py::test_tool_ref_reuses_the_grammars_own_tool_list_rather_than_a_copy
+      - tests/test_dashboard_e2e.py::TestCheckCardReadsAsPlainEnglish
+      - tests/test_dashboard_e2e.py::TestCheckCardIsARealLink
+      - tests/test_dashboard_e2e.py::TestLongDescriptionsAreClampedOnTheCardOnly
+      - tests/test_dashboard_e2e.py::TestAuthoredProseCannotAlterTheCard
+    implemented_by:
+      - pipeline/dashboard_check_labels.py::tool_ref
+      - pipeline/build_dashboard_data.py::build
+      - pipeline/build_cp_dashboard_data.py::build
+      - dashboard/qa-reporting-dashboard.template.html
+    evidence:
+      - >
+        2026-09-20: all 42 distinct tool_ref values across both datasets
+        carry a tool prefix, longest 37 characters - against 20 of 54
+        raw tool check names exceeding 40, and datacontract's longest
+        reaching 200.
+      - >
+        2026-09-20: a 310-character description renders as exactly 2
+        lines on the card and 4 unclamped in the detail panel, measured
+        in a real browser against computed line-height. The longest real
+        description today is 156, so the clamp is verified against a
+        case the corpus cannot yet produce.
+      - >
+        2026-09-20: the status pill sits at an identical offset from the
+        top of every card in a column when every description is over the
+        clamp - one distinct value across all 9 cards.
+      - >
+        2026-09-20: a plain left-click is intercepted (defaultPrevented
+        true) while meta-, ctrl- and shift-click are all left to the
+        browser (false), measured on the real built page.
+      - >
+        2026-09-20: a name of 'Quote " and <b>bold</b>' injects 1 real
+        <b> element through the pre-change renderer and truncates its
+        aria-label to 'View details for Quote '; through the current one
+        it renders as literal text, 0 injected elements, and the full
+        string in the aria-label. 6 of 257 real checks contain an
+        apostrophe and none contain a quote or angle bracket, so this is
+        latent rather than live.
     decisions:
       - Decided the headline is the check's short hand-authored `name`
         rather than its fuller `description`. The criterion originally

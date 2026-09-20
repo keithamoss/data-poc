@@ -626,3 +626,226 @@ class TestStatusMatchesEachToolsOwnVerdict:
           return [...out];
         }""")
         assert names == [], f"real checks are missing their tool verdict: {names}"
+
+
+# =====================================================================
+# REQ-DASH-026 - plain English as a check's primary headline.
+#
+# Driven in a real browser rather than jsdom for a specific reason:
+# renderCheckCard() is a closure inside openColumnDrawer(), so it never
+# becomes a window property the way a top-level function does, and half
+# of what this requirement asks for is not logic at all - a two-line
+# clamp is a computed style, and "a real link" means the BROWSER's
+# handling of a modifier-click, not ours.
+#
+# This is also the layer CLAUDE.md's own standing lesson points at: the
+# builders emitting a correct `tool_ref` says nothing about whether the
+# render layer, which has its own transform, puts it on the page.
+# =====================================================================
+
+_BDM = {"tier": "dataset", "agencyId": "registry-services",
+        "collectionId": "civil-registration", "datasetId": "birth-registrations"}
+
+
+def _open_first_column(page):
+    """Opens the first column drawer that actually has checks, and
+    returns that column's name."""
+    return page.evaluate("""() => {
+      const ctx = resolveContext(STATE);
+      const col = ctx.ds.columns.find(c => c.checks && c.checks.length);
+      openColumnDrawer(ctx.ag, ctx.col, ctx.ds, col);
+      return col.name;
+    }""")
+
+
+def _rewrite_checks(page, fields: dict):
+    """Overwrites hand-authored fields on every check of the first
+    column with checks, then re-renders. Used for the two cases no real
+    check can exercise - a description past the clamp, and prose
+    containing markup - both of which the requirement's own NFRs call
+    out as untestable against today's corpus."""
+    page.evaluate("""(fields) => {
+      const ctx = resolveContext(STATE);
+      const col = ctx.ds.columns.find(c => c.checks && c.checks.length);
+      col.checks.forEach(ck => Object.assign(ck, fields));
+      openColumnDrawer(ctx.ag, ctx.col, ctx.ds, col);
+    }""", fields)
+    page.wait_for_timeout(300)
+
+
+class TestCheckCardReadsAsPlainEnglish:
+    def test_the_headline_is_the_authored_name_with_description_and_tool_beneath(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        clean_page.wait_for_timeout(300)
+
+        card = clean_page.locator(".check-card").first
+        headline = card.locator(".name").inner_text()
+        tool_ref = card.locator(".tool-ref").inner_text()
+
+        # The headline is prose a reader recognises, and carries no tool
+        # vocabulary at all - headings used to read "Invalid values -
+        # dbt:accepted_values (dbt-core)".
+        assert headline.strip()
+        assert not re.search(r"dbt|soda|datacontract|evidently", headline, re.I)
+        assert card.locator(".check-desc").inner_text().strip()
+        # ...and the tool trace is one line below, not a click away.
+        assert re.match(r"^(dbt|soda|datacontract|evidently):\S+$", tool_ref), tool_ref
+
+    def test_the_card_does_not_render_the_shared_category_label(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        clean_page.wait_for_timeout(300)
+
+        assert clean_page.locator(".check-card .dim-tag").count() == 0
+
+    def test_the_tool_line_and_the_url_segment_are_the_same_string(
+            self, clean_page, built_dashboard_html):
+        """The reason for deriving the line from the check_id rather than
+        hand-authoring it: what a reader sees is what they can deep-link
+        to and grep the contract for."""
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        clean_page.wait_for_timeout(300)
+
+        for i in range(clean_page.locator(".check-card").count()):
+            card = clean_page.locator(".check-card").nth(i)
+            tool, terse = card.locator(".tool-ref").inner_text().split(":", 1)
+            assert card.get_attribute("href").endswith(f"/check/{terse}_{tool}")
+
+
+class TestCheckCardIsARealLink:
+    def test_it_is_an_anchor_carrying_the_checks_own_deep_link(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        column = _open_first_column(clean_page)
+        clean_page.wait_for_timeout(300)
+
+        card = clean_page.locator(".check-card").first
+        assert card.evaluate("e => e.tagName") == "A"
+        href = card.get_attribute("href")
+        assert f"/column/{column}/check/" in href
+
+    def test_a_plain_click_is_ours_but_a_modifier_click_is_the_browsers(
+            self, clean_page, built_dashboard_html):
+        """The whole point of the card being a link. If we swallowed
+        every click, cmd-click would silently do nothing instead of
+        opening a tab - which is worse than the div it replaced, because
+        the element now LOOKS like it should work."""
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        clean_page.wait_for_timeout(300)
+
+        prevented = clean_page.evaluate("""() => {
+          const el = document.querySelector('.check-card');
+          const fire = init => {
+            const e = new MouseEvent('click', {bubbles: true, cancelable: true, ...init});
+            el.dispatchEvent(e);
+            return e.defaultPrevented;
+          };
+          return {plain: fire({button: 0}), meta: fire({button: 0, metaKey: true}),
+                  ctrl: fire({button: 0, ctrlKey: true}),
+                  shift: fire({button: 0, shiftKey: true})};
+        }""")
+
+        assert prevented == {"plain": True, "meta": False, "ctrl": False, "shift": False}
+
+    def test_a_plain_click_opens_that_exact_check(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        clean_page.wait_for_timeout(300)
+
+        card = clean_page.locator(".check-card").first
+        headline = card.locator(".name").inner_text()
+        card.click()
+        clean_page.wait_for_timeout(400)
+
+        assert clean_page.locator("#check-panel-title").inner_text() == headline
+
+
+class TestLongDescriptionsAreClampedOnTheCardOnly:
+    _LONG = "long " * 62  # 310 chars; the longest real description is 156
+
+    def _lines(self, page, selector):
+        return page.locator(selector).first.evaluate("""e => {
+          const lh = parseFloat(getComputedStyle(e).lineHeight);
+          return {lines: Math.round(e.getBoundingClientRect().height / lh),
+                  clipped: e.scrollHeight > e.clientHeight + 1,
+                  chars: e.textContent.length};
+        }""")
+
+    def test_the_card_clamps_to_two_lines_and_the_panel_does_not(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        _rewrite_checks(clean_page, {"description": self._LONG})
+
+        card = self._lines(clean_page, ".check-card .check-desc")
+        assert card["chars"] == len(self._LONG)
+        assert card["lines"] == 2
+        assert card["clipped"] is True
+
+        clean_page.locator(".check-card").first.click()
+        clean_page.wait_for_timeout(400)
+        panel = self._lines(
+            clean_page,
+            "#check-panel-body .drawer-section:has(h4:text-is('What this check does')) div")
+        assert panel["chars"] == len(self._LONG)
+        assert panel["lines"] > 2
+        assert panel["clipped"] is False
+
+    def test_the_status_pill_holds_its_position_whatever_the_description(
+            self, clean_page, built_dashboard_html):
+        """Criterion's own wording. The clamp is what makes this true:
+        without it a long description would push each card's pill to a
+        different offset down the list."""
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        _rewrite_checks(clean_page, {"description": self._LONG})
+
+        offsets = clean_page.locator(".check-card").evaluate_all("""els => els.map(e => {
+          const pill = e.querySelector('.row1 .pill');
+          return Math.round(pill.getBoundingClientRect().top - e.getBoundingClientRect().top);
+        })""")
+        assert len(set(offsets)) == 1, offsets
+
+
+class TestAuthoredProseCannotAlterTheCard:
+    """No real check contains a quote or an angle bracket today - 6 of
+    257 contain an apostrophe and that is all. This is latent rather
+    than live, and it is covered precisely because the corpus is
+    hand-authored and growing: the protection has to hold for the check
+    somebody writes next year, not for the ones that exist now."""
+
+    _HOSTILE = {
+        "name": 'Quote " and <b>bold</b>',
+        "description": '</a><script>window.__pwned=1</script> & <img src=x onerror="window.__pwned=2">',
+    }
+
+    def test_markup_in_authored_fields_renders_as_text(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        before = clean_page.locator(".check-card").count()
+        _rewrite_checks(clean_page, self._HOSTILE)
+
+        card = clean_page.locator(".check-card").first
+        assert clean_page.locator(".check-card").count() == before
+        assert card.locator(".name").inner_text() == self._HOSTILE["name"]
+        assert card.locator(".name b").count() == 0
+        assert card.locator("img").count() == 0
+        assert clean_page.evaluate("() => window.__pwned ?? null") is None
+
+    def test_a_double_quote_in_a_name_does_not_break_out_of_the_aria_label(
+            self, clean_page, built_dashboard_html):
+        """The specific escape the requirement's NFR named. The label is
+        set with setAttribute rather than interpolated, so the quote is
+        simply part of the value."""
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        _rewrite_checks(clean_page, self._HOSTILE)
+
+        label = clean_page.locator(".check-card").first.get_attribute("aria-label")
+        assert label.startswith(self._HOSTILE["name"])

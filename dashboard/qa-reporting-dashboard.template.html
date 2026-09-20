@@ -318,11 +318,27 @@ button{font:inherit; color:inherit;}
 .agg-suppressed-note{font-size:11.5px; color:var(--ink-faint); display:flex; align-items:center; gap:6px;}
 .agg-suppressed-note .lock{font-size:13px;}
 
-.check-card{border:1px solid var(--line); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:8px; cursor:pointer;}
+/* REQ-DASH-026: a real <a href>, not a div with role="button", so
+   middle-click, cmd/ctrl-click and "copy link address" behave the way
+   they do everywhere else on the web. color/text-decoration are reset
+   because the card is a link that must not look like body-text prose
+   with an underline through it. */
+.check-card{display:block; color:inherit; text-decoration:none; border:1px solid var(--line); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:8px; cursor:pointer;}
 .check-card:hover, .check-card:focus-visible{border-color:var(--line-strong); background:var(--surface-alt);}
 .check-card:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
 .check-card .row1{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;}
 .check-card .row1 .name{font-weight:600; font-size:13.5px;}
+/* Clamped to two lines (REQ-DASH-026). The clamp is on the DESCRIPTION,
+   not the headline: a check's `name` tops out at 36 characters across
+   all 257 real checks and would never wrap, while descriptions already
+   reach 156 and have no authored length cap. Two lines keeps every card
+   the same height, which is what holds the status pill above it in a
+   fixed position down the list. */
+.check-card .check-desc{font-size:12.5px; color:var(--ink-muted); line-height:1.45; margin-bottom:6px; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+/* "dbt:not_null" - which tool, which check, for the reader who is
+   chasing a root cause rather than scanning. Same string as the URL's
+   own /check/ segment, tool moved to the front. */
+.check-card .tool-ref{font-size:11px; color:var(--ink-faint); font-family:"IBM Plex Mono",monospace; margin-bottom:6px;}
 .check-card .dim-tag{font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); margin-bottom:5px;}
 .check-card .thresholds{font-size:11.5px; color:var(--ink-muted); font-family:"IBM Plex Mono",monospace;}
 .check-card-hint{font-size:11px; color:var(--accent); margin-top:8px;}
@@ -2548,22 +2564,62 @@ function openColumnDrawer(ag, col, ds, column, opts){
   // grouping (a fresh object via spread, column.checks itself never
   // mutated) so the click handler can look it up directly instead of by
   // rendered position.
+  // REQ-DASH-026. Three things changed here together, and they depend
+  // on each other:
+  //
+  //   1. The card is an <a href> now. The href is the real deep link to
+  //      this check - the same one openCheckPanel() would push - so
+  //      middle-click, cmd-click and "copy link address" work without
+  //      any JS at all, and a plain left-click is intercepted below to
+  //      keep the SPA transition.
+  //   2. The headline is the check's hand-authored `name`, with its
+  //      `description` directly beneath it (clamped to two lines) and
+  //      `tool_ref` - "dbt:not_null" - under that. The generated `note`
+  //      ("Computed by dbt-core 1.12 + dbt-duckdb against this run's
+  //      real data") no longer appears on the CARD: tool_ref says which
+  //      tool in four characters where note took eleven words, and the
+  //      note itself still renders in the detail panel, where the
+  //      not-a-fabricated-figure assurance is actually being asked for.
+  //   3. The three hand-authored fields are left EMPTY here and set as
+  //      element text after insertion (see fillCardText below). They are
+  //      the only values on this card a human writes, and an escaping
+  //      helper would protect exactly the call sites somebody remembered
+  //      to wrap - the same silent-omission shape as the gap it fixes.
+  //      textContent cannot be forgotten by a field added later.
+  const checkHref = ck => stateToHash({
+    tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id,
+    columnName: column.name, checkKey: ck.key,
+  });
   const renderCheckCard = ck => {
     const st = checkStatus(ck);
-    return `<div class="check-card ${ck.retired?'is-retired':''}" data-idx="${ck.__idx}" tabindex="0" role="button" aria-label="View details for ${ck.name}">
-      <div class="row1"><span class="name">${ck.name}</span>
+    return `<a class="check-card ${ck.retired?'is-retired':''}" href="${checkHref(ck)}" data-idx="${ck.__idx}">
+      <div class="row1"><span class="name"></span>
         ${ck.retired? `<span class="pill retired sm" title="Retired ${fmtDate(ck.retiredAsOf)}${ck.retiredReason?': '+ck.retiredReason:''}"><span class="ico"></span>Retired</span>` : pill(st,"sm")}
       </div>
-      ${ck.dimension? `<div class="dim-tag">${ck.dimension}</div>`:""}
+      ${ck.description? `<div class="check-desc"></div>`:""}
+      ${ck.tool_ref? `<div class="tool-ref"></div>`:""}
       <div class="thresholds">${[
         ck.warn==null ? null : `warn &gt; ${fmtMetric(ck.warn,ck.unit)}`,
         ck.fail==null ? null : `fail &gt; ${fmtMetric(ck.fail,ck.unit)}`,
         `current ${fmtMetric(ck.current,ck.unit)}`,
       ].filter(Boolean).join(" · ")}${(ck.warn==null&&ck.fail==null) ? ` <span class="muted">(no single-sided threshold — status is this tool's own verdict)</span>` : ""}</div>
-      ${ck.note? `<div style="font-size:12px; color:var(--ink-muted); margin-top:6px;">${ck.note}</div>`:""}
       ${ck.retired? `<div class="retired-note">Retired ${fmtDate(ck.retiredAsOf)}${ck.retiredReason?' — '+ck.retiredReason:''} — no longer part of current status.</div>` : ""}
       <div class="check-card-hint">View current &amp; historical run detail ›</div>
-    </div>`;
+    </a>`;
+  };
+  // The other half of point 3 above. Also sets the accessible name: the
+  // card's own text now runs to a headline, two lines of description,
+  // a tool reference, thresholds and a hint, which is a lot to hear
+  // read out as a link's name - so an explicit one earns its place
+  // here, where the div-with-role-button it replaced only had one
+  // because a div has no accessible name of its own.
+  const fillCardText = (el, ck) => {
+    el.querySelector(".name").textContent = ck.name;
+    const desc = el.querySelector(".check-desc");
+    if(desc) desc.textContent = ck.description;
+    const ref = el.querySelector(".tool-ref");
+    if(ref) ref.textContent = ck.tool_ref;
+    el.setAttribute("aria-label", `${ck.name} — view current and historical run detail`);
   };
   // Grouped into a collapsible section per data-quality category
   // (completeness/uniqueness/conformity/consistency/timeliness - Keith's
@@ -2626,9 +2682,21 @@ function openColumnDrawer(ag, col, ds, column, opts){
   document.getElementById("drawer").setAttribute("aria-hidden","false");
   body.querySelectorAll(".check-card").forEach(el=>{
     const idx = Number(el.dataset.idx);
-    const open = ()=> openCheckPanel(ag, col, ds, column, column.checks[idx]);
-    el.addEventListener("click", open);
-    el.addEventListener("keydown", (e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); } });
+    const ck = column.checks[idx];
+    fillCardText(el, ck);
+    // A real link, so only a plain left-click is ours to take. Anything
+    // the browser has its own meaning for - a new tab, a new window, a
+    // download, the middle mouse button - is left alone, which is the
+    // whole point of the card being an <a> (REQ-DASH-026). Enter on a
+    // focused link fires a plain click, so keyboard activation comes
+    // through here too and needs no separate keydown handler; Space
+    // deliberately does not activate a link, and never did outside the
+    // role="button" this replaced.
+    el.addEventListener("click", (e)=>{
+      if(e.defaultPrevented || e.button!==0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      openCheckPanel(ag, col, ds, column, ck);
+    });
   });
   const retiredToggle = document.getElementById("show-retired-toggle");
   if(retiredToggle){

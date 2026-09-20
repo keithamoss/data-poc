@@ -490,6 +490,9 @@ Rough layout:
   exists before reading that shape of failure as a regression.
   -> **~87s/792 tests (2026-09-20 evening, the requirements sign-off
   gate)**. Flat again, 20 more tests.
+  -> **~97s/809 tests (2026-09-20 evening, REQ-DASH-026)**. Up ~10s on
+  17 more tests - the new ones are all real-browser e2e, which cost far
+  more per test than the rest of the suite. No new hot spot.
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.
