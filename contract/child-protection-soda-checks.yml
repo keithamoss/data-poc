@@ -83,7 +83,10 @@ checks for cp_clients:
         check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.duplicate_count_soda
         category: uniqueness
         introduced_date: "2023-01-15"
-        description: "Client IDs must not be duplicated."
+        description: >
+          A few duplicates are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(given_name):
@@ -270,7 +273,10 @@ checks for cp_notifications:
         check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.duplicate_count_soda
         category: uniqueness
         introduced_date: "2023-01-15"
-        description: "Notification IDs must not be duplicated."
+        description: >
+          A few duplicates are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(cp_client_id):
@@ -447,7 +453,10 @@ checks for cp_investigations:
         check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.duplicate_count_soda
         category: uniqueness
         introduced_date: "2023-01-15"
-        description: "Investigation IDs must not be duplicated."
+        description: >
+          A few duplicates are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(notification_id):
@@ -592,7 +601,10 @@ checks for cp_placements:
         check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.duplicate_count_soda
         category: uniqueness
         introduced_date: "2023-01-15"
-        description: "Placement IDs must not be duplicated."
+        description: >
+          A few duplicates are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(cp_client_id):
@@ -746,7 +758,10 @@ checks for cp_carers:
         check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.duplicate_count_soda
         category: uniqueness
         introduced_date: "2023-01-15"
-        description: "Carer IDs must not be duplicated."
+        description: >
+          A few duplicates are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(given_name):
@@ -836,7 +851,10 @@ checks for cp_case_workers:
         check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.duplicate_count_soda
         category: uniqueness
         introduced_date: "2023-01-15"
-        description: "Case worker IDs must not be duplicated."
+        description: >
+          A few duplicates are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(given_name):

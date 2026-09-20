@@ -94,7 +94,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.duplicate_count_soda
         category: uniqueness
         introduced_date: "2026-09-15"
-        description: "BDM's unique registration identifier must not be duplicated."
+        description: >
+          A few duplicates are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - missing_count(child_given_names):
@@ -256,7 +259,10 @@ checks for birth_registrations:
         check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.duplicate_count_soda
         category: uniqueness
         introduced_date: "2026-01-15"
-        description: "BDM's internal record ID must not be duplicated."
+        description: >
+          A few duplicates are tolerated; a sustained rise fails.
+        failure_indicates: >
+          self-evident
         changelog: []
 
   - invalid_percent(source_system_record_id):

@@ -136,9 +136,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Client IDs must not be duplicated."
+                value: >
+                  This value must be unique.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
       - name: given_name
         logicalType: string
         physicalType: varchar(200)
@@ -424,11 +428,7 @@ schema:
             mustBe: 0
             severity: error
             description: >
-              The dirty(amber/red) presets on this table (see
-              generator/dirty.py's apply_cp_notifications_presets)
-              deliberately inject near-duplicate notifications - a real
-              double-submission scenario - so this rule has something
-              genuine to catch on those runs.
+              This value must be unique.
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.duplicateValues_datacontract
@@ -436,6 +436,9 @@ schema:
                 value: "2023-01-15"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - type: sql
             dimension: completeness
             query: >-
@@ -708,9 +711,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Investigation IDs must not be duplicated."
+                value: >
+                  This value must be unique.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - type: sql
             dimension: consistency
             query: >-
@@ -958,9 +965,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Placement IDs must not be duplicated."
+                value: >
+                  This value must be unique.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
       - name: cp_client_id
         logicalType: string
         physicalType: varchar(20)
@@ -1192,9 +1203,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Carer IDs must not be duplicated."
+                value: >
+                  This value must be unique.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
       - name: given_name
         logicalType: string
         physicalType: varchar(200)
@@ -1340,9 +1355,13 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Case worker IDs must not be duplicated."
+                value: >
+                  This value must be unique.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
       - name: given_name
         logicalType: string
         physicalType: varchar(200)

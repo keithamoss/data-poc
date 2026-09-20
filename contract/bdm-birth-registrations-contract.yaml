@@ -161,7 +161,8 @@ schema:
             dimension: uniqueness
             mustBe: 0
             severity: error
-            description: No two rows may share a registration_number.
+            description: >
+              This value must be unique.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.duplicateValues_datacontract
@@ -169,6 +170,9 @@ schema:
                 value: "2026-01-15"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
 
       - name: child_given_names
         logicalType: string
@@ -664,7 +668,8 @@ schema:
             dimension: uniqueness
             mustBe: 0
             severity: error
-            description: No two rows may share a source_system_record_id - a re-extract landing twice would double-count downstream.
+            description: >
+              This value must be unique.
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.duplicateValues_datacontract
@@ -672,6 +677,9 @@ schema:
                 value: "2026-01-15"
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
           - metric: invalidValues
             dimension: conformity
             arguments:

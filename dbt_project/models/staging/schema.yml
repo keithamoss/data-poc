@@ -181,7 +181,10 @@ models:
                 check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.unique_dbt
                 category: uniqueness
                 introduced_date: "2026-01-15"
-                description: "BDM's unique registration identifier must not be duplicated."
+                description: >
+                  This value must be unique.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - not_null:
               meta:
@@ -467,7 +470,10 @@ models:
                 check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.unique_dbt
                 category: uniqueness
                 introduced_date: "2026-01-15"
-                description: "BDM's internal record ID must not be duplicated."
+                description: >
+                  This value must be unique.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - not_null:
               meta:
@@ -511,7 +517,10 @@ models:
                 check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.unique_dbt
                 category: uniqueness
                 introduced_date: "2023-01-15"
-                description: "Each client must be uniquely identified."
+                description: >
+                  This value must be unique.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - not_null:
               meta:
@@ -682,7 +691,10 @@ models:
                 check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.unique_dbt
                 category: uniqueness
                 introduced_date: "2023-01-15"
-                description: "Notification IDs must not be duplicated - apply_cp_notifications_presets' near-duplicate injection is the only thing that ever makes this fail."
+                description: >
+                  A few duplicates are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  self-evident
                 changelog: []
               config:
                 fail_calc: "coalesce(sum(n_records), 0)"
@@ -852,7 +864,10 @@ models:
                 check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.unique_dbt
                 category: uniqueness
                 introduced_date: "2023-01-15"
-                description: "Each investigation must be uniquely identified."
+                description: >
+                  This value must be unique.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - not_null:
               meta:
@@ -964,7 +979,10 @@ models:
                 check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.unique_dbt
                 category: uniqueness
                 introduced_date: "2023-01-15"
-                description: "Each placement must be uniquely identified."
+                description: >
+                  This value must be unique.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - not_null:
               meta:
@@ -1067,7 +1085,10 @@ models:
                 check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.unique_dbt
                 category: uniqueness
                 introduced_date: "2023-01-15"
-                description: "Each carer must be uniquely identified."
+                description: >
+                  This value must be unique.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - not_null:
               meta:
@@ -1142,7 +1163,10 @@ models:
                 check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.unique_dbt
                 category: uniqueness
                 introduced_date: "2023-01-15"
-                description: "Each case worker must be uniquely identified."
+                description: >
+                  This value must be unique.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - not_null:
               meta:
