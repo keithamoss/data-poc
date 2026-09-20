@@ -673,6 +673,9 @@ schema:
           - property: failure_indicates
             value: >
               The supply arrived truncated or partly empty if it came in under the band, or the same data has been loaded twice if it came in over.
+          - property: failure_indicates
+            value: >
+              self-evident
 
   - name: cp_investigations
     physicalType: table
@@ -927,6 +930,9 @@ schema:
           - property: failure_indicates
             value: >
               The supply arrived truncated or partly empty if it came in under the band, or the same data has been loaded twice if it came in over.
+          - property: failure_indicates
+            value: >
+              self-evident
 
   - name: cp_placements
     physicalType: table
@@ -1165,6 +1171,9 @@ schema:
           - property: failure_indicates
             value: >
               The supply arrived truncated or partly empty if it came in under the band, or the same data has been loaded twice if it came in over.
+          - property: failure_indicates
+            value: >
+              self-evident
 
   - name: cp_carers
     physicalType: table
@@ -1317,6 +1326,9 @@ schema:
           - property: failure_indicates
             value: >
               The supply arrived truncated or partly empty if it came in under the band, or the same data has been loaded twice if it came in over.
+          - property: failure_indicates
+            value: >
+              self-evident
 
   - name: cp_case_workers
     physicalType: table
@@ -1450,6 +1462,9 @@ schema:
           - property: failure_indicates
             value: >
               The supply arrived truncated or partly empty if it came in under the band, or the same data has been loaded twice if it came in over.
+          - property: failure_indicates
+            value: >
+              self-evident
 
 slaProperties:
   # frequency here was stale at "7 d" (weekly) - a leftover from before
