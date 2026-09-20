@@ -25,16 +25,21 @@ quoting it.
 
 1. State what the check verifies, and nothing else. If a clause explains
    what a failure MEANS, that clause belongs in `failure_indicates`.
+   The one exception is a check whose type already says what it
+   verifies - see rule 4.
 2. Name no agency. "Every registration identifier must be unique", not
    "BDM's unique registration identifier".
-3. List no values, and no numeric bands. "one of the values the
-   contract allows", never "M, F, or X"; "inside the expected band for
-   this table", never "[300, 900]". Both already exist structurally in
-   the check.
-4. On an invalid-values check, state the TOLERANCE rather than the check
-   type's purpose. "Must be one of the allowed values" is what that
-   check already IS; what differs between instances is how much it
-   tolerates.
+3. Write no numbers at all - not values, not bands, not thresholds.
+   "one of the values the contract allows", never "M, F, or X";
+   "inside the expected band for this table", never "[300, 900]";
+   "a sustained rise fails", never "a rise past 3% fails". All three
+   already exist structurally in the check.
+4. On an invalid-values check, give the tolerance INSTEAD OF the
+   purpose, not as well as it. "Must be one of the allowed values" is
+   what that check already IS, so saying it tells a reader nothing that
+   distinguishes this instance from any other. Say how much it
+   tolerates, and say it qualitatively (rule 3): "A single unrecognised
+   value fails" / "A few are tolerated; a sustained rise fails".
 
 **`failure_indicates` - what a failure means upstream**
 
@@ -192,6 +197,29 @@ saying so tells a reader nothing that distinguishes this instance from
 any other. What actually differs between instances is the tolerance: one
 tolerates none, another tolerates a few and only fails on a sustained
 rise, a third scopes itself to the most recent supplies only.
+
+**Instead of, not as well as** (Keith, 2026-09-20). The first draft of
+this rule was read as "purpose, then tolerance", which produced *"Every
+concern type must be one of the values the contract allows. None are
+tolerated."* - rejected on both halves. The opening clause is the
+restatement this rule exists to prevent, and *"None are tolerated"*
+never says none of WHAT, so it reads as plausibly being about nulls.
+The tolerance is the whole description:
+
+> A single unrecognised concern type fails.
+> A few unrecognised concern types are tolerated; a sustained rise fails.
+
+**Qualitatively, with no figure** (same call). *"a sustained rise past
+3% fails"* becomes *"a sustained rise fails"*, for the reason rule 3
+already gives for values and bands: the threshold is structural in the
+check's own `warn:`/`fail:`, so prose is a third copy. What survives is
+the distinction that actually matters to a reader - whether the check
+tolerates none or some - which no number was carrying anyway.
+
+Where two instances tolerate some and differ only in how much, the
+honest differentiator is usually not the figure but the SCOPE: one runs
+against everything, the other against the most recent supplies only.
+Say that.
 
 That is also why shared wording is dangerous here specifically - see
 "Shared wording is permission, not obligation" below.
