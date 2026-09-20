@@ -58,7 +58,7 @@ for their products... a UX where you don't even realize it's polished
 because of everything else." That's a real, standing bar for anything
 UX-related in this project, not just a nice-to-have.
 
-**A data steward** (the day-to-day dashboard user this PoC models, not
+**A data engineer** (the day-to-day dashboard user this PoC models, not
 yet a real named person) - checks the register regularly, often quickly,
 often alongside other work, not as their sole focus. What they actually
 need in that moment: "is my dataset OK, and if not, what's wrong and
@@ -78,13 +78,13 @@ time, and do they have something defensible to point to if someone above
 them asks "why is this red."
 
 **Whoever maintains the pipeline itself** (the QA checks, the contract,
-the ingestion) - the opposite of the data steward's need: this person
+the ingestion) - the opposite of the data engineer's need: this person
 *wants* the raw tool-level detail (which specific dbt test, which Soda
 check, the actual failing values) to find and fix a real root cause, not
-a simplified summary. A UX decision that's right for the steward (hide
-the noise) can be wrong for this person (surface the detail) - both are
-real users of the same dashboard, at different depths of the same
-information.
+a simplified summary. A UX decision that's right for the data engineer
+(hide the noise) can be wrong for this person (surface the detail) -
+both are real users of the same dashboard, at different depths of the
+same information.
 
 None of these last three are real named people yet in this PoC -
 `contract/people.yaml` has Keith's own real identity plus fictional

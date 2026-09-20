@@ -4,7 +4,7 @@ How to write the hand-authored prose every QA check carries: the three
 fields a reader meets - `description`, `failure_indicates` and the
 heading, `name` - plus `technical_note`, which is for contributors and
 is never published. These
-are the fields a data steward actually reads in the dashboard's check
+are the fields a data engineer actually reads in the dashboard's check
 drawer, so they are the only part of a check definition written for
 someone who does not know dbt, Soda, datacontract-cli or Evidently.
 
@@ -243,9 +243,9 @@ tension to resolve - only a readability choice, and it does not go the
 same way for every check type. An allowed-values check's heading already
 reads "Invalid values", so restating the purpose adds nothing and the
 tolerance form wins. A not-null check's heading reads "Null rate", which
-is jargon a steward may not parse at all, so *"This value must never be
-empty"* tells them something the tolerance form leaves out: empty OF
-WHAT.
+is jargon a data engineer may not parse at all, so *"This value must
+never be empty"* tells them something the tolerance form leaves out:
+empty OF WHAT.
 
 That second half has a shelf life worth knowing about -
 `plans/running-thoughts.md` #19 records that the drawer heading is
@@ -385,8 +385,8 @@ ordering checks cannot be written without referring to
 `date_registered` - and it is why this rule is about the check's OWN
 column rather than about column names generally.
 
-A real column name is otherwise clearer to a steward than a paraphrase,
-because it is the name they see on the data itself.
+A real column name is otherwise clearer to a data engineer than a
+paraphrase, because it is the name they see on the data itself.
 
 ### Never leak run, cadence or delivery mechanics
 
@@ -455,9 +455,9 @@ text.
 Most checks need no `name` at all - the heading falls back to the label
 each tool's own runner writes (`Invalid values`, `Null rate`), which is
 already plain. Author one only where that fallback would show something
-a steward cannot read: a raw macro (`dbt:escalation_completeness`), or a
-tool's own generated sentence (*"values in (carer_id) must exist in
-cp_carers (carer_id)"*).
+a data engineer cannot read: a raw macro
+(`dbt:escalation_completeness`), or a tool's own generated sentence
+(*"values in (carer_id) must exist in cp_carers (carer_id)"*).
 
 **The heading is not the identity.** It was once, which is why headings
 used to carry the tool and macro - they had to stay unique within a

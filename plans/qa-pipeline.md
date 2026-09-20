@@ -1273,8 +1273,8 @@ relative, not a schedule — this is weeks of work, not months.
        `approval_compliance_datacontract`'s "Passes 0/0 on every clean
        run, child_protection.py only ever assigns an Approved carer to a
        placement, so this holds by construction". Explains why a check
-       looks like it does nothing. A contributor needs it; a steward
-       must never see it.
+       looks like it does nothing. A contributor needs it; a data
+       engineer must never see it.
 
     **The argument that decided it:** a `changelog` entry carries a
     date, an author and a `breaking` flag. Buckets 2 and 3 have none of
@@ -1298,7 +1298,7 @@ relative, not a schedule — this is weeks of work, not months.
     `description=meta.get("description") or native_description`, so an
     ODCS rule's own native `description:` silently becomes the
     reader-facing text when no `customProperties` one exists. Three
-    checks currently show a data steward *"Same format rule as
+    checks currently show a data engineer *"Same format rule as
     child_given_names - see that property's description."* - a
     cross-reference the dashboard cannot resolve, presented as the
     explanation. A fourth shows a paragraph about RE2 lacking lookahead

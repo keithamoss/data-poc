@@ -537,13 +537,13 @@ check_lifecycle.py`'s own `check_id` convention.
       role labels - real motivations and perspectives per role. Added:
       what Keith himself is actually doing when he looks at this (judging
       the approach generally, and using it as something to show other
-      people); the data steward's real frustration point (noise, too many
-      clicks before reaching what matters, checking this quickly
+      people); the data engineer's real frustration point (noise, too
+      many clicks before reaching what matters, checking this quickly
       alongside other work); the accountable data owner's real concern
       (trend over time, defensibility); the pipeline maintainer's
-      opposite need (wants the raw tool-level detail the steward
-      doesn't) - a real, concrete tension the same dashboard has to serve
-      both sides of.
+      opposite need (wants the raw tool-level detail the data engineer
+      doesn't) - a real, concrete tension the same dashboard has to
+      serve both sides of.
     - **The "banked for later" post-build UX pass pulled forward into
       `delivery-critic` now**, not deferred - Keith explicitly liked
       the idea flagged during the UX-agent scoping research (a real-
@@ -552,7 +552,7 @@ check_lifecycle.py`'s own `check_id` convention.
       asked for it built into the current reviewer rather than parked.
       `delivery-critic` now does a real, separate visual-QA pass
       for dashboard-facing requirements only, adopting a busy/moderately-
-      attentive data-steward persona, taking real screenshots as
+      attentive data-engineer persona, taking real screenshots as
       evidence (spacing, interaction states, dark mode, whether a
       confused click-path is possible), checked against the same
       Apple-level bar - and, since `delivery-dashboard-ux`'s own pre-build note
@@ -595,9 +595,9 @@ check_lifecycle.py`'s own `check_id` convention.
       assessed" section rather than inflating the finding count -
       directly validates `delivery-critic`'s own "never mark a
       criterion as met unless you've explicitly verified it" rule and
-      its explicit busy/moderately-attentive-steward persona (though
-      punchlist itself deliberately avoids a "frustrated user" archetype
-      in favour of a neutral state+device description - a real
+      its explicit busy/moderately-attentive-data-engineer persona
+      (though punchlist itself deliberately avoids a "frustrated user"
+      archetype in favour of a neutral state+device description - a real
       alternative framing worth knowing about, not adopted here).
     - `agapi-koutsi/UX-Design-Critique` - a different real pattern: MULTIPLE
       named personas (Product Manager, Engineer, Skeptical User) critique
@@ -1496,7 +1496,7 @@ check_lifecycle.py`'s own `check_id` convention.
     **Keith's own offer, same evening, not yet acted on**: he offered to
     explain more about who the real users actually are, to sharpen both
     this taxonomy/weighting (currently grounded in the generic personas
-    `docs/project-context-for-agents.md` already had - data steward,
+    `docs/project-context-for-agents.md` already had - data engineer,
     agency data owner, pipeline maintainer) and `plans/running-
     thoughts.md` #2's own real roles (QA, peer review, manager - today
     just labels driving ticket assignment, no real description of what

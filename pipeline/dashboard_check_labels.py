@@ -91,9 +91,10 @@ def display_name(check_name: str, engine_short: str, label: str | None) -> str:
     dbt:accepted_values (dbt-core)". Both are gone (Keith, 2026-09-20,
     plans/running-thoughts.md #19): rules 10 and 11 of
     docs/check-authoring-rules.md forbid naming a tool or a macro
-    anywhere in a check's prose, on the grounds that a steward does not
-    know which tool ran the check - and the heading directly above that
-    prose was doing exactly that, on every check in the dashboard.
+    anywhere in a check's prose, on the grounds that a data engineer
+    does not know which tool ran the check - and the heading directly
+    above that prose was doing exactly that, on every check in the
+    dashboard.
 
     Nothing is lost by dropping the tool. Every check card and drawer
     already carries `note` - "Computed by dbt-core against this run's
@@ -118,7 +119,8 @@ def url_key(check_id: str) -> str:
     made every heading change a broken bookmark and required the heading
     to stay unique within a column - which is most of why headings read
     "Invalid values - dbt:accepted_values (dbt-core)" rather than
-    something a steward would recognise (plans/running-thoughts.md #19).
+    something a data engineer would recognise (plans/running-thoughts.md
+    #19).
 
     REQ-QAC-023 already built the guarantee this needs and then left it
     unused: `validate_tail_uniqueness()` exists precisely because "a

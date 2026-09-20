@@ -640,7 +640,7 @@ building:
   GitHub Issue - never a button in the dashboard (this tool has no
   backend, so there's nowhere for one to write to). The dashboard stays
   genuinely read-only; the write happens on GitHub itself, the same
-  place a data steward already works.
+  place a data engineer already works.
 - **No run_id needed**: every real run already has a real arrival
   window (its own `arrived_date` up to the next run's, sourced from
   committed `qa_results/` history, no live data) - a bare `/accept`
@@ -1386,7 +1386,7 @@ metadata (`Registered on or after birth`, `Closed-case hygiene`, and
 
 The tension is real and slightly funny: `docs/check-authoring-rules.md`
 rules 10 and 11 forbid naming a tool, macro or statistical method
-anywhere in a check's prose, because a data steward does not know which
+anywhere in a check's prose, because a data engineer does not know which
 tool ran the check and should not need to. The heading sitting directly
 above that prose names the tool AND the macro. So the one line on the
 page that is guaranteed to be read is the one line held to no standard
@@ -1475,7 +1475,7 @@ it is attached to `registration_number` rather than to the table.
 
 Why it matters beyond tidiness: the dashboard's whole drill-down model
 is Agency -> Collection -> Dataset -> Column, so "is this supply the
-right size" - arguably the first question a steward asks about an
+right size" - arguably the first question a data engineer asks about an
 arriving supply - has nowhere to live in it. That is the same
 shape-of-data-asset question `plans/wider.md` #9 raises, just hit from
 a different direction.
@@ -1559,21 +1559,21 @@ Why it is interesting rather than just another field use: it is the
 natural counterpart to `self-evident`. That sentinel exists because the
 cause of a failure is often genuinely unknown at authoring time, and
 rule 5 forbids guessing. But "unknown now" is not "unknowable" - a
-steward who investigates three red runs on the same check learns
+data engineer who investigates three red runs on the same check learns
 something real, and today there is nowhere for it to go. This would
 turn the sentinel from a permanent admission into a starting state.
 
 Not scoped, and it needs care on at least four things. It reopens the
 standing/dated boundary that `technical_note` was narrowed to protect -
 "we saw this in March" has a date, which is what `changelog` is for.
-It is contributor-facing and never published, so a steward would be
-writing into a field they cannot see on the page, which is either the
-point or a fatal flaw depending on who is meant to write it. It
-overlaps the ticketing system, which already records what a real
-failure turned out to be and has an owner and a state. And it would
-want a real authoring rule of its own, since "record the kinds of
-issues found" is exactly the loose invitation that produced the prose
-this whole requirement is rewriting.
+It is contributor-facing and never published, so a data engineer would
+be writing into a field they cannot see on the page, which is either the
+point or a fatal flaw depending on who is meant to write it. It overlaps
+the ticketing system, which already records what a real failure turned
+out to be and has an owner and a state. And it would want a real
+authoring rule of its own, since "record the kinds of issues found" is
+exactly the loose invitation that produced the prose this whole
+requirement is rewriting.
 
 22. **[parked, 2026-09-20]** **[QA checks & contract]** `dataset` and `table` are the same thing in every check_id, and only one of them should exist.
 

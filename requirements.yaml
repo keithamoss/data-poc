@@ -292,7 +292,7 @@ requirements:
   - id: REQ-QAC-001
     title: Real multi-tool QA checks against Birth Registrations
     story: >
-      As a data steward, I want Birth Registrations run through real
+      As a data engineer, I want Birth Registrations run through real
       dbt-core, Soda Core, datacontract-cli, and Evidently AI checks
       against real generated data, so that the QA results I see are
       genuinely computed, not fabricated for a demo.
@@ -344,7 +344,7 @@ requirements:
   - id: REQ-QAC-002
     title: Real multi-tool QA checks against Child Protection
     story: >
-      As a data steward, I want the Child Protection collection (all 6
+      As a data engineer, I want the Child Protection collection (all 6
       tables, including cross-table business rules) run through the
       same four real tools, so that a multi-table collection gets the
       same real QA rigor as a single-table feed.
@@ -432,7 +432,7 @@ requirements:
   - id: REQ-PIPE-004
     title: Committed, permanent QA history
     story: >
-      As a data steward, I want every real QA run's raw tool output
+      As a data engineer, I want every real QA run's raw tool output
       committed and preserved permanently, so that history survives a
       check's own definition changing or being retired, potentially for
       years.
@@ -480,7 +480,7 @@ requirements:
   - id: REQ-PIPE-005
     title: CI-gated publish, no manual publish path
     story: >
-      As a data steward, I want the published dashboard to only ever
+      As a data engineer, I want the published dashboard to only ever
       come from an automated, gated CI build, so that nobody can push a
       dashboard build that skipped validation.
     moscow: must
@@ -520,7 +520,7 @@ requirements:
   - id: REQ-QAC-006
     title: Check lifecycle - retirement without losing history
     story: >
-      As a data steward, I want a check's history preserved even after
+      As a data engineer, I want a check's history preserved even after
       it's formally retired or its definition changes, so that
       "retired" never means "forgotten."
     moscow: must
@@ -568,7 +568,7 @@ requirements:
   - id: REQ-PIPE-007
     title: Cadence-aware "as of" viewing
     story: >
-      As a data steward, I want to pick any date and see the data asset
+      As a data engineer, I want to pick any date and see the data asset
       exactly as it stood then, so that I can answer "what did we know
       as of this date" for a daily or a quarterly dataset alike.
     moscow: should
@@ -609,7 +609,7 @@ requirements:
   - id: REQ-QAC-008
     title: Resupply chains derived from real, observable signals
     story: >
-      As a data steward, I want a resupply chain identified purely from
+      As a data engineer, I want a resupply chain identified purely from
       real cadence timing and each arrival's own real pass/fail status,
       not from internal generator bookkeeping about which delivery a
       resupply was "for," so that the model matches what a real
@@ -724,7 +724,7 @@ requirements:
   - id: REQ-TEST-011
     title: Real automated test coverage with an enforced floor
     story: >
-      As a data steward relying on this pipeline, I want its own
+      As a data engineer relying on this pipeline, I want its own
       correctness verified by a real, continuously-enforced test suite
       (unit, real-tool integration, dashboard JS, and real-browser
       end-to-end), so that a regression can't silently ship.
@@ -800,7 +800,7 @@ requirements:
   - id: REQ-DASH-013
     title: "Time travel: point-in-time dashboard snapshots"
     story: >
-      As a data steward, I want fully self-contained, gzip-archived
+      As a data engineer, I want fully self-contained, gzip-archived
       snapshots of the dashboard at points in time, so that "what did
       the whole page look like on this date" is answerable years later
       with nothing but a browser.
@@ -942,7 +942,7 @@ requirements:
   - id: REQ-QAC-017
     title: An accept/reject decision workflow for amber-status supplies
     story: >
-      As a data steward, I want a real, recorded decision on a
+      As a data engineer, I want a real, recorded decision on a
       persistently-amber dataset (accept it, or reject it and treat it
       as effectively red), so that "amber" doesn't sit ambiguous
       forever.
@@ -998,7 +998,7 @@ requirements:
   - id: REQ-PIPE-018
     title: An AWS MVP reacting to real S3 delivery events
     story: >
-      As a data steward, I want the pipeline to run automatically when
+      As a data engineer, I want the pipeline to run automatically when
       a real file lands in S3, so that QA happens as part of the actual
       delivery workflow, not a manually-kicked-off local script.
     moscow: should
@@ -1018,7 +1018,7 @@ requirements:
   - id: REQ-GEN-019
     title: Realistic Child Protection resupply simulation
     story: >
-      As a data steward, I want Child Protection's synthetic data to
+      As a data engineer, I want Child Protection's synthetic data to
       simulate realistic resupplies too (today only Birth Registrations
       does), so that the resupply-chain model has real, varied data to
       demonstrate against for a periodic, multi-table collection.
@@ -1352,7 +1352,7 @@ requirements:
     title: Plain-English explanation of what every QA check does
     date_written: "2026-09-20"
     story: >
-      As a data steward who doesn't know dbt, Soda or Evidently, I want
+      As a data engineer who doesn't know dbt, Soda or Evidently, I want
       every check to say in plain English what it looks for and what it
       means if it fails, so that I can tell what's actually wrong with
       my data without asking the person who built the pipeline.
@@ -1620,10 +1620,10 @@ requirements:
         Raised against the carer-approval check - a child placed with
         an unapproved carer is a compliance failure, not a
         data-tidiness one - and never answered. The category and red
-        status may already carry it, or a steward triaging several reds
-        at once may have no way to tell which one matters most. Not
-        scoped; it would be a new field or a UI treatment, not
-        something the prose can fix.
+        status may already carry it, or a data engineer triaging several
+        reds at once may have no way to tell which one matters most. Not
+        scoped; it would be a new field or a UI treatment, not something
+        the prose can fix.
     dependencies: [REQ-QAC-023]
     implemented_by:
       - docs/check-authoring-rules.md
