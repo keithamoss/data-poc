@@ -615,6 +615,41 @@ Rough layout:
   prose deletes it in practice even though git has the bytes. Deleting
   is cheap to do and expensive to notice you got wrong.
 
+  **WHEN, mechanically: the deletion goes in the commit that flips a
+  requirement to `built`.** Not the next commit, not a sweep at the end
+  of the day. If that commit does not either remove prose or say in one
+  line why there was none, the rule has been broken - which is a thing
+  to check before committing, like `ruff`, not a thing to intend.
+
+  **The reason this got skipped, and it will recur, so recognise the
+  shape.** A plans entry is very often `done` AND still carrying live
+  items - a follow-up fork, a tidy-up, an open question. That makes
+  "delete the superseded prose" not a clean operation on a whole entry,
+  and the friction is enough to turn it into "later". Real incident,
+  2026-09-20: five requirements shipped in one day and not one plans
+  entry came out with them; caught only because Keith asked directly.
+
+  So a mixed entry is the NORMAL case, not an exception to postpone:
+
+  1. Pull the live items out first - into the requirement's own
+     `open_questions:`, or into a new plans entry of their own, or into
+     a new requirement if they are real work. A fork sitting in the last
+     paragraph of a `done` write-up is the single likeliest thing to be
+     lost.
+  2. Move what the prose knows that the requirement does not into
+     `decisions:` - especially a rejected alternative.
+  3. Then delete, and repoint every inbound reference at the requirement
+     that now owns the decision. `grep` for the entry number; there are
+     usually more than expected (11 for one pair of entries).
+
+  **If a plans entry turns out to be the ONLY record of something real,
+  that is a missing requirement, not a reason to keep the entry.** Write
+  the requirement, then delete. Found this way on 2026-09-20: one `done`
+  entry held both a live data-corruption bug affecting 166 of 352
+  committed runs and an unbuilt design decision, neither of which any
+  requirement mentioned. Deleting it as "done work, already shipped"
+  would have destroyed the only account of both.
+
   Sequencing (Keith's own words, `plans/running-thoughts.md` #13):
   requirements first, deletion second, and the `CHANGELOG.yaml` rewrite as
   its own separate piece - that last one LANDED 2026-09-20 (REQ-DOCS-028). The back-catalogue of existing `done` items is
