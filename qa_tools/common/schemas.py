@@ -1,0 +1,158 @@
+"""
+Declared schemas for this repo's own hand-authored YAML - `requirements.yaml`
+and `CHANGELOG.yaml` - as pydantic models (REQ-DOCS-029).
+
+Keith's challenge, 2026-09-20: "can't we use a YAML schema validation
+library and give it a spec for this kind of stuff rather than writing
+these hacky scripts?" He was right about the half of the validators that
+is genuinely schema work - required fields, closed vocabularies, string
+patterns, nesting. That half now lives here as a declaration rather than
+as a sequence of hand-written `if` statements.
+
+**What deliberately did NOT move here**, because no schema library can
+express it:
+
+  - `linked_tests` and `implemented_by` are checked against a real AST
+    parse of the file they name, so a renamed function fails the build.
+    That is a cross-reference into the codebase, not a shape.
+  - `dependencies` must resolve to a real id in the same document.
+    Expressible as a model validator in principle, but it belongs with
+    the other cross-references rather than split across two files.
+  - Duplicate mapping keys. Verified rather than assumed: schema
+    validation runs on the already-parsed object, and a duplicate does
+    not make a key MISSING - it leaves it present with truncated
+    content, so a required-key rule passes. `yamllint`'s key-duplicates
+    rule catches that instead, at parse time, before any of this runs.
+
+Those stay in `validate_requirements.py`/`validate_changelog.py`, which
+now do schema-validation-then-cross-reference rather than everything by
+hand.
+
+Note these models are used by the VALIDATORS, not by
+`dashboard/requirements_yaml.py`/`changelog_yaml.py`. Those parsers have
+a different documented job - render whatever is really there, never
+raise, so a half-written file still shows in the dashboard - which is
+the opposite of what a schema does. Keeping them apart preserves that
+split rather than blurring it.
+"""
+from __future__ import annotations
+
+import re
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from qa_tools.common.vocab import (
+    CHANGELOG_CATEGORIES,
+    COMPONENT_CODES,
+    MOSCOW,
+    REQUIREMENT_STATUSES,
+)
+
+# A non-empty string once stripped - the shape almost every authored
+# field here really has. `min_length=1` alone would accept "   ".
+NonEmptyStr = Annotated[str, Field(min_length=1)]
+
+_ID_PATTERN = r"^REQ-(?:" + "|".join(COMPONENT_CODES) + r")-\d{3}$"
+_DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
+
+
+class _Strict(BaseModel):
+    """Shared base. `extra="forbid"` is the point: a typo'd field name in
+    a hand-authored file would otherwise be accepted and silently ignored
+    forever, which is the same failure shape as the duplicate key that
+    started this work."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    @field_validator("*", mode="after")
+    @classmethod
+    def _no_blank_strings_in_lists(cls, v):
+        if isinstance(v, list) and any(isinstance(x, str) and not x.strip() for x in v):
+            raise ValueError("list entries must be non-empty strings")
+        return v
+
+
+class Requirement(_Strict):
+    id: str = Field(pattern=_ID_PATTERN)
+    title: NonEmptyStr
+    story: NonEmptyStr
+    moscow: Literal[*MOSCOW]  # type: ignore[valid-type]
+    status: Literal[*REQUIREMENT_STATUSES]  # type: ignore[valid-type]
+    acceptance_criteria: list[NonEmptyStr] = Field(min_length=1)
+
+    # Optional in the file; required once `status` is "built", which is
+    # a rule about the WHOLE record and so lives in the model validator
+    # below rather than on any one field.
+    linked_tests: list[str] = []
+    implemented_by: list[str] = []
+    evidence: list[str] = []
+    decisions: list[str] = []
+
+    date_written: str = ""
+    source: str = ""
+    non_functional_requirements: list[str] = []
+    dependencies: list[str] = []
+    open_questions: list[str] = []
+
+    @field_validator("date_written")
+    @classmethod
+    def _real_date(cls, v: str) -> str:
+        if v and not re.match(_DATE_PATTERN, v):
+            raise ValueError('must be a real "YYYY-MM-DD" date')
+        return v
+
+    def missing_when_built(self) -> list[str]:
+        """The four fields a `built` requirement must carry, and why they
+        are checked here rather than as a pydantic rule that would reject
+        the document outright: the validator reports EVERY problem in one
+        run so an author fixes them together, and a raised exception
+        stops at the first."""
+        if self.status != "built":
+            return []
+        return [name for name in ("linked_tests", "implemented_by", "evidence", "decisions")
+                if not getattr(self, name)]
+
+
+class ChangelogItem(_Strict):
+    headline: NonEmptyStr
+    description: NonEmptyStr
+    components: list[Literal[*COMPONENT_CODES.values()]] = Field(min_length=1)  # type: ignore[valid-type]
+    # Optional and normally absent - day-grouping is the point, and a
+    # to-the-minute timestamp is detail this audience does not need.
+    time: str | None = None
+
+
+class ChangelogSection(_Strict):
+    category: Literal[*CHANGELOG_CATEGORIES]  # type: ignore[valid-type]
+    items: list[ChangelogItem] = Field(min_length=1)
+
+
+class Release(_Strict):
+    date: str = Field(pattern=_DATE_PATTERN)
+    summary: NonEmptyStr
+    changes: list[ChangelogSection] = Field(min_length=1)
+
+
+class Changelog(_Strict):
+    releases: list[Release] = Field(min_length=1)
+    intro: str = ""
+
+
+def format_error(err: dict, where: str) -> str:
+    """One pydantic error as a line an author can act on.
+
+    Pydantic's own message lists what a field SHOULD be but not what was
+    actually written - "Input should be 'Data generation', ..." leaves
+    you to go and find the offending value yourself. The hand-written
+    validators this replaced always named it, so the input is appended
+    here rather than accepting a quieter error as the price of using a
+    schema."""
+    field = ".".join(str(x) for x in err["loc"]) or "(entry)"
+    msg = err["msg"]
+    value = err.get("input")
+    if err["type"] not in ("missing",) and isinstance(value, (str, int, float, bool)):
+        text = str(value)
+        if text.strip():
+            msg = f"{msg} - got {text[:60]!r}"
+    return f"{where}: {field} - {msg}"

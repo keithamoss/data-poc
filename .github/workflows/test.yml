@@ -122,6 +122,15 @@ jobs:
       - name: Install Playwright's Chromium
         run: uv run playwright install --with-deps chromium
 
+      # Before the suite, because it is fast and because the class of
+      # bug it catches is invisible to everything after it: PyYAML
+      # silently keeps only the last of a duplicate mapping key, so the
+      # content under the first is gone before any test or schema check
+      # can see it. Runs here as well as in pre-commit, since hooks only
+      # fire for people who ran `pre-commit install`.
+      - name: Lint YAML (duplicate keys)
+        run: uv run yamllint --strict .
+
       - name: Run test suite
         run: uv run pytest --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov-report=term-missing
 

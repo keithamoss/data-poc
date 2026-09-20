@@ -660,15 +660,14 @@ requirements:
       - A "built" requirement can't ship with zero real linked tests.
     linked_tests:
       - tests/test_validate_requirements.py
-      - tests/test_yaml_strict.py
       - tests/test_requirements_yaml.py
     evidence:
       - >
-        2026-09-20: the duplicate-key guard run against every
-        hand-authored YAML file in the repo found exactly one real
-        instance - two `decisions:` blocks on REQ-QAC-023, silently
-        costing 5 decisions - and zero false positives across the
-        changelog, the data-asset config and both ODCS contracts.
+        2026-09-20: yamllint's key-duplicates rule run across every
+        hand-authored YAML file in the repo reports zero findings, and
+        catches a deliberately planted duplicate at the exact line. On
+        its default ruleset the same files report 230 findings, 220 of
+        them line-length, which is why every style rule is disabled.
       - >
         2026-09-20: 27 requirements validate with zero errors, every
         linked_tests and implemented_by entry resolving to a real file or a
@@ -678,15 +677,34 @@ requirements:
         Linkage to tests is enforced by CI against a real AST parse rather than a string match, because a decorative reference to a test that does not exist is the exact failure this register was built to prevent.
       - >
         A duplicate mapping key is rejected outright rather than left to
-        PyYAML's last-one-wins. It cost 5 real decisions before the guard
+        PyYAML's last-one-wins. It cost 5 real decisions before the check
         existed, and nothing in the Python stack noticed - safe_load, the
-        check-yaml hook and the whole test suite all passed. A second
-        parser happening to be stricter is luck, not a strategy.
+        check-yaml hook and the whole test suite all passed.
+      - >
+        Used yamllint rather than a hand-written checker or ruamel.yaml.
+        Keith's challenge - "can't we use a library rather than these
+        hacky scripts" - was right, and a first attempt did hand-roll a
+        PyYAML node walk. ruamel also detects duplicates, but soda-core
+        pins it below 0.18 so this repo is stuck on a 2023 release
+        chosen by a QA tool. yamllint is purpose-built, has no such
+        entanglement, and makes it a named rule rather than a side
+        effect of a stricter parser.
+      - >
+        Rejected doing this with a schema, verified rather than assumed.
+        Schema validation runs on the already-parsed object, and a
+        duplicate key does not make the key MISSING - it leaves it
+        present with truncated content. A jsonschema model requiring a
+        non-empty decisions list PASSED on the exact failing input.
+      - >
+        Runs in CI as well as pre-commit, because hooks only fire for
+        people who ran `pre-commit install`.
       - >
         The register describes the PRODUCT, not this project's own working process, so conventions about how we work stay in plans files rather than becoming pseudo-requirements.
     implemented_by:
       - requirements.yaml
-      - qa_tools/common/yaml_strict.py::find_duplicate_keys
+      - .yamllint
+      - .pre-commit-config.yaml
+      - .github/workflows/test.yml
       - dashboard/requirements_yaml.py::parse_requirements
       - qa_tools/common/validate_requirements.py::validate
 
@@ -1459,3 +1477,114 @@ requirements:
         re-checked in the same run to confirm its own 10 chip icons
         survived, since the emoji removal was deliberately scoped to one
         surface of two.
+
+  - id: REQ-DOCS-029
+    title: Declared schemas and a standard linter for this repo's own YAML
+    date_written: "2026-09-20"
+    story: >
+      As someone maintaining this project's hand-authored YAML, I want
+      its shape declared as a spec and its parse-level hazards caught by
+      a standard tool, so that a typo or a duplicated key fails loudly
+      instead of being silently accepted.
+    moscow: should
+    status: built
+    source: >
+      Keith, 2026-09-20 - "can't we use a YAML schema validation library
+      and give it a spec for this kind of stuff rather than writing these
+      hacky scripts?", after a hand-rolled duplicate-key checker.
+    acceptance_criteria:
+      - THE SYSTEM SHALL declare the shape of requirements.yaml and
+        CHANGELOG.yaml as a schema rather than as hand-written field
+        checks.
+      - WHEN a hand-authored YAML file contains a duplicate mapping key,
+        THE SYSTEM SHALL fail and name the key and its line.
+      - WHEN a record carries a field name the schema does not define,
+        THE SYSTEM SHALL reject it rather than ignore it.
+      - WHERE a value is rejected, THE SYSTEM SHALL name the offending
+        value, not only what was expected.
+      - THE SYSTEM SHALL continue to verify every linked_tests and
+        implemented_by entry against a real parse of the code it names,
+        and every dependency against a real id in the same file.
+      - THE SYSTEM SHALL run the duplicate-key check in CI as well as at
+        commit time.
+    non_functional_requirements:
+      - No behaviour change to what is accepted, beyond the two
+        deliberate ones recorded in decisions - every rule the previous
+        validators enforced still fires.
+      - The closed vocabularies have one home, so adding a component or
+        a category stays a single edit and the existing taxonomy
+        consistency check keeps working.
+    decisions:
+      - >
+        Used yamllint for duplicate keys rather than a hand-written
+        checker or ruamel.yaml. ruamel detects them too, but soda-core
+        pins it below 0.18, so this repo is stuck on a 2023 release
+        chosen by a QA tool. yamllint is purpose-built, standalone, and
+        makes it a named rule rather than a side effect of a stricter
+        parser.
+      - >
+        Rejected solving the duplicate-key problem with a schema, tested
+        rather than assumed. Schema validation runs on the parsed
+        object, and a duplicate does not make a key MISSING - it leaves
+        it present with truncated content. A jsonschema model requiring
+        a non-empty list PASSED on the exact input that had already cost
+        five decisions.
+      - >
+        Every yamllint style rule is disabled. On its default ruleset
+        this repo reports 230 findings, 220 of them line-length - these
+        files are hand-authored prose that wraps to suit the sentence,
+        and leaving those on would bury the one rule that matters.
+      - >
+        The schemas are used by the VALIDATORS, not by the dashboard's
+        own parsers. Those have the opposite documented job - render
+        whatever is really there and never raise, so a half-written file
+        still shows - and merging the two would have destroyed that.
+      - >
+        Kept the cross-reference checks in Python, as Keith expected. A
+        schema can say linked_tests is a list of strings; only an AST
+        parse can say that tests/x.py::TestY::test_z names a method that
+        exists, which is the difference between a decorative reference
+        and an enforced one.
+      - >
+        Added an error formatter rather than accepting pydantic's
+        wording. Pydantic states what a field should be but not what was
+        written; the hand-written validators always named the offending
+        value, and losing that would have made the errors worse in
+        exchange for tidier code.
+      - >
+        Deliberate behaviour change - a whitespace-only `source` is now
+        accepted rather than rejected. The schema strips it to "", which
+        is exactly the value an absent source already has, and there is
+        no difference in intent between leaving a field blank and
+        leaving it out.
+    dependencies: [REQ-DOCS-014]
+    linked_tests:
+      - tests/test_schemas.py
+      - tests/test_validate_requirements.py
+      - tests/test_changelog_yaml.py
+      - tests/test_component_taxonomy_consistency.py
+    implemented_by:
+      - qa_tools/common/schemas.py::Requirement
+      - qa_tools/common/schemas.py::Changelog
+      - qa_tools/common/schemas.py::format_error
+      - qa_tools/common/vocab.py::COMPONENT_CODES
+      - qa_tools/common/validate_requirements.py::validate
+      - qa_tools/common/validate_changelog.py::validate
+      - .yamllint
+      - .pre-commit-config.yaml
+      - .github/workflows/test.yml
+    evidence:
+      - >
+        2026-09-20: the two validators fell from 487 lines to 366 while
+        gaining a guarantee they never had - an unknown field is now
+        rejected rather than silently ignored. All 28 requirements and
+        the whole changelog validate unchanged.
+      - >
+        2026-09-20: 11 requirement rules and 9 changelog rules were each
+        re-confirmed to fire after the rewrite, by feeding a
+        deliberately broken record to the real validator rather than
+        trusting that the schema covered them.
+      - >
+        2026-09-20: yamllint reports zero findings across this repo's
+        own YAML with key-duplicates enabled, and catches a planted
+        duplicate at the exact line.

@@ -1,0 +1,61 @@
+# yamllint config (2026-09-20, REQ-DOCS-029).
+#
+# This exists for ONE rule - key-duplicates - and everything else here
+# is turned off to get out of its way.
+#
+# Why that rule earns a whole tool: PyYAML's safe_load accepts a
+# duplicate mapping key silently and keeps only the LAST one. On
+# 2026-09-20 requirements.yaml's REQ-QAC-023 had two `decisions:`
+# blocks; five real decisions were discarded with no error, including a
+# rejected design alternative that had been moved there deliberately
+# BEFORE the plans prose describing it was deleted. Nothing in the
+# Python stack noticed - safe_load, the check-yaml pre-commit hook and
+# 722 passing tests all missed it.
+#
+# A JSON-Schema or pydantic model cannot catch this, verified rather
+# than assumed: schema validation runs on the already-parsed object, by
+# which point the duplicate is gone. A required-key rule sees the key
+# present with a valid (truncated) value and passes.
+#
+# Style rules are disabled deliberately, not lazily. On the default
+# ruleset this repo reports 230 findings, 220 of them line-length -
+# these files are hand-authored prose in block scalars and wrap to suit
+# the sentence, not a column limit. Enabling them would bury the one
+# rule that matters.
+extends: default
+
+# Only this project's OWN hand-authored YAML. Third-party trees carry
+# YAML we neither wrote nor control, and some of it breaks these rules
+# on purpose - dbt's own metricflow ships a fixture with a deliberate
+# duplicate key to test its linter, which would otherwise fail every
+# run here.
+ignore: |
+  .venv/
+  node_modules/
+  dbt_project/dbt_packages/
+  dashboard/snapshots/
+  reports/
+  data/
+
+rules:
+  key-duplicates: enable
+
+  # Prose files, not config - line length and blank lines are an
+  # authoring choice here.
+  line-length: disable
+  empty-lines: disable
+  trailing-spaces: disable
+  comments: disable
+  comments-indentation: disable
+  document-start: disable
+  indentation: disable
+  brackets: disable
+  braces: disable
+  colons: disable
+  commas: disable
+  hyphens: disable
+  new-line-at-end-of-file: disable
+  empty-values: disable
+  octal-values: disable
+  quoted-strings: disable
+  truthy: disable

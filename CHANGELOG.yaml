@@ -105,6 +105,15 @@ releases:
               belongs to.
       - category: New
         items:
+          - headline: The tool now checks its own paperwork properly
+            components: ["Docs & process", "Testing & dev tooling"]
+            description: >
+              The rules about what a requirement or a release note must
+              contain are now written down as a specification rather
+              than scattered through code, and a standard linter catches
+              a whole class of mistake that used to slip through
+              silently. A misspelt field name is now an error instead
+              of being quietly ignored.
           - headline: What's New, written for you
             components: ["Docs & process", "Dashboard UI"]
             description: >

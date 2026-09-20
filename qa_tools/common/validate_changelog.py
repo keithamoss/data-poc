@@ -34,9 +34,11 @@ import re
 import sys
 from pathlib import Path
 
-from dashboard.changelog_yaml import CATEGORIES, parse_changelog
-from qa_tools.common.validate_requirements import _COMPONENT_CODES
-from qa_tools.common.yaml_strict import find_duplicate_keys
+import yaml
+from pydantic import ValidationError
+
+from qa_tools.common.schemas import Changelog, format_error
+from qa_tools.common.vocab import CHANGELOG_CATEGORIES, COMPONENT_CODES
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 CHANGELOG_YAML = ROOT / "CHANGELOG.yaml"
@@ -46,66 +48,50 @@ _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 # The same taxonomy requirement ids are built from, by full name. Taken
 # from `_COMPONENT_CODES` rather than restated, so there is one source
 # of truth and adding a component cannot leave this behind.
-VALID_COMPONENTS = frozenset(_COMPONENT_CODES.values())
+VALID_COMPONENTS = frozenset(COMPONENT_CODES.values())
+CATEGORIES = CHANGELOG_CATEGORIES
 
 
-def validate(feed: dict) -> list[str]:
-    """Pure function over parsed feed data - no file I/O, testable
-    against a fixture dict, same pattern as `validate_requirements.py`'s
-    own `validate()`."""
+def validate(raw: dict) -> list[str]:
+    """Schema first, then the one rule a schema cannot express.
+
+    Restructured 2026-09-20 (REQ-DOCS-029). Almost all of this module
+    was schema work - required fields, a closed category vocabulary, a
+    date pattern, nesting - and now lives as a declaration in
+    `qa_tools/common/schemas.py`. What is left is the duplicate-date
+    rule, which is about the relationship BETWEEN releases rather than
+    the shape of any one of them.
+
+    Takes the RAW parsed YAML rather than `changelog_yaml.parse_changelog()`
+    output, deliberately: that parser's documented job is to render
+    whatever is really there and never raise, so it fills in defaults
+    that would hide exactly the absences this is meant to report."""
     errors: list[str] = []
-    entries = feed.get("entries") or []
-    if not entries:
-        errors.append("CHANGELOG.yaml has no releases")
+    try:
+        feed = Changelog(**(raw or {}))
+    except ValidationError as e:
+        for err in e.errors():
+            loc = list(err["loc"])
+            # Name the release by its DATE rather than its index - "the
+            # third release" means nothing to someone looking at a file
+            # ordered newest-first.
+            where = "CHANGELOG.yaml"
+            if len(loc) >= 2 and loc[0] == "releases" and isinstance(loc[1], int):
+                releases = (raw or {}).get("releases") or []
+                if loc[1] < len(releases):
+                    where = f"release {releases[loc[1]].get('date', '(no date)')!r}"
+            trimmed = dict(err, loc=tuple(loc[2:]) or tuple(loc))
+            errors.append(format_error(trimmed, where))
+        return errors
 
-    seen_dates: set[str] = set()
-    for entry in entries:
-        date = entry.get("date") or ""
-        where = f"release {date!r}" if date else "a release with no date"
-
-        if not _DATE_RE.match(date):
-            errors.append(f'{where}: date must be a real "YYYY-MM-DD" string')
-        elif date in seen_dates:
+    seen: dict[str, int] = {}
+    for release in feed.releases:
+        seen[release.date] = seen.get(release.date, 0) + 1
+    for date, count in seen.items():
+        if count > 1:
             # Two blocks for one day means a reader sees the same date
-            # twice and cannot tell which is authoritative. Append to the
-            # existing day instead.
-            errors.append(f"{where}: appears more than once - merge the day's entries")
-        else:
-            seen_dates.add(date)
-
-        if not (entry.get("summary") or "").strip():
-            errors.append(f"{where}: missing summary - one sentence for the whole day, "
-                           f"so a reader can stop there")
-
-        sections = entry.get("sections") or []
-        if not sections:
-            errors.append(f"{where}: has no changes")
-
-        for section in sections:
-            category = section.get("category") or ""
-            if category not in CATEGORIES:
-                errors.append(f"{where}: category {category!r} is not one of "
-                               f"{', '.join(CATEGORIES)}")
-            items = section.get("items") or []
-            if not items:
-                errors.append(f"{where}, {category or 'a section'}: has no items")
-
-            for item in items:
-                headline = (item.get("headline") or "").strip()
-                item_where = f"{where}, {category}, {headline or '(no headline)'!r}"
-                if not headline:
-                    errors.append(f"{item_where}: missing headline")
-                if not (item.get("text") or "").strip():
-                    errors.append(f"{item_where}: missing description")
-                components = item.get("components") or []
-                if not components:
-                    errors.append(f"{item_where}: names no components")
-                for component in components:
-                    if component not in VALID_COMPONENTS:
-                        errors.append(
-                            f"{item_where}: component {component!r} is not one of the "
-                            f"project's own {len(VALID_COMPONENTS)}: "
-                            f"{', '.join(sorted(VALID_COMPONENTS))}")
+            # twice and cannot tell which is authoritative.
+            errors.append(f"release {date!r}: appears {count} times - merge the day's entries")
     return errors
 
 
@@ -113,16 +99,17 @@ def main() -> int:
     if not CHANGELOG_YAML.exists():
         print(f"CHANGELOG.yaml not found at {CHANGELOG_YAML}", file=sys.stderr)
         return 1
-    duplicate_errors = find_duplicate_keys(CHANGELOG_YAML)
-    feed = parse_changelog(CHANGELOG_YAML)
-    errors = duplicate_errors + validate(feed)
+    with open(CHANGELOG_YAML) as f:
+        raw = yaml.safe_load(f) or {}
+    errors = validate(raw)
     if errors:
         print(f"changelog validation FAILED ({len(errors)} error(s)):", file=sys.stderr)
         for e in errors:
             print(f"  - {e}", file=sys.stderr)
         return 1
-    items = sum(len(s["items"]) for e in feed["entries"] for s in e["sections"])
-    print(f"changelog validation OK - {len(feed['entries'])} day(s), {items} item(s), "
+    feed = Changelog(**raw)
+    items = sum(len(s.items) for r in feed.releases for s in r.changes)
+    print(f"changelog validation OK - {len(feed.releases)} day(s), {items} item(s), "
           f"zero errors.")
     return 0
 

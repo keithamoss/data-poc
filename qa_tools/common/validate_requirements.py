@@ -43,45 +43,26 @@ comparison here).
 from __future__ import annotations
 
 import ast
-import re
 import sys
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from dashboard.requirements_yaml import parse_requirements
-from qa_tools.common.yaml_strict import find_duplicate_keys
+from qa_tools.common.schemas import Requirement, format_error
+from qa_tools.common.vocab import COMPONENT_CODES
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 REQUIREMENTS_YAML = ROOT / "requirements.yaml"
 
-# Single source of truth for the id's own middle component code - the
-# same 7-part taxonomy plans/*.md items and CHANGELOG.md entries tag
-# things with (dashboard/qa-reporting-dashboard.template.html's own
-# `COMPONENT_ICON`/`PLANS_ALL_COMPONENTS` consts), just condensed to
-# 3-4 letters for the id. Edit this dict when the taxonomy itself
-# changes and nothing else - tests/test_component_taxonomy_consistency.py
-# (2026-09-19, Keith's own question: "how do we keep components.md in
-# sync with the UI") fails CI if this dict, those 2 template consts, and
-# docs/components.md's own section headers ever disagree, so drift here
-# is a real, structural CI failure, not something that has to be
-# remembered by hand any more. docs/components.md has the
-# full write-up of what each one actually covers (real scope, real
-# file/directory ownership, in/out-of-scope boundary against its
-# neighbours) - this dict is deliberately just the bare code mapping.
-_COMPONENT_CODES = {
-    "GEN": "Data generation",
-    "QAC": "QA checks & contract",
-    "PIPE": "Pipeline & publishing",
-    "DASH": "Dashboard UI",
-    "GHUB": "GitHub workflow & people",
-    "TEST": "Testing & dev tooling",
-    "DOCS": "Docs & process",
-}
-# "REQ-<CODE>-NNN" only - the old bare "REQ-NNN" shape is no longer
-# valid, see this module's own docstring for the same-day migration.
-_ID_RE = re.compile(r"^REQ-(?:" + "|".join(_COMPONENT_CODES) + r")-\d{3}$")
-_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_VALID_MOSCOW = {"must", "should", "could", "wont"}
-_VALID_STATUS = {"not_started", "in_progress", "built"}
+# The taxonomy itself moved to qa_tools/common/vocab.py (2026-09-20)
+# so the declared schema and this validator can both use it without
+# importing each other in a circle. Re-exported under its old private
+# name because tests/test_component_taxonomy_consistency.py and
+# validate_changelog.py both import it from here - that test is what
+# fails CI if this, the dashboard's own two consts and
+# docs/components.md ever disagree.
+_COMPONENT_CODES = COMPONENT_CODES
 
 
 def _python_symbol_exists(rel_path: str, qualname: list[str]) -> bool:
@@ -107,10 +88,23 @@ def _python_symbol_exists(rel_path: str, qualname: list[str]) -> bool:
         # in this class") - both are real, legitimate single-segment
         # references.
         name = qualname[0]
-        return any(
-            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == name
-            for node in tree.body
-        )
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                if node.name == name:
+                    return True
+            # A module-level CONSTANT is a symbol too, and worth pinning
+            # for the same reason a function is - delete it and the
+            # requirement claiming it should break. Added 2026-09-20,
+            # found by the gate itself: qa_tools/common/vocab.py is
+            # purely constants, so a bare path was rejected (rightly)
+            # and no symbol was acceptable (wrongly).
+            elif isinstance(node, ast.Assign):
+                if any(isinstance(tgt, ast.Name) and tgt.id == name for tgt in node.targets):
+                    return True
+            elif isinstance(node, ast.AnnAssign):
+                if isinstance(node.target, ast.Name) and node.target.id == name:
+                    return True
+        return False
     if len(qualname) == 2:
         class_name, method_name = qualname
         for node in ast.walk(tree):
@@ -182,165 +176,74 @@ def _implemented_by_errors(entry: str, where: str) -> list[str]:
     return []
 
 
-def _valid_string_list(value, field_name: str, where: str) -> list[str]:
-    """Real validation shared by all 4 optional list-of-strings fields
-    (non_functional_requirements/dependencies/open_questions/evidence):
-    absent/empty is fine (all 4 are optional), but if present, must be
-    a real list of non-empty strings - a stray `null` entry or a bare
-    string instead of a list is a real authoring mistake, not silently
-    accepted."""
-    if value is None:
-        return []
-    errors = []
-    if not isinstance(value, list):
-        errors.append(f"{where}: {field_name} must be a list, got {type(value).__name__}")
-        return errors
-    for entry in value:
-        if not isinstance(entry, str) or not entry.strip():
-            errors.append(f"{where}: {field_name} entries must be non-empty strings, got {entry!r}")
+def _schema_errors(raw: list[dict]) -> tuple[list[str], list[Requirement]]:
+    """Validates each entry against the declared schema, returning error
+    strings and the entries that parsed.
+
+    Every entry is tried even after one fails, so an author fixing a
+    batch sees the whole list rather than one problem per run - which is
+    why this catches ValidationError per entry rather than validating
+    the document in one go."""
+    errors: list[str] = []
+    ok: list[Requirement] = []
+    for i, entry in enumerate(raw):
+        where = entry.get("id") or f"entry #{i + 1} (no id)"
+        try:
+            ok.append(Requirement(**entry))
+        except ValidationError as e:
+            errors.extend(format_error(err, where) for err in e.errors())
+    return errors, ok
+
+
+def _cross_reference_errors(requirements: list[Requirement]) -> list[str]:
+    """The half no schema library can express - claims checked against
+    the real codebase and against the rest of the document.
+
+    A schema can say `linked_tests` is a list of strings. Only this can
+    say that `tests/test_x.py::TestY::test_z` names a method that really
+    exists, which is the difference between a decorative reference and
+    an enforced one."""
+    errors: list[str] = []
+    all_ids = {r.id for r in requirements}
+
+    seen: dict[str, int] = {}
+    for r in requirements:
+        seen[r.id] = seen.get(r.id, 0) + 1
+    for rid, count in seen.items():
+        if count > 1:
+            errors.append(f"id {rid!r} is used {count} times - ids must be globally unique")
+
+    for r in requirements:
+        for field in r.missing_when_built():
+            errors.append(f"{r.id}: status is 'built' but {field} is empty")
+
+        for entry in r.linked_tests:
+            if not _linked_test_exists(entry):
+                errors.append(f"{r.id}: linked_tests entry {entry!r} does not resolve to a real "
+                               f"file/test")
+        for entry in r.implemented_by:
+            errors.extend(_implemented_by_errors(entry, r.id))
+        for dep in r.dependencies:
+            if dep not in all_ids:
+                errors.append(f"{r.id}: dependencies entry {dep!r} does not match any real "
+                               f"requirement id in this file")
     return errors
 
 
 def validate(requirements: list[dict]) -> list[str]:
-    """Pure function, no file I/O of its own (except each linked_tests
-    entry's own real existence check) - testable directly against
-    fixture data, same pattern as qa_tools.common.check_lifecycle."""
-    errors: list[str] = []
-    seen_ids: dict[str, int] = {}
+    """Schema first, then cross-references against the real codebase.
 
-    for i, r in enumerate(requirements):
-        where = r.get("id") or f"entry #{i + 1} (no id)"
-
-        rid = r.get("id", "")
-        if not _ID_RE.match(rid):
-            errors.append(
-                f"{where}: id {rid!r} doesn't match ^REQ-({'|'.join(_COMPONENT_CODES)})-\\d{{3}}$"
-            )
-        else:
-            seen_ids[rid] = seen_ids.get(rid, 0) + 1
-
-        if not (r.get("title") or "").strip():
-            errors.append(f"{where}: missing/empty title")
-        if not (r.get("story") or "").strip():
-            errors.append(f"{where}: missing/empty story")
-
-        moscow = r.get("moscow")
-        if moscow not in _VALID_MOSCOW:
-            errors.append(f"{where}: moscow {moscow!r} not one of {sorted(_VALID_MOSCOW)}")
-
-        status = r.get("status")
-        if status not in _VALID_STATUS:
-            errors.append(f"{where}: status {status!r} not one of {sorted(_VALID_STATUS)}")
-
-        acceptance = r.get("acceptance_criteria") or []
-        if not acceptance or not all((c or "").strip() for c in acceptance):
-            errors.append(f"{where}: acceptance_criteria must have at least 1 non-empty entry")
-
-        linked = r.get("linked_tests") or []
-        if status == "built" and not linked:
-            errors.append(f"{where}: status is 'built' but linked_tests is empty - "
-                           f"a built requirement needs at least one real test verifying it")
-        for entry in linked:
-            if not _linked_test_exists(entry):
-                errors.append(f"{where}: linked_tests entry {entry!r} does not resolve to a real "
-                               f"file/test")
-
-        # dashboard/requirements_yaml.py's own parser defaults an unset
-        # `source` to `""` (falsy), not `None` - `main()` below always
-        # runs against parser output, so this must treat a real, unset
-        # default the same as genuinely absent, only flagging an
-        # actually-present-but-invalid value (whitespace-only, or a
-        # non-string).
-        source = r.get("source")
-        if source and (not isinstance(source, str) or not source.strip()):
-            errors.append(f"{where}: source, if present, must be a non-empty string")
-
-        # Same "permissive if absent, strict if present" treatment as
-        # `source` - dashboard/requirements_yaml.py's own parser also
-        # defaults an unset `date_written` to `""`.
-        date_written = r.get("date_written")
-        if date_written and (not isinstance(date_written, str) or not _DATE_RE.match(date_written)):
-            errors.append(f"{where}: date_written {date_written!r}, if present, must be a real "
-                           f"\"YYYY-MM-DD\" date")
-
-        for field_name in ("non_functional_requirements", "open_questions", "evidence",
-                           "decisions"):
-            errors.extend(_valid_string_list(r.get(field_name), field_name, where))
-
-        # `implemented_by` - where the requirement actually LIVES, as opposed
-        # to `linked_tests`' what verifies it. Required once `built`, by
-        # Keith's own explicit call (2026-09-20), for a reason the
-        # `evidence` field demonstrated the hard way: an optional field
-        # with no forcing function stays at zero use however well its
-        # schema is written. A CI gate that will not go green IS the
-        # forcing function.
-        # `decisions` - what was decided and what was rejected, in the
-        # requirement itself rather than in a plans write-up. Required
-        # once `built` (Keith, 2026-09-20, no exceptions) because this is
-        # the field that makes deleting plans prose safe rather than
-        # merely reversible: git preserves a deleted write-up, but
-        # finding one needs `git log -S"<phrase>"` with a phrase you must
-        # already suspect. Sits opposite `open_questions` - that holds
-        # the forks NOT resolved, this holds the ones that were.
-        if status == "built" and not (r.get("decisions") or []):
-            errors.append(f"{where}: status is 'built' but decisions is empty - "
-                           f"a built requirement needs to record what was decided "
-                           f"and what was rejected on the way")
-
-        # `evidence` - a MEASURED result showing the requirement holds.
-        # Required once `built` too (Keith, 2026-09-20, asked directly
-        # whether a requirement with no obvious measurement should get an
-        # opt-out and answering no exceptions). That was the right call:
-        # the awkward case was dark mode, and demanding a number produced
-        # a real one - all 21 colour tokens redefined under the dark
-        # theme, zero falling through to their light value - measured off
-        # the real page, which says more than the toggle-persists test it
-        # sits beside. See requirements.yaml's header for the authoring
-        # rule; the CONTENT is not machine-checkable (a digit check was
-        # offered and declined), only its presence.
-        if status == "built" and not (r.get("evidence") or []):
-            errors.append(f"{where}: status is 'built' but evidence is empty - "
-                           f"a built requirement needs a measured result showing it holds")
-
-        implemented_by = r.get("implemented_by") or []
-        shape_errors = _valid_string_list(implemented_by, "implemented_by", where)
-        errors.extend(shape_errors)
-        if status == "built" and not implemented_by:
-            errors.append(f"{where}: status is 'built' but implemented_by is empty - "
-                           f"a built requirement needs to say where it is implemented")
-        if not shape_errors:
-            for entry in implemented_by:
-                errors.extend(_implemented_by_errors(entry, where))
-
-        # dependencies gets the same "is it a real list of strings" check
-        # as the other 3, PLUS its own extra rule below (each entry must
-        # actually exist as a real REQ-id in this same file) - same
-        # "dangling reference is a real error" treatment linked_tests
-        # already gets, checked once every id is known (after this loop).
-        errors.extend(_valid_string_list(r.get("dependencies"), "dependencies", where))
-
-    for rid, count in seen_ids.items():
-        if count > 1:
-            errors.append(f"id {rid!r} is used {count} times - ids must be globally unique")
-
-    all_ids = set(seen_ids)
-    for i, r in enumerate(requirements):
-        where = r.get("id") or f"entry #{i + 1} (no id)"
-        for dep in r.get("dependencies") or []:
-            if isinstance(dep, str) and dep not in all_ids:
-                errors.append(f"{where}: dependencies entry {dep!r} does not match any real "
-                               f"requirement id in this file")
-
-    return errors
+    Restructured 2026-09-20 (REQ-DOCS-029). What used to be ~90 lines of
+    hand-written field checks is now a declaration in
+    `qa_tools/common/schemas.py`; what remains here is everything a
+    schema genuinely cannot do."""
+    errors, parsed = _schema_errors(requirements)
+    return errors + _cross_reference_errors(parsed)
 
 
 def main() -> int:
-    # Before anything else: a duplicate key here is content already
-    # LOST by the time the file is a dict, so no downstream check can
-    # see it. See qa_tools/common/yaml_strict.py for the real incident.
-    duplicate_errors = find_duplicate_keys(REQUIREMENTS_YAML)
     requirements = parse_requirements(REQUIREMENTS_YAML)
-    errors = duplicate_errors + validate(requirements)
+    errors = validate(requirements)
 
     if errors:
         print(f"requirements validation FAILED ({len(errors)} error(s)):", file=sys.stderr)

@@ -170,8 +170,12 @@ def test_source_defaulted_to_empty_string_by_the_real_parser_is_fine():
 
 
 def test_source_if_present_must_be_a_non_empty_string():
-    errors = validate([_valid_entry(source="   ")])
-    assert any("source" in e for e in errors)
+    # Behaviour CHANGED deliberately 2026-09-20 (REQ-DOCS-029). The
+    # schema strips whitespace, so "   " becomes "" - which is exactly
+    # the value an ABSENT source already has, and source is optional.
+    # Erroring on it was noise for no benefit: there is no difference in
+    # intent between "I left it blank" and "I left it out".
+    assert validate([_valid_entry(source="   ")]) == []
 
 
 def test_source_can_be_real_free_text():
@@ -204,12 +208,12 @@ def test_non_functional_requirements_absent_is_fine():
 
 def test_non_functional_requirements_must_be_a_list_not_a_bare_string():
     errors = validate([_valid_entry(non_functional_requirements="CI must never touch live data")])
-    assert any("non_functional_requirements must be a list" in e for e in errors)
+    assert any("non_functional_requirements" in e and "valid list" in e for e in errors), errors
 
 
 def test_non_functional_requirements_rejects_empty_entries():
     errors = validate([_valid_entry(non_functional_requirements=["", "  "])])
-    assert any("non_functional_requirements entries must be non-empty strings" in e for e in errors)
+    assert any("non_functional_requirements" in e and "non-empty strings" in e for e in errors), errors
 
 
 def test_non_functional_requirements_accepts_real_entries():
@@ -232,7 +236,7 @@ def test_dependencies_absent_is_fine():
 
 def test_dependencies_must_be_a_list():
     errors = validate([_valid_entry(dependencies="REQ-QAC-002")])
-    assert any("dependencies must be a list" in e for e in errors)
+    assert any("dependencies" in e and "valid list" in e for e in errors), errors
 
 
 def test_dependencies_referencing_a_real_id_in_the_same_file_is_fine():
@@ -362,3 +366,18 @@ def test_decisions_is_optional_until_a_requirement_is_built():
 def test_decisions_must_be_a_list_of_non_empty_strings():
     errors = validate([_valid_entry(decisions=["   "])])
     assert any("decisions" in e for e in errors), errors
+
+
+def test_a_module_level_constant_counts_as_a_symbol():
+    """Found by the gate itself, 2026-09-20: a module that is purely
+    constants - qa_tools/common/vocab.py - could not satisfy
+    implemented_by at all, because the AST check only looked for
+    functions and classes. A path alone was rejected (rightly), and no
+    symbol was acceptable (wrongly).
+
+    A constant is a symbol worth pinning for exactly the same reason a
+    function is: delete COMPONENT_CODES and the requirement claiming it
+    should break, rather than a bare path staying green over an empty
+    file."""
+    assert _python_symbol_exists("qa_tools/common/vocab.py", ["COMPONENT_CODES"]) is True
+    assert _python_symbol_exists("qa_tools/common/vocab.py", ["NOT_A_REAL_CONST"]) is False

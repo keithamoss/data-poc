@@ -18,3 +18,15 @@ repos:
     rev: v6.0.0
     hooks:
       - id: check-yaml
+  # check-yaml above only proves a file PARSES. It uses yaml.safe_load,
+  # which accepts a duplicate mapping key silently and keeps the last
+  # one - so a second `decisions:` block on one requirement discarded
+  # five real decisions on 2026-09-20 with nothing anywhere noticing.
+  # yamllint's key-duplicates rule is the purpose-built check for that;
+  # see .yamllint for why every other rule is off, and why a schema
+  # validator could not have caught it.
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.38.0
+    hooks:
+      - id: yamllint
+        args: [--strict]

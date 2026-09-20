@@ -12,12 +12,23 @@ import textwrap
 
 import pytest
 
-from dashboard.changelog_yaml import CATEGORIES, parse_changelog
+import yaml
+
+from dashboard.changelog_yaml import parse_changelog
 from qa_tools.common.validate_changelog import (
+    CATEGORIES,
     CHANGELOG_YAML,
     VALID_COMPONENTS,
     validate,
 )
+
+
+def _raw(path):
+    """validate() takes the RAW parsed YAML, not parse_changelog()'s
+    output - deliberately, since that parser fills in defaults for
+    missing fields and would hide exactly the absences being tested."""
+    with open(path) as f:
+        return yaml.safe_load(f) or {}
 
 
 def _write(tmp_path, body: str):
@@ -88,7 +99,7 @@ def test_a_missing_optional_field_defaults_rather_than_raising(tmp_path):
 # ---- validation ------------------------------------------------------
 
 def test_the_real_committed_changelog_is_valid():
-    assert validate(parse_changelog(CHANGELOG_YAML)) == []
+    assert validate(_raw(CHANGELOG_YAML)) == []
 
 
 def test_an_unknown_component_is_rejected(tmp_path):
@@ -99,10 +110,10 @@ def test_an_unknown_component_is_rejected(tmp_path):
     instead of "Dashboard UI" fails no other check in the repo, and
     simply renders as a tag matching no filter and grouping with
     nothing."""
-    feed = parse_changelog(_write(tmp_path, _ONE_DAY.replace(
+    feed = _raw(_write(tmp_path, _ONE_DAY.replace(
         '["QA checks & contract"]', '["Dashboard"]')))
     errors = validate(feed)
-    assert any("Dashboard" in e and "not one of" in e for e in errors), errors
+    assert any("got 'Dashboard'" in e for e in errors), errors
 
 
 def test_components_come_from_the_same_source_as_requirement_ids():
@@ -160,26 +171,26 @@ def test_a_missing_or_malformed_required_field_is_reported(tmp_path, body, expec
     good one - removing a line from YAML leaves broken indentation, so
     the first version of this test was failing on a parse error and
     proving nothing about validation."""
-    errors = validate(parse_changelog(_write(tmp_path, body)))
+    errors = validate(_raw(_write(tmp_path, body)))
     assert any(expected in e for e in errors), errors
 
 
 def test_an_unknown_category_is_rejected(tmp_path):
     """A closed vocabulary, because an open one drifts into six
     near-synonyms within a month."""
-    feed = parse_changelog(_write(tmp_path, _ONE_DAY.replace(
+    feed = _raw(_write(tmp_path, _ONE_DAY.replace(
         "category: Improved", "category: Tweaks")))
-    assert any("Tweaks" in e for e in validate(feed))
+    assert any("got 'Tweaks'" in e for e in validate(feed)), validate(feed)
     assert all(c in ("New", "Improved", "Fixed") for c in CATEGORIES)
 
 
 def test_the_same_day_appearing_twice_is_rejected(tmp_path):
     """Two blocks for one date means a reader sees the day twice and
     cannot tell which is authoritative."""
-    feed = parse_changelog(_write(tmp_path, _ONE_DAY + _ONE_DAY.split("releases:")[1]))
-    assert any("more than once" in e for e in validate(feed))
+    feed = _raw(_write(tmp_path, _ONE_DAY + _ONE_DAY.split("releases:")[1]))
+    assert any("appears 2 times" in e for e in validate(feed))
 
 
 def test_an_empty_feed_is_rejected(tmp_path):
-    assert any("no releases" in e for e in validate(parse_changelog(
-        _write(tmp_path, "releases: []\n"))))
+    errors = validate(_raw(_write(tmp_path, "releases: []\n")))
+    assert any("releases" in e and "at least 1 item" in e for e in errors), errors
