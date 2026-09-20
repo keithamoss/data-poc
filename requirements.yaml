@@ -710,11 +710,46 @@ requirements:
       as effectively red), so that "amber" doesn't sit ambiguous
       forever.
     moscow: should
-    status: not_started
+    status: built
     acceptance_criteria:
       - A human decision on an amber result is recorded somewhere real
         and reflected back in the dashboard's own status.
-    linked_tests: []
+    linked_tests:
+      - tests/test_acceptance_sync.py
+    implemented_by:
+      - qa_tools/common/acceptance_sync.py::match_decisions
+      - qa_tools/common/acceptance_sync.py::build_decisions
+      - qa_tools/common/ticket_sync.py::main
+      - dashboard/qa-reporting-dashboard.template.html::buildRealDataset
+    evidence:
+      - >
+        2026-09-20: 23 tests cover the decision matcher, including that a
+        /reject comment matches its run the same way /accept does, that
+        matching is case-insensitive, and that a comment before any real
+        run matches nothing.
+    decisions:
+      - >
+        The decision is a real comment on the dataset's own GitHub
+        ticket, not a button in the dashboard. The dashboard is a static
+        published page with no backend to receive a click, so a button
+        would have needed one built purely to record a decision.
+      - >
+        No run_id has to be typed or copied. Every run already has a real
+        arrival window from committed history, so a bare /accept or
+        /reject is matched to whichever run's window contains the
+        comment's own timestamp.
+      - >
+        A rejected run's status pill stays amber rather than turning red
+        - Keith's own call, 2026-09-19, as the smaller and safer option,
+        symmetric with accept rather than repainting the pill.
+      - >
+        An accepted run stays amber too, with an acknowledgment badge.
+        Repainting it green would have made a human decision look like a
+        data improvement.
+      - >
+        The decision is per-run, not standing: a new amber arrival needs
+        its own fresh comment, so nobody can accept a dataset once and
+        stop looking.
 
   - id: REQ-PIPE-018
     title: An AWS MVP reacting to real S3 delivery events
@@ -753,10 +788,33 @@ requirements:
       view that's actually readable, so that I don't have to share an
       opaque URL-encoded JSON blob.
     moscow: could
-    status: not_started
+    status: built
     acceptance_criteria:
       - A dataset-level URL reads as a real path, not encoded JSON.
-    linked_tests: []
+    linked_tests:
+      - tests-js/navigation.test.js
+      - tests-js/plans-filter-url.test.js
+      - tests/test_dashboard_e2e.py::TestAsOfDatePicking
+    implemented_by:
+      - dashboard/qa-reporting-dashboard.template.html::stateToPath
+      - dashboard/qa-reporting-dashboard.template.html::hashToState
+      - dashboard/qa-reporting-dashboard.template.html::navigate
+    evidence:
+      - >
+        2026-09-20: driven in a real browser - a dataset-level URL reads
+        /agency/registry-services/collection/civil-registration/dataset/
+        birth-registrations, with zero percent-encoded JSON characters in
+        it, against the encodeURIComponent(JSON.stringify(state)) blob it
+        replaced.
+    decisions:
+      - >
+        Replaced an opaque hash carrying encoded JSON with a real,
+        readable path. The old form could not be read, shortened, guessed
+        or discussed out loud, which is most of what a URL is for.
+      - >
+        Filter state persists in the query string rather than the path,
+        so a filtered Plans view can be shared while the path still says
+        which page it is.
 
   - id: REQ-DASH-021
     title: Expose this project's own planning memory in the dashboard
@@ -766,11 +824,40 @@ requirements:
       dashboard, so that I don't have to leave it to see what's done,
       parked, or still open.
     moscow: could
-    status: not_started
+    status: built
     acceptance_criteria:
       - Each planning file's own items are browsable with a real status
         indicator, not just raw markdown text.
-    linked_tests: []
+    linked_tests:
+      - tests/test_plans_md.py
+      - tests/test_plans_index.py
+      - tests-js/plans.test.js
+      - tests-js/plans-filter-url.test.js
+    implemented_by:
+      - dashboard/plans_md.py::parse_plans
+      - dashboard/plans_index.py::build_index
+      - dashboard/qa-reporting-dashboard.template.html::renderPlans
+      - dashboard/embed_dashboard_data.py::embed
+    evidence:
+      - >
+        2026-09-20: measured on the real built page - 172 numbered items
+        and 6 threads parsed from the committed plans directory, carrying
+        5 distinct statuses (done, investigate, parked, superseded,
+        todo), rendered with zero console errors.
+    decisions:
+      - >
+        Built as a real top-level tab with its own URL rather than
+        another header side-panel, so a plans view can be linked to.
+      - >
+        The parser walks every markdown file in the directory rather than
+        an allowlist of filenames. The allowlist had already hidden 13
+        real items, including HIGH-priority work, and an allowlist fails
+        silently by construction.
+      - >
+        Nothing is rewritten or paraphrased for display - a summary that
+        says something the item does not is worse than no summary, since
+        the whole point is deciding whether to go and read the real
+        thing.
 
   - id: REQ-DASH-022
     title: Dashboard gamification for QA turnaround
@@ -779,10 +866,41 @@ requirements:
       consistently produce clean data celebrated somehow on the
       dashboard, so that good QA practice is visibly recognized.
     moscow: could
-    status: not_started
+    status: built
     acceptance_criteria:
-      - Not yet scoped - shape (leaderboard, badges, streaks) undecided.
-    linked_tests: []
+      - THE SYSTEM SHALL show, per person, a streak of consecutive QA
+        ticket resolutions that were never reopened.
+      - WHEN a resolved ticket is later reopened, THE SYSTEM SHALL treat
+        that resolution as not clean and SHALL NOT count it toward the
+        streak.
+      - THE SYSTEM SHALL list everyone with recorded resolutions, not
+        only the highest-scoring few.
+    linked_tests:
+      - tests/test_leaderboard.py
+    implemented_by:
+      - qa_tools/common/leaderboard.py::build_leaderboard
+      - qa_tools/common/leaderboard.py::compute_resolution_streaks
+      - qa_tools/common/leaderboard.py::build_resolution_episodes
+      - dashboard/qa-reporting-dashboard.template.html::renderLeaderboardPanel
+    evidence:
+      - >
+        2026-09-20: 18 tests cover the streak logic, including that a
+        closed ticket later reopened is a dirty episode and breaks the
+        streak rather than counting toward it.
+    decisions:
+      - >
+        The metric counts clean TICKET RESOLUTIONS, not clean QA runs.
+        The original design credited whoever ran QA, which stops meaning
+        anything the moment running is automated - there is no human left
+        to credit. Closing a ticket is the one action in this system
+        guaranteed to need a person.
+      - >
+        A reopened ticket breaks the streak. Counting a close that did
+        not hold would reward closing tickets rather than fixing data.
+      - >
+        Everyone with resolutions appears, not only the top few - a
+        leaderboard that shows only winners tells most people nothing
+        about their own work.
 
   - id: REQ-QAC-023
     title: Check metadata comes from data, never from prose
