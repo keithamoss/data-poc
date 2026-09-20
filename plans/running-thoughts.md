@@ -1508,6 +1508,19 @@ So a new check is not only a forward-looking thing. Adding one should be
 able to answer "how long has this been wrong", which needs the check
 evaluated against supplies that arrived before it existed.
 
+**It is a TUI operation, not a one-off script** (Keith, 2026-09-21,
+adding to the above). Exposed through `mothman` like everything else,
+and runnable at **either dataset or collection level** - so "backfill
+this new check across every supply of cp-placements" and "backfill it
+across the whole Child Protection collection" are both real choices a
+person makes at the point of running it.
+
+Collection level is not just a convenience wrapper over six dataset
+runs, and that is worth noticing early: a collection-scoped backfill is
+the only shape that can re-evaluate a CROSS-TABLE check across history,
+because those checks do not belong to any one dataset (`REQ-QAC-037`).
+A dataset-scoped backfill can only reach that dataset's own checks.
+
 **Tension to resolve before this is built**, flagged rather than
 resolved: `REQ-PIPE-035` records his own answer that a check is
 evaluated once against the composition current at the time and never
