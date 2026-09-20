@@ -204,6 +204,25 @@ registrations"* - that assumes a cadence this data asset does not
 guarantee. Compare against **"the previous supply"** instead, which is
 true regardless of how often data arrives or what triggered the check.
 
+### Drop measured results; keep the rule they justify
+
+A description states the rule. It does not carry the measurement that
+was used to set the rule. *"tolerated null up to ~5%"* stays;
+*"(real observed range: 0.9-3.3%)"* goes.
+
+Keith's call, 2026-09-20, taken against three real alternatives that
+would each have kept the number somewhere - `evidence:` on the
+requirement that owns the check battery, `technical_note`, and a new
+requirement invented to hold it. The reasoning that beat all three:
+observed ranges are recomputable from committed
+`dataset_stats.json` whenever anyone actually wants them, so writing
+them into prose buys nothing that cannot be got back, while costing a
+sentence that goes stale silently the moment the data moves.
+
+The same applies to a note saying how a check behaves on this project's
+own synthetic runs - *"Passes 0/0 on every clean run"* - which is both
+a measured result and generator prose, and fails this rule twice over.
+
 ### Shared wording is permission, not obligation
 
 Where two tools genuinely check the same thing, their wording may be

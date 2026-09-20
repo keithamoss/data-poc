@@ -1412,18 +1412,36 @@ requirements:
         REQ-QAC-023 fixed - name and column used to be recovered from
         the description prose - and it is the dependency that made this
         requirement safe to attempt at all.
-    open_questions:
       - >
-        Where does measured VERIFICATION prose go when a description is
-        rewritten? Several existing descriptions carry real measured
-        results - "confirmed for real: 0 on clean runs, 1-3 on amber
-        runs, 6 on the red run" - which is neither a plain-English
-        what, nor a failure meaning, nor (per Keith, 2026-09-20) a
-        technical_note, since it is about synthetic runs. Left
-        unresolved deliberately: it reads like `evidence:` material on
-        a requirement, but there is no requirement it belongs to, and
-        the authoring pass will otherwise delete it. Decide before
-        rewriting the checks that carry it, not after.
+        RESOLVED (Keith, 2026-09-20), the open question that blocked
+        this pass: measured verification prose in a description is
+        DROPPED, not rehomed. Rejected three alternatives, each of
+        which would have kept it: `evidence:` on REQ-QAC-001 (the right
+        shape - that field was narrowed to measured analysis the same
+        day - but it puts the justification a level above the check it
+        justifies, where nobody reading the check will find it);
+        `technical_note` (would have meant reopening the
+        no-synthetic-data ruling); and a new requirement invented
+        mainly to give the measurements an owner. What survives is the
+        tolerance itself - "tolerated null up to ~5%" is the rule and
+        stays in the description - and the observed ranges are
+        recomputable from committed `dataset_stats.json` whenever
+        anyone wants them, so nothing is actually lost, only un-written.
+      - >
+        The prose the open question was about is really TWO kinds, and
+        only one of them was ever open. Counted against the real
+        checks: 7 carry it, 7 distinct texts. Four are measured
+        tolerance evidence ("real observed range: 0.9-3.3%", two
+        distinct measurements shared across Soda/datacontract sibling
+        pairs) - those are what the decision above settles. The other
+        three are generator-construction notes on CP contract checks
+        ("Passes 0/0 on every clean run - child_protection.py only ever
+        assigns an Approved carer"), which need no new decision at all:
+        they are the synthetic-generator prose already ruled out of
+        technical_note, welded onto a real description that was never
+        stated separately. They are the splitting case, not the
+        rehoming one.
+    open_questions:
       - >
         Should a check's real-world CONSEQUENCE weight show anywhere?
         Raised against the carer-approval check - a child placed with
