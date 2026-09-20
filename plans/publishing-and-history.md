@@ -3128,8 +3128,84 @@ one Thread's narrative.
    `delivery-architect` AFTER scoping - `delivery-scoper` needs to know
    what is in scope, not how it is built.
 
-   **Still to do**: turn the decided model plus these three answers into
-   real requirements for sign-off. Nothing here is built.
+   **CORRECTION to finding 2 above, verified 2026-09-20 night.** It says
+   "Birth Registrations has no collection in code at all". Not quite:
+   there is no `bdm_common.py`, and all four `qa_tools/bdm/run_*_bdm.py`
+   modules DO each declare `COLLECTION_ID = "civil-registration"` -
+   copy-pasted four times - while `orchestrate_bdm.py` and
+   `build_results_from_history.py` declare only `AGENCY_ID` +
+   `DATASET_ID`. So BDM names its collection and then never passes it to
+   `write_qa_result()`, which is why it vanishes at the storage layer.
+   Raised by `delivery-scoper` and confirmed by reading the four files.
+   The inconsistency is real; it is a duplication problem as much as an
+   omission, which makes it a better fit for the "stated once" treatment
+   than the original wording suggested.
+
+   **SCOPED 2026-09-20 night by `delivery-scoper`, awaiting Keith's
+   sign-off. Nothing applied to `requirements.yaml` yet, deliberately -
+   several criteria are provisional on the questions below.** Eight
+   small requirements proposed, ids to be re-checked at apply time
+   (highest live id was `REQ-DASH-033`):
+
+   - per-dataset arrival lineage
+   - the composed warehouse
+   - per-dataset QA runs
+   - cross-table checks get their own scope and lineage
+   - `qa_results/` keyed per dataset, plus the approved one-off rebuild
+   - one hierarchy stated once, including in a check's own identity
+   - the generator delivering one table at a time
+   - supply history and the as-of picker under per-dataset arrivals
+     (the stated limit of this item's own verification)
+
+   **Eight questions for Keith, recorded here so they survive the
+   session that produced them:**
+
+   Set 1 - the model's own forks.
+   1. **Check_ids and a collection segment.** Rename all 258 ids to carry
+      `collection` (and absorb `plans/running-thoughts.md` #22's
+      `table`/data-asset changes at the same time, one rename instead of
+      two), rename for `collection` only, or do not touch check_ids and
+      resolve a check's collection through the single hierarchy
+      definition instead. The first two need an explicit exception to the
+      permanence rule below.
+   2. **Does "these six arrived together" stay a recorded fact?**
+      Per-dataset arrival ids only, or per-dataset ids plus a delivery id.
+   3. **How is a historical arrival re-evaluated** once the warehouse is
+      composed rather than snapshotted? Point-in-time composition,
+      current composition only, or split by check type.
+   4. **When does a cross-table check re-run?** On any arrival it depends
+      on, on any arrival in the collection, or on its own cadence.
+
+   Set 2 - the non-functional ones it could not settle from the files.
+   5. **Timestamps on rebuilt history.** Preserve the originals, stamp
+      the rebuild, or carry both.
+   6. **A check whose other side has never arrived.** Report not
+      evaluable, fail loudly and stop, or defer silently until both
+      sides exist.
+   7. **Are superseded table versions kept?** Every version, current
+      only, or a bounded window. This one decides whether question 3's
+      point-in-time option is even available.
+   8. **How far may the composed warehouse span?** Per collection, per
+      agency, or the whole data asset. Real privacy question in a real
+      deployment, since composition puts several agencies' tables in one
+      place.
+
+   **The collision question 1 turns on is real, confirmed by reading
+   it**: this file's own line 991 states a check_id "once introduced, is
+   PERMANENTLY unique - it must never be changed or deleted". 1,850
+   committed history files, 129MB, carry today's ids. Any rename needs
+   its own recorded exception on the same terms as the `qa_results`
+   rebuild, not one inherited from it by implication.
+
+   **One scoper claim NOT confirmed**, flagged so it is not carried
+   forward: it suggested `validate_tail_uniqueness()`'s own docstring
+   calls its collision "structurally impossible". No such wording exists
+   in `qa_tools/common/check_id.py`. Whether that gate still guards
+   something real under the new model is still worth settling while the
+   grammar is open - but not on that basis.
+
+   **Still to do**: get Keith's answers to the eight above, then apply
+   the requirements for sign-off. Nothing here is built.
 
    **Three real questions this opens, flagged not resolved:**
    1. **What does "good" mean in "current good version"?** If
