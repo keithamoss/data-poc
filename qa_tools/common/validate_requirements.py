@@ -272,6 +272,21 @@ def validate(requirements: list[dict]) -> list[str]:
         # with no forcing function stays at zero use however well its
         # schema is written. A CI gate that will not go green IS the
         # forcing function.
+        # `evidence` - a MEASURED result showing the requirement holds.
+        # Required once `built` too (Keith, 2026-09-20, asked directly
+        # whether a requirement with no obvious measurement should get an
+        # opt-out and answering no exceptions). That was the right call:
+        # the awkward case was dark mode, and demanding a number produced
+        # a real one - all 21 colour tokens redefined under the dark
+        # theme, zero falling through to their light value - measured off
+        # the real page, which says more than the toggle-persists test it
+        # sits beside. See requirements.yaml's header for the authoring
+        # rule; the CONTENT is not machine-checkable (a digit check was
+        # offered and declined), only its presence.
+        if status == "built" and not (r.get("evidence") or []):
+            errors.append(f"{where}: status is 'built' but evidence is empty - "
+                           f"a built requirement needs a measured result showing it holds")
+
         implemented_by = r.get("implemented_by") or []
         shape_errors = _valid_string_list(implemented_by, "implemented_by", where)
         errors.extend(shape_errors)

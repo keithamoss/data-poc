@@ -20,9 +20,10 @@ def _valid_entry(**overrides):
         "status": "built",
         "acceptance_criteria": ["It does the thing."],
         "linked_tests": ["tests/test_resupply.py::test_add_business_days_skips_weekends"],
-        # Required once `status` is "built" (2026-09-20) - so the base
-        # fixture, which IS built, has to carry one to stay valid.
+        # Both required once `status` is "built" (2026-09-20) - so the
+        # base fixture, which IS built, has to carry them to stay valid.
         "implemented_by": ["qa_tools/common/validate_requirements.py::validate"],
+        "evidence": ["2026-09-20: 27 requirements validate with zero errors."],
     }
     entry.update(overrides)
     return entry
@@ -308,3 +309,26 @@ def test_a_symbol_on_a_file_neither_python_nor_front_end_is_rejected():
 def test_an_implemented_by_path_that_does_not_exist_is_an_error():
     errors = validate([_valid_entry(implemented_by=["qa_tools/common/nope.py::thing"])])
     assert any("nope.py" in e for e in errors), errors
+
+
+def test_a_built_requirement_must_carry_a_measured_result():
+    """Keith's call, 2026-09-20: mandate it, no exceptions.
+
+    The field went unused on all 27 requirements for the day and a half
+    it was optional, and nothing noticed. The same forcing function
+    `implemented_by` gets - CI refusing to go green - is what keeps it
+    from drifting back.
+
+    Asked whether a requirement with no obvious measurement (dark mode)
+    should be allowed an explicit opt-out, he said no exceptions. That
+    turned out to be the right call: demanding a real number produced
+    one - all 21 colour tokens redefined under the dark theme, zero
+    falling through to their light value - and produced it by measuring
+    the real page rather than asserting a toggle flips."""
+    errors = validate([_valid_entry(evidence=[])])
+    assert any("evidence" in e for e in errors), errors
+
+
+def test_evidence_is_optional_until_a_requirement_is_built():
+    assert validate([_valid_entry(status="not_started", linked_tests=[],
+                                   implemented_by=[], evidence=[])]) == []

@@ -1122,3 +1122,40 @@ common/check_lifecycle.py`'s own `check_id` convention.
     against the real committed `CHANGELOG.md` too, not just fixtures:
     all 92 entries now parse with components (was 89), zero stray-
     asterisk texts (was 7).
+
+18. **[todo, 2026-09-20]** **[Dashboard UI]** `--ink-faint` fails WCAG AA
+    contrast in both themes - 3.03:1 in light, 4.16:1 in dark, against
+    a 4.5:1 threshold for normal text. Used in 47 places.
+
+    Found incidentally, and the way it was found is the point. Keith's
+    call to mandate `requirements.yaml`'s `evidence` field on every
+    built requirement with **no exceptions** (`plans/tooling.md` #20)
+    forced a real measurement for `REQ-DASH-012` (dark mode), which had
+    looked like the one case where no measurement applied. Demanding one
+    turned up this instead. The toggle-persists Playwright test that
+    verifies that requirement today could never have caught it - it
+    asserts a flag survives a reload, not that anything is legible.
+
+    Measured directly off the real built page (`getComputedStyle` in a
+    real browser, both themes, WCAG relative-luminance formula):
+
+    | token | theme | value | on `--paper` | contrast |
+    |---|---|---|---|---|
+    | `--ink-faint` | light | `#8A8D80` | `#F5F2EA` | **3.03:1** |
+    | `--ink-faint` | dark | `#767A6C` | `#12160F` | **4.16:1** |
+
+    For context, the neighbouring tokens are comfortable: `--ink` is
+    14.95:1 on `--paper` in dark mode, `--ink-muted` 7.66:1. Only the
+    faintest tier falls short, which fits how it got there - it is the
+    de-emphasis colour, and de-emphasis was presumably pushed until it
+    looked right rather than until it measured right.
+
+    **Not fixed here, deliberately.** Changing a design token is a
+    visual decision across 47 usages, not a mechanical one, and
+    `REQ-DASH-012`'s own acceptance criterion is narrowly "the choice
+    persists across a reload" - contrast is genuinely out of that
+    requirement's scope, so this is a new finding rather than a
+    regression against something already promised. Worth scoping with
+    Keith: whether to darken the token, restrict where the faintest tier
+    may be used, or accept it for non-essential text with a stated
+    rationale. 3.03:1 in light mode is the more serious of the two.

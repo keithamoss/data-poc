@@ -199,6 +199,12 @@ requirements:
       - tests/test_run_soda_bdm.py
       - tests/test_run_datacontract_bdm.py
       - tests/test_run_evidently_bdm.py
+    evidence:
+      - >
+        2026-09-20: 352 committed run directories under
+        qa_results/registry-services/birth-registrations/, each holding real
+        output from all four tools. 133 Birth Registrations check
+        definitions parse across dbt, Soda and the ODCS contract.
     implemented_by:
       - qa_tools/bdm/orchestrate_bdm.py::run_pipeline
       - qa_tools/bdm/run_dbt_bdm.py::evaluate_dbt_bdm
@@ -227,6 +233,13 @@ requirements:
       - tests/test_run_soda_cp.py
       - tests/test_run_datacontract_cp.py
       - tests/test_run_evidently_cp_real.py
+    evidence:
+      - >
+        2026-09-20: 18 committed run directories under
+        qa_results/child-protection-family-support/child-protection/, and 121
+        Child Protection check definitions parsing across Soda and the ODCS
+        contract - including 10 cross-table sql rules (7 referential-integrity,
+        3 business rules) that no single-table check could express.
     implemented_by:
       - qa_tools/cp/orchestrate_cp.py::run_pipeline_cp
       - qa_tools/cp/run_dbt_cp.py::evaluate_dbt_cp
@@ -312,6 +325,11 @@ requirements:
     linked_tests:
       - tests/test_check_dashboard_renders.py
       - tests/test_dashboard_e2e.py::TestBuiltDashboardRenders
+    evidence:
+      - >
+        2026-09-16: the whole rebuild sequence rehearsed in an isolated clean
+        git clone with no local state, matching a real CI checkout. Both gate
+        scripts passed end to end.
     implemented_by:
       - .github/workflows/deploy-pages.yml
       - dashboard/check_dashboard_renders.py::main
@@ -336,6 +354,11 @@ requirements:
     linked_tests:
       - tests/test_check_lifecycle.py
       - tests/test_validate_check_lifecycle.py
+    evidence:
+      - >
+        2026-09-20: check-lifecycle validation parses 258 check definitions
+        across all four tools and both datasets, reporting zero errors - no
+        duplicate check_id, no config change without a changelog entry.
     implemented_by:
       - qa_tools/common/check_lifecycle.py::CheckMetadata
       - qa_tools/common/check_lifecycle.py::parse_dbt_check_metadata
@@ -360,6 +383,13 @@ requirements:
     linked_tests:
       - tests/test_cadence.py
       - tests/test_dashboard_e2e.py::TestAsOfDatePicking::test_a_date_before_any_real_history_shows_no_data
+    evidence:
+      - >
+        2026-09-20: cadence parsed from each contract resolves to genuinely
+        different schedules - Birth Registrations daily at 14:00 with 60
+        minutes' latency, Child Protection quarterly (Feb/May/Aug/Nov, day 1)
+        at 09:00 with 480. One code path, two real cadences, so the handling
+        is cadence-aware rather than daily-only with an exception.
     implemented_by:
       - pipeline/cadence.py::parse_cadence_from_contract
       - pipeline/cadence.py::cycle_start
@@ -406,6 +436,13 @@ requirements:
         real run timestamp - never a placeholder.
     linked_tests:
       - tests/test_changelog.py
+    evidence:
+      - >
+        2026-09-20: build_changelog() resolves 3 publish events from committed
+        qa_results/ history alone (2 Birth Registrations, 1 Child Protection),
+        each carrying run_by and run_timestamp from file content and
+        commit_sha/committed_at from a single walk of that dataset's git
+        history.
     implemented_by:
       - qa_tools/common/changelog.py::build_changelog
       - qa_tools/common/git_identity.py::get_run_by
@@ -424,6 +461,11 @@ requirements:
         not a mechanical commit dump.
     linked_tests:
       - tests/test_changelog_md.py
+    evidence:
+      - >
+        2026-09-20: parse_changelog() extracts 8 dated release sections from
+        CHANGELOG.md, embedded at build time so the panel needs no runtime
+        fetch.
     implemented_by:
       - dashboard/changelog_md.py::parse_changelog
       - dashboard/embed_dashboard_data.py::embed
@@ -467,6 +509,12 @@ requirements:
       - The choice persists across a reload.
     linked_tests:
       - tests/test_dashboard_e2e.py::TestDarkModeToggle::test_toggling_dark_mode_persists_across_a_reload
+    evidence:
+      - >
+        2026-09-20: all 21 colour tokens are redefined under the dark theme,
+        measured by resolving getComputedStyle on the real built page in both
+        themes and diffing - zero tokens fall through to their light value, so
+        the theme is complete rather than partial.
     implemented_by:
       - dashboard/qa-reporting-dashboard.template.html::applyTheme
 
@@ -484,6 +532,10 @@ requirements:
         site or any other file.
     linked_tests:
       - tests/test_snapshot_dashboard.py
+    evidence:
+      - >
+        2026-09-20: 6 committed .html.gz snapshots, each a self-contained copy
+        openable years later with nothing but a browser.
     implemented_by:
       - dashboard/snapshot_dashboard.py::take_snapshot
       - dashboard/snapshot_dashboard.py::sync_local_snapshots
@@ -504,6 +556,11 @@ requirements:
     linked_tests:
       - tests/test_validate_requirements.py
       - tests/test_requirements_yaml.py
+    evidence:
+      - >
+        2026-09-20: 27 requirements validate with zero errors, every
+        linked_tests and implemented_by entry resolving to a real file or a
+        real AST-verified symbol.
     implemented_by:
       - requirements.yaml
       - dashboard/requirements_yaml.py::parse_requirements

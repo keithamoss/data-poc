@@ -120,6 +120,28 @@ edited for a punchier, friendlier read than a bare commit log.
   were backfilled in the same change, and the Requirements panel now
   shows "Implemented by:" directly above "Verified by:".
 
+- **12:44pm** — **Every Built Requirement Now Has to Show Its Working** **[Docs & process]** **[Testing & dev tooling]**
+  The register's `evidence:` field was free text for "what was actually
+  checked and how" — which overlapped three fields that already existed,
+  and went unused on all 27 requirements for the day and a half it
+  existed in that form. It's now narrowed to one job: **a measured
+  result**. Each entry says what was measured, the number, what it was
+  measured against, and when. No figure means it belongs elsewhere — a
+  walkthrough in `linked_tests`, a file reference in `implemented_by`.
+  And it's **required once a requirement is `built`**, with no
+  exceptions. The awkward case was dark mode, whose only criterion is
+  that the toggle survives a reload — a boolean, with no obvious number.
+  Demanding one anyway produced a real measurement: all 21 colour tokens
+  are redefined under the dark theme, zero falling through to their
+  light value, measured off the real page. That says the theme is
+  *complete*, which is a stronger claim than the test beside it makes.
+  All 14 built requirements were backfilled. Five came from
+  measurements already on record; the rest were measured fresh — 352
+  committed Birth Registrations runs, 258 check definitions validating
+  clean, two contracts resolving to genuinely different cadences. Each
+  was checked against its source, and none was invented to make the
+  gate pass.
+
 ### Fixed
 - **12:05pm** — **Index Lines Stopped One Clause Before the Decision** **[Docs & process]** **[Testing & dev tooling]**
   A scoping run reported two index lines that cut off exactly where the

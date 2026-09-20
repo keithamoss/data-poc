@@ -2243,17 +2243,46 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
     "what was actually checked and how" wording invited, each of which
     overlapped a field that already existed.
 
-    **Deliberately NOT CI-enforced** beyond the existing "list of
-    non-empty strings" (Keith's explicit call). A digit check was
-    offered as a crude forcing function and declined. Worth naming the
-    risk that leaves rather than pretending it away: this is now the
-    only field in the register with no verification of its own, which
-    is precisely the shape that left it at zero use before. The
-    mitigation is that the rule is narrow enough to be obviously broken
-    at a glance, where "what was checked and how" was not.
+    **Required once `built`, no exceptions** - Keith, 2026-09-20, asked
+    directly. The content stays un-enforced (a digit check was offered
+    and declined); only its presence is gated, exactly as
+    `implemented_by` is, and for the same reason: the field went unused
+    on all 27 requirements for the day and a half it was optional and
+    nothing noticed.
 
-    **Backfilled the same day, from real measurements already recorded
-    elsewhere** - 0 uses to 5, across 4 requirements, rather than
+    He was asked whether a requirement with no obvious measurement
+    should get an explicit opt-out, since the awkward case looked
+    genuinely unanswerable: `REQ-DASH-012` is "Dark mode", whose only
+    acceptance criterion is that the choice survives a reload - a
+    boolean, verified by demonstration, which the narrowed rule says
+    belongs in `linked_tests`. He said no exceptions, **and that was the
+    right call.** Demanding a real number produced one: all 21 colour
+    tokens are redefined under the dark theme, zero falling through to
+    their light value, measured by resolving `getComputedStyle` on the
+    real built page in both themes and diffing. That says the theme is
+    COMPLETE rather than partial - a stronger claim than the
+    toggle-persists test sitting beside it, and one nothing in the
+    register previously made.
+
+    **It also turned up a real defect**, which is the better argument
+    for the mandate than anything reasoned in advance. Reaching for a
+    dark-mode measurement first led to contrast ratios, and `--ink-faint`
+    fails WCAG AA in both themes - 3.03:1 in light, 4.16:1 in dark,
+    against 4.5:1, across 47 usages. Out of `REQ-DASH-012`'s own scope,
+    so logged separately as `plans/dashboard.md` #18, but it had sat
+    unnoticed and the existing test could never have found it. **A
+    requirement forced to produce a number produces one, and sometimes
+    the number is bad.** That is the whole value.
+
+    **Backfilled the same day** - 0 uses to **all 14 built
+    requirements**, since the mandate cannot land incrementally. Five
+    came from measurements already recorded elsewhere; the rest were
+    measured fresh and dated today (committed run counts, parsed check
+    counts, the two contracts' genuinely different cadences, resolved
+    changelog events, snapshot count, dark-theme token coverage). Each
+    was checked against its source before being written, not recalled;
+    none was invented to make the gate go green. The first five, for
+    the record, rather than
     re-specifying an empty field and calling it done. Each was checked
     against its source before being written, not recalled:
     REQ-TEST-011 (94.76% against the 92% floor), REQ-DASH-003 (30,561
