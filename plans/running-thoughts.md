@@ -18,7 +18,7 @@ request.
 Keith's own framing throughout: work through these once the current
 loop (Phase 7 / whatever's active) is done, not immediately.
 
-### 1. Ticketing system: GitHub Issues, MVP after this loop
+1. **[done, 2026-09-18]** **[GitHub workflow & people]** Ticketing system: GitHub Issues, MVP after this loop.
 
 **Decided** (a real decision, not just an idea - previously an open
 question about Jira vs. something else): use GitHub Issues as the
@@ -79,7 +79,7 @@ WITHOUT its automatic push trigger yet (`workflow_dispatch` only) -
 Keith's own call needed on fixing item 74 first vs. accepting the
 noise before flipping it on for real.
 
-### 2. Data-asset-level people/roles config
+2. **[done, 2026-09-18]** **[GitHub workflow & people]** Data-asset-level people/roles config.
 
 A new config file (alongside `contract/data-asset.yaml`'s existing
 data-asset-level, not per-dataset, scope) listing the people who work on
@@ -132,7 +132,7 @@ this item's own roles (today just labels driving ticket assignment/the
 does). Captured here so it survives compaction - ask him for this
 directly next time it's relevant, don't let it quietly drop.
 
-### 3. Gamification MVP on the reporting dashboard
+3. **[done, 2026-09-18]** **[Dashboard UI]** Gamification MVP on the reporting dashboard.
 
 A small MVP that celebrates staff turning QA around fast, or
 consistently getting green datasets - "some kind of gamified thing."
@@ -260,7 +260,7 @@ shape without needing a real `gh`/network call. Nothing broken ever
 reached Pages - the gate caught it before the deploy step ran. Fixed in
 `6fa8039`, confirmed green on the next real CI run.
 
-### 4. GitHub Issues -> Microsoft Teams integration (research first)
+4. **[investigate, 2026-09-18]** **[GitHub workflow & people]** GitHub Issues -> Microsoft Teams integration (research first).
 
 Idea: live notifications into a Microsoft Teams chat as datasets arrive
 and get QA'd - possibly with a small piece of the gamification idea
@@ -339,7 +339,7 @@ environment with unrestricted web access" option above might now
 actually be available, rather than still needing a real Teams
 installation to settle the actor-field question.
 
-### 5. Staff adoption - two threads
+5. **[done, 2026-09-19]** **[Pipeline & publishing]** Staff adoption - two threads.
 
 Motivation: Keith wants staff to actually start using this tool/
 pipeline for real, not just as a PoC demo. Two genuinely separate
@@ -559,7 +559,7 @@ re-run for regressions, all green), `uv run ruff check .` clean. Full
 suite + coverage check still to run before this is considered fully
 verified for the morning.
 
-### 6. Read-only tension: accepting/rejecting Amber supplies
+6. **[done, 2026-09-18]** **[GitHub workflow & people]** Read-only tension: accepting/rejecting Amber supplies.
 
 A genuine, not-yet-resolved tension Keith flagged himself, directly
 building on the amber-governance question already parked in
@@ -657,7 +657,7 @@ tests, 3 new e2e tests, verified with a real Playwright screenshot of
 both badge kinds rendering correctly side by side against real
 committed amber runs.
 
-### 7. Business requirements page on the dashboard
+7. **[done, 2026-09-18]** **[Dashboard UI]** Business requirements page on the dashboard.
 
 A new dashboard page/view showing live-maintained user stories,
 requirements, and acceptance criteria for what's actually being built -
@@ -684,7 +684,7 @@ behind it now fails CI. See item 75's own writeup for the full build
 (schema, validator, panel UI, tests) - this entry stays as the
 original ask for context, not duplicated there.
 
-### 8. Deep links from the dashboard back into GitHub
+8. **[done, 2026-09-18]** **[Dashboard UI]** Deep links from the dashboard back into GitHub.
 
 Two related, smaller asks:
 
@@ -763,7 +763,7 @@ batch above, but landed in the same conversation)
   standing convention (the "check real CI" bullet) rather than logged
   here - a process fix, not a project idea.
 
-### 9. Human-friendlier URLs
+9. **[done, 2026-09-18]** **[Dashboard UI]** Human-friendlier URLs.
 
 **Built, 2026-09-18 evening.** Keith's own words: "improve the human
 friendliness of the URLs, so we don't have to rely on hash URLs so
@@ -810,7 +810,7 @@ a real theme-never-forced-by-URL assertion) - npm test (71 passed),
 `uv run ruff check .` all clean, plus a manual real-browser walkthrough
 confirming zero console errors end to end.
 
-### 10. Expose the planning markdown files in the dashboard (MVP)
+10. **[done, 2026-09-18]** **[Dashboard UI]** Expose the planning markdown files in the dashboard (MVP).
 
 Keith's own words: he'd like the `plans/*.md` files themselves
 browsable inside the dashboard, not just on GitHub/locally. His own
@@ -1008,7 +1008,7 @@ retrofit was actually done SEPARATELY the same night (see `plans/
 dashboard.md` #6) once Keith's own release-notes redesign ask
 converged with this taxonomy.
 
-### 11. Switch pytest-cov from line/statement coverage to branch coverage
+11. **[parked, 2026-09-18]** **[Testing & dev tooling]** Switch pytest-cov from line/statement coverage to branch coverage.
 
 Keith's own follow-up question after the requirements-register work
 (2026-09-18): confirmed the current `pytest-cov` setup (`pyproject.toml`
@@ -1025,7 +1025,7 @@ question, along with anything else testing-related that comes up in the
 meantime, for a dedicated planning loop on the weekend rather than
 picking pieces of it off one at a time mid-session.
 
-### 12. Local pytest/Playwright runtime - real profiling done, more possible
+12. **[done, 2026-09-18]** **[Testing & dev tooling]** Local pytest/Playwright runtime - real profiling done, more possible.
 
 Keith's own follow-up question (2026-09-18): "it's taking a while to
 run pytest and Playwright locally, is there anything we can do to speed
