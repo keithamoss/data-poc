@@ -403,11 +403,15 @@ a measured result and generator prose, and fails this rule twice over.
 Where two tools genuinely check the same thing, their wording may be
 identical - there is no requirement to manufacture a difference. But
 per-engine wording exists precisely because the checks sometimes differ,
-and identical text can paper over a real difference. The worked case:
-dbt's `accepted_values` is pass/fail, Soda's `invalid_percent` tolerates
-up to 2%, and a third variant scopes to the most recent supplies only.
-Same rule, three genuinely different questions, and one shared sentence
-would be wrong for two of them.
+and identical text can paper over a real difference.
+
+The worked case, and it is worth reading closely because the first
+version of it was wrong: the real split across the `sex` family is zero
+tolerance (datacontract's `mustBe: 0`), some tolerance (dbt **and**
+Soda, which legitimately share a sentence), and some tolerance scoped to
+the most recent supplies only. dbt's `accepted_values` looks pass/fail
+and is not - every one in this repo carries a real `error_if` row
+threshold. Check the config before deciding which case a check is in.
 
 So splitting wording **apart** is as much part of authoring as reusing
 it. Check what the check actually does before copying its sibling's

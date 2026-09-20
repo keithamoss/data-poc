@@ -1429,11 +1429,18 @@ arriving supply - has nowhere to live in it. That is the same
 shape-of-data-asset question `plans/wider.md` #9 raises, just hit from
 a different direction.
 
-Not scoped. Real forks to settle with Keith: whether table-level checks
-get a dataset-level section of their own above the column list, or get
-attached to a synthetic "whole table" pseudo-column that reuses the
-existing drawer; whether the 13 should be authored in the
-`REQ-QAC-024` pass at all while nothing displays them (they were, for
-the five in batch 1 - the prose is correct and simply invisible); and
-whether the `failure_indicates` CI gate should exempt them until they
-render, which would be the wrong way round if the fix is coming anyway.
+**Keith's call, same day: fix it, but after the current loop of
+building finishes.** So two of the three forks below are already
+settled by that - the 13 keep being authored in the `REQ-QAC-024` pass
+exactly like every other check, because the prose is correct and will
+simply start rendering once this lands; and the `failure_indicates`
+gate does NOT exempt them, which would have been the wrong way round
+given a fix is coming.
+
+The one real fork left: whether table-level checks get a dataset-level
+section of their own above the column list, or get attached to a
+synthetic "whole table" pseudo-column that reuses the existing drawer
+unchanged. Worth settling before building - the second is much less
+work and the first is probably the better answer, since "is this supply
+the right size" is a different question from anything in the column
+list rather than one more row in it.
