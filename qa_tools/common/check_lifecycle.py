@@ -123,6 +123,27 @@ class CheckMetadata:
     # not a change to what it does.
     name: str | None = None
 
+    # The two prose fields REQ-QAC-024 adds, alongside `description` -
+    # which that requirement repurposes as, by definition, the
+    # plain-English statement of WHAT a check verifies.
+    #
+    #   failure_indicates - what a failure most likely means happened
+    #     upstream. Reader-facing, and deliberately not "what to do
+    #     about it": remediation belongs to the ticket, not to the
+    #     check definition.
+    #   technical_note - contributor-facing standing facts a viewer
+    #     must not see (cross-references between checks, why a check
+    #     behaves as it does by construction). Sparse by design and
+    #     never required. NOT for dated definition changes - those are
+    #     what `changelog` is for, and forcing one in here would mean
+    #     inventing a date and an author for something that never
+    #     happened.
+    #
+    # Both are outside the config hash for the same reason `description`
+    # and `name` are.
+    failure_indicates: str | None = None
+    technical_note: str | None = None
+
 
 def _config_hash(config: dict) -> str:
     """A stable fingerprint of "what the check actually does" - sorted
@@ -151,7 +172,24 @@ def _lifecycle_fields(meta: dict) -> dict:
         "description": meta.get("description"),
         "changelog": list(meta.get("changelog") or []),
         "name": meta.get("name"),
+        "failure_indicates": meta.get("failure_indicates"),
+        "technical_note": meta.get("technical_note"),
     }
+
+
+# Everything `_lifecycle_fields` reads, plus `category` - i.e. every key
+# that describes a check rather than defining what it does.
+#
+# Derived rather than restated, and that is the whole point (REQ-QAC-024,
+# 2026-09-20). Only the Evidently parser needs this: dbt and Soda exclude
+# their WHOLE metadata block from the config hash, so a field added there
+# is cosmetic automatically, while Evidently hashes everything EXCEPT a
+# named list - the opposite default, and one that silently hashes any new
+# authored field. That list was hand-maintained and had already fallen
+# behind once: `name` shipped with REQ-QAC-023 and never reached it, a
+# bug that stayed latent only because no Evidently check happens to carry
+# a display name yet. Deriving it means the next field cannot repeat that.
+_NON_CONFIG_FIELDS = frozenset(_lifecycle_fields({})) | {"category"}
 
 
 # ---- dbt schema.yml -------------------------------------------------
@@ -447,9 +485,7 @@ def parse_evidently_check_metadata(check_lifecycle: dict, source: str) -> list[C
     out = []
     for check_id, meta in check_lifecycle.items():
         category = _require_category(meta, f"{source}: evidently check (check_id={check_id!r})")
-        config = {k: v for k, v in meta.items()
-                  if k not in ("introduced_date", "retired_as_of", "retired_reason", "description", "changelog",
-                                "category")}
+        config = {k: v for k, v in meta.items() if k not in _NON_CONFIG_FIELDS}
         out.append(CheckMetadata(
             check_id=check_id, category=category, tool="evidently", config_hash=_config_hash(config),
             source_file=source, **_lifecycle_fields(meta),

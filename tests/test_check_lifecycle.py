@@ -435,6 +435,55 @@ def test_parse_evidently_check_metadata_reads_a_check_lifecycle_dict():
     assert checks[0].source_file == "run_evidently_bdm.py"
 
 
+@pytest.mark.parametrize("field, value", [
+    ("description", "A different plain-English sentence."),
+    ("name", "A hand-authored display name"),
+    ("failure_indicates", "The upstream extract probably ran early."),
+    ("technical_note", "Paired with the Soda check on the same column."),
+])
+def test_authored_prose_never_changes_an_evidently_checks_config_hash(field, value):
+    """The trap REQ-QAC-024 named before a line of it was written, and
+    it is real.
+
+    dbt and Soda exclude their WHOLE metadata block from the config
+    hash, so any field added there is automatically cosmetic. Evidently
+    does the opposite - it hashes everything EXCEPT an explicit list of
+    names - so a new authored field is hashed by default, and every
+    Evidently check "changes" the moment someone writes one. A changed
+    hash with no changelog entry is what `find_undocumented_changes`
+    fails CI on, so the symptom is a broken build blaming a proofread.
+
+    `name` is in here because it has the same defect and shipped
+    earlier: REQ-QAC-023 added it to the dataclass and to the dbt/Soda
+    side, and no Evidently check happens to carry one yet - so the bug
+    is latent rather than absent, and the first one to get a display
+    name would have found it."""
+    base = {"category": "completeness", "introduced_date": "2026-02-01",
+            "description": "Row count should mostly grow run over run.", "changelog": []}
+    cid = "data-asset-1.bdm.birth_registrations.stg_birth_registrations.row_count_growth"
+
+    before = cl.parse_evidently_check_metadata({cid: base}, source="s")[0].config_hash
+    after = cl.parse_evidently_check_metadata(
+        {cid: {**base, field: value}}, source="s")[0].config_hash
+
+    assert before == after, (
+        f"authoring {field!r} changed the config hash - the check now reads as "
+        f"modified, and CI will demand a changelog entry for a wording change")
+
+
+def test_the_evidently_hash_still_notices_a_real_config_change():
+    """The other side of it. Widening the exclusion list is only safe
+    while something a check actually DOES still moves the hash - an
+    exclusion list that grew until it covered everything would make the
+    whole lifecycle gate silently useless."""
+    cid = "data-asset-1.bdm.birth_registrations.stg_birth_registrations.row_count_growth"
+    base = {"category": "completeness", "description": "d", "changelog": [], "threshold": 0.1}
+    before = cl.parse_evidently_check_metadata({cid: base}, source="s")[0].config_hash
+    after = cl.parse_evidently_check_metadata(
+        {cid: {**base, "threshold": 0.5}}, source="s")[0].config_hash
+    assert before != after
+
+
 # ---- Duplicate detection -------------------------------------------------
 
 def test_find_duplicate_check_ids_flags_ids_used_more_than_once():
