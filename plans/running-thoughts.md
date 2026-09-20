@@ -1025,6 +1025,14 @@ question, along with anything else testing-related that comes up in the
 meantime, for a dedicated planning loop on the weekend rather than
 picking pieces of it off one at a time mid-session.
 
+**Re-parked 2026-09-20** - Keith's own call, when this came back up
+alongside item #12's DRY examples: the weekend the original note named
+has now arrived without the testing loop happening, so rather than let
+the parking note quietly go stale, park it explicitly again until **a
+bit later next week**. Same grouping as before (this plus anything else
+testing-related that accumulates in the meantime, taken as one planning
+loop rather than picked off piecemeal) - only the date moves.
+
 12. **[done, 2026-09-18]** **[Testing & dev tooling]** Local pytest/Playwright runtime - real profiling done, more possible.
 
 Keith's own follow-up question (2026-09-18): "it's taking a while to
