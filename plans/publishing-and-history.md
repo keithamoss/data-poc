@@ -2915,6 +2915,73 @@ one Thread's narrative.
    now has a decided outcome to aim at rather than an open question
    about whether to bother.
 
+   **FIRST piece of work under this item (Keith's own call, 2026-09-20):
+   settle the agency/collection/dataset/table hierarchy before touching
+   anything else here.** It surfaced from a plain factual question of his
+   - "what is it that actually groups Child Protection data together as a
+   collection?" - and the answer turned out to be four different things.
+
+   The hierarchy IS modelled, three levels, and the dashboard's own data
+   tree uses it consistently (`registry-services` -> `civil-registration`
+   -> `birth-registrations`; `child-protection-family-support` ->
+   `child-protection` -> 6 datasets; the illustrative agencies the same).
+   What is inconsistent is everything underneath it:
+
+   1. **The CP collection has four names.** `cp_common.py` says
+      `COLLECTION_ID = "child-protection"`; the contract's `id` is
+      `child-protection-casework`, its `name` is "Child Protection
+      Casework Collection", and its `domain` is `child-and-family-safety`.
+      The telling detail - Birth Registrations' contract `domain` is
+      `civil-registration`, which EXACTLY matches the dashboard's
+      collection id for it. So `domain` looks like it is meant to BE the
+      collection, and for CP it simply does not match.
+   2. **Birth Registrations has no collection in code at all.**
+      `cp_common.py` carries `AGENCY_ID` + `COLLECTION_ID` + a
+      `TABLE_DATASET_ID` map; the BDM side carries only `AGENCY_ID` +
+      `DATASET_ID`. One models the middle level, the other skips it.
+   3. **`check_id` has no collection segment.** The grammar is
+      `data-asset.agency.dataset.table.column.check`, but a dashboard URL
+      is `/agency/X/collection/Y/dataset/Z`. The URL carries a level the
+      identifier does not, so a check's collection cannot be derived from
+      its own id. Found while scoping `plans/qa-pipeline.md` item 25's
+      REQ-QAC-023, which writes that grammar down - it was taken from the
+      module docstring without noticing it skips a level.
+   4. **The storage layer picks the OTHER model.** `qa_results/` keys CP
+      by `<agency>/<collection>/<run_id>/` with ONE set of 5 tool files
+      per run covering all 6 tables, and BDM by
+      `<agency>/<dataset>/<run_id>/` with the same 5 files. So on disk,
+      CP's collection is stored exactly the way BDM's dataset is - one
+      unit, one run, one set of files - and the 6 tables are split out
+      afterwards by `TABLE_DATASET_ID`.
+
+   **Keith's own framing of the choice**, recorded in his words rather
+   than paraphrased: it could be "a collection containing multiple data
+   sets where each data set has one table", or "drop collection and just
+   have one data set, for example child protection, having multiple
+   tables". **He leans toward keeping collection** because it groups
+   things well, "even if it means inventing some collection names for
+   smaller agencies".
+
+   **His stress test - "if we didn't have a collection and we had one
+   dataset with multiple tables, is that something we'd also support?" -
+   already has an answer in the code, and it is the most useful finding
+   here.** Yes, and not hypothetically: that IS how CP is stored today
+   (finding 4). The system currently implements BOTH models at once - one
+   dataset holding multiple tables at the storage layer, a collection of
+   single-table datasets at the presentation layer - and bridges them
+   with a hand-maintained table-to-dataset map. That is not a choice
+   between two designs so much as a decision about which of the two the
+   system should stop pretending not to have.
+
+   So the real question for this work is narrower than it first looks:
+   not "collection or no collection", but whether the storage layer
+   should follow the presentation layer (split `qa_results/` per dataset,
+   retiring `TABLE_DATASET_ID`), or the presentation layer should follow
+   storage (a dataset legitimately holds multiple tables, and collection
+   becomes purely an organisational grouping above it). Either answer
+   then settles findings 1-3 as a consequence rather than as three
+   separate cleanups.
+
 7. **[done, 2026-09-19]** **[Pipeline & publishing]** Both GitHub Actions
    workflows are pinned to a single, hardcoded session branch name -
    `on: push: branches: [claude/new-session-en9qen]` in

@@ -533,6 +533,15 @@ requirements:
         Python and 32 in tests. Correctness everywhere comes from the
         validator, not from a constructor serving 1% of cases.
       - Nothing here needs a live connection to data/ or any warehouse.
+      - KNOWN GAP, deliberately not resolved here - the grammar this
+        defines has no collection segment, while a dashboard URL is
+        /agency/X/collection/Y/dataset/Z. The identifier skips a level
+        the rest of the system models, so a check's collection cannot be
+        derived from its own id. That is the first piece of work under
+        plans/publishing-and-history.md item 6 and may change this
+        grammar. Build the module so the pattern is a single definition
+        that can absorb a new segment, rather than assuming today's
+        shape is final.
       - The tail-uniqueness rule exists because global check_id
         uniqueness does NOT imply it. Two checks could differ only in
         their table segment, be globally unique, and still collide in a
