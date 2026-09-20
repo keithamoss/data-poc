@@ -567,7 +567,11 @@ models:
                 check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.sex.accepted_values_dbt
                 category: conformity
                 introduced_date: "2023-01-15"
-                description: "Sex must be one of the closed value set M, F, or X."
+                description: >
+                  A few unrecognised values are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never agreed in the
+                  contract, usually a new code introduced upstream without notice.
                 changelog: []
               config:
                 fail_calc: "coalesce(sum(n_records), 0)"

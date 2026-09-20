@@ -238,9 +238,14 @@ schema:
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
-                value: "Sex must be one of the closed value set M, F, or X."
+                value: >
+                  A single unrecognised value fails.
               - property: changelog
                 value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed
+                  in the contract, usually a new code introduced upstream without notice.
       - name: suburb
         logicalType: string
         physicalType: varchar(100)
