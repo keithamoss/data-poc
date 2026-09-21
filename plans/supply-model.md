@@ -1327,9 +1327,47 @@ possibly deferrable, but not to be assumed away.
     SUPPLY (they are the evidence for its acceptance or rejection);
     the PERIOD's status is computed from promoted supplies only. So a
     rejected candidate leaves its period's dependent checks back at
-    cannot-run. Note the failure mode is benign - evaluated-and-failed
-    and cannot-run are both red, so nothing can go falsely green
-    here.
+    cannot-run.
+
+    **This rule is LOAD-BEARING, and was first justified here with
+    reasoning that did not reach the case it exists for.** That
+    justification said the failure mode is benign because
+    "evaluated-and-failed and cannot-run are both red" - true, but it
+    only covers the case where the cross-table check itself failed.
+    The case it misses, found 2026-09-22 when Keith asked whether this
+    broke the model: **the cross-table check evaluates GREEN, and the
+    candidate is rejected for a DIFFERENT reason** - one of its own
+    checks is red. Keep the evaluated verdict and the check reads green
+    for a period whose data never entered the warehouse. A false green,
+    in the direction this whole design exists to eliminate. So the
+    period-state-from-promoted-supplies-only rule is not tidiness; it
+    is what closes that path.
+
+    **The model is not broken by this** - it holds because two similar-
+    looking things are genuinely different. A SUPPLY's QA results are
+    evidence about that supply, the record of why it was accepted or
+    rejected, and a rejected supply keeps them (the reason rejected
+    supplies are kept at all). A PERIOD's state is a function of
+    promoted supplies only. The staged evaluation is a PRE-FLIGHT: it
+    informs the promotion decision and attaches to the supply. Nothing
+    needed patching; this falls out of "promotion is what puts data in
+    the warehouse".
+
+    **And it does not mean evaluating twice.** Promotion does not re-run
+    anything - it promotes the VERDICT alongside the data, in the same
+    act. The verdict computed against a staged table is identical to one
+    computed against the promoted table, because promotion moves a table
+    without changing its contents. The check runs once; promotion makes
+    its verdict authoritative for the period. That closes the loop
+    Keith flagged when rejecting promotion-as-trigger.
+
+    **Dependency worth naming**: that identity holds only if QA and
+    promotion are SERIALISED per period, the way slot assignment
+    already is. If another table's arrival could interleave between a
+    candidate's QA and its promotion, the staged verdict might no
+    longer describe the state being promoted into. The arrival-order
+    replay rule covers assignment - this extends the same discipline
+    through QA and promotion.
 - "Which dataset's history records it" - the COLLECTION's, which
   follows from lifting multi-table checks to collection level.
 
