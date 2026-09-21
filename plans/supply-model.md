@@ -32,7 +32,7 @@ does not moved into that requirement's own `decisions:` first.
 
 **One requirement is already known to be wrong.** `REQ-PIPE-035` ("QA
 runs against a warehouse composed of every table's current version") was
-written before cross-period composition was dropped - see Thread F. It
+written before cross-period composition was dropped - see Thread J. It
 needs rewriting rather than building.
 
 Status values: `todo` / `investigate` / `in-progress` / `parked` /
@@ -65,7 +65,7 @@ that same evening, before this sequence was set - do not act on that.
 **The still-open items, as at end of 2026-09-21:**
 
 - **Does re-filing exist as its own operation?** It may be forced anyway,
-  since promote + demote compose into it. See Thread D.
+  since promote + demote compose into it. See Thread G.
 
   *Prepared 2026-09-21 night, for the morning.* Two options: **(A) no
   re-file operation** - demote, then promote to a chosen slot, two
@@ -81,7 +81,7 @@ that same evening, before this sequence was set - do not act on that.
   points at (B).
 
   **But the two open questions here are entangled and should be answered
-  together.** Thread D's own unresolved question is whether "un-decide"
+  together.** Thread G's own unresolved question is whether "un-decide"
   (demote back to staging for re-review) is an operation worth having at
   all. If NO, demote only ever goes to rejected, nothing passes back
   through staging, and re-file MUST be atomic - (B) is forced. If YES,
@@ -90,11 +90,11 @@ that same evening, before this sequence was set - do not act on that.
   largely falls out of it.
 - **What happens to a `nodata` supply** under the amber-or-green
   auto-promotion rule. `nodata` is neither, and a supply where no check
-  ran is not evidence of good data. See Thread A.
+  ran is not evidence of good data. See Thread B.
 
   *Prepared 2026-09-21 night, for the morning - and the question has
   probably changed under us.* This was logged BEFORE the red-for-unrun
-  decision (Thread F). Since a check that could not run is now RED, a
+  decision (Thread I). Since a check that could not run is now RED, a
   supply whose checks all failed to run is RED too, and red never
   auto-promotes. **That case is already resolved**; it wants confirming
   rather than deciding, the same way "what a `run` means" does.
@@ -115,160 +115,180 @@ that same evening, before this sequence was set - do not act on that.
 - **Cross-cadence check period ownership** - which table's period is a
   check's period when it spans tables on different cadences. Moot within
   Child Protection; a cross-COLLECTION problem, possibly deferrable. See
-  Thread F.
+  Thread I.
 - **Operator identity** in a deployed environment - already marked
   deliberately deferred to build time, listed here so it is not mistaken
-  for an oversight. See Thread D.
+  for an oversight. See Thread G.
 - **Whether to build an as-published RECONSTRUCTION path at all**, given
   snapshots already provide that view. Both are computable from the
   append-only decision log; the question is whether the reconstruction
-  earns its place alongside the archive. See Thread F.
+  earns its place alongside the archive. See Thread K.
 - **"Current version" vs "good version"** - inherited from
   `plans/publishing-and-history.md` item 6, still open, adjacent to
   `plans/conceptual-design.md` Thread A's amber accept/reject governance
   and to be settled with it rather than separately.
 - **What a "run" means for supply history** - also inherited from item 6,
   and needs RE-CHECKING rather than answering fresh: the per-table slot
-  decision (Thread C) and dropping the date from `run_id` (Thread A) may
+  decision (Thread F) and dropping the date from `run_id` (Thread A) may
   already have resolved it.
 
 ## Delivery sprints
 
-First pass, written 2026-09-21 night at Keith's request, ordered by real
-dependency rather than by size. Two things shaped the order more than
-anything else: **some work is a precondition that gets expensive if
-deferred** (a check's identity, and status parity between the two
-implementations, both have to land before the things that depend on them
-exist), and **the slot is the spine** - staleness, overdue, assignment,
-classification and promotion are all defined against the expected-supply
-sequence, so nothing downstream can be built before it.
+First pass, 2026-09-21 night, at Keith's request - and deliberately cut
+SMALL (his own instruction: "I don't want any large chunks of text and
+overly large sprints"). Each is one coherent deliverable that can be
+built and verified on its own. Ordered by real dependency, not size.
 
-1. **[todo, 2026-09-21]** **[QA checks & contract]** **[Pipeline & publishing]**
-   **Sprint 1 - ground truth.** Three small, independent pieces that
-   everything else assumes, none of which depends on the supply model.
+Two things drove the order. **Some work is a precondition that gets
+expensive if deferred** - a check's identity, and status parity between
+the two status implementations. And **the slot is the spine**: overdue,
+staleness, assignment, classification and promotion are all defined as
+comparisons against the expected-supply sequence.
 
-   - `REQ-QAC-039` - one hierarchy, stated once, including in a check's
-     own identity.
-   - The repo-wide timezone config parameter, replacing
-     `pipeline/cadence.py`'s hardcoded `AWST_OFFSET` (Thread E).
-   - **Status parity between `qa_tools/common/dataset_status.py` and the
-     template's JS** (Thread F). `dataset_status.py` has no `nodata` at
-     all, so a recorded `nodata` currently falls through to threshold
-     math and comes back green.
+1. **[todo, 2026-09-21]** **[QA checks & contract]** **Check identity.**
+   `REQ-QAC-039` - one hierarchy, stated once, including in a check's own
+   `check_id`.
 
-   **Why first**: two of the three are genuinely preconditions rather
-   than preferences. `check_id` identity is baked into every one of the
-   257 hand-authored checks, so changing it later is a corpus-wide edit.
-   And status parity must land BEFORE per-check `nodata` exists, or the
-   first thing the new status meets is a silent misgrade - `plans/
-   qa-pipeline.md` item 74's exact failure mode, which that module's own
-   docstring says it already suffered once.
+   First because it is baked into all 257 hand-authored checks; changing
+   it later is a corpus-wide edit.
 
-2. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Sprint 2 - the
-   schedule as a first-class input.** The expected-supply sequence, and
-   everything that reads it.
+2. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Status parity
+   between the two implementations.** `qa_tools/common/dataset_status.py`
+   has no `nodata` at all, so a recorded `nodata` falls through to
+   threshold math and returns green (Thread I).
 
-   - Schedule config: authored dates (quarterly) or cadence rule
-     (daily), `delivery_months` participation, `effective_from` plus
-     changelog, `not_expected` exceptions (Thread B).
-   - `mothman check`'s `validate-config` gate (Thread F).
-   - Slot derivation - the `(period, due_at)` sequence - plus the
-     low-runway warning and the hard failure on an exhausted schedule
-     (Thread B).
+   Must land BEFORE per-check `nodata` exists, or the new status meets a
+   silent misgrade on arrival - `plans/qa-pipeline.md` item 74's exact
+   failure mode, which that module's own docstring says it already
+   suffered once.
 
-   **Why here**: the slot is the spine. Overdue, staleness, assignment
-   and classification are all defined as comparisons against this
-   sequence, so none of them can be built until it exists. The
-   validation gate ships WITH the config rather than after it, because
-   a config typo silently yields zero slots, which is the exhausted-
-   schedule state arriving by accident.
+3. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Timezone
+   parameter.** One repo-wide config value replacing
+   `pipeline/cadence.py`'s hardcoded `AWST_OFFSET`; stored timestamps
+   carry their offset (Thread H).
 
-3. **[todo, 2026-09-21]** **[Pipeline & publishing]** **[Data generation]**
-   **Sprint 3 - arrival, staging and slot assignment.** The heart of the
-   model, and the sprint carrying the most design risk.
+   Small, independent, and every later sprint compares instants.
 
-   - Arrival recording - our own receipt timestamp, never the
-     supplier's, always carrying its offset (Thread E).
-   - Staging, asserting only arrival facts.
-   - Slot assignment: claim windows, on-time-wins-for-the-current-slot,
-     monotonic filling, replay in arrival-timestamp order, and
-     hold-for-a-human when nothing is confidently claimable (Threads C
-     and E).
-   - Arrival classification against the ASSIGNED slot, not a slot
-     re-derived from the arrival date (Thread C).
-   - `REQ-GEN-040` - the generator delivers one table at a time.
+4. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Schedule config
+   and its validation gate.** Authored dates (quarterly) or cadence rule
+   (daily), `delivery_months` participation, `effective_from` plus
+   changelog, `not_expected` (Thread C); `mothman check`'s
+   `validate-config` (Thread K).
 
-   **Why the generator change sits here rather than in sprint 1**: it is
-   what makes any of this testable. Every rule above is about awkward
-   arrival sequences - a resupply landing after its slot filled, an
-   outage, two files in one batch - and none of them can be exercised
-   while the generator only ever emits whole deliveries.
+   The gate ships WITH the config, not after: a typo silently yields zero
+   slots, which is the exhausted-schedule state arriving by accident.
 
-4. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Sprint 4 -
-   promotion, the decision log, and the warehouse.**
+5. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Slots.** The
+   `(period, due_at)` sequence derived from the schedule, the low-runway
+   warning measured in slots, and the hard failure on an exhausted
+   schedule (Thread C).
 
-   - Promotion: auto on green/amber into an EMPTY slot; red never;
-     landing in a filled slot never (Thread A).
-   - Rejection, demotion with its stickiness rule, and re-filing if the
-     open question above resolves that way (Thread D).
-   - The append-only decision log - who, when, what, which, why - with
-     automated decisions recorded the same way, the rule as actor
-     (Thread D).
-   - One database with many schemas, retiring the per-run warehouses,
-     and one database per test worker (Thread F).
-   - `REQ-PIPE-038` - `qa_results/` keyed per dataset, and today's
-     history regenerated under Keith's one-off exception.
+   The spine. Nothing downstream can be built before it.
 
-   **Why together**: promotion is the act that writes into the
-   warehouse, so the storage change belongs in the same sprint rather
-   than stranded either side of it. The decision log has to exist before
-   promotion can be recorded at all, and it is what makes mutable filing
-   safe - without it, a re-file silently rewrites history.
+6. **[todo, 2026-09-21]** **[Data generation]** **Generator delivers one
+   table at a time.** `REQ-GEN-040`.
 
-5. **[todo, 2026-09-21]** **[QA checks & contract]** **Sprint 5 - checks
-   under the new model.**
+   Sits here because it is what makes the next three sprints testable at
+   all - every rule in them is about awkward arrival sequences, and none
+   can be exercised while the generator only emits whole deliveries.
 
-   - `REQ-PIPE-036` - a dataset's own arrival triggers its own QA run.
-   - `depends_on` declaration on multi-table checks, plus its validation
-     (Thread F). The `nodata` rule is not computable without it.
-   - `REQ-QAC-037` - cross-table checks lifted to the collection scope.
-   - Red-for-unrun, with its qualifying chip, and the pointer indicator
-     on a healthy table blocked by a neighbour (Thread F).
-   - Drift and trend declaring a temporal dependency; a missing-but-
-     expected reference is red, a brand-new dataset with no prior period
-     is `nodata` (Thread F).
-   - `REQ-PIPE-035` REWRITTEN - it currently specifies the composition
-     that Thread F dropped.
+7. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Arrival and
+   staging.** Our own receipt timestamp, never the supplier's; staging
+   asserting only arrival facts; replay in arrival-timestamp order
+   (Threads B and H).
 
-   **Why after sprint 4**: a check can only be re-scoped once slots and
-   promotion exist to define what "this period's data" means. Before
-   that there is no fact for `depends_on` to be evaluated against.
+   Arrival order is load-bearing, not tidiness: assignment reads slot
+   state, so discovery order changes the answer.
 
-6. **[todo, 2026-09-21]** **[Dashboard UI]** **Sprint 6 - the
-   dashboard.**
+8. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Slot
+   assignment.** Claim windows, on-time-wins-for-the-current-slot,
+   monotonic filling, and hold-for-a-human when nothing is confidently
+   claimable (Threads E and H).
 
-   - `REQ-DASH-041` - supply history and as-of viewing under per-dataset
-     arrivals.
-   - The freshness axis, capping the headline status (Thread F).
-   - Decision-log display, and the as-corrected default (Thread F).
-   - Banners: exhausted schedule (computed from config, so it renders
-     even when the pipeline that would have produced results did not
-     run), arrival into a filled slot, and the blocked-check pointer.
-   - Automatic snapshots on every publish, deduplicated by content hash.
+   The highest-risk sprint in the plan - two cascades were found here by
+   stress-testing, one created by the fix for the other.
 
-   **Why last**: it renders everything above. Building it earlier means
-   building against a data shape still moving underneath it - which is
-   how `clipDatasetToAsOf()` ended up filtering on arrival rather than
-   promotion (Thread E), correct only because promotion did not yet
-   exist.
+9. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Arrival
+   classification.** Early / on-time / late against the ASSIGNED slot,
+   never a slot re-derived from the arrival date (Thread D).
+
+   Separate from sprint 8 so the assignment rules can be verified before
+   anything reports on them.
+
+10. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Promotion and
+    rejection.** Auto on green/amber into an EMPTY slot; red never;
+    landing in a filled slot never (Thread B).
+
+11. **[todo, 2026-09-21]** **[Pipeline & publishing]** **The decision
+    log.** Append-only; who, when, what, which, why; automated decisions
+    recorded the same way with the rule as actor; demotion stickiness
+    (Thread G).
+
+    Pairs with sprint 10 and could merge with it, but kept separate
+    because it is what makes mutable filing safe and deserves its own
+    verification.
+
+12. **[todo, 2026-09-21]** **[Pipeline & publishing]** **One database,
+    many schemas.** Retire the per-run warehouses; one database per test
+    worker (Thread J).
+
+    Test isolation is deliberate here, not incidental - the per-run
+    databases were providing it by accident and `pytest-xdist` is the
+    default.
+
+13. **[todo, 2026-09-21]** **[Pipeline & publishing]** **`qa_results/`
+    keyed per dataset.** `REQ-PIPE-038`, including regenerating today's
+    history under Keith's one-off exception.
+
+14. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Per-dataset QA
+    trigger.** `REQ-PIPE-036` - a dataset's own arrival triggers its own
+    QA run.
+
+15. **[todo, 2026-09-21]** **[QA checks & contract]** **Check
+    dependencies.** `depends_on` on multi-table checks plus its
+    validation, and `REQ-QAC-037` lifting cross-table checks to the
+    collection scope (Thread I).
+
+    The `nodata` rule is not computable without `depends_on` - "any table
+    it spans" is not knowable from a tool's check syntax.
+
+16. **[todo, 2026-09-21]** **[QA checks & contract]** **Red-for-unrun.**
+    The status, its qualifying chip, and the pointer indicator on a
+    healthy table blocked by a neighbour (Thread I).
+
+17. **[todo, 2026-09-21]** **[QA checks & contract]** **Drift and trend
+    dependencies.** A declared temporal reference; missing-but-expected
+    is red, no-prior-period is `nodata`. Includes REWRITING
+    `REQ-PIPE-035`, which specifies the composition Thread J dropped.
+
+18. **[todo, 2026-09-21]** **[Dashboard UI]** **Supply history and
+    as-of under per-dataset arrivals.** `REQ-DASH-041`.
+
+19. **[todo, 2026-09-21]** **[Dashboard UI]** **Freshness axis and
+    banners.** Freshness capping the headline status; the
+    exhausted-schedule banner (computed from config, so it renders even
+    when the pipeline that would have produced results did not run);
+    arrival-into-a-filled-slot; the blocked-check pointer (Threads C and I).
+
+20. **[todo, 2026-09-21]** **[Dashboard UI]** **Decision-log display and
+    the as-corrected default** (Thread K).
+
+21. **[todo, 2026-09-21]** **[Dashboard UI]** **Automatic snapshots**, on
+    every publish, deduplicated by content hash (Thread K).
+
+**Why the dashboard sprints come last**: they render everything above.
+Building them earlier means building against a data shape still moving -
+which is how `clipDatasetToAsOf()` ended up filtering on arrival rather
+than promotion (Thread H), correct only because promotion did not yet
+exist.
 
 **Not in these sprints, deliberately.** Adding two more datasets and
-making the data-asset level concrete (`plans/running-thoughts.md` #23) is
-separate and sequenced AFTER this work - it is what makes the
-file-architecture question in `plans/publishing-and-history.md` item 6
-answerable, and it depends on the model here being real first.
+making the data-asset level concrete (`plans/running-thoughts.md` #23)
+is sequenced AFTER this work - it is what makes the file-architecture
+question in `plans/publishing-and-history.md` item 6 answerable, and it
+needs the model here to be real first.
 
-## Thread A - Storage, staging and promotion
+## Thread A - Storage and the physical model
 **Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
 
 ### Composition and the physical storage model - SETTLED 2026-09-21
@@ -335,6 +355,9 @@ Consequence accepted rather than solved: "show me Q3" and "show me as
 at 30 June" become different questions once early arrivals exist. The
 dashboard has one picker. Keith's call - stick with "as at 30 June",
 the as-at question is the one that matters.
+
+## Thread B - Staging and promotion
+**Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
 
 ### How a supply gets filed - staging and promotion
 
@@ -454,7 +477,7 @@ discovering:
    of good data, so it should presumably hold rather than promote -
    but it is an edge case the rule as stated leaves open.
 
-## Thread B - The schedule
+## Thread C - The schedule
 **Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
 
 ### The schedule - what exists, what changes
@@ -623,7 +646,7 @@ have fewer than 2 supplies remaining"); 30 individual banners is
 noise. Same for staleness - the top-level view summarises rather than
 enumerates.
 
-## Thread C - Slots and arrival classification
+## Thread D - Arrival classification
 **Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
 
 ### Early/onTime/late - a real gap in the current classifier
@@ -743,6 +766,9 @@ Raised 2026-09-21, unresolved:
   supply sits in staging with auto-promotion suppressed, and a human
   promotes it where they choose. No third operation, and the verdict
   recomputes because the slot assignment genuinely changed.
+
+## Thread E - Slot assignment and the two cascades
+**Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
 
 ### Slot assignment - the claim-window rule
 
@@ -985,6 +1011,9 @@ Keith's scenario is the second. Editing config retrospectively to
 make red history disappear is exactly what the exceptions rule above
 says must not happen.
 
+## Thread F - Per-table slots
+**Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
+
 ### A supply is ONE TABLE - each table claims its own slot
 
 Keith, 2026-09-21. Everything above was worked through assuming one
@@ -1024,7 +1053,7 @@ The claim-window and never-claim-forward rules apply per table
 unchanged - each table has its own independently-tracked slot
 sequence.
 
-## Thread D - The decision log
+## Thread G - The decision log
 **Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
 
 ### Filing decisions are recorded - an append-only decision log
@@ -1079,7 +1108,7 @@ deliberately refuses to do, hard-erroring when unset. **Deliberately DEFERRED by
 Keith to when this requirement is actually built** - named now so it
 is not discovered late, not left open because nobody noticed it.
 
-## Thread E - Chaos-engineering findings
+## Thread H - Chaos-engineering findings
 **Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
 
 ### Chaos-engineering pass - five more wrinkles
@@ -1204,8 +1233,8 @@ lands (see wrinkle 1 above). Keith, 2026-09-21: flagged, to be
 addressed in the build - on the list of things that must change,
 never something that keeps working by default.
 
-## Thread F - Checks, the dashboard, and what we stopped building
-**Status:** todo (2026-09-21) · **Category:** Dashboard UI
+## Thread I - The multi-table nodata seam
+**Status:** todo (2026-09-21) · **Category:** QA checks & contract
 
 ### The multi-table `nodata` seam
 
@@ -1409,6 +1438,9 @@ CI-gatable the same way everything else here is: `mothman check`
 validates every declared table exists in the collection, and that a
 check declaring nothing genuinely is single-table.
 
+## Thread J - Composition dropped, and the warehouse
+**Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
+
 ### Composition drops out; drift declares what it needs
 
 Settled 2026-09-21. **Cross-period composition is not needed and
@@ -1483,6 +1515,9 @@ thoughts.md` #12). One shared database puts several workers in one
 file. Fix: **one database per test worker** via `tmp_path_factory`,
 the same pattern the other tools' fixtures already use. Agreed with
 Keith rather than discovered as flaky tests later.
+
+## Thread K - "As at T", the published record, and config validation
+**Status:** todo (2026-09-21) · **Category:** Dashboard UI
 
 ### "As at T" defaults to AS-CORRECTED; snapshots are as-published
 
