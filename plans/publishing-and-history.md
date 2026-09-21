@@ -3849,6 +3849,75 @@ one Thread's narrative.
    three separate requirements in this entry alone: where a rule
    genuinely cannot know, SAY SO rather than commit silently.**
 
+   ### The BACKWARD cascade - a missed slot absorbing later arrivals
+
+   Keith's second stress test, 2026-09-21, and it broke the fix for the
+   first one. Recorded in full for the same reason: the rule reads
+   sensible and the failure is invisible day to day.
+
+   **The scenario.** Daily feed, supply due ~22:00. Monday received and
+   filled. Supplier's system goes down for an upgrade - found out 9pm
+   Tuesday, too late to be a planned schedule change. Wednesday missed
+   too. The next supply arrives on time at 22:00 Thursday.
+
+   Under "oldest claimable unfilled slot, window never closes":
+
+   | Arrival | Oldest claimable unfilled | Filed as |
+   |---|---|---|
+   | Thu 22:00 | Tue | Tuesday, 2 days late |
+   | Fri 22:00 | Wed | Wednesday |
+   | Sat 22:00 | Thu | Thursday |
+
+   **A permanent two-day lag, cascading BACKWARDS.** Every supply reads
+   "late", every day looks locally plausible, it never self-corrects.
+   Same catastrophic shape as the forward cascade, introduced by the fix
+   for it.
+
+   **Cause**: the rule cannot know that a MISSED slot is never going to
+   be filled. The supplier was down; there is no Tuesday extract and
+   never will be. But an unfilled slot waits indefinitely to absorb
+   whatever arrives next.
+
+   Two obvious fixes that do NOT work, worth recording so they are not
+   re-proposed:
+   - **Close a slot's window when the next one opens.** Kills the
+     cascade but breaks lateness - Monday's supply landing Tuesday
+     morning would file as Tuesday.
+   - **A finite lateness tolerance.** Only shifts the lag: a one-day
+     tolerance turns a two-day cascade into a one-day cascade. Any fixed
+     tolerance has an outage longer than it.
+
+   **The fix: punctuality is evidence of which slot a supply is for.**
+
+   > If an arrival falls within the ON-TIME WINDOW of the current slot,
+   > and that slot is unfilled, file it there - even if earlier slots
+   > are unfilled. Otherwise, oldest claimable unfilled slot.
+
+   - Thu 22:00, Thursday due 22:00 -> on time for Thursday -> Thursday's
+     slot. Tue and Wed stay unfilled and read as MISSED, which is true.
+   - Monday's supply arriving Tue 03:00 -> not on time for Tuesday ->
+     oldest unfilled is Monday -> Monday's slot, late.
+
+   Lateness still works and an outage no longer eats the future.
+
+   **The rule only needs to be sensible, not clairvoyant, because an
+   outage is LOUD.** Tuesday's slot goes overdue Tuesday evening; by
+   Thursday two overdue slots are red. A human is engaged well before
+   the ambiguous arrival lands. So the definitive answer lives in the
+   decision log: **a human marks Tue and Wed as missed**, reason
+   "supplier system upgrade", closing those slots explicitly rather than
+   by rule.
+
+   **Two mechanisms that must not blur:**
+   - **`not_expected:` in config** - agreed IN ADVANCE that no supply is
+     coming. Planned.
+   - **A slot marked missed in the decision log** - a supply was owed,
+     did not arrive, someone recorded why. Operational.
+
+   Keith's scenario is the second. Editing config retrospectively to
+   make red history disappear is exactly what the exceptions rule above
+   says must not happen.
+
    ### A supply is ONE TABLE - each table claims its own slot
 
    Keith, 2026-09-21. Everything above was worked through assuming one
