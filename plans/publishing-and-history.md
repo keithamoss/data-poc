@@ -3604,9 +3604,8 @@ one Thread's narrative.
    It is a gap against the model settled above, which has early supplies
    as a first-class case.
 
-   Proposed fix, still to be agreed: **classify against the period the
-   supply was FILED to, rather than one inferred from its arrival
-   date** - a signature change (`classify_arrival(cadence,
+   **Fix, settled 2026-09-21: classify against the period the supply was
+   FILED to, rather than one inferred from its arrival date** - a signature change (`classify_arrival(cadence,
    assigned_period, arrival)`), not a new cadence property. Promotion
    already decides the period, using information `cycle_start` does not
    have (which slots are already filled); deriving it a second time here
@@ -3616,6 +3615,113 @@ one Thread's narrative.
    keeping: it REMOVES a property rather than adding one - once the slot
    is known, "early" is just `arrival < due_at`, so the earliness window
    is a promotion/filing parameter, not a cadence one.
+
+   **Two corrections to that fix as first stated, both found while
+   explaining it rather than while writing it - it was sold as "just a
+   signature change" and that undersold it.**
+
+   1. **Slot ASSIGNMENT and PROMOTION are two steps, not one.** As first
+      proposed, the period was assigned at promotion - but QA runs
+      BEFORE promotion, so at QA time there would be no slot to classify
+      against. Split them:
+
+      ```
+      arrival -> slot ASSIGNED   (derived: oldest unfilled slot, or a
+                                  later one if inside its early window;
+                                  no human, no judgment, just the rule)
+              -> QA runs          (classifies against that slot's due_at)
+              -> PROMOTION        (the act of moving the table into the
+                                  period schema - auto on green/amber,
+                                  human otherwise)
+      ```
+
+      Assignment is a derivation; promotion is a decision. The original
+      point survives intact - there is still exactly one place the slot
+      is decided, and classification still consumes it rather than
+      re-deriving it - it just happens earlier. It also means a REJECTED
+      supply still gets classified, which matters: "arrived three weeks
+      late AND was bad" is exactly what belongs on the record for a
+      supply that never got promoted.
+
+   2. **The verdict stops being a frozen historical fact.** Filing is
+      mutable, so if a supply is re-filed the classification must
+      follow - a supply reported "late" purely because it was misfiled
+      was never actually late, and leaving a known-wrong verdict in
+      place for the sake of immutability is the one place this design
+      would knowingly say something untrue. This contradicts
+      `pipeline/cadence.py`'s own current docstring, which states the
+      verdict is computed once, committed, and "never needs porting to
+      JS: a past run's own real arrival time never changes no matter
+      what as-of date someone later picks". The arrival TIME still never
+      changes; the VERDICT becomes a function of the current filing.
+
+      Keith settled this CONDITIONALLY, 2026-09-21: if re-filing
+      exists - and he has not yet decided whether it does - the verdict
+      follows the new filing and is recomputed.
+
+      One upside either way: since the verdict travels with the supply,
+      the dashboard's JS never recomputes classification.
+      `cycleStartDate()` still earns its place for the as-of picker's
+      period math, so the duplicated-logic surface shrinks rather than
+      grows.
+
+   **Re-filing may not be a free decision, and demotion has a trap.**
+   Raised 2026-09-21, unresolved:
+   - Promote and demote are both already asked for in the TUI. Demote
+     out of Q2, promote into Q3, and a supply has been re-filed without
+     anyone designing re-filing. So the real question is whether the
+     composition of two agreed operations gets recognised and handled,
+     not whether to build a third one.
+   - **Demotion must be STICKY, regardless of the re-filing decision.**
+     With auto-promotion on green/amber, a human demotes a green supply
+     and the rule promotes it straight back - the operator's decision
+     silently reverted by automation, in the same run. Demotion has to
+     record an operator decision that suppresses auto-promotion for that
+     supply until someone acts again.
+   - That also gives re-filing a natural shape if wanted: a demoted
+     supply sits in staging with auto-promotion suppressed, and a human
+     promotes it where they choose. No third operation, and the verdict
+     recomputes because the slot assignment genuinely changed.
+
+   ### `mothman check` validates the new config
+
+   Keith, 2026-09-21: the new asset and schedule YAML gets validated
+   like everything else, as a `validate-config` gate alongside
+   `validate-requirements`/`validate-changelog` in `cli/check.py`'s own
+   list. `qa_tools/common/schemas.py`'s `_Strict` base (`extra="forbid"`)
+   is the existing pattern to build on - no new machinery needed.
+
+   The organising idea, rather than a checklist: **every check here
+   exists to stop a config error silently producing ZERO SLOTS** - the
+   exhausted-schedule state, arriving by accident, on a dataset nobody
+   is watching. Most of the validations are variations on that one
+   failure.
+
+   Errors:
+   - **Shape** - required fields, types, and `extra="forbid"` so a
+     mistyped KEY is caught rather than ignored (a silently-dropped
+     `delivery_months` key gives a dataset all four dates when it should
+     have one).
+   - **Values** - month names real and full, dates parseable,
+     `effective_from` a real date, `latency_minutes` non-negative.
+   - **Cross-reference against the asset calendar** - a dataset naming a
+     month the calendar has no date for has zero slots. This is the
+     drift check that justified one calendar over 30 date lists, so it
+     has to actually run.
+   - **Internal consistency** - schedule versions ordered and
+     non-overlapping on `effective_from`, no duplicate calendar dates, a
+     dataset not both subsetting and overriding.
+   - **Referential** - every dataset named in asset config has a
+     contract and vice versa. At 30 datasets this is where a typo hides
+     indefinitely.
+
+   Warning only:
+   - **Runway** - "fewer than N supplies remain" is "act soon", not
+     "this is broken". Failing an otherwise-fine build on it is how a
+     gate gets disabled.
+
+   All config-only, no `data/` access, so it is safe in CI under the
+   standing rule.
 
 7. **[done, 2026-09-19]** **[Pipeline & publishing]** Both GitHub Actions
    workflows are pinned to a single, hardcoded session branch name -
