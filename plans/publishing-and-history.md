@@ -4220,6 +4220,97 @@ one Thread's narrative.
    checking?"), and would be helpfully "fixed" by a later session
    without the reasoning attached.
 
+   #### Worked example, and what it must display
+
+   Real check, from `contract/child-protection-soda-checks.yml`:
+   `values in (cp_client_id) must exist in cp_clients (cp_client_id)`,
+   name "Client reference", **defined on `cp_notifications` but
+   depending on `cp_clients`**. A second of the same shape sits on
+   `cp_investigations`.
+
+   August 2026: `cp_clients` arrives as an invalid CSV, red, rejected,
+   so its August slot stays unfilled. The other five land clean.
+
+   Traced through the real code - `worstOf()` is
+   `list.reduce((w,s)=> STATUS_ORDER[s]>STATUS_ORDER[w]?s:w, "green")`,
+   seeded with green, and `STATUS_ORDER.nodata` is -1, so nodata can
+   never win:
+   - `cp_clients` column -> `worstOf(["nodata",...])` -> **green**
+   - `cp_notifications` column -> `worstOf(["green","green","nodata"])`
+     -> **green**
+   - Collection -> **green**, and `rollup()`'s `noDataAsOf` filter never
+     fires because CP as a dataset does have August data - five sixths
+     of it.
+
+   **Child Protection reads green for August with one of six tables
+   missing and two referential checks never evaluated.** Note where the
+   nodata surfaces: under `cp_notifications`, a table that arrived
+   perfectly. Nothing on the healthy table's own row hints the problem
+   is next door.
+
+   **The fix is mostly already decided here and was simply not
+   connected**: staleness is an independent axis that caps the headline,
+   and an unfilled August `cp_clients` slot MEANS composition carries
+   May's forward, which IS stale. One condition, two symptoms. So the
+   headline is worst-of (quality, freshness) and cannot read clean
+   green.
+
+   The one new piece: **a nodata check is excluded from the quality
+   worst-of** (a check that did not run has no verdict to offer) **and
+   surfaced as a COUNT instead** - "18 of 24 checks evaluated".
+   Excluded from severity math, impossible to overlook. This also
+   preserves what Keith asked for early on: the five healthy tables are
+   not dragged to red by a sibling's failure, while the cross-table
+   check that genuinely was impacted stops being invisible.
+
+   What each level shows (Keith, 2026-09-21 - his own instinct that
+   `cp_notifications` should "light up" with an obvious warning):
+
+   | | August |
+   |---|---|
+   | `cp_clients` | no data this period; 0 of 12 checks evaluated; freshness red |
+   | `cp_notifications` | own checks green; 1 relationship check involving it could not run, **blocked by `cp_clients`** |
+   | Collection | headline not green (freshness); "18 of 24 checks evaluated" |
+
+   **The warning must NAME THE BLOCKER**, not just report absence. "Not
+   all checks could be run" leaves someone staring at a table where
+   nothing is wrong; "Client reference could not run - `cp_clients` has
+   no August data" makes the next click obvious.
+
+   **And it is a POINTER, not a duplicated result.** Multi-table checks
+   are lifted to the collection level (settled earlier), so the check
+   itself is not under notifications any more. The honest statement for
+   that row is a real distinction worth saying out loud: **fully
+   verified against its own data, unverified against its
+   relationships** - which is not the same as "this table has a
+   problem".
+
+   #### Checks must DECLARE their participating tables
+
+   Required, and not previously specified. To say "Client reference
+   could not run because `cp_clients` has no August data", the system
+   must know the check spans notifications -> clients. Today that is
+   only expressible in the check's SYNTAX - SodaCL grammar here, and
+   dbt/ODCS bury it differently in theirs. Parsing four tools' syntaxes
+   to recover dependencies is exactly the fragile thing this project
+   avoids elsewhere.
+
+   So a multi-table check declares them in its lifecycle metadata,
+   hand-authored alongside `check_id`/`name`/`introduced_date`:
+
+   ```yaml
+         depends_on: [cp_clients]
+   ```
+
+   **This is not only for the message.** The nodata rule itself -
+   "nodata if any table it spans has an unfilled slot" - is NOT
+   COMPUTABLE without it. That phrase had been written throughout as
+   though "any table it spans" were a known quantity; it is not.
+
+   CI-gatable the same way everything else here is: `mothman check`
+   validates every declared table exists in the collection, and that a
+   check declaring nothing genuinely is single-table.
+
    ### `mothman check` validates the new config
 
    Keith, 2026-09-21: the new asset and schedule YAML gets validated
