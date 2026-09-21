@@ -49,10 +49,17 @@ from typing import Generic, Iterator, Optional, Protocol, TypeVar
 import numpy as np
 
 MAX_ATTEMPTS = 8  # a hard ceiling so a pathological chain can't run forever
-STILL_RED_PROB = 0.60  # per-attempt chance a resupply is ALSO red - a chain
-# needing 5+ attempts to resolve happens ~13% of the time a delivery goes
-# red at all (0.6**4), matching Keith's own framing: "sometimes, in a
+STILL_RED_PROB = 0.45  # per-attempt chance a resupply is ALSO red - a chain
+# needing 5+ attempts to resolve happens ~4% of the time a delivery goes
+# red at all (0.45**4), matching Keith's own framing: "sometimes, in a
 # really bad scenario" - most resolve within 1-2 resupplies.
+#
+# Lowered from 0.60 on 2026-09-21, with Keith, for two reasons. The
+# committed history was being trimmed toward ~145 runs, and chain length
+# is the second lever on that after RED_SHARE. And at 0.60 the real
+# generated history contained a chain that ran to depth 7 - a supplier
+# failing seven times running is a stretch, and it was the tail this
+# distribution was always least confident about.
 
 # Delay (in working days) until the next attempt arrives: skewed toward
 # fast, geometrically decaying so days 1-3 carry ~79% of the probability

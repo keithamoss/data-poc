@@ -1549,3 +1549,45 @@ resolution - all relevant data is loaded before QA runs, whether a human
 or an automation triggers it, and QA then runs against the latest
 version available of each table, whether that came from this supply or
 an earlier one.
+
+26. **[todo, 2026-09-21]** **[Data generation]** Regenerating on a different day DOUBLES the committed history instead of replacing it.
+
+Found 2026-09-21 while answering Keith's question about how far Birth
+Registrations' history goes back. The answer turned out not to be a
+configuration matter at all.
+
+`qa_results/registry-services/birth-registrations/` holds **352 run
+directories, and they are two complete generations of the same history**.
+Measured, not inferred: there are exactly 176 distinct
+`(delivery_id, attempt_number)` pairs, and every single one appears
+under two `delivery_date` values one day apart.
+
+    delivery_099 attempt 3  ->  2026-08-28  AND  2026-08-29
+    delivery_094 attempt 1  ->  2026-08-23  AND  2026-08-24
+
+The cause is `generator/generate_runs.py` line 118:
+
+    START_DATE = get_anchor_date() - timedelta(days=N_DELIVERIES - 1)
+
+The schedule is anchored to **today**, and a `run_id` embeds its own
+date (`run_007_2026-05-28`). So regenerating on a different day shifts
+every delivery date, every run_id changes, and the new set lands
+ALONGSIDE the old rather than replacing it. Somebody regenerated on two
+consecutive days and the committed history silently doubled.
+
+**This is a going-forward bug, not a one-off mess to tidy.** It fires
+again on the next regeneration, it is silent - nothing errors, the
+history just grows another copy - and `qa_results/` is the permanent
+source of truth, so the growth is committed. It also means every
+measurement taken off that directory has been inflated: the "352 runs"
+this project has been quoting is really 176.
+
+Worth fixing in the same change as `REQ-PIPE-038`'s regeneration, or the
+very first run of the new pipeline reintroduces it.
+
+Shapes a fix could take, none chosen: pin the anchor date so a
+regeneration is reproducible rather than relative to today; have
+regeneration clear the dataset's directory first, which the
+delete-and-regenerate decision already permits; or stop encoding a date
+in the directory name so a re-run overwrites rather than accumulates.
+The third is the only one that also fixes it for a partial regeneration.

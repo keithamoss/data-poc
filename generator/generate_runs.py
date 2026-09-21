@@ -89,10 +89,20 @@ _RUN_PLAN_SEED = 1900  # distinct range from per-delivery seeds (1000+i) and id_
 N_DELIVERIES = 120
 
 
+# The clean/amber/red mix across the scheduled deliveries. Named rather
+# than left as magic numbers in the function below because the RED share
+# is the main lever on how big this dataset's committed history gets -
+# only a red delivery starts a resupply chain, and a chain is several
+# more runs (Keith, 2026-09-21, trimming the history toward ~145 runs
+# from a measured 176 for one generation).
+AMBER_SHARE = 0.2
+RED_SHARE = 0.12  # was 0.2
+
+
 def _build_run_plan(n: int, seed: int) -> list[tuple[int, int, str | None]]:
     rng = np.random.default_rng(seed)
-    n_amber = round(n * 0.2)
-    n_red = round(n * 0.2)
+    n_amber = round(n * AMBER_SHARE)
+    n_red = round(n * RED_SHARE)
     n_clean_middle = n - n_amber - n_red - 2  # first/last carved out separately, always clean
     middle = [None] * n_clean_middle + ["amber"] * n_amber + ["red"] * n_red
     rng.shuffle(middle)
