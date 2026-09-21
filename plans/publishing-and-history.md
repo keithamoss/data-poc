@@ -4469,15 +4469,19 @@ one Thread's narrative.
    regardless, because the log is append-only and timestamped, so the
    filing state at any T is fully recoverable.
 
-   **Flagged for the build rather than decided**: committed snapshot
-   growth. Today there are 6 snapshots totalling 1.1MB, the newest
-   ~460KB gzipped - and the page has grown a lot since (Plans, Demo and
-   Requirements tabs all landed after it). At several publishes a day
-   that is real repo growth. Suggested refinement: **deduplicate by
-   content hash** so an identical rebuild does not accumulate a
-   snapshot - `deploy-pages.yml` redeploys on pushes that change nothing
-   about the rendered page. That needs no judgement about which changes
-   "count", and leaves retention as a decision rather than a discovery.
+   **Deduplicated by CONTENT HASH** (Keith agreed, 2026-09-21) - an
+   identical rebuild does not accumulate a snapshot, since
+   `deploy-pages.yml` redeploys on plenty of pushes that change nothing
+   about the rendered page. Chosen because it needs no judgement about
+   which changes "count": if the published page differs from the last
+   snapshot, archive it; otherwise do not.
+
+   The reason this needed deciding rather than discovering: snapshots
+   are committed and meant to accumulate forever. Today there are 6
+   totalling 1.1MB, newest ~460KB gzipped - and the page has grown a lot
+   since that one (Plans, Demo and Requirements tabs all landed after
+   it). Automatic-on-every-publish without deduplication is real repo
+   growth in the one directory nothing is ever cleaned out of.
 
    ### `mothman check` validates the new config
 
