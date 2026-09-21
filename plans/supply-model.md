@@ -288,6 +288,157 @@ is sequenced AFTER this work - it is what makes the file-architecture
 question in `plans/publishing-and-history.md` item 6 answerable, and it
 needs the model here to be real first.
 
+## Test scenario register
+**Status:** todo (2026-09-22) · **Category:** Testing & dev tooling
+
+Every scenario worked through while shaping this model, pulled together
+so requirements and tests can cite one list rather than re-deriving it
+from the threads. Keith's ask, 2026-09-22, before any of this goes to
+`delivery-scoper`.
+
+**Two standing obligations, both his:**
+
+1. **Every scenario here gets a unit test.** Not a subset, not the
+   interesting ones - all of them.
+2. **The scenarios KEITH PROPOSED get INJECTED into generated
+   deliveries**, so they are visible in the real dashboard rather than
+   only green in a test run. Flagged `[INJECT]` below. The rest are
+   `[unit]` (pure logic) or `[both]` (needs a shape to drive a rendered
+   assertion).
+
+`[INJECT]` is deliberately the narrower set: these are the situations
+Keith described from real operational experience, so they are the ones
+worth being able to point at on screen. Everything else is still tested,
+just not staged in the synthetic data.
+
+**One practical requirement on the injected set**: a deliberately broken
+supply must be identifiable AS deliberate - a scenario label carried on
+the run, or a known set of run ids - or the dashboard grows permanent
+red that looks like a defect and trains people to ignore it. This is the
+same "a signal people learn to ignore is worse than no signal" concern
+that shaped the banners above.
+
+### Slot assignment
+
+- **TS-1 `[INJECT]` Forward cascade.** Supply fails 14:00, resupply
+  succeeds 16:00, a second resupply arrives 20:00 the same day. Under
+  "oldest unfilled slot" the 20:00 claims TOMORROW and every later
+  supply is permanently off by one. (Keith's scenario, Thread E.)
+- **TS-2 `[INJECT]` Backward cascade.** Two-day supplier outage, then an
+  on-time arrival. Under an always-open claim window it files as the
+  first missed day and the feed sits permanently two days behind.
+  (Keith's scenario, Thread E.)
+- **TS-3 `[INJECT]` Boundary near-miss.** Tuesday's slot due 22:00
+  Monday; the file arrives 21:57. Files to the previous slot, producing
+  a false "late" AND a false overdue on the next. (Keith's scenario,
+  Thread E.)
+- **TS-4 `[INJECT]` Arrival into an already-filled slot.** Must never
+  auto-promote whatever its status, must warn, and the warning must name
+  the blocker. (Keith's proposal, Thread B.)
+- **TS-5 `[unit]` Missed slot vacuuming a later resupply.** Tuesday
+  missed, Wednesday filled on time, a Wednesday resupply arrives - files
+  as Tuesday, RECORDING A MISSED DELIVERY AS MET. Monotonic filling is
+  the fix.
+- **TS-6 `[unit]` Monotonic filling must not eat genuine lateness.**
+  Monday's supply arriving Tuesday 03:00 with Tuesday unfilled still
+  fills Monday.
+- **TS-7 `[unit]` Ambiguous prior slot.** An arrival while an earlier
+  slot is unfilled cannot be placed by any rule; must hold for a human
+  rather than guess.
+- **TS-8 `[unit]` Order-dependence.** Two files in one batch with close
+  timestamps produce different outcomes by processing order. Replay must
+  be in arrival-timestamp order, with a defined tiebreak.
+
+### Arrival classification
+
+- **TS-9 `[INJECT]` Genuinely early quarterly supply.** Arrives three
+  weeks before due. Under `cycle_start` it resolves to the PREVIOUS
+  anchor and reads ~12 weeks late. (Keith's case, Thread D.)
+- **TS-10 `[INJECT]` Evening-before daily arrival.** 22:00 intended for
+  the next day - and note the correct answer DIFFERS depending on
+  whether today's slot is already filled, so both variants are needed.
+  (Keith's case, Thread D.)
+- **TS-11 `[unit]` Re-filed supply.** Verdict recomputes against the new
+  slot rather than persisting the old one.
+
+### Delivery and multi-table
+
+- **TS-12 `[INJECT]` Five tables load, one invalid CSV.** The canonical
+  case: five QA'd normally, one slot unfilled, dependent checks red
+  durably rather than transiently. (Keith's scenario, Thread B/I.)
+- **TS-13 `[INJECT]` Six tables landing seconds apart.** Per-table
+  triggering makes cross-table checks flicker red then green on every
+  healthy delivery. (Keith's concern, Thread B.)
+- **TS-14 `[INJECT]` Later single-table resupply.** The one bad table
+  resupplied on its own, arriving as its own delivery and triggering
+  re-QA of the period. (Keith's scenario, Thread B.)
+- **TS-15 `[unit]` Unexpected table.** Not in the schedule for that
+  period - must not break the delivery, is itself a finding.
+- **TS-16 `[unit]` Per-table classification.** One table 09:00, another
+  14:00 - a single late table must not drag five punctual ones down.
+- **TS-17 `[unit]` Transport cannot express a delivery boundary.** The
+  plumbing constraint.
+
+### Status and rollup - the false-green family
+
+- **TS-18 `[both]` Cross-table check green, candidate rejected for
+  another reason.** Keeping the verdict reads green for a period with no
+  data. This is the case that makes period-state-from-promoted-only
+  load-bearing.
+- **TS-19 `[unit]` Partial nodata rollup.** Five green plus one nodata
+  returns green, because `worstOf()` is seeded `"green"` and
+  `STATUS_ORDER.nodata` is -1.
+- **TS-20 `[unit]` `dataset_status.py` has no nodata.** A recorded
+  nodata falls through to threshold math and returns green - silent
+  divergence from the JS.
+- **TS-21 `[unit]` Table with no checks defined.** Green by vacuum over
+  an empty list.
+- **TS-22 `[both]` Freshness capping the headline.** Every check green,
+  on data a period old.
+
+### Schedule and config
+
+- **TS-23 `[unit]` Exhausted schedule.** Hard fail scoped to the one
+  dataset; the dashboard computes the banner from config alone, so it
+  renders even though the pipeline did not run.
+- **TS-24 `[unit]` Low runway.** Measured in slots, not months.
+- **TS-25 `[unit]` Config typo yielding zero slots.** `Febuary` matches
+  nothing - the exhausted state reached by accident.
+- **TS-26 `[unit]` Schedule version change.** Past periods keep the rule
+  in force at their own due date.
+- **TS-27 `[unit]` `not_expected` versus marked-missed.** One changes
+  what was OWED; the other records an obligation UNMET.
+
+### Composition and as-at
+
+- **TS-28 `[both]` Rejected Monday, promoted Friday.** "As at Wednesday"
+  must not show it - filtering is on PROMOTION, not arrival.
+- **TS-29 `[unit]` Drift with a missing reference period.** Red.
+- **TS-30 `[unit]` Drift on a brand-new dataset.** No prior period was
+  ever owed, so `nodata`, not red - otherwise every new dataset starts
+  life red on all its drift checks.
+
+### Timestamps
+
+- **TS-31 `[unit]` Naive timestamp.** Eight hours out, enough to flip
+  on-time to late or move a supply into the wrong slot.
+- **TS-32 `[unit]` Supplier-provided timestamp.** Ignored in favour of
+  our own receipt.
+
+### What this implies for sprint order
+
+**Most of the `[INJECT]` set cannot be generated at all today.** The
+generator emits whole deliveries only and never partial; produces ZERO
+early supplies (measured 0 early / 240 on time / 112 late,
+`plans/running-thoughts.md` #27); and `run_id` still carries dates. So
+`REQ-GEN-040` ("the generator can deliver one table at a time") is not
+one requirement among many - it gates whether roughly two-thirds of this
+register can be exercised against real data at all.
+
+It currently sits at sprint 6. **Recommendation, not yet agreed with
+Keith: move it earlier** - it blocks the injected shapes, and the
+injected shapes are how he sees any of this working.
+
 ## Thread A - Storage and the physical model
 **Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
 
