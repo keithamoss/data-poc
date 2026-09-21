@@ -4356,6 +4356,129 @@ one Thread's narrative.
    validates every declared table exists in the collection, and that a
    check declaring nothing genuinely is single-table.
 
+   ### Composition drops out; drift declares what it needs
+
+   Settled 2026-09-21. **Cross-period composition is not needed and
+   should not be built.** What killed it was the red-for-unrun decision
+   above: a cross-table check only runs when every participating table
+   has a filled slot for period P, so the query reads ONE schema.
+   Carry-forward was the only reason cross-period assembly existed.
+
+   Walking the consumers: QA of a staged candidate - one schema, or it
+   is red. Backfilling a new check - period P's schema. Dashboard "as at
+   T" - reads `qa_results/`, never the warehouse, so it filters RESULTS
+   by time rather than composing data (two operations that had been
+   conflated throughout this entry; the dashboard could not do the
+   latter anyway under the CI-never-touches-data rule). Downstream
+   consumers - explicitly out of scope, they own their own staleness
+   tolerance.
+
+   **Tension resolved**: Keith's early "we run against the latest
+   version available of each table" referred to the OPERATIONAL
+   warehouse, which is downstream and out of scope, and the promotion
+   concept now covers it. It was never a statement about this tool.
+
+   What survives: **picking the newest version of a table WITHIN one
+   period's schema** (a schema can hold a supply plus its resupplies) -
+   trivial, and a different thing from assembly across time.
+
+   **Drift and trend declare a temporal dependency**, the same shape as
+   `depends_on` for cross-table checks:
+
+   ```yaml
+         depends_on: [cp_clients]        # another table, same period
+         reference: previous_period      # or baseline: <date>, or window: N
+   ```
+
+   The reference choice is a real design decision, not a tuning knob -
+   **previous period** catches sudden shifts, **a fixed baseline**
+   catches slow drift over years, **a rolling window** smooths noise.
+   Different checks, not different settings.
+
+   Two cases fall out of rules already set:
+   - **Reference period was expected but is missing** -> cannot run ->
+     **red**. Identical to a missing table dependency; the dependency is
+     temporal rather than lateral.
+   - **No reference because the dataset is brand new** -> no prior
+     period was ever owed -> **`nodata`, not red**. The owed-versus-not-
+     owed boundary again. Without it every new dataset starts life red
+     on all its drift checks, which is how people learn to ignore a
+     signal.
+
+   ### One database, many schemas - replacing the per-run warehouses
+
+   Keith, 2026-09-21, and it is a strictly better answer to the problem
+   the per-run databases were solving. Their justification (see
+   `qa_tools/bdm/build_per_run_warehouses.py`'s own docstring) is that
+   dbt and Soda have no `run_id`-scoped `WHERE`, so a per-run verdict
+   needs a database holding exactly one run. **Schema-per-period gives
+   the same isolation AND matches the real operational system**, instead
+   of being a test-only construct that exists nowhere in production.
+
+   It also removes a build consequence flagged a moment earlier: a drift
+   check's reference period is another schema in the same database, so
+   it is an ordinary cross-schema query rather than something that must
+   be copied into a sealed database first. Mechanically it is the same
+   lever, different field - dbt resolves sources through database/schema
+   in its profile, and Soda's configuration carries a schema too.
+
+   **Test isolation needs doing deliberately.** The per-run databases
+   were also providing incidental isolation for parallel tests -
+   `pytest-xdist` is the default now, and `DUCKDB_RUNS_DIR` being unique
+   per run is what fixed the dbt target-path collision (`plans/running-
+   thoughts.md` #12). One shared database puts several workers in one
+   file. Fix: **one database per test worker** via `tmp_path_factory`,
+   the same pattern the other tools' fixtures already use. Agreed with
+   Keith rather than discovered as flaky tests later.
+
+   ### "As at T" defaults to AS-CORRECTED; snapshots are as-published
+
+   Settled 2026-09-21. A supply filed to Monday reads late; on 12 August
+   someone re-files it to Tuesday where it was on time. The 5 August
+   view can show either.
+
+   - **As-published** - shows it late, forever. What the dashboard said
+     that day.
+   - **As-corrected** - shows it on time, because we now know it was.
+
+   Both legitimate, different questions: "what did the dashboard say
+   when I approved that promotion?" wants the first; "was this supplier
+   actually late in August?" wants the second, since a performance
+   number built from known-wrong verdicts is simply wrong.
+
+   **The live dashboard defaults to AS-CORRECTED.** The deciding
+   argument: this design spent a whole session eliminating cases where
+   the system says something untrue, and as-published deliberately
+   preserves a falsehood already identified and fixed. A correction
+   nobody sees by default is not doing much work.
+
+   **The as-published view is the SNAPSHOT archive, not a toggle** -
+   `dashboard/snapshots/*.html.gz` is already a frozen, self-contained
+   copy openable years later, immutable in a way a recomputed view can
+   never be. Good split, and it needs no new mechanism.
+
+   **Snapshots become automatic on every publish - opt-out, not opt-in**
+   (Keith). Today they are opt-in via `SNAPSHOT_DASHBOARD=1`, which
+   makes the as-published record SPARSE: it exists for moments someone
+   chose, not continuously.
+
+   **Decision-log visibility**: where decisions have been made, the
+   dashboard shows them clearly - the live view shows truth, snapshots
+   show what was published, and the decision log explains every
+   difference between them. Also note both views are computable
+   regardless, because the log is append-only and timestamped, so the
+   filing state at any T is fully recoverable.
+
+   **Flagged for the build rather than decided**: committed snapshot
+   growth. Today there are 6 snapshots totalling 1.1MB, the newest
+   ~460KB gzipped - and the page has grown a lot since (Plans, Demo and
+   Requirements tabs all landed after it). At several publishes a day
+   that is real repo growth. Suggested refinement: **deduplicate by
+   content hash** so an identical rebuild does not accumulate a
+   snapshot - `deploy-pages.yml` redeploys on pushes that change nothing
+   about the rendered page. That needs no judgement about which changes
+   "count", and leaves retention as a decision rather than a discovery.
+
    ### `mothman check` validates the new config
 
    Keith, 2026-09-21: the new asset and schedule YAML gets validated
