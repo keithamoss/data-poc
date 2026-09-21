@@ -3490,6 +3490,98 @@ one Thread's narrative.
    reason. Excepted periods must be SHOWN rather than silently omitted,
    so a late-added exception cannot quietly erase red history.
 
+   ### The asset owns the calendar; the dataset owns participation
+
+   Settled 2026-09-21, prompted by real scale Keith supplied mid-thread:
+   the quarterly asset will carry **~30 datasets**, of which roughly 70%
+   arrive every quarter and the rest once or twice a year - still landing
+   on one of the same four dates, just not all of them. "The quarterly
+   asset" is therefore slightly the wrong name: the ASSET has a quarterly
+   rhythm, and DATASETS participate in it at different rates.
+
+   So there is one authored calendar per asset per year (the once-a-year
+   human task settled above), and each dataset names which of those dates
+   it is in. Inheritance is the default - say nothing, get all of them.
+
+   ```yaml
+   # asset
+   calendar:
+     - effective_from: 2026-01-01
+       dates: [2026-02-02, 2026-05-01, 2026-08-03, 2026-11-02]
+
+   # dataset: silent -> all four
+   # dataset: annual
+   delivery_months: [February]
+   # dataset: twice yearly
+   delivery_months: [February, August]
+   ```
+
+   Why one calendar rather than a date list per dataset, and it is a
+   scale argument rather than a tidiness one: **30 independent date lists
+   can drift.** Dataset A saying 2 February and dataset B saying 3
+   February for the same delivery window is a class of bug nothing would
+   ever flag. One calendar makes it impossible by construction.
+
+   Detail decisions:
+   - **Month NAMES, not numbers or positional indices.** Indices break
+     silently if the calendar is edited or reordered; names stay
+     meaningful and match how people talk about it. Full names only,
+     case-insensitive - not `Feb` as well, since two accepted forms
+     means config reading differently across 30 datasets for no gain.
+   - **`delivery_months`, never shortened to `months`.** It names when a
+     supply ARRIVES, not the period it covers - a 2 February delivery is
+     often for the November-January period, so the short form invites
+     exactly the wrong reading. (Confirmed with Keith after a dictation
+     ambiguity pointed the other way.)
+   - **CI-gated in `mothman check`, and it is load-bearing rather than
+     tidiness**: a typo like `Febuary` matches no delivery date, so the
+     dataset silently has ZERO slots - which is the exhausted-schedule
+     state, reached by accident, on a dataset nobody is watching. A
+     config typo must not be able to produce the condition the hard
+     failure below exists to catch.
+   - **A dataset may fully override with its own dates** rather than
+     subsetting the calendar. No such dataset exists today (Keith:
+     everything is aligned to one of the four days), but it is cheap now
+     and awkward to retrofit once 30 datasets assume subsetting. Same
+     effective-dating, changelog and runway check as the asset calendar.
+
+   ### Exhausted schedule - hard failure, scoped per dataset
+
+   Keith's call, 2026-09-21, stronger than the "read UNKNOWN" option
+   proposed above and for a good reason: it cannot be ignored. Once the
+   runway warning has fired and nobody has filled in the dates, the
+   pipeline refuses to process that dataset. Supplies pile up in
+   staging, which is safe - staging only ever asserts arrival facts, so
+   the backlog drains CORRECTLY once dates are added, filed to the right
+   slots and classified against the right `due_at`, not approximated.
+
+   Four constraints that make hard failure safe rather than a quieter
+   way to go silent:
+   1. **The dashboard computes "exhausted" itself, from config.** If the
+      pipeline fails, no new `qa_results/` are written, so the dashboard
+      rebuilds to exactly what it showed yesterday - and a dashboard
+      that stopped updating looks identical to one where nothing
+      changed. The schedule is CONFIG, not data, so the build can derive
+      the banner with no data access and no dependency on the run that
+      did not happen (CLAUDE.md's CI-never-touches-data rule is
+      satisfied).
+   2. **Scope the failure to the dataset whose schedule ran out**, never
+      the whole run. At 30 datasets, one neglected annual dataset
+      halting the other 29 is how a check gets disabled wholesale.
+   3. **Fail at FILING, before QA runs.** A supply with no slot cannot be
+      classified (no `due_at`) or promoted (no target schema), so QA
+      would produce results that cannot be filed anywhere. Keith's own
+      preference too: a clear signal beats half-processing.
+   4. **The banner counts SUPPLIES WAITING, not days elapsed.** "14
+      supplies in staging, unprocessed since 2 November" scales its own
+      urgency - daily and quarterly feeds pile up at very different
+      rates.
+
+   At 30 datasets the runway warning must **aggregate** ("3 datasets
+   have fewer than 2 supplies remaining"); 30 individual banners is
+   noise. Same for staleness - the top-level view summarises rather than
+   enumerates.
+
    ### Early/onTime/late - a real gap in the current classifier
 
    NOT yet settled with Keith - recorded because the finding itself is
