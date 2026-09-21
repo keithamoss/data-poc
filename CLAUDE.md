@@ -190,6 +190,27 @@ it, including the project's origin in a claude.ai session with no
 internet access, later picked up by a Claude Code session with real
 access to actually run the tools).
 
+**The scale this is a PoC FOR, not the scale it currently runs at -
+Keith's own standing instruction, 2026-09-21: "factor that into all
+decisions and all advice."** Today there are 2 datasets. The real target
+is **two data assets, each managed by a different team in a strictly
+separated cloud environment, with its own deployment and its own
+dashboard** (same codebase, entirely separate instances - so the asset
+is a deployment's identity, not a row in the data), and **roughly 30
+datasets on the quarterly asset alone**. A third and possibly fourth
+asset shape is coming too: QA of one-off data extractions for individual
+projects, which has supplies but no cadence at all.
+
+Why it matters for advice rather than just for planning: a design that
+is fine at 2 datasets routinely fails at 30 (per-dataset banners become
+noise that must aggregate; a failure scoped to a whole run instead of
+one dataset gets disabled by users; navigation built for a 2-item tree
+is a different problem at 30), and a design that assumes a recurring
+supply excludes the project-extraction shape entirely. Neither is
+visible from the current repo, so it has to be carried in deliberately.
+See `plans/publishing-and-history.md` item 6 and `plans/running-
+thoughts.md` #23 for the design work this is feeding.
+
 Rough layout:
 
 | Path | What |
