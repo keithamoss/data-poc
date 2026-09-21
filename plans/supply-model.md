@@ -249,8 +249,8 @@ comparisons against the expected-supply sequence.
     validation, and `REQ-QAC-037` lifting cross-table checks to the
     collection scope (Thread I).
 
-    The `nodata` rule is not computable without `depends_on` - "any table
-    it spans" is not knowable from a tool's check syntax.
+    The cannot-run rule is not computable without `depends_on` - "any
+    table it spans" is not knowable from a tool's check syntax.
 
 16. **[todo, 2026-09-21]** **[QA checks & contract]** **Red-for-unrun.**
     The status, its qualifying chip, and the pointer indicator on a
@@ -1027,12 +1027,26 @@ one DELIVERY. The delivery is a grouping for presentation ("these six
 landed together"), never the unit of filing.
 
 **This makes an earlier decision implementable.** Keith had already
-settled that a multi-table check should read `nodata` when a table it
-spans is missing - but there was no fact to test that against until
-slots became per-table. It is now a crisp condition:
+settled that a multi-table check should signal when a table it spans is
+missing - but there was no fact to test that against until slots became
+per-table. It is now a crisp condition:
 
-> A multi-table check is `nodata` for a period if ANY table it spans
-> has an unfilled slot for that period.
+> A multi-table check CANNOT RUN for a period if ANY table it spans has
+> an unfilled slot for that period.
+
+**What that renders as is RED with a qualifying chip, not `nodata`** -
+see Thread I, which supersedes the `nodata` wording this section
+originally carried. Corrected 2026-09-22 when Keith asked how the
+five-tables-land-one-fails case works and quoted the old wording back,
+which is how the contradiction surfaced: Thread I already said red, and
+recorded that it was written as a replacement "so the file does not hold
+two contradictory designs" - while this section still said `nodata`.
+
+The distinction matters most in exactly this scenario. Five green tables
+plus one `nodata` check rolls up GREEN, because `worstOf()` is seeded
+`"green"` and `STATUS_ORDER.nodata` is -1, so a `nodata` can never win.
+Red wins by construction. The case that prompted the rule is the case
+the old wording would have failed.
 
 Same for the five-tables-land-one-fails case Keith raised early on:
 five slots filled, one unfilled and going overdue, rather than a
@@ -1294,13 +1308,14 @@ possibly deferrable, but not to be assumed away.
   follows from lifting multi-table checks to collection level.
 
 **The trap that started this, to be written down as INTENDED
-behaviour**: a multi-table check reads `nodata` even though the
-composed warehouse holds data for every table it spans. Carried-
-forward data from another period makes a cross-table result
+behaviour**: a multi-table check REFUSES TO RUN - and so reads red -
+even though the composed warehouse holds data for every table it spans.
+Carried-forward data from another period makes a cross-table result
 meaningless, so this is correct and deliberate - but it reads like a
 bug to anyone encountering it cold ("we have the data, why is it not
-checking?"), and would be helpfully "fixed" by a later session
-without the reasoning attached.
+checking?"), and would be helpfully "fixed" by a later session without
+the reasoning attached. (Wording corrected 2026-09-22 - this sentence
+predated the red-with-a-chip decision below and still said `nodata`.)
 
 #### Worked example, and what it must display
 
@@ -1429,8 +1444,8 @@ hand-authored alongside `check_id`/`name`/`introduced_date`:
       depends_on: [cp_clients]
 ```
 
-**This is not only for the message.** The nodata rule itself -
-"nodata if any table it spans has an unfilled slot" - is NOT
+**This is not only for the message.** The cannot-run rule itself -
+"a check cannot run if any table it spans has an unfilled slot" - is NOT
 COMPUTABLE without it. That phrase had been written throughout as
 though "any table it spans" were a known quantity; it is not.
 
