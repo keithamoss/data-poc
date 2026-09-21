@@ -152,7 +152,20 @@ comparisons against the expected-supply sequence.
    First because it is baked into all 257 hand-authored checks; changing
    it later is a corpus-wide edit.
 
-2. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Status parity
+2. **[todo, 2026-09-22]** **[Data generation]** **Generator delivers one
+   table at a time, and injects the scenario shapes.** `REQ-GEN-040`,
+   plus the `[INJECT]` set from the test scenario register below, plus
+   the generated scenario map that says where each one landed.
+
+   **Moved here from sprint 6** (Keith, 2026-09-22). It gates roughly
+   two-thirds of the test scenario register: the generator today emits
+   whole deliveries only and never partial, produces ZERO early supplies
+   (measured 0 early / 240 on time / 112 late), and `run_id` still
+   carries dates. Until this lands, most of the model cannot be
+   exercised against real data at all - and the injected shapes are how
+   Keith sees any of it working.
+
+3. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Status parity
    between the two implementations.** `qa_tools/common/dataset_status.py`
    has no `nodata` at all, so a recorded `nodata` falls through to
    threshold math and returns green (Thread I).
@@ -162,14 +175,14 @@ comparisons against the expected-supply sequence.
    failure mode, which that module's own docstring says it already
    suffered once.
 
-3. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Timezone
+4. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Timezone
    parameter.** One repo-wide config value replacing
    `pipeline/cadence.py`'s hardcoded `AWST_OFFSET`; stored timestamps
    carry their offset (Thread H).
 
    Small, independent, and every later sprint compares instants.
 
-4. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Schedule config
+5. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Schedule config
    and its validation gate.** Authored dates (quarterly) or cadence rule
    (daily), `delivery_months` participation, `effective_from` plus
    changelog, `not_expected` (Thread C); `mothman check`'s
@@ -178,19 +191,12 @@ comparisons against the expected-supply sequence.
    The gate ships WITH the config, not after: a typo silently yields zero
    slots, which is the exhausted-schedule state arriving by accident.
 
-5. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Slots.** The
+6. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Slots.** The
    `(period, due_at)` sequence derived from the schedule, the low-runway
    warning measured in slots, and the hard failure on an exhausted
    schedule (Thread C).
 
    The spine. Nothing downstream can be built before it.
-
-6. **[todo, 2026-09-21]** **[Data generation]** **Generator delivers one
-   table at a time.** `REQ-GEN-040`.
-
-   Sits here because it is what makes the next three sprints testable at
-   all - every rule in them is about awkward arrival sequences, and none
-   can be exercised while the generator only emits whole deliveries.
 
 7. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Arrival and
    staging.** Our own receipt timestamp, never the supplier's; staging
@@ -311,12 +317,34 @@ Keith described from real operational experience, so they are the ones
 worth being able to point at on screen. Everything else is still tested,
 just not staged in the synthetic data.
 
-**One practical requirement on the injected set**: a deliberately broken
-supply must be identifiable AS deliberate - a scenario label carried on
-the run, or a known set of run ids - or the dashboard grows permanent
-red that looks like a defect and trains people to ignore it. This is the
-same "a signal people learn to ignore is worse than no signal" concern
-that shaped the banners above.
+**No scenario label on the runs** - Keith, 2026-09-22: "this is still
+just a proof of concept remember". A first draft here argued for one, to
+stop the dashboard growing permanent red that looks like a defect. For a
+PoC that is over-building; the red IS the point, and the audience knows
+it is synthetic.
+
+**Instead: a SCENARIO MAP** - "which scenario, and where do I go to look
+at it". Keith's own ask, so he can find each injected shape in the real
+dashboard rather than hunting for it.
+
+- **Generated, never hand-maintained.** The generator injects the
+  shapes, so the generator is the only thing that reliably knows where
+  each one landed. A hand-written map drifts the first time the data is
+  regenerated - and regeneration is routine here, since everything is
+  seeded.
+- **Committed markdown**, because the dashboard build reads committed
+  files only and may never touch `data/` (CLAUDE.md's standing rule).
+  Same shape as `plans/INDEX.md`, which is already exactly this pattern:
+  generated, committed, "do not hand-edit", with a CI check that fails
+  when it disagrees with its source.
+- **Rendered in the dashboard** for PoC purposes, alongside the existing
+  embedded-markdown paths (`PLANS`, `RELEASE_NOTES`).
+- **A `mothman` subcommand regenerates it**, per the standing rule that
+  every new script gets one in the same change that adds it.
+
+Each entry wants scenario id, dataset, the run or runs it occupies, and
+the date, so "TS-1, Birth Registrations, run_047-run_049, 2026-07-14"
+tells Keith exactly where to click.
 
 ### Slot assignment
 
@@ -435,9 +463,11 @@ early supplies (measured 0 early / 240 on time / 112 late,
 one requirement among many - it gates whether roughly two-thirds of this
 register can be exercised against real data at all.
 
-It currently sits at sprint 6. **Recommendation, not yet agreed with
-Keith: move it earlier** - it blocks the injected shapes, and the
-injected shapes are how he sees any of this working.
+**Moved to sprint 2** (Keith agreed, 2026-09-22) from sprint 6 - it
+blocks the injected shapes, and the injected shapes are how he sees any
+of this working. Safe to renumber at the time: nothing outside this file
+cited a sprint id, and the two internal references point at sprints 8
+and 10, which did not move.
 
 ## Thread A - Storage and the physical model
 **Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
