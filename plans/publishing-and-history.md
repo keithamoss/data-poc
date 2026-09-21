@@ -3416,6 +3416,115 @@ one Thread's narrative.
       of good data, so it should presumably hold rather than promote -
       but it is an edge case the rule as stated leaves open.
 
+   ### The schedule - what exists, what changes
+
+   Most of this already exists and was nearly reinvented. `pipeline/
+   cadence.py` plus each contract's `slaProperties:` already carries
+   `cadenceType`/`cadenceAnchorMonths`/`cadenceDayOfMonth`/
+   `expectedTime`/`latency`, and already provides `cycle_start()`
+   ("as at this date, what is the most recent day a delivery was
+   expected") and `classify_arrival()` (early/onTime/late). Check there
+   before designing anything schedule-shaped.
+
+   **Quarterly uses authored DATES; daily uses a cadence rule.**
+   Settled 2026-09-21 (Keith). Not a compromise - they are different
+   shapes. 365 daily dates would be absurd to enumerate and the rule
+   genuinely is "every day"; four quarterly dates a year are known well
+   in advance, and the real agreed day is "the closest business day to
+   the 1st", which a `day_of_month: 1` rule does not express.
+
+   Both authoring styles produce the same thing - a sequence of
+   `(period, due_at)`. Everything downstream consumes that sequence and
+   never knows which produced it.
+
+   Two alternatives were worked through and rejected, both worth not
+   re-deriving:
+   - **Runtime derivation from a holiday library** (nearest/earliest/
+     latest business day + an AU-WA holiday package, Keith's own
+     counter-proposal). Technically fine - and note his correction to
+     an overstated objection here: holiday packages are year-keyed, so
+     a later gazette amendment does NOT silently rewrite a settled past
+     date. The reason it still loses does not depend on library quality
+     at all: **the dates ARE the supplier agreement, and QA judges
+     against the agreement.** A calendar predicts it; it does not
+     constitute it.
+   - **Derive at runtime, freeze the computed `due_at` onto the result
+     when a slot is evaluated.** Elegant, no annual maintenance, history
+     immutable because the judgement is recorded rather than its inputs
+     pre-written. Rejected for the same agreement-is-the-authority
+     reason, and because it leaves nowhere to record a date that
+     differs from what the rule would generate.
+
+   Generation stays available as a CONVENIENCE (a `mothman` subcommand
+   printing a year's dates for a human to review, edit and commit) -
+   never as the evaluation path.
+
+   **A date list runs out, and that is the dangerous part.** Raised
+   against my own proposal rather than discovered later: if nobody adds
+   next year's dates, the schedule has no slots, so nothing is ever
+   expected, so nothing is ever overdue - the dashboard goes QUIET
+   rather than red. Same false-green shape as the staleness problem
+   above. Two requirements follow:
+   - **Warn on low runway, measured in SLOTS not months** (months
+     mislead - three months of quarterly runway is one slot). "Fewer
+     than N expected supplies remain", N=2 giving ~6 months on the
+     quarterly asset. Applies only to date-list schedules; a
+     cadence-generated one is infinite and cannot run out.
+   - **An exhausted schedule reads UNKNOWN, never green.** No slot
+     covering the viewed date means staleness and overdue have nothing
+     to compare against, so the honest answer is "cannot tell".
+   Surface in both the dashboard and as a non-fatal CI warning - the
+   person who must act maintains config, not necessarily the one
+   reading the dashboard.
+
+   **Schedule versions are effective-dated, with a changelog** (Keith
+   approved 2026-09-21), same shape and same reason as check lifecycle:
+   a period is evaluated against the schedule version in force at that
+   period's due date, so changing a supplier's cadence does not
+   retroactively turn met periods into breaches.
+
+   **Exceptions collapse to one kind.** Authored dates make a changed
+   quarterly date an ordinary edit (`effective_from` + changelog), not a
+   second mechanism. What survives is only a daily feed paused for a day
+   or two by a source-system upgrade - `not_expected: [dates]` plus a
+   reason. Excepted periods must be SHOWN rather than silently omitted,
+   so a late-added exception cannot quietly erase red history.
+
+   ### Early/onTime/late - a real gap in the current classifier
+
+   NOT yet settled with Keith - recorded because the finding itself is
+   real and independent of how it gets fixed.
+
+   `classify_arrival()` derives the cycle from the arrival date
+   (`cycle_start(cadence, run_date)`), and `cycle_start` is defined as
+   the most recent expected day AT OR BEFORE its input - it can only
+   look backwards. So "early" today can only mean early WITHIN a cycle
+   (expected 09:00, arrived 07:00). A genuinely early supply resolves to
+   the PREVIOUS cycle and is reported late against it - worked example:
+   a quarterly supply arriving 2026-07-25 for the 2026-08-01 anchor
+   resolves to the 2026-05-01 anchor and reads ~12 weeks late. The daily
+   case is the same: a 10pm arrival intended for the next day reads late
+   against the current one.
+
+   Not a bug against today's behaviour - no early supplies exist in the
+   generated data at all (`plans/running-thoughts.md` #27 measured 0
+   early / 240 on time / 112 late), so nothing currently mis-classifies.
+   It is a gap against the model settled above, which has early supplies
+   as a first-class case.
+
+   Proposed fix, still to be agreed: **classify against the period the
+   supply was FILED to, rather than one inferred from its arrival
+   date** - a signature change (`classify_arrival(cadence,
+   assigned_period, arrival)`), not a new cadence property. Promotion
+   already decides the period, using information `cycle_start` does not
+   have (which slots are already filled); deriving it a second time here
+   creates two implementations of one concept that can disagree, the
+   `plans/qa-pipeline.md` item 74 failure mode, with "filed to Q3,
+   reported late for Q2" as the visible symptom. A side effect worth
+   keeping: it REMOVES a property rather than adding one - once the slot
+   is known, "early" is just `arrival < due_at`, so the earliness window
+   is a promotion/filing parameter, not a cadence one.
+
 7. **[done, 2026-09-19]** **[Pipeline & publishing]** Both GitHub Actions
    workflows are pinned to a single, hardcoded session branch name -
    `on: push: branches: [claude/new-session-en9qen]` in
