@@ -477,102 +477,102 @@ discovering:
    of good data, so it should presumably hold rather than promote -
    but it is an edge case the rule as stated leaves open.
 
-### A period is QA'd once it is READY, not on every table's arrival
+### The DELIVERY is the arrival unit, and QA triggers on it
 
-Keith, 2026-09-22, and it closes a real gap: **a delivery must be fully
-staged before QA runs over it**, or multi-table checks evaluate against a
-half-arrived period.
+Keith, 2026-09-22. A delivery arrives, is loaded into staging as one
+package, and QA triggers on that delivery. Replaces a first attempt the
+same day that defined readiness over EXPECTED tables and needed a
+clock-driven sweep to resolve ones that never showed - Keith's own call
+("would rather not add a clock driven trigger"), and it turns out to
+remove the clock from the model entirely.
 
-**What breaks without it.** Six CP tables land seconds apart -
-`cp_clients` 09:00:00, `cp_notifications` 09:00:04. Clients arrives, QA
-runs, "Client reference" depends on notifications whose slot is still
-unfilled, so it reads RED. Four seconds later notifications arrives and
-it reads green. The check flickers red on every healthy delivery. Note
-the model is not LYING at 09:00:00 - notifications genuinely had not
-arrived - it is transiently true and practically useless, and at 30
-datasets a red that appears on every normal delivery is how people learn
-to ignore red.
+**What breaks without a delivery concept.** Six CP tables land seconds
+apart - `cp_clients` 09:00:00, `cp_notifications` 09:00:04. Under
+per-table triggering, clients arrives, QA runs, "Client reference"
+depends on notifications whose slot is still unfilled, so it reads RED.
+Four seconds later notifications arrives and it reads green. The check
+flickers red on every healthy delivery. The model is not LYING at
+09:00:00 - notifications genuinely had not arrived - it is transiently
+true and practically useless, and at 30 datasets a red appearing on
+every normal delivery is how people learn to ignore red.
 
-**The unit is the DELIVERY, not the supply.** A supply is one table, so
-"load the whole supply at once" only means "do not load half a table's
-rows". And it cannot mean atomic in the roll-back sense, or the
-five-tables-land-one-fails case breaks: all-or-nothing would refuse the
-five Keith explicitly wants QA'd.
+> **A delivery is loaded into staging as one package, and QA runs once
+> over it.** A table that failed to load simply is not in it - its slot
+> stays unfilled and dependent checks are red DURABLY and correctly,
+> rather than transiently.
 
-> **Stage everything in the delivery, then run QA once for that period.**
-> A table that failed to load simply did not arrive successfully - its
-> slot stays unfilled and dependent checks are red DURABLY and
-> correctly, rather than transiently.
+Not atomic in the roll-back sense: the five-tables-land-one-fails case
+requires the five to be staged and QA'd, so a failed sixth does not
+refuse the delivery.
 
-**Readiness comes from the schedule, not a window.** Both alternatives
-are already ruled out elsewhere in this file - supplier-declared
-manifests (unenforceable across a varied supplier base) and temporal
-windows (Keith, explicitly: "I don't want to use a temporal window on
-that"). So the same answer as everywhere else, we know what is OWED:
+**Why this is not the supplier-declared manifest already rejected.** The
+distinction is sharp and worth keeping sharp. What was rejected is a
+supplier DECLARING which period their data is for - a judgment we would
+have to trust and cannot enforce across a varied supplier base. A
+delivery is an OBSERVED TRANSPORT UNIT: one folder drop, one S3 prefix,
+one SFTP session. A physical fact about how the data landed, which we
+can see for ourselves. Nobody is asserting anything; we are noticing
+what arrived together.
 
-> A period is ready to QA when every expected table for it has either
-> **loaded successfully or failed to load** - RESOLVED, not merely
-> ARRIVED. A table that never shows resolves when its due time passes.
+#### What this removes
 
-"Resolved" rather than "arrived" is what makes the invalid-CSV case work
-with no waiting at all: that table's outcome is known the instant the
-load fails, so QA runs immediately with five tables and one unfilled
-slot.
+1. **No clock-driven trigger anywhere.** The earlier attempt needed a
+   periodic "have any due times passed?" sweep, to resolve an expected
+   table that never showed. Under delivery-triggering there is nothing
+   to resolve: the delivery arrived with five tables, QA ran on it, and
+   the sixth table's slot is simply unfilled. If it turns up later it
+   arrives as its own delivery and triggers its own QA.
 
-**Arrival is still the trigger** - it triggers a READINESS CHECK, and QA
-runs when the period is ready. For single-table Birth Registrations,
-readiness is satisfied by the one arrival, so nothing changes. For a
-November resupply of August's clients, the other five resolved long ago,
-so it runs immediately too.
+2. **No timeout on the "table never shows" path.** That whole mechanism
+   existed only because readiness had been defined over EXPECTED tables
+   rather than over what actually arrived together.
 
-#### What running this up turned over
+3. **Overdue needs no trigger either** - a correction to the earlier
+   claim that it did. **Overdue is a computed property, not an event**:
+   "which slots are past due and unfilled" is a query over the schedule
+   plus slot state, evaluated whenever the dashboard is built or read.
+   The same pattern already settled for the exhausted-schedule banner,
+   which the dashboard computes from config rather than being told
+   about.
 
-1. **"Failed to load" is a check result, not a separate concept.** An
-   invalid CSV, a missing file, zero bytes, a bad encoding, a schema
-   that does not match - all are red QA findings on that table (settled
-   earlier: a supply that cannot be loaded is red). Readiness does not
-   need its own taxonomy of failure; it needs to know the table reached
-   a verdict.
+#### What it costs, and what is still open
 
-2. **A clock-driven trigger is genuinely NEW to this model.** Every
-   trigger so far has been an arrival. But "a table that never shows
-   resolves when its due time passes" needs something to NOTICE the due
-   time passing - nothing arrives to prompt it. So the system needs a
-   periodic sweep asking "have any due times passed?", which is the
-   first non-arrival trigger in the design and wants naming as such
-   rather than being discovered during the build. It is also what drives
-   overdue detection generally, so it earns its place twice.
+**The delivery boundary becomes load-bearing, and it comes from the
+transport.** A source whose transport cannot express one - six unrelated
+S3 PUTs with no common prefix - puts us back to guessing. So the design
+must state what constitutes a delivery PER SOURCE, and a source that
+cannot express a boundary needs one arranged: a folder convention, a
+trigger file, a batch endpoint. That is an operational transport
+arrangement rather than asking a supplier to classify their data - still
+a different thing from the rejected manifest - but it is a real
+requirement on how each feed is plumbed, and should be explicit rather
+than assumed.
 
-3. **An UNEXPECTED table is a finding, not a readiness problem.** A
-   table arriving that the schedule does not list for that period must
-   not block readiness, which is defined over EXPECTED tables. But
-   receiving something nobody asked for is worth surfacing in its own
-   right - it usually means a supplier changed their extract without
-   telling anyone, which is exactly the class of thing this tool should
-   catch. Unresolved: whether it is red, or an informational finding.
+Also carried over from working this through, and unchanged by the
+delivery model:
 
-4. **Re-QA is ordinary, and history keeps both runs.** August was QA'd
-   with five tables; November's resupply makes the period ready again
-   and QA runs afresh. Each run's results attach to the supplies it
-   evaluated, the period's CURRENT state is the latest, and
-   `qa_results/` keeps every run - which is the whole point of it being
-   permanent. Readiness is therefore not a one-way latch: it stays
-   satisfied, and a new arrival simply triggers a fresh pass.
+- **"Failed to load" is a check result, not a separate concept.** An
+  invalid CSV, a missing file, zero bytes, a bad encoding, a schema that
+  does not match - all are red QA findings on that table (settled
+  earlier: a supply that cannot be loaded is red). No separate taxonomy
+  of failure is needed.
+- **An UNEXPECTED table is a finding, not a delivery problem.** A table
+  the schedule does not list for that period must not break the
+  delivery, but receiving something nobody asked for usually means a
+  supplier changed their extract without telling anyone - exactly what
+  this tool should catch. Unresolved: red, or informational.
+- **Re-QA is ordinary, and history keeps both runs.** August QA'd with
+  five tables; November's resupply arrives as its own delivery and QA
+  runs afresh. Each run's results attach to the supplies it evaluated,
+  the period's CURRENT state is the latest, and `qa_results/` keeps
+  every run - the whole point of it being permanent.
 
-5. **A race worth accepting rather than engineering around.** Five
-   tables staged, the sixth still uploading, and its due time passes:
-   the sweep resolves it as missing, QA runs, and the sixth lands thirty
-   seconds later triggering a re-QA. Slightly wasteful, entirely
-   correct, and cheaper than any mechanism that tries to predict an
-   in-flight upload.
-
-**Two things to re-read against this rather than assume**: the
-arrival-triggers-QA text in Thread I (so the file does not carry two
-versions of the trigger rule - the mistake made with `nodata` on
-2026-09-22), and `REQ-PIPE-036` ("a dataset's own arrival triggers its
-own QA run"), whose intent probably survives - CP's QA stays independent
-of BDM's - but whose WITHIN-collection timing is now specified where it
-was not.
+**To re-read against this rather than assume**: the arrival-triggers-QA
+text in Thread I (so the file does not carry two versions of the trigger
+rule - the mistake made with `nodata` on 2026-09-22), and
+`REQ-PIPE-036` ("a dataset's own arrival triggers its own QA run"),
+whose intent probably survives - CP's QA stays independent of BDM's -
+but which now triggers on a DELIVERY rather than on a table.
 
 ## Thread C - The schedule
 **Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
@@ -1404,11 +1404,10 @@ possibly deferrable, but not to be assumed away.
 
   **ARRIVAL triggers QA, never promotion** (Keith's correction,
   2026-09-22, against a claim that promoting the missing table
-  "re-triggers" the checks blocked on it). **Refined the same day** -
-  arrival triggers a READINESS CHECK, and QA runs once the period is
-  ready; see Thread B's "A period is QA'd once it is READY" for why
-  per-arrival QA makes cross-table checks flicker red on every healthy
-  delivery. Promotion is an OUTCOME of
+  "re-triggers" the checks blocked on it). **Refined the same day** - the
+  trigger is a DELIVERY, not a single table's arrival; see Thread B's
+  "The DELIVERY is the arrival unit" for why per-table QA makes
+  cross-table checks flicker red on every healthy delivery. Promotion is an OUTCOME of
   QA, so it cannot also be its input - promotion-as-trigger loops:
   arrival -> QA -> promote -> QA -> promote. `depends_on` determines
   SCOPE, not timing: a resupplied `cp_clients` arriving means QA runs
