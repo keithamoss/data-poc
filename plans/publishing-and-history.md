@@ -4255,22 +4255,67 @@ one Thread's narrative.
    headline is worst-of (quality, freshness) and cannot read clean
    green.
 
-   The one new piece: **a nodata check is excluded from the quality
-   worst-of** (a check that did not run has no verdict to offer) **and
-   surfaced as a COUNT instead** - "18 of 24 checks evaluated".
-   Excluded from severity math, impossible to overlook. This also
-   preserves what Keith asked for early on: the five healthy tables are
-   not dragged to red by a sibling's failure, while the cross-table
-   check that genuinely was impacted stops being invisible.
+   #### A check that could not run is RED, with a qualifying chip
 
-   What each level shows (Keith, 2026-09-21 - his own instinct that
-   `cp_notifications` should "light up" with an obvious warning):
+   **Keith's proposal, 2026-09-21, and it SUPERSEDES the exclude-from-
+   worst-of-plus-a-count approach first drafted here** (that version:
+   nodata leaves the quality worst-of, and an "18 of 24 checks
+   evaluated" count carries the signal instead). Recorded as a
+   replacement rather than an alternative so the file does not hold two
+   contradictory designs.
+
+   The check lights up **red**, with a secondary qualifying chip noting
+   the cause is missing data. Status says how bad; the chip says why.
+
+   Why it is better:
+   - **It cannot be silently swallowed.** Red wins every `worstOf` by
+     construction. No exclusion filter, no count side-channel, no
+     special case in the rollup - the bug traced above becomes
+     impossible rather than guarded against.
+   - **It is honest about consequence.** A check that could not run
+     means there is no assurance here, which for someone deciding
+     whether to promote or use the data is the same practical position
+     as a check that ran and failed. "Unknown" is not a softer "bad".
+   - **Less machinery.** The superseded version needed three things
+     (exclude from worst-of, carry a count, lean on the freshness axis
+     to cap the headline); this needs a status and a chip. It also
+     sidesteps the `dataset_status.py` drift problem entirely, since
+     there is no new status value for the Python mirror to be missing.
+   - **It satisfies Keith's own earlier requirement BETTER** - a failed
+     table should not drag the other five down "unless they have a
+     multi-table check that impacts the failed table". Cross-table
+     checks are lifted to the collection, so the red lands at
+     COLLECTION level where the check lives; `cp_notifications` keeps
+     its own green status and carries only an informational pointer.
+
+   **The boundary it must not cross - two "no data" conditions, only one
+   of them red:**
+   - **Owed but absent** - a supply was expected, did not arrive or
+     failed, so the check could not run. **RED.**
+   - **Nothing was owed** - the period predates the dataset, or
+     `not_expected` says no supply was coming. **Still `nodata`.**
+
+   The existing `noDataAsOf` is the second kind: viewing as at a date
+   before Child Protection existed must not turn the page red, because
+   nothing was missing - there was simply nothing yet.
+
+   That is the same distinction settled earlier in this entry between
+   `not_expected` and marking a slot missed - did we change what was
+   OWED, or did an obligation go UNMET? Same question one layer up,
+   which is a decent sign it is a real seam rather than an arbitrary
+   one.
+
+   What each level shows (Keith's own instinct that `cp_notifications`
+   should "light up" with an obvious warning):
 
    | | August |
    |---|---|
-   | `cp_clients` | no data this period; 0 of 12 checks evaluated; freshness red |
-   | `cp_notifications` | own checks green; 1 relationship check involving it could not run, **blocked by `cp_clients`** |
-   | Collection | headline not green (freshness); "18 of 24 checks evaluated" |
+   | `cp_clients` | red - its own checks could not run, chip: no August data |
+   | `cp_notifications` | own checks green; informational pointer that a relationship check involving it is red, **blocked by `cp_clients`** |
+   | Collection | red, from the lifted cross-table checks |
+
+   An evaluated-count ("18 of 24") survives only as an optional nicety,
+   no longer load-bearing.
 
    **The warning must NAME THE BLOCKER**, not just report absence. "Not
    all checks could be run" leaves someone staring at a table where
