@@ -3672,12 +3672,29 @@ one Thread's narrative.
      anyone designing re-filing. So the real question is whether the
      composition of two agreed operations gets recognised and handled,
      not whether to build a third one.
-   - **Demotion must be STICKY, regardless of the re-filing decision.**
-     With auto-promotion on green/amber, a human demotes a green supply
-     and the rule promotes it straight back - the operator's decision
-     silently reverted by automation, in the same run. Demotion has to
-     record an operator decision that suppresses auto-promotion for that
-     supply until someone acts again.
+   - **Demotion needs stickiness, but only in one direction** - Keith's
+     own refinement, 2026-09-21, sharper than the original framing. With
+     auto-promotion on green/amber, a human demotes a green supply and
+     the rule promotes it straight back, in the same run. But that only
+     applies to demote-to-STAGING: auto-promotion looks at supplies
+     AWAITING a decision, and a rejected supply is not awaiting one, so
+     demote-to-rejected is inherently sticky. **The destination state
+     carries the stickiness.**
+
+     Proposed rule that covers it with no flag and no extra state:
+     **auto-promotion only ever acts on a supply no human has touched.**
+     Once any operator decision is recorded - promote, demote, reject -
+     automation defers to people permanently. It generalises past this
+     case: an operator's deliberate promotion into an unusual period
+     should not be second-guessed on the next run either.
+
+     **The real question it exposes, still open: is "un-decide" an
+     operation we want?** Demote-to-staging means "put this back in the
+     queue for someone to look at again", which is genuinely different
+     from rejecting it. If not wanted, demote goes to rejected only,
+     re-filing is an ATOMIC move between periods, nothing ever passes
+     back through staging, and the trap disappears entirely rather than
+     being managed.
    - That also gives re-filing a natural shape if wanted: a demoted
      supply sits in staging with auto-promotion suppressed, and a human
      promotes it where they choose. No third operation, and the verdict
