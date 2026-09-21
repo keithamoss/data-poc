@@ -3377,16 +3377,44 @@ one Thread's narrative.
    staged / promoted / failed are the same three states seen from the
    storage side rather than the QA side. One concept, not two.
 
-   **Open, and with Keith: does QA gate promotion, or only inform it?**
-   For the quarterly asset, inform-only is the likely answer - sometimes
-   you promote data you know is imperfect because you need it, and a tool
-   that refuses is a tool people route around. For the daily asset there
-   is no human in the loop, so it has to be a rule: does a red supply
-   auto-promote anyway with the finding recorded, or does red hold it in
-   staging? Recommended auto-promote-and-record, because holding
-   recreates the manual bottleneck the automation exists to avoid, and
-   because red data present and flagged is more honest than red data
-   invisible. Keith's operational call.
+   **QA gates promotion, on status - settled 2026-09-21 (Keith).**
+   **A red supply is NEVER auto-promoted** - that is always a human
+   decision. Amber and green auto-promote. Since a supply that cannot be
+   loaded at all is red (settled earlier in this same conversation), the
+   failed-to-load case is covered by the same rule with nothing extra.
+
+   Recorded as a correction, because the recommendation here was the
+   opposite and the reasoning behind it was wrong: it argued that
+   holding red in staging "recreates the manual bottleneck the
+   automation exists to avoid". It does not. **A queue of red supplies
+   is a work queue, not an obstruction** - a red supply genuinely does
+   need a person, so a human waiting on it is the correct output of the
+   gate rather than a defect in it. The error was treating "something is
+   waiting for a human" as a failure mode when it is the purpose.
+
+   **Operators also drive promotion directly, through the TUI** (Keith,
+   same conversation) - explicitly promote AND demote, not just a manual
+   promote for the quarterly asset. That is its own requirement in this
+   batch, and it has two consequences worth settling rather than
+   discovering:
+
+   1. **Demotion makes "as at T" unstable over time**, which cuts
+      against this whole file's durable-history purpose. If a table
+      promoted in June is demoted in August, the same "as at 30 June"
+      query gives one answer in July and a different one in September -
+      the DATA is immutable, but the FILING is not, and the composed
+      view depends on both. So reproducing a past view exactly needs
+      transaction time on the promotion decisions themselves, not only
+      on the arrivals. Suggested shape: record promotion/demotion as
+      timestamped events, default "as at T" to today's filing (simplest
+      and what an operator usually means), and keep the event log so
+      "the view as it was published then" stays answerable. Unresolved -
+      for the scoper to stress-test.
+   2. **What happens to a `nodata` supply.** "Amber or green
+      auto-promotes" does not name it, and `nodata` ranks below green in
+      `STATUS_ORDER`. A supply where no check ran at all is not evidence
+      of good data, so it should presumably hold rather than promote -
+      but it is an edge case the rule as stated leaves open.
 
 7. **[done, 2026-09-19]** **[Pipeline & publishing]** Both GitHub Actions
    workflows are pinned to a single, hardcoded session branch name -
