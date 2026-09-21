@@ -4132,6 +4132,94 @@ one Thread's narrative.
    instant. Settled: **the schedule carries a time alongside the
    dates**, rather than relying on an implicit default.
 
+   **6. One repo-wide timezone config parameter** (Keith, 2026-09-21) -
+   timestamps should be easy for humans to read, this is only ever
+   operated in Perth, so one parameter in `contract/data-asset.yaml`
+   (asset-level config IS repo-level here, since assets are separate
+   deployments) is what every datetime derives from. It replaces
+   `pipeline/cadence.py`'s hardcoded `AWST_OFFSET = timedelta(hours=8)`.
+
+   One completion rather than a disagreement: **stored values still
+   carry their offset** (`2026-09-21T22:00:00+08:00`) - costs nothing,
+   stays human-readable, and is self-describing to anyone opening a
+   `qa_results/` file years later. Without it, changing that config
+   parameter retroactively reinterprets every timestamp ever written -
+   the same retroactivity problem `effective_from` exists to prevent,
+   arriving by a different door.
+
+   **7. `clipDatasetToAsOf()` filters on `run_date`, which is ARRIVAL.**
+   Correct today only because no promotion concept exists, so arrival is
+   the sole timestamp there is. It becomes wrong the moment promotion
+   lands (see wrinkle 1 above). Keith, 2026-09-21: flagged, to be
+   addressed in the build - on the list of things that must change,
+   never something that keeps working by default.
+
+   ### The multi-table `nodata` seam
+
+   Keith asked this be picked at, 2026-09-21. Two of the findings are
+   verified against real code rather than reasoned.
+
+   **The existing `nodata` is a DIFFERENT KIND from the new one.** Today
+   it means "this dataset has nothing in the selected as-of window" - a
+   VIEWING condition, uniform across a whole dataset (`ds.noDataAsOf`).
+   The new one means "this particular check cannot be evaluated" -
+   PER-CHECK and PARTIAL.
+
+   The template's `rollup()` was built for the first kind:
+
+   ```js
+   const withData = datasets.filter(d=>!d.noDataAsOf);
+   if(!withData.length) return datasets.length ? "nodata" : "green";
+   return worstOf(withData.map(...));
+   ```
+
+   All-or-nothing, at dataset granularity. Its own comment states the
+   intent exactly - "'no data' is a different KIND of signal... must
+   never silently vote 'green'". But five green checks plus one nodata
+   cross-table check returns **green**, because the nodata never reaches
+   a filter that only looks at whole datasets. **The mechanism written
+   to prevent a false green produces one, once nodata becomes partial.**
+   Not wrong today; built for a shape that is about to change.
+
+   **`qa_tools/common/dataset_status.py` has no `nodata` AT ALL** -
+   `STATUS_ORDER = {"green": 0, "amber": 1, "red": 2}`, and
+   `dashboard_status_of()` does `if recorded in STATUS_ORDER: return
+   recorded`, so a recorded `"nodata"` falls through to threshold math
+   and comes back GREEN. No crash, no warning, just a silently different
+   answer from the JS. That is `plans/qa-pipeline.md` item 74
+   pre-loaded, and worth fixing BEFORE per-check nodata exists - the
+   file's own docstring says it was written because this module "drifted
+   from its own JS counterpart" once already.
+
+   **Cross-cadence checks have no period to share.** The rule "nodata if
+   any table it spans has an unfilled slot for period P" assumes every
+   participating table HAS a slot for P. A check spanning a daily table
+   and a quarterly reference table does not: for P = Wednesday the
+   quarterly table has no Wednesday slot at all, and comparing against
+   its latest promoted version is the only thing the check could ever
+   mean. So narrow the rule to "a table that PARTICIPATES IN period P",
+   and note that cross-cadence checks need an answer to "which table's
+   period is the check's period" that does not yet exist. Moot within CP
+   (all six tables quarterly) - this is a cross-COLLECTION problem, so
+   possibly deferrable, but not to be assumed away.
+
+   **This resolves two things listed as open elsewhere in this item:**
+   - "A check result stops being a pure function of one run" - now
+     well-defined: a multi-table check is a function of PERIOD P's
+     composed state, and changes when any participating table's P
+     version changes.
+   - "Which dataset's history records it" - the COLLECTION's, which
+     follows from lifting multi-table checks to collection level.
+
+   **The trap that started this, to be written down as INTENDED
+   behaviour**: a multi-table check reads `nodata` even though the
+   composed warehouse holds data for every table it spans. Carried-
+   forward data from another period makes a cross-table result
+   meaningless, so this is correct and deliberate - but it reads like a
+   bug to anyone encountering it cold ("we have the data, why is it not
+   checking?"), and would be helpfully "fixed" by a later session
+   without the reasoning attached.
+
    ### `mothman check` validates the new config
 
    Keith, 2026-09-21: the new asset and schedule YAML gets validated
