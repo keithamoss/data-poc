@@ -181,7 +181,7 @@ one when this line suggests it matters.
   - *touches:* `dashboard/qa-reporting-dashboard.template.html`
 - **#5** `parked` 2026-09-16 - Root cause of the astral-sh/setup-uv@v10 CI failure (plans/dashboard.md #5's addendum) - not the specific broken pin...
 - **#6** `todo` 2026-09-19 - Priority: HIGH - to FIX, and no longer a "discuss it later" (2026-09-19, Keith's own explicit words, quoting plans/qa-pipeline.md #84's own closing cost back at it)...
-  - *touches:* `qa_tools/cp/completion_tracker.py`, `aws/lambda_handlers/cp_ingest_handler.py`, `qa_tools/common/changelog.py`, `generator/generate_cp_runs.py`, `qa_tools/common/check_id.py`
+  - *touches:* `qa_tools/cp/completion_tracker.py`, `aws/lambda_handlers/cp_ingest_handler.py`, `qa_tools/common/changelog.py`, `generator/generate_cp_runs.py`, `qa_tools/common/check_id.py`, `pipeline/cadence.py` +7 more
 - **#7** `done` 2026-09-19 - Both GitHub Actions workflows are pinned to a single, hardcoded session branch name - on: push: branches:...
 - **#8** `done` 2026-09-19 - The Plans tab was silently never republishing.
   - *touches:* `dashboard/embed_dashboard_data.py`, `dashboard/plans_md.py`
@@ -410,6 +410,7 @@ one when this line suggests it matters.
 - **#21** `todo` 2026-09-20 - Let technical_note accumulate the real causes a check has actually turned out to have.
 - **#22** `parked` 2026-09-20 - dataset and table are the same thing in every check_id, and only one of them should exist.
 - **#23** `todo` 2026-09-20 - Adding two more datasets is the trigger for resolving the file-per-dataset shape.
+  - *touches:* `contract/data-asset.yaml`
 - **#24** `todo` 2026-09-21 - Backfill a newly-added check across every historical supply.
 - **#25** `todo` 2026-09-21 - A TUI entry point for loading a supply from S3 or the filesystem into Postgres, then running QA against it.
 - **#26** `todo` 2026-09-21 - Regenerating on a different day DOUBLES the committed history instead of replacing it.
