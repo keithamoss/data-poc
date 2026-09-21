@@ -660,6 +660,16 @@ dashboard question to answer.
 **Expect**: `mothman check` fails; the green-by-vacuum path is
 unreachable.
 
+**The gate counts ACTIVE checks, not DEFINED ones** - settled
+2026-09-22 after the second chaos pass found the same failure reached by
+a different door (Thread H). A retired check is still defined, so a
+table whose checks have ALL been retired has zero ACTIVE checks and
+renders green by vacuum, while a naive gate counting definitions sees
+nothing wrong. Keith: "a table with no checks is the same as a table
+with no active checks." Worth getting right now because retirement is
+gradual - the day a table crosses to zero active checks is nobody's
+commit, so nothing prompts a look.
+
 **This also closes the "what happens to a `nodata` supply" open
 question**, which was the same question wearing different clothes - a
 check-less table's supply IS a nodata supply. With the CI gate, a supply
@@ -1798,12 +1808,11 @@ INPUT, the committed log is the RECORD. Treat issues as the store and
 someone editing one silently rewrites history, which is the thing
 append-only exists to prevent.
 
-**Open, and honest about it**: whether GitHub is available at all in the
-real separated government cloud environments. The PRINCIPLE (dashboard
-read-only, writes through a reviewable channel) generalises; the
-MECHANISM may be PoC-only, with production using whatever that platform
-provides. Recorded so the principle is not mistaken for the
-implementation.
+**Not PoC-only** - Keith confirmed 2026-09-22 that GitHub will exist in
+the real separated environments too. A draft here speculated the
+mechanism might be PoC-only with production using whatever the platform
+provides; that speculation was wrong and is corrected rather than left
+to mislead. Both the principle and the mechanism carry through.
 
 ## Thread H - Chaos-engineering findings
 **Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
@@ -1929,6 +1938,88 @@ the sole timestamp there is. It becomes wrong the moment promotion
 lands (see wrinkle 1 above). Keith, 2026-09-21: flagged, to be
 addressed in the build - on the list of things that must change,
 never something that keeps working by default.
+
+### Second chaos pass - six more, 2026-09-22
+
+Run against the model as it stood after the delivery, decision-log,
+GitHub-issues, end-of-day-as-of and CI-gate decisions. All six reviewed
+with Keith the same day.
+
+**1. Retiring the last check on a table reaches TS-21 by a different
+door - VERIFIED against real code, not reasoned.** Both implementations
+filter retired checks BEFORE the rollup - the template's
+`worstOf(c.checks.filter(ck=>!ck.retired).map(checkStatus))` and
+`dataset_status.py`'s `if ck.get("retired_as_of"): continue`. So a table
+whose checks have all been retired yields an empty filtered list,
+`worstOf([])` seeded `"green"`, and renders **green by vacuum**.
+**Settled**: the CI gate counts ACTIVE checks, not DEFINED ones (Keith:
+"a table with no checks is the same as a table with no active checks").
+A retired check is still defined, so a gate counting definitions sees
+nothing wrong. Retirement is gradual, so the day a table crosses zero is
+nobody's commit and nothing prompts a look.
+
+**2. Two conflicting decisions on the same supply - DEFERRED BY
+DECISION.** An operator comments `/promote`; a colleague comments
+`/reject` ninety seconds later. The append-only log records BOTH, which
+is correct - that is the audit trail working - but the STATE can only be
+one, and nothing says which wins. The asynchronous write path makes it
+likelier rather than rarer: comment -> workflow -> pipeline -> rebuild
+takes minutes, during which the dashboard still shows the old state, so
+**an operator who thinks their comment did not land will comment again**.
+Duplicate and conflicting decisions are the expected case, not the
+exotic one.
+Keith, 2026-09-22, began answering and then deliberately deferred: "let's
+tackle that when we come to doing that requirement." Recorded as
+DEFERRED BY DECISION, not overlooked - it is a real gap and it needs an
+answer before the decision log ships.
+
+**3. The same dataset twice in one delivery.** A supplier drops
+`cp_clients.csv` and `cp_clients_v2.csv` in the same folder. A supply is
+one table VERSION, so a delivery containing two versions of one table is
+ill-formed, and "whichever the loop saw last" is what you get by
+default.
+**Settled**: **hold for a human.** Keith ties this to the
+not-yet-designed filename-to-dataset mapping - his instinct is a
+**regular expression per dataset**, which both files would match. So the
+rule is: **two files in one delivery matching one dataset's pattern ->
+hold for a human**, with a TUI affordance to run QA and decide which
+slot each belongs to.
+
+**4. A delivery spanning two periods - COLLAPSES INTO #3.** A catch-up
+drop containing both August's and November's `cp_clients`. Worth
+recording that this is NOT a separate mechanism, because building it as
+one would be waste: nothing ever reads a declared period, assignment is
+purely arrival plus slot state, so two `cp_clients` files in one
+delivery is exactly #3's "two files match one dataset" hold. And a
+delivery carrying August's `cp_clients` alongside November's
+`cp_notifications` is not ambiguous at all - different tables, each
+assigned independently to its own oldest claimable unfilled slot. One
+rule, not two.
+
+**5. Re-filing into an already-occupied slot.** Re-filing is a human act
+that BYPASSES assignment - that is its purpose - so nothing stops a
+human re-filing into a slot that already holds a promoted supply.
+**Settled** (Keith, 2026-09-22): the filled-slot rule does **not** apply
+to a human's deliberate act, since applying it would stop re-filing
+doing what it is for. But the TUI **warns and requires explicit
+confirmation** when the target slot is filled, and **a re-file into an
+occupied slot SUPERSEDES what is there** - stated rather than left to
+produce two supplies claiming one slot and an ambiguous "version for
+period P" lookup downstream.
+
+**6. Same-day decisions are invisible to the as-of picker.** With as-of
+meaning end of day, a supply promoted 14:00 and demoted 22:00 the same
+day shows only the final state.
+**Settled** (Keith, 2026-09-22): acceptable, because **the snapshots
+already cover it** - multiple snapshots exist for that day, so anyone
+needing the granular sequence opens the snapshot for a given time. The
+decision log is driven by the as-of date at end-of-day granularity like
+everything else.
+**One dependency worth naming**: that answer holds only because each
+decision triggers a publish, and snapshots are automatic per publish
+(deduplicated by content hash). If several decisions were ever batched
+into one publish, the intermediate states would not be snapshotted and
+this answer quietly stops working.
 
 ## Thread I - The multi-table nodata seam
 **Status:** todo (2026-09-21) · **Category:** QA checks & contract
