@@ -88,9 +88,11 @@ that same evening, before this sequence was set - do not act on that.
   demotion needs its stickiness rule regardless, and (A) becomes viable
   again. So answer "do we want un-decide?" first; the re-file answer
   largely falls out of it.
-- **What happens to a `nodata` supply** under the amber-or-green
-  auto-promotion rule. `nodata` is neither, and a supply where no check
-  ran is not evidence of good data. See Thread B.
+- ~~**What happens to a `nodata` supply**~~ - **CLOSED 2026-09-22.** It
+  was the same question as TS-21 (a check-less table's supply IS a
+  nodata supply), and the CI gate settled there makes the state
+  unreachable. Every remaining `nodata` case is "nothing was owed",
+  which never reaches a promotion decision.
 
   *Prepared 2026-09-21 night, for the morning - and the question has
   probably changed under us.* This was logged BEFORE the red-for-unrun
@@ -112,13 +114,14 @@ that same evening, before this sequence was set - do not act on that.
   is "this table has no checks defined" itself a finding the dashboard
   should surface as a coverage gap? At 30 datasets, a table quietly
   carrying zero checks is very easy to never notice.
-- **Cross-cadence check period ownership** - which table's period is a
-  check's period when it spans tables on different cadences. Moot within
-  Child Protection; a cross-COLLECTION problem, possibly deferrable. See
-  Thread I.
-- **Operator identity** in a deployed environment - already marked
-  deliberately deferred to build time, listed here so it is not mistaken
-  for an oversight. See Thread G.
+- ~~**Cross-cadence check period ownership**~~ - **CLOSED BY SCOPE
+  2026-09-22.** Keith: "we won't have cross cadence checks, so there
+  won't be a case where we have a check spanning the day table and the
+  quarterly one. That just doesn't happen." Recorded as closed by SCOPE
+  rather than ANSWERED, so a future session reading this does not
+  reopen it as unresolved - if a cross-cadence check ever does appear,
+  the question is live again and unanswered.
+- ~~**Operator identity**~~ - **SETTLED 2026-09-22**, see Thread G. See Thread G.
 - **Whether to build an as-published RECONSTRUCTION path at all**, given
   snapshots already provide that view. Both are computable from the
   append-only decision log; the question is whether the reconstruction
@@ -641,14 +644,28 @@ Item 74's exact failure mode, in the module whose own docstring says it
 drifted from its JS counterpart once already.
 
 **TS-21 `[unit]` A table with no checks defined.**
-Nothing failed to run, because there was nothing to run.
-**Expect**: **not a clean green.** `worstOf()` over an empty list is
-seeded green, so such a table currently reads green by vacuum and would
-auto-promote with no quality signal behind it at all.
-**Still open**: what it should read instead, and whether "this table has
-no checks defined" is itself a coverage finding. Every other false green
-found was a real signal being swallowed; this is the ABSENCE of any
-signal reading as a good one.
+Nothing failed to run, because there was nothing to run. `worstOf()`
+over an empty list is seeded green, so such a table reads green by
+vacuum and would auto-promote with no quality signal behind it at all.
+Every other false green found was a real signal being swallowed; this is
+the ABSENCE of any signal reading as a good one.
+
+**SETTLED 2026-09-22: CI gate, hard fail, no opt-out.** Keith's call,
+and deliberately simpler than the draft it replaced (which proposed an
+explicit opt-out declaration, a `nodata`-with-an-"unchecked"-qualifier
+render, and the opt-out doubling as a standing promotion decision).
+A table in the schedule with zero checks defined **fails
+`mothman check`**. The state cannot reach production, so there is no
+dashboard question to answer.
+**Expect**: `mothman check` fails; the green-by-vacuum path is
+unreachable.
+
+**This also closes the "what happens to a `nodata` supply" open
+question**, which was the same question wearing different clothes - a
+check-less table's supply IS a nodata supply. With the CI gate, a supply
+with no checks at all cannot exist, and every other `nodata` case is
+"nothing was owed" (a brand-new dataset with no prior period, a period
+before the dataset existed), which never reaches a promotion decision.
 
 **TS-22 `[both]` Freshness caps the headline.**
 Child Protection's August delivery: all six tables promoted, every check
@@ -1737,16 +1754,56 @@ Likely feeds the existing activity feed - `qa_tools/common/
 changelog.py` already builds "who QA'd what, when" events, and filing
 decisions are the same shape.
 
-**Open, and flagged rather than assumed: OPERATOR IDENTITY.**
+### Operator identity, and the write path - SETTLED 2026-09-22
+
 `qa_tools/common/git_identity.py`'s `get_run_by()` reads the local
 `git config user.email`, which is fine for a developer running the
 pipeline and means nothing for an operator in a deployed environment.
-Who an operator IS needs a real answer in the target architecture.
-Worth naming now because it is exactly the thing that gets stubbed
-with a placeholder otherwise - which `get_run_by()` itself
-deliberately refuses to do, hard-erroring when unset. **Deliberately DEFERRED by
-Keith to when this requirement is actually built** - named now so it
-is not discovered late, not left open because nobody noticed it.
+
+- **The decision log MUST REFUSE to record a decision with no
+  identity.** Never "unknown", never a default. `get_run_by()` already
+  hard-errors rather than falling back to a placeholder; that discipline
+  extends here. An audit trail with anonymous entries is worse than
+  none, because it looks complete.
+- **The actor distinguishes person from automation**, since
+  auto-promotions go in the same log:
+  `actor: { kind: human | rule, id: <email | principal | rule name> }`.
+
+**The write path is GITHUB ISSUES** (Keith, 2026-09-22), from a
+principle he stated as standing: **the dashboard is READ-ONLY, so
+anything requiring a write goes through GitHub Issues** and is fed back
+in.
+
+**This is not new architecture - it already exists, built for this exact
+reason.** `qa_tools/common/ticket_sync.py`'s own docstring records it:
+one real `qa-ticket` issue per real dataset, and it was "extended to
+amber too (2026-09-18, `plans/running-thoughts.md` #6, 'read-only
+tension: accepting/rejecting amber supplies') once a real accept
+mechanism needed somewhere to write a decision - a dataset that's only
+ever been amber, never red, had no real ticket to comment `/accept` on
+until this." Promote, reject, demote and re-file are the same shape of
+write, landing on machinery that exists.
+
+Two things this settles for free:
+- **Identity.** GitHub authenticates the comment author, so the actor is
+  known without inventing an SSO story for the separated environments.
+- **Structure.** Issue forms give structured input, so a decision
+  carries its supply id, action and reason rather than being free prose
+  a workflow has to parse hopefully.
+
+**Issues are the write CHANNEL, not the SYSTEM OF RECORD.** Issues can
+be edited and deleted. So the pipeline reads the issue and writes an
+immutable entry into the committed decision log - the issue is the
+INPUT, the committed log is the RECORD. Treat issues as the store and
+someone editing one silently rewrites history, which is the thing
+append-only exists to prevent.
+
+**Open, and honest about it**: whether GitHub is available at all in the
+real separated government cloud environments. The PRINCIPLE (dashboard
+read-only, writes through a reviewable channel) generalises; the
+MECHANISM may be PoC-only, with production using whatever that platform
+provides. Recorded so the principle is not mistaken for the
+implementation.
 
 ## Thread H - Chaos-engineering findings
 **Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
