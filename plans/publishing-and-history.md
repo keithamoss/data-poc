@@ -3936,7 +3936,9 @@ one Thread's narrative.
    Who an operator IS needs a real answer in the target architecture.
    Worth naming now because it is exactly the thing that gets stubbed
    with a placeholder otherwise - which `get_run_by()` itself
-   deliberately refuses to do, hard-erroring when unset.
+   deliberately refuses to do, hard-erroring when unset. **Deliberately DEFERRED by
+   Keith to when this requirement is actually built** - named now so it
+   is not discovered late, not left open because nobody noticed it.
 
    ### `mothman check` validates the new config
 
