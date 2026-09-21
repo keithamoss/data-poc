@@ -4032,6 +4032,106 @@ one Thread's narrative.
    Keith to when this requirement is actually built** - named now so it
    is not discovered late, not left open because nobody noticed it.
 
+   ### Chaos-engineering pass - five more wrinkles
+
+   Keith's ask, 2026-09-21, after two of his own stress tests had each
+   found a cascade: run the settled model against deliberately awkward
+   sequences. All five below agreed with him the same session.
+
+   **1. Composition filters on the WRONG timestamp - a bug in a rule
+   already settled here.** This entry says "as at T: the latest version
+   whose ARRIVAL is <= T", described as transaction time. It is not -
+   two different timestamps were conflated.
+
+   ```
+   Mon 22:00  supply arrives, QA red, rejected -> NOT promoted
+   Wed        nothing; warehouse still holds last period's table
+   Fri        human decides it is the best available -> promotes it
+   ```
+
+   Ask "as at Wednesday": its arrival was Monday and it is promoted, so
+   the rule includes it - but on Wednesday it was sitting rejected in
+   staging. **The view shows data that was not there.**
+
+   > Corrected rule: **as at T = the latest version PROMOTED on or
+   > before T.**
+
+   For auto-promoted supplies arrival and promotion are minutes apart
+   and nothing changes. The gap only opens on human-decided ones, which
+   are exactly the cases someone later asks about. Promotion timestamps
+   exist because of the decision log above.
+
+   **2. Slot assignment is ORDER-DEPENDENT.** Assignment reads the
+   current state of the slots, so processing order changes the answer.
+   Tuesday's late file and Thursday's on-time file both land in one
+   batch around Thu 22:00:
+   - Thursday's processed first -> on-time for Thursday -> Thursday;
+     then Tuesday's -> oldest claimable unfilled -> Tuesday. Correct.
+   - Tuesday's processed first -> it falls inside Thursday's on-time
+     window -> files as THURSDAY; then Thursday's real file hits a
+     filled slot and is held. Wrong.
+
+   Same two files, opposite outcome, decided by loop order. **Fix:
+   always assign in ARRIVAL-TIMESTAMP order, never discovery order**,
+   with a defined tiebreak for identical timestamps. Note this is
+   load-bearing for a claim made earlier in this entry - that a staging
+   backlog "drains correctly" after a hard failure because staging
+   preserved arrival times. That only holds if draining replays in
+   arrival order; the conclusion was stated without its dependency.
+
+   **3. An outstanding MISSED slot vacuums up later resupplies.**
+   Survives the backward-cascade fix and is worse in kind:
+
+   ```
+   Tue        missed entirely (outage)
+   Wed 22:00  arrives on time, green, promoted -> Wednesday filled
+   Wed 23:00  a resupply of Wednesday arrives
+   ```
+
+   Wednesday is filled so the on-time rule does not apply; the oldest
+   claimable unfilled slot is TUESDAY, so the Wednesday resupply files
+   as Tuesday, one day late. The "resupply of the most recently filled
+   slot" branch never fires, because an outstanding missed slot means a
+   claimable unfilled one exists. **So a missed delivery is recorded as
+   MET** - a service failure erased, using another day's data. Worse
+   than a cascade: it manufactures a delivery that never happened.
+
+   > Fix - **monotonic filling: a slot stops being claimable once a
+   > LATER slot has been filled.**
+
+   Re-traced: Tuesday is non-claimable, nothing else is claimable, so
+   the 23:00 arrival is correctly a Wednesday resupply. Genuine lateness
+   survives - Monday's supply landing Tue 03:00 finds Tuesday unfilled.
+
+   **Its limit, named rather than papered over** (Keith: "I think we
+   can't design around that"): once a delivery is skipped AND a later
+   one has landed, a genuine backfill of the older slot cannot be placed
+   by any rule - it is not claimable, and defaulting it into a future
+   slot is the forward cascade again. **When nothing is confidently
+   claimable, hold it for a human** and let them decide where it is
+   filed.
+
+   **4. Arrival timestamps: whose clock.** Every rule compares an
+   arrival instant against a due instant, and only the due side was
+   specified. Settled:
+   - **Never use supplier-provided timestamps** - a file's own metadata
+     reflects their clock, timezone and bugs. Staging's whole
+     justification is that it asserts only facts we can vouch for, so
+     arrival means **when WE received it**, recorded on our side of the
+     boundary.
+   - **Never store a naive timestamp.** `pipeline/cadence.py` already
+     treats naive values as UTC; a naive AWST value is eight hours out,
+     enough on a daily feed to flip on-time to late or move a supply
+     into the wrong slot. The requirement is that the value **carries
+     its offset** - AWST works precisely because it is a fixed UTC+8
+     with no daylight saving, while a bare `2026-09-21 22:00` is
+     ambiguous whatever was intended.
+
+   **5. Authored quarterly dates carry no time of day.** `2026-08-03` is
+   a date, but due-ness, on-time windows and claim windows all need an
+   instant. Settled: **the schedule carries a time alongside the
+   dates**, rather than relying on an implicit default.
+
    ### `mothman check` validates the new config
 
    Keith, 2026-09-21: the new asset and schedule YAML gets validated
