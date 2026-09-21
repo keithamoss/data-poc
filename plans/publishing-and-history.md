@@ -3908,11 +3908,34 @@ one Thread's narrative.
    "supplier system upgrade", closing those slots explicitly rather than
    by rule.
 
-   **Two mechanisms that must not blur:**
-   - **`not_expected:` in config** - agreed IN ADVANCE that no supply is
-     coming. Planned.
-   - **A slot marked missed in the decision log** - a supply was owed,
-     did not arrive, someone recorded why. Operational.
+   **Two mechanisms that must not blur.** The distinction is not really
+   WHEN it was agreed - it is what the record ends up saying:
+   - **`not_expected:` in config** changes what was OWED. The slot never
+     existed. No overdue, nothing red, nothing missing - the record says
+     "nothing was due."
+   - **A slot marked missed in the decision log** records an obligation
+     that was NOT MET. The slot existed, it was owed, it did not arrive,
+     and it stays in the record as a failure, permanently, with a reason
+     attached.
+
+   So marking a slot missed is not agreeing the supply was not owed - it
+   is **closing the slot while recording that it WAS owed and did not
+   come**. The acknowledgement is "it is not coming", never "it was not
+   due".
+
+   **Why the distinction protects the numbers**: otherwise supplier
+   reliability becomes whatever people were willing to excuse after the
+   fact. A two-day outage is a real service failure even when entirely
+   understandable, and the record should still carry it.
+
+   Timing then falls out as a CONSEQUENCE rather than being the rule -
+   you can only legitimately say "nothing is owed" before the fact,
+   because afterwards you are describing what happened rather than what
+   was agreed. So the same physical event splits by how it reached you:
+   a supplier saying next week "we are upgrading Tue-Wed, no files" is
+   `not_expected` (the obligation was renegotiated); finding out at 9pm
+   Tuesday that it is already not coming is marked-missed (the
+   obligation stood and was missed).
 
    Keith's scenario is the second. Editing config retrospectively to
    make red history disappear is exactly what the exceptions rule above
