@@ -1074,7 +1074,7 @@ overwritten.
 
 Per decision: **who** (the operator), **when** (timestamp), **what**
 (promote/reject/demote/re-file), **which** (the supply, and for a
-re-file the from- and to- slots), **why** (free text).
+re-file the from-slot and the to-slot), **why** (free text).
 
 **A reason is mandatory for the consequential decisions** - rejecting,
 accepting something red, or superseding already-accepted data - and
