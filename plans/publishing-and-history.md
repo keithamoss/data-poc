@@ -3700,6 +3700,74 @@ one Thread's narrative.
      promotes it where they choose. No third operation, and the verdict
      recomputes because the slot assignment genuinely changed.
 
+   ### Slot assignment - the claim-window rule
+
+   Settled 2026-09-21, after Keith's stress-test found a CASCADING bug
+   in the rule as first stated ("assign to the oldest unfilled slot").
+   Recorded in full because the broken rule reads perfectly reasonable
+   and would be re-proposed otherwise.
+
+   **The scenario.** Daily feed, due 12:00 Monday:
+
+   | Time | Rule said | Result |
+   |---|---|---|
+   | Mon 14:00 | Mon unfilled -> Mon | red, rejected - Mon still unfilled |
+   | Mon 16:00 | Mon unfilled -> Mon | green, promoted - Mon now filled |
+   | Mon 20:00 | Mon filled, oldest unfilled is Tue | WRONG - a Monday resupply filed as Tuesday's delivery |
+   | Mon 22:00 | Tue now filled -> Wed | WRONG |
+   | Tue | Wed filled -> Thu | WRONG |
+
+   Every later supply is off by one permanently, nothing self-corrects,
+   and each day looks locally plausible. The cause: "oldest unfilled
+   slot" assumes every arrival fills a NEW obligation. A resupply does
+   not - it supersedes an existing filing - and the rule had no way to
+   say so, so it invented a future obligation instead.
+
+   **The rule:**
+
+   > Assign to the oldest slot whose CLAIM WINDOW is open and which is
+   > unfilled. If there is no such slot, it is a RESUPPLY of the most
+   > recently filled slot.
+
+   A slot's claim window opens a configured interval before its due date
+   and never closes (late is always allowed). A slot whose window has
+   not opened cannot be claimed, so nothing can reach forward into the
+   future and the cascade is structurally impossible rather than avoided
+   by luck.
+
+   **This reinstates the earliness window, which the entry above had
+   just dropped.** That call was wrong: it was argued redundant in the
+   normal case and false precision in the ambiguous one, but the window
+   is what defines when a slot becomes CLAIMABLE, which is the thing
+   preventing the cascade. Keith's quarterly three-weeks-early case uses
+   the same mechanism - a ~21-day window on that asset makes a 13 July
+   arrival eligible for the August slot.
+
+   **It also deletes the daily cutoff rule.** "Arrives 10pm, so it is
+   for tomorrow" needs no special handling: if a feed's supply genuinely
+   lands the evening before, its `due_at` IS the evening before, and the
+   window opens accordingly. The schedule expresses it directly instead
+   of a separate rule reinterpreting arrivals afterwards.
+
+   **The principle worth keeping: NEVER CLAIM FORWARD.** Mis-attributing
+   an arrival backwards (calling a new delivery a resupply) is one
+   contained error on one supply. Mis-attributing it forwards cascades
+   through every future delivery. The risk is asymmetric, so the default
+   must be the one that cannot propagate - and the claim window is what
+   makes "cannot" literal rather than likely.
+
+   Note this depends on a rule settled earlier in this same entry: **a
+   rejected supply does not fill its slot** (only a promotion fills
+   one). Without that, the Mon 16:00 resupply above would itself have
+   been pushed to Tuesday.
+
+   Still genuinely ambiguous, and unchanged by this: an arrival when a
+   PRIOR slot is unfilled (a missed delivery not yet resolved) cannot be
+   told apart from a late one by any rule. Default to the oldest
+   claimable unfilled slot since late is commoner than early, mark it as
+   assigned under ambiguity, and surface it for review - cheap to
+   correct, because filing is mutable and the verdict recomputes.
+
    ### `mothman check` validates the new config
 
    Keith, 2026-09-21: the new asset and schedule YAML gets validated
