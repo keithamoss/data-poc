@@ -1591,3 +1591,30 @@ regeneration clear the dataset's directory first, which the
 delete-and-regenerate decision already permits; or stop encoding a date
 in the directory name so a re-run overwrites rather than accumulates.
 The third is the only one that also fixes it for a partial regeneration.
+
+27. **[todo, 2026-09-21]** **[Data generation]** A small number of supplies should arrive EARLY.
+
+Keith, 2026-09-21, while describing how the real operational database
+organises supplies - "if data arrived 10 days before the designated
+refresh day, it would go into the quarter it belongs to, not the quarter
+it arrived in per the calendar."
+
+Measured against the real generated history: **zero supplies arrive
+early**. 240 arrive exactly on their delivery date and 112 arrive late,
+and every one of those 112 is a resupply. So the generator models
+on-time and late, and has never produced the case Keith has just said
+is real.
+
+The concept is already half-built and needs no new fields. Every
+manifest entry already carries BOTH `delivery_date` (the period the
+supply belongs to) and `arrived_date` (when it actually landed), and
+they are already allowed to differ - that is exactly how a late resupply
+is represented. An early arrival is the same two fields with the
+inequality the other way round, which the generator never emits.
+
+Why it matters beyond realism, and this is the part to carry into the
+design: it is the cleanest demonstration that **the period a supply
+belongs to is not the same axis as when it turned up.** Every "as at"
+question has to pick one. A supply that belongs to Q1 but landed in
+March, and a correction to Q1 that landed in April, both belong to Q1 -
+so a resolution rule keyed only on arrival time gets them wrong.
