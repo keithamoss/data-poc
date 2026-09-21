@@ -3849,6 +3849,45 @@ one Thread's narrative.
    three separate requirements in this entry alone: where a rule
    genuinely cannot know, SAY SO rather than commit silently.**
 
+   ### A supply is ONE TABLE - each table claims its own slot
+
+   Keith, 2026-09-21. Everything above was worked through assuming one
+   table per supply, which holds for Birth Registrations but not for
+   Child Protection's six. Settled: **each table claims a slot
+   independently**, rather than a collection filling one slot as a unit.
+
+   Vocabulary that follows, and the earlier text was loose about it: a
+   SUPPLY is one table version. CP's normal arrival is six supplies in
+   one DELIVERY. The delivery is a grouping for presentation ("these six
+   landed together"), never the unit of filing.
+
+   **This makes an earlier decision implementable.** Keith had already
+   settled that a multi-table check should read `nodata` when a table it
+   spans is missing - but there was no fact to test that against until
+   slots became per-table. It is now a crisp condition:
+
+   > A multi-table check is `nodata` for a period if ANY table it spans
+   > has an unfilled slot for that period.
+
+   Same for the five-tables-land-one-fails case Keith raised early on:
+   five slots filled, one unfilled and going overdue, rather than a
+   single partial fill with no vocabulary to describe it.
+
+   Two consequences:
+   - **Per-table classification is more honest than per-delivery.** If
+     `cp_clients` lands 09:00 and `cp_placements` 14:00, each gets its
+     own early/onTime/late verdict instead of the whole delivery taking
+     the worst one. A single late table stops dragging five punctual
+     ones down.
+   - **Slot count multiplies** - ~30 datasets on the quarterly asset,
+     several of them multi-table collections, times four periods a year.
+     This is what turns the aggregation requirement above from likely to
+     certain.
+
+   The claim-window and never-claim-forward rules apply per table
+   unchanged - each table has its own independently-tracked slot
+   sequence.
+
    ### `mothman check` validates the new config
 
    Keith, 2026-09-21: the new asset and schedule YAML gets validated
