@@ -681,13 +681,28 @@ Implement it against "today" and every historical view goes falsely
 stale, which trains people to ignore the indicator. The 15 September
 assertion above is the one that catches that.
 
-**Smaller question this turned up, unresolved**: the as-of picker is
-DATE-granular while `due_at` is INSTANT-granular. If Q4 is due 2
-November 09:00, does "as at 2 November" mean the start of that day
-(not yet due -> green) or the end (due has passed -> red)? End-of-day is
-the more intuitive reading - "what did we know by the end of that day" -
-but it should be stated rather than inherited from whichever comparison
-gets written first.
+**"As at <date>" means END OF DAY** - settled with Keith, 2026-09-22,
+after noticing the as-of picker is DATE-granular while `due_at` is
+INSTANT-granular. So "as at 2 November" against a Q4 due at 2 November
+09:00 means the due moment HAS passed -> red. A supply arriving 2
+November 14:00 is likewise included in that view. Both read naturally:
+"what did we know by the end of that day".
+
+Two things that hang off it:
+
+- **End of day IN THE ASSET'S TIMEZONE**, per the repo-wide timezone
+  parameter. "End of day" is meaningless without saying whose day, and
+  an end-of-day computed in UTC would be eight hours out - including or
+  excluding a whole evening's arrivals. The naive-timestamp hazard
+  (TS-31) wearing a different hat.
+- **Today's code already behaves this way, but for an accidental
+  reason.** `clipDatasetToAsOf()` filters
+  `r.run_date <= asOfDateStr` - a STRING date comparison, so a
+  same-day arrival is included, which is end-of-day semantics by
+  coincidence rather than by design. That comparison has to become a
+  real instant comparison once `due_at` carries a time, and the
+  behaviour must not change when it does. Worth a test that pins the
+  current semantics before the refactor, not after.
 
 ### Schedule and config
 
