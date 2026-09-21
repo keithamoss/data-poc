@@ -3768,6 +3768,87 @@ one Thread's narrative.
    assigned under ambiguity, and surface it for review - cheap to
    correct, because filing is mutable and the verdict recomputes.
 
+   **Window size is a genuine TRADE, not a tuning knob.** Worth
+   recording so nobody "fixes" it later. The obvious cure for a boundary
+   misfile is a generous window - make consecutive windows contiguous so
+   there is no dead zone. That reintroduces the cascade exactly: with
+   Tuesday's window open from Monday 12:00, the Mon 20:00 resupply finds
+   Monday filled, Tuesday open and unfilled, and claims Tuesday again.
+   **Tight windows buy cascade-immunity at the price of boundary
+   misfiling; wide windows do the reverse. No sizing gets both.**
+   The trade is accepted in favour of never-claiming-forward: a boundary
+   misfile is two wrong labels on one day, a cascade is wrong forever.
+
+   **What a boundary misfile actually costs**, since "the data is still
+   there so downstream can cope" covers only half of it (Keith's own
+   framing, and the data half is right - it sits in the previous slot,
+   present and QA'd). The REPORTING is wrong twice, and reporting is
+   this system's product: a punctual supplier is recorded as delivering
+   a very late resupply, AND the next slot is left unfilled so it goes
+   overdue - a phantom missing delivery for data that arrived on time
+   one slot over. The second is the "says something untrue" category.
+
+   **Scope boundary that falls out of this** (Keith): we do NOT build
+   staleness-tolerance policy for consumers. This system attributes
+   supplies to slots and reports what is where and how fresh. Whether a
+   downstream consumer takes only the latest slot, composes several, or
+   refuses anything older than a week is theirs. Otherwise the tool
+   grows a config surface for every downstream system's preferences,
+   unmanageable at 30 datasets.
+
+   ### Arrival into an already-filled slot - warn, and never auto-promote
+
+   Keith's own proposal, 2026-09-21, and better than the
+   near-a-window-boundary trigger it replaced **because it needs no
+   magic number**. That one required "within X of the window opening",
+   and X is arbitrary - pick 5 minutes and a 6-minute case slips through
+   silently. This is a structural condition: the slot had been PROMOTED
+   into, and something arrived anyway. Nothing to tune. Same
+   structural-over-configured preference this project applies elsewhere.
+
+   It also draws a distinction the boundary rule could not:
+   - **Resupply after REJECTION** - the slot was never filled, so this
+     is the expected repair path. Routine, no warning.
+   - **Resupply after ACCEPTANCE** - we had already accepted something
+     for this period. Odd. Warn.
+
+   On a healthy feed the second is rare, so the banner stays meaningful
+   rather than becoming wallpaper at 30 datasets.
+
+   **Warning, not error**, because one legitimate case remains: a
+   supplier realises the extract they sent was wrong - wrong period,
+   wrong filter - even though it passed every check. Data can be clean
+   and still be wrong; that is the limit of any check suite.
+
+   **Boundary proximity becomes the EXPLANATION rather than the
+   trigger** - still computed, used in the message:
+
+   > A supply arrived for Monday, which was already accepted at 16:00.
+   > It landed 3 minutes before Tuesday's window opened - it may belong
+   > to Tuesday.
+
+   versus, with no boundary proximity, the same banner without that
+   second sentence. Same trigger, different diagnosis.
+
+   **The hole this exposed in auto-promotion, and it is a gap rather
+   than a refinement:** the rule as settled says amber-or-green
+   auto-promotes, so a green supply landing in an already-filled slot
+   would **silently supersede data already accepted**. Without a carve-
+   out, a supplier's accidental duplicate send quietly replaces good
+   accepted data and the only trace is a superseded table nobody looked
+   at. So: **a supply landing in a filled slot never auto-promotes,
+   whatever its status.** It holds, warns, and waits. Filling an empty
+   slot is routine; replacing accepted data is a decision.
+
+   Three actions the banner must lead to, genuinely different from each
+   other: **accept** it as a correction (promote, superseding),
+   **re-file** it to the next slot (it was a boundary misfile), or
+   **reject** it (duplicate or erroneous send).
+
+   **Standing principle Keith endorsed here, and it has now produced
+   three separate requirements in this entry alone: where a rule
+   genuinely cannot know, SAY SO rather than commit silently.**
+
    ### `mothman check` validates the new config
 
    Keith, 2026-09-21: the new asset and schedule YAML gets validated
