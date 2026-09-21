@@ -66,9 +66,52 @@ that same evening, before this sequence was set - do not act on that.
 
 - **Does re-filing exist as its own operation?** It may be forced anyway,
   since promote + demote compose into it. See Thread D.
+
+  *Prepared 2026-09-21 night, for the morning.* Two options: **(A) no
+  re-file operation** - demote, then promote to a chosen slot, two
+  existing operations composing; **(B) an atomic re-file**, moving a
+  supply from period A to period B without passing through staging.
+
+  The argument that actually separates them is the DECISION LOG, which
+  is the reason the log exists rather than a detail of it. Under (A) a
+  re-file appears as two entries - a demote and a promote - and a reader
+  a year later has to infer they were one act. Under (B) it is one
+  entry with a from-slot, a to-slot and one reason. "Why is this supply
+  in Q3?" has a single answer instead of a correlation exercise. That
+  points at (B).
+
+  **But the two open questions here are entangled and should be answered
+  together.** Thread D's own unresolved question is whether "un-decide"
+  (demote back to staging for re-review) is an operation worth having at
+  all. If NO, demote only ever goes to rejected, nothing passes back
+  through staging, and re-file MUST be atomic - (B) is forced. If YES,
+  demotion needs its stickiness rule regardless, and (A) becomes viable
+  again. So answer "do we want un-decide?" first; the re-file answer
+  largely falls out of it.
 - **What happens to a `nodata` supply** under the amber-or-green
   auto-promotion rule. `nodata` is neither, and a supply where no check
   ran is not evidence of good data. See Thread A.
+
+  *Prepared 2026-09-21 night, for the morning - and the question has
+  probably changed under us.* This was logged BEFORE the red-for-unrun
+  decision (Thread F). Since a check that could not run is now RED, a
+  supply whose checks all failed to run is RED too, and red never
+  auto-promotes. **That case is already resolved**; it wants confirming
+  rather than deciding, the same way "what a `run` means" does.
+
+  What is left is a different and arguably sharper question: **a table
+  with NO CHECKS DEFINED AT ALL.** Nothing failed to run, because there
+  was nothing to run. `worstOf()` over an empty list is seeded `"green"`
+  (verified in the template), so such a supply is green by vacuum and
+  auto-promotes with no quality signal whatsoever behind it.
+
+  That is a false green of a kind none of the day's work addressed -
+  every other case we found was a real signal being swallowed, whereas
+  this is the absence of any signal reading as a good one. Worth
+  deciding deliberately: does a table with no checks auto-promote, and
+  is "this table has no checks defined" itself a finding the dashboard
+  should surface as a coverage gap? At 30 datasets, a table quietly
+  carrying zero checks is very easy to never notice.
 - **Cross-cadence check period ownership** - which table's period is a
   check's period when it spans tables on different cadences. Moot within
   Child Protection; a cross-COLLECTION problem, possibly deferrable. See
