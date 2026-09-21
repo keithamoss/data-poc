@@ -3888,6 +3888,56 @@ one Thread's narrative.
    unchanged - each table has its own independently-tracked slot
    sequence.
 
+   ### Filing decisions are recorded - an append-only decision log
+
+   Keith, 2026-09-21: a human promoting, rejecting, demoting or
+   re-filing a supply must be recorded, with the decision and a
+   timestamp.
+
+   **This closes an open question raised earlier in this same entry.**
+   Demotion makes "as at T" unstable - a table promoted in June and
+   demoted in August means the same "as at 30 June" query answers
+   differently in July than in September, because the data is immutable
+   but the FILING is not and a composed view depends on both. A
+   timestamped decision log is the missing piece: it puts transaction
+   time on the filing decisions themselves, so "the view as it was
+   published then" stays answerable instead of being quietly
+   overwritten.
+
+   Per decision: **who** (the operator), **when** (timestamp), **what**
+   (promote/reject/demote/re-file), **which** (the supply, and for a
+   re-file the from- and to- slots), **why** (free text).
+
+   **A reason is mandatory for the consequential decisions** - rejecting,
+   accepting something red, or superseding already-accepted data - and
+   optional for a routine promote. The question that arrives a year
+   later in a government agency is "why did we accept this into Q3", and
+   an audit trail recording the what but not the why answers the easy
+   half.
+
+   Two shape decisions:
+   - **Automated decisions go in the same log, with the RULE as the
+     actor.** Auto-promotion is a decision too. One log means "why is
+     this supply promoted" has a single answer location rather than two
+     mechanisms to reconcile, and it makes the "auto-promotion only acts
+     on a supply no human has touched" rule checkable directly from the
+     log.
+   - **Append-only.** A decision record that can be edited is not an
+     audit trail. Same immutability as table contents, same reason.
+
+   Likely feeds the existing activity feed - `qa_tools/common/
+   changelog.py` already builds "who QA'd what, when" events, and filing
+   decisions are the same shape.
+
+   **Open, and flagged rather than assumed: OPERATOR IDENTITY.**
+   `qa_tools/common/git_identity.py`'s `get_run_by()` reads the local
+   `git config user.email`, which is fine for a developer running the
+   pipeline and means nothing for an operator in a deployed environment.
+   Who an operator IS needs a real answer in the target architecture.
+   Worth naming now because it is exactly the thing that gets stubbed
+   with a placeholder otherwise - which `get_run_by()` itself
+   deliberately refuses to do, hard-erroring when unset.
+
    ### `mothman check` validates the new config
 
    Keith, 2026-09-21: the new asset and schedule YAML gets validated
