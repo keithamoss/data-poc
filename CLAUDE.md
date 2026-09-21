@@ -1,8 +1,9 @@
 # Orientation for a new session
 
 Read this first, then `plans/wider.md`, `plans/qa-pipeline.md`,
-`plans/publishing-and-history.md`, `plans/conceptual-design.md`,
-`plans/dashboard.md`, `plans/data-generation.md`, and `plans/tooling.md`
+`plans/publishing-and-history.md`, `plans/supply-model.md`,
+`plans/conceptual-design.md`, `plans/dashboard.md`,
+`plans/data-generation.md`, and `plans/tooling.md`
 in full before doing anything else. This project is worked across many separate chat
 sessions over a period of weeks - those files are the actual persistent
 memory of the project, not this chat history. They're kept current as
@@ -54,6 +55,23 @@ already scoped.
   dashboard's publish/deploy path, check lifecycle, or the as-of
   viewing/picker - the design already accounts for changes in this area
   that haven't all landed in code yet.
+- `plans/supply-model.md` - **the supply lifecycle model, and the
+  delivery plan for building it.** How a supply arrives, where it is
+  filed, when it is checked, what reaches the warehouse, and what the
+  dashboard says about it: staging and promotion, the schedule and its
+  slots, arrival classification, the decision log, and six delivery
+  sprints. Split out of `plans/publishing-and-history.md` item 6 on
+  2026-09-21 (Keith's own ask) once a day of design had grown far
+  larger than its host item and turned out to be a different subject -
+  item 6 is about CODE ARCHITECTURE (how many near-identical modules
+  per dataset), this is the DOMAIN MODEL. Read this before touching
+  anything about supply arrival, run/slot identity, promotion, cadence
+  or the as-of picker - it records decisions already settled (don't
+  re-litigate), several plausible-but-wrong approaches explicitly
+  rejected (don't re-propose), and the open questions still with Keith.
+  Nothing in it is built yet, and its eight requirements
+  (`REQ-PIPE-034`..`REQ-DASH-041`) are all unsigned, so the sign-off
+  gate applies.
 - `plans/conceptual-design.md` - real conceptual/design tensions in how
   this PoC MODELS real-world concepts (e.g. whether a resupply chain
   should be derived from synthetic generator bookkeeping or from real,
