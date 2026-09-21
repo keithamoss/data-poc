@@ -2843,6 +2843,53 @@ one Thread's narrative.
    parts to keep - that is not tolerable in the short term as we add
    more data sets, so that will need to be addressed as a priority."**
 
+   **Priority: work through in THIS ORDER (Keith, 2026-09-21 night, his
+   own words setting tomorrow's queue): "let's work through the still
+   open items that you've got logged... and then we'll do one last
+   stress test using chaos engineering. And then we'll work up a
+   delivery plan and then start feeding them to the delivery scoper
+   after that."**
+
+   1. **Close the open items** listed below.
+   2. **One last chaos-engineering stress test** of the settled model.
+   3. **Work up a delivery plan.**
+   4. **Then** feed requirements to `delivery-scoper` (batch one first -
+      storage and supply model - with the readers batch after, per the
+      two-batch split agreed 2026-09-21).
+
+   Note step 4 comes LAST: do not fire the scoper before 1-3 are done,
+   even though batch one was described as "ready to fire" earlier the
+   same evening. Also outstanding regardless: the eight item-6
+   requirements (REQ-PIPE-034 .. REQ-DASH-041) are still `not_started`
+   and UNSIGNED - `CLAUDE.md`'s sign-off gate applies before any of this
+   gets built.
+
+   **The still-open items, as at end of 2026-09-21:**
+   - **Does re-filing exist as its own operation?** It may be forced
+     anyway, since promote + demote compose into it. See the demotion-
+     stickiness section below.
+   - **What happens to a `nodata` supply** under the amber-or-green
+     auto-promotion rule. `nodata` is neither, and a supply where no
+     check ran is not evidence of good data.
+   - **Cross-cadence check period ownership** - which table's period is
+     a check's period when it spans tables on different cadences. Moot
+     within CP; a cross-COLLECTION problem, possibly deferrable.
+   - **Operator identity** in a deployed environment - already marked
+     deliberately deferred to build time, listed here so it is not
+     mistaken for an oversight.
+   - **Whether to build an as-published RECONSTRUCTION path at all**,
+     given snapshots already provide that view. Both are computable from
+     the append-only decision log; the question is whether the
+     reconstruction earns its place alongside the archive.
+   - **"Current version" vs "good version"** (item 6's own earlier open
+     question, still open) - adjacent to `plans/conceptual-design.md`
+     Thread A's amber accept/reject governance, to be settled with it
+     rather than separately.
+   - **What a "run" means for supply history** (item 6's own earlier
+     open question) - needs RE-CHECKING rather than answering fresh: the
+     per-table slot decision and dropping the date from `run_id` may
+     already have resolved it.
+
    That is a real change of position on this item, and worth recording
    as one rather than quietly rewriting the entry: this was parked from
    Phase 2 until now on Keith's own earlier, softer framing - "near-
