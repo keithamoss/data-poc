@@ -1494,6 +1494,41 @@ the model differently - a single-table collection, a multi-table one, a
 different cadence - would tell us more than picking two that look like
 what exists.
 
+**Answered in part, and widened, 2026-09-21** (Keith, while settling the
+composition rules for item 6): it is **one new dataset per data asset**,
+not two onto one. That choice is doing real work - it forces the
+daily asset and the quarterly asset each to hold more than one dataset,
+which is the configuration none of the current code has ever seen.
+
+And it carries a second piece of work he named at the same time: **add a
+more concrete concept of the DATA ASSET level**. Today the asset is
+barely modelled - `contract/data-asset.yaml` holds an id and one global
+`as_of_offset_days`, and everything else in the system is keyed on
+agency/dataset. Two assets each holding two datasets is the point where
+that stops being sufficient.
+
+Specifically flagged as possibly needing rework: **how the dashboard
+separates one data asset from another**. Keith's own words - "maybe it's
+actually two versions of the dashboard." Deliberately left open rather
+than decided here; it is a real fork (one dashboard with an asset
+selector, versus a separate published site per asset, versus asset as
+another level of the existing tree) and it wants scoping with him, not a
+guess. Worth noting the published-site question is not purely cosmetic -
+`.github/workflows/deploy-pages.yml` publishes one site today, so "two
+versions" is a deploy-shape change, not just a UI one.
+
+Where this came from, since it reads as a non-sequitur otherwise: the
+argument that killed it was mine and it was wrong. I had argued a
+per-day schema on the daily asset would be overhead, because BDM
+delivers one table a day so the schema would group one thing. That
+premise dies as soon as a second dataset lands on the daily asset - and
+Keith had said two sentences earlier that both assets will eventually
+carry both datasets. The schema-per-period pattern therefore holds for
+both assets (settled, see item 6), and the reason the argument failed is
+the same reason this item exists: the current single-dataset-per-asset
+shape is not the target state, and reasoning from it produces wrong
+answers.
+
 24. **[todo, 2026-09-21]** **[QA checks & contract]** Backfill a newly-added check across every historical supply.
 
 Keith, 2026-09-21, while working through `REQ-PIPE-038`, and it is the
