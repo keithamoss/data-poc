@@ -1304,6 +1304,32 @@ possibly deferrable, but not to be assumed away.
   well-defined: a multi-table check is a function of PERIOD P's
   composed state, and changes when any participating table's P
   version changes.
+
+  **ARRIVAL triggers QA, never promotion** (Keith's correction,
+  2026-09-22, against a claim that promoting the missing table
+  "re-triggers" the checks blocked on it). Promotion is an OUTCOME of
+  QA, so it cannot also be its input - promotion-as-trigger loops:
+  arrival -> QA -> promote -> QA -> promote. `depends_on` determines
+  SCOPE, not timing: a resupplied `cp_clients` arriving means QA runs
+  every check involving `cp_clients`, including ones defined on other
+  tables that merely depend on it.
+
+  Two consequences of QA running BEFORE promotion, worth settling
+  rather than discovering:
+  - **A supply's promotion decision considers every check its arrival
+    caused to run**, not only checks defined on that table. Otherwise a
+    resupply that breaks a referential constraint with an already-
+    promoted sibling would promote anyway.
+  - **Check results are CONDITIONAL on that supply being promoted.**
+    A cross-table check only ran because the candidate was staged; if
+    the candidate is then rejected, the warehouse never receives it, so
+    the verdict describes data that is not there. Results attach to the
+    SUPPLY (they are the evidence for its acceptance or rejection);
+    the PERIOD's status is computed from promoted supplies only. So a
+    rejected candidate leaves its period's dependent checks back at
+    cannot-run. Note the failure mode is benign - evaluated-and-failed
+    and cannot-run are both red, so nothing can go falsely green
+    here.
 - "Which dataset's history records it" - the COLLECTION's, which
   follows from lifting multi-table checks to collection level.
 
