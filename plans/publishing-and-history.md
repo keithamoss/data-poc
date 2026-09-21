@@ -3232,6 +3232,162 @@ one Thread's narrative.
       existing supply-history UI genuinely survives that, given Thread A
       claims it is "dataset-agnostic by construction".
 
+
+   ### Composition and the physical storage model - SETTLED 2026-09-21
+
+   Worked through with Keith over a long back-and-forth. Recorded here
+   because the requirements in this item's batch (point-in-time
+   composition, backfill, the three-state supply model, multi-table
+   checks) all depend on it, and because several of the answers came
+   from how his real operational database already works rather than
+   from anything derivable here.
+
+   **How composition works TODAY: it doesn't.** Established by reading
+   the code, not assumed. There are three DuckDB shapes and none is a
+   point-in-time assembly - `data/duckdb_runs/<run_id>.duckdb` (BDM, one
+   table, only that run's rows), `data/cp_duckdb_runs/<run_id>.duckdb`
+   (CP, six tables all `CREATE OR REPLACE`d from that run's CSVs), and
+   `data/warehouse.duckdb` (BDM only, every run's rows with a `run_id`
+   column, built for the dashboard's own queries). The per-run
+   warehouses are what dbt and Soda point at, and each is a sealed silo -
+   `build_per_run_warehouses.py`'s own docstring says why (the tools have
+   no `run_id`-scoped `WHERE`, so a per-run verdict needs a database
+   holding exactly one run).
+
+   Two consequences worth being explicit about, because they are not
+   bugs, they are things that were never built:
+   - **CP's cross-table checks only work by accident of the generator.**
+     Every CP run delivers all six tables, so replacing all six wholesale
+     leaves a coherent set. If one table failed to load, that run's
+     warehouse would hold five fresh tables and one MISSING one, not five
+     fresh and one carried forward. There is no carry-forward mechanism
+     because nothing ever needed one.
+   - **"The warehouse as at time T" has never existed.** Either option
+     below is new construction, not a repair.
+
+   **The storage model, settled:**
+   - **One schema per period, on both assets** - quarterly gets a schema
+     per quarter, daily a schema per day. Keyed on the period the supply
+     is INTENDED for, not the day it arrived.
+   - **One table per supply per dataset** inside it. A resupply is a new
+     table in the same schema, not an overwrite, so a schema can hold
+     several versions of the same logical table.
+   - **Table contents are immutable** once written - never touched again.
+     But **tables CAN move between schemas** (Keith, explicitly). Only
+     the contents are frozen, not the filing.
+   - **Physical table names carry the arrival timestamp**, matching
+     Keith's real operational database.
+   - **`run_id` is a deterministic sequence** - no date, no `_resupply`
+     suffix, just a unique id for the run. Deterministic rather than
+     random is load-bearing: it is what makes regeneration overwrite in
+     place instead of doubling the history (`plans/running-thoughts.md`
+     #26). The delivery/attempt/supersedes relationships already live in
+     the manifest, so dropping the suffix loses nothing.
+
+   **Composing "as at T"**: for each logical table, take the latest
+   version whose ARRIVAL is <= T. Transaction time filters, valid time
+   files. Cleanly bitemporal, and it means the existing as-of picker was
+   already correct - verified against a real resupply
+   (`run_010_2026-05-31_resupply1`: `delivery_date` 2026-05-31,
+   `arrived_date` and `run_date` both 2026-06-01), and both generators
+   set `run_date` from `arrived_date` explicitly. Nothing in the
+   dashboard says which axis it is on, though, which is worth fixing.
+
+   Consequence accepted rather than solved: "show me Q3" and "show me as
+   at 30 June" become different questions once early arrivals exist. The
+   dashboard has one picker. Keith's call - stick with "as at 30 June",
+   the as-at question is the one that matters.
+
+   ### How a supply gets filed - staging and promotion
+
+   The hard part, and it took three wrong answers to get here. Worth
+   recording the rejected ones, since each was rejected for a specific
+   reason that will recur.
+
+   - **Rejected: the supply declares its period.** Keith's objection, and
+     it is decisive: it cannot be enforced across a wide and varied
+     supplier base, and the suppliers who would get it wrong are exactly
+     the ones whose data most needs QA. A rule depending on every
+     supplier doing something new and doing it consistently is a wish,
+     not a design.
+   - **Rejected: derive the period from the data's own content.**
+     Circular - it would infer the filing decision from the very data
+     whose correctness is about to be tested. A resupply exists precisely
+     because the first attempt was wrong, possibly wrong in its dates, so
+     a bad extract would file itself in the wrong place and then be QA'd
+     against the wrong period. Fails silently, which is the worst
+     direction.
+   - **Weakened, then dropped: "file by arrival, period as correctable
+     metadata".** The argument for it was "do not freeze a derived
+     judgment into an immutable structure". It lost its force the moment
+     Keith said tables can move between schemas - re-filing is cheap, so
+     there is nothing expensive being frozen.
+
+   **The answer, from Keith's real system: staging, then promotion.**
+   Everything lands in staging on arrival. Staging is arrival-ordered and
+   needs no decision - it asserts only the thing actually known (this
+   landed at this time), so it can never be wrong. An early supply just
+   sits there. Promotion then moves it into a period schema, and is
+   reversible because tables move.
+
+   This is already how the quarterly asset works today (a human promotes
+   out of staging into a quarter). The daily asset is genuinely unbuilt
+   and unsolved - Keith's own words - and he wants both on the same
+   structure. Which they can be, because the daily/quarterly difference
+   is not structural, it is only **who pulls the trigger**:
+
+   | Asset | Decision rule | Trigger |
+   |---|---|---|
+   | Quarterly | which quarter this fills | a human, as today |
+   | Daily | oldest unfilled slot, unless inside a later slot's early window | automatic |
+
+   One policy flag per asset, same machinery. The automatic rule is safe
+   to be imperfect precisely because tables move - a wrong promotion is a
+   correction, not a rebuild.
+
+   Note what this dissolves: the "arrives 10pm, belongs to tomorrow"
+   cutoff and the "arrives a week early" case stop being two mechanisms.
+   A cutoff time is just a one-day early window - same rule, different
+   config per asset. Resupply detection also falls out for free: if the
+   slot an arrival maps to is already filled, it supersedes what is
+   there, with nothing parsing a filename.
+
+   **The content check survives, but as a DETECTOR, not a decider.**
+   "This supply does not look like the period it is filed under" is a
+   legitimate QA finding, non-circular because it is not making the call,
+   and it is what turns a wrong default into something a human sees
+   rather than something that sits there quietly.
+
+   ### QA runs on staging, and that is arguably the point
+
+   QA runs BEFORE promotion, and its results are what the promotion
+   decision is made on. For the quarterly asset the human's question at
+   promotion time is literally "is this good enough to go into Q3?" -
+   which makes this tool an input to a decision someone already makes,
+   rather than a report they read afterwards.
+
+   It also resolves the cross-table problem: QA does not run against
+   staging alone, it **composes the current promoted state and overlays
+   the staged candidate**. A newly-arrived `placements` is checked
+   against the promoted `clients`. The same composition machinery serves
+   backfill - compose the promoted state as at a past point, run the new
+   check against it (`plans/running-thoughts.md` #24).
+
+   Converges with the three-state supply model already in this batch:
+   staged / promoted / failed are the same three states seen from the
+   storage side rather than the QA side. One concept, not two.
+
+   **Open, and with Keith: does QA gate promotion, or only inform it?**
+   For the quarterly asset, inform-only is the likely answer - sometimes
+   you promote data you know is imperfect because you need it, and a tool
+   that refuses is a tool people route around. For the daily asset there
+   is no human in the loop, so it has to be a rule: does a red supply
+   auto-promote anyway with the finding recorded, or does red hold it in
+   staging? Recommended auto-promote-and-record, because holding
+   recreates the manual bottleneck the automation exists to avoid, and
+   because red data present and flagged is more honest than red data
+   invisible. Keith's operational call.
+
 7. **[done, 2026-09-19]** **[Pipeline & publishing]** Both GitHub Actions
    workflows are pinned to a single, hardcoded session branch name -
    `on: push: branches: [claude/new-session-en9qen]` in
