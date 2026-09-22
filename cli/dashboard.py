@@ -79,16 +79,22 @@ def validate_check_lifecycle_command(require_explanations: bool) -> None:
     _validate_check_lifecycle(require_explanations)
 
 
-def _validate_requirements() -> None:
+def _validate_requirements(path: str | None = None) -> None:
     from qa_tools.common.validate_requirements import main as validate_main
-    if validate_main() != 0:
+    if validate_main(path) != 0:
         raise click.ClickException("requirements validation failed - see output above.")
 
 
 @dashboard_group.command("validate-requirements")
-def validate_requirements_command() -> None:
+@click.option("--draft", "draft", metavar="PATH", default=None,
+              help="Validate a DRAFT file of requirements instead of the real "
+                   "register - for checking scoped requirements before they are "
+                   "applied. A draft may be a bare list rather than a "
+                   "'requirements:' mapping. Cross-reference errors against "
+                   "requirements the draft does not itself contain are expected.")
+def validate_requirements_command(draft: str | None) -> None:
     """Gate: requirements.yaml stays consistent with the real test files it references."""
-    _validate_requirements()
+    _validate_requirements(draft)
 
 
 def _validate_changelog() -> None:

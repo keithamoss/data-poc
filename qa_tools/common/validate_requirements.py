@@ -249,7 +249,7 @@ def validate(requirements: list[dict]) -> list[str]:
     return errors + _cross_reference_errors(parsed)
 
 
-def main() -> int:
+def main(path: str | None = None) -> int:
     """Reads the raw YAML rather than going through
     `dashboard/requirements_yaml.py`.
 
@@ -257,13 +257,32 @@ def main() -> int:
     first problem it meets (2026-09-20) - fine for a build, wrong for a
     gate. An author fixing a batch of entries should see the whole list
     in one run, not one error per run, so this keeps its own read and
-    catches per entry."""
-    if not REQUIREMENTS_YAML.exists():
-        print(f"requirements.yaml not found at {REQUIREMENTS_YAML}", file=sys.stderr)
+    catches per entry.
+
+    `path` lets a DRAFT be checked before it is applied - added
+    2026-09-22, Keith's own call, after a scoper pass handed back 16
+    list items that could not parse as YAML at all (plain scalars
+    containing a colon-space, which YAML reads as a mapping key). The
+    root cause was not carelessness: `delivery-scoper` is granted
+    Read/Grep/Glob and no Bash, so it had no way to run a parser over
+    its own output. Keith's framing - "let the agents validate the
+    YAML, or give them the tools to write better YAML" - is the fix,
+    and a style rule telling them to quote everything would only have
+    been the fix until somebody forgot.
+
+    A draft file holds a bare LIST of requirements rather than the
+    `requirements:` mapping the real file uses, so both shapes are
+    accepted. Cross-reference checks still run, and a draft that
+    references a requirement it does not itself contain will report
+    that - correctly, since the draft is not the whole register."""
+    target = Path(path) if path else REQUIREMENTS_YAML
+    if not target.exists():
+        print(f"requirements YAML not found at {target}", file=sys.stderr)
         return 1
-    with open(REQUIREMENTS_YAML) as f:
+    with open(target) as f:
         doc = yaml.safe_load(f) or {}
-    requirements = [r or {} for r in (doc.get("requirements") or [])]
+    raw = doc.get("requirements") if isinstance(doc, dict) else doc
+    requirements = [r or {} for r in (raw or [])]
     errors = validate(requirements)
 
     if errors:
@@ -277,4 +296,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else None))

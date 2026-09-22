@@ -4282,9 +4282,13 @@ requirements:
         sensible window is days and a daily calendar's is hours, so a
         single asset-root default would be wrong for one of them on day
         one, in this repo. Putting it on the calendar makes the default
-        track the thing that sets its scale. THE SCOPER'S OWN CALL
-        following from two answers settled separately - flagged for Keith
-        at sign-off rather than buried."
+        track the thing that sets its scale. Raised as the scoper's own
+        call, following from two answers settled separately, and
+        CONFIRMED by Keith 2026-09-22 when shown all three shapes side by
+        side: the asset-root default would hand Birth Registrations a
+        14-day claim window on a daily feed, so it only ever serves one
+        of the two cadences. Per-dataset-only was rejected again at the
+        same time - 30 copies of one number that nobody maintains."
       - "[A1] Decided delivery_months is meaningful only on an
         authored-date calendar, and is an ERROR on a cadence-rule one
         rather than an ignored key. A dataset naming a daily calendar
@@ -4354,16 +4358,6 @@ requirements:
       - THE SYSTEM SHALL reject a claim window that is not a duration
         with a recognised unit, and SHALL NOT coerce one.
       - THE SYSTEM SHALL reject duplicate calendar names.
-      - IF the contents of a calendar version whose effective-from date
-        has already passed do not match that version's own recorded
-        content record, THEN THE SYSTEM SHALL exit non-zero, naming the
-        calendar and the version.
-      - IF a calendar version's recorded content record has changed
-        without a corresponding new changelog entry identifying it, THEN
-        THE SYSTEM SHALL exit non-zero.
-      - IF a period is declared not expected and that period's date has
-        already passed, THEN THE SYSTEM SHALL exit non-zero unless the
-        same change is recorded in that calendar's changelog.
       - THE SYSTEM SHALL validate configuration without reading git
         history and without opening or querying anything under data/.
     non_functional_requirements:
@@ -4384,13 +4378,6 @@ requirements:
       - Failing a build is a real interruption, so every error here must
         be one a human can act on immediately. Name the file, the
         dataset and the value.
-      - The retrospective-edit guard must work from the working tree
-        alone. CI checks out a single commit and the dashboard build runs
-        the same validation, so a guard that needs git history would be
-        unreliable in exactly the places it matters.
-      - The override path must be usable. A guard that makes a genuine
-        typo correction painful gets worked around, which is worse than
-        no guard.
     dependencies: [REQ-PIPE-049, REQ-QAC-039]
     decisions:
       - Decided the organising idea is one sentence rather than a
@@ -4409,50 +4396,32 @@ requirements:
         not exist until sprint 6, so it lands in REQ-PIPE-053 instead.
         Failing an otherwise-fine build on runway is also how a gate
         gets disabled.
-      - "[A4] Decided a retrospective change to a past calendar date, or a
-        past-dated not_expected entry, is a HARD FAILURE with a
-        deliberate override (Keith, 2026-09-22). Rejected warn-only,
-        which was offered on the reasoning that a real correction should
-        not have to fight the tooling - but Thread E's rule that config
-        must never be edited to make red history disappear is either
-        enforced or it is a hope, and a warning in a gate that prints
-        several is a hope. Rejected no guard at all, relying on review."
-      - "[A4] Decided the override is a COMMITTED ARTEFACT, not a flag -
-        the version's own recorded content record plus a changelog entry
-        naming it, both in the same commit. Rejected a CLI flag or
-        environment variable outright: it is invisible the moment the
-        command finishes, so CI goes green and nothing records that a
-        past date moved, which is the exact failure the guard exists to
-        prevent, with a sanctioned door. The point is not to make the act
-        hard, it is to make it recorded. THE POLICY IS KEITH'S; THE
-        MECHANISM IS THE SCOPER'S - flagged for sign-off."
-      - "[A4] Decided the guard works from the working tree alone, via a
-        recorded content record per version rather than by diffing
-        against git. Two local checks compose into the guarantee: the
-        recorded record must match the version's contents, AND the newest
-        changelog entry for that version must identify the current
-        record. Updating the contents fails the first; updating the
-        record to pass it fails the second; only doing both plus writing
-        down why passes. Rejected diffing against git history, which is
-        unavailable or unreliable in a shallow CI checkout. config_hash
-        from REQ-QAC-023 is the established shape for the record."
-      - "[A4] Consequence worth naming rather than discovering: the
-        synthetic history's own calendar versions are past-dated too, so
-        regenerating the generated history trips this guard by design.
-        That is the override working, not a conflict - regeneration is a
-        deliberate act, and the mothman regeneration command updates the
-        recorded records and writes the changelog entry as part of the
-        same act. Worth watching in the build: if it becomes friction on
-        every regeneration, the answer is to make regeneration write the
-        record properly, not to exempt the synthetic calendars, because
-        exempting them removes the only place the guard is ever
-        exercised."
       - "[A2] Decided the gate validates the claim-window duration rather
         than coercing it. A parser that accepts 14, 14d, 14 days and P14D
         is four ways for 30 datasets' config to read differently for no
         gain - the same reasoning that limited month names to one
         accepted form."
 
+      - "[A4] Decided to REJECT building any technical mechanism for this,
+        and to rely on review instead (Keith, 2026-09-22): \"let's just
+        catch that and review. I don't need to invent a technical
+        mechanism to handle that.\" The policy stands - Thread E's rule
+        that config must never be edited to make red history disappear is
+        real - but it is enforced by people reading a diff, as it is
+        today, not by the gate."
+      - "[A4] Rejected TWO mechanisms, both worked through before the
+        decision, and both recorded because they are the obvious things
+        to re-propose. (1) A recorded content record per calendar version
+        plus a changelog entry naming it, checked locally: editing a past
+        date breaks the record, updating the record breaks the changelog
+        check, so the only route through is writing down what changed.
+        Genuinely airtight, and real machinery for a rule that bites
+        rarely. (2) Diffing the config against git history. Simpler to
+        understand, and possible - CI clones at fetch-depth 2 today,
+        which is a config line rather than a law - but this repo has a
+        recorded performance incident from walking its own git history,
+        so a deeper clone on every push is not free. Neither earns its
+        cost against a reviewer reading the diff."
   - id: REQ-PIPE-051
     title: Periods are derived from the schedule, and never move
     date_written: "2026-09-22"
