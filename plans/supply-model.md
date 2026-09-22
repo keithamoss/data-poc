@@ -311,9 +311,10 @@ comparisons against the expected-supply sequence.
     **Conflicting decisions on one supply**: record both, LAST WINS,
     both operators notified by the ticket being updated with the
     outcome. Decisions are applied **serialised per supply, in
-    comment-timestamp order**, and the workflow must **queue rather
-    than cancel** (`cancel-in-progress: false`) - a cancelled run is a
-    lost decision. Settled 2026-09-22, see Thread H.
+    comment-timestamp order**, and **each run DRAINS THE BACKLOG** -
+    reading all unprocessed decisions since a marker rather than only
+    the triggering event, so a cancelled run costs nothing. Settled
+    2026-09-22, see Thread H.
 
 13. **[todo, 2026-09-21]** **[Pipeline & publishing]** **One database,
     many schemas.** Retire the per-run warehouses; one database per test
@@ -2143,13 +2144,34 @@ APPLICATION**: process decisions in comment-timestamp order, one at a
 time per supply. Which is the same serialisation constraint already
 named for QA and promotion in Thread I - one discipline, not two.
 
-**One concrete detail that would silently drop decisions if got wrong.**
-GitHub Actions concurrency groups are the mechanism, and this repo
+**Two concrete details that would silently drop decisions.**
+
+**(a) `cancel-in-progress: false` - necessary, not sufficient.** GitHub
+Actions concurrency groups are the obvious mechanism, and this repo
 already uses them - we watched `test.yml` runs get CANCELLED by
 concurrency on 2026-09-22 when pushes landed in quick succession.
 Cancelling is exactly wrong here: a cancelled run is a LOST DECISION.
-The decision workflow needs **`cancel-in-progress: false`** - queue,
-do not cancel - the opposite of what the test workflow wants.
+So the decision workflow queues rather than cancels, the opposite of
+what the test workflow wants.
+
+**But that only holds for TWO.** Keith asked directly whether GitHub
+queues runs for us - "the first one will run and the second one will not
+start running until the first one is done, is that right?" Yes for two.
+**GitHub holds only ONE pending run per concurrency group**, so with A
+running, B pending and C arriving, B is cancelled and replaced by C -
+three rapid decisions silently lose the middle one, which is the exact
+failure this was meant to prevent. (Worth verifying against current
+GitHub docs rather than taken on trust; it is specific platform
+behaviour.)
+
+**(b) The real fix, which makes (a) moot either way: EACH RUN DRAINS
+THE BACKLOG.** The workflow reads ALL unprocessed decisions since a
+recorded marker, applies them in comment-timestamp order, and advances
+the marker - rather than handling only the event that triggered it.
+Idempotent and drop-safe: a cancelled run costs nothing, because the
+next run picks up everything outstanding including whatever the
+cancelled one would have done. The design then does not depend on the
+platform queueing one, ten, or none.
 
 **3. The same dataset twice in one delivery.** A supplier drops
 `cp_clients.csv` and `cp_clients_v2.csv` in the same folder. A supply is
