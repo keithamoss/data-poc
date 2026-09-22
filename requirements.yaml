@@ -4337,10 +4337,10 @@ requirements:
         which its own calendar has no date.
       - THE SYSTEM SHALL reject schedule versions that overlap or are
         out of order on their effective-from dates.
-      - THE SYSTEM SHALL reject duplicate calendar dates and duplicate
-        period names.
+      - THE SYSTEM SHALL reject duplicate calendar names, duplicate
+        dates within a calendar, and duplicate period names.
       - THE SYSTEM SHALL reject a dataset that both subsets and
-        overrides the asset calendar.
+        overrides its own calendar.
       - THE SYSTEM SHALL reject a dataset named in asset configuration
         that has no contract, and a contract that has no asset
         configuration entry.
@@ -4357,9 +4357,6 @@ requirements:
         against a cadence-rule calendar.
       - THE SYSTEM SHALL reject a claim window that is not a duration
         with a recognised unit, and SHALL NOT coerce one.
-      - THE SYSTEM SHALL reject duplicate calendar names.
-      - THE SYSTEM SHALL validate configuration without reading git
-        history and without opening or querying anything under data/.
     non_functional_requirements:
       - This gate runs on every push and inside mothman check, whose own
         gates are ordered cheapest-first so the fast ones report while
@@ -4439,8 +4436,6 @@ requirements:
       Delivery sprint 6, and test scenario register TS-26. Scoped by
       delivery-scoper, batch 1+2 pass, 2026-09-22.
     acceptance_criteria:
-      - THE SYSTEM SHALL derive from the schedule a sequence of periods,
-        each carrying a name and a date.
       - THE SYSTEM SHALL produce that sequence in the same shape whether
         the schedule was authored as dates or expressed as a cadence
         rule, so that nothing downstream knows which produced it.
@@ -4627,14 +4622,9 @@ requirements:
       TS-23 and TS-24. Scoped by delivery-scoper, batch 1+2 pass,
       2026-09-22.
     acceptance_criteria:
-      - WHERE a dataset's schedule is an authored date list, THE SYSTEM
-        SHALL warn when fewer than a configured number of future slots
-        remain.
       - THE SYSTEM SHALL measure that runway in SLOTS, and SHALL NOT
         measure it in elapsed time.
       - THE SYSTEM SHALL NOT fail a build on the runway warning.
-      - WHERE a dataset's schedule is a cadence rule, THE SYSTEM SHALL
-        NOT warn about runway.
       - WHEN more than one dataset is low on runway, THE SYSTEM SHALL
         state how many rather than warning once per dataset.
       - IF a dataset has no slot covering the date being processed, THEN
@@ -4728,8 +4718,6 @@ requirements:
       would silently return nothing. Delivery sprint 6. Scoped by
       delivery-scoper, batch 1+2 pass, 2026-09-22.
     acceptance_criteria:
-      - THE SYSTEM SHALL embed the asset's derived period sequence into
-        the built dashboard.
       - THE SYSTEM SHALL use that embedded sequence for the as-of
         picker's period arithmetic.
       - THE SYSTEM SHALL NOT reimplement schedule derivation in the
