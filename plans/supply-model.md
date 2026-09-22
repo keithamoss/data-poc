@@ -155,7 +155,41 @@ permits it, not to save time.
   rather than ANSWERED, so a future session reading this does not
   reopen it as unresolved - if a cross-cadence check ever does appear,
   the question is live again and unanswered.
-- ~~**Operator identity**~~ - **SETTLED 2026-09-22**, see Thread G. See Thread G.
+- ~~**Operator identity**~~ - **SETTLED 2026-09-22**, see Thread G.
+
+**Genuinely still open as at 2026-09-22, after a full sweep of this
+file** - five items, none of which blocks the first two scoper batches:
+
+1. **Is "un-decide" an operation we want?** Demote-to-staging, meaning
+   "put this back in the queue for someone to look at again", as
+   distinct from rejecting it. Re-filing being atomic (TS-11) removes
+   the need for anything to pass back through staging, so this is now a
+   standalone question rather than an entangled one. If NO, demote goes
+   to rejected only and the stickiness rule becomes unnecessary. Lands
+   in batch 4 (sprints 11-12).
+2. **Whether to build an as-published RECONSTRUCTION path at all**,
+   given snapshots already answer that question. Batch 6.
+3. **"Current version" vs "good version"** - inherited from
+   `plans/publishing-and-history.md` item 6, deliberately parked to be
+   settled alongside `plans/conceptual-design.md` Thread A's amber
+   accept/reject governance rather than separately.
+4. **What a "run" means for supply history** - a RE-CHECK task rather
+   than an open question: per-table slots and the dateless `run_id` may
+   already have resolved it.
+5. **Verify GitHub's concurrency queueing behaviour** - a fact-check,
+   and the drain-the-backlog design makes the answer non-load-bearing
+   either way.
+
+**Two requirements need work before their sprint, not before the
+scoper**: `REQ-PIPE-035` needs REWRITING (it specifies the composition
+Thread J dropped) and `REQ-PIPE-036` needs RE-READING (its trigger is
+now a delivery, not a table).
+
+**And the standing gate**: all eight existing requirements
+(`REQ-PIPE-034`..`REQ-DASH-041`) are `not_started` and UNSIGNED, and
+anything `delivery-scoper` produces is a PROPOSAL. `CLAUDE.md`'s
+sign-off rule applies before any of it is built - scoping is not
+sign-off. See Thread G.
 - **Whether to build an as-published RECONSTRUCTION path at all**, given
   snapshots already provide that view. Both are computable from the
   append-only decision log; the question is whether the reconstruction
@@ -1182,16 +1216,17 @@ discovering:
    the DATA is immutable, but the FILING is not, and the composed
    view depends on both. So reproducing a past view exactly needs
    transaction time on the promotion decisions themselves, not only
-   on the arrivals. Suggested shape: record promotion/demotion as
-   timestamped events, default "as at T" to today's filing (simplest
-   and what an operator usually means), and keep the event log so
-   "the view as it was published then" stays answerable. Unresolved -
-   for the scoper to stress-test.
-2. **What happens to a `nodata` supply.** "Amber or green
-   auto-promotes" does not name it, and `nodata` ranks below green in
-   `STATUS_ORDER`. A supply where no check ran at all is not evidence
-   of good data, so it should presumably hold rather than promote -
-   but it is an edge case the rule as stated leaves open.
+   on the arrivals. **SETTLED 2026-09-22** (Thread K): promotion and
+   demotion are recorded as timestamped events in the decision log;
+   the live dashboard defaults to AS-CORRECTED; and "the view as it was
+   published then" is the SNAPSHOT archive rather than a reconstruction.
+   Only one residual remains - whether to build a reconstruction path at
+   all, given snapshots already answer that question.
+2. ~~**What happens to a `nodata` supply.**~~ **CLOSED 2026-09-22.**
+   It was the same question as TS-21 - a check-less table's supply IS a
+   nodata supply - and the zero-ACTIVE-checks CI gate makes the state
+   unreachable. Every remaining `nodata` case is "nothing was owed",
+   which never reaches a promotion decision.
 
 ### The DELIVERY is the arrival unit, and QA triggers on it
 
@@ -1276,7 +1311,8 @@ delivery model:
   the schedule does not list for that period must not break the
   delivery, but receiving something nobody asked for usually means a
   supplier changed their extract without telling anyone - exactly what
-  this tool should catch. Unresolved: red, or informational.
+  this tool should catch. **Settled 2026-09-22: INFORMATIONAL**, in
+  the activity feed - it is not a data quality failure.
 - **Re-QA is ordinary, and history keeps both runs.** August QA'd with
   five tables; November's resupply arrives as its own delivery and QA
   runs afresh. Each run's results attach to the supplies it evaluated,
@@ -1464,8 +1500,9 @@ enumerates.
 
 ### Early/onTime/late - a real gap in the current classifier
 
-NOT yet settled with Keith - recorded because the finding itself is
-real and independent of how it gets fixed.
+**SETTLED 2026-09-21** - the fix below was agreed, along with two
+corrections found while explaining it. The "not yet settled" note that
+stood here was stale.
 
 `classify_arrival()` derives the cycle from the arrival date
 (`cycle_start(cadence, run_date)`), and `cycle_start` is defined as
@@ -1545,13 +1582,14 @@ signature change" and that undersold it.**
    period math, so the duplicated-logic surface shrinks rather than
    grows.
 
-**Re-filing may not be a free decision, and demotion has a trap.**
-Raised 2026-09-21, unresolved:
+**Re-filing, and demotion's trap.** Raised 2026-09-21; **re-filing
+was confirmed IN SCOPE as its own atomic operation 2026-09-22** (see
+TS-11), so the question below is settled except where noted:
 - Promote and demote are both already asked for in the TUI. Demote
   out of Q2, promote into Q3, and a supply has been re-filed without
-  anyone designing re-filing. So the real question is whether the
-  composition of two agreed operations gets recognised and handled,
-  not whether to build a third one.
+  anyone designing re-filing. Settled: re-filing is atomic, not that
+  composition - one decision-log entry with a from-slot, a to-slot and
+  a reason, rather than two a later reader must correlate.
 - **Demotion needs stickiness, but only in one direction** - Keith's
   own refinement, 2026-09-21, sharper than the original framing. With
   auto-promotion on green/amber, a human demotes a green supply and
