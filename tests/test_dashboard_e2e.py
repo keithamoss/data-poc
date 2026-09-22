@@ -404,22 +404,81 @@ class TestTicketBadge:
         assert clean_page.locator("a.pill.tag[href*='github.com'][href*='issues']").count() == 0
 
 
+def _real_amber_bdm_runs() -> list[tuple[str, str]]:
+    """(run_id, run_date) for every BDM run the dashboard currently
+    renders AMBER, oldest first, and that a decision comment can
+    actually resolve to.
+
+    Two things here were got wrong first time and are worth stating.
+
+    It computes status with `status_by_run()` - the same rollup the
+    page itself applies - NOT from the generator's own `dirty_severity`
+    in the manifest. Those genuinely disagree: dirty_severity is what
+    the generator INTENDED to inject, while the badge gates on what the
+    real tools actually reported. On the regenerated history they
+    produce different sets of runs, and the proxy is the wrong one.
+
+    It also drops any run whose acceptance window is zero-width. Two
+    runs sharing an arrived_date leave the first with
+    window_start == window_end, which `created >= start and created <
+    end` can never match - see TestRunWindowsWithTiedArrivedDates. A
+    run like that renders amber but no comment can ever attach to it,
+    so it is useless to these tests.
+
+    Reads committed qa_results/ via the built dashboard JSON, never
+    data/.
+    """
+    import json as _json
+
+    from qa_tools.common import acceptance_sync as _acc
+    from qa_tools.common.dataset_status import status_by_run
+
+    reports = Path(__file__).resolve().parent.parent / "reports"
+    with open(reports / "birth_registrations_dashboard.json") as f:
+        dataset = _json.load(f)
+
+    amber = {run_id for run_id, status in status_by_run(dataset).items() if status == "amber"}
+    usable: list[tuple[str, str]] = []
+    for run_id, start, end in _acc._run_windows_for_dataset("birth-registrations"):
+        if run_id in amber and start != end:
+            usable.append((run_id, start.isoformat()))
+    return usable
+
+
 @pytest.fixture
 def dashboard_html_with_amber_decisions(built_dashboard_html, tmp_path, monkeypatch) -> Path:
     """running-thoughts.md #6 ("read-only tension: accepting/rejecting
     amber supplies") - same real-fake-injection shape as dashboard_html_
     with_ticket above (a real gh call only deploy-pages.yml can make
     locally), via QA_COMMENTS_JSON instead of OPEN_TICKETS_JSON. Targets
-    3 REAL, currently-amber committed runs (birth-registrations,
-    2026-05-22/23/24) - found by actually computing this dataset's own
-    per-run status from reports/birth_registrations_dashboard.json, not
-    assumed - so the decision badge's own real gating condition
-    (status==="amber") has genuine amber rows to attach to: one gets a
-    real /accept, one gets a real /reject, one gets neither."""
+    3 REAL, currently-amber committed runs, so the decision badge's own
+    real gating condition (status==="amber") has genuine amber rows to
+    attach to: one gets a real /accept, one gets a real /reject, one
+    gets neither.
+
+    Those three runs are COMPUTED HERE, not written down. The original
+    version did the right investigation - its docstring said the dates
+    were "found by actually computing this dataset's own per-run status
+    ... not assumed" - and then froze the answer as three literals
+    (2026-05-22/23/24, later run_044/run_062/run_066). Cutting BDM's
+    history to 30 deliveries on 2026-09-23 deleted all three, and these
+    three tests failed for a reason that had nothing to do with what
+    they test. Deriving them means any future regeneration is free.
+
+    Yields the built HTML plus the three run ids it chose, since the
+    tests locate rows by data-run-id and can no longer hardcode them.
+    """
     from dashboard import embed_dashboard_data as edd
 
     (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
     (tmp_path / "vendor").symlink_to((Path(edd.ROOT) / "dashboard" / "vendor").resolve())
+
+    amber = _real_amber_bdm_runs()
+    assert len(amber) >= 3, (
+        f"need 3 real amber BDM runs to attach decisions to, found {len(amber)}. "
+        "generate_runs.py's RUN_PLAN controls the clean/amber/red mix."
+    )
+    (accept_id, accept_date), (reject_id, reject_date), (neither_id, _) = amber[:3]
 
     comments_path = tmp_path / "qa_comments.json"
     comments_path.write_text(json.dumps([{
@@ -427,12 +486,12 @@ def dashboard_html_with_amber_decisions(built_dashboard_html, tmp_path, monkeypa
         "comments": [
             {
                 "author": {"login": "keithamoss"}, "body": "/accept",
-                "createdAt": "2026-07-05T10:00:00Z",
+                "createdAt": f"{accept_date}T10:00:00Z",
                 "url": "https://github.com/keithamoss/data-poc/issues/998#issuecomment-1",
             },
             {
                 "author": {"login": "keithamoss"}, "body": "/reject",
-                "createdAt": "2026-07-23T10:00:00Z",
+                "createdAt": f"{reject_date}T10:00:00Z",
                 "url": "https://github.com/keithamoss/data-poc/issues/998#issuecomment-2",
             },
         ],
@@ -441,20 +500,20 @@ def dashboard_html_with_amber_decisions(built_dashboard_html, tmp_path, monkeypa
     monkeypatch.setattr(edd, "QA_COMMENTS_JSON", comments_path)
     monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
     edd.embed()
-    return out_html
+    return {"html": out_html, "accept": accept_id, "reject": reject_id, "neither": neither_id}
 
 
 class TestAmberDecisionBadge:
     def test_a_real_accept_comment_shows_a_linked_badge_on_its_matching_amber_run(self, clean_page, dashboard_html_with_amber_decisions):
         _goto(
-            clean_page, dashboard_html_with_amber_decisions,
+            clean_page, dashboard_html_with_amber_decisions["html"],
             state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "birth-registrations"},
         )
         toggle = clean_page.locator("#supply-history-toggle")
         if toggle.count():
             toggle.click()
 
-        row = clean_page.locator('tr[data-run-id="run_044_2026-07-05"]')
+        row = clean_page.locator(f'tr[data-run-id="{dashboard_html_with_amber_decisions["accept"]}"]')
         assert row.count() > 0, "the real amber run this test targets isn't in the rendered supply history"
         badge = row.locator("a.pill.tag[href*='issuecomment-1']")
         assert badge.count() > 0, "no decision badge rendered on the real amber run it was accepted against"
@@ -467,14 +526,14 @@ class TestAmberDecisionBadge:
         question): a rejected run's pill still stays amber - only the
         badge differs from accept's."""
         _goto(
-            clean_page, dashboard_html_with_amber_decisions,
+            clean_page, dashboard_html_with_amber_decisions["html"],
             state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "birth-registrations"},
         )
         toggle = clean_page.locator("#supply-history-toggle")
         if toggle.count():
             toggle.click()
 
-        row = clean_page.locator('tr[data-run-id="run_062_2026-07-23"]')
+        row = clean_page.locator(f'tr[data-run-id="{dashboard_html_with_amber_decisions["reject"]}"]')
         assert row.count() > 0, "the real amber run this test targets isn't in the rendered supply history"
         status_pill_class = row.locator("td").nth(1).locator(".pill").first.get_attribute("class")
         assert "amber" in status_pill_class, "reject must never repaint the pill away from amber"
@@ -485,14 +544,15 @@ class TestAmberDecisionBadge:
 
     def test_a_different_amber_run_with_no_decision_comment_shows_no_badge(self, clean_page, dashboard_html_with_amber_decisions):
         _goto(
-            clean_page, dashboard_html_with_amber_decisions,
+            clean_page, dashboard_html_with_amber_decisions["html"],
             state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "birth-registrations"},
         )
         toggle = clean_page.locator("#supply-history-toggle")
         if toggle.count():
             toggle.click()
 
-        row = clean_page.locator('tr[data-run-id="run_066_2026-07-27"]')  # a different real amber run, no comment
+        # a different real amber run, no comment against it
+        row = clean_page.locator(f'tr[data-run-id="{dashboard_html_with_amber_decisions["neither"]}"]')
         assert row.count() > 0
         assert row.locator("a.pill.tag[href*='issuecomment']").count() == 0
 
@@ -593,10 +653,25 @@ class TestStatusMatchesEachToolsOwnVerdict:
         _goto(clean_page, built_dashboard_html)
         result = clean_page.evaluate(self._COMPARE_JS)
 
-        assert result["compared"] > 10000, (
-            "expected tens of thousands of real statuses to compare - got "
-            f"{result['compared']}, which suggests the embedded data or the "
-            "traversal is wrong rather than the statuses being right"
+        # This guard exists so a broken traversal cannot pass vacuously
+        # by comparing nothing. It used to read `> 10000`, a figure tied
+        # to BDM's 352-run history; cutting that to 30 deliveries on
+        # 2026-09-23 left 7,011 real comparisons and this fired BEFORE
+        # the disagreement check below - so the test reported a failure
+        # while the statuses it exists to police were in fact perfect.
+        #
+        # The floor is now derived from the data the page was built
+        # from: every committed run contributes statuses, so comparing
+        # fewer than one per run means the traversal, not the history.
+        committed_runs = sum(
+            len(list(d.iterdir()))
+            for d in (Path(__file__).resolve().parent.parent / "qa_results").glob("*/*")
+            if d.is_dir()
+        )
+        assert result["compared"] > committed_runs, (
+            f"only {result['compared']} statuses compared across {committed_runs} "
+            "committed runs - the embedded data or the traversal is wrong, "
+            "rather than the statuses being right"
         )
         assert result["disagreements"] == [], (
             "the rendered dashboard disagrees with the tools' own verdicts:\n"
