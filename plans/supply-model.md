@@ -236,18 +236,38 @@ how a closed question gets silently reopened:
    same day was not to rely on it, so drain-the-backlog is the whole
    mechanism, not a fallback behind a belt.
 
-6. **What the word "delivery" refers to, given the generator already
-   uses it for something else** - NEW, found 2026-09-22 by reading the
-   real code for the concept inventory below rather than by design
-   work. Today's `delivery_id` means the logical obligation across
-   attempts, which is what this model calls a SLOT; this model's
-   "delivery" is one physical arrival. Same word, swapped referent,
-   with the old sense still live in all three generator modules and
-   every committed `dataset_stats.json`. Either the generator's field
-   is renamed to `slot_id` or the new concept takes a different word -
-   Keith's call. **Belongs in batch 1**, which already owns the
-   generator and the delivery format; left later, the scoper writes
-   requirements whose vocabulary contradicts the code it is reading.
+6. ~~**What the word "delivery" refers to, given the generator already
+   uses it for something else**~~ - **SETTLED 2026-09-22.** Found the
+   same day by reading the real code for the concept inventory below
+   rather than by design work: today's `delivery_id` means the logical
+   obligation across attempts, which is what this model calls a SLOT,
+   while this model's "delivery" is one physical arrival. Same word,
+   swapped referent, old sense live in all three generator modules.
+
+   **The generator adopts the agreed vocabulary** - Keith: "the
+   generator should be using the new names around slot and delivery and
+   so forth. We shouldn't be changing the concepts we've agreed on."
+   The design does not bend to the code. So `delivery_id` becomes
+   `slot_id`, `delivery_date` becomes the period/due date (exact naming
+   is batch 1's to settle), and "delivery" takes its new sense in the
+   generator too.
+
+   **`is_resupply`, `supersedes_run_id` and `attempt_number` GO, rather
+   than being renamed** (Keith, same conversation). They are already on
+   the retire-as-authority list below, so sweeping them into the rename
+   as `slot_`-prefixed fields would preserve exactly the bookkeeping
+   this model stops trusting. A resupply becomes an arrival landing in
+   a filled slot - observed, not recorded.
+
+   **The cost of rewriting committed history is explicitly a non-issue**
+   - Keith: "I don't care. This is all just fake data. We can nuke it
+   from orbit and rerun all the fake data, rerun all the QA." And he
+   would do that BEFORE the build rather than as part of it, so no
+   requirement needs to plan a migration over the ~352 committed runs.
+
+   **Lands in batch 1**, which already owns the generator and the
+   delivery format; left later, the scoper writes requirements whose
+   vocabulary contradicts the code it is reading.
 
 ~~**Two requirements need work before their sprint**~~ - **DONE
 2026-09-22.** `REQ-PIPE-035` was REWRITTEN (it specified the

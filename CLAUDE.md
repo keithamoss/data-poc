@@ -697,6 +697,49 @@ Rough layout:
   2026-09-20 on, so a change does not add to the pile while that is
   pending.
 
+- **When a body of design work is scoped into requirements, carry the
+  DECISIONS across at DRAFTING time, and delete the prose only when its
+  last dependent batch is built.** Keith's own standing instruction,
+  2026-09-22, and he was explicit that it governs how this works from
+  here on, not just the piece of work that prompted it. It refines the
+  bullet above rather than replacing it: that one says prose goes when
+  a requirement is `built`, which assumes prose and requirement are
+  roughly one-to-one. Once a large design file is scoped in BATCHES,
+  they are not, and the assumption quietly destroys things.
+
+  **What goes wrong without this.** A thread of design prose routinely
+  feeds several batches - in the work that prompted this, one thread
+  fed three. Delete it when the first batch is built and the second
+  batch loses its source before anyone has scoped it. Meanwhile the
+  requirements drafted from that thread carry only what the drafter
+  happened to read, so a decision sitting two paragraphs below the
+  sprint line is in neither place. Nothing fails; the decision just
+  stops existing outside git.
+
+  Four rules, and the third is the one that actually prevents the loss:
+  1. **The scoper gets the SOURCE THREADS, not just the sprint lines.**
+     A sprint entry is two sentences; the decision behind it is two
+     paragraphs elsewhere. A scoper given only the sprint cannot write
+     a requirement that carries what the thread knows.
+  2. **`decisions:` is required at DRAFT time**, not from `built`. CI
+     only enforces it at `built`, which is too late when the prose may
+     be gone by then. Rejected alternatives count, and are the part
+     most likely to be re-proposed if lost.
+  3. **A mechanical carry-over check per batch.** When a batch comes
+     back, walk its source threads and list every decision no drafted
+     requirement carries. Each one either goes into a requirement or
+     gets an explicit "not needed, because". The batch is not finished
+     with the scoper until that list is empty. Mechanical like `ruff`,
+     not a matter of care - the failure mode here is always "nobody
+     knew to look", never "somebody was careless".
+  4. **Delete a thread WHOLE, once its last dependent batch is built** -
+     Keith's own choice, 2026-09-22, over deleting each decision as its
+     requirement is signed off. A half-deleted thread is worse than
+     either end state: it reads as complete while being full of holes,
+     and nothing marks where the holes are. The delay is safe precisely
+     because rule 3 has already established that nothing lives only in
+     the prose.
+
 - **No building begins on a requirement until Keith has signed it off.**
   His own standing instruction, 2026-09-20. A requirement existing in
   `requirements.yaml` is not the same as a requirement he has agreed to
