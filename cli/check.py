@@ -55,6 +55,11 @@ _GATES: tuple[tuple[str, list[str], str], ...] = (
      "real bugs in Python, not style"),
     ("yamllint", ["uv", "run", "yamllint", "--strict", "."],
      "duplicate mapping keys, which PyYAML swallows silently"),
+    # Not coverable by check-yaml/yamllint: these are *.md files, so
+    # neither hook ever globs them - see the module's own docstring for
+    # the incident that produced this gate.
+    ("agents", ["uv", "run", "python3", "-m", "qa_tools.common.validate_agents"],
+     ".claude/agents/*.md frontmatter actually parses"),
     ("requirements", ["uv", "run", "mothman", "dashboard", "validate-requirements"],
      "every linked test and implemented_by symbol still exists"),
     ("changelog", ["uv", "run", "mothman", "dashboard", "validate-changelog"],
@@ -85,10 +90,24 @@ def _run(label: str, argv: list[str]) -> int:
 @click.command("check")
 @click.option("--no-pytest", is_flag=True,
               help="Skip the Python suite (the slow one). Everything else still runs.")
-def check_command(no_pytest: bool) -> None:
-    """Run every gate - lint, YAML, both validators, the JS suite, the Python suite."""
+@click.option("--only", "only", metavar="GATE",
+              help="Run just one gate, by its name in the summary table. For a "
+                   "pre-commit hook or a targeted re-run, where the point is "
+                   "one fast check rather than the whole sweep.")
+def check_command(no_pytest: bool, only: str | None) -> None:
+    """Run every gate - lint, YAML, the validators, the JS suite, the Python suite."""
+    gates = _GATES
+    if only is not None:
+        gates = tuple(g for g in _GATES if g[0] == only)
+        if not gates:
+            # Naming the real options beats "invalid value": the labels
+            # are not guessable from the command name.
+            raise click.ClickException(
+                f"no gate called {only!r}. Available: "
+                f"{', '.join(label for label, _, _ in _GATES)}.")
+
     results: list[tuple[str, int, str]] = []
-    for label, argv, why in _GATES:
+    for label, argv, why in gates:
         if no_pytest and label == "pytest":
             continue
         results.append((label, _run(label, argv), why))
@@ -121,6 +140,11 @@ def check_command(no_pytest: bool) -> None:
         console.print(f"Incomplete - no toolchain for: {', '.join(skipped)}. "
                       f"Everything that ran, passed. See CLAUDE.md's "
                       f"environment-setup bullet.", style="yellow")
+    elif only is not None:
+        # Same reasoning as the skipped-toolchain branch above: never
+        # let a summary overstate what actually ran.
+        console.print(f"The {only!r} gate passed. Other gates were not run.",
+                      style="green")
     elif no_pytest:
         console.print("Every gate passed except the Python suite, which was skipped.",
                       style="green")

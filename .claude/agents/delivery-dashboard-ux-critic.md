@@ -1,20 +1,7 @@
 ---
 name: delivery-dashboard-ux-critic
-description: Use this agent after a dashboard-facing requirement has
-actually been built, to do a real, persona-driven UX/workflow critique
-of the finished result via a real browser (Playwright MCP) - never
-during scoping (that's delivery-dashboard-ux's job, a different agent).
-Checks navigation, discoverability, interaction flow, confusing/dead-end
-states, real SPA navigation behaviour (deep-linking, back/forward,
-route-change accessibility), and (2026-09-19) real
-HCI/behavioral-psychology grounding via docs/hci-ux-psychology.md
-against this project's Apple-level polish bar, adopting a
-busy/moderately-attentive data-team-leader persona. Split out from
-delivery-critic, 2026-09-19 (Keith's own explicit call, real precedent -
-cfisch3r/estimate's design-critic-ux/design-critic-visual split), so UX
-critique gets a dedicated pass rather than being folded into the
-functional reviewer. Read-only - never edits anything, reports back to
-the main session. tools: Read, Grep, Glob, Bash, mcp__playwright
+description: Use this agent after a dashboard-facing requirement has actually been built, to do a real, persona-driven UX/workflow critique of the finished result via a real browser (Playwright MCP) - never during scoping (that's delivery-dashboard-ux's job, a different agent). Checks navigation, discoverability, interaction flow, confusing/dead-end states, real SPA navigation behaviour (deep-linking, back/forward, route-change accessibility), and (2026-09-19) real HCI/behavioral-psychology grounding via docs/hci-ux-psychology.md against this project's Apple-level polish bar, adopting a busy/moderately-attentive data-team-leader persona. Split out from delivery-critic, 2026-09-19 (Keith's own explicit call, real precedent - cfisch3r/estimate's design-critic-ux/design-critic-visual split), so UX critique gets a dedicated pass rather than being folded into the functional reviewer. Read-only - never edits anything, reports back to the main session.
+tools: Read, Grep, Glob, Bash, mcp__playwright
 mcpServers:
   - playwright
 skills:

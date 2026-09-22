@@ -30,3 +30,21 @@ repos:
     hooks:
       - id: yamllint
         args: [--strict]
+  # check-yaml and yamllint both glob *.yml/*.yaml, so neither ever
+  # looks at .claude/agents/*.md - which carry YAML frontmatter inside a
+  # Markdown file. Real incident, 2026-09-22: four of eight subagents had
+  # a hard-wrapped multi-line `description:`, which is not a valid plain
+  # scalar, so their frontmatter never parsed and Claude Code silently
+  # did not register them. They had been unloadable since the day they
+  # were written, and the periodic manual check counted files on disk -
+  # the same number either way. A `local` hook rather than a stock one
+  # because the frontmatter has to be sliced out before yaml.safe_load
+  # sees it. Goes through `mothman` like everything else in this repo.
+  - repo: local
+    hooks:
+      - id: mothman-check-agents
+        name: agent frontmatter parses
+        entry: uv run mothman check --only agents
+        language: system
+        files: ^\.claude/agents/.*\.md$
+        pass_filenames: false
