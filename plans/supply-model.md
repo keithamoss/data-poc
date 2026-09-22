@@ -1754,48 +1754,46 @@ is a FALSE GREEN, which is the direction that matters.
 
 #### Config sketch
 
-The asset's calendar names no datasets at all:
+**This EXTENDS the calendar/`delivery_months` config settled above - it
+does not replace it.** A first draft of this section invented a
+parallel `periods:`/`participatesIn:` shape and had to be corrected the
+same day: `delivery_months` already exists, already does exactly this
+job, and already carries its own reasoned naming decision ("it names
+when a supply ARRIVES, not the period it covers"). Two config sketches
+disagreeing inside one thread is precisely the failure this file keeps
+having, so only the genuinely new parts are shown here.
+
+What is new is that each authored date now carries a PERIOD NAME, so
+the thing a schema is named after is config rather than derived:
 
 ```yaml
-# contract/schedule.yaml - asset level
-data_asset_id: data-asset-1
-timezone: Australia/Perth
-periods:
-  kind: authored              # quarterly: real agreed dates
-  versions:
-    - effective_from: 2026-01-01
-      changelog: "Agreed delivery dates for 2026."
-      dates:
-        - { period: 2026-Q3, date: 2026-07-01 }
-        - { period: 2026-Q4, date: 2026-10-01 }
+# asset - as settled above, plus a period name per date
+calendar:
+  - effective_from: 2026-01-01
+    dates:
+      - { period: 2026-Q1, date: 2026-02-02 }
+      - { period: 2026-Q2, date: 2026-05-01 }
+      - { period: 2026-Q3, date: 2026-08-03 }
+      - { period: 2026-Q4, date: 2026-11-02 }
 ```
 
-The daily asset is the same field with the other shape, which is what
-makes "everything downstream never knows which produced it" real:
+And that the per-dataset SLOT properties sit alongside
+`delivery_months` in that dataset's own contract, where
+`expectedTime`/`latency` already live today:
 
 ```yaml
-periods:
-  kind: cadence
-  rule: daily                 # generates 2026-09-22, 2026-09-23, ...
-```
-
-Each dataset names its participation and its own timing, in its own
-contract where `expectedTime`/`latency` already live:
-
-```yaml
+delivery_months: [February, August]   # unchanged, as settled above
 slaProperties:
-  - property: participatesIn
-    value: all                # or [Q1, Q3] for a twice-yearly dataset
   - property: expectedTime
-    value: "09:00"
+    value: "09:00"            # already exists, already per-dataset
   - property: latency
     value: 120                # minutes of grace before "late"
   - property: claimWindow
     value: 3                  # days before due_at that this slot opens
 ```
 
-Slots are then DERIVED - the cross product of periods and
-participation - never authored.
+Slots are then DERIVED - the calendar crossed with each dataset's
+`delivery_months` - never authored.
 
 #### Which concept each consumer actually needs
 
@@ -1827,10 +1825,14 @@ quarterly asset.
 
 #### Deliberately left to the scoper
 
-Exact field names (`participatesIn`, `claimWindow`), and whether the
-claim window is genuinely per-dataset or one value per asset. It is
-drawn per-dataset above for symmetry, but nothing in the design so far
-actually requires that.
+The exact name of `claimWindow`, and whether the claim window is
+genuinely per-dataset or one value per asset. It is drawn per-dataset
+above for symmetry, but nothing in the design so far actually requires
+that. Also whether the period NAME is authored per date, as sketched,
+or derived from the date - authored is drawn here because a delivery
+date of 2 February is often for the previous November-January period,
+so deriving the name from the date would get it wrong in exactly the
+way `delivery_months`' own naming note warns about.
 
 ### Exhausted schedule - hard failure, scoped per dataset
 
