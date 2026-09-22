@@ -201,6 +201,8 @@ button{font:inherit; color:inherit;}
 .plans-entry-body p{margin:0 0 10px;}
 .plans-entry-body p:last-child{margin-bottom:0;}
 .plans-entry-body ul, .plans-entry-body ol{margin:0 0 10px; padding-left:20px;}
+.plans-entry-body pre{margin:0 0 10px; padding:10px 12px; background:var(--surface-alt); border:1px solid var(--line); border-radius:6px; overflow-x:auto;}
+.plans-entry-body pre code{font-size:12.5px; line-height:1.5; background:none; border:0; padding:0; white-space:pre;}
 .plans-entry-body li{margin-bottom:4px;}
 
 /* ============ Grid / cards ============ */
@@ -3439,6 +3441,16 @@ document.getElementById("activity-panel-close").addEventListener("click", closeP
 // swap to <code> is enough; no need for a real markdown parser just for
 // this one inline form.
 function mdInlineCode(s){ return s.replace(/`([^`]+)`/g, "<code>$1</code>"); }
+// Needed by the fenced-block path below, and ONLY there. Everything else
+// on this page renders trusted, committed repo content into innerHTML
+// unescaped, which is this file's long-standing posture. A code fence is
+// genuinely different: its whole point is to show text VERBATIM, so a
+// YAML sketch containing a literal < or a diagram definition would
+// otherwise be swallowed as markup and silently disappear. Correctness
+// first here, not just safety.
+function escHtml(s){
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
 // Headline/component retrofit (2026-09-18 evening, Keith's own ask: a
 // bold label leading each entry, iconography, and the component(s)
 // shown alongside) - one emoji per plans/*.md component, the same 7-tag
@@ -3710,15 +3722,41 @@ function renderPlansMarkdown(md){
   // safely falls back to <ul> - still a real list, just not numbered.
   const isBulletLine = l => /^[-*]\s+/.test(l);
   const isOrderedLine = l => /^\d+\.\s+/.test(l);
-  return md.split(/\n\n+/).map(block=>{
+
+  // Fenced blocks come out FIRST, before the blank-line split below, for
+  // a reason that is easy to miss: a real config sketch has blank lines
+  // inside it, so splitting first tears one fence into several blocks and
+  // neither half is recognisable as code any more. Real bug this fixes
+  // (2026-09-22, found while scoping diagram support): plans/*.md has
+  // carried ```yaml sketches since Thread C was written, and every one of
+  // them rendered here as a single run-on paragraph with stray backticks
+  // - the same failure Keith reported on 2026-09-19 for numbered lists,
+  // whose fix comment sits a few lines below this one.
+  const fences = [];
+  md = md.replace(/```([A-Za-z0-9_-]*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    // A "mermaid" fence keeps its language on the element so a diagram
+    // renderer can find it later; until one is vendored it still shows
+    // its own source, which is a readable fallback rather than a blank.
+    const cls = lang ? ` class="lang-${lang}"` : "";
+    fences.push(`<pre${cls}><code>${escHtml(code.replace(/\n$/, ""))}</code></pre>`);
+    return `\u0000FENCE${fences.length - 1}\u0000`;
+  });
+
+  const restore = html => html.replace(/\u0000FENCE(\d+)\u0000/g, (_, i) => fences[Number(i)]);
+
+  return restore(md.split(/\n\n+/).map(block=>{
     const lines = block.split("\n");
     if(lines.length && lines.every(l=>isBulletLine(l)||isOrderedLine(l))){
       const tag = lines.every(isOrderedLine) ? "ol" : "ul";
       const items = lines.map(l=>`<li>${inlinePlansMd(l.replace(/^(?:[-*]|\d+\.)\s+/,""))}</li>`).join("");
       return `<${tag}>${items}</${tag}>`;
     }
+    // A block that is nothing but a restored fence must not be wrapped
+    // in a <p> - a <pre> inside a <p> is invalid and browsers close the
+    // paragraph early, which breaks the surrounding flow.
+    if(/^\u0000FENCE\d+\u0000$/.test(block)) return block;
     return `<p>${inlinePlansMd(lines.join(" "))}</p>`;
-  }).join("");
+  }).join(""));
 }
 
 // Reshapes PLANS' 3 separate arrays (items/threads/notes - each file
