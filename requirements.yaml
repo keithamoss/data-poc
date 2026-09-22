@@ -2404,116 +2404,193 @@ requirements:
         coincidental arrivals.
 
   - id: REQ-PIPE-035
-    title: QA runs against a warehouse composed of every table's current version
+    title: QA runs against one period's schema, with the staged delivery overlaid
     date_written: "2026-09-21"
     story: >
-      As whoever maintains this pipeline, I want the warehouse the tools
-      run against assembled from the current version of every table, so
-      that a check comparing placements to carers reads what the agency
-      actually sent for both, rather than one delivery's frozen snapshot
-      or a warehouse missing half its tables.
+      As whoever maintains this pipeline, I want a QA run to read one
+      period's schema with the delivery under test overlaid on it, so
+      that a check comparing placements to carers reads both tables as
+      they stand for that period, and a check whose dependency never
+      arrived says so instead of quietly reading a different period's
+      data.
     moscow: must
     status: not_started
     source: >
-      Keith, plans/publishing-and-history.md item 6, 2026-09-20 - the
-      composed-warehouse half of the decided model, plus his own
-      correction that "good" is the wrong word.
+      Keith, plans/publishing-and-history.md item 6, 2026-09-20,
+      REWRITTEN 2026-09-22 against plans/supply-model.md Threads B and
+      J. The original specified a warehouse COMPOSED across periods
+      from every table's current version; Thread J dropped cross-period
+      composition entirely. What survives is picking the newest version
+      WITHIN one period, which is a different and much smaller thing.
     acceptance_criteria:
-      - THE SYSTEM SHALL compose the warehouse a QA run executes against
-        from the current version of every table in scope.
-      - THE SYSTEM SHALL treat a table's most recent arrival as its
-        current version, whatever that arrival's QA status.
-      - THE SYSTEM SHALL NOT substitute an earlier version of a table on
-        the grounds that the current one failed its checks.
+      - THE SYSTEM SHALL execute a QA run against a single period's
+        schema - the period whose slot the delivery under test claims -
+        and SHALL NOT assemble a warehouse spanning more than one
+        period.
+      - THE SYSTEM SHALL overlay the staged delivery's own tables on
+        that period's promoted state, so that a check reads the
+        candidate under test alongside the tables already promoted into
+        that period.
+      - WHERE a period's schema holds more than one version of a table,
+        a supply and its resupplies, THE SYSTEM SHALL read the newest.
+      - THE SYSTEM SHALL hold every dataset in the data asset for a
+        given period in that one period schema, across agencies and
+        collections, so that a cross-agency check is an ordinary
+        same-schema query rather than an assembly step.
+      - IF a table a check depends on has no filled slot in the period
+        under evaluation and is not present in the staged delivery,
+        THEN THE SYSTEM SHALL report that check RED, naming the missing
+        table, and SHALL NOT evaluate it against an absent table and
+        SHALL NOT report it as having no data.
+      - IF a check declares a temporal reference and the referenced
+        period was owed but has no filled slot, THEN THE SYSTEM SHALL
+        report that check RED, naming the referenced period.
+      - IF a check declares a temporal reference and no prior period was
+        ever owed, because the dataset is new, THEN THE SYSTEM SHALL
+        report that check as having no data rather than red.
+      - THE SYSTEM SHALL resolve a temporal reference as a cross-schema
+        read within the same database, and SHALL NOT copy a reference
+        period into a separate database to evaluate it.
+      - THE SYSTEM SHALL load every table in a delivery into staging
+        before running QA over that delivery, so that a check is never
+        evaluated against a table still mid-load.
       - THE SYSTEM SHALL record, for every QA run, which version of each
-        table it was composed from.
-      - IF a table a check depends on has never received an arrival,
-        THEN THE SYSTEM SHALL report that check as having no data,
-        naming the missing table, rather than evaluating it against an
-        absent table.
-      - THE SYSTEM SHALL evaluate a check once, against the composition
+        table it read.
+      - THE SYSTEM SHALL evaluate a check once, against the state
         current at that moment, and SHALL NOT recompute it for a
         historical arrival.
-      - THE SYSTEM SHALL permit composition to span the whole data
-        asset, across agencies and collections.
-      - THE SYSTEM SHALL compose only after every table a run depends on
-        that is present in the supply has been loaded, so that a check
-        is never evaluated against a table still mid-load.
+      - THE SYSTEM SHALL hold all period schemas in one database, and
+        SHALL NOT create a database per run.
     non_functional_requirements:
-      - CI must never compose, open or query a warehouse. Composition is
-        real-run-time work only, the same rule dataset_stats.py follows -
-        anything a later read needs is computed once while a legitimate
-        live connection exists, and committed.
-      - Composition cost must scale with the number of tables in scope,
-        not with the number of versions ever received.
+      - CI must never open or query a warehouse. This is real-run-time
+        work only, the same rule dataset_stats.py follows - anything a
+        later read needs is computed once while a legitimate live
+        connection exists, and committed.
+      - Test isolation must be arranged deliberately rather than
+        inherited. The per-run databases were incidentally isolating
+        parallel test workers; one shared database puts several xdist
+        workers in one file. One database per worker via
+        tmp_path_factory, the pattern the other tools' fixtures already
+        use.
       - Seeded and deterministic, so a regenerate-and-diff stays a real
         correctness check rather than noise.
-      - A whole-data-asset warehouse is the single most sensitive
-        artefact this design creates - in a real deployment it holds
-        Birth Registrations and Child Protection records together. Today
-        the data is synthetic; the requirement should say plainly what
-        it would be otherwise.
+      - A period schema holding the whole data asset is the single most
+        sensitive artefact this design creates - in a real deployment it
+        holds Birth Registrations and Child Protection records
+        together. Today the data is synthetic; the requirement should
+        say plainly what it would be otherwise.
     dependencies: [REQ-PIPE-034]
     decisions:
-      - Decided the warehouse holds the CURRENT version always, never
-        the last green one (Keith, 2026-09-20). A red table is still the
-        table the agency sent. Holding one back would let the warehouse
-        and the real delivery disagree silently, and a green dashboard
-        built on last week's data is the worst failure this system could
-        have. "Good" was the wrong word in the original framing.
-      - Decided checks are evaluated once against the composition
-        current at the time, never recomputed point-in-time (Keith,
-        2026-09-21). Closest to how a real pipeline behaves. The cost,
-        accepted - a rebuild from committed history can replay recorded
-        results but cannot re-derive them.
+      - Decided AGAINST cross-period composition, and this requirement
+        was rewritten on 2026-09-22 to remove it (plans/supply-model.md
+        Thread J). Red-for-unrun is what killed it - a cross-table check
+        only runs when every participating table has a filled slot for
+        the period, so the query reads ONE schema, and carry-forward was
+        the only reason cross-period assembly existed. Walking the
+        consumers confirmed it - QA of a staged candidate is one schema
+        or it is red; backfilling a new check is one period's schema;
+        the dashboard's "as at T" filters qa_results by time and never
+        touches the warehouse at all, which had been conflated with
+        composing data throughout the original entry.
+      - Decided schema-per-period replaces the per-run warehouses
+        (Keith, 2026-09-21). The per-run databases existed because dbt
+        and Soda have no run_id-scoped WHERE, so a per-run verdict
+        needed a database holding exactly one run. Schema-per-period
+        gives the same isolation AND matches the real operational
+        system, instead of being a test-only construct that exists
+        nowhere in production.
+      - Decided checks are evaluated once against the state current at
+        the time, never recomputed point-in-time (Keith, 2026-09-21).
+        Closest to how a real pipeline behaves. The cost, accepted - a
+        rebuild from committed history can replay recorded results but
+        cannot re-derive them.
       - Decided loading completes before QA runs, whether a human or an
-        automation triggers it, and QA then evaluates against the latest
-        version available of each table - from this supply where it
-        arrived in it, from an earlier one otherwise (Keith,
-        2026-09-21). This is what resolves the ordering tension a
-        tool-does-the-loading world creates, where placements could
-        otherwise be QA'd before carers has been loaded. It does not
-        remove the never-arrived case, which is a table that has no
-        version at all.
-      - Decided composition may span the whole data asset rather than
-        being fenced per collection or per agency (Keith, 2026-09-21).
-        It is the only option supporting a check that spans agencies,
-        which is arguably the point of a multi-agency data asset.
-        Rejected per-collection, which covers every cross-table check
-        that exists today and would have kept the sensitive surface
-        smallest.
+        automation triggers it (Keith, 2026-09-21). This resolves the
+        ordering tension a tool-does-the-loading world creates, where
+        placements could otherwise be QA'd before carers has been
+        loaded. It does not remove the never-arrived case, which is a
+        table with no filled slot at all - that case is red, per
+        red-for-unrun.
+      - Decided the period schema may span the whole data asset rather
+        than being fenced per collection or per agency (Keith,
+        2026-09-21). It is the only option supporting a check that spans
+        agencies, which is arguably the point of a multi-agency data
+        asset. Rejected per-collection, which covers every cross-table
+        check that exists today and would have kept the sensitive
+        surface smallest.
+      - Decided a missing dependency reads RED, not nodata (Keith,
+        2026-09-22). A check that could not run is not a check with
+        nothing to say. Nodata is reserved for "nothing was owed",
+        which is why a brand-new dataset's drift checks are the one
+        case that keeps it - without that carve-out every new dataset
+        starts life red on all its drift checks, which is how people
+        learn to ignore a signal.
+      - NOT decided here - "current version versus good version", ie
+        whether a downstream consumer reads a red table or the last
+        green one. The original wording of this requirement answered it
+        (current version always, status reported rather than acted on)
+        but that question is about the DOWNSTREAM OPERATIONAL
+        warehouse, which is out of this tool's scope, and Keith's
+        "latest version available of each table" referred to that
+        warehouse rather than to this one. It is parked to be settled
+        alongside plans/conceptual-design.md Thread A's amber
+        accept/reject governance, since both ask what the pipeline may
+        do on a human's behalf about data quality. Inside this tool the
+        question does not arise - promotion decides what is in a period
+        schema, and a red supply is never auto-promoted.
 
   - id: REQ-PIPE-036
-    title: A dataset's own arrival triggers its own QA run
+    title: A delivery triggers one QA run, and each dataset's results stand alone
     date_written: "2026-09-21"
     story: >
-      As a data team leader, I want the checks for my dataset to run
-      when my dataset arrives, so that I am not waiting on five other
-      tables from other teams before I learn whether mine is any good.
+      As a data team leader, I want QA to run when a delivery lands and
+      to report on my dataset by itself, so that I am not waiting on
+      five other tables from other teams before I learn whether mine is
+      any good, and so that a normal delivery does not flash red while
+      its own tables are still landing.
     moscow: must
     status: not_started
     source: >
       Keith, plans/publishing-and-history.md item 6, 2026-09-20 - "per
       dataset QA runs, each triggered by its own table's arrival".
+      REVISED 2026-09-22 against plans/supply-model.md Thread B - the
+      per-dataset INDEPENDENCE survives, the per-TABLE trigger does
+      not. The trigger is now the delivery.
     acceptance_criteria:
-      - WHEN a dataset receives an arrival, THE SYSTEM SHALL run that
-        dataset's own checks against the composed warehouse.
-      - THE SYSTEM SHALL scope each tool invocation to the arriving
-        dataset, so that the tool's raw output describes that dataset
-        alone and needs neither duplicating nor filtering to be stored
-        per dataset.
+      - WHEN a delivery has been loaded into staging, THE SYSTEM SHALL
+        run QA once over that delivery.
+      - THE SYSTEM SHALL NOT trigger a separate QA run per table within
+        a delivery.
+      - THE SYSTEM SHALL NOT trigger a QA run on a clock, and SHALL NOT
+        require a periodic sweep to resolve a table that never arrived.
+      - THE SYSTEM SHALL scope each tool invocation to one dataset, so
+        that the tool's raw output describes that dataset alone and
+        needs neither duplicating nor filtering to be stored per
+        dataset.
       - THE SYSTEM SHALL NOT require every table in a collection to have
         arrived before running an arriving dataset's own single-table
         checks.
+      - IF a table in a delivery cannot be loaded, THEN THE SYSTEM SHALL
+        still stage and QA the rest of the delivery, and SHALL report
+        the failed table as a red finding rather than refusing the
+        delivery.
+      - WHEN a table missing from an earlier delivery arrives later, THE
+        SYSTEM SHALL treat it as its own delivery and run QA over it.
       - IF a QA run fails partway through, THEN THE SYSTEM SHALL fail
         loudly, naming the dataset and the tool, and SHALL NOT record a
         partial run as a complete one.
       - THE SYSTEM SHALL keep each tool's raw output genuinely
         unmodified, exactly as it does today.
     non_functional_requirements:
+      - What constitutes a delivery must be stated per source. The
+        boundary is load-bearing and it comes from the transport - one
+        folder drop, one prefix, one session. A source that cannot
+        express a boundary needs one arranged operationally, and that
+        should be explicit rather than assumed.
       - Whole-pipeline runtime must not materially regress from today's
-        ~45s for both datasets. Per-dataset runs multiply the number of
-        invocations, which is the obvious place for this to go wrong.
+        ~45s for both datasets. Per-dataset scoping multiplies the
+        number of invocations, which is the obvious place for this to
+        go wrong.
       - Parallel per-dataset runs must not collide on shared scratch
         paths. The dbt target_path race is the worked precedent, and
         per-dataset runs create more of exactly that shape.
@@ -2522,6 +2599,34 @@ requirements:
         size before and after rather than assuming.
       - Invoked through mothman only.
     dependencies: [REQ-PIPE-034, REQ-PIPE-035, REQ-GEN-040]
+    decisions:
+      - Decided the trigger is the DELIVERY, not the table (Keith,
+        2026-09-22), which is why this requirement was revised rather
+        than built as written. Under per-table triggering, six CP tables
+        landing seconds apart make "Client reference" read red at
+        09:00:00 and green at 09:00:04 - transiently true and
+        practically useless. At 30 datasets a red appearing on every
+        normal delivery is how people learn to ignore red. Loading the
+        delivery as one package and running QA once over it makes a
+        genuinely missing table durably red instead.
+      - Rejected a clock-driven trigger (Keith, 2026-09-22, in his own
+        words "would rather not add a clock driven trigger"). An earlier
+        attempt the same day defined readiness over EXPECTED tables and
+        so needed a periodic sweep to resolve one that never showed.
+        Delivery-triggering removes the clock from the model entirely -
+        there is nothing to resolve, because the sixth table's slot is
+        simply unfilled, and overdue is a computed property rather than
+        an event.
+      - Decided a delivery is an OBSERVED TRANSPORT UNIT, which is what
+        distinguishes it from the supplier-declared manifest rejected in
+        Thread B. A supplier declaring which period their data is for is
+        a judgment we would have to trust and cannot enforce across a
+        varied supplier base. A delivery is a physical fact about how
+        the data landed that we can see for ourselves - nobody is
+        asserting anything, we are noticing what arrived together.
+      - Decided a delivery is not atomic in the roll-back sense. Five
+        tables landing and one failing requires the five to be staged
+        and QA'd; a failed sixth does not refuse the delivery.
 
   - id: REQ-QAC-037
     title: A cross-table check belongs to the cross-table scope, not to one dataset

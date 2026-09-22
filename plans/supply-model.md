@@ -30,10 +30,13 @@ same file's standing rule, this prose is working material: it gets
 deleted as requirements land, with anything it knows that a requirement
 does not moved into that requirement's own `decisions:` first.
 
-**One requirement is already known to be wrong.** `REQ-PIPE-035` ("QA
-runs against a warehouse composed of every table's current version") was
-written before cross-period composition was dropped - see Thread J. It
-needs rewriting rather than building.
+**One requirement was known to be wrong, and has been fixed.**
+`REQ-PIPE-035` was written as "QA runs against a warehouse composed of
+every table's current version", before cross-period composition was
+dropped (Thread J). Rewritten 2026-09-22 as "QA runs against one
+period's schema, with the staged delivery overlaid", with the dropped
+composition recorded in its own `decisions:` so the rejection survives
+the rewrite rather than looking like it was never considered.
 
 Status values: `todo` / `investigate` / `in-progress` / `parked` /
 `done` / `superseded`. Every item also carries a Component tag - see
@@ -114,14 +117,21 @@ permits it, not to save time.
   in Q3?" has a single answer instead of a correlation exercise. That
   points at (B).
 
-  **But the two open questions here are entangled and should be answered
-  together.** Thread G's own unresolved question is whether "un-decide"
-  (demote back to staging for re-review) is an operation worth having at
-  all. If NO, demote only ever goes to rejected, nothing passes back
-  through staging, and re-file MUST be atomic - (B) is forced. If YES,
-  demotion needs its stickiness rule regardless, and (A) becomes viable
-  again. So answer "do we want un-decide?" first; the re-file answer
-  largely falls out of it.
+  **Both halves now settled, and they came apart rather than resolving
+  together.** They were written up as entangled: whether re-file is
+  atomic looked like it depended on whether "un-decide" (demote back to
+  staging for re-review) exists at all. The answers, 2026-09-22, are
+  **(B) atomic re-file** and **YES to un-decide** - which the original
+  framing said could not both hold, because it assumed un-decide
+  existing would make demote-then-promote the natural way to re-file.
+  It does not. They are different acts with different reasons: un-decide
+  says "this needs another look", re-file says "this belongs in a
+  different period", and a system that can do the first is not thereby
+  obliged to express the second as two of them. So re-file stays one
+  log entry with a from-slot, a to-slot and one reason, AND staging can
+  hold a supply a human has already looked at once. What un-decide
+  existing does make unconditional is the STICKINESS rule (Thread G) -
+  without it the next run re-promotes what a human just demoted.
 - ~~**What happens to a `nodata` supply**~~ - **CLOSED 2026-09-22.** It
   was the same question as TS-21 (a check-less table's supply IS a
   nodata supply), and the CI gate settled there makes the state
@@ -157,53 +167,86 @@ permits it, not to save time.
   the question is live again and unanswered.
 - ~~**Operator identity**~~ - **SETTLED 2026-09-22**, see Thread G.
 
-**Genuinely still open as at 2026-09-22, after a full sweep of this
-file** - five items, none of which blocks the first two scoper batches:
+**Swept in full on 2026-09-22, and again after that day's decisions** -
+five items were genuinely open that morning; two are now settled, one is
+deliberately deferred to its own batch, and the two that remain are both
+parked by design. **Nothing here blocks the scoper.** Kept in place
+rather than pruned so the settled ones read as settled rather than
+vanishing, which is how a closed question gets silently reopened:
 
-1. **Is "un-decide" an operation we want?** Demote-to-staging, meaning
-   "put this back in the queue for someone to look at again", as
-   distinct from rejecting it. Re-filing being atomic (TS-11) removes
-   the need for anything to pass back through staging, so this is now a
-   standalone question rather than an entangled one. If NO, demote goes
-   to rejected only and the stickiness rule becomes unnecessary. Lands
-   in batch 4 (sprints 11-12).
+1. ~~**Is "un-decide" an operation we want?**~~ - **SETTLED 2026-09-22.
+   YES.** Keith: "I think undecide is an operation. Undecide, that is."
+   Demote-to-staging is a real operation, distinct from rejecting: it
+   means "put this back in the queue for someone to look at again".
+   Consequences, all of which were already written up conditionally in
+   Threads B and G and are now unconditional: the stickiness rule is
+   REQUIRED (auto-promotion only ever acts on a supply no human has
+   touched, or the next run re-promotes what a human just demoted), and
+   staging holds supplies in two distinguishable situations - never
+   decided, and decided-then-undecided. Re-filing stays ATOMIC anyway
+   (TS-11, settled separately): un-decide existing does not make
+   demote-then-promote the way to move a supply between periods, it
+   just means a supply CAN sit in staging having been looked at once.
+   Builds in batch 4 (sprints 11-12).
 2. **Whether to build an as-published RECONSTRUCTION path at all**,
-   given snapshots already answer that question. Batch 6.
+   given snapshots already answer that question. **Deliberately
+   deferred to batch 6** - Keith, 2026-09-22: "let's settle that when
+   we get to batch six." Not an input to batches 1-5, so it does not
+   gate the scoper.
 3. **"Current version" vs "good version"** - inherited from
    `plans/publishing-and-history.md` item 6, deliberately parked to be
    settled alongside `plans/conceptual-design.md` Thread A's amber
    accept/reject governance rather than separately.
+
+   *What the question actually is*, since the two-word label does not
+   carry it: when `cp-placements` arrives RED, what does the warehouse
+   serve - the version the agency actually sent, or the last one that
+   passed QA? "Good version" means a QA tool quietly substitutes older
+   data for bad data, which is not reporting reality; a consumer would
+   read a clean table and never learn the latest supply was rejected.
+   The likely answer is **current version, full stop** - status is
+   REPORTED, not ACTED ON - which makes "good" the wrong word for the
+   alternative and is why the question is phrased this way. It is
+   parked rather than settled because it is really the same governance
+   question as amber accept/reject: both ask what the pipeline is
+   allowed to do on a human's behalf about data quality, and answering
+   one without the other invites two inconsistent answers.
 4. **What a "run" means for supply history** - a RE-CHECK task rather
    than an open question: per-table slots and the dateless `run_id` may
    already have resolved it.
-5. ~~**Verify GitHub's concurrency queueing behaviour**~~ - **DONE
-   2026-09-22**, see Thread H. Confirmed, plus an opt-in (`queue: max`)
-   that is edition-gated and capped at 100, so drain-the-backlog remains
-   the real guarantee.
 
-**Two requirements need work before their sprint, not before the
-scoper**: `REQ-PIPE-035` needs REWRITING (it specifies the composition
-Thread J dropped) and `REQ-PIPE-036` needs RE-READING (its trigger is
-now a delivery, not a table).
+   *What needs re-checking*: today a `run_id` is ONE DELIVERY across
+   six tables, and Phase 7's resupply-chain redesign derives chain
+   membership from a per-run AGGREGATE status. Per-table arrivals break
+   both halves of that - six independent timelines rather than one, and
+   no single status to aggregate. The existing supply-history UI is
+   built on the old shape, so the task is to open it against the new
+   model and find out whether it survives, degrades, or needs
+   rebuilding. Note the delivery concept (Thread B) partially rescues
+   it: a delivery IS still one observed arrival of several tables, so
+   there may be a real grouping to keep - just not one that owns a
+   single verdict.
+5. ~~**Verify GitHub's concurrency queueing behaviour**~~ - **DONE
+   2026-09-22**, see Thread H. Confirmed: GitHub holds only ONE pending
+   run per group, so three rapid decisions silently lose the middle one.
+   An opt-in queueing mode exists but is edition-gated; Keith's call the
+   same day was not to rely on it, so drain-the-backlog is the whole
+   mechanism, not a fallback behind a belt.
+
+~~**Two requirements need work before their sprint**~~ - **DONE
+2026-09-22.** `REQ-PIPE-035` was REWRITTEN (it specified the
+cross-period composition Thread J dropped; it now specifies one
+period's schema with the staged delivery overlaid, and records the
+composition decision as rejected rather than losing it) and
+`REQ-PIPE-036` was REVISED (its trigger is now a DELIVERY, not a
+table - the per-dataset independence survived, the per-table trigger
+did not). Both remain `not_started` and UNSIGNED.
 
 **And the standing gate**: all eight existing requirements
 (`REQ-PIPE-034`..`REQ-DASH-041`) are `not_started` and UNSIGNED, and
 anything `delivery-scoper` produces is a PROPOSAL. `CLAUDE.md`'s
 sign-off rule applies before any of it is built - scoping is not
 sign-off. See Thread G.
-- **Whether to build an as-published RECONSTRUCTION path at all**, given
-  snapshots already provide that view. Both are computable from the
-  append-only decision log; the question is whether the reconstruction
-  earns its place alongside the archive. See Thread K.
-- **"Current version" vs "good version"** - inherited from
-  `plans/publishing-and-history.md` item 6, still open, adjacent to
-  `plans/conceptual-design.md` Thread A's amber accept/reject governance
-  and to be settled with it rather than separately.
-- **What a "run" means for supply history** - also inherited from item 6,
-  and needs RE-CHECKING rather than answering fresh: the per-table slot
-  decision (Thread F) and dropping the date from `run_id` (Thread A) may
-  already have resolved it.
-
 ## Delivery sprints
 
 First pass, 2026-09-21 night, at Keith's request - and deliberately cut
@@ -371,7 +414,8 @@ comparisons against the expected-supply sequence.
     Protection's QA stays independent of Birth Registrations' - but the
     trigger is a delivery, not a table. Per-table triggering makes
     cross-table checks flicker red on every healthy delivery (TS-13).
-    `REQ-PIPE-036` needs re-reading against this.
+    `REQ-PIPE-036` was revised against this the same day, so the sprint
+    can be built from the requirement as it now stands.
 
 16. **[todo, 2026-09-21]** **[QA checks & contract]** **Check
     dependencies, and the zero-active-checks gate.** `depends_on` on
@@ -395,8 +439,10 @@ comparisons against the expected-supply sequence.
 
 18. **[todo, 2026-09-21]** **[QA checks & contract]** **Drift and trend
     dependencies.** A declared temporal reference; missing-but-expected
-    is red, no-prior-period is `nodata`. Includes REWRITING
-    `REQ-PIPE-035`, which specifies the composition Thread J dropped.
+    is red, no-prior-period is `nodata`. `REQ-PIPE-035` was rewritten
+    2026-09-22 and now carries both cases as acceptance criteria, so
+    this sprint no longer has to fix the requirement before building
+    it.
 
 19. **[todo, 2026-09-21]** **[Dashboard UI]** **Supply history and
     as-of under per-dataset arrivals.** `REQ-DASH-041`.
@@ -1320,12 +1366,18 @@ delivery model:
   the period's CURRENT state is the latest, and `qa_results/` keeps
   every run - the whole point of it being permanent.
 
-**To re-read against this rather than assume**: the arrival-triggers-QA
-text in Thread I (so the file does not carry two versions of the trigger
-rule - the mistake made with `nodata` on 2026-09-22), and
-`REQ-PIPE-036` ("a dataset's own arrival triggers its own QA run"),
-whose intent probably survives - CP's QA stays independent of BDM's -
-but which now triggers on a DELIVERY rather than on a table.
+**Re-read against this, 2026-09-22, rather than assumed** - both items
+that were flagged here are now done. `REQ-PIPE-036` was REVISED: its
+intent did survive (CP's QA stays independent of BDM's) but its title
+and every criterion that named a table as the trigger now name a
+delivery, and the rejected clock trigger is recorded as a decision
+rather than simply deleted. The arrival-triggers-QA text in Thread I
+was re-read and already carries the refinement explicitly - it states
+that the trigger is a DELIVERY rather than a single table's arrival and
+points here for why, so the file holds one version of the rule, not
+two. Checked deliberately rather than assumed, because carrying two
+versions of a rule in one file is exactly the mistake made with
+`nodata` earlier the same day.
 
 ## Thread C - The schedule
 **Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
@@ -1607,17 +1659,36 @@ TS-11), so the question below is settled except where noted:
   case: an operator's deliberate promotion into an unusual period
   should not be second-guessed on the next run either.
 
-  **The real question it exposes, still open: is "un-decide" an
-  operation we want?** Demote-to-staging means "put this back in the
-  queue for someone to look at again", which is genuinely different
-  from rejecting it. If not wanted, demote goes to rejected only,
-  re-filing is an ATOMIC move between periods, nothing ever passes
-  back through staging, and the trap disappears entirely rather than
-  being managed.
-- That also gives re-filing a natural shape if wanted: a demoted
-  supply sits in staging with auto-promotion suppressed, and a human
-  promotes it where they choose. No third operation, and the verdict
-  recomputes because the slot assignment genuinely changed.
+  **The question it exposed - is "un-decide" an operation we want? -
+  is SETTLED 2026-09-22: YES.** Keith's own words: "I think undecide is
+  an operation. Undecide, that is." Demote-to-staging means "put this
+  back in the queue for someone to look at again", which is genuinely
+  different from rejecting it, and it is worth having.
+
+  **So the stickiness rule above is REQUIRED, not optional.** That is
+  the direct consequence: the trap it guards against (a human demotes
+  a green supply, the next run auto-promotes it straight back) is only
+  reachable because demote-to-staging exists. Had the answer been NO,
+  demote would have gone to rejected only, rejected is inherently
+  sticky, and no rule would have been needed at all. It is not, so the
+  rule is load-bearing.
+
+  **Staging therefore holds supplies in two distinguishable
+  situations**: never decided, and decided-then-undecided. They look
+  the same in the table and are not the same to an operator - the
+  second has a decision-log history saying who looked and why they put
+  it back. The queue view needs to show that, or un-decide silently
+  loses the very information it exists to capture.
+- **Re-filing does NOT go through un-decide.** It would be natural to
+  assume it does - demote to staging, then promote into the other
+  period, no third operation needed - and that was the shape proposed
+  here before either question was settled. It was rejected (Thread B):
+  re-file is an ATOMIC move between periods, one log entry with a
+  from-slot, a to-slot and one reason, so that "why is this supply in
+  Q3?" has a single answer rather than two entries a later reader must
+  correlate. Un-decide and re-file are different acts for different
+  reasons; sharing a mechanism would cost the log its legibility for
+  no saving worth having.
 
 ## Thread E - Slot assignment and the two cascades
 **Status:** todo (2026-09-21) · **Category:** Pipeline & publishing
@@ -2203,8 +2274,9 @@ failure this was meant to prevent.
 
 **FACT-CHECKED 2026-09-22** at Keith's request, against GitHub's own
 docs source (`github/docs`, `content/actions/concepts/workflows-and-
-actions/concurrency.md`) - `docs.github.com` itself is blocked by this
-session's egress proxy, see `CLAUDE.md`. Exact wording:
+actions/concurrency.md` - `docs.github.com` was blocked by this
+session's egress proxy at the time, and has since been allow-listed;
+see `CLAUDE.md`). Exact wording:
 
 > "When you limit concurrency, by default only one run can be pending in
 > a concurrency group - any additional pending runs cancel the previous
@@ -2212,24 +2284,23 @@ session's egress proxy, see `CLAUDE.md`. Exact wording:
 > you can opt in to queuing, which allows multiple runs to wait in line
 > and execute in order."
 
-So the claim holds, and there is ALSO an opt-in that was not known when
-this was written: **`queue: max` in the `concurrency` section**, giving
-real FIFO queueing, capped at **100 runs per concurrency group** with
-runs beyond that REJECTED (`content/actions/reference/limits.md`).
+So the claim holds: one pending run, and a third arrival evicts the
+second.
 
-**Two caveats that keep drain-the-backlog as the real guarantee:**
-- **Edition-gated.** That paragraph sits behind `{% ifversion
-  actions-nga %}`, and `data/features/actions-nga.yml` lists `fpt` and
-  `ghec` only - github.com and Enterprise Cloud, NOT Enterprise Server.
-  If the real separated environments run GHES, `queue: max` may not
-  exist there.
-- **Capped and rejecting.** Beyond 100 queued runs they are rejected
-  outright, which is a lost decision again, just at a higher threshold.
+**The opt-in queueing mode is DELIBERATELY NOT USED** - Keith's own
+call, 2026-09-22, on being shown it: "I'd rather not rely upon things
+that are gated behind different licenses. Let's just go for the simple
+solution that you had before." It is gated behind a feature flag whose
+own version data lists github.com and Enterprise Cloud but not
+Enterprise Server, so whether it exists at all depends on which edition
+the real separated environments run - exactly the kind of dependency
+this design should not acquire for a guarantee it can get unconditionally.
+It is also capped, with runs beyond the cap rejected outright, which is
+a lost decision again at a higher threshold.
 
-So: use `queue: max` where available as a belt, but the braces are
-below - draining the backlog works on any edition, at any volume, and
-survives a run failing for reasons that have nothing to do with
-concurrency.
+So the answer is not "queue harder". It is (b) below: draining the
+backlog works on any edition, at any volume, and survives a run failing
+for reasons that have nothing to do with concurrency.
 
 **(b) The real fix, which makes (a) moot either way: EACH RUN DRAINS
 THE BACKLOG.** The workflow reads ALL unprocessed decisions since a
