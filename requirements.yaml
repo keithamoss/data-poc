@@ -2787,7 +2787,12 @@ requirements:
       Keith's own question, 2026-09-20 - "what is it that actually
       groups Child Protection data together as a collection?" - and the
       four inconsistencies the answer turned up, all re-verified against
-      real code. plans/publishing-and-history.md item 6.
+      real code. plans/publishing-and-history.md item 6. AMENDED
+      2026-09-22 against plans/supply-model.md Threads F and K, in the
+      batch 1+2 scoper pass: the hierarchy definition is now also what
+      the schedule config's dataset references are validated against,
+      and Thread F settles the dataset/table collapse this requirement
+      left open.
     acceptance_criteria:
       - THE SYSTEM SHALL define each dataset's place in the hierarchy in
         exactly one place, and SHALL resolve every consumer's need for
@@ -2811,6 +2816,14 @@ requirements:
       - THE SYSTEM SHALL change every affected check identity exactly
         once, in the same change as the history rebuild, and SHALL NOT
         leave two id shapes in committed history.
+      - THE SYSTEM SHALL resolve every reference to a dataset made by
+        schedule or asset configuration, including the calendar a
+        dataset names, through that same single hierarchy definition, so
+        that a dataset named in one and absent from the other is a
+        detectable error rather than a silent mismatch.
+      - THE SYSTEM SHALL keep a check identity resolvable to exactly one
+        dataset, so that a check's identity and a slot's identity name
+        the same thing.
     non_functional_requirements:
       - Renaming a check_id needs its own explicit, recorded exception
         to the 2026-09-16 rule that a check_id is permanently unique and
@@ -2846,25 +2859,40 @@ requirements:
         declare only agency and dataset. BDM names its collection and
         never passes it to write_qa_result, which is why it vanishes at
         the storage layer. A duplication problem as much as an omission.
-    open_questions:
-      - validate_tail_uniqueness() guards a per-column tail collision.
-        Whether that stays meaningful once dataset and table collapse
-        should be settled while the grammar is open.
-
+      - "Decided dataset and table collapse safely, which is what the open
+        question here used to ask. Thread F settles that a SUPPLY is one
+        table version and a slot is one (table, period) pair, so
+        dataset-to-table is 1:1 BY CONSTRUCTION under this model rather
+        than by today's accident. validate_tail_uniqueness() therefore
+        keeps real force - the /check/ URL keys on the tail - and its own
+        docstring's caveat, that it cannot happen today only because
+        every dataset maps to exactly one table and nothing enforces
+        that, is answered: the supply model enforces it."
+      - "Decided this requirement is the single place the supply model's
+        vocabulary attaches to a dataset. Everything batch 2 derives - a
+        period, a slot, a delivery's file-to-dataset mapping - names a
+        dataset, and three of them validating against three different
+        notions of what a dataset is would reintroduce exactly the
+        disagreement this requirement exists to remove."
   - id: REQ-GEN-040
-    title: The generator can deliver one table at a time
+    title: The generator can deliver one table at a time, and can deliver early
     date_written: "2026-09-21"
     story: >
       As whoever is testing this, I want the synthetic generator able to
-      resend two of six tables and leave the other four alone, so that
-      the partial resupply this whole model exists for can actually be
+      resupply two of six tables and leave the other four alone, and able
+      to land a supply before it was due, so that the partial resupply
+      and the early arrival this whole model exists for can actually be
       exercised rather than only described.
     moscow: must
     status: not_started
     source: >
       Keith, plans/publishing-and-history.md item 6, 2026-09-20 - "yes,
       that should be part of this work", on generate_cp_runs.py emitting
-      a whole delivery's worth of tables at once.
+      a whole delivery's worth of tables at once. AMENDED 2026-09-22 in
+      the batch 1+2 scoper pass: reworded into the settled vocabulary
+      (supply = one table version, delivery = one physical arrival), and
+      widened to cover early arrival, which plans/running-thoughts.md
+      #27 measured the generator as never producing.
     acceptance_criteria:
       - THE SYSTEM SHALL generate an arrival for one dataset without
         generating one for any other dataset in the same collection.
@@ -2879,6 +2907,14 @@ requirements:
         same seed produces the same arrivals in the same order.
       - THE SYSTEM SHALL keep Birth Registrations' own daily generation
         behaviourally unchanged.
+      - THE SYSTEM SHALL be able to generate a supply whose receipt
+        instant falls before its slot's due instant.
+      - THE SYSTEM SHALL be able to generate a supply whose receipt
+        instant falls after its slot's due instant by an arbitrary
+        interval, including intervals spanning later slots.
+      - THE SYSTEM SHALL NOT decide, record or emit which slot a
+        generated supply fills - it SHALL only decide when that supply
+        was received.
     non_functional_requirements:
       - Determinism is the correctness check for this whole repo. A
         change to arrival scheduling must keep a regenerate-and-diff
@@ -2890,12 +2926,34 @@ requirements:
       - Generation runtime should not blow out - CP builds a
         70,000-person population once per run today.
       - Invoked through mothman only.
-    dependencies: []
-    open_questions:
-      - Whether the resupply chain model becomes per-table. A per-table
-        chain is the honest reading of partial resupply, but it is a
-        bigger change to a module Birth Registrations shares.
-
+    dependencies: [REQ-GEN-042, REQ-GEN-043]
+    decisions:
+      - "Decided the generator produces ARRIVAL SHAPES, never filing
+        decisions. It says what landed and when; which slot that fills is
+        derived later from arrival plus slot state (Thread E). A
+        generator that emitted the intended slot would make every
+        assignment test tautological - it would be testing that the
+        pipeline can read what the generator already decided."
+      - "Decided early arrival needs no new generator field. Every
+        manifest entry already carries both the period a supply belongs
+        to and when it actually landed, and they are already allowed to
+        differ - that is how a late resupply is represented today. An
+        early arrival is the same two values with the inequality the
+        other way round (plans/running-thoughts.md #27). Measured
+        2026-09-21 against the real generated history: 0 early, 240 on
+        time, 112 late, and every one of the 112 is a resupply."
+      - "Resolved the open question this requirement used to carry -
+        whether the resupply chain model becomes per-table. It does not
+        become anything: is_resupply, supersedes_run_id and
+        attempt_number are REMOVED rather than renamed or reshaped
+        (Keith, 2026-09-22), so there is no chain in the generator left
+        to make per-table. A resupply is observed - an arrival landing in
+        an already-filled slot - with nothing to infer. See REQ-GEN-042."
+      - "[B4] Decided the generator's ability to place a supply
+        arbitrarily late or early is what makes schedule-version hosting
+        work. A scenario sitting in the version that makes it correct
+        still needs its supply landing at the right instant relative to
+        that version's due time."
   - id: REQ-DASH-041
     title: Supply history and as-of viewing hold up under per-dataset arrivals
     date_written: "2026-09-21"
@@ -3333,3 +3391,1427 @@ requirements:
         2026-09-20: all 30 requirements carry a non-blank source, and
         the gate was confirmed to report both an absent one and a
         whitespace-only one against the requirement that carries it.
+
+  - id: REQ-GEN-042
+    title: The generator speaks the supply model's vocabulary
+    date_written: "2026-09-22"
+    story: >
+      As whoever builds arrival recognition next, I want the generator to
+      use "delivery" and "slot" to mean what the model says they mean, so
+      that reading the generator to learn how a delivery works teaches me
+      the right concept rather than the opposite one.
+    moscow: must
+    status: not_started
+    source: >
+      plans/supply-model.md concept inventory, "The collision: delivery
+      already means something else", found 2026-09-22 by reading the real
+      code rather than by design work, and settled with Keith the same
+      day. Delivery sprint 2. Scoped by delivery-scoper, batch 1+2 pass,
+      2026-09-22.
+    acceptance_criteria:
+      - THE SYSTEM SHALL name the logical obligation a supply fills a
+        SLOT, and SHALL NOT use the word delivery for it.
+      - THE SYSTEM SHALL use the word DELIVERY only for one physical
+        arrival of one or more files.
+      - THE SYSTEM SHALL carry the period a supply is intended for, and
+        that supply's own receipt instant, in place of the single
+        delivery date it carries today.
+      - THE SYSTEM SHALL remove is_resupply, supersedes_run_id and
+        attempt_number from everything it emits, and SHALL NOT
+        reintroduce them under slot-prefixed names.
+      - THE SYSTEM SHALL issue a run identifier that carries no date.
+      - THE SYSTEM SHALL issue run identifiers deterministically from
+        configuration and seed, so that regenerating overwrites the
+        existing history in place.
+      - THE SYSTEM SHALL derive the generated schedule from a fixed,
+        committed anchor date rather than from the day it is run.
+      - WHEN the generator is re-run on a different calendar day with
+        unchanged configuration, THE SYSTEM SHALL produce an identical
+        history, and SHALL NOT add a second copy of it alongside the
+        first.
+      - THE SYSTEM SHALL use the same vocabulary in every generator
+        module, and SHALL NOT leave one module using the old sense of a
+        word another module has changed.
+      - THE SYSTEM SHALL read its schedule from the same configuration the
+        pipeline reads, and SHALL NOT carry its own copy of the cadence,
+        due times or calendar.
+    non_functional_requirements:
+      - Rewriting today's committed qa_results/ history is explicitly a
+        non-issue - Keith, 2026-09-22, "I don't care. This is all just
+        fake data. We can nuke it from orbit". He does that BEFORE the
+        build rather than as part of it, so no migration over the ~352
+        committed run directories is in scope, and none should be
+        designed. In a real deployment this would be impossible, which
+        is the whole reason the no-regenerating rule exists.
+      - "Every reader of the removed fields must be enumerated
+        mechanically, not by memory. Real consumers found 2026-09-22 -
+        qa_tools/cp/build_cp_warehouses.py,
+        qa_tools/cp/run_evidently_cp.py, qa_tools/cp/dataset_stats.py
+        (which embeds the whole manifest entry into committed results),
+        qa_tools/common/acceptance_sync.py, tests-js/supply-
+        history.test.js, and the dashboard template's own supply-history
+        logic. CLAUDE.md's standing shape-change lesson: assert at the
+        last transform before the user, not the first one after the
+        source."
+      - A vocabulary change is exactly the kind that half-lands. Nothing
+        in the repo should be able to use the retired sense of
+        "delivery" after this - a grep for the old field names should
+        come back empty, and that is a cheap thing to verify.
+      - Invoked through mothman only.
+    dependencies: []
+    decisions:
+      - Decided the GENERATOR adopts the model's vocabulary, not the
+        reverse (Keith, 2026-09-22 - "the generator should be using the
+        new names around slot and delivery and so forth. We shouldn't be
+        changing the concepts we've agreed on"). The design does not
+        bend to the code. Rejected the alternative of giving the new
+        concept a different word to avoid touching the generator, which
+        would have left the repo with two words for one thing and one
+        word for two things.
+      - Decided is_resupply, supersedes_run_id and attempt_number GO
+        rather than being renamed (Keith, same conversation). They were
+        already on the retire-as-authority list, so sweeping them into
+        the rename as slot_-prefixed fields would have preserved exactly
+        the bookkeeping this model stops trusting. A resupply becomes an
+        arrival landing in a filled slot - observed, not recorded.
+      - "Decided BOTH halves of the regeneration-doubling fix, not one
+        (plans/running-thoughts.md #26, which offered three shapes and
+        chose none). Dropping the date from run_id makes a re-run
+        overwrite rather than accumulate, and is the only shape that
+        also works for a partial regeneration; pinning the anchor date
+        stops every arrival instant in the history shifting when the
+        calendar day changes. Either alone leaves a real failure: a
+        dateless id with a floating anchor overwrites in place but
+        silently rewrites every date, and a pinned anchor with a dated
+        id still doubles the directory count."
+      - Recorded because it was measured, not assumed - the "352
+        committed runs" this project has been quoting is really 176.
+        There are exactly 176 distinct (delivery_id, attempt_number)
+        pairs, each appearing under two delivery dates one day apart,
+        because somebody regenerated on two consecutive days.
+      - "[B4] Decided the generator reads the real schedule config rather
+        than its own. With scenarios hosted by effective-dated versions,
+        a generator carrying a private copy of the cadence would place
+        supplies against one schedule while the pipeline judged them
+        against another - and the disagreement would look like a model
+        failure rather than a config duplication."
+      - "Decided the generator adopts the MODEL'S vocabulary rather than
+        the design bending to the generator's existing names (Keith,
+        2026-09-22, in his own words: we should not be changing the
+        concepts we have agreed on). delivery_id becomes slot_id and
+        delivery_date becomes the period or due date; delivery keeps its
+        new sense of one physical arrival. Recorded as a principle and
+        not only as a list of renames, because the same collision will
+        recur every time a settled concept meets an older field name.
+        Added by the batch 1+2 carry-over check, which found the removals
+        well covered and this positive half absent."
+    open_questions:
+      - A pinned anchor date means the demo data visibly ages until
+        somebody bumps the anchor and regenerates. That is honest -
+        regeneration becomes a deliberate act - but it is a real change
+        to how this PoC looks when shown to someone months from now, and
+        nothing currently prompts the bump.
+
+  - id: REQ-GEN-043
+    title: A delivery has a written-down on-disk format, and it declares nothing
+    date_written: "2026-09-22"
+    story: >
+      As whoever builds delivery recognition in sprint 7, I want the shape
+      a delivery takes on disk written down as a specification when the
+      generator first emits it, so that I am implementing against an
+      agreed format rather than reverse-engineering whatever the
+      generator happened to do five sprints ago.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-22, settling that sprint 2 DEFINES the on-disk
+      delivery format sprint 7 consumes - "it must be a DELIBERATE
+      ARTEFACT of this sprint... rather than something sprint 7
+      reverse-engineers". plans/supply-model.md delivery sprint 2 and
+      Thread B. Scoped by delivery-scoper, batch 1+2 pass, 2026-09-22.
+    acceptance_criteria:
+      - THE SYSTEM SHALL write each delivery as one self-contained unit
+        on disk whose boundary is observable without reading any file's
+        contents.
+      - THE SYSTEM SHALL carry that format as a written specification in
+        the repository, committed in the same change that first emits
+        it.
+      - THE SYSTEM SHALL name each file in a delivery so that the
+        dataset it belongs to is derivable from the filename alone,
+        using that dataset's own configured pattern.
+      - THE SYSTEM SHALL record, for each delivery, the instant WE
+        received it, expressed with its UTC offset.
+      - THE SYSTEM SHALL NOT place the period, the slot, or any other
+        statement of what a file is intended for inside a delivery, and
+        no code that files a supply SHALL read such a statement.
+      - THE SYSTEM SHALL ignore any timestamp a supplier could have
+        written, and SHALL use only the receipt instant recorded on our
+        side of the boundary.
+      - THE SYSTEM SHALL keep the generator's own bookkeeping - which
+        scenario a delivery came from, which slot it was built to fill -
+        in an artefact outside every delivery.
+      - THE SYSTEM SHALL NOT read that bookkeeping artefact from any
+        pipeline, QA or dashboard-build module, and SHALL NOT embed any
+        part of it into committed QA results.
+      - THE SYSTEM SHALL be able to emit a delivery containing more than
+        one file matching a single dataset's pattern.
+      - THE SYSTEM SHALL be able to emit a delivery containing a file
+        matching no dataset's pattern at all, including one that is not
+        tabular data.
+      - THE SYSTEM SHALL be able to emit a delivery containing a file
+        that cannot be parsed as the format its name claims.
+      - THE SYSTEM SHALL emit files destined for several datasets that
+        arrived together as ONE delivery, not as one delivery each.
+      - THE SYSTEM SHALL record, for each delivery, the instant WE
+        received it, expressed with its UTC offset, in a receipt record
+        written by the receiving side and held OUTSIDE the delivery unit.
+      - THE SYSTEM SHALL hold that receipt record where a supplier has no
+        path to write it.
+      - IF a file resembling a receipt record is found INSIDE a delivery,
+        THEN THE SYSTEM SHALL ignore it for every purpose and SHALL
+        report it as an unexpected artefact.
+      - THE SYSTEM SHALL be able to emit deliveries whose names follow no
+        common pattern, so that delivery recognition cannot pass by
+        parsing a name we wrote ourselves.
+    non_functional_requirements:
+      - The format must be expressible by a real transport. A delivery
+        boundary comes from the transport - one folder drop, one prefix,
+        one session - so a synthetic format that could not be produced
+        by an S3 prefix or an SFTP session is not a stand-in for
+        anything (Thread B, TS-17).
+      - The format must not use characters that are illegal or awkward
+        in a path on a non-Linux filesystem. This repo gets run on other
+        people's machines as part of evaluating the PoC, and an ISO-8601
+        instant contains colons.
+      - In a real deployment this directory holds real Birth
+        Registrations and Child Protection extracts. It stays under
+        data/ and stays gitignored, and no part of the format may
+        require committing a delivery's contents to git.
+      - Removing the pipeline's dependence on the generator's manifest
+        is the point, not a side effect. Real readers to retire, found
+        by grep 2026-09-22 - qa_tools/cp/build_cp_warehouses.py:79,
+        qa_tools/cp/run_evidently_cp.py:92, and
+        qa_tools/cp/dataset_stats.py, which embeds the whole manifest
+        entry into committed qa_results/ where
+        qa_tools/common/acceptance_sync.py:113 then reads it back.
+      - Anything that reads a delivery is invoked through mothman.
+      - The receipt record is the one place a supplier could forge our own
+        clock if the boundary is drawn wrongly. It is ours, it lives
+        outside the delivery, and a lookalike inside a delivery is an
+        anomaly to report rather than a value to read.
+    dependencies: [REQ-GEN-042, REQ-PIPE-048]
+    decisions:
+      - "Decided the delivery on disk asserts ONLY what physically
+        happened - these files landed together, at this instant. That is
+        what makes it an OBSERVED TRANSPORT UNIT rather than the
+        supplier-declared manifest Thread B rejected. The distinction is
+        sharp and must stay sharp: a supplier declaring which period
+        their data is for is a judgment we would have to trust and
+        cannot enforce across a varied supplier base; a folder drop is a
+        physical fact we can see for ourselves."
+      - Rejected letting the pipeline keep reading the generator's
+        manifest.json. It reads one today, and under this model that
+        would be the rejected manifest arriving by the back door -
+        filing decisions made from a declaration rather than from
+        arrival plus slot state. The generator still needs bookkeeping
+        for the scenario map, so the fix is to separate the two
+        artefacts rather than to delete one.
+      - Decided the receipt instant must be SIMULATED and supplied by
+        the transport layer rather than taken from a file's mtime. A
+        generated history spans months but is written in seconds, so
+        real file metadata would collapse every arrival onto one instant
+        and destroy every injected scenario. This is the one place the
+        synthetic stand-in genuinely cannot be a file-system fact, and
+        it should be labelled as such rather than quietly relied on.
+      - "[B1] Decided the receipt instant lives in a TRANSPORT RECORD
+        written beside the delivery, not encoded in the delivery's own
+        directory name (Keith, 2026-09-22). It is closer to reality - in
+        a real deployment the receipt time is object metadata the
+        transport records, not anything in the drop - and it deliberately
+        leaves the delivery's name free to be an arbitrary supplier-style
+        prefix."
+      - "[B1] The second half is the real reason, and it is a testing
+        argument rather than a modelling one: if we name the drop
+        ourselves, delivery recognition passes by parsing a name we
+        wrote, which proves nothing. Leaving the name arbitrary makes
+        recognition do real work against a boundary it did not choose.
+        That is why the generator is required to emit names following no
+        common pattern."
+      - "[B1] Rejected encoding the instant in the directory name, which
+        the scoper had leaned towards on the grounds that it is one fact
+        in one place, visible in a listing, and impossible to confuse
+        with file content. It loses on both points above, and it needed a
+        filename-safe encoding because an ISO-8601 instant contains
+        colons. Rejected doing both, which creates two values that can
+        disagree."
+      - "[B1] Decided a receipt-record lookalike INSIDE a delivery is an
+        anomaly, never a value. This does not exist in the threads and
+        follows from the choice: the moment the receipt time lives in a
+        file rather than in a name only we control, a supplier who writes
+        a file of that name would be setting our own clock - which is
+        precisely what TS-32 forbids. The boundary is that the record
+        lives outside the delivery, in a location the supplier cannot
+        write to."
+
+  - id: REQ-GEN-044
+    title: Every injected scenario exists in the generated history
+    date_written: "2026-09-22"
+    story: >
+      As Keith, I want the awkward supply shapes we spent two days
+      designing for to be present in the real generated data, so that I
+      can see the model working on the real dashboard rather than take a
+      green test run's word for it.
+    moscow: must
+    status: not_started
+    source: >
+      Keith's second standing obligation on the test scenario register,
+      2026-09-22 - "the scenarios KEITH PROPOSED get INJECTED into
+      generated deliveries, so they are visible in the real dashboard
+      rather than only green in a test run". plans/supply-model.md
+      delivery sprint 2. Scoped by delivery-scoper, batch 1+2 pass,
+      2026-09-22.
+    acceptance_criteria:
+      - THE SYSTEM SHALL generate, into the committed synthetic history,
+        a real instance of every scenario the test scenario register
+        marks for injection.
+      - THE SYSTEM SHALL generate each one under a schedule
+        configuration that makes that scenario's stated outcome the
+        correct one, and SHALL state that configuration alongside it.
+      - THE SYSTEM SHALL place injected scenarios deterministically, so
+        that the same seed and the same configuration place the same
+        scenario in the same dataset and the same period.
+      - IF an injected scenario cannot be placed under the configured
+        schedule, THEN THE SYSTEM SHALL fail loudly naming that
+        scenario, and SHALL NOT emit a history silently missing it.
+      - THE SYSTEM SHALL NOT mark an injected scenario as a scenario
+        anywhere in the rendered dashboard.
+      - THE SYSTEM SHALL generate only the arrival shapes each scenario
+        needs, and SHALL NOT generate the verdict that scenario expects.
+      - THE SYSTEM SHALL record, for each injected scenario, the dataset,
+        the period and the supplies it produced, for the scenario map to
+        read.
+      - THE SYSTEM SHALL express the differing schedule configurations its
+        scenarios require as effective-dated versions of the same
+        calendar, each in force over the part of the history its
+        scenarios occupy.
+      - THE SYSTEM SHALL generate at least one schedule version change
+        within the committed history, so that the
+        evaluate-each-period-against-the-version-in-force rule is
+        exercised against real data.
+      - WHEN a schedule version changes, THE SYSTEM SHALL leave every
+        earlier generated supply's verdict unchanged.
+      - THE SYSTEM SHALL NOT generate two scenarios requiring
+        incompatible schedule configurations within the same version's
+        period of effect.
+    non_functional_requirements:
+      - Injected scenarios add deliveries to a history whose generation
+        already builds a 70,000-person population per run. Derive the
+        injected deliveries from the base population rather than
+        rebuilding it, and measure generation runtime before and after.
+      - At 30 datasets this set of permanent red would be noise. At two
+        it is the point. The requirement is honest about being a PoC
+        demonstration device, and it should not be generalised into a
+        production deployment where the data is real.
+      - Injected scenarios must not make the normal history unreadable.
+        The bulk of the generated history should still look like an
+        ordinary, healthy feed, or the dashboard stops demonstrating
+        what a healthy feed looks like.
+      - Seeded and deterministic, so a regenerate-and-diff stays a real
+        correctness check.
+      - The generated history now contains schedule changes, which makes
+        the daily feed's story busier than a textbook one. That is
+        realistic, but it should not make the ordinary healthy feed hard
+        to recognise - a reader should still be able to see what normal
+        looks like.
+      - The synthetic calendar's past-dated versions are subject to
+        REQ-PIPE-050's retrospective-edit guard. Regeneration must update
+        the recorded content records and write the changelog entry as
+        part of the same act, or every regeneration fails the gate.
+    dependencies: [REQ-GEN-040, REQ-GEN-042, REQ-GEN-043, REQ-PIPE-049, REQ-PIPE-051]
+    decisions:
+      - Decided against a scenario label on the injected runs (Keith,
+        2026-09-22 - "this is still just a proof of concept remember").
+        A first draft argued for one, to stop the dashboard growing
+        permanent red that looks like a defect. For a PoC that is
+        over-building - the red IS the point and the audience knows the
+        data is synthetic. The scenario map carries the "which one is
+        this" information instead.
+      - "Decided every scenario must state its CONFIG. Found during
+        Keith's own review of the register, and it invalidated two
+        expected results as first written (TS-3, TS-5): an outcome like
+        \"files as a resupply of Wednesday\" is meaningless without the
+        cadence, the due time and the claim-window size, because a
+        different window gives a different and equally correct answer."
+      - Decided the generator emits shapes, not verdicts. TS-3b's
+        expected answer ("fills May, 79 days late") is a claim about
+        slot assignment, which is batch 3. Generating the verdict here
+        would make batch 3's own tests assert that the pipeline agrees
+        with the generator rather than with the rule.
+      - "Recorded because it is what makes this sprint urgent rather
+        than merely useful: most of the injected set cannot be generated
+        at all today. The generator emits whole deliveries only and
+        never partial, produces ZERO early supplies (measured 0 early /
+        240 on time / 112 late), and run_id still carries dates. This is
+        why the sprint moved from 6 to 2."
+      - "[B4] Decided the three incompatible daily configurations TS-1,
+        TS-2 and TS-3c require - due 12:00, due ~22:00, and due 22:00 the
+        evening before - are hosted by EFFECTIVE-DATED SCHEDULE VERSIONS
+        across the generated history, each scenario sitting in the
+        version that makes its stated outcome correct (Keith,
+        2026-09-22). It exercises TS-26 for free and demonstrates a real
+        capability rather than working around a limitation."
+      - "[B4] Rejected relaxing the scenarios to whatever one configured
+        due time allows. Keith's own review of the register established
+        that a scenario's outcome is meaningless without its config -
+        files as a resupply of Wednesday depends entirely on the cadence,
+        the due time and the window size - so changing the config
+        changes what each scenario proves, silently."
+      - "[B4] Rejected adding a third synthetic daily dataset purely to
+        host the other configurations. Adding datasets is explicitly
+        sequenced AFTER this work (plans/running-thoughts.md #23),
+        because it is what makes the file-architecture question
+        answerable and it needs this model to be real first."
+
+  - id: REQ-GEN-045
+    title: A generated scenario map says where each scenario can be seen
+    date_written: "2026-09-22"
+    story: >
+      As Keith showing this to someone, I want a list saying which
+      scenario is which and where to look at it, so that a deliberately
+      broken supply reads as a demonstration rather than as a defect
+      somebody forgot about.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-22, on the test scenario register - "if I click on a
+      test, it takes me to the relevant as-of date and then the relevant
+      page for the check, the dataset or the data collection".
+      plans/supply-model.md test scenario register. Scoped by
+      delivery-scoper, batch 1+2 pass, 2026-09-22.
+    acceptance_criteria:
+      - THE SYSTEM SHALL generate a map naming, for each injected
+        scenario, the dataset, the supplies it produced, the period and
+        the as-of date at which that scenario can be seen.
+      - THE SYSTEM SHALL generate the map from the generator's own
+        record of where each scenario actually landed, and SHALL NOT
+        require anyone to maintain it by hand.
+      - WHEN the synthetic history is regenerated, THE SYSTEM SHALL
+        regenerate the map in the same act, so that the two cannot
+        disagree.
+      - THE SYSTEM SHALL commit the map as markdown, so that anything
+        reading it reads a committed file and never touches data/.
+      - THE SYSTEM SHALL emit coordinates only, and SHALL NOT emit a
+        dashboard URL or anything that encodes the dashboard's routing
+        scheme.
+      - WHERE a scenario has no generated data behind it, THE SYSTEM
+        SHALL say so rather than emitting a coordinate that leads
+        nowhere.
+      - THE SYSTEM SHALL expose map regeneration as a mothman
+        subcommand.
+      - THE SYSTEM SHALL write the map so that it reads as a complete,
+        self-explanatory document on its own, without a dashboard to
+        render it.
+      - THE SYSTEM SHALL state, for each entry, what the scenario is
+        meant to demonstrate, not only where it landed.
+    non_functional_requirements:
+      - The map is committed and read by the dashboard build, so it must
+        contain no row-level data and no failing values. In a real
+        deployment those would be real Birth Registrations or Child
+        Protection records.
+      - A hand-written map drifts the first time seeded data is
+        regenerated. Generating it is the mitigation, and the same-act
+        regeneration criterion is what makes that mitigation real rather
+        than aspirational.
+      - Same pattern plans/INDEX.md already uses - a generated, committed
+        index rather than a live query. No new machinery.
+    dependencies: [REQ-GEN-044]
+    decisions:
+      - Decided the map carries COORDINATES and the dashboard constructs
+        the LINK (Keith's own framing, 2026-09-22). The generator knows
+        the dataset, the supplies, the as-of date and the check; it does
+        not, and should not, know the dashboard's routing scheme.
+        Emitting URLs from the generator would couple the two and break
+        silently the next time a route changes.
+      - Decided the target is an AS-OF DATE, not a snapshot. Keith
+        floated both. The live dashboard defaults to as-corrected, so an
+        as-of link shows the scenario as we now understand it, whereas a
+        snapshot shows what was published at the time - a different
+        question, and the wrong one for "show me this scenario working".
+      - Decided a unit-only scenario appears in the map saying it has no
+        data behind it, rather than being omitted. A map missing entries
+        invites someone to conclude a scenario was never built.
+      - "[B2] Decided the map must stand alone as a document, because
+        Keith's answer to B2 holds all dashboard rendering to batch 6 -
+        so for several sprints the committed markdown on GitHub is the
+        ONLY way anyone sees it. A coordinates-only list would have been
+        adequate with a renderer and is not adequate without one."
+
+  - id: REQ-DASH-046
+    title: The scenario map is browsable, and each entry lands you on the thing itself
+    date_written: "2026-09-22"
+    story: >
+      As Keith walking someone through this, I want to click a scenario
+      and arrive at the right dataset on the right as-of date, so that
+      showing what the model does is one click rather than a date picker
+      and an explanation.
+    moscow: should
+    status: not_started
+    source: >
+      Keith, 2026-09-22, on the test scenario register - "if I click on a
+      test, it takes me to the relevant as-of date and then the relevant
+      page for the check, the dataset or the data collection". Scoped by
+      delivery-scoper, batch 1+2 pass, 2026-09-22.
+    acceptance_criteria:
+      - THE SYSTEM SHALL render the committed scenario map in the
+        dashboard.
+      - WHEN a viewer selects a scenario entry, THE SYSTEM SHALL
+        navigate to the as-of date that entry names and to the dataset,
+        collection or check it names.
+      - THE SYSTEM SHALL construct that link itself from the entry's
+        coordinates, and SHALL NOT consume a link authored anywhere
+        else.
+      - IF an entry names no coordinates, THEN THE SYSTEM SHALL render
+        it as plain text rather than as a link that goes nowhere.
+      - THE SYSTEM SHALL read the map from a committed file, and the
+        build SHALL NOT access anything under data/ to render it.
+      - THE SYSTEM SHALL render with zero console errors in a real
+        browser.
+    non_functional_requirements:
+      - Verify at the render layer in a real browser, not at the data
+        layer - CLAUDE.md's standing lesson from item 74, and the same
+        reason REQ-DASH-041 exists separately from REQ-PIPE-034.
+      - Covered by both toolchains - tests-js for the template's inline
+        logic, tests/test_dashboard_e2e.py for the built page.
+      - This is a PoC demonstration surface. It should not become a
+        permanent fixture of a deployment pointed at real data, where
+        there are no injected scenarios to map.
+      - Until this is built, the map's access path is reading the
+        committed markdown on GitHub. That has to actually work as a
+        standalone document, which is a real constraint on REQ-GEN-045
+        rather than an afterthought.
+    dependencies: [REQ-GEN-045, REQ-DASH-041]
+    decisions:
+      - Decided this is a separate requirement from the map's
+        generation, because the two are verified in entirely different
+        ways - one by regenerating and diffing, one by driving a real
+        browser - and because the link target depends on as-of viewing,
+        which is batch 6 work.
+      - "[B2] Decided the WHOLE rendering is held to batch 6, and sprint 2
+        does no dashboard work (Keith, 2026-09-22). This is STRICTER than
+        what the scoper recommended - the scoper proposed a plain
+        unlinked list in sprint 2 with the click-through added later, and
+        Keith took the harder line. Rejected building it in sprint 2
+        alongside the map, and rejected the split delivery."
+      - "[B2] The reason holds independently of anyone's preference, and
+        is the same one that put every dashboard sprint last: building a
+        view against a data shape still moving is how clipDatasetToAsOf()
+        ended up filtering on arrival rather than promotion - correct
+        only because promotion did not yet exist. The map's own
+        coordinates are exactly such a shape while slot assignment and
+        promotion are unbuilt."
+    open_questions:
+      - Whether a scenario link should be able to target an INSTANT
+        rather than a date. Sprint 24's time-granular as-of makes it
+        possible, and the register notes it "matters for the injected
+        scenarios whose whole point is an intra-day sequence" - but
+        sprint 24 is the last sprint in the plan.
+
+  - id: REQ-QAC-047
+    title: A shared table of status cases, covering the half the browser check cannot
+    date_written: "2026-09-22"
+    story: >
+      As a data team leader, I want the status I see on the page to be
+      the status the pipeline computed, so that a dataset does not read
+      green in the dashboard and mean something else to the automation
+      that opens my ticket.
+    moscow: must
+    status: not_started
+    source: >
+      plans/supply-model.md Thread I, verified against real code
+      2026-09-21 - qa_tools/common/dataset_status.py has no nodata in
+      STATUS_ORDER at all, so a recorded nodata falls through
+      dashboard_status_of() to threshold math and returns green. Delivery
+      sprint 3, and test scenario register TS-20. Scoped by
+      delivery-scoper, batch 1+2 pass, 2026-09-22.
+    acceptance_criteria:
+      - THE SYSTEM SHALL return the same status from its Python and
+        browser implementations for every check-result input.
+      - IF an implementation encounters a recorded status it does not
+        recognise, THEN THE SYSTEM SHALL fail loudly naming the status
+        and where it was read from, and SHALL NOT fall back to
+        threshold arithmetic.
+      - THE SYSTEM SHALL NOT treat an unrecognised recorded status as
+        evidence of health.
+      - THE SYSTEM SHALL order statuses identically in both
+        implementations.
+      - IF a rollup is asked to combine a status it cannot order, THEN
+        THE SYSTEM SHALL NOT return green.
+      - WHEN a new status value is introduced, THE SYSTEM SHALL fail
+        until both implementations recognise it.
+      - THE SYSTEM SHALL apply the same retired-check filtering rule in
+        both implementations.
+    non_functional_requirements:
+      - This must land BEFORE any per-check nodata value is recorded, or
+        the new status meets a silent misgrade on arrival. That is
+        plans/qa-pipeline.md item 74's exact failure mode, in the module
+        whose own docstring says it drifted from its JS counterpart once
+        already.
+      - The verification has to run at the layer a human sees, not only
+        at the data layer. tests/test_dashboard_e2e.py's own
+        TestStatusMatchesEachToolsOwnVerdict is the worked example -
+        ~30k statuses compared inside a real browser, in seconds.
+      - Failing loudly on an unknown status is a change in failure
+        behaviour, from silently-wrong to noisily-broken. That is
+        deliberate, and it means a malformed committed result now stops
+        a dashboard build that would previously have rendered a false
+        green.
+      - No live data access. Both implementations read already-built
+        dashboard JSON, and must continue to.
+      - Two toolchains, so both must cover it - uv run pytest and npm
+        test.
+      - The other half of this verification ALREADY EXISTS and is not
+        rebuilt here. tests/test_dashboard_e2e.py's
+        TestStatusMatchesEachToolsOwnVerdict drives the real built
+        dashboard in a real browser and compares every committed result's
+        rendered status against the verdict the tool recorded. That
+        covers inputs nobody anticipated; the table covers inputs that do
+        not exist yet. Neither covers the other's gap.
+      - The table must be readable by both toolchains without either
+        owning it - a committed data file, not a Python fixture the JS
+        suite has to reimplement.
+      - Adding a row must be the obvious thing to do when a status is
+        added. If it is not, the table rots into a snapshot of what was
+        true once.
+    dependencies: []
+    decisions:
+      - Decided the fix is parity PLUS loud failure, not simply adding
+        nodata to the Python STATUS_ORDER. Adding the one missing value
+        makes the two agree today and guards nothing against the next
+        status either side gains. The silent fall-through to threshold
+        arithmetic is the actual defect - it converts "I do not know
+        what this is" into "green".
+      - Decided to guard the partial-nodata rollup path even though
+        red-for-unrun (sprint 17) is intended to make it unreachable.
+        TS-19 exists precisely because worstOf() is seeded green and
+        STATUS_ORDER.nodata is -1, so five green plus one nodata returns
+        green - the mechanism written to prevent a false green produces
+        one once nodata becomes partial. A structural fix elsewhere is
+        not a reason to leave the old path untested.
+      - "Recorded as verified rather than reasoned. Both implementations
+        filter retired checks BEFORE the rollup - the template's
+        worstOf(c.checks.filter(ck=>!ck.retired)...) and
+        dataset_status.py's `if ck.get(\"retired_as_of\"): continue` -
+        so a table whose checks have all been retired yields an empty
+        list and renders green by vacuum in both. The gate that closes
+        that is sprint 16's zero-ACTIVE-checks CI check, not this
+        requirement, but the parity finding is what proved it
+        reachable."
+      - "[B3] Decided the deliverable is the shared committed table ONLY
+        (Keith, 2026-09-22), correcting the scoper's own recommendation
+        of both mechanisms - which the main session had also recommended.
+        The browser-level cross-check proposed as a second half ALREADY
+        EXISTS: TestStatusMatchesEachToolsOwnVerdict was built after the
+        item 74 incident and already drives the real page over all
+        committed results. Proposing it again would have meant rebuilding
+        something shipped, and would have hidden the fact that the table
+        is precisely the MISSING half."
+      - "[B3] Recorded because it is the reason the table is the right
+        half rather than the cheap half: the existing cross-check can
+        only ever cover statuses that appear in the committed history,
+        and the status this sprint exists for - per-check nodata - has no
+        history at all yet. A verification that only sees what has
+        already happened cannot catch a value that has not happened."
+
+  - id: REQ-PIPE-048
+    title: One timezone parameter, and every stored instant carries its offset
+    date_written: "2026-09-22"
+    story: >
+      As whoever reads a stored timestamp years from now, I want it to
+      say what offset it is in, so that a supply that arrived at 10pm in
+      Perth is not read as having arrived the following afternoon.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-21, plans/supply-model.md Thread H chaos-pass items
+      4 and 6 - one repo-wide config parameter replacing
+      pipeline/cadence.py's hardcoded AWST_OFFSET. Delivery sprint 4, and
+      test scenario register TS-31. Scoped by delivery-scoper, batch 1+2
+      pass, 2026-09-22.
+    acceptance_criteria:
+      - THE SYSTEM SHALL read the data asset's timezone from exactly one
+        configuration value.
+      - THE SYSTEM SHALL derive every wall-clock computation from that
+        value, and SHALL NOT carry a hardcoded offset anywhere.
+      - THE SYSTEM SHALL write every stored timestamp with its own UTC
+        offset.
+      - IF a timestamp without an offset is encountered, THEN THE SYSTEM
+        SHALL fail loudly naming where it came from, and SHALL NOT
+        interpret it as UTC and SHALL NOT interpret it as local time.
+      - THE SYSTEM SHALL NOT reinterpret an already-stored timestamp
+        when the configuration value changes.
+      - WHEN a date is interpreted as a point in time, THE SYSTEM SHALL
+        take it to mean the end of that day in the asset's timezone.
+      - THE SYSTEM SHALL compare instants rather than date strings
+        wherever a comparison decides an outcome.
+    non_functional_requirements:
+      - Every later sprint compares instants, so this must land early
+        and must not be revisited. It is small and independent
+        deliberately.
+      - The current behaviour is correct by coincidence in at least one
+        place - clipDatasetToAsOf() compares date STRINGS, which gives
+        end-of-day semantics by accident rather than by design. Pin the
+        current semantics with a test BEFORE the refactor, not after,
+        so the behaviour is provably unchanged when the comparison
+        becomes a real instant comparison.
+      - An offset stored alongside every value costs nothing, stays
+        human-readable, and is self-describing to anyone opening a
+        qa_results/ file years later. Without it, changing the config
+        parameter retroactively reinterprets every timestamp ever
+        written - the same retroactivity problem effective_from exists
+        to prevent, arriving by a different door.
+      - Enumerate every consumer of a timestamp mechanically before
+        calling this done. A shape change to a stored value is exactly
+        the class CLAUDE.md's item-74 lesson covers.
+      - Config only, no data access, so nothing here constrains CI.
+    dependencies: []
+    decisions:
+      - Decided the parameter lives at the data-asset level, in
+        contract/data-asset.yaml, because asset-level config IS
+        repo-level here - an asset is a separate deployment, not a row
+        in the data.
+      - Decided to name a timezone rather than state an offset, even
+        though AWST is a fixed UTC+8 with no daylight saving and a bare
+        offset would work today. A named zone costs nothing (the
+        standard library resolves it) and a fixed offset fails silently
+        the first time this is pointed anywhere that observes daylight
+        saving. THIS IS THE SCOPER'S OWN CALL and is worth Keith
+        reacting to at sign-off - the counter-argument is that the
+        current code is a deliberate fixed-offset simplification and
+        says so.
+      - Decided a naive timestamp is an error rather than something to
+        interpret. cadence.py treats naive values as UTC today, so a
+        naive AWST value is eight hours out - enough on a daily feed to
+        flip on-time to late or move a supply into the wrong slot.
+      - Decided "as at a date" means END OF DAY in the asset's timezone
+        (Keith, 2026-09-22). "End of day" is meaningless without saying
+        whose day, and one computed in UTC would be eight hours out,
+        including or excluding a whole evening's arrivals. Both readings
+        of the natural phrasing - "what did we know by the end of that
+        day" - agree with it.
+
+  - id: REQ-PIPE-049
+    title: The asset carries named delivery calendars, and each dataset names one
+    date_written: "2026-09-22"
+    story: >
+      As the person who agreed a delivery date with a supplier, I want
+      that agreed date written down as the thing QA judges against, so
+      that a supply is late because it missed what we agreed, not because
+      a calendar library and a public holiday disagreed.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-21, plans/supply-model.md Thread C - quarterly uses
+      authored dates, daily uses a cadence rule, the asset owns the
+      calendar and a dataset owns its participation. Delivery sprint 5,
+      and test scenario register TS-26 and TS-27. Scoped by
+      delivery-scoper, batch 1+2 pass, 2026-09-22; finalised the same day
+      against Keith's answers to questions A1, A2 and A3.
+    acceptance_criteria:
+      - THE SYSTEM SHALL hold one or more NAMED delivery calendars per
+        data asset, and each dataset SHALL name exactly one of them.
+      - THE SYSTEM SHALL let a calendar be expressed either as authored
+        dates, each carrying a period name and a date, or as a cadence
+        rule.
+      - THE SYSTEM SHALL let a dataset name which of an authored
+        calendar's delivery months it participates in, and SHALL treat a
+        dataset saying nothing as participating in all of them.
+      - IF a dataset naming a cadence-rule calendar also names delivery
+        months, THEN THE SYSTEM SHALL reject the configuration rather
+        than ignoring the months.
+      - THE SYSTEM SHALL accept full month names only, case-insensitively,
+        and SHALL NOT accept abbreviations, month numbers or positional
+        indices.
+      - THE SYSTEM SHALL let a dataset override its calendar with its own
+        authored dates instead of subsetting it.
+      - THE SYSTEM SHALL carry each dataset's own expected time of day
+        and its own grace allowance in that dataset's own contract.
+      - THE SYSTEM SHALL carry a default claim window on each calendar,
+        and SHALL let a dataset override it in that dataset's own
+        contract.
+      - THE SYSTEM SHALL express a claim window as a duration carrying
+        its own unit, so that the same property reads naturally at both a
+        quarterly and a daily scale.
+      - THE SYSTEM SHALL NOT attach a time of day to a calendar date.
+      - THE SYSTEM SHALL version each calendar with an effective-from
+        date and a changelog entry per version, in the same shape check
+        lifecycle already uses.
+      - THE SYSTEM SHALL let a dataset declare periods for which no
+        supply is expected, each with a reason.
+      - THE SYSTEM SHALL show a period declared not expected rather than
+        omitting it.
+      - THE SYSTEM SHALL NOT compute an authored date from a holiday
+        calendar at evaluation time.
+      - WHERE someone needs next year's candidate dates, THE SYSTEM SHALL
+        offer a mothman subcommand that prints them for a human to
+        review, edit and commit, and SHALL NOT use generated dates as the
+        evaluation path.
+    non_functional_requirements:
+      - The authored calendar is a real once-a-year human task, and
+        somebody will forget. The runway warning and the exhausted-
+        schedule failure in REQ-PIPE-053 are that risk's mitigation, and
+        this requirement is not safe without them.
+      - The calendar is a governance artefact, not just config - Thread
+        C's own words, "the dates ARE the supplier agreement, and QA
+        judges against the agreement". It is version-controlled,
+        effective-dated, and must never be edited retrospectively to
+        make red history disappear (Thread E's explicit rule about
+        not_expected versus marked-missed).
+      - At ~30 datasets on the quarterly asset, 30 independent date
+        lists would drift - dataset A saying 2 February and dataset B
+        saying 3 February for the same delivery window is a class of bug
+        nothing would ever flag. One calendar makes it impossible by
+        construction, and the cross-reference validation in
+        REQ-PIPE-050 is what makes that real.
+      - Config only, no data access, so a dashboard build can read it
+        under the CI rule.
+      - Real config already exists and must be carried rather than
+        reinvented - pipeline/cadence.py's parse_cadence_from_contract
+        already reads cadenceType, cadenceAnchorMonths, cadenceDayOfMonth,
+        expectedTime and latency from each contract's slaProperties.
+      - A duration string is a new thing to parse and therefore a new
+        thing to get wrong. One accepted form per unit, validated by the
+        gate, rejected rather than coerced.
+    dependencies: [REQ-QAC-039, REQ-PIPE-048]
+    decisions:
+      - Decided quarterly uses authored DATES and daily uses a cadence
+        rule, and that this is not a compromise - they are different
+        shapes. 365 daily dates would be absurd to enumerate and the
+        rule genuinely is "every day"; four quarterly dates a year are
+        known well in advance, and the real agreed day is "the closest
+        business day to the 1st", which a day-of-month rule does not
+        express.
+      - "Rejected runtime derivation from a holiday library (Keith's own
+        counter-proposal), and rejected derive-at-runtime-then-freeze-
+        the-computed-due-date. Neither loses on library quality - Keith
+        was right that holiday packages are year-keyed, so a later
+        gazette amendment does not silently rewrite a settled past date.
+        They lose because the dates ARE the agreement: a calendar
+        PREDICTS it, it does not CONSTITUTE it. Freezing additionally
+        leaves nowhere to record a date that differs from what the rule
+        would generate."
+      - Decided the ASSET owns the calendar and a DATASET owns its
+        participation, on a scale argument rather than a tidiness one -
+        the quarterly asset will carry ~30 datasets, of which roughly
+        70% arrive every quarter and the rest once or twice a year,
+        still landing on one of the same four dates.
+      - Decided month NAMES, not numbers or positional indices. Indices
+        break silently if the calendar is edited or reordered; names
+        stay meaningful and match how people talk about it. Full names
+        only, because two accepted forms means config reading
+        differently across 30 datasets for no gain.
+      - Decided the key is delivery_months, never shortened to months
+        (confirmed with Keith after a dictation ambiguity pointed the
+        other way). It names when a supply ARRIVES, not the period it
+        covers - a 2 February delivery is often for the November-January
+        period, so the short form invites exactly the wrong reading.
+      - Decided a period's NAME is AUTHORED per calendar date, not
+        derived from the date, for the same reason. This was left to the
+        scoper by Thread C and is settled here.
+      - Decided the calendar date carries NO time of day, which
+        SUPERSEDES Thread H chaos-pass item 5 ("the schedule carries a
+        time alongside the dates"). That item predates Thread C's
+        correction moving the deadline to the slot, and the two cannot
+        both hold - a time on the calendar date is a per-period
+        deadline, which is exactly what was ruled out. The instant
+        due-ness needs comes from the slot's own expected time instead.
+      - "Decided a dataset may fully override the calendar with its own
+        dates even though no such dataset exists today (Keith:
+        everything is aligned to one of the four days). Cheap now,
+        awkward to retrofit once 30 datasets assume subsetting."
+      - "Decided per-dataset expected times are \"a definite need\"
+        (Keith, 2026-09-22) - and recorded with a caveat about how it
+        was put to him. The alternative, one deadline per period, was
+        offered as a genuine fork and was not one: choosing it would
+        have meant deleting working config and removing a capability
+        that already ships. A future session should not read this as a
+        close call."
+      - Rejected an exceptions mechanism separate from ordinary schedule
+        editing. Authored dates make a changed quarterly date an
+        ordinary edit; what survives is only a daily feed paused for a
+        day or two, which is what not_expected is for.
+      - "[A1] Decided the asset carries SEVERAL NAMED calendars, each
+        dataset naming one (Keith, 2026-09-22). Rejected the single asset
+        calendar Thread C sketched, and rejected making the calendar
+        optional so a daily dataset could carry its own rule instead. The
+        scoper argued named calendars were a level of config nobody needs
+        yet, and that is wrong on the facts: two cadences ALREADY share
+        one asset today - Birth Registrations daily and Child Protection
+        quarterly, one contract/data-asset.yaml, verified in the real
+        repo. So this is not generality bought for a hypothetical future,
+        it is the shape the repo already needs. A monthly feed later then
+        costs nothing."
+      - "[A1] Rejected hanging the schedule off the COLLECTION instead of
+        the asset. It would have worked today - Civil Registration daily,
+        Child Protection quarterly - but it weakens the anti-drift
+        argument that justified one calendar over 30 date lists: 30
+        quarterly datasets can span several collections, and several
+        collection-level calendars could drift apart again. Named
+        calendars keep anti-drift WITHIN each calendar, which is where
+        drift actually matters."
+      - "[A2] Decided claimWindow is a DURATION STRING carrying its own
+        unit - 14d, 4h - and the small parser is accepted (Keith,
+        2026-09-22). Rejected expressing it in minutes for consistency
+        with the neighbouring latency property: 14 days reads as 20160,
+        which nobody can check by eye, and this value has to be readable
+        at both a quarterly and a daily scale. Rejected naming it
+        earlyWindow, because the design is explicit that nothing measures
+        how early a supply is in order to assign it - earliness is a
+        reported consequence of assignment, so earlyWindow names the
+        wrong half of what the property does."
+      - "[A3] Decided the claim window is a DEFAULT with a per-dataset
+        override, the same inheritance shape as delivery_months - say
+        nothing, get the default (Keith, 2026-09-22). Rejected
+        per-dataset-only, which would put 30 near-identical values on one
+        asset and let them drift, the exact argument that made the
+        calendar asset-level. Rejected asset-level-only with no override,
+        which leaves a dataset with a genuinely different upstream
+        cadence nowhere to say so."
+      - "[A3+A1] Decided the default lives on the CALENDAR rather than on
+        the asset root. A3 was answered before A1 introduced named
+        calendars, so it did not settle which. A quarterly calendar's
+        sensible window is days and a daily calendar's is hours, so a
+        single asset-root default would be wrong for one of them on day
+        one, in this repo. Putting it on the calendar makes the default
+        track the thing that sets its scale. THE SCOPER'S OWN CALL
+        following from two answers settled separately - flagged for Keith
+        at sign-off rather than buried."
+      - "[A1] Decided delivery_months is meaningful only on an
+        authored-date calendar, and is an ERROR on a cadence-rule one
+        rather than an ignored key. A dataset naming a daily calendar
+        participates in every period the rule generates; silently
+        ignoring months there is exactly the kind of accepted-and-
+        discarded config that produces a dataset expecting something
+        other than what its author wrote."
+      - "Rejected naming the participation field participatesIn, which a
+        2026-09-22 draft of Thread C's config sketch invented before
+        noticing delivery_months already existed two screens above it in
+        the same thread. delivery_months wins on a reason the new name
+        did not carry: it names when a supply ARRIVES, not the period it
+        covers, because a 2 February delivery is often for the
+        November-January period. Recorded because the prose that holds
+        this gets deleted, and a future session scoping config would
+        otherwise re-propose participatesIn with no sight of the
+        counter-argument. Found by the batch 1+2 carry-over check, which
+        is what that check is for."
+
+  - id: REQ-PIPE-050
+    title: A config error can never silently produce zero slots, and a past date cannot move quietly
+    date_written: "2026-09-22"
+    story: >
+      As whoever maintains 30 datasets' schedules, I want a typo to fail
+      a build, so that a dataset does not quietly stop expecting anything
+      and sit green for a year because somebody wrote Febuary.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-21, plans/supply-model.md Thread K - the new asset
+      and schedule YAML gets validated like everything else, as a
+      validate-config gate alongside validate-requirements and
+      validate-changelog. Delivery sprint 5, and test scenario register
+      TS-25. Scoped by delivery-scoper, batch 1+2 pass, 2026-09-22.
+    acceptance_criteria:
+      - WHEN the repository's gates run, THE SYSTEM SHALL validate the
+        asset and schedule configuration and SHALL exit non-zero on any
+        error.
+      - IF a configuration error would leave a dataset expecting nothing
+        at all, THEN THE SYSTEM SHALL exit non-zero.
+      - THE SYSTEM SHALL reject an unrecognised configuration key rather
+        than ignoring it.
+      - THE SYSTEM SHALL reject a month name that is not a real, full
+        month name.
+      - THE SYSTEM SHALL reject a dataset naming a delivery month for
+        which the asset calendar has no date.
+      - THE SYSTEM SHALL reject schedule versions that overlap or are
+        out of order on their effective-from dates.
+      - THE SYSTEM SHALL reject duplicate calendar dates and duplicate
+        period names.
+      - THE SYSTEM SHALL reject a dataset that both subsets and
+        overrides the asset calendar.
+      - THE SYSTEM SHALL reject a dataset named in asset configuration
+        that has no contract, and a contract that has no asset
+        configuration entry.
+      - THE SYSTEM SHALL reject a negative grace allowance or claim
+        window, an unparseable date, and a missing required value.
+      - THE SYSTEM SHALL report every offending item rather than
+        stopping at the first.
+      - THE SYSTEM SHALL validate configuration without opening or
+        querying anything under data/.
+      - THE SYSTEM SHALL be invoked as a mothman subcommand.
+      - THE SYSTEM SHALL reject a dataset naming a calendar the asset
+        does not define.
+      - THE SYSTEM SHALL reject a dataset that names delivery months
+        against a cadence-rule calendar.
+      - THE SYSTEM SHALL reject a claim window that is not a duration
+        with a recognised unit, and SHALL NOT coerce one.
+      - THE SYSTEM SHALL reject duplicate calendar names.
+      - IF the contents of a calendar version whose effective-from date
+        has already passed do not match that version's own recorded
+        content record, THEN THE SYSTEM SHALL exit non-zero, naming the
+        calendar and the version.
+      - IF a calendar version's recorded content record has changed
+        without a corresponding new changelog entry identifying it, THEN
+        THE SYSTEM SHALL exit non-zero.
+      - IF a period is declared not expected and that period's date has
+        already passed, THEN THE SYSTEM SHALL exit non-zero unless the
+        same change is recorded in that calendar's changelog.
+      - THE SYSTEM SHALL validate configuration without reading git
+        history and without opening or querying anything under data/.
+    non_functional_requirements:
+      - This gate runs on every push and inside mothman check, whose own
+        gates are ordered cheapest-first so the fast ones report while
+        the slow ones are still ahead. A config-only validation should
+        stay in that fast group - well under a second - rather than
+        joining the slow tail.
+      - Config only, no data access, so it is safe in CI under the
+        standing rule.
+      - At 30 datasets the referential check is where a typo would
+        otherwise hide indefinitely. It is the check that justifies one
+        calendar over 30 date lists, so it has to actually run.
+      - Build on the existing pattern rather than new machinery -
+        qa_tools/common/schemas.py's _Strict base already forbids extra
+        keys, which is what catches a mistyped KEY rather than a
+        mistyped value.
+      - Failing a build is a real interruption, so every error here must
+        be one a human can act on immediately. Name the file, the
+        dataset and the value.
+      - The retrospective-edit guard must work from the working tree
+        alone. CI checks out a single commit and the dashboard build runs
+        the same validation, so a guard that needs git history would be
+        unreliable in exactly the places it matters.
+      - The override path must be usable. A guard that makes a genuine
+        typo correction painful gets worked around, which is worse than
+        no guard.
+    dependencies: [REQ-PIPE-049, REQ-QAC-039]
+    decisions:
+      - Decided the organising idea is one sentence rather than a
+        checklist - every check here exists to stop a config error
+        silently producing ZERO SLOTS, which is the exhausted-schedule
+        state arriving by accident on a dataset nobody is watching. Most
+        of the validations are variations on that one failure, and a
+        future addition should be justified against it.
+      - Decided a mistyped KEY must fail, not just a mistyped value. A
+        silently-dropped delivery_months key gives a dataset all four
+        dates when it should have one - the error is invisible and the
+        result looks plausible.
+      - Decided runway is a WARNING and does NOT live here, which is a
+        change from the sprint plan. Thread K lists runway as this
+        gate's one warning, but runway is measured in SLOTS and slots do
+        not exist until sprint 6, so it lands in REQ-PIPE-053 instead.
+        Failing an otherwise-fine build on runway is also how a gate
+        gets disabled.
+      - "[A4] Decided a retrospective change to a past calendar date, or a
+        past-dated not_expected entry, is a HARD FAILURE with a
+        deliberate override (Keith, 2026-09-22). Rejected warn-only,
+        which was offered on the reasoning that a real correction should
+        not have to fight the tooling - but Thread E's rule that config
+        must never be edited to make red history disappear is either
+        enforced or it is a hope, and a warning in a gate that prints
+        several is a hope. Rejected no guard at all, relying on review."
+      - "[A4] Decided the override is a COMMITTED ARTEFACT, not a flag -
+        the version's own recorded content record plus a changelog entry
+        naming it, both in the same commit. Rejected a CLI flag or
+        environment variable outright: it is invisible the moment the
+        command finishes, so CI goes green and nothing records that a
+        past date moved, which is the exact failure the guard exists to
+        prevent, with a sanctioned door. The point is not to make the act
+        hard, it is to make it recorded. THE POLICY IS KEITH'S; THE
+        MECHANISM IS THE SCOPER'S - flagged for sign-off."
+      - "[A4] Decided the guard works from the working tree alone, via a
+        recorded content record per version rather than by diffing
+        against git. Two local checks compose into the guarantee: the
+        recorded record must match the version's contents, AND the newest
+        changelog entry for that version must identify the current
+        record. Updating the contents fails the first; updating the
+        record to pass it fails the second; only doing both plus writing
+        down why passes. Rejected diffing against git history, which is
+        unavailable or unreliable in a shallow CI checkout. config_hash
+        from REQ-QAC-023 is the established shape for the record."
+      - "[A4] Consequence worth naming rather than discovering: the
+        synthetic history's own calendar versions are past-dated too, so
+        regenerating the generated history trips this guard by design.
+        That is the override working, not a conflict - regeneration is a
+        deliberate act, and the mothman regeneration command updates the
+        recorded records and writes the changelog entry as part of the
+        same act. Worth watching in the build: if it becomes friction on
+        every regeneration, the answer is to make regeneration write the
+        record properly, not to exempt the synthetic calendars, because
+        exempting them removes the only place the guard is ever
+        exercised."
+      - "[A2] Decided the gate validates the claim-window duration rather
+        than coercing it. A parser that accepts 14, 14d, 14 days and P14D
+        is four ways for 30 datasets' config to read differently for no
+        gain - the same reasoning that limited month names to one
+        accepted form."
+
+  - id: REQ-PIPE-051
+    title: Periods are derived from the schedule, and never move
+    date_written: "2026-09-22"
+    story: >
+      As an agency data owner, I want the quarter a supply was filed
+      under to still say the same thing next year, so that a supplier
+      changing their cadence does not turn periods they met into periods
+      they breached.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-21, plans/supply-model.md Thread C, with period and
+      slot separately defined 2026-09-22 after Keith noticed the concept
+      inventory described a period schema without ever naming period.
+      Delivery sprint 6, and test scenario register TS-26. Scoped by
+      delivery-scoper, batch 1+2 pass, 2026-09-22.
+    acceptance_criteria:
+      - THE SYSTEM SHALL derive from the schedule a sequence of periods,
+        each carrying a name and a date.
+      - THE SYSTEM SHALL produce that sequence in the same shape whether
+        the schedule was authored as dates or expressed as a cadence
+        rule, so that nothing downstream knows which produced it.
+      - WHERE a schedule is authored as dates, THE SYSTEM SHALL take
+        each period's name from the configuration.
+      - WHERE a schedule is a cadence rule, THE SYSTEM SHALL name each
+        period by its own date.
+      - THE SYSTEM SHALL evaluate each period against the schedule
+        version in force on that period's own date.
+      - WHEN a new schedule version is added, THE SYSTEM SHALL leave
+        every earlier period unchanged.
+      - THE SYSTEM SHALL NOT attach a due instant, a grace allowance or
+        a claim window to a period.
+      - THE SYSTEM SHALL name a warehouse schema after a period.
+      - THE SYSTEM SHALL derive periods deterministically, so the same
+        configuration produces the same sequence.
+      - THE SYSTEM SHALL derive, for each named calendar, a sequence of
+        periods, each carrying a name and a date.
+      - THE SYSTEM SHALL evaluate each period against the version of its
+        own calendar in force on that period's own date.
+    non_functional_requirements:
+      - Period derivation runs on every pipeline run and every dashboard
+        build. It must stay cheap once a daily asset has years of
+        periods rather than today's handful.
+      - Config only, no data access, so a dashboard build can derive the
+        sequence under the CI rule.
+      - This is the concept a schema is named after, so a change to how
+        a period is named is a change to physical storage. Name it once
+        and do not revisit.
+    dependencies: [REQ-PIPE-049]
+    decisions:
+      - Decided PERIOD and SLOT are separately defined, and that this
+        NAMES what the calendar design already produced rather than
+        replacing it. A first draft of the thread read as though a
+        modelling error had been discovered, and that overstates it -
+        the calendar and delivery_months design stands untouched.
+      - Recorded because the SHAPE of the error is the reusable lesson.
+        What was found was not a design disagreeing with reality, it was
+        one thread disagreeing with ITSELF - its own "what exists"
+        paragraph records that expectedTime is already per-dataset in
+        every contract, four paragraphs above its own sentence putting
+        the deadline on the period. Before concluding a design is wrong,
+        check whether the document already contradicts itself above.
+      - Decided the effective-dating rule is keyed on the PERIOD'S OWN
+        DATE, not on a due date. Thread C phrases it as "the schedule
+        version in force at that period's due date", which predates the
+        deadline moving to the slot and would now be ambiguous - a
+        period has no due date, and its several slots may have different
+        ones. Restating it on the period's date preserves the intent
+        (history does not move when a supplier changes) with no
+        ambiguity.
+      - "Decided a period carries a date and nothing else, deliberately,
+        so that the deadline cannot drift back onto it. The case that
+        decides it: three slots in one period, births due 09:00,
+        cp_clients due 09:00 and cp_placements due 17:00. Births
+        arriving at 16:00 reads ON TIME with the deadline on the period
+        and LATE with it on the slot - and the wrong one is a FALSE
+        GREEN, which is the direction that matters."
+      - "[A1] Decided period derivation is per CALENDAR, not per asset.
+        With several named calendars on one asset the two are no longer
+        the same thing, and a period sequence spanning calendars would
+        collide names - 2026-09-22 from a daily calendar and 2026-Q3 from
+        a quarterly one are different buckets that must not share a
+        schema."
+
+  - id: REQ-PIPE-052
+    title: Slots are derived, one per table per period it participates in
+    date_written: "2026-09-22"
+    story: >
+      As a data team leader whose collection has six tables, I want each
+      table to have its own expected supply with its own deadline, so
+      that one late table shows as one late table rather than dragging
+      five punctual ones down with it.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-21, plans/supply-model.md Threads C, E and F - each
+      table claims a slot independently, and a slot carries its own
+      due_at, grace and claim window. Delivery sprint 6, and test
+      scenario register TS-27 and TS-33b. Scoped by delivery-scoper,
+      batch 1+2 pass, 2026-09-22.
+    acceptance_criteria:
+      - THE SYSTEM SHALL derive a slot for each pairing of a dataset
+        with a period that dataset participates in, and SHALL NOT
+        require a slot to be authored.
+      - THE SYSTEM SHALL create one slot per dataset per period, so that
+        a collection of six datasets in one period has six slots.
+      - THE SYSTEM SHALL give each slot its own due instant, computed
+        from its period's date and its own dataset's expected time of
+        day in the asset's timezone.
+      - THE SYSTEM SHALL give each slot its own grace allowance and its
+        own claim window.
+      - THE SYSTEM SHALL open a slot's claim window a configured
+        interval before that slot's due instant, and SHALL NOT close it.
+      - IF a dataset declares a period as not expected, THEN THE SYSTEM
+        SHALL create no slot for it.
+      - THE SYSTEM SHALL determine whether a slot is overdue by querying
+        the schedule and the slot's state, and SHALL NOT require an
+        event or a scheduled sweep to record it.
+      - THE SYSTEM SHALL derive slots deterministically, so the same
+        configuration and the same date produce the same slots.
+      - THE SYSTEM SHALL track each dataset's slot sequence
+        independently of every other dataset's.
+      - THE SYSTEM SHALL give each slot its own claim window, taken from
+        its dataset's own contract where one is declared and from its
+        calendar's default otherwise.
+    non_functional_requirements:
+      - Slot count multiplies - ~30 datasets on the quarterly asset,
+        several of them multi-table collections, times four periods a
+        year, times years of history. Derivation must stay cheap at that
+        size, and anything presented per slot must aggregate rather than
+        enumerate. Thirty individual banners is noise.
+      - Config only, no data access.
+      - The claim window is a genuine TRADE, not a tuning knob, and this
+        requirement must not invite anyone to "fix" it later. Tight
+        windows buy cascade-immunity at the price of boundary
+        misfiling; wide windows do the reverse; no sizing gets both.
+      - Slot identity is what every later sprint compares against -
+        overdue, staleness, assignment, classification and promotion are
+        all defined against the expected-supply sequence. Its shape must
+        be settled here rather than adjusted downstream.
+    dependencies: [REQ-PIPE-051, REQ-PIPE-049, REQ-PIPE-048]
+    decisions:
+      - Decided each TABLE claims its own slot rather than a collection
+        filling one slot as a unit (Keith, 2026-09-21). Everything
+        before that had assumed one table per supply, which holds for
+        Birth Registrations and not for Child Protection's six.
+      - Decided this is what makes an earlier decision implementable. A
+        multi-table check signalling that a table it spans is missing
+        had no fact to test against until slots became per-table; it is
+        now the crisp condition "any table this check spans has an
+        unfilled slot for that period".
+      - Decided per-table classification is more honest than
+        per-delivery. If cp_clients lands 09:00 and cp_placements 14:00,
+        each gets its own verdict rather than the whole delivery taking
+        the worst.
+      - "Decided the claim window OPENS before due and NEVER CLOSES, and
+        that this reinstates an earliness window an earlier entry had
+        just dropped as redundant. That call was wrong: the window is
+        what defines when a slot becomes CLAIMABLE, which is the thing
+        that makes the forward cascade structurally impossible rather
+        than avoided by luck."
+      - Decided this also DELETES the daily cutoff rule. "Arrives 10pm,
+        so it is for tomorrow" needs no special handling - if a feed's
+        supply genuinely lands the evening before, its due instant IS
+        the evening before and the window opens accordingly. The
+        schedule expresses it directly instead of a separate rule
+        reinterpreting arrivals afterwards.
+      - Decided overdue is a COMPUTED PROPERTY, not an event - a
+        correction to an earlier claim that it needed a trigger. Same
+        pattern already settled for the exhausted-schedule banner, which
+        the dashboard computes from config rather than being told about.
+      - "Scope boundary, recorded because it will be proposed otherwise
+        (Keith): this system does NOT build staleness-tolerance policy
+        for consumers. It attributes supplies to slots and reports what
+        is where and how fresh. Whether a downstream consumer takes only
+        the latest slot, composes several, or refuses anything older
+        than a week is theirs - otherwise the tool grows a config
+        surface for every downstream system's preferences, unmanageable
+        at 30 datasets."
+      - "Note on scope: this requirement DEFINES the claim window as a
+        slot property. The rules that USE it - oldest claimable unfilled
+        slot, on-time-wins-for-the-current-slot, monotonic filling, hold
+        for a human - are slot ASSIGNMENT and belong to batch 3."
+      - "[A3] Decided slot derivation resolves the claim window through
+        inheritance rather than requiring every dataset to state one. A
+        slot must always have a window - assignment is defined against it
+        - so the resolution happens here, at derivation, rather than
+        being left to each consumer to fall back on."
+
+  - id: REQ-PIPE-053
+    title: A schedule that runs out is loud, and only for its own dataset
+    date_written: "2026-09-22"
+    story: >
+      As a data team leader, I want to be told well before my dataset's
+      authored dates run out, and stopped clearly if they do, so that the
+      dashboard never goes quiet in a way that looks exactly like nothing
+      having gone wrong.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-21, plans/supply-model.md Thread C - "exhausted
+      schedule - hard failure, scoped per dataset", stronger than the
+      read-UNKNOWN option proposed to him and for a good reason: it
+      cannot be ignored. Delivery sprint 6, and test scenario register
+      TS-23 and TS-24. Scoped by delivery-scoper, batch 1+2 pass,
+      2026-09-22.
+    acceptance_criteria:
+      - WHERE a dataset's schedule is an authored date list, THE SYSTEM
+        SHALL warn when fewer than a configured number of future slots
+        remain.
+      - THE SYSTEM SHALL measure that runway in SLOTS, and SHALL NOT
+        measure it in elapsed time.
+      - THE SYSTEM SHALL NOT fail a build on the runway warning.
+      - WHERE a dataset's schedule is a cadence rule, THE SYSTEM SHALL
+        NOT warn about runway.
+      - WHEN more than one dataset is low on runway, THE SYSTEM SHALL
+        state how many rather than warning once per dataset.
+      - IF a dataset has no slot covering the date being processed, THEN
+        THE SYSTEM SHALL fail for that dataset.
+      - THE SYSTEM SHALL fail at filing, before QA runs for that
+        dataset.
+      - THE SYSTEM SHALL scope that failure to the affected dataset, and
+        SHALL NOT stop processing any other dataset.
+      - WHILE a dataset's schedule is exhausted, THE SYSTEM SHALL
+        continue to accept that dataset's supplies, so that the backlog
+        can be filed correctly once dates are added.
+      - WHEN the dashboard is built, THE SYSTEM SHALL compute the
+        exhausted-schedule condition from configuration alone, and SHALL
+        show it even though the run that would have produced new results
+        did not happen.
+      - THE SYSTEM SHALL state, in that message, how many supplies are
+        waiting and since when, and SHALL NOT state how many days have
+        elapsed.
+      - WHERE a calendar is an authored date list, THE SYSTEM SHALL warn
+        when fewer than a configured number of future slots remain for a
+        dataset naming it.
+      - WHERE a calendar is a cadence rule, THE SYSTEM SHALL NOT warn
+        about runway for any dataset naming it.
+    non_functional_requirements:
+      - This is the whole reason authored dates are safe. Without it, a
+        date list running out means nothing is ever expected, so nothing
+        is ever overdue, and the dashboard goes QUIET rather than red -
+        the same false-green shape as the staleness problem.
+      - Scoping the failure per dataset is a scale requirement, not a
+        nicety. At 30 datasets, one neglected annual dataset halting the
+        other 29 is how a check gets disabled wholesale.
+      - The banner must be computable by the dashboard build from config
+        alone, with no data access and no dependency on the run that did
+        not happen. A dashboard that stopped updating looks identical to
+        one where nothing changed.
+      - Measuring the backlog in supplies rather than days scales its
+        own urgency - daily and quarterly feeds pile up at very
+        different rates.
+      - A non-fatal warning that fails a build gets disabled. Keep
+        runway non-fatal, permanently.
+    dependencies: [REQ-PIPE-052, REQ-PIPE-050]
+    decisions:
+      - "Decided HARD FAILURE rather than reading UNKNOWN (Keith,
+        2026-09-21), which is stronger than what was proposed to him.
+        The reason is that it cannot be ignored: once the runway warning
+        has fired and nobody has filled in the dates, the pipeline
+        refuses to process that dataset."
+      - Decided hard failure is SAFE because staging only ever asserts
+        arrival facts, so a backlog drains CORRECTLY once dates are
+        added - filed to the right slots and classified against the
+        right due instants, not approximated. That safety depends on
+        replaying the backlog in arrival-timestamp order, which is
+        batch 3's rule and was originally stated here without its
+        dependency.
+      - Decided to fail at FILING, before QA runs. A supply with no slot
+        cannot be classified and cannot be promoted, so QA would produce
+        results that can be filed nowhere. Keith's own preference too -
+        a clear signal beats half-processing.
+      - "Decided runway is measured in SLOTS, because months mislead:
+        three months of quarterly runway is ONE slot, which is already
+        too late."
+      - Decided runway lands here rather than with the validate-config
+        gate in sprint 5, even though Thread K lists it there. Runway is
+        measured in slots and slots do not exist until this sprint. The
+        gate keeps every error case; only the warning moves.
+      - "Note on build order: the criteria covering filing and the
+        staging backlog describe behaviour that cannot be verified until
+        staging exists (batch 3, sprint 8). They are stated here because
+        they are the schedule's own behaviour, and their tests land with
+        staging rather than with this sprint."
+      - "[A1] Decided runway is a property of the CALENDAR, not of the
+        dataset. Thirty datasets on one authored calendar run out on the
+        same day, so thirty warnings would be one fact repeated - which
+        is what the aggregation criterion already exists to prevent, now
+        with a natural unit to aggregate on."
+
+  - id: REQ-DASH-054
+    title: The as-of picker knows the real calendar, because it is embedded
+    date_written: "2026-09-22"
+    story: >
+      As a data owner picking a date, I want the picker to know the
+      quarters we actually agreed with our suppliers, so that asking for
+      a past quarter returns that quarter rather than silently nothing.
+    moscow: must
+    status: not_started
+    source: >
+      Found while sketching the period and slot definitions,
+      plans/supply-model.md Thread C, 2026-09-22 - the dashboard's own
+      cycleStartDate() computes a cycle from a cadence RULE and cannot
+      compute an authored date list, so a quarterly asset's as-of picker
+      would silently return nothing. Delivery sprint 6. Scoped by
+      delivery-scoper, batch 1+2 pass, 2026-09-22.
+    acceptance_criteria:
+      - THE SYSTEM SHALL embed the asset's derived period sequence into
+        the built dashboard.
+      - THE SYSTEM SHALL use that embedded sequence for the as-of
+        picker's period arithmetic.
+      - THE SYSTEM SHALL NOT reimplement schedule derivation in the
+        browser.
+      - IF a viewer picks a date the embedded sequence does not cover,
+        THEN THE SYSTEM SHALL say so plainly rather than render an empty
+        view.
+      - THE SYSTEM SHALL derive the embedded sequence from configuration
+        only, with no access to anything under data/.
+      - THE SYSTEM SHALL render with zero console errors in a real
+        browser.
+      - THE SYSTEM SHALL embed each of the asset's named calendars' period
+        sequences into the built dashboard, and SHALL identify which
+        calendar each dataset uses.
+    non_functional_requirements:
+      - A schedule is CONFIG, not data, so this is a new embed that
+        touches nothing about CLAUDE.md's CI-never-reads-data rule. That
+        is worth stating explicitly, because a new embed into the
+        dashboard build is exactly the shape that rule exists to catch.
+      - Size the embed honestly. A daily asset over five years is
+        roughly 1,800 period entries, which is negligible against a page
+        already around 8MB - but it grows forever, so it should be
+        measured rather than assumed.
+      - Verify in a real browser, at the render layer. A correct Python
+        derivation says nothing about a template with its own transform.
+      - This is easy to discover late, and the symptom would be an
+        as-of picker silently returning nothing on a quarterly asset -
+        which looks like no data rather than like a bug.
+    dependencies: [REQ-PIPE-051, REQ-DASH-041]
+    decisions:
+      - Decided to embed the period sequence for EVERY schedule, not
+        only authored ones, and delete the browser-side reimplementation
+        entirely. Thread C only requires embedding authored lists, since
+        JS can compute a cadence rule - but keeping one path removes the
+        duplicated cycleStartDate()/cycle_start() logic rather than
+        leaving one of its two branches alive, and Thread D already
+        noted that the duplicated-logic surface should shrink rather
+        than grow under this model. THIS IS THE SCOPER'S OWN CALL, going
+        slightly beyond the thread, and worth Keith reacting to at
+        sign-off.
+      - Recorded because it explains why the duplication existed at all
+        and is not a mistake to undo carelessly - the as-of picker lets
+        a viewer pick ANY date in the browser and a static site has no
+        backend to ask, so a client-side computation was genuinely
+        unavoidable while the schedule was a RULE. It stops being
+        unavoidable once the schedule is a list, because a list can be
+        shipped.
+      - "[A1] Decided the embed carries every calendar rather than one
+        sequence. With named calendars the as-of picker must know which
+        calendar a dataset follows before it can do any period arithmetic
+        for it - an embed of one merged sequence would be unusable and
+        silently wrong for whichever calendar lost."
