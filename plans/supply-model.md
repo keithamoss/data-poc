@@ -160,6 +160,15 @@ comparisons against the expected-supply sequence.
    plus the `[INJECT]` set from the test scenario register below, plus
    the generated scenario map that says where each one landed.
 
+   **This sprint DEFINES THE ON-DISK DELIVERY FORMAT** that sprint 7
+   then consumes - settled with Keith, 2026-09-22. Because the generator
+   is built first, whatever shape it emits becomes what delivery
+   recognition has to read. That is fine (synthetic data standing in for
+   a real feed), but it must be a DELIBERATE ARTEFACT of this sprint -
+   written down as the format - rather than something sprint 7
+   reverse-engineers five sprints later from whatever the generator
+   happened to do.
+
    **Moved here from sprint 6** (Keith, 2026-09-22). It gates roughly
    two-thirds of the test scenario register: the generator today emits
    whole deliveries only and never partial, produces ZERO early supplies
