@@ -75,7 +75,7 @@ reaching into the next one.
 | **3 · Arrival and filing** | 7-10 | delivery recognition, arrival/staging, assignment, classification |
 | **4 · Decisions and storage** | 11-14 | promotion, decision log, warehouse, `qa_results/` |
 | **5 · QA under the new model** | 15-18 | delivery-triggered QA, check deps, red-for-unrun, drift |
-| **6 · Dashboard** | 19-24 | supply history, freshness, decision-log display, activity feed, snapshots, time-granular as-of |
+| **6 · Dashboard** | 19-24 | supply history, freshness, decision-log display, activity feed, snapshots, time-granular as-of, plus the embedded period sequences moved here 2026-09-23 |
 
 Batch 2 is only two sprints, deliberately: they are the SPINE -
 everything downstream is defined as a comparison against the slot
@@ -502,11 +502,20 @@ comparisons against the expected-supply sequence.
 
    *Scope grew 2026-09-22*: period and slot are now separately defined,
    and `due_at` belongs to the SLOT, not the period - so this sprint
-   builds two derivations rather than one sequence. It also has to
-   specify **embedding the period list into the built dashboard**:
-   `cycleStartDate()` reimplements `cycle_start()` in JS for the as-of
-   picker, and JS can compute a cadence rule but cannot compute an
-   authored date list. Config, not data, so the CI rule is untouched.
+   builds two derivations rather than one sequence.
+
+   *Scope shrank again 2026-09-23*: **embedding the period list into
+   the built dashboard MOVED TO BATCH 6** (`REQ-DASH-054`, Keith's
+   call). `cycleStartDate()` reimplements `cycle_start()` in JS for the
+   as-of picker, and JS can compute a cadence rule but cannot compute
+   an authored date list, so the embed is still needed - just not here.
+   `delivery-architect` found the requirement labelled this sprint
+   while depending on the unsigned `REQ-DASH-041`, and the same
+   reasoning that puts every dashboard sprint last decided it: the
+   coordinates that picker reasons about are still moving while slot
+   assignment and promotion are unbuilt. **Accepted cost: the as-of
+   picker silently returns nothing on a quarterly asset until batch
+   6.**
 
 7. **[todo, 2026-09-22]** **[Pipeline & publishing]** **Delivery
    recognition and file mapping.** What constitutes a delivery for a

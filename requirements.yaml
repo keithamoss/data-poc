@@ -2929,6 +2929,31 @@ requirements:
         LOGICAL table, which has many physical versions, since a period
         schema holds a supply plus its resupplies with arrival timestamps
         in their physical names (Thread A)."
+      - "Decided the committed qa_results/ tree is rewritten TWICE, not
+        three times (Keith, 2026-09-23). REQ-QAC-039 (check identity)
+        and REQ-GEN-042 (dateless run_id, which renames every directory)
+        land as ONE combined regeneration; unsigned REQ-PIPE-038
+        (re-keying per dataset) waits for its own read-back and
+        sign-off, and rewrites the tree a second time when batch 3
+        reaches it. Found by delivery-architect: all three declared
+        dependencies: [] as though independent, and each is individually
+        coherent."
+      - "Rejected doing all three at once, which needs no second rewrite
+        and leaves no half-migrated state at all - but requires signing
+        REQ-PIPE-038 now, unread, to save a commit. Rejected three
+        separate rewrites, the shape as written, which leaves two
+        windows where committed history has path segments in one shape
+        and run ids in another. The cost accepted is one extra
+        full-tree commit later; what it buys is that the sign-off gate
+        stays honest."
+      - "Consequence for whoever builds these: they are one change even
+        though they are two requirements. REQ-QAC-039's own criterion
+        already says every check identity changes exactly once, in the
+        same change as the history rebuild - that now means REQ-GEN-042's
+        run_id change too. Re-run pytest --durations=30 afterwards:
+        CLAUDE.md records a real ~13x suite regression from git-history
+        walking that scaled with commit count AND diff size, and a
+        full-tree rewrite commit is exactly that growth."
   - id: REQ-GEN-040
     title: The generator can deliver one table at a time, and can deliver early
     date_written: "2026-09-21"
@@ -3576,6 +3601,31 @@ requirements:
         act rather than a side effect of running the generator on a
         different day. That determinism is the point - it is what stops a
         re-run doubling the committed history."
+      - "Decided the committed qa_results/ tree is rewritten TWICE, not
+        three times (Keith, 2026-09-23). REQ-QAC-039 (check identity)
+        and REQ-GEN-042 (dateless run_id, which renames every directory)
+        land as ONE combined regeneration; unsigned REQ-PIPE-038
+        (re-keying per dataset) waits for its own read-back and
+        sign-off, and rewrites the tree a second time when batch 3
+        reaches it. Found by delivery-architect: all three declared
+        dependencies: [] as though independent, and each is individually
+        coherent."
+      - "Rejected doing all three at once, which needs no second rewrite
+        and leaves no half-migrated state at all - but requires signing
+        REQ-PIPE-038 now, unread, to save a commit. Rejected three
+        separate rewrites, the shape as written, which leaves two
+        windows where committed history has path segments in one shape
+        and run ids in another. The cost accepted is one extra
+        full-tree commit later; what it buys is that the sign-off gate
+        stays honest."
+      - "Consequence for whoever builds these: they are one change even
+        though they are two requirements. REQ-QAC-039's own criterion
+        already says every check identity changes exactly once, in the
+        same change as the history rebuild - that now means REQ-GEN-042's
+        run_id change too. Re-run pytest --durations=30 afterwards:
+        CLAUDE.md records a real ~13x suite regression from git-history
+        walking that scaled with commit count AND diff size, and a
+        full-tree rewrite commit is exactly that growth."
   - id: REQ-GEN-043
     title: A delivery has a written-down on-disk format, and it declares nothing
     date_written: "2026-09-22"
@@ -4536,6 +4586,25 @@ requirements:
         recorded performance incident from walking its own git history,
         so a deeper clone on every push is not free. Neither earns its
         cost against a reviewer reading the diff."
+      - "[A4] REOPENED and DEFERRED 2026-09-23. delivery-architect found
+        the cost estimate this was rejected on was too high:
+        validate_check_lifecycle.py already runs `git show HEAD~1:<path>`
+        on a single file at the fetch-depth 2 CI is already configured
+        for - materially cheaper than the deep-clone git diff that was
+        put to Keith and rejected on performance grounds. Keith's call
+        was to defer rather than decide either way, so this is an open
+        question on this requirement rather than a settled decision. The
+        original reasoning still stands on its own terms - his words
+        were \"I do not need to invent a technical mechanism to handle
+        that\", which is a simplicity preference, not only a cost one."
+    open_questions:
+      - Whether the retrospective-edit guard is built after all, now that
+        a much cheaper mechanism than the one rejected is known to exist
+        and already runs in CI. Deferred by Keith 2026-09-23 to when this
+        sprint is actually built. Recorded here rather than left in
+        conversation precisely because the third option he was offered -
+        letting whoever builds it decide - is how an undecided thing gets
+        decided badly by someone who does not know it was ever open.
   - id: REQ-PIPE-051
     title: Periods are derived from the schedule, and never move
     date_written: "2026-09-22"
@@ -4837,15 +4906,14 @@ requirements:
     moscow: must
     status: not_started
     source: >
-      Found while sketching the period and slot definitions,
-      plans/supply-model.md Thread C, 2026-09-22 - the dashboard's own
-      cycleStartDate() computes a cycle from a cadence RULE and cannot
-      compute an authored date list, so a quarterly asset's as-of picker
-      would silently return nothing. Delivery sprint 6. Scoped by
-      delivery-scoper, batch 1+2 pass, 2026-09-22.
-    signed_off:
-      by: Keith
-      date: "2026-09-22"
+      plans/supply-model.md Thread C - the dashboard's cycleStartDate()
+      reimplements cycle_start() in JS because the as-of picker lets a
+      viewer pick any date and a static site has no backend to ask. That
+      reimplementation computes a cadence rule and cannot compute an
+      authored date list, so the period sequences have to be embedded.
+      Scoped by delivery-scoper, batch 1+2 pass, 2026-09-22 as delivery
+      sprint 6. MOVED TO BATCH 6 on 2026-09-23, Keith's call, after
+      delivery-architect found it depends on the unsigned REQ-DASH-041.
     acceptance_criteria:
       - THE SYSTEM SHALL use that embedded sequence for the as-of
         picker's period arithmetic.
@@ -4899,3 +4967,23 @@ requirements:
         calendar a dataset follows before it can do any period arithmetic
         for it - an embed of one merged sequence would be unusable and
         silently wrong for whichever calendar lost."
+      - "Decided this moves to BATCH 6 rather than dropping its
+        REQ-DASH-041 dependency (Keith, 2026-09-23). delivery-architect
+        found it labelled sprint 6 - batch 2 - while depending on
+        REQ-DASH-041, which carries no signed_off and belongs to batch
+        6, so under the sign-off gate it could not be built where it
+        sat. Rejected dropping the dependency and keeping it in batch 2,
+        which was the scoper's and the main session's recommendation on
+        the grounds that its period arithmetic depends only on schedule
+        config. Rejected signing REQ-DASH-041 now to unblock it, which
+        would have bypassed the read-back gate that caught five
+        transcription errors the day before."
+      - "The reason the recommendation lost is the same one that put
+        every dashboard sprint last, and it is Keith's own [B2]
+        reasoning applied consistently: building a view against a data
+        shape still moving is how clipDatasetToAsOf() ended up filtering
+        on arrival rather than promotion - correct only because
+        promotion did not yet exist. Slot assignment and promotion are
+        unbuilt, so the coordinates this picker reasons about are still
+        moving. The accepted cost, stated plainly: the as-of picker
+        silently returns nothing on a quarterly asset until batch 6."

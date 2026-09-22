@@ -88,12 +88,37 @@ def test_validate_check_lifecycle_succeeds_on_zero_exit(monkeypatch):
 def test_validate_requirements_raises_click_exception_on_nonzero_exit(monkeypatch):
     import qa_tools.common.validate_requirements as validate_requirements
 
-    monkeypatch.setattr(validate_requirements, "main", lambda: 1)
+    # Takes the optional `path` the CLI now passes (2026-09-22, so a
+    # scoped DRAFT can be validated before it is applied). The zero-arg
+    # lambda this replaced turned a deliberate signature change into a
+    # TypeError that read as a test failure, not as the stub being stale.
+    monkeypatch.setattr(validate_requirements, "main", lambda path=None: 1)
 
     result = _runner.invoke(dashboard_cli.dashboard_group, ["validate-requirements"])
 
     assert result.exit_code != 0
     assert "requirements validation failed" in result.output
+
+
+def test_validate_requirements_passes_draft_path_through(monkeypatch):
+    """The --draft option has to actually reach the validator.
+
+    Without this, `mothman dashboard validate-requirements --draft x`
+    would silently validate the real register instead of the draft and
+    report OK - the failure mode being a scoper handing back a broken
+    draft that something said was fine.
+    """
+    import qa_tools.common.validate_requirements as validate_requirements
+
+    seen = []
+    monkeypatch.setattr(validate_requirements, "main",
+                        lambda path=None: (seen.append(path), 0)[1])
+
+    result = _runner.invoke(dashboard_cli.dashboard_group,
+                            ["validate-requirements", "--draft", "/tmp/draft.yaml"])
+
+    assert result.exit_code == 0, result.output
+    assert seen == ["/tmp/draft.yaml"]
 
 
 def test_check_renders_raises_click_exception_on_nonzero_exit(monkeypatch):
