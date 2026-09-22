@@ -2793,6 +2793,9 @@ requirements:
       the schedule config's dataset references are validated against,
       and Thread F settles the dataset/table collapse this requirement
       left open.
+    signed_off:
+      by: Keith
+      date: "2026-09-22"
     acceptance_criteria:
       - THE SYSTEM SHALL define each dataset's place in the hierarchy in
         exactly one place, and SHALL resolve every consumer's need for
@@ -2874,6 +2877,17 @@ requirements:
         dataset, and three of them validating against three different
         notions of what a dataset is would reintroduce exactly the
         disagreement this requirement exists to remove."
+      - "APPROVED BY KEITH, 2026-09-22, as its own explicit exception to
+        the 2026-09-16 rule that a check_id, once introduced, is
+        PERMANENTLY unique and must never be changed or deleted
+        (plans/publishing-and-history.md). Recorded here on its own
+        terms rather than inherited by implication from the qa_results
+        rebuild, because that is what the NFR asked for and because an
+        exception nobody can find is the same as a rule nobody kept.
+        1,850 committed history files, 129MB, carry today's ids, and
+        they are rewritten in the same change. The exception is narrow:
+        it licenses THIS one grammar change, not a general freedom to
+        renumber check ids later."
   - id: REQ-GEN-040
     title: The generator can deliver one table at a time, and can deliver early
     date_written: "2026-09-21"
@@ -2893,6 +2907,9 @@ requirements:
       (supply = one table version, delivery = one physical arrival), and
       widened to cover early arrival, which plans/running-thoughts.md
       #27 measured the generator as never producing.
+    signed_off:
+      by: Keith
+      date: "2026-09-22"
     acceptance_criteria:
       - THE SYSTEM SHALL generate a supply for one dataset without
         generating one for any other dataset in the same collection.
@@ -3408,6 +3425,9 @@ requirements:
       code rather than by design work, and settled with Keith the same
       day. Delivery sprint 2. Scoped by delivery-scoper, batch 1+2 pass,
       2026-09-22.
+    signed_off:
+      by: Keith
+      date: "2026-09-22"
     acceptance_criteria:
       - THE SYSTEM SHALL name the logical obligation a supply fills a
         SLOT, and SHALL NOT use the word delivery for it.
@@ -3505,13 +3525,16 @@ requirements:
         recur every time a settled concept meets an older field name.
         Added by the batch 1+2 carry-over check, which found the removals
         well covered and this positive half absent."
-    open_questions:
-      - A pinned anchor date means the demo data visibly ages until
-        somebody bumps the anchor and regenerates. That is honest -
-        regeneration becomes a deliberate act - but it is a real change
-        to how this PoC looks when shown to someone months from now, and
-        nothing currently prompts the bump.
-
+      - "Decided the pinned anchor date stands, and demo data visibly
+        ageing is accepted rather than worked around (Keith, 2026-09-22,
+        signing this off: \"I'm happy for demo data to visibly age.
+        That's just how it works.\"). This closes the open question this
+        requirement carried. The cost is real and now chosen: the
+        generated history drifts further from today until somebody bumps
+        the anchor and regenerates, which makes regeneration a deliberate
+        act rather than a side effect of running the generator on a
+        different day. That determinism is the point - it is what stops a
+        re-run doubling the committed history."
   - id: REQ-GEN-043
     title: A delivery has a written-down on-disk format, and it declares nothing
     date_written: "2026-09-22"
@@ -3529,6 +3552,9 @@ requirements:
       ARTEFACT of this sprint... rather than something sprint 7
       reverse-engineers". plans/supply-model.md delivery sprint 2 and
       Thread B. Scoped by delivery-scoper, batch 1+2 pass, 2026-09-22.
+    signed_off:
+      by: Keith
+      date: "2026-09-22"
     acceptance_criteria:
       - THE SYSTEM SHALL write each delivery as one self-contained unit
         on disk whose boundary is observable without reading any file's
@@ -3668,6 +3694,9 @@ requirements:
       rather than only green in a test run". plans/supply-model.md
       delivery sprint 2. Scoped by delivery-scoper, batch 1+2 pass,
       2026-09-22.
+    signed_off:
+      by: Keith
+      date: "2026-09-22"
     acceptance_criteria:
       - THE SYSTEM SHALL generate, into the committed synthetic history,
         a real instance of every scenario the test scenario register
@@ -3786,6 +3815,9 @@ requirements:
       page for the check, the dataset or the data collection".
       plans/supply-model.md test scenario register. Scoped by
       delivery-scoper, batch 1+2 pass, 2026-09-22.
+    signed_off:
+      by: Keith
+      date: "2026-09-22"
     acceptance_criteria:
       - THE SYSTEM SHALL generate a map naming, for each injected
         scenario, the dataset, the supplies it produced, the period and
@@ -3859,6 +3891,9 @@ requirements:
       test, it takes me to the relevant as-of date and then the relevant
       page for the check, the dataset or the data collection". Scoped by
       delivery-scoper, batch 1+2 pass, 2026-09-22.
+    signed_off:
+      by: Keith
+      date: "2026-09-22"
     acceptance_criteria:
       - THE SYSTEM SHALL render the committed scenario map in the
         dashboard.
@@ -3931,6 +3966,9 @@ requirements:
       dashboard_status_of() to threshold math and returns green. Delivery
       sprint 3, and test scenario register TS-20. Scoped by
       delivery-scoper, batch 1+2 pass, 2026-09-22.
+    signed_off:
+      by: Keith
+      date: "2026-09-22"
     acceptance_criteria:
       - THE SYSTEM SHALL return the same status from its Python and
         browser implementations for every check-result input.
@@ -4035,6 +4073,9 @@ requirements:
       pipeline/cadence.py's hardcoded AWST_OFFSET. Delivery sprint 4, and
       test scenario register TS-31. Scoped by delivery-scoper, batch 1+2
       pass, 2026-09-22.
+    signed_off:
+      by: Keith
+      date: "2026-09-22"
     acceptance_criteria:
       - THE SYSTEM SHALL read the data asset's timezone from exactly one
         configuration value.
@@ -4114,6 +4155,9 @@ requirements:
       and test scenario register TS-26 and TS-27. Scoped by
       delivery-scoper, batch 1+2 pass, 2026-09-22; finalised the same day
       against Keith's answers to questions A1, A2 and A3.
+    signed_off:
+      by: Keith
+      date: "2026-09-22"
     acceptance_criteria:
       - THE SYSTEM SHALL hold one or more NAMED delivery calendars per
         data asset, and each dataset SHALL name exactly one of them.
@@ -4323,6 +4367,9 @@ requirements:
       validate-config gate alongside validate-requirements and
       validate-changelog. Delivery sprint 5, and test scenario register
       TS-25. Scoped by delivery-scoper, batch 1+2 pass, 2026-09-22.
+    signed_off:
+      by: Keith
+      date: "2026-09-22"
     acceptance_criteria:
       - WHEN the repository's gates run, THE SYSTEM SHALL validate the
         asset and schedule configuration and SHALL exit non-zero on any
@@ -4435,6 +4482,9 @@ requirements:
       inventory described a period schema without ever naming period.
       Delivery sprint 6, and test scenario register TS-26. Scoped by
       delivery-scoper, batch 1+2 pass, 2026-09-22.
+    signed_off:
+      by: Keith
+      date: "2026-09-22"
     acceptance_criteria:
       - THE SYSTEM SHALL produce that sequence in the same shape whether
         the schedule was authored as dates or expressed as a cadence
@@ -4515,6 +4565,9 @@ requirements:
       due_at, grace and claim window. Delivery sprint 6, and test
       scenario register TS-27 and TS-33b. Scoped by delivery-scoper,
       batch 1+2 pass, 2026-09-22.
+    signed_off:
+      by: Keith
+      date: "2026-09-22"
     acceptance_criteria:
       - THE SYSTEM SHALL derive a slot for each pairing of a dataset
         with a period that dataset participates in, and SHALL NOT
@@ -4621,6 +4674,9 @@ requirements:
       cannot be ignored. Delivery sprint 6, and test scenario register
       TS-23 and TS-24. Scoped by delivery-scoper, batch 1+2 pass,
       2026-09-22.
+    signed_off:
+      by: Keith
+      date: "2026-09-22"
     acceptance_criteria:
       - THE SYSTEM SHALL measure that runway in SLOTS, and SHALL NOT
         measure it in elapsed time.
@@ -4717,6 +4773,9 @@ requirements:
       compute an authored date list, so a quarterly asset's as-of picker
       would silently return nothing. Delivery sprint 6. Scoped by
       delivery-scoper, batch 1+2 pass, 2026-09-22.
+    signed_off:
+      by: Keith
+      date: "2026-09-22"
     acceptance_criteria:
       - THE SYSTEM SHALL use that embedded sequence for the as-of
         picker's period arithmetic.
