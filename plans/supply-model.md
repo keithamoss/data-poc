@@ -1704,15 +1704,29 @@ Detail decisions:
   and awkward to retrofit once 30 datasets assume subsetting. Same
   effective-dating, changelog and runway check as the asset calendar.
 
-### PERIOD and SLOT, defined - and where `due_at` actually lives
+### PERIOD and SLOT, named - and one sentence corrected
 
-Settled 2026-09-22, and the definition came LAST rather than first,
-which is how the real problem underneath it stayed hidden. "Period" is
-used throughout this file - schemas are keyed on it, the cannot-run
-rule is "an unfilled slot FOR THAT PERIOD", effective-dating says "the
-schedule version in force at that period's due date" - and it was never
-defined anywhere. Keith caught it reading the concept inventory: we say
-one schema per period without ever naming period as a concept.
+Settled 2026-09-22. **This NAMES what the calendar/`delivery_months`
+design above already produced; it does not replace or re-model it.**
+Read it that way, because a first draft of this section read as though
+a modelling error had been discovered, and that overstates it -
+everything in the section above stands untouched.
+
+"Period" was used throughout this file - schemas are keyed on it, the
+cannot-run rule is "an unfilled slot FOR THAT PERIOD", effective-dating
+says "the schedule version in force at that period's due date" - and it
+was never defined anywhere. Keith caught it reading the concept
+inventory: we say one schema per period without ever naming period as
+a concept.
+
+**The lesson for a future session is about the shape of the error, not
+the fix.** What was found was not a design that disagreed with reality.
+It was THIS THREAD disagreeing with ITSELF - its own "what exists"
+paragraph records that `expectedTime` is already per-dataset in every
+contract, four paragraphs above its own sentence putting the deadline
+on the period. So before concluding a design is wrong, check whether
+the document already contradicts itself somewhere above. That is the
+cheaper thing to find, and it was the answer here.
 
 **The definitions:**
 
@@ -1727,7 +1741,7 @@ one schema per period without ever naming period as a concept.
 One period, many slots. Thread F already said this without naming it:
 "the SAME period, but in six DIFFERENT slots".
 
-#### The real finding: `(period, due_at)` cannot express what we need
+#### The correction: `(period, due_at)` cannot express what we need
 
 The schedule was specified above as producing a sequence of
 `(period, due_at)` pairs, which makes the deadline a property of the
@@ -1739,10 +1753,15 @@ times, and at ~30 datasets across different teams and source systems
 they plainly will be.
 
 **Keith's call, 2026-09-22: per-dataset expected times are "a definite
-need"**, so the deadline moves to the SLOT. The alternative - one
-deadline per period, every participant sharing it - was put to him and
-rejected: it is simpler, and it would remove a capability the code
-already has for no gain beyond tidiness.
+need"**, so the deadline moves to the SLOT. Recorded with a caveat
+about how it was put to him: the alternative - one deadline per period,
+every participant sharing it - was offered as a genuine fork, and it
+was not one. Choosing it would have meant deleting working config and
+removing a capability that already ships. He should have been shown the
+contradiction and told which side loses, rather than asked to pick.
+Same outcome, but the fork was far more lopsided than it was presented
+as, and a future session should not read this as a close call that
+could have gone the other way.
 
 **The case that decides it.** Three slots in `2026-Q3` (date 1 July):
 `births` due 09:00, `cp_clients` due 09:00, `cp_placements` due 17:00.
