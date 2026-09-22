@@ -49,7 +49,7 @@ checks for cp_clients:
         when < 100
         when > 2000
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.row_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.row_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -69,7 +69,7 @@ checks for cp_clients:
       fail: when > 3
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.cp_client_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -83,7 +83,7 @@ checks for cp_clients:
       fail: when > 3
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.duplicate_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.cp_client_id.duplicate_count_soda
         category: uniqueness
         introduced_date: "2023-01-15"
         description: >
@@ -97,7 +97,7 @@ checks for cp_clients:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.given_name.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.given_name.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -111,7 +111,7 @@ checks for cp_clients:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.family_name.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.family_name.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -125,7 +125,7 @@ checks for cp_clients:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.date_of_birth.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -140,7 +140,7 @@ checks for cp_clients:
       fail: when > 2%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.sex.invalid_percent_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.sex.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
         description: >
@@ -155,7 +155,7 @@ checks for cp_clients:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.suburb.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.suburb.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -169,7 +169,7 @@ checks for cp_clients:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.case_opened_date.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.case_opened_date.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -187,7 +187,7 @@ checks for cp_clients:
       fail: when > 3%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.invalid_percent_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.postcode.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
         description: >
@@ -201,7 +201,7 @@ checks for cp_clients:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.postcode.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -232,7 +232,7 @@ checks for cp_clients:
       # rows" checks in this file.
       samples limit: 100000
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.range_check_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.date_of_birth.range_check_soda
         name: Date of birth in a plausible range
         category: conformity
         introduced_date: "2023-01-15"
@@ -249,7 +249,7 @@ checks for cp_notifications:
         when < 200
         when > 3000
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.row_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.row_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -269,7 +269,7 @@ checks for cp_notifications:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -283,7 +283,7 @@ checks for cp_notifications:
       fail: when > 3
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.duplicate_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.duplicate_count_soda
         category: uniqueness
         introduced_date: "2023-01-15"
         description: >
@@ -297,7 +297,7 @@ checks for cp_notifications:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.cp_client_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -311,7 +311,7 @@ checks for cp_notifications:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_date.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_date.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -326,7 +326,7 @@ checks for cp_notifications:
       fail: when > 3%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.source_type.invalid_percent_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.source_type.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
         description: >
@@ -341,7 +341,7 @@ checks for cp_notifications:
       fail: when > 3%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.concern_type.invalid_percent_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.concern_type.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
         description: >
@@ -357,7 +357,7 @@ checks for cp_notifications:
       fail: when > 3%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.risk_rating.invalid_percent_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.risk_rating.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
         description: >
@@ -371,7 +371,7 @@ checks for cp_notifications:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.assigned_worker_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -386,7 +386,7 @@ checks for cp_notifications:
       fail: when > 3%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.outcome.invalid_percent_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.outcome.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
         description: >
@@ -409,7 +409,7 @@ checks for cp_notifications:
   - values in (cp_client_id) must exist in cp_clients (cp_client_id):
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.relationships_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.cp_client_id.relationships_soda
         name: Client reference
         category: consistency
         introduced_date: "2023-01-15"
@@ -421,7 +421,7 @@ checks for cp_notifications:
   - values in (assigned_worker_id) must exist in cp_case_workers (worker_id):
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.relationships_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.assigned_worker_id.relationships_soda
         name: Assigned worker reference
         category: consistency
         introduced_date: "2023-01-15"
@@ -453,7 +453,7 @@ checks for cp_notifications:
       # pipeline.md #29's correction).
       samples limit: 100000
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.escalation_completeness_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.escalation_completeness_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -469,7 +469,7 @@ checks for cp_investigations:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -483,7 +483,7 @@ checks for cp_investigations:
       fail: when > 3
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.duplicate_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.duplicate_count_soda
         category: uniqueness
         introduced_date: "2023-01-15"
         description: >
@@ -497,7 +497,7 @@ checks for cp_investigations:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.notification_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -511,7 +511,7 @@ checks for cp_investigations:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.cp_client_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -525,7 +525,7 @@ checks for cp_investigations:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.lead_worker_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -539,7 +539,7 @@ checks for cp_investigations:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.start_date.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.start_date.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -554,7 +554,7 @@ checks for cp_investigations:
       fail: when > 3%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.substantiated.invalid_percent_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.substantiated.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
         description: >
@@ -566,7 +566,7 @@ checks for cp_investigations:
   - values in (notification_id) must exist in cp_notifications (notification_id):
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.relationships_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.notification_id.relationships_soda
         name: Notification reference
         category: consistency
         introduced_date: "2023-01-15"
@@ -578,7 +578,7 @@ checks for cp_investigations:
   - values in (cp_client_id) must exist in cp_clients (cp_client_id):
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.relationships_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.cp_client_id.relationships_soda
         name: Client reference
         category: consistency
         introduced_date: "2023-01-15"
@@ -590,7 +590,7 @@ checks for cp_investigations:
   - values in (lead_worker_id) must exist in cp_case_workers (worker_id):
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.relationships_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.lead_worker_id.relationships_soda
         name: Lead worker reference
         category: consistency
         introduced_date: "2023-01-15"
@@ -619,7 +619,7 @@ checks for cp_investigations:
       # above for why (GitHub sodadata/soda-core#1985).
       samples limit: 100000
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.closed_case_hygiene_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.closed_case_hygiene_soda
         name: Closed-case hygiene
         category: consistency
         introduced_date: "2023-01-15"
@@ -636,7 +636,7 @@ checks for cp_placements:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -650,7 +650,7 @@ checks for cp_placements:
       fail: when > 3
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.duplicate_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_id.duplicate_count_soda
         category: uniqueness
         introduced_date: "2023-01-15"
         description: >
@@ -664,7 +664,7 @@ checks for cp_placements:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.cp_client_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -679,7 +679,7 @@ checks for cp_placements:
       fail: when > 3%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_type.invalid_percent_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_type.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
         description: >
@@ -693,7 +693,7 @@ checks for cp_placements:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -707,7 +707,7 @@ checks for cp_placements:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_start.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_start.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -721,7 +721,7 @@ checks for cp_placements:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_suburb.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_suburb.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -733,7 +733,7 @@ checks for cp_placements:
   - values in (cp_client_id) must exist in cp_clients (cp_client_id):
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.relationships_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.cp_client_id.relationships_soda
         name: Client reference
         category: consistency
         introduced_date: "2023-01-15"
@@ -745,7 +745,7 @@ checks for cp_placements:
   - values in (carer_id) must exist in cp_carers (carer_id):
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.relationships_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.relationships_soda
         name: Carer reference
         category: consistency
         introduced_date: "2023-01-15"
@@ -775,7 +775,7 @@ checks for cp_placements:
       # above for why (GitHub sodadata/soda-core#1985).
       samples limit: 100000
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.approval_compliance_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.approval_compliance_soda
         name: Carer approval compliance
         category: consistency
         introduced_date: "2023-01-15"
@@ -797,7 +797,7 @@ checks for cp_carers:
         when < 50
         when > 1000
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.row_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.row_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -811,7 +811,7 @@ checks for cp_carers:
       fail: when > 3
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.carer_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -825,7 +825,7 @@ checks for cp_carers:
       fail: when > 3
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.duplicate_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.carer_id.duplicate_count_soda
         category: uniqueness
         introduced_date: "2023-01-15"
         description: >
@@ -839,7 +839,7 @@ checks for cp_carers:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.given_name.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.given_name.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -853,7 +853,7 @@ checks for cp_carers:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.family_name.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.family_name.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -868,7 +868,7 @@ checks for cp_carers:
       fail: when > 3%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_type.invalid_percent_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.carer_type.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
         description: >
@@ -883,7 +883,7 @@ checks for cp_carers:
       fail: when > 3%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.approval_status.invalid_percent_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.approval_status.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
         description: >
@@ -899,7 +899,7 @@ checks for cp_case_workers:
         when < 15
         when > 200
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.row_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.row_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -913,7 +913,7 @@ checks for cp_case_workers:
       fail: when > 3
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.worker_id.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -927,7 +927,7 @@ checks for cp_case_workers:
       fail: when > 3
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.duplicate_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.worker_id.duplicate_count_soda
         category: uniqueness
         introduced_date: "2023-01-15"
         description: >
@@ -941,7 +941,7 @@ checks for cp_case_workers:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.given_name.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.given_name.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -955,7 +955,7 @@ checks for cp_case_workers:
       fail: when > 5
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.family_name.missing_count_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.family_name.missing_count_soda
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -970,7 +970,7 @@ checks for cp_case_workers:
       fail: when > 3%
       samples limit: 5
       attributes:
-        check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.team_region.invalid_percent_soda
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.team_region.invalid_percent_soda
         category: conformity
         introduced_date: "2023-01-15"
         description: >

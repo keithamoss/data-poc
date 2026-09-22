@@ -109,6 +109,42 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-09-23"
+    summary: >
+      Every check now says which collection it belongs to, and the
+      agency and collection names come from one place.
+    changes:
+      - category: Improved
+        items:
+          - headline: Checks name their collection
+            components: ["QA checks & contract"]
+            description: >
+              A check's identifier now carries its collection, so you can
+              see where a check sits from its name alone. It no longer
+              carries a database table name that only ever made sense to
+              one of the four tools.
+          - headline: One place for agencies and collections
+            components: ["QA checks & contract", "Pipeline & publishing"]
+            description: >
+              Agency, collection and dataset names were written down in
+              twelve places that could quietly disagree, and several
+              had. Change one now and the whole tool follows, including
+              the dashboard.
+      - category: Fixed
+        items:
+          - headline: Contracts said the wrong thing
+            components: ["QA checks & contract"]
+            description: >
+              Both data contracts named an agency or collection that no
+              longer existed anywhere else. They are corrected, and a
+              new check stops them drifting again.
+          - headline: Birth Registrations found its collection
+            components: ["Pipeline & publishing"]
+            description: >
+              Birth Registrations results were filed without a
+              collection while Child Protection's had one. They now
+              match, so the two read the same way everywhere.
+
   - date: "2026-09-20"
     summary: >
       Checks now sit against the column they actually check, and the

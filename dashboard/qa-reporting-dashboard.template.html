@@ -976,6 +976,19 @@ function groupChecksByCategory(checks){
    graceful-degradation treatment as every other embedded feed here when
    its real source isn't available.
 ========================================================================= */
+// HIERARCHY — REQ-QAC-039. The one statement of the agency/collection/
+// dataset tree, read from contract/data-asset.yaml by qa_tools/common/
+// hierarchy.py and embedded by dashboard/embed_dashboard_data.py. The
+// REAL agencies and collections below take their id and display name
+// from here, so renaming a collection in that one file cannot leave the
+// real dataset tiles hanging under a stale id with a dead URL.
+//
+// null in the raw template, like every other const here - and unlike
+// the others, the literals in buildData() are its real fallback rather
+// than decoration: the template must render standalone with illustrative
+// data, so the two real agencies have to be written somewhere. What this
+// removes is the copy that anything a reader ever sees would use.
+const HIERARCHY = null;
 const REAL_BIRTH_REG_DATA = null;
 const REAL_CP_DATA = null;
 const SNAPSHOT_MANIFEST = [];
@@ -1616,13 +1629,34 @@ let CURRENT_AS_OF = asOfFromUrl() || DEFAULT_AS_OF;
 // scratch against that date rather than mutating anything in place, same
 // "no leftover state from the old view" principle as navigate() already
 // uses for drill-down transitions.
+// One real agency/collection node's id and display name, from the
+// embedded HIERARCHY when there is one, falling back to the literal the
+// raw template needs to render standalone (REQ-QAC-039). `fb` is that
+// fallback, and is also what names WHICH node to look up - the template
+// has to say where the real dataset tiles hang, and naming a node is a
+// reference to the tree rather than a second statement of it.
+function hierAgency(fb){
+  const a = HIERARCHY && (HIERARCHY.agencies||[]).find(x => x.id === fb.id);
+  return a ? {id:a.id, name:a.name} : fb;
+}
+function hierCollection(agencyFb, fb){
+  const a = HIERARCHY && (HIERARCHY.agencies||[]).find(x => x.id === agencyFb.id);
+  const c = a && (a.collections||[]).find(x => x.id === fb.id);
+  return c ? {id:c.id, name:c.name} : fb;
+}
+const AG_REGISTRY = {id:"registry-services", name:"Registry Services"};
+const AG_CHILD_PROTECTION = {id:"child-protection-family-support",
+                             name:"Department for Child Protection and Family Support"};
+const COL_CIVIL_REGISTRATION = {id:"civil-registration", name:"Civil Registration"};
+const COL_CHILD_PROTECTION = {id:"child-protection", name:"Child Protection"};
+
 function buildData(asOfDateStr){
   const data = {
   agencies:[
     {
-      id:"registry-services", name:"Registry Services", blurb:"Civil registration of life events for the whole state.",
+      ...hierAgency(AG_REGISTRY), blurb:"Civil registration of life events for the whole state.",
       collections:[
-        { id:"civil-registration", name:"Civil Registration",
+        { ...hierCollection(AG_REGISTRY, COL_CIVIL_REGISTRATION),
           datasets:[
             buildBirthRegistrations(asOfDateStr),
             genDataset("registry-services.civil-registration.death-registrations","Death Registrations","Registry of Births, Deaths & Marriages (BDM)","CSV (S3 drop)",POOLS.death),
@@ -1630,10 +1664,11 @@ function buildData(asOfDateStr){
           ]},
       ]},
     {
-      id:"child-protection-family-support", name:"Department for Child Protection and Family Support",
+      ...hierAgency(AG_CHILD_PROTECTION),
       blurb:"Casework for children and families needing protection or support services.",
       collections:[
-        { id:"child-protection", name:"Child Protection", datasets: buildChildProtectionDatasets(asOfDateStr) },
+        { ...hierCollection(AG_CHILD_PROTECTION, COL_CHILD_PROTECTION),
+          datasets: buildChildProtectionDatasets(asOfDateStr) },
       ]},
     {
       id:"health-human-services", name:"Health & Human Services", blurb:"Public health programs and hospital system oversight.",

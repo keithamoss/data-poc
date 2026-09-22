@@ -123,7 +123,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.cp_client_id.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -140,7 +140,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.duplicateValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.cp_client_id.duplicateValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -163,7 +163,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.given_name.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.given_name.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -186,7 +186,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.family_name.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.family_name.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -208,7 +208,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.date_of_birth.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -240,7 +240,7 @@ schema:
               This value must be a plausible real date, neither in the future nor absurdly old.
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.range_check_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.date_of_birth.range_check_datacontract
               - property: name
                 value: Date of birth in a plausible range
               - property: introduced_date
@@ -263,7 +263,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.sex.invalidValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.sex.invalidValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -286,7 +286,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.suburb.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.suburb.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -308,7 +308,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.postcode.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -334,7 +334,7 @@ schema:
               A single unrecognised value fails.
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.invalidValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.postcode.invalidValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: changelog
@@ -353,7 +353,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.case_opened_date.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.case_opened_date.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -378,7 +378,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.case_status.invalidValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.case_status.invalidValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -403,7 +403,7 @@ schema:
           The number of rows in the supply must fall inside the expected band.
         customProperties:
           - property: check_id
-            value: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.rowCount_datacontract
+            value: data-asset-1.child-protection-family-support.child-protection.cp-clients.rowCount_datacontract
           - property: introduced_date
             value: "2023-01-15"
           - property: changelog
@@ -430,7 +430,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -449,7 +449,7 @@ schema:
               This value must be unique.
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.duplicateValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.duplicateValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: changelog
@@ -469,7 +469,7 @@ schema:
               Every notification escalated to an investigation must have that investigation recorded.
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.escalation_completeness_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.escalation_completeness_datacontract
               - property: name
                 value: Escalation completeness
               - property: introduced_date
@@ -490,7 +490,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.cp_client_id.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -510,7 +510,7 @@ schema:
               Every value must match an existing client.
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.relationships_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.cp_client_id.relationships_datacontract
               - property: name
                 value: Client reference
               - property: introduced_date
@@ -531,7 +531,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_date.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_date.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -555,7 +555,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.source_type.invalidValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.source_type.invalidValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -586,7 +586,7 @@ schema:
               A single unrecognised value fails.
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.concern_type.invalidValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.concern_type.invalidValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: changelog
@@ -607,7 +607,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.risk_rating.invalidValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.risk_rating.invalidValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -629,7 +629,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.assigned_worker_id.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -649,7 +649,7 @@ schema:
               Every value must match an existing case worker.
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.relationships_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.assigned_worker_id.relationships_datacontract
               - property: name
                 value: Assigned worker reference
               - property: introduced_date
@@ -672,7 +672,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.outcome.invalidValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.outcome.invalidValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -696,7 +696,7 @@ schema:
           The number of rows in the supply must fall inside the expected band.
         customProperties:
           - property: check_id
-            value: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.rowCount_datacontract
+            value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.rowCount_datacontract
           - property: introduced_date
             value: "2023-01-15"
           - property: changelog
@@ -724,7 +724,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -741,7 +741,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.duplicateValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.duplicateValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -764,7 +764,7 @@ schema:
               An investigation must not still be open once its client's case has been closed.
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.closed_case_hygiene_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.closed_case_hygiene_datacontract
               - property: name
                 value: Closed-case hygiene
               - property: introduced_date
@@ -785,7 +785,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.notification_id.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -805,7 +805,7 @@ schema:
               Every value must match an existing notification.
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.relationships_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.notification_id.relationships_datacontract
               - property: name
                 value: Notification reference
               - property: introduced_date
@@ -826,7 +826,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.cp_client_id.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -846,7 +846,7 @@ schema:
               Every value must match an existing client.
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.relationships_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.cp_client_id.relationships_datacontract
               - property: name
                 value: Client reference
               - property: introduced_date
@@ -867,7 +867,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.start_date.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.start_date.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -896,7 +896,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.substantiated.invalidValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.substantiated.invalidValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -918,7 +918,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.lead_worker_id.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -938,7 +938,7 @@ schema:
               Every value must match an existing case worker.
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.relationships_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.lead_worker_id.relationships_datacontract
               - property: name
                 value: Lead worker reference
               - property: introduced_date
@@ -961,7 +961,7 @@ schema:
           The number of rows in the supply must fall inside the expected band.
         customProperties:
           - property: check_id
-            value: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.rowCount_datacontract
+            value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.rowCount_datacontract
           - property: introduced_date
             value: "2023-01-15"
           - property: changelog
@@ -989,7 +989,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_id.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1006,7 +1006,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.duplicateValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_id.duplicateValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1028,7 +1028,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.cp_client_id.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1048,7 +1048,7 @@ schema:
               Every value must match an existing client.
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.relationships_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.cp_client_id.relationships_datacontract
               - property: name
                 value: Client reference
               - property: introduced_date
@@ -1071,7 +1071,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_type.invalidValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_type.invalidValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1093,7 +1093,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1113,7 +1113,7 @@ schema:
               Every value must match an existing carer.
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.relationships_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.relationships_datacontract
               - property: name
                 value: Carer reference
               - property: introduced_date
@@ -1135,7 +1135,7 @@ schema:
               A placement's carer must hold an approved status.
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.approval_compliance_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.approval_compliance_datacontract
               - property: name
                 value: Carer approval compliance
               - property: introduced_date
@@ -1156,7 +1156,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_start.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_start.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1183,7 +1183,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_suburb.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_suburb.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1207,7 +1207,7 @@ schema:
           The number of rows in the supply must fall inside the expected band.
         customProperties:
           - property: check_id
-            value: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.rowCount_datacontract
+            value: data-asset-1.child-protection-family-support.child-protection.cp-placements.rowCount_datacontract
           - property: introduced_date
             value: "2023-01-15"
           - property: changelog
@@ -1235,7 +1235,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-carers.carer_id.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1252,7 +1252,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.duplicateValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-carers.carer_id.duplicateValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1275,7 +1275,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.given_name.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-carers.given_name.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1298,7 +1298,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.family_name.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-carers.family_name.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1322,7 +1322,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_type.invalidValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-carers.carer_type.invalidValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1346,7 +1346,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.approval_status.invalidValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-carers.approval_status.invalidValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1370,7 +1370,7 @@ schema:
           The number of rows in the supply must fall inside the expected band.
         customProperties:
           - property: check_id
-            value: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.rowCount_datacontract
+            value: data-asset-1.child-protection-family-support.child-protection.cp-carers.rowCount_datacontract
           - property: introduced_date
             value: "2023-01-15"
           - property: changelog
@@ -1398,7 +1398,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.worker_id.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1415,7 +1415,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.duplicateValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.worker_id.duplicateValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1438,7 +1438,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.given_name.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.given_name.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1461,7 +1461,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.family_name.nullValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.family_name.nullValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1486,7 +1486,7 @@ schema:
             severity: error
             customProperties:
               - property: check_id
-                value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.team_region.invalidValues_datacontract
+                value: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.team_region.invalidValues_datacontract
               - property: introduced_date
                 value: "2023-01-15"
               - property: description
@@ -1510,7 +1510,7 @@ schema:
           The number of rows in the supply must fall inside the expected band.
         customProperties:
           - property: check_id
-            value: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.rowCount_datacontract
+            value: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.rowCount_datacontract
           - property: introduced_date
             value: "2023-01-15"
           - property: changelog

@@ -48,7 +48,7 @@ def _check(run_id, column_name, value, status="pass", **overrides):
         "warn_threshold": 0.0, "fail_threshold": 5.0, "status": status,
         "row_count_total": 3, "row_count_invalid": 0,
         "engine": "dbt-core 1.12 + dbt-duckdb",
-        "check_id": f"data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.{column_name}.accepted_values_dbt",
+        "check_id": f"data-asset-1.child-protection-family-support.child-protection.cp-notifications.{column_name}.accepted_values_dbt",
     }
     rec.update(overrides)
     return rec

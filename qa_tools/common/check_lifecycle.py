@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -612,6 +613,59 @@ def find_duplicate_check_ids(checks: list[CheckMetadata]) -> list[str]:
     return sorted(check_id for check_id, count in seen.items() if count > 1)
 
 
+# ---- REQ-QAC-039's one-time grammar migration ------------------------
+
+# The 2026-09-16 rule is that a check_id, once introduced, is
+# PERMANENTLY unique and must never be changed - which is what
+# `find_disappeared_check_ids()` below enforces, since a rename reads as
+# the old id vanishing and a new one appearing.
+#
+# REQ-QAC-039 is that rule's one approved exception (Keith, 2026-09-22),
+# and this is where it is spent. The grammar gained a `collection`
+# segment and lost the `table` one, so all 258 ids changed in one
+# commit - see qa_tools/common/check_id.py's own header for what changed
+# and why, and REQ-QAC-039's `decisions:` for the exception itself.
+#
+# It is deliberately a TRANSFORM, not a hand-listed dict of 258 pairs:
+# a list could be wrong in a way nobody would check, while this states
+# the same rule the rename script applied, so an old id that does not
+# map onto a real new one still fails. And it is narrow in the way that
+# matters - it only ever rewrites an id that matches the OLD grammar,
+# which nothing authored after this commit can do.
+#
+# It is also SELF-EXPIRING rather than a standing loophole: from the
+# commit after the migration, no old-grammar id exists in git history to
+# migrate, so this is dead code that changes nothing. It is kept rather
+# than deleted so that the exception is visible where the rule is
+# enforced, instead of only in a requirement nobody reads at the moment
+# they hit the error.
+_PRE_039_ID = re.compile(
+    r"^(?P<asset>[A-Za-z0-9_-]+)\.(?P<agency>[A-Za-z0-9_-]+)\.(?P<dataset>[A-Za-z0-9_-]+)"
+    r"\.(?P<table>stg_[A-Za-z0-9_-]+)(?P<rest>(?:\.[A-Za-z0-9_-]+)?\.[A-Za-z0-9_-]+)$")
+
+
+def migrate_pre_039_check_id(check_id: str) -> str:
+    """One old-grammar check_id in the post-REQ-QAC-039 grammar, or the
+    id unchanged if it is not an old-grammar one.
+
+    Returns the input untouched when the dataset it names is not in the
+    hierarchy, rather than guessing - an id that cannot be placed is
+    exactly the case the permanence rule should still catch."""
+    from qa_tools.common import hierarchy
+
+    m = _PRE_039_ID.match(check_id)
+    if not m:
+        return check_id
+    try:
+        entry = hierarchy.dataset(m.group("dataset"))
+    except hierarchy.UnknownDatasetError:
+        return check_id
+    if entry.agency_id != m.group("agency"):
+        return check_id
+    return (f"{m.group('asset')}.{m.group('agency')}.{entry.collection_id}"
+            f".{m.group('dataset')}{m.group('rest')}")
+
+
 def find_disappeared_check_ids(old_checks: list[CheckMetadata], new_checks: list[CheckMetadata]) -> list[str]:
     """Returns check_ids present in `old_checks` but entirely missing
     from `new_checks` - a check_id, once introduced, must never be
@@ -626,9 +680,15 @@ def find_disappeared_check_ids(old_checks: list[CheckMetadata], new_checks: list
     `_YAML_SOURCES`/`_EVIDENTLY_SOURCES`), just now sourced from the
     retired file instead of the active one. Only a genuine deletion, or
     an attempted rename (editing the check_id string itself, which reads
-    as the old id vanishing and a "new" one appearing), shows up here."""
+    as the old id vanishing and a "new" one appearing), shows up here.
+
+    The one exception is REQ-QAC-039's grammar migration - see
+    `migrate_pre_039_check_id()` above for what it covers and why it is
+    spent rather than standing."""
     new_ids = {c.check_id for c in new_checks}
-    return sorted(c.check_id for c in old_checks if c.check_id not in new_ids)
+    return sorted(c.check_id for c in old_checks
+                  if c.check_id not in new_ids
+                  and migrate_pre_039_check_id(c.check_id) not in new_ids)
 
 
 def find_undocumented_changes(old_checks: list[CheckMetadata], new_checks: list[CheckMetadata]) -> list[str]:

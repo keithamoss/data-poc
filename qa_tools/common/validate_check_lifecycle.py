@@ -119,9 +119,10 @@ def collect_checks(ref: str | None) -> list[cl.CheckMetadata]:
 
 
 def _check_id_errors(checks: list[cl.CheckMetadata]) -> list[str]:
-    """REQ-QAC-023's three gates, all on the CURRENT tree only - unlike
-    the changelog rule above there is no old-vs-new comparison to make;
-    a check_id either matches the grammar or it does not.
+    """REQ-QAC-023's three gates plus REQ-QAC-039's fourth, all on the
+    CURRENT tree only - unlike the changelog rule above there is no
+    old-vs-new comparison to make; a check_id either matches the grammar
+    and the hierarchy or it does not.
 
     Kept here, beside the existing gate, rather than in a separate
     command: a contributor who broke one of these broke the same thing
@@ -130,6 +131,10 @@ def _check_id_errors(checks: list[cl.CheckMetadata]) -> list[str]:
     ids = [c.check_id for c in checks]
     errors = cid.validate_grammar(ids)
     errors += cid.validate_tail_uniqueness(ids)
+    # REQ-QAC-039: shaped right is not the same as meaning something.
+    # An id naming an agency or collection the dataset does not sit
+    # under passes the grammar and resolves to nothing.
+    errors += cid.validate_hierarchy_agreement(ids)
     for rel_path, parser in _YAML_SOURCES:
         if parser is not cl.parse_contract_check_metadata:
             continue  # only the ODCS contracts attach rules to a column

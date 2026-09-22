@@ -270,6 +270,30 @@ def embed() -> None:
         html = _replace_const(html, const_name, real_json)
         print(f"Re-embedded {len(real_json)} bytes of real data into {const_name}")
 
+    # HIERARCHY - REQ-QAC-039. The one statement of the
+    # agency/collection/dataset tree, from contract/data-asset.yaml, so
+    # the template does not carry a second one for the REAL agencies and
+    # collections its real dataset tiles hang under. Its own literals
+    # remain as the raw, unembedded template's illustrative fallback
+    # (Keith, 2026-09-23) - the template has to render with no data at
+    # all, so something has to be written there; what this removes is
+    # the copy that anything a reader ever sees would use.
+    tree: dict = {"agencies": []}
+    for entry in hierarchy.all_datasets():
+        ag = next((a for a in tree["agencies"] if a["id"] == entry.agency_id), None)
+        if ag is None:
+            ag = {"id": entry.agency_id, "name": entry.agency_name, "collections": []}
+            tree["agencies"].append(ag)
+        col = next((c for c in ag["collections"] if c["id"] == entry.collection_id), None)
+        if col is None:
+            col = {"id": entry.collection_id, "name": entry.collection_name, "datasets": []}
+            ag["collections"].append(col)
+        col["datasets"].append({"id": entry.dataset_id, "name": entry.dataset_name})
+    html = _replace_const(html, "HIERARCHY", json.dumps(tree, separators=(",", ":")))
+    print(f"Re-embedded HIERARCHY = {len(tree['agencies'])} agenc(ies), "
+          f"{sum(len(a['collections']) for a in tree['agencies'])} collection(s), "
+          f"{len(hierarchy.all_datasets())} dataset(s)")
+
     changelog_feed = _build_changelog_feed()
     html = _replace_const(html, "CHANGELOG_FEED", json.dumps(changelog_feed, separators=(",", ":")))
     print(f"Re-embedded CHANGELOG_FEED = {len(changelog_feed)} entries")

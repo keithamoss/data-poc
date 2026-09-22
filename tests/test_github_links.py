@@ -47,7 +47,7 @@ def test_a_real_known_check_id_resolves_to_its_real_source_line():
     the file's own real content at the URL's own #L<n> anchor, not a
     hardcoded line number (which would make this test fragile against
     unrelated edits to that file)."""
-    check_id = "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.matches_regex_dbt"
+    check_id = "data-asset-1.registry-services.civil-registration.birth-registrations.registration_number.matches_regex_dbt"
     links = github_links.build_check_source_links(sha="abc123")
     url = links[check_id]
     assert url.startswith("https://github.com/keithamoss/data-poc/blob/abc123/dbt_project/models/staging/schema.yml#L")
@@ -62,7 +62,7 @@ def test_a_real_contract_check_id_resolves_to_its_real_source_line():
     check_id / value: <id>) is a genuinely different YAML layout from
     dbt/soda's inline `check_id: <value>` - covers that the same plain
     text-scan approach still finds the right line for it."""
-    check_id = "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.nullValues_datacontract"
+    check_id = "data-asset-1.registry-services.civil-registration.birth-registrations.registration_number.nullValues_datacontract"
     links = github_links.build_check_source_links(sha="abc123")
     url = links[check_id]
     assert "contract/bdm-birth-registrations-contract.yaml#L" in url
@@ -75,7 +75,7 @@ def test_a_real_contract_check_id_resolves_to_its_real_source_line():
 def test_a_real_evidently_check_id_resolves_to_its_real_source_line():
     """Evidently's own shape (a plain Python constant assignment, no
     YAML at all) - a third real format the line-scan needs to handle."""
-    check_id = "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.drift_psi_evidently"
+    check_id = "data-asset-1.registry-services.civil-registration.birth-registrations.sex.drift_psi_evidently"
     links = github_links.build_check_source_links(sha="abc123")
     url = links[check_id]
     assert "qa_tools/bdm/evidently_check_lifecycle.py#L" in url

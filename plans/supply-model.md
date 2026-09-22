@@ -437,9 +437,10 @@ the two status implementations. And **the slot is the spine**: overdue,
 staleness, assignment, classification and promotion are all defined as
 comparisons against the expected-supply sequence.
 
-1. **[todo, 2026-09-21]** **[QA checks & contract]** **Check identity.**
+1. **[done, 2026-09-23]** **[QA checks & contract]** **Check identity.**
    `REQ-QAC-039` - one hierarchy, stated once, including in a check's own
-   `check_id`.
+   `check_id`. BUILT 2026-09-23; that requirement now owns the decisions,
+   including two the build itself turned up.
 
    First because it is baked into all 257 hand-authored checks; changing
    it later is a corpus-wide edit.

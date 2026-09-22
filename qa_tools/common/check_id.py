@@ -14,24 +14,52 @@ are authored by hand in YAML where a Python constructor cannot help,
 against 3 in production Python. Correctness everywhere comes from
 validating what was written, not from a constructor serving 1% of cases.
 
-    data-asset-1.registry-services.birth-registrations
-        .stg_birth_registrations.registration_number.unique_dbt
-    |__________| |_____________| |___________________|
-     data_asset       agency            dataset
-                  |______________________| |_________________| |________|
-                           table                  column          check
+    data-asset-1.registry-services.civil-registration
+        .birth-registrations.registration_number.unique_dbt
+    |__________| |_____________| |_________________|
+     data_asset       agency         collection
+                  |___________________| |_________________| |________|
+                         dataset               column          check
 
 `column` is optional - a genuinely table-level check (a row count) has
 none. Nothing else is.
 
-KNOWN GAP, stated rather than hidden: there is no `collection` segment,
-while a dashboard URL is /agency/X/collection/Y/dataset/Z. The
-identifier skips a level the rest of the system models, so a check's
-collection cannot be derived from its own id. Resolving that is the
-first piece of work under `plans/publishing-and-history.md` item 6 and
-may change this grammar - which is why `_SEGMENTS` below is a list the
-pattern is BUILT from, not a hand-written regex. Adding a segment is one
-edit there, and every consumer follows.
+THE GRAMMAR CHANGED ONCE, on 2026-09-23 (REQ-QAC-039), and this is the
+only time it has. Two edits, both to `_SEGMENTS`:
+
+- `collection` was ADDED. The identifier used to skip a level the rest
+  of the system models - a dashboard URL is
+  /agency/X/collection/Y/dataset/Z - so a check's collection could not
+  be derived from its own id.
+- `table` was REMOVED, and it was worse than merely redundant: it named
+  the dbt STAGING MODEL, not the table. `stg_cp_clients` is a real dbt
+  model doing `select * from` the raw `cp_clients` source, following
+  dbt's own naming convention - so every check carried dbt's vocabulary,
+  including the Soda, datacontract-cli and Evidently checks that have no
+  staging model and read the real table. One tool's implementation
+  detail in an identifier meant to be tool-neutral. Dropping it is safe
+  because a dataset maps to exactly one logical table BY CONSTRUCTION
+  under the supply model (plans/supply-model.md Thread F), not by
+  today's accident.
+
+`data_asset` stays, deliberately, even though it has one value in any
+single deployment (Keith, 2026-09-22). This repo may end up holding one
+set of shared configuration files for SEVERAL data assets, which will
+probably carry the same table names and some of the same checks; the
+segment is what keeps a check_id globally unique across them. A future
+reader looking to simplify the grammar would see a segment with one
+value and remove it, and the cost of that only appears when a second
+asset arrives.
+
+Renaming 258 ids needed its own explicit exception to the 2026-09-16
+rule that a check_id is permanently unique and must never change -
+approved by Keith on 2026-09-22, recorded on REQ-QAC-039's own
+`decisions:`, and narrow: it licenses THIS one grammar change, not a
+general freedom to renumber later. Measured before it was done: zero of
+the 258 config_hashes change, because all four parsers exclude the
+metadata block carrying the id (dbt's `meta`, Soda's `attributes`, the
+ODCS rule's `customProperties`) and Evidently's id is a dict key that
+never enters its config.
 """
 from __future__ import annotations
 
@@ -39,13 +67,16 @@ import re
 from dataclasses import dataclass
 
 # The grammar, in order. `optional=True` marks a segment a check may
-# legitimately omit. Adding `collection` here (see the KNOWN GAP above)
-# is the single edit that changes the grammar everywhere.
+# legitimately omit. This list is the single definition - the regex
+# below is built from it - so a grammar change is one edit here and
+# every consumer follows. That property is load-bearing, not a
+# nicety: it is what made REQ-QAC-039's change above two lines rather
+# than a hand-edited regex to keep in step.
 _SEGMENTS: tuple[tuple[str, bool], ...] = (
     ("data_asset", False),
     ("agency", False),
+    ("collection", False),
     ("dataset", False),
-    ("table", False),
     ("column", True),
 )
 
@@ -93,8 +124,8 @@ class CheckId:
     check_id: str
     data_asset: str
     agency: str
+    collection: str
     dataset: str
-    table: str
     column: str | None
     check_name: str
     tool: str
@@ -103,10 +134,11 @@ class CheckId:
     def tail(self) -> str:
         """The final segment, `<check_name>_<tool>`.
 
-        This is what a dashboard URL keys a check on, and it carries no
-        table segment - which is why `validate_tail_uniqueness()` exists
-        as its own rule rather than being assumed to follow from global
-        check_id uniqueness. See that function."""
+        This is what a dashboard URL keys a check on, and it carries
+        neither the dataset nor the column - which is why
+        `validate_tail_uniqueness()` exists as its own rule rather than
+        being assumed to follow from global check_id uniqueness. See
+        that function."""
         return f"{self.check_name}_{self.tool}"
 
 
@@ -179,16 +211,32 @@ def validate_tail_uniqueness(check_ids) -> list[str]:
     """Two checks on the same dataset and column must not share a tail.
 
     This does NOT follow from global check_id uniqueness, which is why it
-    is stated directly. Two checks could differ only in their `table`
-    segment, be globally unique, and still collide in a dashboard URL -
-    which carries agency, collection, dataset and column but no table,
-    keying the check on its tail alone. Whichever the lookup found first
-    would win, silently, which is precisely the class of failure this
+    is stated directly. A dashboard URL is
+    /agency/<id>/collection/<id>/dataset/<id>/column/<name>/check/<tail>,
+    so it keys the check on its tail alone. Two globally-unique checks
+    that agree on everything a URL carries and differ only in something
+    it does not would collide there, and whichever the lookup found
+    first would win, silently - precisely the class of failure this
     requirement exists to remove.
 
-    It cannot happen today only because every dataset maps to exactly one
-    table, and nothing enforces that - so the guarantee is stated here
-    rather than inherited from a coincidence of the current data model.
+    Concretely, after REQ-QAC-039 the one way two ids can collide here
+    is by differing only in `data_asset` - which a URL does not carry.
+    That is not hypothetical: the whole reason that segment stays is
+    that this repo may end up holding one set of shared configuration
+    files for several assets, carrying the same table names and some of
+    the same checks.
+
+    The caveat this docstring used to carry is now ANSWERED rather than
+    outstanding. It said the collision could not happen only because
+    every dataset happens to map to exactly one table and nothing
+    enforced that. The supply model enforces it: a supply IS one table
+    version and a slot is one (table, period) pair, so a dataset mapping
+    to two tables has no coherent slot and the model cannot express it
+    (plans/supply-model.md Thread F). That is also what made dropping
+    the `table` segment safe in REQ-QAC-039 rather than merely tidy -
+    note the precision, a dataset is 1:1 with one LOGICAL table, which
+    has many physical versions.
+
     A collision is a hard failure at authoring time, deliberately, not a
     fallback to the full check_id for the colliding check: that would put
     two URL shapes on one page and hide the problem instead of fixing
@@ -198,7 +246,15 @@ def validate_tail_uniqueness(check_ids) -> list[str]:
         parsed = try_parse(cid)
         if parsed is None:
             continue
-        key = (parsed.data_asset, parsed.agency, parsed.dataset, parsed.column, parsed.tail)
+        # Exactly what a dashboard URL carries, and nothing else. In
+        # particular NOT data_asset: the URL does not carry it (see
+        # REQ-QAC-039's own decisions), so two ids differing only in
+        # that segment land on the same page. Including it in the key
+        # would have made this rule a restatement of global check_id
+        # uniqueness the moment the table segment went, since every
+        # remaining segment would then be in the key - found by a test
+        # that stopped being able to construct a collision.
+        key = (parsed.agency, parsed.collection, parsed.dataset, parsed.column, parsed.tail)
         by_key.setdefault(key, []).append(cid)
     errors = []
     # `column` is None for a table-level check, so sort on a coerced
@@ -210,4 +266,53 @@ def validate_tail_uniqueness(check_ids) -> list[str]:
                 f"{len(ids)} checks on dataset {dataset!r} column {column!r} share the "
                 f"final check_id segment {tail!r}, which is what a dashboard URL keys on: "
                 + ", ".join(sorted(ids)))
+    return errors
+
+
+def validate_hierarchy_agreement(check_ids) -> list[str]:
+    """Every check_id whose own identity disagrees with the one
+    hierarchy, as error strings (REQ-QAC-039).
+
+    Grammar validation proves an id is SHAPED right. It cannot tell you
+    the id names a dataset that exists, or that the agency and
+    collection it claims are the ones that dataset actually sits under -
+    and an id that validates and means nothing is worse than one that
+    fails, because it looks resolved. A dashboard URL built from such an
+    id leads nowhere, and a result filed under it is filed under a
+    fiction.
+
+    This is the check that makes the collection segment worth carrying:
+    without it the segment would be a fourth unverified copy of the
+    tree, which is what REQ-QAC-039 exists to stop, only now inside the
+    identifier itself.
+
+    Reports every offender rather than the first, same as its siblings
+    here - someone fixing hand-authored YAML wants the whole list.
+    Imported lazily so this module stays importable without config
+    present, which its own tests rely on.
+    """
+    from qa_tools.common import hierarchy
+
+    errors = []
+    expected_asset = hierarchy.data_asset_id()
+    for cid in check_ids:
+        parsed = try_parse(cid)
+        if parsed is None:
+            continue  # already reported by validate_grammar
+        if parsed.data_asset != expected_asset:
+            errors.append(
+                f"check_id {cid!r} names data asset {parsed.data_asset!r}, but this "
+                f"deployment is {expected_asset!r}")
+        try:
+            entry = hierarchy.dataset(parsed.dataset)
+        except hierarchy.UnknownDatasetError as exc:
+            errors.append(f"check_id {cid!r} names a dataset the hierarchy does not define - {exc}")
+            continue
+        for segment, actual, expected in (
+                ("agency", parsed.agency, entry.agency_id),
+                ("collection", parsed.collection, entry.collection_id)):
+            if actual != expected:
+                errors.append(
+                    f"check_id {cid!r} names {segment} {actual!r}, but the hierarchy puts "
+                    f"dataset {parsed.dataset!r} under {expected!r}")
     return errors

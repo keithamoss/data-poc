@@ -19,8 +19,8 @@ from __future__ import annotations
 # check_id (2026-09-16, Phase 4 prerequisite) - see
 # qa_tools/bdm/evidently_check_lifecycle.py's identical comment.
 PSI_CHECK_ID = (
-    "data-asset-1.child-protection-family-support.cp-notifications."
-    "stg_cp_notifications.concern_type.drift_psi_evidently")
+    "data-asset-1.child-protection-family-support.child-protection."
+    "cp-notifications.concern_type.drift_psi_evidently")
 
 CHECK_LIFECYCLE = {
     PSI_CHECK_ID: {

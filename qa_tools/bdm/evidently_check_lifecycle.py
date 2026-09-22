@@ -22,9 +22,9 @@ from __future__ import annotations
 # check_id (2026-09-16, Phase 4 prerequisite), so there's exactly one
 # place either string is spelled out, not a literal duplicated between
 # this file and the result-construction code.
-PSI_CHECK_ID = "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.drift_psi_evidently"
+PSI_CHECK_ID = "data-asset-1.registry-services.civil-registration.birth-registrations.sex.drift_psi_evidently"
 ROW_COUNT_GROWTH_CHECK_ID = (
-    "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.row_count_growth_evidently")
+    "data-asset-1.registry-services.civil-registration.birth-registrations.row_count_growth_evidently")
 
 CHECK_LIFECYCLE = {
     PSI_CHECK_ID: {

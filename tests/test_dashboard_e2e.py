@@ -1107,3 +1107,54 @@ class TestSupplyAndTableLevelSections:
             "() => document.getElementById('drawer').classList.contains('open')")
         assert "/column/table/check/" in clean_page.url
         assert "%28" not in clean_page.url
+
+
+# =====================================================================
+# REQ-QAC-039 - the tree the page renders IS the tree in
+# contract/data-asset.yaml, not a second copy of it.
+#
+# Driven in a real browser for the reason CLAUDE.md's own shape-change
+# lesson gives: embed_dashboard_data.py writing a correct HIERARCHY
+# const says nothing about whether buildData(), which has its own
+# transform, actually uses it. Before this the two real agencies and
+# collections were literals in the template, and a rename in the config
+# would have left the real dataset tiles hanging under a stale id with a
+# dead URL - failing silently, in the direction that looks fine.
+# =====================================================================
+
+class TestTheRenderedTreeComesFromTheHierarchy:
+    def _config_tree(self):
+        from qa_tools.common import hierarchy
+        out = {}
+        for entry in hierarchy.all_datasets():
+            out.setdefault((entry.agency_id, entry.agency_name), set()).add(
+                (entry.collection_id, entry.collection_name))
+        return out
+
+    def test_the_real_agency_and_collection_nodes_match_the_config(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, {"tier": "executive"})
+        rendered = clean_page.evaluate("""() => buildData(CURRENT_AS_OF).agencies.map(a => ({
+            id: a.id, name: a.name,
+            collections: a.collections.map(c => ({id: c.id, name: c.name})),
+        }))""")
+        by_id = {a["id"]: a for a in rendered}
+        for (agency_id, agency_name), collections in self._config_tree().items():
+            assert agency_id in by_id, f"{agency_id} is in the config but not on the page"
+            assert by_id[agency_id]["name"] == agency_name
+            on_page = {(c["id"], c["name"]) for c in by_id[agency_id]["collections"]}
+            assert collections <= on_page, (
+                f"{agency_id}: config has {collections - on_page} that the page does not")
+
+    def test_the_page_carries_the_hierarchy_const_at_all(
+            self, clean_page, built_dashboard_html):
+        """A guard against the const silently becoming null in the built
+        output - every assertion above would still pass on the
+        template's own illustrative fallback, which happens to agree
+        with the config today. That is exactly the shape of false green
+        this requirement exists to remove."""
+        _goto(clean_page, built_dashboard_html, {"tier": "executive"})
+        embedded = clean_page.evaluate("() => HIERARCHY")
+        assert embedded is not None, "the built dashboard embedded no HIERARCHY"
+        assert {a["id"] for a in embedded["agencies"]} == {
+            agency_id for agency_id, _ in self._config_tree()}

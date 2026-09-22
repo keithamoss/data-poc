@@ -2782,7 +2782,7 @@ requirements:
       id, its dashboard URL and its stored results agree instead of each
       carrying a different half of the truth.
     moscow: must
-    status: not_started
+    status: built
     source: >
       Keith's own question, 2026-09-20 - "what is it that actually
       groups Child Protection data together as a collection?" - and the
@@ -2843,7 +2843,134 @@ requirements:
         the point, not a side effect.
       - Nothing here needs a live connection to data/ or any warehouse.
     dependencies: []
+    linked_tests:
+      - tests/test_hierarchy.py
+      - tests/test_validate_hierarchy.py
+      - tests/test_check_id.py
+      - tests/test_validate_check_lifecycle.py
+      - tests/test_check_lifecycle.py
+      - tests/test_dashboard_e2e.py::TestTheRenderedTreeComesFromTheHierarchy
+    implemented_by:
+      - qa_tools/common/hierarchy.py::Dataset
+      - qa_tools/common/hierarchy.py::all_datasets
+      - qa_tools/common/hierarchy.py::dataset
+      - qa_tools/common/hierarchy.py::dataset_for_table
+      - qa_tools/common/hierarchy.py::datasets_in_collection
+      - qa_tools/common/validate_hierarchy.py::validate
+      - qa_tools/common/check_id.py::validate_hierarchy_agreement
+      - qa_tools/common/check_id.py::validate_tail_uniqueness
+      - qa_tools/common/check_lifecycle.py::migrate_pre_039_check_id
+      - qa_tools/bdm/bdm_common.py::DATASET
+      - qa_tools/cp/cp_common.py::TABLES
+      - contract/data-asset.yaml
+      - dashboard/qa-reporting-dashboard.template.html
+      - cli/dashboard.py::_validate_hierarchy
+    evidence:
+      - >
+        2026-09-23: the tree is stated once in contract/data-asset.yaml
+        and resolved through one module. Twelve Python files carried
+        hierarchy literals before this; the count is now zero, and the
+        two that remain (cp_common.COLLECTION_ID,
+        bdm_common.DATASET_ID) each name WHICH part of the tree their
+        scripts are for, which is a reference rather than a restatement.
+      - >
+        2026-09-23: all six contract fields that had drifted were
+        corrected, and validate_hierarchy.py was verified against the
+        real pre-fix files FIRST - it catches all six and exits 1.
+        tests/test_validate_hierarchy.py reproduces the three real
+        drifts rather than describing them.
+      - >
+        2026-09-23: all 258 check ids were renamed in one change,
+        gaining a collection segment and losing the table one. Measured
+        against the real previous commit rather than reasoned about:
+        258 before, 258 after, one-to-one, and ZERO config_hash changes
+        - every parser excludes the metadata block carrying the id
+        (dbt's meta, Soda's attributes, the ODCS rule's
+        customProperties) and Evidently's id is a dict key that never
+        enters its config. The NFR asking this to be said up front is
+        answered: no check reports as changed.
+      - >
+        2026-09-23: zero grammar errors, zero tail collisions and zero
+        hierarchy disagreements across all 258 checks, and across the
+        257 distinct ids in the regenerated committed history. The tail
+        check mattered here - dropping the table segment is exactly
+        what could have collided two ids into one URL.
+      - >
+        2026-09-23: the rendered dashboard tree genuinely comes from
+        the config, proved by changing a collection's display name in
+        contract/data-asset.yaml, rebuilding, and reading the new name
+        back out of a real browser - not by reading the code. Before
+        this the two real agency and collection nodes were literals in
+        the template.
+      - >
+        2026-09-23: 875 Python tests and 162 JS tests pass, all eight
+        mothman gates green, and the CI-safe rebuild works from
+        committed history alone.
     decisions:
+      - >
+        REVERSED 2026-09-23, with Keith, and recorded as a reversal
+        rather than a quiet rewrite: the committed qa_results/ tree is
+        rewritten THREE times, not twice. The decision below tied this
+        requirement's regeneration to REQ-GEN-042's so they would land
+        as one. Building it turned up the reason that does not work -
+        REQ-GEN-042's own criterion that the generator reads its
+        schedule from the same configuration the pipeline reads depends
+        on REQ-PIPE-049's named calendars, which are not built, and
+        both requirements declare dependencies: [] as though
+        independent. Keith chose the third rewrite over either signing
+        REQ-PIPE-049 in early or deferring a signed criterion. What it
+        costs is one extra full-tree commit; what it buys is that
+        neither the sign-off gate nor a signed criterion is bent to
+        save one.
+      - >
+        Found while building, and worth keeping because the fix is not
+        obvious from the criterion: dropping the table segment made
+        validate_tail_uniqueness() a restatement of global check_id
+        uniqueness. Its key was (data_asset, agency, collection,
+        dataset, column, tail), which after the change is every segment
+        of the id, so no two distinct ids could collide and the rule
+        could never fire. It is now keyed on exactly what a dashboard
+        URL carries and nothing else - data_asset excluded, since the
+        URL does not carry it. That restores real force for the one
+        case that remains: two assets sharing one set of configuration
+        files, which is the whole reason that segment stays. Found by a
+        test that stopped being able to construct a collision, not by
+        reading the code.
+      - >
+        Decided the one-time rename exception is spent in CODE, next to
+        the rule it excepts, as a self-expiring TRANSFORM rather than a
+        hand-listed dict of 258 pairs
+        (check_lifecycle.migrate_pre_039_check_id). A list could be
+        wrong in a way nobody would check; a transform states the same
+        rule the rename applied, so an old id that does not map onto a
+        real new one still fails the permanence gate. It only ever
+        rewrites an id matching the OLD grammar, which nothing authored
+        after this commit can do, and from the next commit no such id
+        exists in history - so it is dead code that changes nothing.
+        Kept rather than deleted so the exception is visible where the
+        error is raised, instead of only in a requirement nobody reads
+        at the moment they hit it.
+      - >
+        Decided the dashboard template keeps its literals as the raw,
+        unembedded fallback while the real agency and collection nodes
+        take their id and name from an embedded HIERARCHY const (Keith,
+        2026-09-23). The template must render standalone with
+        illustrative data, so something has to be written there; what
+        this removes is the copy that anything a reader ever sees would
+        use. Rejected building the real nodes entirely from HIERARCHY,
+        which is cleanest against the criterion but changes what the
+        raw template demo shows and what several tests-js navigation
+        tests assert. Rejected leaving the template alone, which would
+        have let a collection rename break the real tiles' URLs
+        silently.
+      - >
+        Decided the changelog feed labels Birth Registrations' scope by
+        its collection, "Civil Registration", rather than special-casing
+        a single-dataset collection to keep the old label (Keith,
+        2026-09-23). A feed entry is a collection-level publish event
+        now that both scopes are collection-level, and the
+        special-casing would have reintroduced the asymmetry this
+        requirement removes.
       - Decided to rename check_ids once, carrying BOTH the new
         collection segment and running-thoughts item 22's own changes -
         dropping the table segment and the data-asset prefix from the
@@ -2929,7 +3056,13 @@ requirements:
         LOGICAL table, which has many physical versions, since a period
         schema holds a supply plus its resupplies with arrival timestamps
         in their physical names (Thread A)."
-      - "Decided the committed qa_results/ tree is rewritten TWICE, not
+      - "SUPERSEDED 2026-09-23 - see the reversal recorded on
+        REQ-QAC-039. These requirements turned out not to be independent
+        of REQ-PIPE-049 the way this assumed, so the two regenerations
+        happen separately after all and the tree is rewritten three
+        times. Kept rather than edited, because the reasoning below is
+        still what a third rewrite has to be weighed against.
+        Decided the committed qa_results/ tree is rewritten TWICE, not
         three times (Keith, 2026-09-23). REQ-QAC-039 (check identity)
         and REQ-GEN-042 (dateless run_id, which renames every directory)
         land as ONE combined regeneration; unsigned REQ-PIPE-038
@@ -3601,7 +3734,13 @@ requirements:
         act rather than a side effect of running the generator on a
         different day. That determinism is the point - it is what stops a
         re-run doubling the committed history."
-      - "Decided the committed qa_results/ tree is rewritten TWICE, not
+      - "SUPERSEDED 2026-09-23 - see the reversal recorded on
+        REQ-QAC-039. These requirements turned out not to be independent
+        of REQ-PIPE-049 the way this assumed, so the two regenerations
+        happen separately after all and the tree is rewritten three
+        times. Kept rather than edited, because the reasoning below is
+        still what a third rewrite has to be weighed against.
+        Decided the committed qa_results/ tree is rewritten TWICE, not
         three times (Keith, 2026-09-23). REQ-QAC-039 (check identity)
         and REQ-GEN-042 (dateless run_id, which renames every directory)
         land as ONE combined regeneration; unsigned REQ-PIPE-038
