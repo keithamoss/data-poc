@@ -169,10 +169,13 @@ permits it, not to save time.
 
 **Swept in full on 2026-09-22, and again after that day's decisions** -
 five items were genuinely open that morning; two are now settled, one is
-deliberately deferred to its own batch, and the two that remain are both
-parked by design. **Nothing here blocks the scoper.** Kept in place
-rather than pruned so the settled ones read as settled rather than
-vanishing, which is how a closed question gets silently reopened:
+deliberately deferred to its own batch, and the two that remain are
+parked by design. A SIXTH was then found later the same day, while
+reading the real code for the concept inventory below, and it is the
+one item here a batch actually needs an answer to - everything else can
+go to the scoper as it stands. Settled items are kept in place rather
+than pruned, so they read as settled rather than vanishing, which is
+how a closed question gets silently reopened:
 
 1. ~~**Is "un-decide" an operation we want?**~~ - **SETTLED 2026-09-22.
    YES.** Keith: "I think undecide is an operation. Undecide, that is."
@@ -233,6 +236,19 @@ vanishing, which is how a closed question gets silently reopened:
    same day was not to rely on it, so drain-the-backlog is the whole
    mechanism, not a fallback behind a belt.
 
+6. **What the word "delivery" refers to, given the generator already
+   uses it for something else** - NEW, found 2026-09-22 by reading the
+   real code for the concept inventory below rather than by design
+   work. Today's `delivery_id` means the logical obligation across
+   attempts, which is what this model calls a SLOT; this model's
+   "delivery" is one physical arrival. Same word, swapped referent,
+   with the old sense still live in all three generator modules and
+   every committed `dataset_stats.json`. Either the generator's field
+   is renamed to `slot_id` or the new concept takes a different word -
+   Keith's call. **Belongs in batch 1**, which already owns the
+   generator and the delivery format; left later, the scoper writes
+   requirements whose vocabulary contradicts the code it is reading.
+
 ~~**Two requirements need work before their sprint**~~ - **DONE
 2026-09-22.** `REQ-PIPE-035` was REWRITTEN (it specified the
 cross-period composition Thread J dropped; it now specifies one
@@ -247,6 +263,140 @@ did not). Both remain `not_started` and UNSIGNED.
 anything `delivery-scoper` produces is a PROPOSAL. `CLAUDE.md`'s
 sign-off rule applies before any of it is built - scoping is not
 sign-off. See Thread G.
+## Concept inventory
+
+**Status:** todo (2026-09-22) · **Category:** Pipeline & publishing
+
+Written 2026-09-22, at Keith's request, immediately before the first
+scoper batches. It answers three questions in one place - what this
+model INTRODUCES, what it CHANGES about something that already exists,
+and what it RETIRES - because the sprints and threads above describe
+the destination without ever saying which parts of today's vocabulary
+survive the trip.
+
+Grounded in the real code rather than in this file's own prose. That
+mattered: reading the generators turned up a name collision nothing in
+the design work had noticed, recorded first below because it is the
+one item here that is actively hazardous rather than merely useful.
+
+### The collision: "delivery" already means something else
+
+`delivery_id` exists today, in both generators' manifests and in every
+committed `dataset_stats.json`. It means **the logical obligation** -
+`delivery_120` spans attempt 1, resupply 1 and resupply 2, each its own
+`run_id` and its own CSV, chained by `supersedes_run_id`.
+
+Under this model **a delivery is one physical arrival** - the observed
+transport unit, one folder drop, one prefix, one session (Thread B).
+And the thing today's `delivery_id` actually describes is what this
+model calls a **slot**.
+
+So this is not a new word arriving into empty space. It is the same
+word with its referent swapped, while the old sense stays live in
+`generator/generate_runs.py`, `generator/generate_cp_runs.py`,
+`generator/resupply.py` and all committed history. Somebody reading the
+generator while building arrival recognition will read "delivery" and
+get precisely the wrong concept.
+
+**Decide it in batch 1, not batch 3.** Batch 1 already owns the
+generator and the delivery format, so the naming call lands there
+naturally; left to batch 3, the scoper writes requirements whose
+vocabulary contradicts the code it is reading. The options are to
+rename the generator's own field to `slot_id`, or to give the new
+concept a different word. Not settled here - it needs Keith.
+
+### 1. New concepts
+
+**The spine** (batch 2). Everything downstream is defined as a
+comparison against these, which is why they get their own pass:
+- **Slot** - a dated obligation derived from the schedule.
+- **Schedule** - authored quarterly dates plus daily cadence,
+  effective-dated; the asset owns the calendar, a dataset owns its
+  participation in it.
+- **Claim window** - the interval before a slot's due time in which it
+  can be claimed. What makes forward mis-attribution structurally
+  impossible rather than merely unlikely (Thread E).
+
+**Filing** (batches 3 and 4):
+- **Staging** - arrival-ordered, asserting only the thing actually
+  known (this landed at this time), so it can never be wrong.
+- **Promotion**, and with it **demotion**, **un-decide** and
+  **re-file** as four distinct operations rather than one with modes.
+- **Period schema** - one schema per period, all within one database.
+- **Delivery**, in its new sense above.
+- **Decision log** - append-only: who, when, what, which, why.
+- **Operator identity** - `actor: {kind: human|rule, id}`, and a log
+  that refuses to record a decision carrying no identity.
+- **GitHub Issues as the write channel** - the dashboard stays
+  read-only, and issues are the channel, never the system of record.
+
+**Derived rather than stored:**
+- **Overdue as a computed property** - a query over schedule plus slot
+  state, not an event anything has to fire. Same shape as the
+  exhausted-schedule banner.
+
+**Checks** (batch 5):
+- **`depends_on`** - a check's lateral dependency, declared, because
+  "any table this spans" is not knowable from a tool's check syntax.
+- **Temporal `reference`** - `previous_period`, a fixed `baseline`, or
+  a rolling `window`. A real design choice per check, not a knob.
+- **Red-for-unrun, with a qualifying chip**, plus the pointer
+  indicator on a healthy table blocked by a neighbour.
+
+### 2. Existing concepts this model CHANGES
+
+| Concept | Today | Under this model |
+|---|---|---|
+| `run_id` | `run_120_2026-09-19`, carrying a date | Dateless; a run is no longer one delivery across six tables |
+| Supply granularity | One arrival is one collection, six CP tables | One supply is one table version; six independent timelines |
+| Resupply | DERIVED - chain membership inferred from per-arrival aggregate status, red opening a chain and green/amber closing it | OBSERVED - an arrival landing in an already-filled slot, with nothing to infer |
+| Cadence | The only schedule mechanism; quarterly computed from anchor months | One of two; quarterly becomes authored dates, with a run-out banner |
+| `nodata` | "Nothing landed in the current expected cycle", which also swallows cannot-run | Narrows to "nothing was owed"; cannot-run becomes red |
+| As-of | Filters runs by `run_date <= asOfDate` | Latest version PROMOTED on or before T, end of day, later time-granular |
+| Warehouse | One DuckDB file per run | One database, one schema per period |
+| `qa_results/` keying | Per collection | Per dataset, with today's history regenerated |
+| Check identity | Hierarchy implied in several places | One hierarchy stated once, including inside `check_id` |
+| Staleness | Collapses a whole column to `nodata` | Freshness is its own axis, CAPPING the headline |
+| `CHANGELOG_FEED` | A QA-publish changelog | An activity feed carrying arrival anomalies, with severity |
+| Data asset | A placeholder string in `data-asset.yaml` | A real level owning the calendar and a default supply cadence |
+
+### 3. What this model RETIRES, in two kinds
+
+Worth keeping apart, because they need opposite handling: one kind
+needs acceptance criteria to remove it, the other needs a `decisions:`
+entry so nobody proposes it again.
+
+**Retired from real code** - these exist today and come out:
+- `qa_tools/bdm/build_per_run_warehouses.py` and its CP sibling. Their
+  whole justification was that dbt and Soda have no run-scoped
+  `WHERE`; schema-per-period gives the same isolation and matches the
+  real operational system (Thread J).
+- `is_resupply`, `supersedes_run_id`, `attempt_number` and
+  `delivery_id` AS AUTHORITY. Phase 7 already stopped deriving chains
+  from them; this finishes the job. They may survive as generator
+  bookkeeping, but nothing downstream reads them.
+- The date inside `run_id`.
+- Per-collection QA triggering, in favour of per-delivery.
+
+**Rejected on paper, never built** - record, do not delete:
+- **Cross-period composition.** The specified design in `REQ-PIPE-035`
+  until 2026-09-22. Killed by red-for-unrun: carry-forward was the only
+  reason cross-period assembly existed.
+- **The clock-driven trigger**, and the timeout sweep for a table that
+  never showed. Delivery-triggering removes the clock entirely.
+- **Supplier-declared period**, and **deriving a period from the data's
+  own content**. Both rejected in Thread B, each for a reason that will
+  recur.
+- **`nodata` as a supply state.** Closed as unreachable.
+- **`queue: max`.** Rejected 2026-09-22 as edition-gated.
+
+### Not a retirement, checked
+
+`AS_OF_OFFSET_DAYS` is already fully gone - `contract/data-asset.yaml`
+no longer declares it and nothing reads it. Every remaining mention in
+the repo is a comment explaining what replaced it. It belongs on no
+list here.
+
 ## Delivery sprints
 
 First pass, 2026-09-21 night, at Keith's request - and deliberately cut
