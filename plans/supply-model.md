@@ -285,6 +285,34 @@ comparisons against the expected-supply sequence.
 21. **[todo, 2026-09-21]** **[Dashboard UI]** **Automatic snapshots**, on
     every publish, deduplicated by content hash (Thread K).
 
+22. **[todo, 2026-09-22]** **[Dashboard UI]** **Time-granular "as at".**
+    The as-of control accepts an optional TIME alongside the date, so an
+    intra-day sequence - promoted 14:00, demoted 22:00 - can be viewed
+    at any point rather than only at its end state (Thread H, second
+    chaos pass #6).
+
+    Scoped in at Keith's request, 2026-09-22, having first been recorded
+    as an unscoped later refinement.
+
+    - **A refinement, not a reversal**: a date-only input still means
+      END OF DAY. Time is an optional drill-down; the common case stays
+      one click.
+    - **It kills a real dependency.** The snapshot-based answer to
+      intra-day granularity holds only while each decision triggers its
+      own publish. With time-granular as-of the intermediate state comes
+      from the decision log itself, so batching decisions into one
+      publish stops mattering.
+    - **Snapshots still earn their place** - they answer "what the
+      dashboard SAID at that moment", where this answers "what was TRUE
+      at that moment, as we now understand it".
+    - The scenario map's links (see the register) can then target an
+      instant rather than a date, which matters for the injected
+      scenarios whose whole point is an intra-day sequence.
+
+    **Last, and deliberately**: it depends on both the decision log
+    (sprint 11) and the as-of work (sprint 18), and nothing depends on
+    it.
+
 **Why the dashboard sprints come last**: they render everything above.
 Building them earlier means building against a data shape still moving -
 which is how `clipDatasetToAsOf()` ended up filtering on arrival rather
@@ -809,6 +837,30 @@ carry their offset.
 in favour of our own receipt time. A file's metadata reflects the
 supplier's clock, timezone and bugs; staging's whole justification is
 that it asserts only facts we can vouch for.
+
+### The mixed-period delivery gate
+
+**TS-33a `[unit]` A delivery whose tables land in DIFFERENT PERIODS.**
+A catch-up drop carrying August's `cp_clients` alongside November's
+`cp_notifications`. Different tables, so the two-files-match-one-dataset
+hold never fires, and each is assigned independently with no ambiguity.
+**Expect**: QA **runs**, and **nothing auto-promotes** - a human review
+gate. Rare, and most real instances would trip the duplicate-file hold
+first, but cheap protection against a shape nobody expects.
+
+**TS-33b `[unit]` A normal delivery must NOT trip that gate.**
+Child Protection's ordinary six-table August delivery. All six land in
+the SAME period, but in six DIFFERENT slots, because slots are
+per-table.
+**Expect**: normal auto-promotion on green/amber. The gate does not
+fire.
+
+**TS-33b is the important half.** The gate's condition is tables landing
+in different **PERIODS**, not different **SLOTS** - and an
+implementation keyed on slots passes 33a while failing 33b, blocking
+auto-promotion on every healthy multi-table delivery. Without the
+negative case the bug ships, because the positive case alone looks like
+it works.
 
 ### The activity feed
 
