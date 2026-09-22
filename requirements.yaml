@@ -2888,6 +2888,47 @@ requirements:
         they are rewritten in the same change. The exception is narrow:
         it licenses THIS one grammar change, not a general freedom to
         renumber check ids later."
+      - "Decided the data_asset segment STAYS in a check_id, deliberately,
+        even though it is a constant in any single deployment and
+        therefore looks redundant (Keith, 2026-09-22). His reasoning, and
+        it is the part worth keeping: this repo may end up holding one
+        set of shared configuration files for SEVERAL data assets, which
+        will probably carry the same table names and some of the same
+        checks. The segment is what keeps a check_id globally unique
+        across them. Recorded because a future session looking to
+        simplify the grammar would see a segment with one value and
+        remove it, and the cost of that only appears later, when a
+        second asset arrives."
+      - "Recorded to correct a misreading rather than to settle anything
+        new: this requirement never proposed dropping data_asset from the
+        check_id, only from a dashboard URL - and the URL does not carry
+        it in any case. A URL keys a check on its TAIL, check_name_tool,
+        under /agency/<id>/collection/<id>/dataset/<id>/column/<name>/
+        check/<tail>. That criterion is a guard against the segment being
+        added to a URL later, not a removal. Keith confirmed the URL
+        shape is what he wants: agency, collection, dataset, column and
+        check all present and explicit, so a link never needs a lookup to
+        resolve."
+      - "Decided the table segment goes, and noted WHY the current one is
+        worse than merely redundant: it names the dbt STAGING MODEL, not
+        the table. stg_cp_clients is a real dbt model doing select * from
+        the raw cp_clients source, following dbt's own naming convention
+        - so every check carries dbt's vocabulary, including Soda,
+        datacontract-cli and Evidently checks that have no staging model
+        and read the real table. One tool's implementation detail in an
+        identity meant to be tool-neutral. Keith found this from the name
+        alone, 2026-09-22, asking why a table started with stg_."
+      - "Decided dataset-to-table is 1:1 BY CONSTRUCTION under the supply
+        model, which is what makes dropping the table segment safe rather
+        than merely tidy. check_id.py's own docstring records that tails
+        cannot collide today only because every dataset happens to map to
+        one table and nothing enforces it. Thread F enforces it: a supply
+        IS one table version and a slot is one (table, period) pair, so a
+        dataset mapping to two tables has no coherent slot and the model
+        cannot express it. Note the precision - a dataset is 1:1 with one
+        LOGICAL table, which has many physical versions, since a period
+        schema holds a supply plus its resupplies with arrival timestamps
+        in their physical names (Thread A)."
   - id: REQ-GEN-040
     title: The generator can deliver one table at a time, and can deliver early
     date_written: "2026-09-21"
