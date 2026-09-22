@@ -1,0 +1,66 @@
+{
+  "run_timestamp": "2026-09-22T22:22:19.460890+00:00",
+  "run_by": "noreply@anthropic.com",
+  "raw_output": {
+    "manifest_entry": {
+      "run_id": "run_030_2026-09-22",
+      "run_index": 42,
+      "delivery_id": "delivery_030",
+      "delivery_date": "2026-09-22",
+      "attempt_number": 1,
+      "arrived_date": "2026-09-22",
+      "run_date": "2026-09-22",
+      "is_resupply": false,
+      "supersedes_run_id": null,
+      "n_rows_generated": 1894,
+      "dirty_severity": null,
+      "id_offset": 3000000,
+      "seed": 1030,
+      "file": "run_030_2026-09-22.csv"
+    },
+    "value_counts": {
+      "sex": [
+        [
+          "M",
+          917
+        ],
+        [
+          "F",
+          937
+        ],
+        [
+          "X",
+          40
+        ]
+      ]
+    },
+    "arrival": {
+      "max_lag_hours": 7.113333333333333,
+      "earliest_extract": "2026-09-22 06:22:48.481564"
+    },
+    "check_aggregates": {
+      "sex": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 0,
+        "values": []
+      },
+      "place_of_birth_suburb": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 0,
+        "values": []
+      },
+      "date_of_birth": {
+        "type": "numeric_date",
+        "suppressed": false,
+        "total_invalid": 0,
+        "min": null,
+        "max": null,
+        "values": [],
+        "histogram": []
+      }
+    }
+  },
+  "verified": []
+}

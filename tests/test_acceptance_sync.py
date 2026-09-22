@@ -172,7 +172,10 @@ class TestRunWindowsWithTiedArrivedDates:
     coverage against real current committed history: this project's own
     full BDM pipeline regeneration (same day) left MOST real runs
     sharing their own arrived_date with another real run (352 real runs,
-    only 123 distinct dates) - this module's own long-documented intent
+    only 123 distinct dates, AS THE TREE STOOD THEN - BDM's history was
+    cut to 30 deliveries on 2026-09-23, so today's counts are smaller;
+    the tie condition this class covers is unaffected, since it is
+    produced by resupplies arriving on a day another run also arrived) - this module's own long-documented intent
     ("resolve to whichever sorts first") turns out not to match what the
     code actually did: the FIRST tied entry got window_end ==
     window_start (a zero-width, structurally unmatchable window, since

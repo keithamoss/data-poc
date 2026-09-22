@@ -245,7 +245,9 @@ def test_a_checks_description_and_changelog_are_carried_through(tmp_path, monkey
 # with `severity: warning` - a genuine TWO-SIDED range. Both thresholds
 # come through as None (correctly - there is no single upper bound), the
 # real tool evaluates it and says `pass`, and the 0-substitution turned
-# that into `1939 > 0` => RED on 352/352 BDM runs and 18/18 CP runs -
+# that into `1939 > 0` => RED on 352/352 BDM runs and 18/18 CP runs
+# (the BDM figure as the tree stood then; its history was cut to 30
+# deliveries on 2026-09-23) -
 # one per dataset, which is exactly what made all 7 datasets read red on
 # every single run.
 #
@@ -426,7 +428,8 @@ def test_a_check_with_no_authored_prose_still_builds(tmp_path, monkeypatch):
 # "datacontract:custom_sql", because it does not distinguish one
 # `type: sql` rule from another. The builder keyed its slots on
 # (engine, check_name), so the two collapsed into one - and they
-# genuinely disagree on 166 of the 352 committed runs, so the surviving
+# genuinely disagree on 166 of the 352 committed runs (as the tree
+# stood then - BDM's history was cut on 2026-09-23), so the surviving
 # tile was showing the other check's numbers under its own name.
 #
 # check_id is the identity the rest of this system already guarantees
