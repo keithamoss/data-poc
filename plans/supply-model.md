@@ -1985,16 +1985,27 @@ rule is: **two files in one delivery matching one dataset's pattern ->
 hold for a human**, with a TUI affordance to run QA and decide which
 slot each belongs to.
 
-**4. A delivery spanning two periods - COLLAPSES INTO #3.** A catch-up
-drop containing both August's and November's `cp_clients`. Worth
-recording that this is NOT a separate mechanism, because building it as
-one would be waste: nothing ever reads a declared period, assignment is
-purely arrival plus slot state, so two `cp_clients` files in one
-delivery is exactly #3's "two files match one dataset" hold. And a
-delivery carrying August's `cp_clients` alongside November's
-`cp_notifications` is not ambiguous at all - different tables, each
-assigned independently to its own oldest claimable unfilled slot. One
-rule, not two.
+**4. A delivery spanning two periods - MOSTLY COLLAPSES INTO #3, plus a
+backstop.** A catch-up drop containing both August's and November's
+`cp_clients` is NOT a separate mechanism: nothing ever reads a declared
+period, assignment is purely arrival plus slot state, so two
+`cp_clients` files in one delivery is exactly #3's "two files match one
+dataset" hold.
+
+The residual case is a delivery carrying August's `cp_clients` alongside
+November's `cp_notifications` - different tables, so #3 never fires, and
+each is assigned independently with no ambiguity. Keith, 2026-09-22:
+"that's a bit of a weird shape, and it would be weird to get only August
+clients, not also August and November, but just in case it happens."
+**Settled**: a **human review gate** - such a delivery **runs QA but
+never auto-promotes**. A cheap extra layer for a rare shape, and most
+real instances would trip #3 first anyway.
+
+**Wording matters here and would break everything if taken literally**:
+the condition is tables landing in **different PERIODS**, not different
+SLOTS. Per-table slots mean a normal six-table CP delivery already lands
+in six different slots, so a rule phrased on slots trips on every
+healthy delivery.
 
 **5. Re-filing into an already-occupied slot.** Re-filing is a human act
 that BYPASSES assignment - that is its purpose - so nothing stops a
@@ -2020,6 +2031,26 @@ decision triggers a publish, and snapshots are automatic per publish
 (deduplicated by content hash). If several decisions were ever batched
 into one publish, the intermediate states would not be snapshotted and
 this answer quietly stops working.
+
+**Adding a TIME element to as-of resolves it, and specifically kills
+that dependency** - Keith asked directly, 2026-09-22. With a
+time-granular as-of the intermediate state is derivable from the
+decision log itself, regardless of publish cadence, so batching stops
+mattering. The data already supports it: arrivals carry our own receipt
+instant and promotions carry a decision-log timestamp.
+
+Two things it does NOT change:
+- **A refinement, not a reversal.** A date-only input still means END OF
+  DAY (settled above); time is an optional drill-down, not a new
+  default. The common case stays one click.
+- **Snapshots still earn their place**, because they answer a DIFFERENT
+  question. Time-granular as-of gives "what was true at that moment, as
+  we now understand it"; a snapshot gives "what the dashboard actually
+  SAID at that moment". As-corrected versus as-published, one layer
+  down from the same distinction settled in Thread K.
+
+Not scoped to a sprint - a later refinement rather than sprint-1 work,
+since the common case does not need it.
 
 ## Thread I - The multi-table nodata seam
 **Status:** todo (2026-09-21) · **Category:** QA checks & contract
