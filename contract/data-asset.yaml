@@ -32,3 +32,74 @@
 # offset" / "revisit global-vs-per-dataset" options this superseded).
 
 data_asset_id: data-asset-1
+
+# ---------------------------------------------------------------------
+# THE HIERARCHY, stated once (REQ-QAC-039).
+#
+# Until 2026-09-23 this lived as literals in TWELVE Python files - four
+# copy-pasted BDM tool scripts, a hand-maintained table-to-dataset map
+# in cp_common.py, plus ticket_sync.py, acceptance_sync.py,
+# github_links.py, the two orchestrators and two build scripts. Every
+# consumer that needed a piece of the tree took its own copy, and
+# ticket_sync.py's own comment had already noted it was the FOURTH and
+# that consolidating was overdue.
+#
+# It lives HERE, rather than in a new file or derived by scanning the
+# dataset contracts, because this file already exists for genuinely
+# data-asset-level config, and because REQ-PIPE-049's named delivery
+# calendars land here too - so the asset's shape and its schedule sit
+# together, and a dataset naming a calendar resolves through one file
+# (Keith, 2026-09-23).
+#
+# WHERE THE IDS CAME FROM, and why the contracts were changed to match
+# rather than the other way round (Keith, same conversation): these ids
+# are already baked into every check_id, every qa_results/ path and
+# every dashboard URL. The dataset contracts disagreed - BDM declared
+# `id: bdm-birth-registrations` against the code's `birth-registrations`,
+# and CP declared `domain: child-and-family-safety`, which matched
+# NEITHER its collection (`child-protection`) nor its agency. Changing
+# the code would have churned committed history for nothing; the
+# contract fields were read by nothing load-bearing, so they were
+# corrected instead.
+#
+# `table:` is the replacement for cp_common.py's hand-maintained
+# TABLE_DATASET_ID/TABLE_DATASET_NAME pair. A dataset maps to exactly
+# one logical table - by construction under the supply model, not by
+# today's accident (plans/supply-model.md Thread F) - so the mapping
+# belongs beside the dataset rather than in a dict somebody maintains.
+hierarchy:
+  agencies:
+    - id: registry-services
+      name: Registry Services
+      collections:
+        - id: civil-registration
+          name: Civil Registration
+          datasets:
+            - id: birth-registrations
+              name: Birth Registrations
+              table: birth_registrations
+
+    - id: child-protection-family-support
+      name: Department for Child Protection and Family Support
+      collections:
+        - id: child-protection
+          name: Child Protection
+          datasets:
+            - id: cp-clients
+              name: Client Register
+              table: cp_clients
+            - id: cp-notifications
+              name: Notifications
+              table: cp_notifications
+            - id: cp-investigations
+              name: Investigations
+              table: cp_investigations
+            - id: cp-placements
+              name: Placements
+              table: cp_placements
+            - id: cp-carers
+              name: Carer Register
+              table: cp_carers
+            - id: cp-case-workers
+              name: Case Workers
+              table: cp_case_workers
