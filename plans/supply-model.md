@@ -329,7 +329,14 @@ concept a different word. Not settled here - it needs Keith.
 
 **The spine** (batch 2). Everything downstream is defined as a
 comparison against these, which is why they get their own pass:
-- **Slot** - a dated obligation derived from the schedule.
+- **Period** - a named bucket on the ASSET's calendar (`2026-Q3`, or
+  `2026-09-22`), carrying a date. What a schema is named after. Added
+  to this list 2026-09-22: Keith noticed the inventory described a
+  "period schema" while never naming period itself, and the gap turned
+  out to be hiding a real modelling error (Thread C).
+- **Slot** - one `(table, period)` pair that is actually expected,
+  carrying its own `due_at`, grace and claim window. One period, many
+  slots.
 - **Schedule** - authored quarterly dates plus daily cadence,
   effective-dated; the asset owns the calendar, a dataset owns its
   participation in it.
@@ -485,12 +492,21 @@ comparisons against the expected-supply sequence.
    The gate ships WITH the config, not after: a typo silently yields zero
    slots, which is the exhausted-schedule state arriving by accident.
 
-6. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Slots.** The
-   `(period, due_at)` sequence derived from the schedule, the low-runway
-   warning measured in slots, and the hard failure on an exhausted
-   schedule (Thread C).
+6. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Periods and
+   slots.** The period sequence derived from the schedule, slots
+   derived as periods crossed with each dataset's participation, the
+   low-runway warning measured in slots, and the hard failure on an
+   exhausted schedule (Thread C).
 
    The spine. Nothing downstream can be built before it.
+
+   *Scope grew 2026-09-22*: period and slot are now separately defined,
+   and `due_at` belongs to the SLOT, not the period - so this sprint
+   builds two derivations rather than one sequence. It also has to
+   specify **embedding the period list into the built dashboard**:
+   `cycleStartDate()` reimplements `cycle_start()` in JS for the as-of
+   picker, and JS can compute a cadence rule but cannot compute an
+   authored date list. Config, not data, so the CI rule is untouched.
 
 7. **[todo, 2026-09-22]** **[Pipeline & publishing]** **Delivery
    recognition and file mapping.** What constitutes a delivery for a
@@ -1569,9 +1585,16 @@ genuinely is "every day"; four quarterly dates a year are known well
 in advance, and the real agreed day is "the closest business day to
 the 1st", which a `day_of_month: 1` rule does not express.
 
-Both authoring styles produce the same thing - a sequence of
-`(period, due_at)`. Everything downstream consumes that sequence and
+Both authoring styles produce the same thing - a sequence of PERIODS,
+each carrying a date. Everything downstream consumes that sequence and
 never knows which produced it.
+
+**Corrected 2026-09-22**: this originally said the sequence was
+`(period, due_at)` pairs, putting the deadline on the period. It
+cannot live there - see "PERIOD and SLOT, defined" below, where the
+deadline moves to the slot. Fixed here rather than left to contradict
+that section, since carrying two versions of one rule in this file is
+the mistake already made once with `nodata`.
 
 Two alternatives were worked through and rejected, both worth not
 re-deriving:
@@ -1680,6 +1703,134 @@ Detail decisions:
   everything is aligned to one of the four days), but it is cheap now
   and awkward to retrofit once 30 datasets assume subsetting. Same
   effective-dating, changelog and runway check as the asset calendar.
+
+### PERIOD and SLOT, defined - and where `due_at` actually lives
+
+Settled 2026-09-22, and the definition came LAST rather than first,
+which is how the real problem underneath it stayed hidden. "Period" is
+used throughout this file - schemas are keyed on it, the cannot-run
+rule is "an unfilled slot FOR THAT PERIOD", effective-dating says "the
+schedule version in force at that period's due date" - and it was never
+defined anywhere. Keith caught it reading the concept inventory: we say
+one schema per period without ever naming period as a concept.
+
+**The definitions:**
+
+> A **PERIOD** is a named bucket on the ASSET's calendar - `2026-Q3`,
+> or `2026-09-22`. It carries a DATE and nothing else. It is what a
+> schema is named after.
+>
+> A **SLOT** is one `(table, period)` pair that is actually expected -
+> created only where that table participates in that period. It carries
+> its own `due_at`, its own grace allowance and its own claim window.
+
+One period, many slots. Thread F already said this without naming it:
+"the SAME period, but in six DIFFERENT slots".
+
+#### The real finding: `(period, due_at)` cannot express what we need
+
+The schedule was specified above as producing a sequence of
+`(period, due_at)` pairs, which makes the deadline a property of the
+period - one deadline per date. **It cannot be.** `expected_time` lives
+in each dataset's own ODCS contract today (`pipeline/cadence.py`'s
+`parse_cadence_from_contract` reads `expectedTime` per dataset), so two
+datasets landing on the same quarterly date can be due at different
+times, and at ~30 datasets across different teams and source systems
+they plainly will be.
+
+**Keith's call, 2026-09-22: per-dataset expected times are "a definite
+need"**, so the deadline moves to the SLOT. The alternative - one
+deadline per period, every participant sharing it - was put to him and
+rejected: it is simpler, and it would remove a capability the code
+already has for no gain beyond tidiness.
+
+**The case that decides it.** Three slots in `2026-Q3` (date 1 July):
+`births` due 09:00, `cp_clients` due 09:00, `cp_placements` due 17:00.
+Births arrives 1 July at 16:00. With the deadline on the PERIOD - one
+value for the day, say 17:00 - Births reads ON TIME. With the deadline
+on the SLOT, it is due 09:00 plus 120 minutes of grace, so it reads
+LATE by five hours. Same arrival, opposite verdict, and the wrong one
+is a FALSE GREEN, which is the direction that matters.
+
+#### Config sketch
+
+The asset's calendar names no datasets at all:
+
+```yaml
+# contract/schedule.yaml - asset level
+data_asset_id: data-asset-1
+timezone: Australia/Perth
+periods:
+  kind: authored              # quarterly: real agreed dates
+  versions:
+    - effective_from: 2026-01-01
+      changelog: "Agreed delivery dates for 2026."
+      dates:
+        - { period: 2026-Q3, date: 2026-07-01 }
+        - { period: 2026-Q4, date: 2026-10-01 }
+```
+
+The daily asset is the same field with the other shape, which is what
+makes "everything downstream never knows which produced it" real:
+
+```yaml
+periods:
+  kind: cadence
+  rule: daily                 # generates 2026-09-22, 2026-09-23, ...
+```
+
+Each dataset names its participation and its own timing, in its own
+contract where `expectedTime`/`latency` already live:
+
+```yaml
+slaProperties:
+  - property: participatesIn
+    value: all                # or [Q1, Q3] for a twice-yearly dataset
+  - property: expectedTime
+    value: "09:00"
+  - property: latency
+    value: 120                # minutes of grace before "late"
+  - property: claimWindow
+    value: 3                  # days before due_at that this slot opens
+```
+
+Slots are then DERIVED - the cross product of periods and
+participation - never authored.
+
+#### Which concept each consumer actually needs
+
+Both are load-bearing; neither is a wrapper for the other:
+- **Schema naming** - period only.
+- **Overdue** - slot. "Which slots have `due_at` in the past and are
+  unfilled."
+- **Claim window and slot assignment** - slot.
+- **Early/onTime/late** - slot. This is what gives Thread F's
+  per-table classification something to compare against.
+- **The cannot-run rule** - BOTH. "Any table this check spans has an
+  unfilled slot for that period" needs the period to group by and the
+  slot to hold the state.
+
+#### Consequence for the dashboard, found while sketching this
+
+`pipeline/cadence.py`'s `cycle_start()` is deliberately reimplemented
+in the dashboard's own JS (`cycleStartDate()`) because the as-of picker
+lets a viewer pick any date in the browser and a static site has no
+backend to ask. That reimplementation COMPUTES a cycle from a cadence
+rule, and it cannot compute an authored date list.
+
+So **the period list has to be embedded into the built dashboard**
+alongside the other consts. This does not touch the
+CI-never-reads-data rule - a schedule is config, not data - but it is a
+real new embed that batch 2 must specify. Easy to discover late, and
+the symptom would be an as-of picker silently returning nothing on a
+quarterly asset.
+
+#### Deliberately left to the scoper
+
+Exact field names (`participatesIn`, `claimWindow`), and whether the
+claim window is genuinely per-dataset or one value per asset. It is
+drawn per-dataset above for symmetry, but nothing in the design so far
+actually requires that.
 
 ### Exhausted schedule - hard failure, scoped per dataset
 
