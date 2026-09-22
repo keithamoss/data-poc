@@ -2894,19 +2894,13 @@ requirements:
       widened to cover early arrival, which plans/running-thoughts.md
       #27 measured the generator as never producing.
     acceptance_criteria:
-      - THE SYSTEM SHALL generate an arrival for one dataset without
+      - THE SYSTEM SHALL generate a supply for one dataset without
         generating one for any other dataset in the same collection.
-      - THE SYSTEM SHALL generate at least one scenario in which some of
+      - THE SYSTEM SHALL generate at least one delivery in which some of
         a collection's tables are resupplied and the rest are not.
-      - THE SYSTEM SHALL record each generated arrival against its own
-        dataset, and SHALL record the delivery it belonged to where it
-        belonged to one.
       - WHERE a whole-collection delivery is what is being simulated,
-        THE SYSTEM SHALL still be able to generate one.
-      - THE SYSTEM SHALL keep generation seeded and reproducible - the
-        same seed produces the same arrivals in the same order.
-      - THE SYSTEM SHALL keep Birth Registrations' own daily generation
-        behaviourally unchanged.
+        THE SYSTEM SHALL still be able to generate one, as one delivery
+        rather than as several.
       - THE SYSTEM SHALL be able to generate a supply whose receipt
         instant falls before its slot's due instant.
       - THE SYSTEM SHALL be able to generate a supply whose receipt
@@ -2915,6 +2909,12 @@ requirements:
       - THE SYSTEM SHALL NOT decide, record or emit which slot a
         generated supply fills - it SHALL only decide when that supply
         was received.
+      - THE SYSTEM SHALL keep generation seeded and reproducible - the
+        same seed produces the same supplies, with the same receipt
+        instants, in the same order.
+      - THE SYSTEM SHALL keep Birth Registrations' own daily generation
+        behaviourally unchanged except where this requirement, or the
+        vocabulary change in REQ-GEN-042, changes it deliberately.
     non_functional_requirements:
       - Determinism is the correctness check for this whole repo. A
         change to arrival scheduling must keep a regenerate-and-diff
@@ -3539,8 +3539,6 @@ requirements:
       - THE SYSTEM SHALL name each file in a delivery so that the
         dataset it belongs to is derivable from the filename alone,
         using that dataset's own configured pattern.
-      - THE SYSTEM SHALL record, for each delivery, the instant WE
-        received it, expressed with its UTC offset.
       - THE SYSTEM SHALL NOT place the period, the slot, or any other
         statement of what a file is intended for inside a delivery, and
         no code that files a supply SHALL read such a statement.
@@ -4334,7 +4332,7 @@ requirements:
       - THE SYSTEM SHALL reject a month name that is not a real, full
         month name.
       - THE SYSTEM SHALL reject a dataset naming a delivery month for
-        which the asset calendar has no date.
+        which its own calendar has no date.
       - THE SYSTEM SHALL reject schedule versions that overlap or are
         out of order on their effective-from dates.
       - THE SYSTEM SHALL reject duplicate calendar dates and duplicate
@@ -4448,8 +4446,6 @@ requirements:
         each period's name from the configuration.
       - WHERE a schedule is a cadence rule, THE SYSTEM SHALL name each
         period by its own date.
-      - THE SYSTEM SHALL evaluate each period against the schedule
-        version in force on that period's own date.
       - WHEN a new schedule version is added, THE SYSTEM SHALL leave
         every earlier period unchanged.
       - THE SYSTEM SHALL NOT attach a due instant, a grace allowance or
@@ -4531,8 +4527,8 @@ requirements:
       - THE SYSTEM SHALL give each slot its own due instant, computed
         from its period's date and its own dataset's expected time of
         day in the asset's timezone.
-      - THE SYSTEM SHALL give each slot its own grace allowance and its
-        own claim window.
+      - THE SYSTEM SHALL give each slot its own grace allowance, taken
+        from its own dataset's contract.
       - THE SYSTEM SHALL open a slot's claim window a configured
         interval before that slot's due instant, and SHALL NOT close it.
       - IF a dataset declares a period as not expected, THEN THE SYSTEM
