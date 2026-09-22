@@ -63,18 +63,36 @@ OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 ID_BLOCK = 100_000  # per-delivery id_offset spacing - well above any single delivery's row count
 
 # (day offset from delivery 1, base row count, first-attempt dirty severity or None)
-# 120 scheduled deliveries (widened again 2026-09-16, Keith's own call,
-# same day as Thread C's as-of picker landed: the previous 60-delivery
-# window barely cleared AS_OF_OFFSET_DAYS' own 60-day span - the DEFAULT
-# as-of date, today minus 60, landed one day before this dataset's own
-# earliest real run, so the flagship real dataset showed "no data" on
-# the default view. 120 gives genuine margin beyond the 60-day offset,
-# not just enough to scrape by - Keith's own words: "this will mean an
-# occasional regeneration, but that's fine." Originally deepened from
-# ~10 to 60 deliveries on 2026-09-16 too - see plans/dashboard.md #5's
-# "deepening simulated history" follow-up, done together with widening
-# Child Protection's cadence to quarterly since the two were explicitly
-# parked as one piece of work) - same ~60/20/20 clean/amber/red ratio as
+# 30 scheduled deliveries - CUT TO A QUARTER on 2026-09-23 (Keith:
+# "let's cut that down to a quarter while we're doing this development
+# work, and then we can always punch it back up for a longer history
+# later"). A development-speed setting, not a design one: every real
+# pipeline run, every committed qa_results/ directory and every git
+# walk over that tree scales with this number, and the supply-model
+# build ahead regenerates the whole tree twice.
+#
+# WHY THIS IS SAFE NOW, AND WAS NOT BEFORE. It was 120 because the
+# previous 60-delivery window "barely cleared AS_OF_OFFSET_DAYS' own
+# 60-day span - the DEFAULT as-of date, today minus 60, landed one day
+# before this dataset's own earliest real run, so the flagship real
+# dataset showed 'no data' on the default view" (2026-09-16, Keith's
+# own call). That constraint is GONE: AS_OF_OFFSET_DAYS was removed
+# entirely on 2026-09-17 in favour of per-dataset cadence, and the
+# dashboard's defaultAsOf() is now simply today. Since START_DATE is
+# anchored so the LAST delivery lands ON the anchor date, the default
+# view shows fresh data at any N. Checked in the template rather than
+# assumed, after a 2026-09-22 lesson about inferring behaviour from
+# config instead of reading the code that consumes it.
+#
+# To raise it again, change this one number and regenerate - but
+# re-read the paragraph above first, because a future as-of default
+# that looks backwards would make N load-bearing again.
+#
+# (Originally deepened from ~10 to 60 deliveries on 2026-09-16 - see
+# plans/dashboard.md #5's "deepening simulated history" follow-up, done
+# together with widening Child Protection's cadence to quarterly since
+# the two were explicitly parked as one piece of work) - same ~60/20/20
+# clean/amber/red ratio as
 # the original 10-delivery plan (which was itself bumped from a single
 # red to 2 so the resupply-chain simulation below had more than one
 # independent example to demonstrate variability), generated rather than
@@ -86,7 +104,7 @@ ID_BLOCK = 100_000  # per-delivery id_offset spacing - well above any single del
 # RUN_PLAN deliberately ends red instead, see that module's own comment
 # for why.
 _RUN_PLAN_SEED = 1900  # distinct range from per-delivery seeds (1000+i) and id_offset math
-N_DELIVERIES = 120
+N_DELIVERIES = 30
 
 
 # The clean/amber/red mix across the scheduled deliveries. Named rather
@@ -212,7 +230,7 @@ def _manifest_entries_for_delivery(attempts: list, i: int, delivery_id: str, del
     previous_run_id = None
     for attempt in attempts:
         suffix = "" if attempt.attempt_number == 1 else f"_resupply{attempt.attempt_number - 1}"
-        # :03d, not :02d - N_DELIVERIES=120 (widened 2026-09-16) needs 3
+        # :03d, not :02d - N_DELIVERIES was 120 (2026-09-16) and needed 3
         # digits, and the padding must stay WIDE ENOUGH for every id to
         # sort correctly as a plain string: a real bug caught by
         # test_severity_counts_match_run_plan when this was still :02d
