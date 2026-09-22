@@ -79,6 +79,18 @@ def validate_check_lifecycle_command(require_explanations: bool) -> None:
     _validate_check_lifecycle(require_explanations)
 
 
+def _validate_hierarchy() -> None:
+    from qa_tools.common.validate_hierarchy import main as validate_main
+    if validate_main() != 0:
+        raise click.ClickException("hierarchy validation failed - see output above.")
+
+
+@dashboard_group.command("validate-hierarchy")
+def validate_hierarchy_command() -> None:
+    """Gate: every dataset contract agrees with the one hierarchy (REQ-QAC-039)."""
+    _validate_hierarchy()
+
+
 def _validate_requirements(path: str | None = None) -> None:
     from qa_tools.common.validate_requirements import main as validate_main
     if validate_main(path) != 0:

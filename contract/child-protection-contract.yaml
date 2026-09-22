@@ -51,12 +51,20 @@
 
 apiVersion: v3.2.0
 kind: DataContract
-id: child-protection-casework
+# `id`, `name` and `domain` are held to the hierarchy in
+# contract/data-asset.yaml (REQ-QAC-039, gated by
+# `mothman dashboard validate-hierarchy`): `id` names what this
+# contract describes, `domain` names the agency that owns it, and
+# `name` is that thing's display name. Corrected 2026-09-23 - all
+# three previously disagreed with the ids every check_id,
+# qa_results/ path and dashboard URL already used, and nothing read
+# them, so they had drifted unnoticed.
+id: child-protection
 status: draft
 version: 1.0.0
 
-name: Child Protection Casework Collection
-domain: child-and-family-safety
+name: Child Protection
+domain: child-protection-family-support
 description:
   purpose: >
     The Child Protection Casework collection: notifications received about

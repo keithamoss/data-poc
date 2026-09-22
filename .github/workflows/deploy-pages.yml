@@ -264,6 +264,9 @@ jobs:
       - name: Embed real data into the dashboard
         run: uv run mothman dashboard embed
 
+      - name: Gate - hierarchy validation (REQ-QAC-039)
+        run: uv run mothman dashboard validate-hierarchy
+
       - name: Gate - check-lifecycle validation (Thread D)
         run: uv run mothman dashboard validate-check-lifecycle --require-explanations
 

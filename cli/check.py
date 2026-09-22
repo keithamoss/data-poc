@@ -60,6 +60,8 @@ _GATES: tuple[tuple[str, list[str], str], ...] = (
     # the incident that produced this gate.
     ("agents", ["uv", "run", "python3", "-m", "qa_tools.common.validate_agents"],
      ".claude/agents/*.md frontmatter actually parses"),
+    ("hierarchy", ["uv", "run", "mothman", "dashboard", "validate-hierarchy"],
+     "every contract agrees with the one agency/collection/dataset tree"),
     ("requirements", ["uv", "run", "mothman", "dashboard", "validate-requirements"],
      "every linked test and implemented_by symbol still exists"),
     ("changelog", ["uv", "run", "mothman", "dashboard", "validate-changelog"],
