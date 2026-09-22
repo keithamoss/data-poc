@@ -921,6 +921,18 @@ Rough layout:
     article Keith found himself. A `translate.goog` proxy mirror exists
     and was deliberately NOT used - routing around a block is a
     different thing from picking a different legitimate primary URL.
+  - **`docs.github.com`** - GitHub's own documentation. Hit 2026-09-22
+    fact-checking GitHub Actions concurrency/queueing semantics for the
+    decision-log design (`plans/supply-model.md` Thread H). Confirmed a
+    real `curl: (56) CONNECT tunnel failed, response 403`, not just a
+    `WebFetch` refusal. **Worked around legitimately** via the docs'
+    own source repository - `github/docs` is public, so a shallow
+    sparse clone (`content/actions`) gave the exact same text plus its
+    `data/features/*.yml` version gates, which the rendered site does
+    not expose. Same repo, same content, a real primary source rather
+    than a bypass. Worth allow-listing anyway: this project reaches for
+    GitHub docs often enough (Actions, Issues, the ticketing path) that
+    cloning a large docs repo each time is a poor trade.
   - **`clig.dev`** - the CLI guidelines, used for the CLI/TUI UX work.
     Worked around legitimately via its own real GitHub source
     (`raw.githubusercontent.com/cli-guidelines/cli-guidelines/main/

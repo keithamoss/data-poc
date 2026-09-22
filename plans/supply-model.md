@@ -176,9 +176,10 @@ file** - five items, none of which blocks the first two scoper batches:
 4. **What a "run" means for supply history** - a RE-CHECK task rather
    than an open question: per-table slots and the dateless `run_id` may
    already have resolved it.
-5. **Verify GitHub's concurrency queueing behaviour** - a fact-check,
-   and the drain-the-backlog design makes the answer non-load-bearing
-   either way.
+5. ~~**Verify GitHub's concurrency queueing behaviour**~~ - **DONE
+   2026-09-22**, see Thread H. Confirmed, plus an opt-in (`queue: max`)
+   that is edition-gated and capped at 100, so drain-the-backlog remains
+   the real guarantee.
 
 **Two requirements need work before their sprint, not before the
 scoper**: `REQ-PIPE-035` needs REWRITING (it specifies the composition
@@ -2198,9 +2199,37 @@ start running until the first one is done, is that right?" Yes for two.
 **GitHub holds only ONE pending run per concurrency group**, so with A
 running, B pending and C arriving, B is cancelled and replaced by C -
 three rapid decisions silently lose the middle one, which is the exact
-failure this was meant to prevent. (Worth verifying against current
-GitHub docs rather than taken on trust; it is specific platform
-behaviour.)
+failure this was meant to prevent.
+
+**FACT-CHECKED 2026-09-22** at Keith's request, against GitHub's own
+docs source (`github/docs`, `content/actions/concepts/workflows-and-
+actions/concurrency.md`) - `docs.github.com` itself is blocked by this
+session's egress proxy, see `CLAUDE.md`. Exact wording:
+
+> "When you limit concurrency, by default only one run can be pending in
+> a concurrency group - any additional pending runs cancel the previous
+> one. If you need runs to execute sequentially without being canceled,
+> you can opt in to queuing, which allows multiple runs to wait in line
+> and execute in order."
+
+So the claim holds, and there is ALSO an opt-in that was not known when
+this was written: **`queue: max` in the `concurrency` section**, giving
+real FIFO queueing, capped at **100 runs per concurrency group** with
+runs beyond that REJECTED (`content/actions/reference/limits.md`).
+
+**Two caveats that keep drain-the-backlog as the real guarantee:**
+- **Edition-gated.** That paragraph sits behind `{% ifversion
+  actions-nga %}`, and `data/features/actions-nga.yml` lists `fpt` and
+  `ghec` only - github.com and Enterprise Cloud, NOT Enterprise Server.
+  If the real separated environments run GHES, `queue: max` may not
+  exist there.
+- **Capped and rejecting.** Beyond 100 queued runs they are rejected
+  outright, which is a lost decision again, just at a higher threshold.
+
+So: use `queue: max` where available as a belt, but the braces are
+below - draining the backlog works on any edition, at any volume, and
+survives a run failing for reasons that have nothing to do with
+concurrency.
 
 **(b) The real fix, which makes (a) moot either way: EACH RUN DRAINS
 THE BACKLOG.** The workflow reads ALL unprocessed decisions since a
