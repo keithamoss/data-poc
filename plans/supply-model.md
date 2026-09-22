@@ -50,17 +50,51 @@ you've got logged... and then we'll do one last stress test using chaos
 engineering. And then we'll work up a delivery plan and then start
 feeding them to the delivery scoper after that."**
 
-1. **Close the open items** listed below.
-2. **One last chaos-engineering stress test** of the settled model.
-3. **Work up a delivery plan** - first pass is the sprints below, written
-   2026-09-21 night; it wants reviewing with Keith rather than treating
-   as agreed.
-4. **Then** feed requirements to `delivery-scoper` - batch one (storage
-   and supply model) first, the readers batch after, per the two-batch
-   split agreed 2026-09-21.
+1. ~~**Close the open items**~~ - **DONE 2026-09-22.**
+2. ~~**One last chaos-engineering stress test**~~ - **DONE 2026-09-22**,
+   see Thread H's second pass.
+3. ~~**Work up a delivery plan**~~ - **DONE 2026-09-22**: 24 sprints
+   below, reviewed with Keith.
+4. **Feed requirements to `delivery-scoper`, in the batches below.**
 
-Step 4 comes LAST. Batch one was described as "ready to fire" earlier
-that same evening, before this sequence was set - do not act on that.
+### Scoper batches
+
+Settled with Keith, 2026-09-22, replacing the two-batch split agreed
+2026-09-21 - at 24 sprints that split would have put 18 in one batch,
+which he judged too many. **Cut at the seams where the CONCEPTS change
+rather than evenly**, so a batch's questions can be answered without
+reaching into the next one.
+
+| Batch | Sprints | What it is |
+|---|---|---|
+| **1 · Preconditions** | 1-4 | check identity, generator + delivery format, status parity, timezone |
+| **2 · Schedule and slots** | 5-6 | schedule config + validation, slot derivation |
+| **3 · Arrival and filing** | 7-10 | delivery recognition, arrival/staging, assignment, classification |
+| **4 · Decisions and storage** | 11-14 | promotion, decision log, warehouse, `qa_results/` |
+| **5 · QA under the new model** | 15-18 | delivery-triggered QA, check deps, red-for-unrun, drift |
+| **6 · Dashboard** | 19-24 | supply history, freshness, decision-log display, activity feed, snapshots, time-granular as-of |
+
+Batch 2 is only two sprints, deliberately: they are the SPINE -
+everything downstream is defined as a comparison against the slot
+sequence - so it gets its own pass rather than being buried in a batch
+of six.
+
+Batch 6 is the biggest at six. Homogeneous enough to hold together, but
+**split it at 19-21 / 22-24 if it comes back sprawling** - the seam is
+"showing current state" versus "showing history and activity".
+
+**Sequencing - five passes, not six.** The 2026-09-21 reasoning still
+holds (a later batch depends on an earlier one's answers, and
+conflating them produces tangled questions), but not every batch
+chains:
+- **Batches 1 and 2 run TOGETHER** - batch 1 is genuinely independent of
+  everything.
+- **Batches 2 -> 3 -> 4 -> 5 chain**, each needing the previous one's
+  answers.
+- **Batch 6 depends on 2-5**, and nothing depends on it.
+
+The one parallel pair is parallel because the dependency genuinely
+permits it, not to save time.
 
 **The still-open items, as at end of 2026-09-21:**
 
@@ -274,11 +308,12 @@ comparisons against the expected-supply sequence.
     because it is what makes mutable filing safe and deserves its own
     verification.
 
-    **Carries the one deferred open question**: two conflicting
-    decisions on the same supply - the log records both, but the state
-    can only be one, and nothing says which wins. Keith deferred it to
-    this requirement (Thread H, second chaos pass #2). It needs an
-    answer before this ships.
+    **Conflicting decisions on one supply**: record both, LAST WINS,
+    both operators notified by the ticket being updated with the
+    outcome. Decisions are applied **serialised per supply, in
+    comment-timestamp order**, and the workflow must **queue rather
+    than cancel** (`cancel-in-progress: false`) - a cancelled run is a
+    lost decision. Settled 2026-09-22, see Thread H.
 
 13. **[todo, 2026-09-21]** **[Pipeline & publishing]** **One database,
     many schemas.** Retire the per-run warehouses; one database per test
@@ -2092,10 +2127,29 @@ takes minutes, during which the dashboard still shows the old state, so
 **an operator who thinks their comment did not land will comment again**.
 Duplicate and conflicting decisions are the expected case, not the
 exotic one.
-Keith, 2026-09-22, began answering and then deliberately deferred: "let's
-tackle that when we come to doing that requirement." Recorded as
-DEFERRED BY DECISION, not overlooked - it is a real gap and it needs an
-answer before the decision log ships.
+**SETTLED 2026-09-22** (Keith, after first deferring it): **record
+both, LAST WINS, and both operators get feedback via the GitHub ticket
+being updated with the outcome of the action.**
+
+**On the race condition he raised** - "I'm also not sure how you would
+solve like a race condition." The ordering half is free: GitHub
+serialises comment creation and stamps each with a `created_at`, so
+"last" is well defined without us doing anything. The real race is in
+PROCESSING - two workflow runs firing concurrently, both reading the
+pre-decision state, both writing.
+
+So the fix is not ordering the comments, it is **serialising their
+APPLICATION**: process decisions in comment-timestamp order, one at a
+time per supply. Which is the same serialisation constraint already
+named for QA and promotion in Thread I - one discipline, not two.
+
+**One concrete detail that would silently drop decisions if got wrong.**
+GitHub Actions concurrency groups are the mechanism, and this repo
+already uses them - we watched `test.yml` runs get CANCELLED by
+concurrency on 2026-09-22 when pushes landed in quick succession.
+Cancelling is exactly wrong here: a cancelled run is a LOST DECISION.
+The decision workflow needs **`cancel-in-progress: false`** - queue,
+do not cancel - the opposite of what the test workflow wants.
 
 **3. The same dataset twice in one delivery.** A supplier drops
 `cp_clients.csv` and `cp_clients_v2.csv` in the same folder. A supply is
