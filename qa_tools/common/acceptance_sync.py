@@ -48,33 +48,21 @@ import subprocess
 from datetime import date, datetime
 from pathlib import Path
 
+from qa_tools.common import hierarchy
 from qa_tools.common.qa_results_reader import QA_RESULTS_DIR, list_run_ids, read_dataset_stats
 from qa_tools.common.ticket_sync import TICKET_LABEL
 
 ACCEPT_RE = re.compile(r"^/accept\b", re.IGNORECASE)
 REJECT_RE = re.compile(r"^/reject\b", re.IGNORECASE)
 
-# Every real dataset this MVP's ticketing covers, and which real
-# qa_results/ (agency, dataset-or-collection) scope its own arrival
-# history actually lives under. NOT always the same as the dataset_id
+# dataset -> the qa_results/ (agency, dataset-or-collection) scope its
+# own arrival history lives under. NOT always the same as the dataset_id
 # itself: Child Protection's 6 real tables each get their own ticket
-# (ticket_sync.py's own per-table scoping), but arrive together as ONE
-# real collection delivery, so all 6 share the SAME real run history -
-# qa_results/child-protection-family-support/child-protection/, not 6
-# separate per-table directories. A plain dict, not derived from
-# anything dynamic - same "just add the new entry" convention every
-# other small real mapping in this project already uses (github_links.py's
-# own AGENCY_QA_FOLDER/DATASET_QA_FOLDER, validate_check_lifecycle.py's
-# _YAML_SOURCES).
-QA_RESULTS_SCOPE_FOR_DATASET = {
-    "birth-registrations": ("registry-services", "birth-registrations"),
-    "cp-clients": ("child-protection-family-support", "child-protection"),
-    "cp-notifications": ("child-protection-family-support", "child-protection"),
-    "cp-investigations": ("child-protection-family-support", "child-protection"),
-    "cp-placements": ("child-protection-family-support", "child-protection"),
-    "cp-carers": ("child-protection-family-support", "child-protection"),
-    "cp-case-workers": ("child-protection-family-support", "child-protection"),
-}
+# (ticket_sync.py's own per-table scoping) but arrive together as ONE
+# real collection delivery, so all 6 share one run history. Since
+# REQ-QAC-039 Birth Registrations does too, under its own collection -
+# the asymmetry that used to make this map need spelling out by hand.
+QA_RESULTS_SCOPE_FOR_DATASET = {d.dataset_id: d.qa_results_scope for d in hierarchy.all_datasets()}
 
 
 def _run_windows_for_dataset(dataset_id: str, qa_results_dir: Path | str = QA_RESULTS_DIR) -> list[tuple[str, date, date | None]]:

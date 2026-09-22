@@ -17,6 +17,7 @@ import os
 
 import duckdb
 
+from qa_tools.common import hierarchy
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -24,7 +25,9 @@ CP_RAW_DIR = os.path.join(ROOT, "data", "cp_raw")
 OUT_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-contract.yaml")
 
-TABLES = ["cp_clients", "cp_notifications", "cp_investigations", "cp_placements", "cp_carers", "cp_case_workers"]
+# The six CP tables, in the order contract/data-asset.yaml declares
+# them - resolved, not restated (REQ-QAC-039).
+TABLES = [d.table for d in hierarchy.datasets_in_collection("child-protection")]
 
 
 def add_table_to_run(run_id: str, table: str, csv_path: str, out_dir: str = OUT_DIR,

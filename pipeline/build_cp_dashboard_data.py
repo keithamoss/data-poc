@@ -29,6 +29,7 @@ import json
 import os
 from datetime import date, datetime
 
+from qa_tools.common import hierarchy
 from qa_tools.cp import cp_common
 from qa_tools.cp.dataset_stats import AGGREGATE_SPEC
 from qa_tools.common.validate_check_lifecycle import collect_checks
@@ -152,7 +153,7 @@ COLUMN_META = {
 
 def build_one_table(table: str, results: list[dict], manifest: list[dict], dataset_stats: dict,
                      lifecycle_by_id: dict) -> dict:
-    dataset_id = cp_common.TABLE_DATASET_ID[table]
+    dataset_id = hierarchy.dataset_for_table(table).dataset_id
     column_meta = COLUMN_META[table]
     all_columns = list(column_meta.keys())
 
@@ -376,7 +377,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
 
     return {
         "id": dataset_id,
-        "name": cp_common.TABLE_DATASET_NAME[table],
+        "name": hierarchy.dataset_for_table(table).dataset_name,
         "provider": "Department for Child Protection and Family Support — Casework Management System",
         "deliveryFormat": "CSV (S3 drop)",
         "sla": {"cadence": cadence},
@@ -413,7 +414,8 @@ def build() -> dict:
     # computed once here, not once per table.
     lifecycle_by_id = {c.check_id: c for c in collect_checks(None)}
 
-    by_table = {t: [r for r in results if r["dataset_id"] == cp_common.TABLE_DATASET_ID[t]] for t in cp_common.TABLES}
+    by_table = {t: [r for r in results if r["dataset_id"] == hierarchy.dataset_for_table(t).dataset_id]
+                for t in cp_common.TABLES}
     datasets = [build_one_table(t, by_table[t], manifest, dataset_stats, lifecycle_by_id) for t in cp_common.TABLES]
     return {"datasets": datasets}
 

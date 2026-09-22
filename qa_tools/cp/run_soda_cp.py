@@ -17,6 +17,7 @@ import os
 
 import duckdb
 
+from qa_tools.common import hierarchy
 from qa_tools.common.soda_common import (
     ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys, check_id_from_resource_attributes,
 )
@@ -74,7 +75,7 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
     results = []
     for c in scan_results["checks"]:
         table = c["table"]
-        if table not in cp_common.TABLE_DATASET_ID:
+        if table not in cp_common.TABLES:
             continue  # not a CP table (shouldn't happen - guard anyway)
 
         column = c["column"] or _CUSTOM_CHECK_COLUMN.get(c["name"]) or "(table)"
@@ -126,7 +127,7 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
         results.append({
             "agency_id": cp_common.AGENCY_ID,
             "collection_id": cp_common.COLLECTION_ID,
-            "dataset_id": cp_common.TABLE_DATASET_ID[table],
+            "dataset_id": hierarchy.dataset_for_table(table).dataset_id,
             "check_id": check_id,
             "column_name": column,
             "check_name": check_name,

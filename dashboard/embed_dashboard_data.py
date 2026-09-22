@@ -180,6 +180,7 @@ import re
 from dashboard.changelog_yaml import parse_changelog
 from dashboard.plans_md import parse_plans
 from dashboard.requirements_yaml import parse_requirements
+from qa_tools.common import hierarchy
 from qa_tools.common.acceptance_sync import build_decisions
 from qa_tools.common.changelog import build_changelog
 from qa_tools.common.github_links import build_check_source_links, build_folder_links, current_commit_sha
@@ -204,13 +205,19 @@ TARGETS = [
     ("REAL_CP_DATA", os.path.join(ROOT, "reports", "child_protection_dashboard.json")),
 ]
 
-# (agency, dataset-or-collection id, display label) - the same two real
-# scopes TARGETS above embeds, just identified the way qa_results/'s own
-# directory layout (and build_changelog()'s own signature) needs them,
-# not the reshaped-JSON-file layout TARGETS uses.
+# (agency, collection, display label) - the same two real scopes TARGETS
+# above embeds, identified the way qa_results/'s own directory layout
+# (and build_changelog()'s own signature) needs them, not the
+# reshaped-JSON-file layout TARGETS uses. Derived from the one hierarchy
+# since REQ-QAC-039, which is also what made both scopes collection-level
+# - Birth Registrations used to be listed here under its dataset id and
+# labelled "Birth Registrations"; it is now its collection, labelled
+# "Civil Registration", the same way Child Protection always was.
 CHANGELOG_SOURCES = [
-    ("registry-services", "birth-registrations", "Birth Registrations"),
-    ("child-protection-family-support", "child-protection", "Child Protection"),
+    (agency, collection, name)
+    for agency, collection, name in sorted({
+        (d.agency_id, d.collection_id, d.collection_name) for d in hierarchy.all_datasets()
+    })
 ]
 
 # "Something like the last 20-50 entries" (plans/publishing-and-

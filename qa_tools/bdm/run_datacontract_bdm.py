@@ -30,6 +30,7 @@ include_failed_samples at all, a real gap noted rather than hidden.
 from __future__ import annotations
 import os
 
+from . import bdm_common
 from qa_tools.common.datacontract_common import (
     ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
     run_against_local_server, failing_sample_keys, check_id_from_quality_definition,
@@ -44,9 +45,9 @@ ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
 RAW_DIR = os.path.join(ROOT, "data", "raw")
 
-AGENCY_ID = "registry-services"
-COLLECTION_ID = "civil-registration"
-DATASET_ID = "birth-registrations"
+AGENCY_ID = bdm_common.AGENCY_ID
+COLLECTION_ID = bdm_common.COLLECTION_ID
+DATASET_ID = bdm_common.DATASET_ID
 
 # the real quality-rule-driven check types this project's contract produces
 # (see contract yaml's metric: nullValues/invalidValues/duplicateValues/
@@ -144,7 +145,7 @@ def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str
     # `verified` for uniformity with the other 3 tools, so the reader
     # never has to special-case which tools happen to need it (see
     # qa_results_writer.py's own docstring).
-    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "datacontract", run.model_dump(), verified=results)
+    write_qa_result(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, "datacontract", run.model_dump(), verified=results)
     return results
 
 

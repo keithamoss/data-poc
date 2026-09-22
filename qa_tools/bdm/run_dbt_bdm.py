@@ -65,6 +65,7 @@ import os
 
 import duckdb
 
+from . import bdm_common
 from qa_tools.common.check_lifecycle import dbt_check_id_lookup
 from qa_tools.common.dbt_common import (
     ENGINE_TAG, parse_threshold, run_dbt, test_nodes,
@@ -85,9 +86,9 @@ SCHEMA_YML_PATH = os.path.join(DBT_PROJECT_DIR, "models", "staging", "schema.yml
 # see that file's header comment) never produces one.
 _CHECK_ID_LOOKUP = dbt_check_id_lookup(SCHEMA_YML_PATH)
 
-AGENCY_ID = "registry-services"
-COLLECTION_ID = "civil-registration"
-DATASET_ID = "birth-registrations"
+AGENCY_ID = bdm_common.AGENCY_ID
+COLLECTION_ID = bdm_common.COLLECTION_ID
+DATASET_ID = bdm_common.DATASET_ID
 
 # Test shapes whose --store-failures audit table can replace
 # run_results.json's own (sometimes wrong) `failures` field - see
@@ -370,7 +371,7 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     # already-corrected records) is what a later, no-live-DB read of
     # this file actually needs - see qa_results_writer.py's own
     # docstring for why.
-    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "dbt", run_results, verified=results)
+    write_qa_result(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, "dbt", run_results, verified=results)
     return results
 
 

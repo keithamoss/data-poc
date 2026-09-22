@@ -9,14 +9,14 @@ from qa_tools.common.results_s3_sink import upload_qa_result
 
 def test_upload_qa_result_uses_the_path_relative_to_qa_results_root_as_the_key(tmp_path):
     root = tmp_path / "qa_results"
-    local_path = root / "registry-services" / "birth-registrations" / "run_042" / "dbt.json"
+    local_path = root / "registry-services" / "civil-registration" / "run_042" / "dbt.json"
     local_path.parent.mkdir(parents=True)
     local_path.write_text("{}")
 
     client = MagicMock()
     key = upload_qa_result(str(local_path), str(root), "my-results-bucket", s3_client=client)
 
-    assert key == "registry-services/birth-registrations/run_042/dbt.json"
+    assert key == "registry-services/civil-registration/run_042/dbt.json"
     client.upload_file.assert_called_once_with(str(local_path), "my-results-bucket", key)
 
 

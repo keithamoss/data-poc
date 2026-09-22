@@ -29,6 +29,7 @@ from datetime import datetime, timezone
 
 import duckdb
 
+from qa_tools.common import hierarchy
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
@@ -160,7 +161,7 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
         "generated_at": run_timestamp,
         "dataset_stats": dataset_stats_by_run,
         "collection": f"{cp_common.AGENCY_ID}.{cp_common.COLLECTION_ID}",
-        "datasets": sorted(cp_common.TABLE_DATASET_ID.values()),
+        "datasets": sorted(d.dataset_id for d in hierarchy.datasets_in_collection(cp_common.COLLECTION_ID)),
         "runs": manifest,
         "results": all_results,
         "summary": {

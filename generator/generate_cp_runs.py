@@ -89,6 +89,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
+from qa_tools.common import hierarchy
 from generator.anchor_date import get_anchor_date
 from generator import dirty as dirty_mod
 from generator.resupply import MAX_ATTEMPTS, DatasetProvider, run_delivery_chain
@@ -103,7 +104,9 @@ POPULATION_N = 70_000
 N_CASE_WORKERS = 60
 BASE_SEED = 5000  # distinct range from generate_runs.py's 1000s and generate.py's demo seeds
 
-TABLES = ["cp_clients", "cp_notifications", "cp_investigations", "cp_placements", "cp_carers", "cp_case_workers"]
+# The six CP tables, in the order contract/data-asset.yaml declares
+# them - resolved, not restated (REQ-QAC-039).
+TABLES = [d.table for d in hierarchy.datasets_in_collection("child-protection")]
 
 # Resupply timing - deliberately NOT Birth Registrations' own curve
 # (mostly 1-3 business days, tailing to 10): a corrected full quarterly

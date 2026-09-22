@@ -123,10 +123,10 @@ def test_raw_template_renders_with_zero_console_errors(clean_page):
 
 class TestAsOfDatePicking:
     def test_a_date_before_any_real_history_shows_no_data(self, clean_page, built_dashboard_html):
-        run_ids = list_run_ids("registry-services", "birth-registrations")
+        run_ids = list_run_ids("registry-services", "civil-registration")
         assert run_ids, "no real committed BDM history to test against"
         earliest_run_date = min(
-            read_dataset_stats("registry-services", "birth-registrations", rid)["manifest_entry"]["run_date"]
+            read_dataset_stats("registry-services", "civil-registration", rid)["manifest_entry"]["run_date"]
             for rid in run_ids
         )
         before_all_history = (date.fromisoformat(earliest_run_date) - timedelta(days=1000)).isoformat()

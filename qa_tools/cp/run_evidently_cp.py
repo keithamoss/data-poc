@@ -14,6 +14,7 @@ plans/qa-pipeline.md #84.
 from __future__ import annotations
 import os
 
+from qa_tools.common import hierarchy
 from qa_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, status_for_psi, compute_psi
 from qa_tools.common.csv_io import load_null_values_by_column, read_csv_explicit_nulls
 from qa_tools.common.qa_results_writer import write_qa_result
@@ -25,7 +26,7 @@ CP_RAW_DIR = os.path.join(ROOT, "data", "cp_raw")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-contract.yaml")
 _NULL_VALUES = load_null_values_by_column(CONTRACT_PATH).get("cp_notifications", {})
 
-DATASET_ID = cp_common.TABLE_DATASET_ID["cp_notifications"]
+DATASET_ID = hierarchy.dataset_for_table("cp_notifications").dataset_id
 
 # A fallback default only, for calling this function directly with no
 # other context - real callers (orchestrate_cp.py, this file's own
@@ -76,7 +77,7 @@ def evaluate_evidently_cp(run_id: str, run_timestamp: str,
     # dataset(collection)-level for every tool, matching run_dbt_cp.py/
     # run_soda_cp.py/run_datacontract_cp.py/dataset_stats.py, which all
     # already write there. Evidently was the one real outlier (it only
-    # ever checks cp_notifications, so it used TABLE_DATASET_ID directly
+    # ever checks cp_notifications, so it resolves that table directly
     # as its write path too) - each result record's own "dataset_id"
     # field above still correctly says "cp-notifications" for dashboard
     # per-table grouping; only the FILE location changes here.

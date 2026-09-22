@@ -36,6 +36,7 @@ import os
 
 import duckdb
 
+from . import bdm_common
 from qa_tools.common.soda_common import (
     ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys, check_id_from_resource_attributes,
 )
@@ -45,9 +46,9 @@ ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 SODA_CHECKS_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-soda-checks.yml")
 DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "duckdb_runs")
 
-AGENCY_ID = "registry-services"
-COLLECTION_ID = "civil-registration"
-DATASET_ID = "birth-registrations"
+AGENCY_ID = bdm_common.AGENCY_ID
+COLLECTION_ID = bdm_common.COLLECTION_ID
+DATASET_ID = bdm_common.DATASET_ID
 
 
 # "failed rows" checks (extract_timestamp ordering, the multiple-birth
@@ -209,7 +210,7 @@ def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     # Committed only now, after row_count_total's own live query above -
     # scan_results alone never carries it (see qa_results_writer.py's
     # own docstring for why `verified` exists).
-    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "soda", scan_results, verified=results)
+    write_qa_result(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, "soda", scan_results, verified=results)
     return results
 
 

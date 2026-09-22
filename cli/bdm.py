@@ -34,7 +34,7 @@ from qa_tools.common.qa_results_reader import list_run_ids
 from . import common
 
 AGENCY_ID = orchestrate_bdm.AGENCY_ID
-DATASET_ID = orchestrate_bdm.DATASET_ID
+COLLECTION_ID = orchestrate_bdm.COLLECTION_ID
 CONTRACT_PATH = os.path.join(os.path.dirname(__file__), "..", "contract", "bdm-birth-registrations-contract.yaml")
 
 console = Console()
@@ -93,7 +93,7 @@ def default_reference(manifest: list[dict]) -> tuple[str, str]:
     longer exists locally (RUN_PLAN's size has changed across versions of
     this repo before; regeneration is deterministic only for run_ids the
     CURRENT RUN_PLAN still produces)."""
-    promoted = list_run_ids(AGENCY_ID, DATASET_ID)
+    promoted = list_run_ids(AGENCY_ID, COLLECTION_ID)
     if promoted:
         candidate = promoted[-1]
         if os.path.exists(os.path.join(raw_dir(), f"{candidate}.csv")):
@@ -268,7 +268,7 @@ def _offer_promote(results: list[dict], run_id: str, tmp_dir: str, commit_defaul
     console.print(report_table(results, run_id))
     if common.confirm("Promote this run into the real, permanent qa_results/ history?",
                        yes=False, default=commit_default):
-        dst = common.promote(tmp_dir, AGENCY_ID, DATASET_ID, run_id)
+        dst = common.promote(tmp_dir, AGENCY_ID, COLLECTION_ID, run_id)
         common.report_promoted(dst)
     else:
         console.print("Not promoted - nothing written to the real qa_results/ history.", style="dim")
@@ -402,7 +402,7 @@ def generate_synthetic_data_command(yes: bool) -> None:
 def _finish_flag_mode(results: list[dict], run_id: str, tmp_dir: str, commit: bool) -> None:
     console.print(report_table(results, run_id))
     if commit:
-        dst = common.promote(tmp_dir, AGENCY_ID, DATASET_ID, run_id)
+        dst = common.promote(tmp_dir, AGENCY_ID, COLLECTION_ID, run_id)
         console.print(f"Promoted -> {dst}", style="green")
     else:
         console.print("(local-only check - not written to qa_results/ history; re-run with --commit to keep it)",

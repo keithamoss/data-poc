@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import os
 
+from . import bdm_common
 from qa_tools.common.evidently_common import ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, status_for_psi, compute_psi
 from qa_tools.common.csv_io import load_null_values_by_column, read_csv_explicit_nulls
 from qa_tools.common.qa_results_writer import write_qa_result
@@ -35,9 +36,9 @@ RAW_DIR = os.path.join(ROOT, "data", "raw")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
 _NULL_VALUES = load_null_values_by_column(CONTRACT_PATH).get("birth_registrations", {})
 
-AGENCY_ID = "registry-services"
-COLLECTION_ID = "civil-registration"
-DATASET_ID = "birth-registrations"
+AGENCY_ID = bdm_common.AGENCY_ID
+COLLECTION_ID = bdm_common.COLLECTION_ID
+DATASET_ID = bdm_common.DATASET_ID
 
 # A fallback default only - see run_evidently_cp.py's identical comment
 # and orchestrate_bdm.py for why real callers never rely on it.
@@ -156,7 +157,7 @@ def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
             "reference_run_id": None,
         })
 
-    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "evidently", raw_output, verified=results)
+    write_qa_result(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, "evidently", raw_output, verified=results)
     return results
 
 

@@ -72,6 +72,7 @@ import os
 import subprocess
 from dataclasses import dataclass
 
+from qa_tools.common import hierarchy
 from qa_tools.common.dataset_status import dataset_status
 from qa_tools.common.people import PEOPLE_YAML, github_usernames_for, parse_people_config
 from qa_tools.common.ticket_check_summary import build_check_summary
@@ -87,38 +88,19 @@ CP_DASHBOARD_JSON = os.path.join(ROOT, "reports", "child_protection_dashboard.js
 # any other issue a human might open on this repo for unrelated reasons.
 TICKET_LABEL = "qa-ticket"
 
-# Real, currently-static dataset -> agency mapping (running-thoughts.md
-# #2, 2026-09-18) - needed here so open_ticket() can resolve real ticket
-# assignees (qa_tools/common/people.py's own dataset-then-agency
-# fallback). A plain dict, not derived from anything dynamic, same "just
-# add the new entry" convention already used twice elsewhere for this
-# exact same real mapping (qa_tools/common/github_links.py's
-# AGENCY_QA_FOLDER/DATASET_QA_FOLDER, qa_tools/common/acceptance_sync.py's
-# QA_RESULTS_SCOPE_FOR_DATASET) - not consolidated into one shared
-# module in this pass (a real, deliberate scope call, not an oversight -
-# worth doing if a 4th copy is ever needed).
-# REQ-GHUB-027 grew this from dataset -> agency to dataset -> (agency,
-# collection), because a real dashboard deep link carries all three.
-# That makes this the fourth place the same mapping lives, which is the
-# exact condition the note above set for consolidating it - flagged,
-# deliberately not done here, because merging four modules' copies is a
-# refactor of its own and does not belong inside a ticket-body change.
-DATASET_SCOPE = {
-    "birth-registrations": ("registry-services", "civil-registration"),
-    "cp-clients": ("child-protection-family-support", "child-protection"),
-    "cp-notifications": ("child-protection-family-support", "child-protection"),
-    "cp-investigations": ("child-protection-family-support", "child-protection"),
-    "cp-placements": ("child-protection-family-support", "child-protection"),
-    "cp-carers": ("child-protection-family-support", "child-protection"),
-    "cp-case-workers": ("child-protection-family-support", "child-protection"),
-}
+# dataset -> (agency, collection), needed here so open_ticket() can
+# resolve real ticket assignees (qa_tools/common/people.py's own
+# dataset-then-agency fallback) and so a ticket body can carry a real
+# dashboard deep link, which names all three.
+#
+# This used to be a plain dict, and its own comment recorded that it was
+# the FOURTH copy of the same mapping - alongside github_links.py's
+# AGENCY_QA_FOLDER/DATASET_QA_FOLDER and acceptance_sync.py's
+# QA_RESULTS_SCOPE_FOR_DATASET - and that four was the trigger for
+# consolidating them. REQ-QAC-039 is that consolidation: all four now
+# resolve through the one hierarchy in contract/data-asset.yaml.
+DATASET_SCOPE = {d.dataset_id: (d.agency_id, d.collection_id) for d in hierarchy.all_datasets()}
 
-# The dataset -> agency view of the mapping above, kept because two real
-# callers want only that half - dashboard/embed_dashboard_data.py and,
-# through it, qa_tools/common/leaderboard.py. Derived rather than a
-# second literal, so the two cannot disagree; when this and DATASET_SCOPE
-# are eventually merged with the copies in github_links.py and
-# acceptance_sync.py, this goes with them.
 DATASET_AGENCY = {dataset: agency for dataset, (agency, _collection) in DATASET_SCOPE.items()}
 
 

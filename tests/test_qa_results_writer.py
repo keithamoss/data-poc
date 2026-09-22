@@ -12,10 +12,10 @@ from qa_tools.common.qa_results_writer import write_qa_result
 
 
 def test_write_qa_result_lands_at_the_documented_path(tmp_path):
-    out_path = write_qa_result("registry-services", "birth-registrations", "run_01", "2026-01-01T00:00:00Z",
+    out_path = write_qa_result("registry-services", "civil-registration", "run_01", "2026-01-01T00:00:00Z",
                                 "dbt", {"some": "output"}, results_dir=tmp_path)
 
-    assert out_path == tmp_path / "registry-services" / "birth-registrations" / "run_01" / "dbt.json"
+    assert out_path == tmp_path / "registry-services" / "civil-registration" / "run_01" / "dbt.json"
     assert out_path.exists()
 
 

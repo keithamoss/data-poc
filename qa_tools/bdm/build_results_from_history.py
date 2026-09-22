@@ -28,22 +28,24 @@ import json
 import os
 from datetime import datetime, timezone
 
+from . import bdm_common
 from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats, read_qa_results
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
 
-AGENCY_ID = "registry-services"
-DATASET_ID = "birth-registrations"
+AGENCY_ID = bdm_common.AGENCY_ID
+COLLECTION_ID = bdm_common.COLLECTION_ID
+DATASET_ID = bdm_common.DATASET_ID
 
 
 def build_results_from_history() -> dict:
-    run_ids = list_run_ids(AGENCY_ID, DATASET_ID)
+    run_ids = list_run_ids(AGENCY_ID, COLLECTION_ID)
 
     manifest = []
     dataset_stats_by_run = {}
     for run_id in run_ids:
-        stats = read_dataset_stats(AGENCY_ID, DATASET_ID, run_id)
+        stats = read_dataset_stats(AGENCY_ID, COLLECTION_ID, run_id)
         if stats is None:
             continue  # shouldn't happen for any real committed run - see dataset_stats.py
         manifest.append(stats["manifest_entry"])
@@ -53,7 +55,7 @@ def build_results_from_history() -> dict:
     # sorts it away from its parent delivery; run_index doesn't.
     manifest.sort(key=lambda m: m["run_index"])
 
-    all_results = read_qa_results(AGENCY_ID, DATASET_ID)
+    all_results = read_qa_results(AGENCY_ID, COLLECTION_ID)
 
     n_pass = sum(1 for r in all_results if r["status"] == "pass")
     n_warn = sum(1 for r in all_results if r["status"] == "warn")
@@ -62,7 +64,7 @@ def build_results_from_history() -> dict:
 
     output = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "dataset": "registry-services.civil-registration.birth-registrations",
+        "dataset": f"{AGENCY_ID}.{COLLECTION_ID}.{DATASET_ID}",
         "runs": manifest,
         "dataset_stats": dataset_stats_by_run,
         "results": all_results,

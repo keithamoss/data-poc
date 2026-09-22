@@ -83,7 +83,7 @@ def test_bdm_handler_uploads_written_results_to_the_results_bucket(monkeypatch, 
 
     def fake_patch(modules, qa_results_root):
         qa_results_root_holder["root"] = qa_results_root
-        run_dir = __import__("pathlib").Path(qa_results_root) / "registry-services" / "birth-registrations" / "run_099"
+        run_dir = __import__("pathlib").Path(qa_results_root) / "registry-services" / "civil-registration" / "run_099"
         # simulate what patch_write_qa_result_for_lambda's real target
         # would eventually cause write_qa_result() to produce
         run_dir.mkdir(parents=True)
@@ -99,7 +99,7 @@ def test_bdm_handler_uploads_written_results_to_the_results_bucket(monkeypatch, 
     fake_client.upload_file.assert_called_once()
     uploaded_local_path, uploaded_bucket, uploaded_key = fake_client.upload_file.call_args[0]
     assert uploaded_bucket == "my-results-bucket"
-    assert uploaded_key == "registry-services/birth-registrations/run_099/dataset_stats.json"
+    assert uploaded_key == "registry-services/civil-registration/run_099/dataset_stats.json"
 
 
 def test_cp_handler_loads_a_table_arrival_without_running_the_full_pipeline(monkeypatch, tmp_path):

@@ -36,6 +36,7 @@ from qa_tools.common.datacontract_common import (
 from qa_tools.common.check_lifecycle import (
     name_by_check_id, parse_contract_check_metadata,
 )
+from qa_tools.common import hierarchy
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
 
@@ -85,7 +86,7 @@ def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
         if c.type not in _QUALITY_CHECK_TYPES:
             continue
         table = c.model
-        if table not in cp_common.TABLE_DATASET_ID:
+        if table not in cp_common.TABLES:
             continue
 
         diag = c.diagnostics or {}
@@ -131,7 +132,7 @@ def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
         results.append({
             "agency_id": cp_common.AGENCY_ID,
             "collection_id": cp_common.COLLECTION_ID,
-            "dataset_id": cp_common.TABLE_DATASET_ID[table],
+            "dataset_id": hierarchy.dataset_for_table(table).dataset_id,
             "check_id": check_id,
             "column_name": c.field or "(table)",
             "check_name": check_name,

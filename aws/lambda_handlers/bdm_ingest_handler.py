@@ -43,7 +43,7 @@ REFERENCE_CSV = "run_001.csv"
 
 RESULTS_BUCKET_NAME = os.environ.get("RESULTS_BUCKET_NAME")
 AGENCY_ID = orchestrate_bdm.AGENCY_ID
-DATASET_ID = orchestrate_bdm.DATASET_ID
+COLLECTION_ID = orchestrate_bdm.COLLECTION_ID
 
 
 def handler(event: dict, context=None) -> dict:
@@ -96,7 +96,7 @@ def handler(event: dict, context=None) -> dict:
                 run_id, local_csv, run_date, None,
                 reference_run_id=REFERENCE_RUN_ID, reference_csv=REFERENCE_CSV)
 
-        run_dir = os.path.join(qa_results_root, AGENCY_ID, DATASET_ID, run_id)
+        run_dir = os.path.join(qa_results_root, AGENCY_ID, COLLECTION_ID, run_id)
         if RESULTS_BUCKET_NAME and os.path.isdir(run_dir):
             for filename in os.listdir(run_dir):
                 upload_qa_result(os.path.join(run_dir, filename), qa_results_root, RESULTS_BUCKET_NAME,

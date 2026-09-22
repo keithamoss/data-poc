@@ -150,7 +150,7 @@ def test_qa_command_flag_mode_commit_promotes_into_the_patched_qa_results_dir(
 
     assert result.exit_code == 0, result.output
     assert "Promoted" in result.output
-    dataset_stats_path = fake_qa_results / bdm.AGENCY_ID / bdm.DATASET_ID / _REF_RUN_ID / "dataset_stats.json"
+    dataset_stats_path = fake_qa_results / bdm.AGENCY_ID / bdm.COLLECTION_ID / _REF_RUN_ID / "dataset_stats.json"
     assert dataset_stats_path.exists()
     with open(dataset_stats_path) as f:
         assert json.load(f)["run_by"] == "test@example.com"
@@ -259,7 +259,7 @@ def test_qa_command_local_file_commit_promotes_into_the_patched_qa_results_dir(
 
     assert result.exit_code == 0, result.output
     assert "Promoted" in result.output
-    matches = list(fake_qa_results.glob(f"{bdm.AGENCY_ID}/{bdm.DATASET_ID}/*/dataset_stats.json"))
+    matches = list(fake_qa_results.glob(f"{bdm.AGENCY_ID}/{bdm.COLLECTION_ID}/*/dataset_stats.json"))
     assert len(matches) == 1
     with open(matches[0]) as f:
         assert json.load(f)["run_by"] == "test@example.com"

@@ -155,7 +155,7 @@ class TestRunWindowsAgainstRealCommittedHistory:
         # window" - so count the runs and say that.
         committed_runs = len(list(
             (Path(__file__).resolve().parent.parent / "qa_results"
-             / "registry-services" / "birth-registrations").iterdir()))
+             / "registry-services" / "civil-registration").iterdir()))
         windows = acc._run_windows_for_dataset("birth-registrations")
         assert len(windows) > 0, "no windows at all - committed history missing?"
         assert len(windows) <= committed_runs, (

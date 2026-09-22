@@ -20,7 +20,7 @@ import os
 
 def upload_qa_result(local_path: str, qa_results_root: str, bucket: str, s3_client=None) -> str:
     """local_path is an absolute path somewhere under qa_results_root
-    (e.g. "/tmp/qa_results/registry-services/birth-registrations/run_042/
+    (e.g. "/tmp/qa_results/registry-services/civil-registration/run_042/
     dbt.json"); qa_results_root is that same local qa_results/ root
     (e.g. "/tmp/qa_results"). Uploads to the results bucket at the exact
     same path relative to qa_results_root (e.g. "registry-services/

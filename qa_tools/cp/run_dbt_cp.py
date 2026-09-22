@@ -52,6 +52,7 @@ import os
 
 import duckdb
 
+from qa_tools.common import hierarchy
 from qa_tools.common.check_lifecycle import dbt_check_id_lookup
 from qa_tools.common.dbt_common import (
     ENGINE_TAG, parse_threshold, run_dbt, test_nodes,
@@ -300,7 +301,7 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
         results.append({
             "agency_id": cp_common.AGENCY_ID,
             "collection_id": cp_common.COLLECTION_ID,
-            "dataset_id": cp_common.TABLE_DATASET_ID[table],
+            "dataset_id": hierarchy.dataset_for_table(table).dataset_id,
             "check_id": check_id,
             "column_name": column,
             "check_name": f"dbt:{test_name}",

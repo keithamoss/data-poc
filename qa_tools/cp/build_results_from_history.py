@@ -9,7 +9,7 @@ Reads every tool's output from the same qa_results/ dataset segment per
 run - cp_common.COLLECTION_ID. All 5 files (dbt/soda/datacontract/
 evidently/dataset_stats) live together under one run_id directory now;
 Evidently briefly wrote under its own table-scoped dataset id
-(cp_common.TABLE_DATASET_ID["cp_notifications"]) instead, a real bug
+(hierarchy.dataset_for_table("cp_notifications").dataset_id) instead, a real bug
 fixed 2026-09-16 (run_evidently_cp.py's own comment on the write side)
 - Evidently's own per-result "dataset_id" field still correctly says
 "cp-notifications" for dashboard per-table grouping, only the file
@@ -28,6 +28,7 @@ import json
 import os
 from datetime import datetime, timezone
 
+from qa_tools.common import hierarchy
 from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats, read_one, TOOL_ORDER
 from . import cp_common
 
@@ -62,7 +63,7 @@ def build_results_from_history() -> dict:
     output = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "collection": f"{cp_common.AGENCY_ID}.{cp_common.COLLECTION_ID}",
-        "datasets": sorted(cp_common.TABLE_DATASET_ID.values()),
+        "datasets": sorted(d.dataset_id for d in hierarchy.datasets_in_collection(cp_common.COLLECTION_ID)),
         "runs": manifest,
         "dataset_stats": dataset_stats_by_run,
         "results": all_results,

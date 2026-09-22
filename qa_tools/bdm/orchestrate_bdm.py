@@ -35,6 +35,7 @@ from datetime import datetime, timezone
 
 import duckdb
 
+from . import bdm_common
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
@@ -51,8 +52,9 @@ MANIFEST_PATH = os.path.join(ROOT, "data", "raw", "manifest.json")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
 WAREHOUSE_DB_PATH = os.path.join(ROOT, "data", "warehouse.duckdb")
 
-AGENCY_ID = "registry-services"
-DATASET_ID = "birth-registrations"
+AGENCY_ID = bdm_common.AGENCY_ID
+COLLECTION_ID = bdm_common.COLLECTION_ID
+DATASET_ID = bdm_common.DATASET_ID
 
 
 # The real, discrete steps one run of the check chain goes through, in
@@ -108,7 +110,7 @@ def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str
     # one value per run is all qa_tools/common/changelog.py needs, and
     # dataset_stats.json is the one file guaranteed to exist for every
     # run (see write_qa_result()'s own docstring).
-    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "dataset_stats", stats, run_by=run_by)
+    write_qa_result(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, "dataset_stats", stats, run_by=run_by)
 
     return results
 
@@ -239,7 +241,7 @@ def run_pipeline(sequential: bool = False) -> dict:
     # two can't drift on how dataset_stats gets assembled.
     dataset_stats_by_run = {}
     for entry in manifest:
-        stats = read_dataset_stats(AGENCY_ID, DATASET_ID, entry["run_id"])
+        stats = read_dataset_stats(AGENCY_ID, COLLECTION_ID, entry["run_id"])
         if stats is not None:
             dataset_stats_by_run[entry["run_id"]] = stats
 
@@ -250,7 +252,7 @@ def run_pipeline(sequential: bool = False) -> dict:
 
     output = {
         "generated_at": run_timestamp,
-        "dataset": "registry-services.civil-registration.birth-registrations",
+        "dataset": f"{AGENCY_ID}.{COLLECTION_ID}.{DATASET_ID}",
         "runs": manifest,
         "dataset_stats": dataset_stats_by_run,
         "results": all_results,

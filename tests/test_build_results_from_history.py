@@ -18,7 +18,7 @@ def test_bdm_rebuilds_from_real_committed_history(tmp_path, monkeypatch):
     output = bdm_history.build_results_from_history()
 
     assert results_path.exists(), "should write reports/results_bdm.json (redirected to tmp here)"
-    assert output["runs"], "the real committed qa_results/registry-services/birth-registrations/ history is empty"
+    assert output["runs"], "the real committed qa_results/registry-services/civil-registration/ history is empty"
     assert output["results"], "no real check results found across committed history"
     # run_index, not run_date - a resupply's own run_date sorts away from its parent delivery (see module docstring)
     run_indexes = [r["run_index"] for r in output["runs"]]
