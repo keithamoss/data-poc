@@ -1719,14 +1719,38 @@ was never defined anywhere. Keith caught it reading the concept
 inventory: we say one schema per period without ever naming period as
 a concept.
 
-**The lesson for a future session is about the shape of the error, not
-the fix.** What was found was not a design that disagreed with reality.
-It was THIS THREAD disagreeing with ITSELF - its own "what exists"
-paragraph records that `expectedTime` is already per-dataset in every
-contract, four paragraphs above its own sentence putting the deadline
-on the period. So before concluding a design is wrong, check whether
-the document already contradicts itself somewhere above. That is the
-cheaper thing to find, and it was the answer here.
+**This section's own lesson was itself wrong, and is corrected here
+rather than deleted, because the correction is the more useful part.**
+
+It used to say the error was only THIS THREAD disagreeing with ITSELF -
+its own "what exists" paragraph recording that `expectedTime` is
+already per-dataset, four paragraphs above its own sentence putting the
+deadline on the period - and that the fix was therefore a phrasing
+change to something already true.
+
+**It is not already true.** Found 2026-09-22 by `delivery-architect`,
+reading the parser rather than the config: `pipeline/cadence.py`'s
+`_sla_properties_to_dict()` is `{i["property"]: i for i in items}`. It
+keys on `property` ALONE and DISCARDS `element:` - so Child
+Protection's single `expectedTime` block, tagged `element: cp_clients`,
+is the expected time for all six of its datasets, and the `element`
+discriminator already sitting in the contract is thrown away. CP has
+exactly one `expectedTime` block, verified.
+
+So `expectedTime` is per-CONTRACT, which is the same thing as
+per-dataset only for Birth Registrations, where a contract holds one
+dataset. Moving the deadline to the SLOT is therefore building a
+capability that does not exist rather than preserving one that does -
+which makes the decision MORE justified, not less, and means the fork
+put to Keith was more real than it was presented as.
+
+**Two lessons, and the second is the one that keeps costing.** A
+document can contradict itself, so check that first - that part
+stands. But *reading config and inferring what the code does with it*
+is not verification. The shape of `slaProperties` looks per-dataset
+because `element:` is right there on every property. Only the parser
+says whether anything reads it, and nothing here had opened the
+parser.
 
 **The definitions:**
 
@@ -1804,7 +1828,11 @@ And that the per-dataset SLOT properties sit alongside
 delivery_months: [February, August]   # unchanged, as settled above
 slaProperties:
   - property: expectedTime
-    value: "09:00"            # already exists, already per-dataset
+    value: "09:00"            # exists today, but see the correction
+                              # above: cadence.py discards `element:`,
+                              # so CP's six datasets share one value.
+                              # Honouring `element:` is real work in
+                              # this sprint, not a given.
   - property: latency
     value: 120                # minutes of grace before "late"
   - property: claimWindow

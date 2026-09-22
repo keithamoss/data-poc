@@ -3791,10 +3791,13 @@ requirements:
         realistic, but it should not make the ordinary healthy feed hard
         to recognise - a reader should still be able to see what normal
         looks like.
-      - The synthetic calendar's past-dated versions are subject to
-        REQ-PIPE-050's retrospective-edit guard. Regeneration must update
-        the recorded content records and write the changelog entry as
-        part of the same act, or every regeneration fails the gate.
+      - Regenerating the synthetic history rewrites past-dated calendar
+        versions, which is exactly the act Thread E says must never
+        happen quietly. Nothing automated stops it - REQ-PIPE-050's A4
+        decision rejected building any such guard - so this is governed
+        by review, like every other retrospective config edit. A
+        regeneration that moves a past date should say so in its commit
+        message.
     dependencies: [REQ-GEN-040, REQ-GEN-042, REQ-GEN-043, REQ-PIPE-049, REQ-PIPE-051]
     decisions:
       - Decided against a scenario label on the injected runs (Keith,
@@ -3839,7 +3842,25 @@ requirements:
         sequenced AFTER this work (plans/running-thoughts.md #23),
         because it is what makes the file-architecture question
         answerable and it needs this model to be real first."
-
+      - "CORRECTED 2026-09-22, after delivery-architect found a direct
+        contradiction between two SIGNED requirements. This requirement
+        carried an NFR requiring REQ-PIPE-050's retrospective-edit guard
+        by name - recorded content records plus a changelog entry, or
+        every regeneration fails the gate. REQ-PIPE-050's [A4] decision
+        rejects building that mechanism outright, naming it as rejected
+        option (1). The NFR was written before Keith answered A4 and was
+        never revisited when the answer landed. The NFR gives way,
+        because A4 is the later and explicit decision; regenerating the
+        synthetic calendar is governed by review like any other
+        retrospective config edit."
+      - "Recorded because the shape will recur: the contradiction was
+        introduced by the main session, not by scoping. An NFR referring
+        to another requirement BY NAME is a cross-reference nothing
+        validates - requirements.yaml's own gate checks that a
+        dependencies: entry names a real requirement, and checks nothing
+        about prose that cites one. When a decision on one requirement
+        changes, every other requirement naming it has to be re-read by
+        hand, and this one was not."
   - id: REQ-GEN-045
     title: A generated scenario map says where each scenario can be seen
     date_written: "2026-09-22"
@@ -4313,13 +4334,21 @@ requirements:
         dates even though no such dataset exists today (Keith:
         everything is aligned to one of the four days). Cheap now,
         awkward to retrofit once 30 datasets assume subsetting."
-      - "Decided per-dataset expected times are \"a definite need\"
-        (Keith, 2026-09-22) - and recorded with a caveat about how it
-        was put to him. The alternative, one deadline per period, was
-        offered as a genuine fork and was not one: choosing it would
-        have meant deleting working config and removing a capability
-        that already ships. A future session should not read this as a
-        close call."
+      - "Decided per-dataset expected times are a definite need (Keith,
+        2026-09-22). CORRECTED 2026-09-22 after delivery-architect read
+        the parser rather than the config: this was originally recorded
+        with a caveat saying the alternative - one deadline per period -
+        was not a genuine fork, because taking it would have meant
+        deleting working config. That was wrong.
+        pipeline/cadence.py's _sla_properties_to_dict keys on `property`
+        alone and DISCARDS `element:`, so Child Protection's single
+        expectedTime block covers all six of its datasets and the
+        per-dataset discriminator already sitting in the contract is
+        thrown away. expectedTime is per-CONTRACT, which equals
+        per-dataset only for Birth Registrations, where a contract holds
+        one dataset. So this requirement BUILDS a capability rather than
+        preserving one - which justifies it more strongly - and
+        honouring `element:` is real work in this sprint, not a given."
       - Rejected an exceptions mechanism separate from ordinary schedule
         editing. Authored dates make a changed quarterly date an
         ordinary edit; what survives is only a daily feed paused for a
