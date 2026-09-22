@@ -4471,7 +4471,13 @@ requirements:
         otherwise re-propose participatesIn with no sight of the
         counter-argument. Found by the batch 1+2 carry-over check, which
         is what that check is for."
-
+      - "Decided the candidate-dates printer lives in the same new
+        `mothman schedule` group as the config gate (Keith, 2026-09-23),
+        for the same reason: it is a once-a-year human task, and
+        `mothman schedule --help` is where somebody looks for it. See
+        REQ-PIPE-050's own decision for why a new group beat folding
+        both into `pipeline`, and for the reviewer disagreement behind
+        it."
   - id: REQ-PIPE-050
     title: A config error can never silently produce zero slots, and a past date cannot move quietly
     date_written: "2026-09-22"
@@ -4524,6 +4530,22 @@ requirements:
         against a cadence-rule calendar.
       - THE SYSTEM SHALL reject a claim window that is not a duration
         with a recognised unit, and SHALL NOT coerce one.
+      - THE SYSTEM SHALL be invoked as a command in a schedule command
+        group, and SHALL NOT be placed in a group documented as not
+        human-facing.
+      - THE SYSTEM SHALL be registered as a gate that runs alongside the
+        repository's other sub-second gates.
+      - THE SYSTEM SHALL report every offending item individually, and
+        SHALL NOT collapse repeated instances of one rule into a single
+        line.
+      - THE SYSTEM SHALL name, in each error, the correction to make,
+        not only the rule that was broken.
+      - THE SYSTEM SHALL group reported errors by the file and the
+        calendar or dataset they belong to, and SHALL state, before the
+        detail, how many errors affect how many datasets.
+      - WHEN the configuration cannot be parsed at all, THE SYSTEM SHALL
+        name the file and the location, and SHALL NOT then report the
+        absence of every value it could not read.
     non_functional_requirements:
       - This gate runs on every push and inside mothman check, whose own
         gates are ordered cheapest-first so the fast ones report while
@@ -4597,6 +4619,31 @@ requirements:
         original reasoning still stands on its own terms - his words
         were \"I do not need to invent a technical mechanism to handle
         that\", which is a simplicity preference, not only a cost one."
+      - "Decided this lives in a new `mothman schedule` command group,
+        Tier 1 (Keith, 2026-09-23). The two pre-build reviewers
+        DISAGREED here and this is the one place they did:
+        delivery-architect said fold it into `pipeline` (both commands
+        are PIPE by the taxonomy, `pipeline` holds exactly one command,
+        and putting a config gate under `dashboard` deepens an existing
+        misfiling); delivery-cli-ux said make a new group. The CLI
+        reviewer won on a point the architect did not weigh: Keith's own
+        docstring in cli/pipeline.py calls that group \"not
+        human-facing - for integration tests and for yourself\", and
+        someone editing 30 delivery calendars is exactly a human.
+        Rejected also the architect's synthesis - fold in now, move to a
+        `mothman supply` group when batches 3-6 justify one - because
+        moving a command later breaks whatever docs and muscle memory
+        have formed, and renames are how a CLI surface rots."
+      - "Decided every offending item is reported INDIVIDUALLY (Keith,
+        2026-09-23), against the recommendation. delivery-cli-ux argued
+        for compiler-style cause suppression - report the root once,
+        then \"30 datasets name this calendar and were not checked
+        further\" - on the grounds that one asset-level mistake produces
+        30 downstream errors and a reader who meets the 30 first fixes
+        30 things. Keith took the literal reading of the existing
+        criterion instead: nothing is ever hidden, and the count in the
+        header is the true count. The grouping and ordering criteria
+        above are what carry the scale problem instead."
     open_questions:
       - Whether the retrospective-edit guard is built after all, now that
         a much cheaper mechanism than the one rejected is known to exist
@@ -4843,6 +4890,36 @@ requirements:
         dataset naming it.
       - WHERE a calendar is a cadence rule, THE SYSTEM SHALL NOT warn
         about runway for any dataset naming it.
+      - THE SYSTEM SHALL surface the low-runway warning both in the
+        dashboard and as a non-fatal warning in the repository's gates.
+      - THE SYSTEM SHALL state, in the runway warning itself, that it is
+        not failing the build.
+      - THE SYSTEM SHALL distinguish a warning from a failure in text as
+        well as colour, and SHALL NOT rely on colour alone.
+      - WHEN a calendar is low on runway, THE SYSTEM SHALL warn once for
+        that calendar, naming it, its last authored period and how many
+        datasets name it, and SHALL NOT enumerate those datasets.
+      - THE SYSTEM SHALL render an exhausted schedule as a status
+        distinct from green, amber and red, and SHALL NOT render it with
+        the same status or the same wording as a dataset that simply has
+        no run on or before the selected as-of date.
+      - THE SYSTEM SHALL NOT allow an exhausted schedule to be absorbed
+        by the worst-of status rollup at any tier.
+      - WHEN one or more schedules are exhausted, THE SYSTEM SHALL state
+        so in a notice above the executive tier's agency grid, naming
+        how many.
+      - THE SYSTEM SHALL evaluate the exhausted-schedule condition
+        against the as-of date currently selected, and SHALL NOT report
+        a schedule as exhausted while viewing a date its calendar
+        covers.
+      - THE SYSTEM SHALL name, in that notice and in the failure, the
+        configuration a person must edit.
+      - THE SYSTEM SHALL NOT offer a way to dismiss or hide the
+        exhausted-schedule notice, and SHALL NOT persist any such
+        dismissal in browser storage.
+      - WHEN a run skips a dataset because its schedule is exhausted,
+        THE SYSTEM SHALL state in that run's own summary how many
+        datasets were processed and how many were skipped.
     non_functional_requirements:
       - This is the whole reason authored dates are safe. Without it, a
         date list running out means nothing is ever expected, so nothing
@@ -4895,7 +4972,50 @@ requirements:
         same day, so thirty warnings would be one fact repeated - which
         is what the aggregation criterion already exists to prevent, now
         with a natural unit to aggregate on."
-
+      - "Decided the low-runway warning surfaces on BOTH the dashboard
+        and in the gates (Keith, 2026-09-23). Thread C always said both;
+        every runway criterion drafted here was pipeline-side, and
+        delivery-dashboard-ux caught the dashboard half as lost in
+        scoping. Thread C's own reasoning for both: the person who must
+        act maintains config, not necessarily the one reading the
+        dashboard. Rejected CI-only, which was the requirement as
+        written - its real cost is that nobody sees the warning until
+        the schedule has already run out, which is the failure it
+        exists to pre-empt. Accepted cost: on a healthy quarterly asset
+        this element is present for months at a time."
+      - "Decided an exhausted schedule renders as a DISTINCT state
+        outside green/amber/red (Keith, 2026-09-23). Rejected RED, which
+        Thread C's own delta table had implied via cannot-run-becomes-
+        red: a supplier's clean dataset would read red because WE forgot
+        to type next year's dates, which is an attribution error - our
+        config task undone, presented as their data gone bad - and the
+        fastest way to teach people that red does not mean what it says.
+        Rejected leaving it as nodata, which is what the naive
+        implementation produces and is invisible in every rollup above
+        it."
+      - "The nodata trap is verified in the real code, not reasoned:
+        rollup() filters d.noDataAsOf and rollupStatuses() filters
+        s!==nodata before worstOf(), and STATUS_ORDER puts nodata at -1
+        - the template's own comment says it can only ever lose a reduce
+        that starts from green. So one exhausted dataset among 29
+        healthy ones makes its collection, its agency and the executive
+        tier all read green, with the only trace being a Tier-2 row
+        whose wording is identical to a dataset that was never supplied.
+        Under the new model nodata also narrows to \"nothing was owed\",
+        and an exhausted schedule owes nothing by construction - so the
+        obvious derivation lands it in exactly the bucket engineered to
+        vanish."
+      - "Decided the executive tier gets a NOTICE above the agency grid,
+        naming how many (Keith, 2026-09-23), against the recommendation
+        of a count badge on the affected agency's card. The badge was
+        argued as quieter, scaling to 30 datasets, and telling you WHERE
+        rather than just THAT. Keith took the louder option: an
+        exhausted schedule stops a dataset being processed, and this
+        whole requirement exists because the dashboard must never go
+        quiet in a way that looks like nothing went wrong. The accepted
+        risk, named so it can be watched: a notice that sits there for
+        weeks becomes wallpaper, and wallpaper stops working for the
+        next thing too."
   - id: REQ-DASH-054
     title: The as-of picker knows the real calendar, because it is embedded
     date_written: "2026-09-22"
@@ -4929,6 +5049,17 @@ requirements:
       - THE SYSTEM SHALL embed each of the asset's named calendars' period
         sequences into the built dashboard, and SHALL identify which
         calendar each dataset uses.
+      - WHEN a viewer opens the as-of panel, THE SYSTEM SHALL state, for
+        each of the asset's named calendars, which period the selected
+        date falls in.
+      - THE SYSTEM SHALL keep the as-of selection in its query parameter
+        as a calendar date, and SHALL NOT replace it with a period name.
+      - THE SYSTEM SHALL bound the as-of date input to the range the
+        embedded sequences cover, so that an out-of-range date cannot be
+        chosen with the picker.
+      - IF an as-of date outside that range arrives by URL, THEN THE
+        SYSTEM SHALL say so plainly, state the covered range, and offer
+        a one-click reset to the default.
     non_functional_requirements:
       - A schedule is CONFIG, not data, so this is a new embed that
         touches nothing about CLAUDE.md's CI-never-reads-data rule. That
@@ -4987,3 +5118,19 @@ requirements:
         unbuilt, so the coordinates this picker reasons about are still
         moving. The accepted cost, stated plainly: the as-of picker
         silently returns nothing on a quarterly asset until batch 6."
+      - "Decided the picker STAYS a plain date, with each calendar's
+        period shown as context in the panel (Keith, 2026-09-23).
+        Rejected adding a period picker alongside the date: it matches
+        how a quarterly data owner actually talks, but a period name is
+        ambiguous at asset level once several calendars exist - 2026-Q3
+        from the quarterly calendar and 2026-09-22 from the daily one
+        are different buckets that must not share a key - so it could
+        only ever sit beside the date, not replace it. Showing the
+        periods as context answers \"which quarter am I in\" with no new
+        control, no URL change, and no existing shared link broken."
+      - "Decided the date input is BOUNDED to the embedded range rather
+        than handling the out-of-range case well. delivery-dashboard-ux
+        found #asof-input has no min/max at all today, so nothing
+        prevents it. Removing the error case beats handling it; the
+        by-URL path still needs the recovery, since a bound on the input
+        cannot constrain a pasted link."
