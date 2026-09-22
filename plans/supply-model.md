@@ -201,7 +201,19 @@ comparisons against the expected-supply sequence.
 
    The spine. Nothing downstream can be built before it.
 
-7. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Arrival and
+7. **[todo, 2026-09-22]** **[Pipeline & publishing]** **Delivery
+   recognition and file mapping.** What constitutes a delivery for a
+   given source (folder, prefix, session); the per-dataset filename
+   pattern that maps a file to a table; the **hold for a human** when
+   two files in one delivery match one dataset's pattern (Thread H,
+   second chaos pass #3/#4).
+
+   **New sprint, added 2026-09-22.** The delivery boundary is
+   load-bearing - it is what replaced the clock-driven trigger - and
+   nothing owned it. Before this, arrival and staging assumed a delivery
+   had already been recognised and its files already attributed.
+
+8. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Arrival and
    staging.** Our own receipt timestamp, never the supplier's; staging
    asserting only arrival facts; replay in arrival-timestamp order
    (Threads B and H).
@@ -209,7 +221,7 @@ comparisons against the expected-supply sequence.
    Arrival order is load-bearing, not tidiness: assignment reads slot
    state, so discovery order changes the answer.
 
-8. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Slot
+9. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Slot
    assignment.** Claim windows, on-time-wins-for-the-current-slot,
    monotonic filling, and hold-for-a-human when nothing is confidently
    claimable (Threads E and H).
@@ -217,27 +229,49 @@ comparisons against the expected-supply sequence.
    The highest-risk sprint in the plan - two cascades were found here by
    stress-testing, one created by the fix for the other.
 
-9. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Arrival
+10. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Arrival
    classification.** Early / on-time / late against the ASSIGNED slot,
    never a slot re-derived from the arrival date (Thread D).
 
-   Separate from sprint 8 so the assignment rules can be verified before
+   Separate from sprint 9 so the assignment rules can be verified before
    anything reports on them.
 
-10. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Promotion and
+11. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Promotion and
     rejection.** Auto on green/amber into an EMPTY slot; red never;
-    landing in a filled slot never (Thread B).
+    landing in a filled slot never (Thread B). Plus the **mixed-period
+    delivery gate** - a delivery whose tables land in different PERIODS
+    runs QA but never auto-promotes (Thread H, TS-33).
 
-11. **[todo, 2026-09-21]** **[Pipeline & publishing]** **The decision
-    log.** Append-only; who, when, what, which, why; automated decisions
-    recorded the same way with the rule as actor; demotion stickiness
-    (Thread G).
+    *Scope grew 2026-09-22*: the mixed-period gate is a promotion rule
+    rather than an assignment one, so it lives here. Note its condition
+    is different PERIODS, not different SLOTS - per-table slots mean an
+    ordinary six-table delivery already spans six slots.
 
-    Pairs with sprint 10 and could merge with it, but kept separate
+12. **[todo, 2026-09-21]** **[Pipeline & publishing]** **The decision
+    log, and the GitHub Issues write path.** Append-only; who, when,
+    what, which, why; automated decisions recorded the same way with the
+    rule as actor; demotion stickiness; **re-filing** (confirmed in
+    scope); and the log **refusing to record a decision with no
+    identity** (Thread G).
+
+    *Scope grew 2026-09-22*: the write path is GitHub Issues, from the
+    standing principle that the dashboard is read-only. It extends
+    `ticket_sync.py`'s existing `/accept` mechanism rather than being
+    new architecture. **Issues are the write CHANNEL, not the system of
+    record** - the pipeline reads the issue and writes an immutable
+    entry to the committed log.
+
+    Pairs with sprint 11 and could merge with it, but kept separate
     because it is what makes mutable filing safe and deserves its own
     verification.
 
-12. **[todo, 2026-09-21]** **[Pipeline & publishing]** **One database,
+    **Carries the one deferred open question**: two conflicting
+    decisions on the same supply - the log records both, but the state
+    can only be one, and nothing says which wins. Keith deferred it to
+    this requirement (Thread H, second chaos pass #2). It needs an
+    answer before this ships.
+
+13. **[todo, 2026-09-21]** **[Pipeline & publishing]** **One database,
     many schemas.** Retire the per-run warehouses; one database per test
     worker (Thread J).
 
@@ -245,47 +279,76 @@ comparisons against the expected-supply sequence.
     databases were providing it by accident and `pytest-xdist` is the
     default.
 
-13. **[todo, 2026-09-21]** **[Pipeline & publishing]** **`qa_results/`
+14. **[todo, 2026-09-21]** **[Pipeline & publishing]** **`qa_results/`
     keyed per dataset.** `REQ-PIPE-038`, including regenerating today's
     history under Keith's one-off exception.
 
-14. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Per-dataset QA
-    trigger.** `REQ-PIPE-036` - a dataset's own arrival triggers its own
-    QA run.
+15. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Delivery-
+    triggered QA.** `REQ-PIPE-036` - QA runs once per DELIVERY, per
+    period touched, rather than per table arrival.
 
-15. **[todo, 2026-09-21]** **[QA checks & contract]** **Check
-    dependencies.** `depends_on` on multi-table checks plus its
-    validation, and `REQ-QAC-037` lifting cross-table checks to the
-    collection scope (Thread I).
+    *Reworded 2026-09-22*: the requirement's intent survives - Child
+    Protection's QA stays independent of Birth Registrations' - but the
+    trigger is a delivery, not a table. Per-table triggering makes
+    cross-table checks flicker red on every healthy delivery (TS-13).
+    `REQ-PIPE-036` needs re-reading against this.
+
+16. **[todo, 2026-09-21]** **[QA checks & contract]** **Check
+    dependencies, and the zero-active-checks gate.** `depends_on` on
+    multi-table checks plus its validation, and `REQ-QAC-037` lifting
+    cross-table checks to the collection scope (Thread I). Plus the CI
+    gate failing a table with **zero ACTIVE checks** (TS-21).
 
     The cannot-run rule is not computable without `depends_on` - "any
     table it spans" is not knowable from a tool's check syntax.
 
-16. **[todo, 2026-09-21]** **[QA checks & contract]** **Red-for-unrun.**
+    *Scope grew 2026-09-22*: the zero-checks gate lives here rather than
+    with check identity, because it is a `mothman check` gate over check
+    configuration like the `depends_on` validation beside it. ACTIVE,
+    not defined - a table whose checks have all been RETIRED hits the
+    same green-by-vacuum path, and retirement is gradual so nothing
+    prompts a look.
+
+17. **[todo, 2026-09-21]** **[QA checks & contract]** **Red-for-unrun.**
     The status, its qualifying chip, and the pointer indicator on a
     healthy table blocked by a neighbour (Thread I).
 
-17. **[todo, 2026-09-21]** **[QA checks & contract]** **Drift and trend
+18. **[todo, 2026-09-21]** **[QA checks & contract]** **Drift and trend
     dependencies.** A declared temporal reference; missing-but-expected
     is red, no-prior-period is `nodata`. Includes REWRITING
     `REQ-PIPE-035`, which specifies the composition Thread J dropped.
 
-18. **[todo, 2026-09-21]** **[Dashboard UI]** **Supply history and
+19. **[todo, 2026-09-21]** **[Dashboard UI]** **Supply history and
     as-of under per-dataset arrivals.** `REQ-DASH-041`.
 
-19. **[todo, 2026-09-21]** **[Dashboard UI]** **Freshness axis and
+20. **[todo, 2026-09-21]** **[Dashboard UI]** **Freshness axis and
     banners.** Freshness capping the headline status; the
     exhausted-schedule banner (computed from config, so it renders even
     when the pipeline that would have produced results did not run);
     arrival-into-a-filled-slot; the blocked-check pointer (Threads C and I).
 
-20. **[todo, 2026-09-21]** **[Dashboard UI]** **Decision-log display and
+21. **[todo, 2026-09-21]** **[Dashboard UI]** **Decision-log display and
     the as-corrected default** (Thread K).
 
-21. **[todo, 2026-09-21]** **[Dashboard UI]** **Automatic snapshots**, on
+22. **[todo, 2026-09-22]** **[Dashboard UI]** **The activity feed.**
+    `CHANGELOG_FEED` (built by `qa_tools/common/changelog.py`) stops
+    being a changelog and becomes an **activity feed**, carrying arrival
+    anomalies alongside QA activity: early and late arrivals, supplies
+    held for a human, arrivals into a filled slot, unexpected tables and
+    unrecognised artefacts. Basic filtering, and **design and colour
+    distinguishing severity** - informational versus warning versus
+    significant - so a routine early arrival reads differently from
+    something needing action (Threads B and H).
+
+    **New sprint, added 2026-09-22.** It came out of TS-10 and TS-15 and
+    had no home. Not `RELEASE_NOTES` (the repo-root `CHANGELOG.yaml`
+    tracking the PoC's own development), which is a different feed and
+    unaffected.
+
+23. **[todo, 2026-09-21]** **[Dashboard UI]** **Automatic snapshots**, on
     every publish, deduplicated by content hash (Thread K).
 
-22. **[todo, 2026-09-22]** **[Dashboard UI]** **Time-granular "as at".**
+24. **[todo, 2026-09-22]** **[Dashboard UI]** **Time-granular "as at".**
     The as-of control accepts an optional TIME alongside the date, so an
     intra-day sequence - promoted 14:00, demoted 22:00 - can be viewed
     at any point rather than only at its end state (Thread H, second
@@ -310,7 +373,7 @@ comparisons against the expected-supply sequence.
       scenarios whose whole point is an intra-day sequence.
 
     **Last, and deliberately**: it depends on both the decision log
-    (sprint 11) and the as-of work (sprint 18), and nothing depends on
+    (sprint 12) and the as-of work (sprint 19), and nothing depends on
     it.
 
 **Why the dashboard sprints come last**: they render everything above.
