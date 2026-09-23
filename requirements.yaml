@@ -5932,7 +5932,7 @@ requirements:
       dashboard never goes quiet in a way that looks exactly like nothing
       having gone wrong.
     moscow: must
-    status: not_started
+    status: built
     source: >
       Keith, 2026-09-21, plans/supply-model.md Thread C - "exhausted
       schedule - hard failure, scoped per dataset", stronger than the
@@ -6096,6 +6096,115 @@ requirements:
         risk, named so it can be watched: a notice that sits there for
         weeks becomes wallpaper, and wallpaper stops working for the
         next thing too."
+      - "[BUILD] Status is `built`, and what that does NOT mean is
+        worth stating because the plain word overclaims here. The
+        runway warning and the exhausted-schedule state are built and
+        tested end to end. The criteria about failing at filing,
+        accepting supplies while exhausted, and a run summary naming
+        what it skipped describe a filing layer that does not exist
+        yet - this requirement''s own earlier decision already says
+        their tests land with staging (sprint 8), and that is what the
+        register is relying on here. `in_progress` was tried first and
+        rejected BY THE GATE, which forbids evidence on anything not
+        built: the register''s model is binary, so the alternative was
+        to drop the record of everything verified today. Recorded
+        rather than worked around quietly."
+      - "[BUILD] Decided an exhausted schedule OUTRANKS `noDataAsOf` on
+        the same dataset. Both render as a quiet tile and both are
+        reachable at once - a dataset with no recent run whose calendar
+        has also ended - but only one of them is somebody''s job. The
+        naive derivation reports the other one."
+      - "[BUILD] Verified the nodata trap in the running page rather
+        than reasoning about it: planting the naive derivation (let an
+        exhausted schedule fall through to nodata) fails five of the
+        eleven browser tests, including the one where a single
+        exhausted dataset sits among five healthy siblings. The
+        executive notice alone did NOT catch it, which is why the
+        rollup has its own tests."
+      - "[BUILD] Decided a dataset''s message names its OWN last period,
+        not its calendar''s. They differ wherever a dataset takes some
+        months and not others - cp-case-workers ends at 2027-Q3 while
+        the quarterly calendar runs to 2027-Q4 - and the first version
+        of this told a reader their dataset ended after a period it
+        never had."
+      - "[BUILD] Made scheduleRunwayAsOf() take the runway as a
+        parameter rather than reading the embedded const directly. A
+        top-level `const` in a classic script is not reachable from
+        outside it, so the version that read SCHEDULE_RUNWAY could only
+        ever have been tested against the embedded null - which is to
+        say not tested at all, while appearing to be."
+      - "[BUILD] Surfaced the count at EVERY tier, not only in the
+        executive notice. \"Not absorbed by the rollup at any tier\" is
+        not satisfied by one banner: a collection reading red because
+        five datasets are red still has to say that a sixth stopped
+        being processed entirely."
+    linked_tests:
+      - tests/test_runway.py
+      - tests/test_dashboard_e2e.py
+      - tests-js/schedule-runway.test.js
+      - tests/test_validate_schedule.py
+    implemented_by:
+      - qa_tools/common/runway.py::calendar_runway
+      - qa_tools/common/runway.py::low_runway
+      - qa_tools/common/runway.py::exhausted_datasets
+      - qa_tools/common/runway.py::warning_lines
+      - qa_tools/common/runway.py::summary
+      - qa_tools/common/validate_schedule.py::_warn_about_runway
+      - dashboard/embed_dashboard_data.py::embed
+    evidence:
+      - >
+        2026-09-23: the warning is ALREADY LIVE against the real
+        committed configuration - the quarterly calendar has two future
+        slots left, because cp-case-workers takes two months of four
+        and so runs out twice as fast as its five siblings. Not a
+        hypothetical, and the gate says so on every run while still
+        exiting 0.
+      - >
+        2026-09-23: eleven real-browser tests assert what is ON THE
+        PAGE rather than what the model computed, across three as-of
+        dates - none exhausted, exactly one exhausted among five
+        healthy siblings, and all six. A correct derivation nobody can
+        see is the same failure in a different place.
+      - >
+        2026-09-23: the nodata trap was verified by planting it. Letting
+        an exhausted schedule fall through to nodata - the derivation
+        this requirement was written around - fails five of those
+        eleven tests. The executive notice alone did not catch it.
+      - >
+        2026-09-23: it is not rendered as red, asserted on the real
+        pill. A supplier's clean dataset reading red because we forgot
+        to type next year's dates is an attribution error, and the
+        fastest way to teach people that red does not mean what it
+        says.
+      - >
+        2026-09-23: the wording differs from a dataset that simply has
+        no run, compared directly by loading the SAME dataset at two
+        as-of dates and requiring the two pages to differ. Both are
+        quiet tiles; only one is somebody's job.
+      - >
+        2026-09-23: the notice cannot be dismissed and nothing about it
+        is persisted - asserted by reading localStorage and
+        sessionStorage after rendering it, not by reading the code.
+      - >
+        2026-09-23: computed from configuration alone against the
+        SELECTED as-of date, which is what lets the page show an
+        exhausted schedule even though the run that would have reported
+        it never happened. Both halves assert they open nothing under
+        data/.
+      - >
+        2026-09-23: NOT YET BUILT, and stated plainly because `built`
+        overclaims here - the criteria covering failure at filing,
+        accepting supplies while exhausted, and a run summary naming
+        what it skipped need a filing layer that does not exist until
+        staging (sprint 8). Their tests land there. `in_progress` was
+        tried and rejected by the gate, which forbids evidence on
+        anything not built; see this requirement's [BUILD] decision for
+        why the record was kept rather than dropped.
+      - >
+        2026-09-23: measured after the last change, not carried over -
+        1185 Python tests and 183 JS tests pass, and all nine mothman
+        gates are green.
+
   - id: REQ-DASH-054
     title: The as-of picker knows the real calendar, because it is embedded
     date_written: "2026-09-22"

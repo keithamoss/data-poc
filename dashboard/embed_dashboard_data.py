@@ -182,6 +182,8 @@ from dashboard.plans_md import parse_plans
 from dashboard.requirements_yaml import parse_requirements
 from qa_tools.common import asset_time
 from qa_tools.common import hierarchy
+from qa_tools.common import runway
+from qa_tools.common import schedule
 from qa_tools.common.acceptance_sync import build_decisions
 from qa_tools.common.changelog import build_changelog
 from qa_tools.common.github_links import build_check_source_links, build_folder_links, current_commit_sha
@@ -300,6 +302,52 @@ def embed() -> None:
     print(f"Re-embedded HIERARCHY = {len(tree['agencies'])} agenc(ies), "
           f"{sum(len(a['collections']) for a in tree['agencies'])} collection(s), "
           f"{len(hierarchy.all_datasets())} dataset(s)")
+
+    # SCHEDULE_RUNWAY - REQ-PIPE-053. Enough for the PAGE to answer
+    # "has this dataset's schedule run out, as at the date the viewer
+    # is looking at" without any data access at all. That independence
+    # is the criterion rather than an optimisation: an exhausted
+    # schedule stops the run that would otherwise have reported it, so
+    # a dashboard that could only learn about it from results would go
+    # quiet in exactly the case this exists to make loud.
+    #
+    # Only AUTHORED calendars appear. A cadence rule generates periods
+    # for ever and can never run out, so including one would invite the
+    # page to warn about something that cannot happen.
+    schedule_runway = {"configFile": "contract/data-asset.yaml",
+                        "defaultThreshold": runway.DEFAULT_WARNING_SLOTS,
+                        "calendars": []}
+    for cal in schedule.calendars():
+        if cal.current.is_cadence_rule:
+            continue
+        periods = schedule.periods_for_calendar(cal.name)
+        datasets = []
+        for entry in hierarchy.all_datasets():
+            if schedule.calendar_for_dataset(entry.dataset_id).name != cal.name:
+                continue
+            owed = [p for p in schedule.periods_for_dataset(entry.dataset_id) if p.expected]
+            # A dataset's OWN last period, not the calendar's. They
+            # differ the moment a dataset participates in some months
+            # and not others - cp-case-workers' last owed period is
+            # 2027-Q3 while its calendar runs to 2027-Q4 - and naming
+            # the calendar's would tell a reader their dataset ended
+            # after a period it never had.
+            datasets.append({"id": entry.dataset_id,
+                              "dates": [p.date.isoformat() for p in owed],
+                              "lastPeriod": owed[-1].name if owed else None,
+                              "lastDate": owed[-1].date.isoformat() if owed else None})
+        schedule_runway["calendars"].append({
+            "name": cal.name,
+            "threshold": cal.runway_warning_slots or runway.DEFAULT_WARNING_SLOTS,
+            "lastPeriod": periods[-1].name if periods else None,
+            "lastDate": periods[-1].date.isoformat() if periods else None,
+            "datasets": datasets,
+        })
+    html = _replace_const(html, "SCHEDULE_RUNWAY",
+                           json.dumps(schedule_runway, separators=(",", ":")))
+    print(f"Re-embedded SCHEDULE_RUNWAY = {len(schedule_runway['calendars'])} authored "
+          f"calendar(s), "
+          f"{sum(len(c['datasets']) for c in schedule_runway['calendars'])} dataset(s)")
 
     changelog_feed = _build_changelog_feed()
     html = _replace_const(html, "CHANGELOG_FEED", json.dumps(changelog_feed, separators=(",", ":")))

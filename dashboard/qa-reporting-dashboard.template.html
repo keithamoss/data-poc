@@ -151,6 +151,16 @@ button{font:inherit; color:inherit;}
 .pill.tag .ico{background:var(--accent); border-radius:2px;}
 .pill.nodata{background:var(--surface-alt); color:var(--ink-faint); border:1px dashed var(--line-strong);}
 .pill.nodata .ico{background:var(--ink-faint); border-radius:2px;}
+/* REQ-PIPE-053. Deliberately unlike the other four: a solid border and
+   a square marker, because this is the one state that is OUR task
+   undone rather than a verdict on anybody's data. Never distinguished
+   by colour alone - the label says "Schedule ended" in words. */
+.pill.exhausted{background:var(--surface-alt); color:var(--ink); border:1.5px solid var(--ink-muted);}
+.pill.exhausted .ico{background:var(--ink-muted); border-radius:1px;}
+.notice-exhausted{border:1.5px solid var(--ink-muted); background:var(--surface-alt);
+  border-radius:10px; padding:12px 14px; margin-bottom:14px;}
+.notice-exhausted b{display:block; margin-bottom:4px;}
+.notice-exhausted code{background:var(--surface); padding:1px 5px; border-radius:4px;}
 
 /* ============ Section headers ============ */
 .view-head{display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:6px;}
@@ -807,8 +817,23 @@ function fmtMetric(x, unit){
 // like the WORST outcome when it's really just "nothing to show yet") -
 // callers that need to render it explicitly (a dataset's own status pill)
 // set it directly, not via worstOf().
+// "exhausted" is a FOURTH state, outside green/amber/red, and outside
+// worstOf() entirely (REQ-PIPE-053). Not red, which was the obvious
+// choice and is an attribution error: a supplier's perfectly clean
+// dataset would read red because WE forgot to type next year's dates -
+// our config task undone, presented as their data gone bad, and the
+// fastest way to teach people that red does not mean what it says.
+//
+// Not "nodata" either, which is what the naive derivation produces and
+// is the trap this requirement was written around: rollup() filters
+// noDataAsOf and rollupStatuses() filters nodata before worstOf(), and
+// STATUS_ORDER puts nodata at -1 where it can only ever LOSE a reduce
+// starting from green. One exhausted dataset among twenty-nine healthy
+// ones would make its collection, its agency and the executive tier
+// all read green.
 const STATUS_ORDER = {nodata:-1, green:0, amber:1, red:2};
-const STATUS_LABEL = {nodata:"No data", green:"Green", amber:"Amber", red:"Red"};
+const STATUS_LABEL = {nodata:"No data", green:"Green", amber:"Amber", red:"Red",
+                       exhausted:"Schedule ended"};
 function worstOf(list){ return list.reduce((w,s)=> STATUS_ORDER[s]>STATUS_ORDER[w]?s:w, "green"); }
 // plans/qa-pipeline.md item 74, Bug A (fixed 2026-09-19). The real tool
 // (dbt-core/Soda Core/datacontract-cli/Evidently) already decided whether
@@ -1006,6 +1031,21 @@ const ASSET_TIMEZONE = null;
 const REAL_BIRTH_REG_DATA = null;
 const REAL_CP_DATA = null;
 const SNAPSHOT_MANIFEST = [];
+// SCHEDULE_RUNWAY - REQ-PIPE-053, embedded from contract/data-asset.yaml
+// at build time. Every AUTHORED calendar, its warning threshold, its
+// last authored period, and the dates each dataset on it actually owes
+// a supply for.
+//
+// THE DATES RATHER THAN A PRE-COMPUTED VERDICT, deliberately: whether
+// a schedule has run out depends on the as-of date the viewer has
+// SELECTED, and a schedule is not exhausted while you are looking at a
+// date its calendar covers. A build-time boolean would be wrong in the
+// one place somebody is most likely to check it.
+//
+// Cadence-rule calendars are absent by construction - a rule generates
+// periods for ever and cannot run out, so warning about one would be
+// warning about something that cannot happen.
+const SCHEDULE_RUNWAY = null;
 const CHANGELOG_FEED = [];
 const RELEASE_NOTES = {intro:[], entries:[]};
 const REQUIREMENTS = [];
@@ -1512,9 +1552,18 @@ function rawRealDatasetById(datasetId){
 // status becomes "nodata" too, rather than falling back to a
 // meaningless "green" over an empty list.
 function rollup(datasets){
-  const withData = datasets.filter(d=>!d.noDataAsOf);
-  if(!withData.length) return datasets.length ? "nodata" : "green";
-  return worstOf(withData.map(d=> worstOf(d.columns.map(c=>c.status))));
+  // An exhausted schedule is excluded from the worst-of for the same
+  // reason nodata is - it is a different KIND of signal - but UNLIKE
+  // nodata it must not then vanish: if every dataset here is
+  // exhausted, the group says so rather than reporting the "no data"
+  // that would be indistinguishable from a quiet healthy feed
+  // (REQ-PIPE-053).
+  const live = datasets.filter(d=>!d.noDataAsOf && !d.scheduleExhausted);
+  if(!live.length){
+    if(datasets.some(d=>d.scheduleExhausted)) return "exhausted";
+    return datasets.length ? "nodata" : "green";
+  }
+  return worstOf(live.map(d=> worstOf(d.columns.map(c=>c.status))));
 }
 // Same "don't let nodata silently win OR silently vanish" logic as
 // rollup() above, one level up (collections -> agency) - a collection's
@@ -1523,9 +1572,60 @@ function rollup(datasets){
 // that surface (STATUS_ORDER.nodata is below green, so it can only ever
 // lose a reduce that starts from "green").
 function rollupStatuses(statuses){
-  const withData = statuses.filter(s=>s!=="nodata");
-  if(!withData.length) return statuses.length ? "nodata" : "green";
-  return worstOf(withData);
+  const live = statuses.filter(s=> s!=="nodata" && s!=="exhausted");
+  if(!live.length){
+    if(statuses.includes("exhausted")) return "exhausted";
+    return statuses.length ? "nodata" : "green";
+  }
+  return worstOf(live);
+}
+
+/* ---- Schedule runway (REQ-PIPE-053) ---------------------------------
+   Answered from CONFIG ALONE, against the as-of date the viewer has
+   selected. Config-only is the criterion, not an optimisation: an
+   exhausted schedule stops the run that would otherwise have reported
+   it, so a page that could only learn of it from results would go
+   quiet in exactly the case this exists to make loud. */
+// `runway` defaults to the embedded const and is a PARAMETER so this
+// stays a pure function of its inputs - a top-level `const` is not
+// reachable from outside the script in jsdom, so a version reading
+// SCHEDULE_RUNWAY directly could only ever be tested against the
+// embedded null, which is to say not tested at all.
+function scheduleRunwayAsOf(asOfDateStr, runway){
+  const source = runway === undefined ? SCHEDULE_RUNWAY : runway;
+  const out = {exhausted:{}, low:[], exhaustedCount:0};
+  if(!source) return out;
+  (source.calendars||[]).forEach(cal=>{
+    let fewest = null;
+    (cal.datasets||[]).forEach(ds=>{
+      // A slot still to come is one whose date is AFTER the date being
+      // viewed. Strings compare correctly here because both are
+      // ISO-8601 - the same reasoning clipDatasetToAsOf() relies on.
+      const remaining = (ds.dates||[]).filter(d=> d > asOfDateStr).length;
+      if(fewest===null || remaining < fewest) fewest = remaining;
+      if(remaining === 0){
+        // The DATASET's own last period, falling back to its
+        // calendar's only when it has none of its own. They differ
+        // wherever a dataset takes some months and not others, and
+        // naming the calendar's would tell a reader their dataset
+        // ended after a period it never had.
+        out.exhausted[ds.id] = {calendar:cal.name,
+                                 lastPeriod: ds.lastPeriod || cal.lastPeriod,
+                                 lastDate: ds.lastDate || cal.lastDate};
+        out.exhaustedCount++;
+      }
+    });
+    // The dataset that runs out FIRST decides when this is worth
+    // saying - one taking two months of four runs out twice as fast as
+    // its siblings.
+    if(fewest!==null && fewest < cal.threshold){
+      out.low.push({name:cal.name, remaining:fewest, lastPeriod:cal.lastPeriod,
+                     lastDate:cal.lastDate, datasetCount:(cal.datasets||[]).length,
+                     threshold:cal.threshold});
+    }
+  });
+  out.low.sort((a,b)=> a.remaining - b.remaining);
+  return out;
 }
 
 function toDateStr(d){ return d.toISOString().slice(0,10); }
@@ -1644,13 +1744,31 @@ function buildData(asOfDateStr){
     })),
   }));
   const data = {agencies};
+  // REQ-PIPE-053. Marked BEFORE the rollup below, because it changes
+  // which datasets that rollup is allowed to read a status from.
+  const runway = scheduleRunwayAsOf(asOfDateStr);
+  data.scheduleRunway = runway;
   // wire up rollup statuses bottom-up. A noDataAsOf dataset already
   // carries its own "nodata" status from noDataDataset() above - its
   // (empty) columns list must never be re-derived over the top of that,
   // since worstOf([]) would silently default it back to "green".
   data.agencies.forEach(ag=>{
+    ag.exhaustedCount = 0;
     ag.collections.forEach(col=>{
-      col.datasets.forEach(ds=>{ if(!ds.noDataAsOf) ds.status = worstOf(ds.columns.map(c=>c.status)); });
+      col.exhaustedCount = 0;
+      col.datasets.forEach(ds=>{
+        const ended = runway.exhausted[ds.id];
+        if(ended){
+          // An exhausted schedule OUTRANKS "no data as of" on the same
+          // dataset, and that is the whole point: both render as a
+          // quiet tile, but only one of them is somebody's job to fix.
+          ds.scheduleExhausted = ended;
+          ds.status = "exhausted";
+          col.exhaustedCount++; ag.exhaustedCount++;
+        } else if(!ds.noDataAsOf){
+          ds.status = worstOf(ds.columns.map(c=>c.status));
+        }
+      });
       col.status = rollup(col.datasets);
     });
     ag.status = rollupStatuses(ag.collections.map(c=>c.status));
@@ -2021,6 +2139,20 @@ function wireChart(id, history, warn, fail, unit, xs, ys, W, padL, padR, onPoint
 /* =========================================================================
    5. RENDER: pill / breadcrumb / views
 ========================================================================= */
+
+// REQ-PIPE-053. "Not absorbed by the rollup at any tier" is not
+// satisfied by the executive notice alone: a collection whose status
+// reads red because five datasets are red still has to say that a
+// sixth stopped being processed entirely. Rendered wherever a tier's
+// card is, in words as well as by the border the .pill.exhausted class
+// carries.
+function exhaustedMarker(count){
+  if(!count) return "";
+  return `<div style="margin-top:6px; font-size:12px; color:var(--ink); display:flex;
+    align-items:center; gap:5px;"><span class="pill exhausted sm"><span class="ico"></span>${count}
+    schedule${count===1?"":"s"} ended</span></div>`;
+}
+
 function pill(status, size){ return `<span class="pill ${status} ${size||""}"><span class="ico"></span>${STATUS_LABEL[status]}</span>`; }
 // Item 76's UI-integration follow-up (plans/qa-pipeline.md, 2026-09-18) -
 // a small badge next to a dataset's own status pill linking straight to
@@ -2252,6 +2384,40 @@ function render(){
   if(STATE.tier==="dataset") return renderDataset(view, STATE.agencyId, STATE.collectionId, STATE.datasetId);
 }
 
+
+// REQ-PIPE-053. ABOVE the agency grid, not a badge on the affected
+// agency's card - Keith's own call, 2026-09-23, against the quieter
+// recommendation. An exhausted schedule stops a dataset being
+// processed at all, and this whole requirement exists because the
+// dashboard must never go quiet in a way that looks like nothing went
+// wrong.
+//
+// The accepted risk, named here so it can be watched rather than
+// discovered: a notice that sits there for weeks becomes wallpaper,
+// and wallpaper stops working for the next thing too.
+//
+// NO DISMISS CONTROL, and nothing about it is persisted anywhere. A
+// dismissible notice about a task nobody has done is a notice about a
+// task nobody will do.
+function exhaustedNotice(){
+  const runway = (DATA && DATA.scheduleRunway) || null;
+  if(!runway || !runway.exhaustedCount) return "";
+  const n = runway.exhaustedCount;
+  const calendars = [...new Set(Object.values(runway.exhausted).map(e=>e.calendar))];
+  const which = calendars.map(c=>`<b style="display:inline">${c}</b>`).join(", ");
+  const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || "contract/data-asset.yaml";
+  return `<div class="notice-exhausted" role="status">
+    <b>${n} dataset${n===1?"":"s"} cannot be processed — the delivery schedule has ended</b>
+    <div style="color:var(--ink-muted); font-size:13px;">
+      The ${calendars.length===1?"calendar":"calendars"} ${which} ${calendars.length===1?"has":"have"}
+      no delivery dates after the date being viewed, so nothing is expected and nothing can be
+      filed. This is a configuration task, not a problem with anyone's data.
+      Add the next dates to <code>${file}</code> — <code>mothman schedule candidate-dates</code>
+      proposes them for review.
+    </div>
+  </div>`;
+}
+
 function renderExec(view){
   setRail([{tier:"Tier 1", label:"Executive", nav:{tier:"exec"}}]);
   // NOTHING EMBEDDED (REQ-DASH-055). Since the whole tree comes from
@@ -2288,6 +2454,7 @@ function renderExec(view){
       <span><i class="amber"></i>Amber — warning band (${amberCount})</span>
       <span><i class="red"></i>Red — fail band (${redCount})</span>
     </div>
+    ${exhaustedNotice()}
     <div class="grid" id="agency-grid"></div>
   `;
   const grid = document.getElementById("agency-grid");
@@ -2300,6 +2467,7 @@ function renderExec(view){
       <div style="color:var(--ink-muted); font-size:12.5px;">${ag.blurb}</div>
       ${spark}
       <div class="card-meta"><span><b>${ag.collections.length}</b> ${pluralize(ag.collections.length,"collection")}</span><span><b>${nDatasets}</b> ${pluralize(nDatasets,"dataset")}</span></div>
+      ${exhaustedMarker(ag.exhaustedCount)}
     </button>`;
   }).join("");
   wireCards(grid);
@@ -2346,12 +2514,23 @@ function renderAgency(view, agencyId){
   const wrap = document.getElementById("collections");
   wrap.innerHTML = ag.collections.map(col=>`
     <div class="collection-block">
-      <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}</div>
+      <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount)}</div>
       <div class="overflow-x">
       <table class="dataset-table">
         <thead><tr><th>Dataset</th><th>Status</th><th>Latest arrival</th><th>Rows, latest run</th><th>Last QA run</th><th>Trend</th></tr></thead>
         <tbody>
         ${col.datasets.map(ds=>{
+          // REQ-PIPE-053, checked BEFORE the no-data row. Both render
+          // as a quiet row; only one of them is somebody's job, and
+          // identical wording is what would hide that.
+          if(ds.scheduleExhausted){
+            return `<tr data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
+              <td><div class="dataset-name">${ds.name}</div><div class="dataset-provider">${ds.provider}</div></td>
+              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
+              <td colspan="4" style="color:var(--ink); font-size:12.5px;">Delivery schedule ended after
+                ${ds.scheduleExhausted.lastPeriod} — no supply expected, and QA cannot run until dates are added</td>
+            </tr>`;
+          }
           if(ds.noDataAsOf){
             return `<tr data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
               <td><div class="dataset-name">${ds.name}</div><div class="dataset-provider">${ds.provider}</div></td>
@@ -2518,6 +2697,35 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   // underlying check history. Keith's own words: "no red amber and
   // greens... but I should still be able to see the historical graphs
   // and comparison stuff."
+  // REQ-PIPE-053. CHECKED BEFORE the no-data branch, and worded so the
+  // two can never be mistaken for each other. "Nothing has been
+  // supplied yet" is a fact about a supplier; "the schedule has ended"
+  // is a task on OUR side, and rendering them the same way is what
+  // makes a configuration task invisible.
+  if(ds.scheduleExhausted){
+    const ended = ds.scheduleExhausted;
+    const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || "contract/data-asset.yaml";
+    view.innerHTML = `
+      <div class="view-head">
+        <div>
+          <h2>${ds.name} ${pill("exhausted")} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</h2>
+          <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}</div>
+        </div>
+      </div>
+      <div style="padding:40px 0; color:var(--ink-muted); font-size:14px; max-width:60ch;">
+        <b style="color:var(--ink);">This dataset's delivery schedule has ended.</b><br><br>
+        Its calendar <b>${ended.calendar}</b> has no dates after
+        <b>${ended.lastPeriod}</b> (${fmtDate(new Date(ended.lastDate+"T00:00:00Z"))}), so as of
+        <b>${fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"))}</b> no supply is expected, none can be
+        filed, and QA cannot run for it.<br><br>
+        Nothing is wrong with the data. Add the next delivery dates to
+        <code>${file}</code> — <code>mothman schedule candidate-dates</code> proposes them for
+        review. Supplies that arrive meanwhile are still accepted and will be filed correctly
+        once the dates exist.
+      </div>
+    `;
+    return;
+  }
   if(ds.noDataAsOf && !ds.columns.length){
     view.innerHTML = `
       <div class="view-head">

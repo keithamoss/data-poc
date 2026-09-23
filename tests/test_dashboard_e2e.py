@@ -1221,3 +1221,114 @@ class TestTodayIsTheAssetsToday:
         from qa_tools.common import asset_time
         _goto(clean_page, built_dashboard_html, {"tier": "executive"})
         assert clean_page.evaluate("() => ASSET_TIMEZONE") == asset_time.asset_timezone().key
+
+
+class TestAnExhaustedScheduleIsLoud:
+    """REQ-PIPE-053, asserted where a person actually looks.
+
+    The requirement exists because a schedule running out looks exactly
+    like a healthy feed: no periods, no slots, nothing owed, nothing
+    overdue, everything green. So the assertions here are about what is
+    ON THE PAGE, not about what the model computed - a correct
+    derivation nobody can see is the same failure in a different place.
+
+    The real quarterly calendar's last date is 2027-11-01, and
+    cp-case-workers takes only February and August, so it runs out at
+    2027-Q3 while its five siblings run to 2027-Q4. That gap gives a
+    real window - autumn 2027 - where exactly ONE dataset is exhausted
+    among five that are not, which is the case a rollup most wants to
+    swallow.
+    """
+
+    ONE_EXHAUSTED = "2027-09-15"
+    ALL_EXHAUSTED = "2028-06-01"
+    NONE_EXHAUSTED = "2026-09-23"
+    CP = "child-protection-family-support"
+    DS = {"tier": "dataset", "agencyId": CP, "collectionId": "child-protection",
+          "datasetId": "cp-case-workers"}
+
+    def test_nothing_is_said_while_the_calendar_still_has_dates(self, page, built_dashboard_html):
+        _goto(page, built_dashboard_html, as_of=self.NONE_EXHAUSTED)
+        assert page.locator(".notice-exhausted").count() == 0
+
+    def test_the_executive_tier_says_how_many_above_the_grid(self, page, built_dashboard_html):
+        _goto(page, built_dashboard_html, as_of=self.ONE_EXHAUSTED)
+        notice = page.locator(".notice-exhausted")
+        assert notice.count() == 1
+        text = " ".join(notice.inner_text().split())
+        assert "1 dataset cannot be processed" in text
+        assert "schedule has ended" in text
+
+    def test_the_count_tracks_the_as_of_date(self, page, built_dashboard_html):
+        _goto(page, built_dashboard_html, as_of=self.ALL_EXHAUSTED)
+        text = " ".join(page.locator(".notice-exhausted").inner_text().split())
+        assert "6 datasets cannot be processed" in text
+
+    def test_the_notice_names_the_file_to_edit(self, page, built_dashboard_html):
+        _goto(page, built_dashboard_html, as_of=self.ONE_EXHAUSTED)
+        text = " ".join(page.locator(".notice-exhausted").inner_text().split())
+        assert "contract/data-asset.yaml" in text
+        assert "candidate-dates" in text, "and how to get the next dates proposed"
+
+    def test_the_notice_cannot_be_dismissed(self, page, built_dashboard_html):
+        """A dismissible notice about a task nobody has done is a notice
+        about a task nobody will do - and a dismissal persisted in
+        browser storage would hide it for that person permanently."""
+        _goto(page, built_dashboard_html, as_of=self.ONE_EXHAUSTED)
+        assert page.locator(".notice-exhausted button").count() == 0
+        assert page.locator(".notice-exhausted [role=button]").count() == 0
+        stored = page.evaluate(
+            "() => JSON.stringify({l: {...localStorage}, s: {...sessionStorage}})")
+        assert "exhaust" not in stored.lower(), stored
+        assert "dismiss" not in stored.lower(), stored
+
+    def test_one_exhausted_dataset_among_five_healthy_is_not_swallowed(self, page, built_dashboard_html):
+        """The nodata trap, at the tier it would vanish from."""
+        _goto(page, built_dashboard_html, state={"tier": "agency", "agencyId": self.CP},
+              as_of=self.ONE_EXHAUSTED)
+        rows = page.locator("tr", has=page.locator("td", has_text="Delivery schedule ended"))
+        assert rows.count() == 1
+        assert "Case Workers" in rows.first.inner_text()
+
+    def test_the_dataset_itself_says_so_in_its_own_words(self, page, built_dashboard_html):
+        _goto(page, built_dashboard_html, state=self.DS, as_of=self.ONE_EXHAUSTED)
+        text = " ".join(page.locator("#view").inner_text().split())
+        assert "delivery schedule has ended" in text.lower()
+        assert "contract/data-asset.yaml" in text
+
+    def test_it_names_the_datasets_own_last_period_not_its_calendars(self, page, built_dashboard_html):
+        """cp-case-workers' last owed period is 2027-Q3; the quarterly
+        calendar runs to 2027-Q4. Naming the calendar's would tell a
+        reader their dataset ended after a period it never had."""
+        _goto(page, built_dashboard_html, state=self.DS, as_of=self.ONE_EXHAUSTED)
+        text = " ".join(page.locator("#view").inner_text().split())
+        assert "2027-Q3" in text
+        assert "2027-Q4" not in text
+
+    def test_it_reads_differently_from_a_dataset_that_simply_has_no_run(self, page, built_dashboard_html):
+        """Both are quiet tiles. Only one of them is somebody's job, and
+        identical wording is exactly what would hide that."""
+        _goto(page, built_dashboard_html, state=self.DS, as_of=self.ONE_EXHAUSTED)
+        ended = " ".join(page.locator("#view").inner_text().split())
+        _goto(page, built_dashboard_html, state=self.DS, as_of="2023-01-01")
+        no_run = " ".join(page.locator("#view").inner_text().split())
+        assert ended != no_run
+        assert "schedule has ended" in ended.lower()
+        assert "schedule has ended" not in no_run.lower()
+
+    def test_it_is_not_rendered_as_red(self, page, built_dashboard_html):
+        """A supplier's clean dataset reading red because WE forgot to
+        type next year's dates is an attribution error, and the fastest
+        way to teach people that red does not mean what it says."""
+        _goto(page, built_dashboard_html, state=self.DS, as_of=self.ONE_EXHAUSTED)
+        heading = page.locator("#view h2").first
+        assert heading.locator(".pill.exhausted").count() == 1
+        assert heading.locator(".pill.red").count() == 0
+
+    def test_the_page_still_has_zero_console_errors(self, page, built_dashboard_html):
+        errors = []
+        page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+        for as_of in (self.NONE_EXHAUSTED, self.ONE_EXHAUSTED, self.ALL_EXHAUSTED):
+            _goto(page, built_dashboard_html, as_of=as_of)
+            _goto(page, built_dashboard_html, state=self.DS, as_of=as_of)
+        assert errors == []

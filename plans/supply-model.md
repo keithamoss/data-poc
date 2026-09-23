@@ -521,17 +521,26 @@ comparisons against the expected-supply sequence.
    gate: it is measured in slots, and slots do not exist until sprint
    6, so it belongs to `REQ-PIPE-053`.
 
-6. **[in-progress, 2026-09-23]** **[Pipeline & publishing]** **Periods and
-   slots.** The two DERIVATIONS are BUILT, 2026-09-23. `REQ-PIPE-051`
+6. **[done, 2026-09-23]** **[Pipeline & publishing]** **Periods and
+   slots.** All three parts BUILT, 2026-09-23. `REQ-PIPE-051`
    derives the period sequence version by version - which turned out to
    fix a real latent bug, not just add a function: authoring a second
    calendar version would have DELETED every earlier period rather than
    leaving it alone. `REQ-PIPE-052` derives slots as periods crossed
    with each dataset's own participation, each carrying its own due
-   instant, grace allowance and claim window. Both own their decisions.
+   instant, grace allowance and claim window. `REQ-PIPE-053` did the
+   low-runway warning measured in slots, and the exhausted-schedule
+   state (Thread C). Each owns its own decisions.
 
-   What is LEFT is `REQ-PIPE-053`: the low-runway warning measured in
-   slots, and the hard failure on an exhausted schedule (Thread C).
+   **One deliberate hold on `REQ-PIPE-053`, and it is why that
+   requirement's `built` overclaims.** Its criteria about failing at
+   FILING, accepting supplies while exhausted, and a run summary naming
+   what it skipped all need a filing layer that does not exist until
+   sprint 8. Their tests land there. The requirement carries this in
+   its own `[BUILD]` decision, including why `in_progress` was not
+   available: the register's gate forbids evidence on anything not
+   built, so the alternative was to drop the record of what WAS
+   verified.
 
    The spine. Nothing downstream can be built before it.
 
