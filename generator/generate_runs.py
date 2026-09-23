@@ -232,6 +232,18 @@ class BirthRegistrationsProvider:
         return apply_birth_registrations_presets(df, severity=severity, seed=seed,
                                                   previous_row_count=previous_row_count)
 
+    def resupply_subset(self, df: pd.DataFrame, previous_dirty_seed: int, seed: int) -> pd.DataFrame:
+        """A Birth Registrations supply is ONE FILE, so there is no
+        such thing as resending part of it (REQ-GEN-040).
+
+        Implemented rather than left off, because the honest answer to
+        "can this dataset deliver one table at a time" is no, and a
+        dataset that says so is different from one nobody asked. The
+        partial shape belongs to a collection of several tables, which
+        is what Child Protection is and this is not.
+        """
+        return df
+
     def churn(self, df: pd.DataFrame, seed: int, run_date: date, id_offset: int,
               add_rate: float = 0.02, modify_rate: float = 0.02, remove_rate: float = 0.01) -> pd.DataFrame:
         """Between one attempt and the next, the source system hasn't been

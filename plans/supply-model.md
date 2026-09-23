@@ -445,20 +445,31 @@ comparisons against the expected-supply sequence.
    First because it is baked into all 257 hand-authored checks; changing
    it later is a corpus-wide edit.
 
-2. **[in-progress, 2026-09-23]** **[Data generation]** **Generator delivers one
-   table at a time, and injects the scenario shapes.** Two of the three
-   parts are BUILT, both 2026-09-23. `REQ-GEN-042` did the VOCABULARY -
-   slot vs delivery, period vs receipt instant, dateless deterministic
-   run ids, a pinned anchor, and the schedule read from the shared
-   calendar config. `REQ-GEN-043` did the ON-DISK DELIVERY FORMAT,
-   specified in `docs/delivery-format.md` and emitted by both
-   generators, and took the pipeline off the generator's manifest onto
-   recognised arrivals - that requirement now owns the decisions,
-   including six the build itself turned up.
+2. **[done, 2026-09-23]** **[Data generation]** **Generator delivers one
+   table at a time, and injects the scenario shapes.** All three parts
+   BUILT, 2026-09-23. `REQ-GEN-042` did the VOCABULARY - slot vs
+   delivery, period vs receipt instant, dateless deterministic run ids,
+   a pinned anchor, and the schedule read from the shared calendar
+   config. `REQ-GEN-043` did the ON-DISK DELIVERY FORMAT, specified in
+   `docs/delivery-format.md`, and took the pipeline off the generator's
+   manifest onto recognised arrivals. `REQ-GEN-040` did ONE TABLE AT A
+   TIME and arrival timing - a resupply carrying some of a collection
+   and not the rest, down to a single dataset, plus supplies landing
+   before they were due or arbitrarily after. Each requirement owns its
+   own decisions now, including the dozen the builds themselves turned
+   up.
 
-   What is LEFT is `REQ-GEN-040`: one table at a time, plus the
-   `[INJECT]` set from the test scenario register below, plus the
-   generated scenario map that says where each one landed.
+   **One deliberate hold, Keith's own call 2026-09-23**: those shapes
+   are CAPABILITY, not committed history. A partial Child Protection
+   delivery cannot be loaded by today's warehouse builder, so emitting
+   one would take CP's pipeline down until the staging overlay exists.
+   `REQ-GEN-044` carries putting them into the real history, and
+   depends on sprint 7's `REQ-PIPE-035`/`036` being able to read them.
+
+   What is LEFT in this sprint's own area is `REQ-GEN-044`/`REQ-GEN-045`:
+   the `[INJECT]` set from the test scenario register below, actually
+   present in the generated history, plus the scenario map that says
+   where each one landed.
 
    **Moved here from sprint 6** (Keith, 2026-09-22). It gates roughly
    two-thirds of the test scenario register: the generator today emits

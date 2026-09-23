@@ -110,6 +110,29 @@ class DatasetProvider(Protocol[T]):
         we waited for a resupply."""
         ...
 
+    def resupply_subset(self, payload: T, previous_dirty_seed: int, seed: int) -> T:
+        """The PART of the payload a resupply actually sends back
+        (REQ-GEN-040).
+
+        A supplier correcting a bad quarterly extract does not
+        necessarily resend all six tables - they resend what was wrong,
+        and sometimes only some of that, with the rest following later.
+        This is where a dataset says what "some of it" means for its own
+        payload shape. Birth Registrations' is one CSV and therefore
+        indivisible, so its implementation returns the payload unchanged
+        and says so.
+
+        `previous_dirty_seed` is the seed that produced the dirt in the
+        arrival being corrected. Passed explicitly rather than
+        remembered on the provider: a provider instance is shared across
+        every slot in a run, so per-chain state on it would work only
+        while slots happen to be walked one at a time to completion -
+        exactly the kind of thing that holds until it quietly does not.
+        A provider that needs to know what failed recomputes it from
+        this seed, which is deterministic.
+        """
+        ...
+
 
 def _add_business_days(start: date, n: int) -> date:
     """start + n working days (Mon-Fri) - real supplier turnaround is
@@ -150,7 +173,9 @@ def run_slot_chain(provider: DatasetProvider[T], slot_date: date, seed: int,
                         id_offset: int, n_rows: int, first_severity: Optional[str],
                         previous_row_count: Optional[int],
                         delay_days: np.ndarray = _DELAY_DAYS,
-                    delay_weights: np.ndarray = _DELAY_WEIGHTS) -> Iterator[Delivery[T]]:
+                    delay_weights: np.ndarray = _DELAY_WEIGHTS,
+                    first_arrival_offset_days: int = 0,
+                    partial_resupply: bool = False) -> Iterator[Delivery[T]]:
     """Walks ONE SLOT through its deliveries, yielding each arrival in
     order. Stops as soon as one isn't red, or after MAX_ATTEMPTS.
 
@@ -161,6 +186,30 @@ def run_slot_chain(provider: DatasetProvider[T], slot_date: date, seed: int,
     default to Birth Registrations' own curve above; a provider whose
     real-world turnaround differs (see generate_cp_runs.py) passes its
     own.
+
+    WHEN AN ARRIVAL LANDS, and why the lever is a plain offset
+    (REQ-GEN-040). `first_arrival_offset_days` shifts the first arrival
+    in calendar days relative to the slot date - NEGATIVE for a supply
+    that turns up before it was due, which is a real shape the model
+    has to handle and which this generator could not previously produce
+    at all. Arbitrarily late is the same lever from the other end, plus
+    `delay_days`: a curve whose values exceed the gap between slots
+    produces a resupply landing after later slots have been filled.
+
+    Note what this does NOT do: decide which slot any of that fills
+    (criterion 6). It says when a supply was received. Which slot that
+    answers for is derived later, from arrival plus slot state, and a
+    generator that emitted it would make every assignment test a
+    tautology.
+
+    `partial_resupply` opts into asking the provider what a resupply
+    actually sends back, rather than assuming it resends everything.
+    OFF by default, and deliberately: a Child Protection delivery
+    missing two of its six tables cannot be loaded by today's warehouse
+    builder, which reads all six out of the delivery directory. The
+    capability is real and tested; putting it into the committed
+    history waits on the staging overlay (REQ-PIPE-035/036). Keith's
+    own call, 2026-09-23.
 
     Tracks two lineages, not one (real bug found and fixed 2026-09-15 -
     see plans/qa-pipeline.md #31): `clean_payload` is churned forward
@@ -182,7 +231,8 @@ def run_slot_chain(provider: DatasetProvider[T], slot_date: date, seed: int,
     design intent), just never carrying forward another attempt's
     injected defects."""
     clean_payload = provider.generate(slot_date, seed, n_rows, id_offset)
-    payload = (provider.dirty(clean_payload, first_severity, seed + 500, previous_row_count)
+    dirty_seed = seed + 500
+    payload = (provider.dirty(clean_payload, first_severity, dirty_seed, previous_row_count)
                if first_severity else clean_payload)
 
     # An internal counter, not an emitted field. The chain has to know
@@ -190,7 +240,10 @@ def run_slot_chain(provider: DatasetProvider[T], slot_date: date, seed: int,
     # vary its own RNG streams - what criterion 4 retires is RECORDING
     # that number as an authority on the record.
     arrival_count = 1
-    received_date = slot_date
+    # The FIRST arrival is the one the offset moves. A resupply's own
+    # timing is the delay curve's job, measured from wherever the
+    # arrival it corrects actually landed.
+    received_date = slot_date + timedelta(days=first_arrival_offset_days)
     severity = first_severity
 
     while True:
@@ -208,9 +261,21 @@ def run_slot_chain(provider: DatasetProvider[T], slot_date: date, seed: int,
 
         clean_payload = provider.churn(clean_payload, seed + 800 + arrival_count, slot_date,
                                         id_offset + 50_000 + arrival_count * 100)
+
+        # WHAT IS BEING RESENT is decided BEFORE what is wrong with it,
+        # not after (REQ-GEN-040). Dirtying first and trimming second
+        # would let a "red" arrival ship a clean payload, because a
+        # provider that dirties a SUBSET of what it is handed (which is
+        # what Child Protection's does) could mark only tables that the
+        # trim then drops - a chain that says red while the files say
+        # otherwise.
+        resent = (provider.resupply_subset(clean_payload, dirty_seed, seed + 600 + arrival_count)
+                  if partial_resupply else clean_payload)
+
+        dirty_seed = seed + 900 + arrival_count
         if resupply_rng.random() < STILL_RED_PROB:
-            payload = provider.dirty(clean_payload, "red", seed + 900 + arrival_count, previous_row_count)
+            payload = provider.dirty(resent, "red", dirty_seed, previous_row_count)
             severity = "red"
         else:
-            payload = clean_payload
+            payload = resent
             severity = None

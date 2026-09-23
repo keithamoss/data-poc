@@ -240,7 +240,7 @@ def _add_extract_timestamp(df: pd.DataFrame, snapshot_date: date, date_col: str 
     return out
 
 
-def _pick_dirty_tables(seed: int) -> set[str]:
+def _pick_dirty_tables(seed: int, available: list[str] | None = None) -> set[str]:
     """Which 2-3 of the 6 real tables actually fail on a given dirty
     delivery/attempt - not all of them (Keith's own call, 2026-09-18
     dictated feedback: "it should be possible for only some tables in
@@ -253,10 +253,22 @@ def _pick_dirty_tables(seed: int) -> set[str]:
     directly-testable pure function rather than inlined into dirty()
     itself, so this real invariant (never 0/1, never all 6) can be unit
     tested without needing realistic fake table content just to satisfy
-    the real per-table preset functions' own column requirements."""
+    the real per-table preset functions' own column requirements.
+
+    `available` narrows the pick to the tables actually being sent
+    (REQ-GEN-040). A partial resupply ships two of the six, and picking
+    2-3 out of all six would usually land on tables that are not in the
+    delivery at all - producing an arrival the chain calls red whose
+    files are clean. Defaulting to every table keeps a whole-collection
+    delivery drawing exactly the numbers it drew before, so this
+    signature change moves nothing about today's generated history.
+    Where only one table is being sent, that one is dirtied: "never 1"
+    is an invariant about a six-table delivery, not a rule that a
+    single-table one must come back clean."""
+    tables = list(TABLES if available is None else available)
     rng = np.random.default_rng(seed)
-    n_dirty = int(rng.integers(2, 4))  # 2 or 3 tables
-    return set(rng.choice(TABLES, size=n_dirty, replace=False))
+    n_dirty = min(int(rng.integers(2, 4)), len(tables))  # 2 or 3, or all of a smaller delivery
+    return set(rng.choice(tables, size=n_dirty, replace=False))
 
 
 # Churn (resupply attempt N -> N+1) touches only these three "activity"
@@ -313,7 +325,10 @@ class ChildProtectionProvider:
 
     def dirty(self, payload: dict[str, pd.DataFrame], severity: str, seed: int,
               previous_row_count: int | None) -> dict[str, pd.DataFrame]:
-        dirty_tables = _pick_dirty_tables(seed)
+        # Scoped to what this delivery actually CONTAINS - a partial
+        # resupply has only the tables being resent (REQ-GEN-040).
+        present = [t for t in TABLES if t in payload]
+        dirty_tables = _pick_dirty_tables(seed, present)
         tables = dict(payload)
         base = self.base_tables
         if "cp_notifications" in dirty_tables:
@@ -322,7 +337,11 @@ class ChildProtectionProvider:
                 severity, seed=seed + 100)
         if "cp_placements" in dirty_tables:
             tables["cp_placements"] = dirty_mod.apply_cp_placements_presets(
-                tables["cp_placements"], tables["cp_carers"], base["cp_clients"],
+                # cp_carers is a REFERENCE here, not the table being
+                # dirtied, so a partial resupply that does not contain
+                # it falls back to the true source - which is what the
+                # class docstring says reference tables are anyway.
+                tables["cp_placements"], tables.get("cp_carers", base["cp_carers"]), base["cp_clients"],
                 severity, seed=seed + 200)
         if "cp_investigations" in dirty_tables:
             tables["cp_investigations"] = dirty_mod.apply_cp_investigations_presets(
@@ -338,6 +357,40 @@ class ChildProtectionProvider:
             tables["cp_case_workers"] = dirty_mod.apply_cp_case_workers_presets(
                 tables["cp_case_workers"], severity, seed=seed + 600)
         return tables
+
+    def resupply_subset(self, payload: dict[str, pd.DataFrame], previous_dirty_seed: int,
+                         seed: int) -> dict[str, pd.DataFrame]:
+        """The tables a resupply actually sends back - SOME of what
+        failed, not all of it, and not the whole collection
+        (REQ-GEN-040, Keith's own call 2026-09-23).
+
+        A supplier told three tables are wrong does not necessarily
+        return all three at once; they fix what they can and the rest
+        follows. Modelling it that way is what produces two shapes the
+        model has to handle and the generator could not previously
+        make: a delivery carrying SOME of a collection's tables, and a
+        delivery carrying exactly ONE - a supply for one dataset with
+        no supply for any of its siblings.
+
+        Rejected resending exactly the failed set, which is the simpler
+        and arguably more typical single behaviour: it can never
+        produce a one-table delivery, because a failure is never
+        narrower than two tables by construction (_pick_dirty_tables).
+
+        What failed is RECOMPUTED from the seed that dirtied the
+        arrival being corrected, never remembered on this object - see
+        DatasetProvider.resupply_subset()'s own docstring for why a
+        provider shared across every slot must not carry per-chain
+        state.
+        """
+        present = [t for t in TABLES if t in payload]
+        failed = sorted(_pick_dirty_tables(previous_dirty_seed, present))
+        if not failed:  # defensive - a chain only resupplies what went red
+            return payload
+        rng = np.random.default_rng(seed)
+        n_sent = int(rng.integers(1, len(failed) + 1))
+        sent = set(rng.choice(failed, size=n_sent, replace=False))
+        return {name: df for name, df in payload.items() if name in sent}
 
     def churn(self, payload: dict[str, pd.DataFrame], seed: int, run_date: date,
               id_offset: int) -> dict[str, pd.DataFrame]:
@@ -356,6 +409,9 @@ class ChildProtectionProvider:
         exist, only when they were extracted."""
         rng = np.random.default_rng(seed)
         out = dict(payload)
+        # Always the WHOLE collection: run_slot_chain churns the clean
+        # lineage forward and only then asks what part of it is being
+        # resent, so churn never sees a partial payload (REQ-GEN-040).
         for table in _CHURN_TABLES:
             df = out[table].copy()
             modify_mask = rng.random(len(df)) < _CHURN_MODIFY_RATE

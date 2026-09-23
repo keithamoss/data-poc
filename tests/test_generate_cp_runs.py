@@ -32,13 +32,15 @@ import re
 
 import json
 import os
+from datetime import date
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 import generator_isolation
 from generator import generate_cp_runs
-from generator.generate_cp_runs import TABLES, _pick_dirty_tables
+from generator.generate_cp_runs import TABLES, ChildProtectionProvider, _pick_dirty_tables
 from qa_tools.common import asset_time
 
 
@@ -264,3 +266,155 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
         assert _fingerprint(path) == before[name], f"the real {name} tree was written to by a test run"
     assert (delivery.BOOKKEEPING_PATH.read_bytes()
             if delivery.BOOKKEEPING_PATH.exists() else None) == book_before
+
+
+# ---- Partial resupplies (REQ-GEN-040) --------------------------------
+#
+# These exercise the CAPABILITY, not the generated history. Partial
+# deliveries are off in the real run until the staging overlay can load
+# one (REQ-PIPE-035/036) - Keith's own sequencing call, 2026-09-23 - so
+# every assertion about the shape lives here rather than in
+# data/deliveries/.
+
+
+def _fake_payload(names=None):
+    """A payload shaped like a real CP one. resupply_subset() only ever
+    chooses KEYS, so the frames need no realistic content - and giving
+    them some would suggest this test says more than it does."""
+    return {name: pd.DataFrame({"id": [1, 2, 3]}) for name in (names or TABLES)}
+
+
+def test_pick_dirty_tables_is_scoped_to_what_the_delivery_contains():
+    """A partial resupply of two tables must not have its failures
+    drawn from all six - that produces an arrival the chain calls red
+    whose files are clean."""
+    available = ["cp_clients", "cp_notifications"]
+    for seed in range(100):
+        picked = _pick_dirty_tables(seed, available)
+        assert picked <= set(available), f"seed={seed}: picked outside the delivery ({picked})"
+        assert picked
+
+
+def test_a_single_table_delivery_has_that_table_dirtied():
+    """"Never 1" is an invariant about a six-table delivery, not a rule
+    that a one-table one comes back clean."""
+    for seed in range(50):
+        assert _pick_dirty_tables(seed, ["cp_carers"]) == {"cp_carers"}
+
+
+def test_scoping_does_not_change_a_whole_collection_draw():
+    """The default has to be exactly what it was, because the real
+    generated history is byte-identical across this change and that is
+    the claim being made."""
+    for seed in range(200):
+        assert _pick_dirty_tables(seed) == _pick_dirty_tables(seed, list(TABLES))
+
+
+def test_a_resupply_sends_back_only_tables_that_failed():
+    provider = ChildProtectionProvider(_fake_payload())
+    for seed in range(100):
+        failed = _pick_dirty_tables(seed, list(TABLES))
+        sent = provider.resupply_subset(_fake_payload(), previous_dirty_seed=seed, seed=seed + 1)
+        assert set(sent) <= failed, f"seed={seed}: resent a table that never failed"
+        assert sent, f"seed={seed}: resupplied nothing at all"
+
+
+def test_a_resupply_is_never_the_whole_collection():
+    """Criterion 2 - some of a collection's tables are resupplied and
+    the rest are not. A failure is never wider than three of six, so a
+    resupply cannot be."""
+    provider = ChildProtectionProvider(_fake_payload())
+    for seed in range(100):
+        sent = provider.resupply_subset(_fake_payload(), previous_dirty_seed=seed, seed=seed + 1)
+        assert set(sent) != set(TABLES), f"seed={seed}: resent the entire collection"
+
+
+def test_a_resupply_can_carry_exactly_one_dataset():
+    """Criterion 1 - a supply for one dataset with no supply for any
+    other dataset in the same collection. This is the reason a resupply
+    sends a SUBSET of what failed rather than all of it: a failure is
+    never narrower than two tables, so resending the failed set exactly
+    could never produce this."""
+    provider = ChildProtectionProvider(_fake_payload())
+    sizes = {len(provider.resupply_subset(_fake_payload(), previous_dirty_seed=s, seed=s + 1))
+             for s in range(200)}
+    assert 1 in sizes, "no seed in 200 produced a single-dataset supply"
+    assert sizes - {1}, "every resupply was a single table - the subset is not varying"
+
+
+def test_resupply_subset_is_reproducible():
+    provider = ChildProtectionProvider(_fake_payload())
+    first = sorted(provider.resupply_subset(_fake_payload(), previous_dirty_seed=11, seed=22))
+    second = sorted(provider.resupply_subset(_fake_payload(), previous_dirty_seed=11, seed=22))
+    assert first == second
+
+
+def test_resupply_subset_holds_no_state_between_chains():
+    """A provider instance is shared across every slot in a run. If
+    what-failed were remembered on it rather than recomputed from the
+    seed, two chains interleaved would contaminate each other - which
+    holds only while slots happen to be walked one at a time."""
+    provider = ChildProtectionProvider(_fake_payload())
+    a_first = sorted(provider.resupply_subset(_fake_payload(), previous_dirty_seed=3, seed=9))
+    provider.resupply_subset(_fake_payload(), previous_dirty_seed=77, seed=5)
+    a_again = sorted(provider.resupply_subset(_fake_payload(), previous_dirty_seed=3, seed=9))
+    assert a_first == a_again
+
+
+def test_a_birth_registrations_supply_cannot_be_split():
+    """One CSV is indivisible, and the provider says so rather than
+    leaving the method off."""
+    from generator.generate_runs import BirthRegistrationsProvider
+
+    df = pd.DataFrame({"id": [1, 2, 3]})
+    assert BirthRegistrationsProvider().resupply_subset(df, previous_dirty_seed=1, seed=2) is df
+
+
+def test_a_partial_resupply_survives_as_a_real_delivery_on_disk(tmp_path, monkeypatch):
+    """The end-to-end shape REQ-PIPE-035/036 will have to load: the
+    real chain, the real provider's own subset rule, written through
+    the real delivery format and read back by the real recogniser.
+
+    Everything except the dirt is real. dirty() is stubbed because the
+    per-table preset functions need genuine CP columns and this test is
+    about which FILES a delivery carries, not what is wrong inside
+    them - a distinction worth stating rather than implying.
+    """
+    from qa_tools.common import arrivals, delivery
+    from generator import resupply as resupply_mod
+
+    class ShapeOnlyProvider(ChildProtectionProvider):
+        def dirty(self, payload, severity, seed, previous_row_count):
+            return payload
+
+    monkeypatch.setattr(resupply_mod, "STILL_RED_PROB", 0.0)
+    deliveries_dir, receipts_dir = tmp_path / "deliveries", tmp_path / "receipts"
+
+    arrivals_written = []
+    for slot, seed in enumerate((3, 5, 9, 14, 21), start=1):
+        chain = list(resupply_mod.run_slot_chain(
+            ShapeOnlyProvider(_fake_payload()), date(2026, 2, 1), seed=seed, id_offset=0,
+            n_rows=0, first_severity="red", previous_row_count=None,
+            partial_resupply=True))
+        for n, arrival in enumerate(chain, start=1):
+            csvs = {f"{name}.csv": df.to_csv(index=False) for name, df in arrival.payload.items()}
+            delivery.write_delivery(
+                f"slot{slot}-arrival{n}", csvs,
+                received_at=asset_time.parse_instant(
+                    f"2026-02-{slot:02d}T0{n}:00:00+08:00", "test"),
+                deliveries_dir=deliveries_dir, receipts_dir=receipts_dir)
+            arrivals_written.append(arrival)
+
+    found = arrivals.arrivals_for("child-protection", "cp_run_", deliveries_dir, receipts_dir)
+    assert len(found) == len(arrivals_written), "every arrival must be recognised as its own delivery"
+
+    sizes = [len(a.files_by_dataset) for a in found]
+    assert 6 in sizes, "criterion 3 - a whole-collection delivery is still ONE delivery"
+    assert any(0 < n < 6 for n in sizes), \
+        "criterion 2 - some of a collection's tables resupplied and the rest not"
+    assert 1 in sizes, "criterion 1 - a supply for one dataset and none of its siblings"
+
+    # And every one of them is still placed as Child Protection, from
+    # the filenames alone - a partial delivery is not an unplaceable one.
+    assert all(a.collection_id == "child-protection" for a in found)
+    assert arrivals.unplaceable(deliveries_dir, receipts_dir) == []

@@ -3234,7 +3234,7 @@ requirements:
       and the early arrival this whole model exists for can actually be
       exercised rather than only described.
     moscow: must
-    status: not_started
+    status: built
     source: >
       Keith, plans/publishing-and-history.md item 6, 2026-09-20 - "yes,
       that should be part of this work", on generate_cp_runs.py emitting
@@ -3307,6 +3307,115 @@ requirements:
         work. A scenario sitting in the version that makes it correct
         still needs its supply landing at the right instant relative to
         that version's due time."
+      - "[BUILD] Decided the CAPABILITY ships now and the generated
+        history follows later (Keith, 2026-09-23, asked directly). A
+        partial Child Protection delivery cannot be loaded by today''s
+        warehouse builder - verified, not assumed: it reads all six
+        tables out of the delivery directory and raises FileNotFoundError
+        on the first one missing. Emitting one into the committed
+        history would take CP''s whole pipeline down, not just turn a
+        check red, until the staging overlay exists (REQ-PIPE-035/036).
+        So partial_resupply is off in the real run, on in the tests, and
+        REQ-GEN-044 already carries the obligation to put these shapes
+        into the history once something can consume them."
+      - "[BUILD] Rejected a stopgap carry-forward in build_cp_warehouses
+        that would have kept everything green - REQ-PIPE-035 already
+        specifies how the overlay works, and inventing a second answer
+        ahead of it would either be thrown away or quietly disagree
+        with it."
+      - "[BUILD] Decided a resupply sends back a SUBSET of what failed,
+        not the whole failed set (Keith, 2026-09-23). The simpler rule -
+        resend exactly what broke - can never produce a single-dataset
+        supply, because _pick_dirty_tables never picks fewer than two of
+        six by construction. Criterion 1 asks for exactly that shape, so
+        the subset rule is what meets it, and it models the real
+        behaviour of a supplier fixing what they can and sending the
+        rest later."
+      - "[BUILD] Decided WHAT IS RESENT is chosen BEFORE what is wrong
+        with it. The obvious ordering - dirty the payload, then trim it -
+        lets a provider that dirties a subset of what it is handed mark
+        only tables the trim then drops, producing an arrival the chain
+        calls red whose files are clean. Found while writing the test
+        for it, and the test was confirmed to catch the wrong ordering
+        before the right one was kept."
+      - "[BUILD] Decided what-failed is RECOMPUTED from the seed that
+        dirtied the previous arrival, never remembered on the provider.
+        A provider instance is shared across every slot in a run, so
+        per-chain state on it works only while slots happen to be walked
+        one at a time to completion - correct today, and the kind of
+        thing that holds until it silently does not."
+      - "[BUILD] Decided Birth Registrations IMPLEMENTS the subset hook
+        and returns its payload unchanged, rather than leaving the
+        method off. One CSV is indivisible, and a dataset that says so
+        is different from one nobody asked."
+      - "[BUILD] Decided early and arbitrarily-late arrivals get the
+        same treatment as partial ones - capability and tests now, the
+        generated history later. An arrival landing a day before its
+        slot was due would be classified against its own receipt date''s
+        cycle today, so putting one in the history before periods are
+        derived properly (REQ-PIPE-051/052) would file it wrongly rather
+        than demonstrate anything."
+    linked_tests:
+      - tests/test_resupply.py
+      - tests/test_generate_cp_runs.py
+      - tests/test_generate_runs.py
+      - tests/test_arrivals.py
+    implemented_by:
+      - generator/resupply.py::run_slot_chain
+      - generator/resupply.py::DatasetProvider
+      - generator/generate_cp_runs.py::ChildProtectionProvider
+      - generator/generate_cp_runs.py::_pick_dirty_tables
+      - generator/generate_runs.py::BirthRegistrationsProvider
+    evidence:
+      - >
+        2026-09-23: the generator emits all three delivery shapes, shown
+        end to end through the real delivery format and the real
+        recogniser rather than at the provider in isolation - six
+        whole-collection supplies, and resupplies carrying three, two
+        and exactly one dataset. Every one still places as Child
+        Protection from its filenames alone, and none is unplaceable: a
+        partial delivery is a recognised supply, not a drop needing a
+        human.
+      - >
+        2026-09-23: NONE of that is in the committed history, stated
+        plainly because it would be easy to read the above as more than
+        it is. Partial deliveries are off in the real generator run
+        until REQ-PIPE-035/036 can load one - Keith's own sequencing
+        call - so today's generated history is still whole-collection
+        throughout. The same holds for early and arbitrarily-late
+        arrivals.
+      - >
+        2026-09-23: the real generated history is BYTE-IDENTICAL across
+        this change - 210 files across the delivery and receipt trees,
+        plus the bookkeeping file, fingerprinted before and after and
+        again after a full regeneration. That is criterion 8 measured
+        rather than argued: Birth Registrations' daily generation, and
+        Child Protection's whole-collection one, do exactly what they
+        did.
+      - >
+        2026-09-23: a supply can arrive BEFORE it was due, which this
+        generator could not previously produce at all - the measurement
+        that motivated the requirement was 0 early against 240 on time
+        and 112 late. The lever is a plain calendar-day offset on the
+        first arrival, negative for early; arbitrarily late is the same
+        lever plus the delay curve, tested at 200 days so the resupply
+        lands after two later quarterly slots have already been filled.
+      - >
+        2026-09-23: what is RESENT is decided before what is wrong with
+        it, and the test for that was confirmed to fail against the
+        other ordering before the right one was kept. Dirty-then-trim
+        produces an arrival labelled red whose files are clean, which
+        no QA run would contradict and no reader would question.
+      - >
+        2026-09-23: the generator still decides only WHEN a supply
+        arrived, never which slot it fills - asserted against the real
+        Delivery dataclass's own fields rather than left to reading,
+        because the tempting shortcut for every downstream filing test
+        is to have the generator just say.
+      - >
+        2026-09-23: 1068 Python tests, 166 JS tests, all eight mothman
+        gates.
+
   - id: REQ-DASH-041
     title: Supply history and as-of viewing hold up under per-dataset arrivals
     date_written: "2026-09-21"

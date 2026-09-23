@@ -286,3 +286,155 @@ def test_no_manifest_entry_carries_a_retired_field():
         assert retired not in entries[0], f"{retired} came back"
     for retired in ("slot_delivery_id", "slot_attempt_number", "slot_is_resupply"):
         assert retired not in entries[0], f"{retired} - retired fields must not return under a slot_ prefix"
+
+
+# ---- Arrival timing and partial resupplies (REQ-GEN-040) -------------
+#
+# The two shapes the supply model is built for and this generator could
+# not previously make: a supply that turns up BEFORE it was due, and a
+# resupply that sends back only part of a collection. Both are exercised
+# here against the real chain, because both are OFF in the real
+# generated history until the staging overlay can consume them
+# (REQ-PIPE-035/036) - which means these tests are the only thing
+# holding the capability honest.
+
+
+def test_a_supply_can_arrive_before_its_slot_was_due():
+    """Criterion 4. Negative is the whole point - the generator produced
+    ZERO early arrivals before this, so "early" was a state the model
+    described and the data never showed."""
+    early = list(run_slot_chain(
+        StubProvider(), date(2026, 9, 10), seed=1, id_offset=0,
+        n_rows=10, first_severity=None, previous_row_count=None,
+        first_arrival_offset_days=-3,
+    ))
+    assert [a.received_date for a in early] == [date(2026, 9, 7)]
+
+
+def test_an_offset_of_zero_is_the_slot_date_itself():
+    """The default, stated as a test rather than assumed: every existing
+    caller relies on it, and the real generated history is byte-identical
+    across this change because of it."""
+    on_time = list(run_slot_chain(
+        StubProvider(), date(2026, 9, 10), seed=1, id_offset=0,
+        n_rows=10, first_severity=None, previous_row_count=None,
+    ))
+    assert [a.received_date for a in on_time] == [date(2026, 9, 10)]
+
+
+def test_a_supply_can_arrive_arbitrarily_late_including_past_later_slots(monkeypatch):
+    """Criterion 5. 200 days is deliberately longer than a quarter, so
+    this resupply lands well after the next two slots have come and
+    gone - the case a per-slot model has to file correctly and a
+    per-run one cannot even represent."""
+    monkeypatch.setattr(resupply, "STILL_RED_PROB", 0.0)
+    attempts = list(run_slot_chain(
+        StubProvider(), date(2026, 2, 1), seed=1, id_offset=0,
+        n_rows=10, first_severity="red", previous_row_count=None,
+        delay_days=np.array([200]), delay_weights=np.array([1.0]),
+    ))
+    assert len(attempts) == 2
+    assert attempts[0].received_date == date(2026, 2, 1)
+    # Two later quarterly slots (May 1, Aug 1) are already behind it.
+    assert attempts[1].received_date > date(2026, 8, 1)
+
+
+def test_the_chain_still_decides_only_when_a_supply_arrived(monkeypatch):
+    """Criterion 6. A Delivery says when it landed and what is wrong
+    with it - never which slot it answers for. Asserted on the real
+    dataclass rather than left to reading, because the tempting fix for
+    every filing test is to have the generator just say."""
+    monkeypatch.setattr(resupply, "STILL_RED_PROB", 0.0)
+    attempts = list(run_slot_chain(
+        StubProvider(), date(2026, 9, 10), seed=1, id_offset=0,
+        n_rows=10, first_severity="red", previous_row_count=None,
+        first_arrival_offset_days=-3,
+    ))
+    for arrival in attempts:
+        assert set(vars(arrival)) == {"received_date", "severity", "payload"}
+
+
+class PartialStubProvider(DictPayloadStubProvider):
+    """Sends back only the FIRST table on a resupply - the smallest
+    stand-in for "some of a collection, not all of it"."""
+
+    def resupply_subset(self, payload, previous_dirty_seed, seed):
+        first = sorted(payload)[0]
+        return {first: payload[first]}
+
+
+def test_a_resupply_can_carry_some_of_a_collection_and_not_the_rest(monkeypatch):
+    """Criteria 1 and 2 at the chain level."""
+    monkeypatch.setattr(resupply, "STILL_RED_PROB", 0.0)
+    attempts = list(run_slot_chain(
+        PartialStubProvider(), date(2026, 9, 1), seed=1, id_offset=0,
+        n_rows=10, first_severity="red", previous_row_count=None,
+        partial_resupply=True,
+    ))
+    assert len(attempts) == 2
+    assert set(attempts[0].payload) == {"a", "b"}, "the first supply is the whole collection"
+    assert set(attempts[1].payload) == {"a"}, "the resupply carries one table, not both"
+
+
+def test_a_whole_collection_resupply_is_still_one_delivery(monkeypatch):
+    """Criterion 3, and the default. Partial is opt-in; without it the
+    chain resends everything, as one arrival rather than several."""
+    monkeypatch.setattr(resupply, "STILL_RED_PROB", 0.0)
+    attempts = list(run_slot_chain(
+        PartialStubProvider(), date(2026, 9, 1), seed=1, id_offset=0,
+        n_rows=10, first_severity="red", previous_row_count=None,
+    ))
+    assert len(attempts) == 2
+    assert set(attempts[1].payload) == {"a", "b"}
+
+
+def test_what_is_resent_is_decided_before_what_is_wrong_with_it(monkeypatch):
+    """A red resupply must ship files that are actually bad.
+
+    The obvious implementation - dirty the whole payload, then trim it -
+    lets the newly-dirtied tables fall entirely outside the ones being
+    resent, producing an arrival the chain calls red whose files are
+    clean. Caught by checking the shipped payload rather than the label
+    on it.
+    """
+    monkeypatch.setattr(resupply, "STILL_RED_PROB", 1.0)
+
+    class DirtiesOnlyTheLastTableItIsGiven(PartialStubProvider):
+        """Mirrors what Child Protection's own dirty() does - it picks a
+        SUBSET of the tables it is handed, which is what makes the
+        ordering matter. Dirty-then-trim hands it both tables, it
+        marks "b", and the trim then ships "a" - clean, labelled red."""
+
+        def dirty(self, payload, severity, seed, previous_row_count):
+            out = dict(payload)
+            last = sorted(out)[-1]
+            marked = out[last].copy()
+            marked["dirtied"] = True
+            out[last] = marked
+            return out
+
+    attempts = list(run_slot_chain(
+        DirtiesOnlyTheLastTableItIsGiven(), date(2026, 9, 1), seed=1, id_offset=0,
+        n_rows=10, first_severity="red", previous_row_count=None,
+        partial_resupply=True,
+    ))
+    # The FIRST arrival is the whole collection, where dirtying a subset
+    # is normal and correct. The resupplies are the ones under test.
+    resupplies = [a for a in attempts[1:] if a.severity == "red"]
+    assert resupplies, "test precondition - the chain must produce at least one red resupply"
+    for arrival in resupplies:
+        assert any("dirtied" in df.columns for df in arrival.payload.values()), \
+            "an arrival labelled red shipped only tables with nothing wrong with them"
+
+
+def test_partial_resupplies_stay_reproducible(monkeypatch):
+    """Criterion 7 - the same seed produces the same arrivals, carrying
+    the same tables, in the same order."""
+    def run():
+        return [(a.received_date, a.severity, tuple(sorted(a.payload)))
+                for a in run_slot_chain(
+                    PartialStubProvider(), date(2026, 9, 1), seed=7, id_offset=0,
+                    n_rows=10, first_severity="red", previous_row_count=None,
+                    partial_resupply=True, first_arrival_offset_days=-2)]
+
+    assert run() == run()
