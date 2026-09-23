@@ -7035,3 +7035,373 @@ requirements:
         one row is how a row stops being readable. Needs the dashboard
         UX pass rather than a decision here.
 
+  - id: REQ-PIPE-057
+    title: A delivery is recognised from the transport, and what it cannot place it reports
+    date_written: "2026-09-23"
+    story: "As whoever maintains this pipeline, I want the pipeline to work out for itself what arrived together and to say plainly what it could not place, so that filing starts from an observed transport unit rather than from anything a supplier told us or the generator wrote down."
+    moscow: must
+    status: not_started
+    source: "Keith, delivery sprint 7, plans/supply-model.md Thread B (the DELIVERY is the arrival unit) and Thread H second chaos pass, plus test scenario register TS-15 and TS-17. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL treat one delivery as one observed transport unit, and SHALL establish its boundary without reading the contents of any file in it."
+      - "THE SYSTEM SHALL take what constitutes a delivery from per-source configuration, so that a source whose transport expresses a boundary differently can be described rather than assumed."
+      - "IF a source's configuration does not state what constitutes a delivery for that source, THEN THE SYSTEM SHALL fail for that source naming the missing configuration, and SHALL NOT infer a grouping from filenames, timestamps or arrival proximity."
+      - "THE SYSTEM SHALL treat a delivery as received only where our own receipt record for it exists."
+      - "IF a delivery is present with no receipt record, THEN THE SYSTEM SHALL leave it unprocessed, SHALL continue processing every other delivery, and SHALL report it once it has been present for longer than a configured interval."
+      - "THE SYSTEM SHALL derive which collection a delivery is for from the datasets its own files were attributed to."
+      - "THE SYSTEM SHALL NOT derive the receipt instant, the period, the dataset, the collection or the processing order from a delivery's name."
+      - "WHERE a delivery contains a file attributed to no dataset, THE SYSTEM SHALL record it as an unrecognised artefact, SHALL report it as informational, and SHALL NOT fail the delivery, check it or promote it."
+      - "IF a delivery contains a file asserting what that delivery is for, or a file resembling our own receipt record, THEN THE SYSTEM SHALL report it as an anomaly and SHALL NOT read any value out of it."
+      - "IF no file in a delivery is attributed to any dataset, THEN THE SYSTEM SHALL report the delivery as unplaceable, and SHALL NOT fail the run."
+      - "IF a delivery holds files attributed to more than one collection, THEN THE SYSTEM SHALL hold it for a human, SHALL NOT split it across collections, and SHALL continue processing every other delivery."
+      - "THE SYSTEM SHALL record every artefact it declined to act on alongside the delivery it came in, so that a supplier changing their extract is visible rather than silent."
+      - "WHERE no deliveries are present at all, THE SYSTEM SHALL report no arrivals and SHALL NOT fail."
+      - "THE SYSTEM SHALL expose delivery recognition through a mothman subcommand."
+    non_functional_requirements:
+      - "Recognition runs on every pipeline run and reads every delivery present. At ~30 datasets with years of history this is thousands of deliveries, and today's shape re-reads the whole tree once per collection - it must scale by reading each delivery once per run, not once per collection."
+      - "Recognition must work on a freshly-cloned machine where data/ does not exist at all. A test that asserts a gitignored tree is present passes locally and fails in CI - a real red on 2026-09-23 - so absence is a state to handle, not a precondition to assert."
+      - "A delivery's name and its file names are supplier-controlled input that become paths. They must be validated before use and never interpolated into a shell command, a SQL identifier or a path without validation. The PoC's names already include spaces and bare hex strings."
+      - "An unrecognised artefact's NAME is recorded so a person can act on it; its CONTENTS are never read, never recorded and never rendered. A filename is itself potentially identifying in a Birth Registrations or Child Protection context, which is the reason to state where the line is rather than assume it."
+      - "This repository is public and the dashboard is published to GitHub Pages, so anything recognition reports becomes public in this PoC even though the data is synthetic. Anything whose real-deployment equivalent would be sensitive should be judged on the real-deployment terms, not on today's."
+      - "Everything that reads a delivery is invoked through mothman."
+      - "CI and any read-committed-history path may never open or query anything under data/, so recognition belongs to the pipeline run, never to the dashboard build."
+    dependencies: [REQ-GEN-043, REQ-PIPE-058]
+    decisions:
+      - "Decided a delivery is an OBSERVED TRANSPORT UNIT - one folder drop, one S3 prefix, one SFTP session - and that this is categorically different from the supplier-declared manifest Thread B rejected. Nobody is asserting anything; we are noticing what arrived together. The distinction is worth keeping sharp, because a format that read a declaration of intent would reintroduce the rejected design by a back door."
+      - "Decided the delivery boundary comes from the TRANSPORT and must be stated PER SOURCE. A source that cannot express one - six unrelated S3 PUTs with no common prefix - needs a boundary arranged as a plumbing step: a folder convention, a trigger file, a batch endpoint. That is an operational transport arrangement rather than asking a supplier to classify their data, and TS-17 requires it be an explicit configuration failure rather than a silent guess at grouping."
+      - "Decided our own receipt record doubles as the completeness marker, which is what makes a mid-upload delivery distinguishable from a short one. The files are the supplier's side of the boundary and a directory being watched while still uploading looks exactly like a partial delivery; the receipt is ours and is written when the arrival is complete. This falls out of the format REQ-GEN-043 already built rather than being new machinery."
+      - "Decided an unexpected or unrecognised artefact is INFORMATIONAL rather than red (Keith, 2026-09-22, settling an earlier red-or-informational fork). It is not a data quality failure; it is a supplier telling us something changed without saying so. Rejected red, which would make a routine covering note look like bad data."
+      - "Decided an unrecognised artefact must not break a delivery or block readiness, because both are defined over EXPECTED tables (TS-15, broadened by Keith to cover a test.png, a garbage filename, any artefact mapping to no slot at all)."
+      - "Decided a delivery's NAME means nothing and is required to follow no pattern, so that recognition cannot pass by parsing a name we wrote ourselves (docs/delivery-format.md, REQ-GEN-043 criterion 15). The real generated set already contains spaces, bare hex strings and four different naming conventions."
+      - "Decided nothing in the pipeline may read data/generator_bookkeeping.json. It knows which slot each delivery was built to fill, and a pipeline reading it would be filing from a declaration rather than from arrival plus slot state - the rejected supplier manifest wearing our own badge. Tests may read it; nothing that files a supply may."
+      - "Decided a mixed-COLLECTION delivery is held rather than raising. Today qa_tools/common/arrivals.py raises DeliveryFormatError on one, which stops the whole run over one malformed drop - the same shape as failing 29 healthy datasets for one exhausted schedule, which REQ-PIPE-053 exists to prevent. Note this is different from the mixed-PERIOD delivery, which runs QA and never auto-promotes (TS-33a, sprint 11)."
+    open_questions:
+      - "A delivery directory present with no receipt record: is it an in-flight upload or a gap to investigate? Today read_receipt() makes it a hard error by a deliberate decision, whose reasoning is that an arrival we have no record of receiving is exactly the thing worth seeing. Against that, a real transport produces this state routinely for seconds at a time, and one such directory currently fails recognition for every delivery. Options - (a) hard error as today; (b) skip as in-flight and report only if it persists beyond a configured interval, which is the criterion drafted above; (c) skip silently. Recommended (b): it keeps the gap visible without letting a normal in-flight upload take the run down."
+      - "The mixed-collection criterion above CHANGES BUILT BEHAVIOUR - qa_tools/common/arrivals.py raises today - so it needs a yes rather than an assumption. Options - (a) hold the delivery and continue, which is the criterion as drafted; (b) keep the hard error, on the grounds that a delivery spanning two collections means the transport boundary itself is wrong and everything downstream is suspect. Recommended (a): one malformed drop taking down a run that has 29 healthy datasets in it is the shape REQ-PIPE-053 already exists to prevent."
+
+  - id: REQ-PIPE-058
+    title: A file's dataset comes from that dataset's own declared pattern, and the patterns are gated
+    date_written: "2026-09-23"
+    story: "As whoever plumbs in a new dataset, I want to declare how that dataset's files are named and have the pipeline attribute them on that alone, so that adding a dataset is a configuration change rather than a code change, and so that two datasets can never quietly claim the same file."
+    moscow: must
+    status: not_started
+    source: "Keith, delivery sprint 7 - the per-dataset filename pattern that maps a file to a table - plus Thread H second chaos pass #3, where his own instinct was a regular expression per dataset. docs/delivery-format.md is normative on the consuming side. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL attribute each file in a delivery to at most one dataset, using that dataset's own declared arrival pattern."
+      - "THE SYSTEM SHALL match that pattern against the file's own name alone, and SHALL NOT use the delivery's name, its path or the file's position in it as any part of the match."
+      - "THE SYSTEM SHALL hold one arrival pattern per dataset, in that dataset's own configuration."
+      - "THE SYSTEM SHALL evaluate patterns independently of the order they are declared in, so that no attribution depends on which pattern happened to be checked first."
+      - "WHEN the configuration gate runs, THE SYSTEM SHALL fail if a dataset that has slots declares no arrival pattern."
+      - "WHEN the configuration gate runs, THE SYSTEM SHALL fail if any filename can be attributed to more than one dataset."
+      - "THE SYSTEM SHALL report a file matching no pattern as unrecognised, and SHALL NOT attribute it by elimination, by proximity or by the collection the rest of the delivery belongs to."
+      - "THE SYSTEM SHALL allow one dataset's pattern to match more than one file in a single delivery, and SHALL NOT silently take one of them."
+      - "THE SYSTEM SHALL record, with each attributed file, which dataset's pattern attributed it."
+      - "THE SYSTEM SHALL expose the pattern gate through mothman check."
+    non_functional_requirements:
+      - "A supplier renaming their extract is ordinary. Changing the pattern must be a configuration edit with no code change, or the ~30-dataset case becomes a code change per supplier whim."
+      - "The gate is the whole protection at 30 datasets. Two datasets quietly claiming one filename produces a supply filed against the wrong table, which is the false-green direction, and nothing about it is visible by reading either contract on its own."
+      - "Supplier filenames are untrusted input matched against configured patterns. If the pattern form is a raw regular expression, a pathological pattern plus a long filename is a real denial of service, so either the form is constrained or the matching is bounded."
+      - "Only ~30 datasets' patterns exist, but every file in every delivery is matched against all of them on every run. Keep the matching linear and cheap rather than compiling a pattern per file."
+      - "Patterns are configuration a human writes rarely and reads under pressure, so the gate's failure message must name the two datasets and the example filename that collide, not just report a conflict."
+    dependencies: [REQ-GEN-043]
+    decisions:
+      - "Decided the per-dataset pattern is the ONLY thing inside a delivery that carries meaning (docs/delivery-format.md). Everything else - the delivery name, file order, any file's contents - is either arbitrary or a judgment we refuse to read."
+      - "Recorded because the settled instinct and the built code differ, and someone will otherwise implement one and find the other. Keith's own instinct in Thread H was a REGULAR EXPRESSION per dataset. What exists today is an arrivalPattern keyPattern shaped as an S3 key - bdm/birth_registrations_{date}.csv - whose LAST SEGMENT is reused as a filename matcher by qa_tools/common/delivery.py, with {placeholder} expanding to a non-separator run. The same configured value is read by two consumers with different semantics: file_arrival.py matches whole S3 keys, delivery.py matches bare filenames."
+      - "FOUND WHILE SCOPING, and it matters for sprint 7's own test coverage: under the real committed patterns, Child Protection's six datasets match EXACTLY one filename each (cp_clients.csv and so on), so the split-extract shape docs/delivery-format.md lists as legitimate - cp_clients.csv alongside cp_clients_part2.csv - matches nothing at all, and the second file would be reported as unrecognised rather than triggering the duplicate-match hold. Verified by running the real matcher over the real patterns. Two files matching one dataset is therefore currently unreachable for Child Protection and reachable for Birth Registrations only because its pattern carries a {date} placeholder."
+      - "Rejected attributing an unmatched file by elimination - for instance, assuming the one file in a Birth Registrations delivery must be Birth Registrations. It reads reasonable and it is how a garbage file quietly becomes a supply."
+      - "Rejected deriving the dataset from the delivery's directory name, which is arbitrary by design and would make recognition pass by parsing a name we wrote ourselves."
+    open_questions:
+      - "What form should the per-dataset pattern take? Options - (a) keep reusing the S3 keyPattern's last segment, which is what is built and needs no config change, but leaves one value doing two jobs and cannot express the split-extract shape; (b) add an explicit filename pattern per dataset alongside the keyPattern, so the S3 concern and the filename concern stop sharing a field; (c) a real regular expression per dataset, which is Keith's own stated instinct and the most expressive, at the cost of untrusted-input matching and a config form that is easy to get subtly wrong. Recommended (b), with the pattern form kept to placeholders rather than raw regex - it fixes the double duty and the split-extract gap without putting a regex engine on the supplier's side of the boundary."
+
+  - id: REQ-PIPE-059
+    title: Two files for one dataset in one delivery are held, never chosen between
+    date_written: "2026-09-23"
+    story: "As an operator, I want the pipeline to stop and ask when one delivery contains two files that could both be the same table, so that a supplier's second file is never dropped by whichever one the loop happened to see last."
+    moscow: must
+    status: not_started
+    source: "Keith, 2026-09-22, plans/supply-model.md Thread H second chaos pass #3 - 'hold for a human', tied by him to the not-yet-designed filename-to-dataset mapping. Delivery sprint 7. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
+    acceptance_criteria:
+      - "IF more than one file in a delivery is attributed to the same dataset, THEN THE SYSTEM SHALL hold that dataset's supply for a human, and SHALL NOT choose between the files."
+      - "WHEN a supply is held this way, THE SYSTEM SHALL continue to process every other dataset in the same delivery."
+      - "WHILE a supply is held, THE SYSTEM SHALL NOT assign it a slot, classify its arrival or promote it."
+      - "WHEN a supply is held, THE SYSTEM SHALL record the delivery, the dataset and every file that matched, so that a person can see exactly what it could not choose between."
+      - "THE SYSTEM SHALL report a held supply as an event needing action, distinguished from an informational one."
+      - "WHILE a dataset's supply is held, THE SYSTEM SHALL leave that dataset's slot unfilled, so that the slot goes overdue in the ordinary way."
+      - "IF a later delivery for the same dataset arrives while a hold is outstanding, THEN THE SYSTEM SHALL process the later delivery normally, and SHALL NOT discard or automatically resolve the held one."
+    non_functional_requirements:
+      - "A hold is a work queue entry, not an obstruction - the same reasoning that made a queue of red supplies the correct output of the promotion gate rather than a defect in it. It must be visible enough to be drained and must not stop anything else."
+      - "At 30 datasets, holds must aggregate rather than produce one banner each. Two outstanding holds and twenty are different situations and must read differently without twenty separate elements."
+      - "The held files stay where they are, on the supplier's side of the boundary. Nothing is copied, renamed or merged while a hold is outstanding, so resolving it later has the original material to work from."
+    dependencies: [REQ-PIPE-058, REQ-PIPE-057]
+    decisions:
+      - "Decided HOLD FOR A HUMAN (Keith, 2026-09-22). A supply is one table VERSION, so a delivery containing two versions of one table is ill-formed, and 'whichever the loop saw last' is what you get by default."
+      - "Rejected merging or concatenating the two files. A supply is one table version; concatenating two would manufacture a supply that never arrived, which is the same category of untruth as recording a missed delivery as met."
+      - "Rejected taking the newest, the largest or the lexically last file. Every such rule is a guess dressed as a policy, and the failure is silent - the dropped file is exactly the one a supplier will later say they sent."
+      - "Decided this hold, rather than a separate mechanism, is also what catches a delivery carrying two periods of the SAME table - a catch-up drop with August's and November's cp_clients is two files matching one dataset's pattern, so nothing reads a declared period and no new machinery is needed (Thread H second chaos pass #4). The residual case, different tables landing in different periods, is a promotion gate in sprint 11."
+      - "Decided the built behaviour already refuses rather than guessing: Arrival.path_for() raises when a dataset matched several files, with its own docstring saying that taking the first would silently drop a supplier's second file. This requirement turns that refusal into a handled operational state instead of an exception."
+      - "The TUI affordance Keith asked for - run QA on the held files and decide which slot each belongs to - is the write path, and belongs with the decision log in sprint 12. Recorded here so the hold is not built as a dead end."
+    open_questions:
+      - "Does a held supply get QA'd while it is held? Options - (a) no checks until it is filed, because REQ-PIPE-035 runs QA against the period schema the supply's slot names and a held supply has no slot; (b) run only the checks that read that table alone, leaving cross-table and temporal ones unrun; (c) run against the most recent period, which risks evaluating a supply against a period it does not belong to. Recommended (a), with the hold itself being the signal - this is the same question as REQ-PIPE-064's, and both should be answered the same way."
+
+  - id: REQ-PIPE-060
+    title: Staging asserts only arrival facts, and a table is there or it is not
+    date_written: "2026-09-23"
+    story: "As whoever maintains this pipeline, I want every arriving file loaded into staging on the strength of arrival alone, so that a supply is checkable before anybody has decided where it belongs, and so that staging can never be wrong about anything."
+    moscow: must
+    status: not_started
+    source: "Keith, delivery sprint 8, plans/supply-model.md Thread B - staging then promotion, and 'staged data lives IN the warehouse', settled 2026-09-23 at REQ-PIPE-034's sign-off. Test scenario register TS-12 and TS-32. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
+    acceptance_criteria:
+      - "WHEN a delivery is recognised, THE SYSTEM SHALL load every file it attributed to a dataset into one global staging schema, before any check runs over that delivery."
+      - "THE SYSTEM SHALL record, for a staged table, only facts observed at arrival - which delivery carried it, which dataset it was attributed to, and when we received it."
+      - "THE SYSTEM SHALL NOT record a period, a slot or a supersession relationship at load time."
+      - "THE SYSTEM SHALL name each staged table uniquely per arrival, carrying that arrival's instant, and SHALL NOT overwrite a table staged from an earlier arrival of the same dataset."
+      - "IF a file cannot be loaded at all, THEN THE SYSTEM SHALL create no table for it, SHALL record the arrival and the reason it could not be loaded, and SHALL report that dataset's supply as red."
+      - "WHERE one file in a delivery cannot be loaded, THE SYSTEM SHALL still stage every other file in that delivery."
+      - "THE SYSTEM SHALL make a staged table readable only once it has been loaded completely, so that an interrupted load leaves no partially-loaded table for a check to read."
+      - "IF a load is interrupted, THEN THE SYSTEM SHALL leave that delivery in a state the next run can process from the beginning, and SHALL NOT treat a partially-staged delivery as staged."
+      - "THE SYSTEM SHALL serialise every write to the shared database, so that a parallel run can never attempt two writing processes against one database file."
+      - "THE SYSTEM SHALL trigger checks from the arrival of a delivery, and SHALL NOT trigger them from a promotion."
+      - "THE SYSTEM SHALL use only our own receipt instant as a supply's arrival time, and SHALL NOT use a timestamp inside the supplier's files, a column in their data or a file modification time."
+      - "THE SYSTEM SHALL expose the staging load through a mothman subcommand."
+    non_functional_requirements:
+      - "A crash between the staging load and QA currently has no defined behaviour, and the failure is silent in the worst direction: a truncated table in a global staging schema is indistinguishable from a real short supply and would be checked as real data. Loading must be all-or-nothing per table, and a partially-processed delivery must be recognisable as such."
+      - "DuckDB permits one PROCESS per database file - verified: while one holds a read-write connection a second writer fails AND a read-only reader fails with 'IO Error: Could not set lock on file'. mothman pipeline run is parallel by default and dbt runs as its own writing process, and the per-run databases that provide isolation for free today are removed by REQ-PIPE-035. This is a hard blocker, not a tuning concern."
+      - "The global staging schema is new, spans every agency, holds every supply ever received including ones that were wrong, and is never emptied. In a real deployment it is the most sensitive artefact this design creates after the period schemas: an extract containing columns nobody should have sent sits there permanently. Retention is deliberately out of PoC scope, and that deferral belongs in the register rather than only in prose due for deletion."
+      - "Staging only grows. At ~30 datasets on a quarterly asset plus a daily one, with years of history and a new table per arrival rather than an overwrite, the table count is the thing that grows fastest in this design - so nothing may require enumerating every staged table to answer an ordinary question."
+      - "CI and any read-committed-history path may never open or query the warehouse, including staging. Anything a later read needs must be computed here, at load time, by whoever legitimately has a connection, and committed alongside."
+      - "Everything that loads a delivery is invoked through mothman."
+    dependencies: [REQ-PIPE-057, REQ-PIPE-035]
+    decisions:
+      - "Decided staging is a SCHEMA IN THE WAREHOUSE (Keith, 2026-09-23). Thread B said 'everything lands in staging on arrival' without saying where staging physically is, and the natural reading of 'promotion moves it into a period schema' is that staging sits somewhere else. It does not. Data is loaded as soon as it can be, checks run on it there, and the only thing not loaded is a file that cannot be read at all."
+      - "Decided ONE GLOBAL staging schema rather than one mirroring slots or periods, and the REASON is recorded here because REQ-PIPE-034 records the departure from Keith's operational system without it - which is the worst combination, since a later session sees the difference, finds no argument, and corrects it back. A supply's slot is not known when it lands, and deferring that is the whole point of staging. A slot-mirrored staging schema forces the slot to be named at LOAD time. Three cases have no slot to name at all: an early supply not yet inside its claim window, a supply held because nothing is confidently claimable, and a mixed-period delivery. A mirror would need an unassigned schema alongside it, ending up with global AND mirrors. Keith's own summary on agreeing: we don't know where it should go, or indeed we need a human to make a decision."
+      - "Decided staging asserts only the thing actually known - this landed at this time - so it can never be wrong. Rejected 'file by arrival, with the period as correctable metadata', which was argued as avoiding freezing a derived judgment into an immutable structure; it lost its force once tables could move between schemas, because then nothing expensive is being frozen."
+      - "Decided an unloadable file gets NO TABLE (Keith, 2026-09-23, directly): there is no point creating an empty one when the delivery record already says something arrived and could not be read. The arrival is a fact; the table is not."
+      - "Decided 'failed to load' is a CHECK RESULT, not a separate concept. An invalid CSV, a missing file, zero bytes, a bad encoding, a schema that does not match are all red findings on that table, and no separate taxonomy of failure is needed."
+      - "Decided a resupply is a NEW TABLE in the same schema, never an overwrite, and that physical table names carry the arrival instant - matching Keith's real operational database. Recorded because the cheapest implementation is the wrong one: build_cp_warehouses.py does CREATE OR REPLACE today, which would satisfy a read-the-newest rule by keeping exactly one version and destroying the history that rule exists for."
+      - "Decided ARRIVAL triggers checks, never promotion, because promotion-as-trigger LOOPS - a promotion decision made on a check result that was itself triggered by a promotion. No requirement held this; REQ-PIPE-036 carries delivery-triggered QA without the reason it is not the other way round."
+      - "Decided a delivery is loaded as one package and is not atomic in the roll-back sense: the five-tables-land-one-fails case requires the five to be staged and checked, so a failed sixth does not refuse the delivery (TS-12, which Keith called 'a really important one' from real operational experience)."
+      - "Decided RETENTION IS EXPLICITLY OUT OF SCOPE for the PoC (Keith, 2026-09-23): staging and rejected only grow, and that is accepted - 'we'll need that eventually but it's not a priority right now'. The future question he named is not just dropping data but whether QA history is kept alongside it, kept after it, or dropped with it. Recorded as a deliberate no rather than an unasked question."
+    open_questions:
+      - "Where does 'this delivery has already been processed' live, given REQ-PIPE-038 writes a delivery's file ONCE at recognition and never rewrites it? Options - (a) re-process a delivery from the beginning whenever its staged tables are incomplete, staging fresh tables under new names and leaving the partial ones as garbage for a later sweep; (b) a separate append-only processing marker committed beside the delivery log, which is new state but readable without a warehouse; (c) derive completeness from the warehouse catalogue, which needs no new committed state but is pipeline-side only and invisible to the dashboard build. Recommended (c) for completeness plus (a) for recovery: the dashboard never needs to know, and a re-staged table under a new name is cheap while a half-loaded one read as real data is not."
+      - "Build order, not design. This requirement needs the one-database-many-schemas model that REQ-PIPE-035 specifies and sprint 13 builds, but sprint 8 comes five sprints earlier. Options - move the single-database work forward to sit with staging; or build staging against today's per-run databases and migrate it at sprint 13; or move sprint 8 later. Recommended the first: staging has no meaning without a durable schema to stage into, and building it twice is the most expensive of the three."
+
+  - id: REQ-PIPE-061
+    title: Arrivals are processed in receipt order, and an interrupted run loses nothing
+    date_written: "2026-09-23"
+    story: "As an agency data owner, I want two files that landed in the same batch to be filed the same way whatever order the pipeline happened to pick them up in, so that where a supply ends up is a fact about when it arrived rather than about a directory listing."
+    moscow: must
+    status: not_started
+    source: "Keith, delivery sprint 8 - replay in arrival-timestamp order - plans/supply-model.md Thread H first chaos pass #2, and the dependency REQ-PIPE-053 already names: 'replaying the backlog in arrival-timestamp order, which is batch 3's rule'. Test scenario register TS-8 and TS-32. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL process arrivals in ascending order of our own receipt instant."
+      - "THE SYSTEM SHALL NOT process arrivals in the order they were discovered, listed or named."
+      - "WHERE two arrivals share a receipt instant, THE SYSTEM SHALL order them by a defined, deterministic tiebreak."
+      - "THE SYSTEM SHALL produce identical filings for a given set of arrivals whatever order they were presented in."
+      - "WHEN a run processes arrivals, THE SYSTEM SHALL process every arrival not yet processed since its recorded marker, rather than only the arrival that triggered the run."
+      - "THE SYSTEM SHALL advance its marker only past arrivals it has fully processed."
+      - "IF a run is interrupted partway through a backlog, THEN THE SYSTEM SHALL leave every arrival it had not fully processed to the next run, in the same order."
+      - "WHILE a dataset's schedule is exhausted, THE SYSTEM SHALL continue to accept and record that dataset's arrivals, so that the backlog files correctly once dates are added."
+    non_functional_requirements:
+      - "This is what makes REQ-PIPE-053's hard failure safe. That requirement's own decision says a backlog drains CORRECTLY once dates are added, filed to the right slots and classified against the right due instants rather than approximated - and it states plainly that the claim rests on this rule, which was written down without its dependency."
+      - "Replay cost must be bounded by the arrivals not yet processed, not by the total history. A rule requiring every arrival ever received to be re-read on every run is correct and does not survive years of a daily feed."
+      - "Determinism is a real correctness check here, not a preference: everything in this repo is seeded, so regenerating and diffing is how a refactor is proven behaviour-preserving. An order-dependent filing makes that check meaningless."
+      - "Draining a backlog is idempotent and drop-safe by design, so a cancelled or failed run costs nothing beyond the delay. That property is what lets the pipeline stop depending on any platform's queueing guarantees."
+    dependencies: [REQ-PIPE-057, REQ-PIPE-060]
+    decisions:
+      - "Decided ALWAYS ASSIGN IN ARRIVAL-TIMESTAMP ORDER, never discovery order, with a defined tiebreak for identical instants (Thread H first chaos pass #2). The worked example: Tuesday's late file and Thursday's on-time file both land in one batch around Thursday 22:00. Thursday's processed first is correct; Tuesday's processed first falls inside Thursday's on-time window, files as Thursday, and Thursday's real file then hits a filled slot and is held. Same two files, opposite outcome, decided by loop order - non-determinism nothing would ever flag."
+      - "Decided the receipt instant is the only ordering fact. A supplier-provided timestamp reflects their clock, their timezone and their bugs, and staging's whole justification is that it asserts only facts we can vouch for (TS-32). A delivery's name is arbitrary by design, so sorting by it would be inventing an order out of a supplier's naming habits."
+      - "Decided each run DRAINS THE BACKLOG - reading everything unprocessed since a marker rather than only the triggering event. Settled for decision processing in Thread H's second pass, and it is the same discipline here rather than a second one. The reason it matters generally: GitHub holds only ONE pending run per concurrency group, so three rapid triggers silently lose the middle one, and the opt-in queueing mode was rejected by Keith as edition-gated. Draining works on any edition, at any volume, and survives a run failing for reasons that have nothing to do with concurrency."
+      - "Decided the tiebreak must be deterministic and stated rather than left to sort stability, because a stable sort over a directory listing is still a directory listing."
+
+  - id: REQ-PIPE-062
+    title: A supply is assigned to a slot by rule, and the rule can never claim forward
+    date_written: "2026-09-23"
+    story: "As an agency data owner, I want each supply attributed to the period it is actually for, so that a punctual supplier is never recorded as sending a very late resupply while the slot they actually filled goes overdue as a phantom missing delivery."
+    moscow: must
+    status: not_started
+    source: "Keith, delivery sprint 9 - the highest-risk sprint in the plan. plans/supply-model.md Thread E in full, including both cascades found by his own stress tests, plus Thread D's split of assignment from promotion. Test scenario register TS-1, TS-2, TS-3a-d, TS-6a, TS-6b, TS-9, TS-10. Honours the deferral REQ-PIPE-052 wrote: 'the rules that USE it - oldest claimable unfilled slot, on-time-wins-for-the-current-slot, monotonic filling, hold for a human - are slot ASSIGNMENT and belong to batch 3'. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
+    acceptance_criteria:
+      - "WHEN a supply arrives and is attributed to a dataset, THE SYSTEM SHALL assign it to exactly one of that dataset's own slots, record it as a resupply of a filled slot, or hold it - and SHALL do so before any check runs over it."
+      - "IF the arrival falls at or before the due instant of that dataset's current slot plus that slot's grace allowance, and that slot is unfilled, THEN THE SYSTEM SHALL assign the supply to that slot, even where earlier slots are unfilled."
+      - "WHERE that rule does not apply, THE SYSTEM SHALL assign the supply to the oldest slot that is unfilled and claimable."
+      - "IF no such slot exists, THEN THE SYSTEM SHALL record the supply as a resupply of the most recently filled slot."
+      - "THE SYSTEM SHALL NOT assign a supply to a slot whose claim window has not opened, under any rule or any circumstance."
+      - "THE SYSTEM SHALL treat a slot as filled only where a supply has been PROMOTED into it, and SHALL NOT treat an arrival, a staged supply or a rejected supply as filling one."
+      - "THE SYSTEM SHALL assign each dataset's supplies against that dataset's own slot sequence alone."
+      - "THE SYSTEM SHALL perform assignment as a derivation, with no human input and no judgment."
+      - "THE SYSTEM SHALL record, with each assigned supply, which branch of the rule assigned it and which slot it considered."
+      - "WHEN a supply has already been filed, THE SYSTEM SHALL leave its assignment alone on every later run, and SHALL NOT re-derive it."
+      - "THE SYSTEM SHALL assign a supply whose checks will report red on the same terms as any other, so that a supply never promoted still carries where it was filed."
+      - "THE SYSTEM SHALL derive assignment from slot configuration and promotion state alone, and SHALL NOT read the contents of the supply being assigned."
+    non_functional_requirements:
+      - "The obvious implementation is the catastrophic one, and it is currently in the codebase. qa_tools/common/slots.py's next_unfilled_claimable() implements 'oldest claimable unfilled slot' with no on-time-wins branch and no monotonic filling - which is exactly the rule Thread E proves produces a permanent backward cascade. Its own docstring says it implements only half the rule deliberately, so this requirement extends it rather than re-deriving; but anything calling it as-is today gets the cascade."
+      - "Both cascades are invisible day to day - every day looks locally plausible and nothing self-corrects - so the tests are the only thing that will ever catch a regression. This requirement's tests must drive real sequences over real slots, not assert one call's return value."
+      - "The TS-3 family of tests asserts that a KNOWN IMPERFECTION STAYS CONTAINED rather than that the system gets the right answer, and the register says explicitly to label them so a later session does not 'fix' them. Label them in the tests themselves, not in a plans file that will be deleted."
+      - "Assignment runs per arrival against a dataset's whole slot sequence. At a daily feed with years of history that sequence is thousands of slots, so assignment must not scan all of them per arrival - the rule only ever needs the current slot and the oldest claimable unfilled one."
+      - "Deterministic and reproducible: the same arrivals plus the same configuration plus the same promotion state must produce the same filings, or the seeded regenerate-and-diff check stops meaning anything."
+      - "Why a supply is where it is must be answerable a year later without re-running anything, which is why the rule branch is recorded rather than recomputed. Recomputing it later is not equivalent - the slot state it was decided against has moved on."
+      - "Config and promotion state only, no read of anything under data/ beyond what the pipeline run legitimately holds open."
+    dependencies: [REQ-PIPE-052, REQ-PIPE-061, REQ-PIPE-034]
+    decisions:
+      - "The rule, stated once: assign to the oldest slot whose CLAIM WINDOW is open and which is unfilled; if there is no such slot, it is a RESUPPLY of the most recently filled slot - amended by the on-time-wins branch below and by monotonic filling in REQ-PIPE-063."
+      - "Decided NEVER CLAIM FORWARD, and the reason is asymmetric risk rather than taste. Mis-attributing an arrival backwards - calling a new delivery a resupply - is one contained error on one supply. Mis-attributing it forwards cascades through every future delivery. The claim window is what makes 'cannot' literal rather than likely: a slot whose window has not opened cannot be claimed at all."
+      - "The FORWARD cascade, recorded in full because the broken rule reads perfectly reasonable and would be re-proposed. Daily feed due 12:00 Monday. Mon 14:00 arrives, red, rejected, Monday still unfilled. Mon 16:00 arrives, green, promoted, Monday filled. Mon 20:00 a third file arrives - under 'oldest unfilled slot' the oldest unfilled is TUESDAY, so a Monday resupply files as Tuesday's delivery; the next takes Wednesday; every later supply is off by one permanently. The cause: 'oldest unfilled slot' assumes every arrival fills a NEW obligation, and a resupply does not."
+      - "The BACKWARD cascade, which was introduced by the fix for the forward one. Daily feed due ~22:00. Monday filled; the supplier's system goes down and Tuesday and Wednesday are missed; the next supply arrives on time at 22:00 Thursday. Under 'oldest claimable unfilled, window never closes' it files as Tuesday two days late, the next as Wednesday, the next as Thursday - a permanent two-day lag cascading backwards, every day locally plausible, never self-correcting."
+      - "Decided the fix is that PUNCTUALITY IS EVIDENCE OF WHICH SLOT A SUPPLY IS FOR: if an arrival falls within the on-time window of the current slot and that slot is unfilled, file it there even if earlier slots are unfilled. Thursday 22:00 for a Thursday due 22:00 fills Thursday, and Tuesday and Wednesday stay unfilled and read as missed, which is true. Monday's supply arriving Tuesday 03:00 is not on time for Tuesday, so it takes the oldest unfilled - Monday, late. Lateness still works and an outage no longer eats the future."
+      - "Rejected CLOSING a slot's window when the next one opens. It kills the cascade and breaks lateness - Monday's supply landing Tuesday morning would file as Tuesday."
+      - "Rejected a FINITE LATENESS TOLERANCE. It only shifts the lag: a one-day tolerance turns a two-day cascade into a one-day cascade, and any fixed tolerance has an outage longer than it."
+      - "Rejected GENEROUS OR CONTIGUOUS claim windows as the cure for boundary misfiling. With Tuesday's window open from Monday 12:00, the Monday 20:00 resupply finds Monday filled, Tuesday open and unfilled, and claims Tuesday - the forward cascade exactly. Tight windows buy cascade-immunity at the price of boundary misfiling; wide windows do the reverse; no sizing gets both, and the trade is accepted in favour of never claiming forward."
+      - "Recorded because it is the cost being accepted knowingly: a boundary misfile is wrong TWICE, and reporting is this system's product. A punctual supplier is recorded as delivering a very late resupply, AND the next slot is left unfilled so it goes overdue - a phantom missing delivery for data that arrived on time one slot over. The data half is fine; it sits in the previous slot, present and checked."
+      - "Decided ONLY A PROMOTION FILLS A SLOT, and this is load-bearing rather than definitional: without it the Monday 16:00 resupply in the forward-cascade example would itself have been pushed to Tuesday, because Monday's slot would have been 'filled' by the rejected 14:00 supply."
+      - "Decided SLOT ASSIGNMENT AND PROMOTION ARE TWO STEPS, not one. As first proposed the period was assigned at promotion, but checks run BEFORE promotion, so at check time there would be no slot to classify against. Assignment is a derivation with no human in it; promotion is a decision. There is still exactly one place the slot is decided, it just happens earlier - and it means a REJECTED supply still gets classified, which matters, because 'arrived three weeks late AND was bad' is what belongs on the record."
+      - "Decided the daily and quarterly assets share this machinery, and that the difference between them is ONLY WHO PULLS THE TRIGGER - a human decides which quarter a supply fills, a rule decides for the daily asset - with assignment identical underneath. The automatic rule is safe to be imperfect precisely because tables move between schemas: a wrong filing is a correction, not a rebuild."
+      - "Decided an assignment is RECORDED and never re-derived for a supply already filed. Re-deriving on every run would silently undo a human's re-file and make history move under a reader - the same instability the stickiness rule exists to prevent on the promotion side."
+      - "Rejected, again and for the record, DERIVING THE PERIOD FROM THE SUPPLY'S OWN CONTENT (circular - it infers the filing decision from the very data whose correctness is about to be tested, and a resupply exists precisely because the first attempt was wrong, possibly wrong in its dates) and the SUPPLIER-DECLARED PERIOD (unenforceable across a wide and varied supplier base, and the suppliers who would get it wrong are exactly the ones whose data most needs QA)."
+      - "Decided this also DELETES the daily cutoff rule and the separate 'arrives a week early' case. Both are the same mechanism now: if a feed's supply genuinely lands the evening before, its due instant IS the evening before and the window opens accordingly - the schedule expresses it directly instead of a rule reinterpreting arrivals afterwards. TS-10 is the worked example: the same 22:00 arrival fills Tuesday on time or Monday late depending only on slot state."
+      - "Decided nothing measures HOW EARLY a supply is in order to assign it (TS-9). Earliness is a reported consequence of the assignment, which is why classification can be a pure function of the assigned slot."
+
+  - id: REQ-PIPE-063
+    title: A slot stops being claimable once a later one is filled
+    date_written: "2026-09-23"
+    story: "As an agency data owner, I want a delivery that never arrived to stay recorded as not arrived, so that a later resupply of a different day cannot be quietly filed against it and turn a service failure into a met obligation."
+    moscow: must
+    status: not_started
+    source: "Keith, delivery sprint 9, plans/supply-model.md Thread H first chaos pass #3 - monotonic filling - with its own named limit. Test scenario register TS-5, TS-6c. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL treat a slot as no longer claimable once any later slot for the same dataset has been filled."
+      - "THE SYSTEM SHALL continue to allow a genuinely late supply to fill its own slot where no later slot for that dataset is filled."
+      - "WHERE consecutive slots are each filled late in sequence, THE SYSTEM SHALL fill each one, so that a feed running behind is recorded as running behind rather than as a run of missing slots."
+      - "THE SYSTEM SHALL leave a slot closed this way unfilled, so that it reads as an obligation that was not met."
+      - "THE SYSTEM SHALL NOT record a slot as met using a supply that arrived for a different slot."
+      - "IF an arrival can only be placed in a slot that monotonic filling has closed, THEN THE SYSTEM SHALL hold it for a human."
+    non_functional_requirements:
+      - "The failure this prevents is rated worse than a cascade in the source thread, because it manufactures a delivery that never happened - a service failure erased using another day's data. A test asserting it must assert that a particular slot stayed UNFILLED, which is easy to write as a no-op that passes against any implementation."
+      - "Claimability is asked, never recorded. The answer changes as later slots fill, so a stored flag is wrong from the moment the next promotion lands - the same reasoning REQ-PIPE-052 already applied to overdue."
+      - "Whether a later slot is filled is promotion state, so this rule cannot be answered by the schedule alone. It must not become a second place that decides what 'filled' means."
+    dependencies: [REQ-PIPE-062]
+    decisions:
+      - "The scenario, recorded in full because it survives the backward-cascade fix and is worse in kind. Tuesday missed entirely after an outage. Wednesday 22:00 arrives on time, green, promoted, so Wednesday is filled. Wednesday 23:00 a resupply of Wednesday arrives. Wednesday is filled so the on-time branch does not apply; the oldest claimable unfilled slot is TUESDAY, so the Wednesday resupply files as Tuesday one day late, and the resupply-of-the-most-recently-filled-slot branch never fires because an outstanding missed slot means a claimable unfilled one exists. A missed delivery is thereby recorded as MET."
+      - "Decided MONOTONIC FILLING: a slot stops being claimable once a LATER slot has been filled. Re-traced against the scenario - Tuesday becomes non-claimable, nothing else is claimable, and the 23:00 arrival is correctly a Wednesday resupply. Genuine lateness survives, because Monday's supply landing Tuesday 03:00 finds Tuesday unfilled."
+      - "The LIMIT, named rather than papered over (Keith: 'I think we can't design around that'). Once a delivery is skipped AND a later one has landed, a genuine backfill of the older slot cannot be placed by any rule - it is not claimable, and defaulting it into a future slot is the forward cascade again. That is what REQ-PIPE-064 exists for."
+      - "Decided the definitive answer lives with a person, not a rule: a human marks the missed slots missed, with a reason. The rule only needs to be sensible rather than clairvoyant, because an outage is LOUD - Tuesday's slot goes overdue Tuesday evening, by Thursday two overdue slots are red, and a human is engaged well before the ambiguous arrival lands."
+      - "Decided NOT_EXPECTED and MARKED MISSED must never blur, and the distinction is about what the record ends up saying rather than when it was agreed. not_expected in config changes what was OWED - the slot never existed, nothing is overdue, the record says nothing was due. A slot marked missed records an obligation that was NOT MET - it existed, it was owed, it did not arrive, and it stays in the record as a failure with a reason. Marking a slot missed is closing it while recording that it WAS owed; the acknowledgement is 'it is not coming', never 'it was not due'. Without the distinction, supplier reliability becomes whatever people were willing to excuse after the fact."
+      - "Timing follows as a CONSEQUENCE rather than being the rule: you can only legitimately say nothing is owed BEFORE the fact. A supplier saying next week 'we are upgrading Tue-Wed, no files' is not_expected; finding out at 9pm Tuesday that it is already not coming is marked-missed. Editing config retrospectively to make red history disappear is exactly what must not happen."
+      - "Recorded as a build-order fact: marking a slot missed is a human decision and belongs to the decision log in sprint 12. Until it exists, a slot closed by monotonic filling simply stays unfilled and overdue, which is correct but unresolvable - the dashboard will show a permanently red slot nobody can close."
+
+  - id: REQ-PIPE-064
+    title: When nothing is confidently claimable, hold it for a human
+    date_written: "2026-09-23"
+    story: "As an operator, I want the pipeline to say it does not know where a supply belongs rather than putting it somewhere plausible, so that the one thing it can never do is start a cascade by guessing forward."
+    moscow: must
+    status: not_started
+    source: "Keith, delivery sprint 9, plans/supply-model.md Thread H first chaos pass #3 and Thread E's standing principle - where a rule genuinely cannot know, SAY SO rather than commit silently. Test scenario register TS-7 and TS-6c's tail. Honours REQ-PIPE-052's deferral, in which 'hold for a human' appears exactly once in the whole register and nowhere else. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
+    acceptance_criteria:
+      - "IF no slot can be assigned by the rule and the supply cannot be recorded as a resupply of a filled slot, THEN THE SYSTEM SHALL hold it for a human."
+      - "THE SYSTEM SHALL NOT assign a held supply to a slot whose claim window has not opened, under any fallback, default or recovery path."
+      - "WHILE a supply is held, THE SYSTEM SHALL keep it staged, and SHALL NOT promote it or classify its arrival."
+      - "WHEN a supply is held, THE SYSTEM SHALL state why no slot could be assigned, naming the slots it considered and why each was unavailable."
+      - "THE SYSTEM SHALL report a held supply as an event needing action, distinguished from an informational one."
+      - "WHILE a supply is held, THE SYSTEM SHALL leave every slot's state unchanged."
+      - "THE SYSTEM SHALL continue to process every other dataset and every other delivery while a supply is held."
+      - "THE SYSTEM SHALL count and report outstanding holds together, and SHALL NOT present one element per held supply."
+    non_functional_requirements:
+      - "A hold is the correct output of the rule, not a defect in it - the same reasoning that established a queue of red supplies is a work queue rather than an obstruction. Treating 'something is waiting for a human' as a failure mode is the error to avoid."
+      - "At ~30 datasets, holds must aggregate. A design that is fine at two datasets produces thirty banners at thirty, and a banner per dataset is how people learn to ignore the whole class."
+      - "A held supply is a state that persists across runs and must be re-presented on every run until it is resolved, not reported once into a log nobody re-reads."
+      - "The resolution path does not exist until sprint 12, so a hold built now is a dead end by construction. That is acceptable for a build order but must be stated, because a hold nobody can clear is indistinguishable from a bug."
+    dependencies: [REQ-PIPE-062, REQ-PIPE-063]
+    decisions:
+      - "Decided HOLD, never default forward. Defaulting a supply nothing can place into a future slot is the forward cascade again, arriving by the recovery path rather than by the rule."
+      - "Decided this is a standing principle rather than a one-off, and Keith endorsed it as such: where a rule genuinely cannot know, SAY SO rather than commit silently. It has now produced three separate requirements in this area alone - this one, the ambiguity marking in REQ-PIPE-065, and the duplicate-file hold in REQ-PIPE-059."
+      - "Decided a held supply stays STAGED rather than being rejected or discarded. Staging asserts only that this landed at this time, which is true regardless of where it eventually files, so holding costs nothing and loses nothing."
+      - "The reachable case, so the test has something real to drive: a slot is skipped, a later slot is filled, monotonic filling closes the skipped one, and the genuine backfill for it then turns up. Nothing is claimable and nothing may be invented (TS-6c's tail, TS-7)."
+    open_questions:
+      - "Does a held supply get checked while it is held? Same fork as REQ-PIPE-059's, and they should be answered together. Options - (a) no checks until it is filed, because QA runs against the period schema the supply's slot names and a held supply has no slot; (b) run only the checks reading that table alone; (c) run against the most recent period. Recommended (a): the hold is the signal, and checking a supply against a period it may not belong to produces a verdict that has to be thrown away."
+
+  - id: REQ-PIPE-065
+    title: An uncertain assignment says it is uncertain, and an arrival into a filled slot is reported
+    date_written: "2026-09-23"
+    story: "As an operator, I want to be shown the filings the rule was not sure about and the supplies that landed on top of something already accepted, so that the two cases the rule genuinely cannot resolve reach a person while they are still cheap to correct."
+    moscow: should
+    status: not_started
+    source: "Keith's own proposal, 2026-09-21, plans/supply-model.md Thread E - 'arrival into an already-filled slot: warn, and never auto-promote' - plus the ambiguous-assignment default in the same thread. Test scenario register TS-4, TS-1's tail, TS-3a and TS-3c. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
+    acceptance_criteria:
+      - "WHERE a supply is assigned to the oldest claimable unfilled slot while an earlier slot for the same dataset is also unfilled, THE SYSTEM SHALL mark that assignment as made under ambiguity."
+      - "THE SYSTEM SHALL surface an assignment made under ambiguity for review, and SHALL NOT present it as certain."
+      - "WHEN a supply is recorded against a slot already filled by a promoted supply, THE SYSTEM SHALL report it, naming when the existing supply was accepted."
+      - "WHERE such an arrival landed close to an adjacent slot's claim window opening, THE SYSTEM SHALL include that proximity in the explanation."
+      - "THE SYSTEM SHALL NOT use proximity to a claim window as the trigger for that report."
+      - "THE SYSTEM SHALL NOT report an arrival into a slot that was never filled, so that the ordinary repair path after a rejection stays silent."
+      - "THE SYSTEM SHALL name, in that report, the three responses available - accepting the supply as a correction, re-filing it to another slot, and rejecting it as a duplicate."
+      - "THE SYSTEM SHALL report these as warnings rather than failures, and SHALL NOT stop processing on either."
+    non_functional_requirements:
+      - "On a healthy feed an arrival into an accepted slot is rare, which is what keeps the report meaningful rather than becoming wallpaper at 30 datasets. If it turns out to be common, that is a signal about the claim windows, not a reason to suppress the report."
+      - "The trigger is STRUCTURAL - the slot had been promoted into, and something arrived anyway - so there is nothing to tune. Keep it that way: the version this replaced needed a 'within X of the window opening' threshold, and any such X is arbitrary, with a case just outside it slipping through silently."
+      - "An assignment marked uncertain must stay visible until somebody looks at it, and must not be cleared by the next run simply passing over it again."
+    dependencies: [REQ-PIPE-062]
+    decisions:
+      - "Decided the trigger is a STRUCTURAL condition rather than a magic number (Keith's own proposal, 2026-09-21, replacing a near-a-window-boundary trigger). The slot had been promoted into and something arrived anyway; nothing to configure. Boundary proximity survives as the EXPLANATION rather than the trigger - the message reads 'a supply arrived for Monday, which was already accepted at 16:00. It landed 3 minutes before Tuesday's window opened - it may belong to Tuesday', versus the same message without the second sentence where there is no proximity. Same trigger, different diagnosis."
+      - "Decided the distinction the boundary rule could not draw: a resupply after REJECTION is the expected repair path, routine and silent, because the slot was never filled. A resupply after ACCEPTANCE means we had already accepted something for this period, which is odd and gets reported."
+      - "Decided WARNING, not error, because one legitimate case remains: a supplier realises the extract they sent was wrong - wrong period, wrong filter - even though it passed every check. Data can be clean and still be wrong, and that is the limit of any check suite."
+      - "Decided the ambiguous case DEFAULTS BACKWARD but is marked. An arrival when a prior slot is unfilled cannot be told apart from a late one by any rule, so it takes the oldest claimable unfilled slot since late is commoner than early - marked as assigned under ambiguity and surfaced for review. Cheap to correct, because filing is mutable and the verdict recomputes."
+      - "CARRIED HERE because sprint 11 owns the act and this requirement owns the detection, and the gap must not be lost between them: a supply landing in a filled slot NEVER AUTO-PROMOTES, whatever its status. Without that carve-out the amber-or-green auto-promotion rule would let a supplier's accidental duplicate send silently supersede data already accepted, with the only trace a superseded table nobody looked at. Filling an empty slot is routine; replacing accepted data is a decision."
+      - "Recorded so it is not re-proposed: the content check survives as a DETECTOR, not a decider. 'This supply does not look like the period it is filed under' is a legitimate, non-circular QA finding - it is not making the call - and it is the only thing that turns a wrong default filing into something a human sees rather than something that sits there quietly. NO REQUIREMENT OWNS IT; it is a check and belongs with batch 5's check work, and it is recorded here so it survives the deletion of Thread B."
+
+  - id: REQ-PIPE-066
+    title: Early, on time and late are measured against the slot the supply was filed to
+    date_written: "2026-09-23"
+    story: "As an agency data owner, I want lateness measured against the period a supply was actually filed to, so that a supply filed to Q3 is never reported late for Q2 and a genuinely early one is never reported twelve weeks late."
+    moscow: must
+    status: not_started
+    source: "Keith, delivery sprint 10, plans/supply-model.md Thread D - settled 2026-09-21, and every substantive decision in that thread is uncarried by any requirement. Test scenario register TS-9, TS-10, TS-16. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL classify a supply's arrival as early, on time or late against the due instant of the slot it was ASSIGNED to."
+      - "THE SYSTEM SHALL NOT derive the period or slot used for classification from the arrival date."
+      - "THE SYSTEM SHALL classify a supply as early where it arrived before its slot's due instant."
+      - "THE SYSTEM SHALL classify a supply as on time where it arrived at or before its slot's due instant plus that slot's own grace allowance."
+      - "THE SYSTEM SHALL classify a supply as late otherwise."
+      - "THE SYSTEM SHALL classify each dataset's supply independently, so that one late table in a delivery does not make its punctual siblings late."
+      - "THE SYSTEM SHALL classify a supply whose checks reported red, and a supply a human rejected, on the same terms as a promoted one."
+      - "WHERE a supply has no assigned slot, THE SYSTEM SHALL report it as unfiled, and SHALL NOT report it as early, on time or late."
+      - "THE SYSTEM SHALL record the classification with the supply, and every consumer SHALL read that record rather than recomputing it."
+      - "THE SYSTEM SHALL retire the classification derived from an arrival date, and SHALL NOT leave two derivations of arrival classification in the codebase."
+    non_functional_requirements:
+      - "Two implementations of one concept that can disagree is item 74's exact failure mode, and it is the reason this is a signature change rather than an addition. The visible symptom of getting it wrong is 'filed to Q3, reported late for Q2', and the current derivation is live in BOTH dashboard build paths - pipeline/build_dashboard_data.py and pipeline/build_cp_dashboard_data.py."
+      - "The usual seeded regenerate-and-diff check does NOT apply here, and that has to be said out loud before the work starts. Today's generated history measures 0 early, 240 on time, 112 late under the arrival-date derivation; the new derivation will legitimately produce different numbers, so a diff against today's output is evidence of the change working, not of a regression."
+      - "Classification must be computable at check time, before promotion, because a rejected supply still gets classified. Anything requiring promotion state would make the record depend on a decision that may never be taken."
+      - "The verdict travels with the supply, so the dashboard's JS never recomputes classification - the duplicated-logic surface shrinks rather than grows. cycleStartDate() still earns its place for the as-of picker's period maths, and that is a different job."
+    dependencies: [REQ-PIPE-062, REQ-PIPE-048]
+    decisions:
+      - "The gap being fixed, with its worked examples. classify_arrival() derives the cycle from the arrival date via cycle_start(), which is defined as the most recent expected day AT OR BEFORE its input - it can only look backwards. So 'early' today can only mean early within a cycle. A quarterly supply arriving 2026-07-25 for the 2026-08-01 anchor resolves to the 2026-05-01 anchor and reads about twelve weeks LATE for a quarter that was filled months ago; a 10pm daily arrival intended for the next day reads late against the current one."
+      - "Decided the fix is a SIGNATURE CHANGE - classify against the assigned slot rather than a cadence-derived cycle - not a new cadence property. Assignment already decides the period using information cycle_start() does not have, namely which slots are already filled, and deriving it a second time here creates two implementations of one concept that can disagree."
+      - "Decided this REMOVES a property rather than adding one, which is the part most likely to be undone by a well-meaning later change: once the slot is known, 'early' is just arrival before due_at, so the earliness window is a filing parameter and not a cadence one. There is no separate earliness concept left in classification."
+      - "Decided a REJECTED supply still gets classified. 'Arrived three weeks late AND was bad' is exactly what belongs on the record for a supply that never got promoted, and it falls out of assignment happening before promotion rather than at it."
+      - "Decided classification is PER TABLE, not per delivery (TS-16). If cp_clients lands 09:00 and cp_placements 14:00, each gets its own verdict rather than the whole delivery taking the worst - a single late table stops dragging five punctual ones down. It follows from slots being per-table."
+      - "Decided nothing measures how early a supply is in order to assign it; earliness is a reported consequence of the assignment (TS-9). That is what makes classification a pure function of arrival instant and assigned slot."
+      - "Decided the grace allowance used is the SLOT's own, which is per-dataset. The two datasets in this repo genuinely differ - Birth Registrations an hour, Child Protection eight hours - so taking a collection-level or asset-level grace would be one table's answer imposed on the rest."
+
+  - id: REQ-PIPE-067
+    title: An arrival verdict follows its filing, and is never a frozen fact
+    date_written: "2026-09-23"
+    story: "As an agency data owner, I want a supply that was reported late only because it was filed wrongly to stop reading late once it is filed correctly, so that the record never keeps a verdict everybody knows to be untrue."
+    moscow: must
+    status: not_started
+    source: "Keith, delivery sprint 10, plans/supply-model.md Thread D's second correction, settled conditionally 2026-09-21 and unconditionally once re-filing was confirmed in scope 2026-09-22. Test scenario register TS-11. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
+    acceptance_criteria:
+      - "WHEN a supply is re-filed to a different slot, THE SYSTEM SHALL recompute its arrival classification against the slot it is now filed to."
+      - "THE SYSTEM SHALL NOT treat an arrival classification as a frozen historical fact."
+      - "THE SYSTEM SHALL leave a supply's recorded arrival instant unchanged when its classification is recomputed."
+      - "THE SYSTEM SHALL present the classification current for a supply's present filing, and SHALL NOT present one computed against a filing that has since changed."
+      - "THE SYSTEM SHALL make a recomputed classification traceable to the re-filing that caused it."
+      - "WHERE a supply's filing has not changed, THE SYSTEM SHALL leave its classification unchanged, and SHALL NOT recompute it on every run."
+    non_functional_requirements:
+      - "Recomputation must be local to the supply that moved. A re-file changes one supply's verdict, and a design requiring the history to be replayed to answer that is one that stops being usable once a daily feed has years behind it."
+      - "The live dashboard defaults to as-corrected, so a recomputed verdict legitimately changes what a past as-of view shows. That is intended rather than a defect; the as-published answer lives in the snapshot archive. Say so where a reader will meet it, or it reads as history rewriting itself."
+      - "pipeline/cadence.py's own docstring currently states the opposite - that the verdict is computed once, committed, and never needs porting to JS because a past run's arrival time never changes. The arrival TIME still never changes; the VERDICT becomes a function of the current filing. Correct the docstring in the same change rather than leaving two accounts."
+    dependencies: [REQ-PIPE-066]
+    decisions:
+      - "Decided the verdict FOLLOWS the filing (Keith, settled conditionally 2026-09-21 on whether re-filing exists, unconditionally 2026-09-22 when he confirmed he means re-filing - moving a supply between slots - and that it is in scope). A supply reported late purely because it was misfiled was never actually late, and leaving a known-wrong verdict in place for the sake of immutability is the one place this design would knowingly say something untrue."
+      - "Decided RE-FILING IS ATOMIC - one decision-log entry with a from-slot, a to-slot and one reason - rather than a demote followed by a promote. The argument that separates them is the decision log itself, which is the reason the log exists rather than a detail of it: under the composed version a re-file appears as two entries and a reader a year later has to infer they were one act, so 'why is this supply in Q3?' becomes a correlation exercise instead of having a single answer."
+      - "Decided re-filing does NOT go through un-decide, and this was rejected explicitly rather than never considered. It looks natural - demote to staging, promote into the other period, no third operation - and it was the shape originally proposed. Un-decide and re-file are different acts for different reasons: un-decide says 'this needs another look', re-file says 'this belongs in a different period'. Sharing a mechanism would cost the log its legibility for no saving worth having."
+      - "Recorded as a boundary: re-filing itself, its warning when the target slot is already filled, and the rule that a re-file into an occupied slot SUPERSEDES what is there, are sprint 11 and 12 work. This requirement owns only what happens to the VERDICT when a filing moves, which is why it can be built and tested before the write path exists - by moving a filing in a test rather than through the real operator path."
+      - "Decided the dashboard's JS never recomputes classification, which is what makes a mutable verdict safe rather than a source of two answers. The verdict travels with the supply; the page renders it."

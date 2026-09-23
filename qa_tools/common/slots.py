@@ -170,6 +170,20 @@ def next_unfilled_claimable(slots: list[Slot], at: datetime,
     state and therefore data. Filing is REQ-PIPE-034's; this is the
     schedule's own half of the answer, which is the half that has to be
     derivable from config alone.
+
+    DO NOT USE THIS AS THE ASSIGNMENT RULE. It is not one, and the
+    paragraph above understates what is missing: as well as the resupply
+    case, this has NO on-time-wins-for-the-current-slot branch and NO
+    monotonic filling. "Oldest claimable unfilled slot" on its own is
+    precisely the rule plans/supply-model.md Thread E proves
+    catastrophic - it produces the backward cascade, where a punctual
+    supplier is recorded as a very late resupply AND the slot they
+    actually filled is left to go overdue as a phantom missing delivery.
+
+    Nothing calls this yet, which is why it is a trap rather than a bug
+    (found 2026-09-23 while scoping sprints 7-10). REQ-PIPE-062 is the
+    requirement that carries the whole rule; extend this there rather
+    than reaching for it as-is.
     """
     for slot in slots:
         if slot.name in filled:

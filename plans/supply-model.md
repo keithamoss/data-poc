@@ -661,6 +661,161 @@ explicitly to label them so a later session does not "fix" them.
    accept a wall-to-wall red Child Protection for however long batch 4
    takes.
 
+## Batch 3 proper - sprints 7-10 scoped, 2026-09-23
+
+**Status:** todo (2026-09-23) · **Category:** Pipeline & publishing
+
+Keith's sequencing call after the sense-check found sprints 7-10 had no
+requirement at all. One pass over all four, going deepest on sprint 9.
+Eleven requirements, `REQ-PIPE-057`..`REQ-PIPE-067`, **all unsigned** -
+scoping is not sign-off, and several carry open questions that would
+change what gets built.
+
+**The carry-over check was done and came back empty.** Every decision in
+Threads A, B, D, E, F, H and I bearing on sprints 7-10 is now either
+carried on a requirement's own `decisions:` or has an explicit
+not-needed-because. Threads D and E, which the sense-check found almost
+entirely uncarried, are carried in full - both cascades with their
+worked tables, every rejected alternative, and the `not_expected`
+versus marked-missed distinction.
+
+**One decision is carried but UNOWNED**: the content check as a
+DETECTOR rather than a decider ("this supply does not look like the
+period it is filed under"). It is a check, so it belongs with batch 5.
+Recorded on `REQ-PIPE-065` so it survives Thread B's eventual deletion,
+but it still needs a `QAC` requirement of its own.
+
+**Two build-order facts, neither a design problem:**
+- `REQ-PIPE-060` needs the one-database-many-schemas model that
+  `REQ-PIPE-035` specifies and **sprint 13** builds. Staging has nowhere
+  to stage into before then. Either sprint 13 moves forward to sit with
+  sprint 8, or staging gets built twice.
+- A slot closed by monotonic filling can only be resolved by a human
+  marking it missed, which is **sprint 12**. Until then such a slot is
+  permanently red and unclearable - correct, and visibly unfinished.
+
+**A live trap found by running the real code rather than reading it.**
+`qa_tools/common/slots.py`'s `next_unfilled_claimable()` implements
+"oldest claimable unfilled slot" with **no on-time-wins branch and no
+monotonic filling** - which is exactly the rule Thread E proves
+catastrophic. Nothing calls it yet, so it is a trap rather than a bug.
+Its own docstring made it worse: it said the missing half was the
+RESUPPLY case, never mentioning the other two absences, so a reader
+trusting that account would reach for it as "the assignment rule". A
+warning has been added to the docstring itself, where the reader
+actually is; `REQ-PIPE-062` is what extends it.
+
+**Threads A, B, D, E, F and H are NOT yet safe to delete** - their last
+dependent batch is not built, and CLAUDE.md's rule 4 says delete a
+thread whole once it is. What rule 3 has now established is that
+nothing in them lives only in the prose.
+
+### The on-disk delivery structure, for Keith's review
+
+His own ask (`plans/running-thoughts.md` #36). This is the real layout
+under `data/` today - gitignored, 60 deliveries, 42 Birth Registrations
+and 18 Child Protection. **Sprint 7 changes none of it; sprint 7 is the
+consumer.**
+
+```
+data/
+  deliveries/                        <- the supplier's side of the boundary
+    EXTRACT_20260824/                <- ONE delivery. The DIRECTORY is the boundary.
+      birth_registrations_2026-08-24.csv
+    Data Extract 01 Feb 2023/        <- another. Six files, ONE arrival.
+      cp_clients.csv
+      cp_notifications.csv
+      ... four more
+    01bcad0f3bee/                    <- names follow NO pattern, on purpose
+    monthly_extract_may2025/
+    drop-9023/
+  receipts/                          <- OURS. Outside every delivery.
+    EXTRACT_20260824.json            <- {"delivery": ..., "received_at": ...} and nothing else
+  generator_bookkeeping.json         <- the generator's own notes.
+                                        NO pipeline module may read it.
+```
+
+What recognition reads out of that, and nothing else:
+
+| Question | Answered from | Never from |
+|---|---|---|
+| What arrived together? | the directory | any file's contents |
+| When did it arrive? | our own receipt record | a file mtime, a column, anything a supplier wrote |
+| Which dataset is this file? | that dataset's own `arrivalPattern`, against the FILENAME alone | the directory name, file order, position |
+| Which collection? | the datasets its files matched | the delivery's name |
+| What order did arrivals happen in? | the receipt instants | directory order, the names |
+| Which slot or period? | **nothing here answers that** | any declaration inside the delivery |
+
+**Two facts about the current tree that bear on sign-off**, both found
+by running the real matcher rather than reading it:
+1. **All 60 deliveries are clean** - zero unmatched files, zero
+   anomalies, zero duplicate matches. The awkward shapes
+   `docs/delivery-format.md` says the generator CAN emit are capability
+   held by `REQ-GEN-044`, not present in the history. So sprint 7's
+   interesting paths have no real data behind them yet.
+2. **The duplicate-match hold cannot fire for Child Protection at all**
+   under today's patterns. CP's six match exactly one filename each
+   (`^cp_clients\.csv$`), so the split-extract shape the normative doc
+   calls legitimate - `cp_clients.csv` plus `cp_clients_part2.csv` -
+   matches nothing, and the second file falls out as unrecognised
+   instead. Reachable for Birth Registrations only because its pattern
+   carries a `{date}` placeholder. This is `REQ-PIPE-058`'s open
+   question.
+
+### Open questions waiting on Keith
+
+**Non-functional**, each with the scoper's own pick:
+1. **A crash between staging load and QA** - a truncated table in a
+   global staging schema is indistinguishable from a real short supply.
+   Derive completeness from the warehouse catalogue and re-stage
+   (*pick*); a committed processing marker; or re-process everything
+   every run.
+2. **One DuckDB database versus parallel runs** - verified: while one
+   process holds a read-write connection, a second writer AND a
+   read-only reader both fail. Private scratch database per run with the
+   warehouse attached read-only (*pick*); one writer serialised; or
+   per-run databases for dbt only.
+3. **What recognition may report in public** - an unrecognised
+   artefact's filename is what an operator needs, would be committed and
+   rendered, and this repo is public. Full filenames (*pick, for the
+   PoC, with file CONTENTS never read or recorded*); extension plus a
+   hash; or recorded but never rendered.
+4. **How much replay per run** - incremental with a marker; full
+   deterministic replay; or incremental with a `mothman` command to
+   force a full one (*pick*). Note full replay would silently undo human
+   re-filings.
+
+**Design forks**, each with the scoper's own pick:
+1. **A delivery directory with no receipt record** - today a hard error,
+   and one such directory currently fails recognition for EVERY
+   delivery. A real transport produces this state for seconds during an
+   upload. Keep the error; treat as in-flight and report if it persists
+   (*pick*); or skip silently.
+2. **What form the per-dataset filename pattern takes** - today an S3
+   `keyPattern` whose last segment is reused as a filename matcher, one
+   config value doing two jobs. Keep it; an explicit filename pattern
+   with placeholders (*pick*); or a real regex per dataset, which means
+   regex over untrusted supplier filenames.
+3. **Does a held supply get checked while held?** No checks until filed
+   (*pick*); only its own single-table checks; or against the most
+   recent period. Applies to both hold cases and should be answered once.
+4. **A delivery holding files for two collections** - today
+   `arrivals.py` raises, stopping the whole run including the other 29
+   healthy datasets. Hold it and keep processing (*pick*); or keep the
+   hard error because the transport boundary itself is wrong.
+
+### Also flagged, not this batch's to fix
+
+- **`REQ-PIPE-038` should gain a `format_version` criterion** for the
+  delivery file. `read_json_auto` over years of immutable files needs an
+  explicit column spec, so the first added field breaks the view or is
+  silently dropped. 038 is signed, so this is Keith's call.
+- **`REQ-PIPE-066` invalidates the usual correctness check**, and it is
+  worth saying before the work starts: today's history measures 0 early
+  / 240 on time / 112 late, and the new derivation will legitimately
+  change those numbers. The seeded regenerate-and-diff proves nothing
+  here.
+
 ## Concept inventory
 
 **Status:** todo (2026-09-22) · **Category:** Pipeline & publishing
@@ -951,7 +1106,12 @@ comparisons against the expected-supply sequence.
 
    **New sprint, added 2026-09-22.** The delivery boundary is
    load-bearing - it is what replaced the clock-driven trigger - and
-   nothing owned it. Before this, arrival and staging assumed a delivery
+   nothing owned it.
+
+   **Scoped 2026-09-23**: `REQ-PIPE-057` (the boundary, and what
+   recognition reports), `REQ-PIPE-058` (file-to-dataset patterns and
+   their gate), `REQ-PIPE-059` (two files, one dataset - hold). All
+   three unsigned. Before this, arrival and staging assumed a delivery
    had already been recognised and its files already attributed.
 
 8. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Arrival and
@@ -962,6 +1122,11 @@ comparisons against the expected-supply sequence.
    Arrival order is load-bearing, not tidiness: assignment reads slot
    state, so discovery order changes the answer.
 
+   **Scoped 2026-09-23**: `REQ-PIPE-060` (staging asserts only arrival
+   facts) and `REQ-PIPE-061` (receipt-order processing and backlog
+   drain - the rule `REQ-PIPE-053` already depends on by name). Both
+   unsigned.
+
 9. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Slot
    assignment.** Claim windows, on-time-wins-for-the-current-slot,
    monotonic filling, and hold-for-a-human when nothing is confidently
@@ -970,12 +1135,23 @@ comparisons against the expected-supply sequence.
    The highest-risk sprint in the plan - two cascades were found here by
    stress-testing, one created by the fix for the other.
 
+   **Scoped 2026-09-23**: `REQ-PIPE-062` (the rule, both cascades,
+   never claim forward), `REQ-PIPE-063` (monotonic filling),
+   `REQ-PIPE-064` (hold for a human), `REQ-PIPE-065` (ambiguity and
+   filled-slot arrivals). Four requirements rather than one,
+   deliberately - the sprint's own risk note is the argument for each
+   rule having its own criteria and its own tests. All unsigned.
+
 10. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Arrival
    classification.** Early / on-time / late against the ASSIGNED slot,
    never a slot re-derived from the arrival date (Thread D).
 
    Separate from sprint 9 so the assignment rules can be verified before
    anything reports on them.
+
+   **Scoped 2026-09-23**: `REQ-PIPE-066` (classify against the assigned
+   slot, and retire the arrival-date derivation) and `REQ-PIPE-067`
+   (the verdict follows the filing). Both unsigned.
 
 11. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Promotion and
     rejection.** Auto on green/amber into an EMPTY slot; red never;
