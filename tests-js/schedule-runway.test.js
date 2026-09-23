@@ -140,13 +140,23 @@ describe("an exhausted schedule is never absorbed by the rollup", () => {
     expect(w.rollupStatuses(["exhausted", "green"])).toBe("green");
   });
 
-  it("is outside STATUS_ORDER, so worstOf can never rank it", () => {
-    // Asserted through worstOf() rather than by reading the table -
-    // the behaviour is what matters, and a status with no rank simply
-    // loses every comparison.
+  it("is outside STATUS_ORDER, so worstOf REFUSES to rank it", () => {
+    // CORRECTED by REQ-QAC-047, and the correction is the interesting
+    // part. This test used to assert that worstOf(["exhausted",
+    // "green"]) returns "green", on the reasoning that a status with no
+    // rank simply loses every comparison. That reasoning is true of the
+    // implementation and wrong about the requirement: returning green
+    // for a status you cannot order is precisely the "I do not know
+    // what this is" -> "this is fine" conversion that item 74 was
+    // about, and REQ-QAC-047's own criterion forbids it in those words.
+    //
+    // Worth noting HOW it survived: this suite owned its own
+    // expectations, so it blessed whatever the page already did. The
+    // shared table in status-cases.json exists because a suite that
+    // writes its own answers cannot catch that.
     const w = load();
-    expect(w.worstOf(["exhausted", "green"])).toBe("green");
-    expect(w.worstOf(["exhausted", "red"])).toBe("red");
+    expect(() => w.worstOf(["exhausted", "green"])).toThrow(/cannot order/);
+    expect(() => w.worstOf(["exhausted", "red"])).toThrow(/cannot order/);
   });
 });
 

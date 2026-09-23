@@ -834,7 +834,79 @@ function fmtMetric(x, unit){
 const STATUS_ORDER = {nodata:-1, green:0, amber:1, red:2};
 const STATUS_LABEL = {nodata:"No data", green:"Green", amber:"Amber", red:"Red",
                        exhausted:"Schedule ended"};
-function worstOf(list){ return list.reduce((w,s)=> STATUS_ORDER[s]>STATUS_ORDER[w]?s:w, "green"); }
+// REQ-QAC-047. The vocabulary above and its Python twin in
+// qa_tools/common/dataset_status.py are held to the SAME committed table
+// - status-cases.json at the repo root, read by tests-js/
+// status-parity.test.js and tests/test_status_parity.py. Neither suite
+// owns it, so neither can quietly bend a case to whatever its own side
+// already does. That is what stops the two drifting the way they did in
+// plans/qa-pipeline.md item 74, where the drift rendered a check with 14
+// real violations green.
+const UNORDERED_STATUSES = ["exhausted"];
+// Recognition is scoped to WHERE a status was read from. `exhausted` is
+// a property of a dataset's SCHEDULE - a check result carrying one means
+// something upstream wrote a dataset-level status onto a check, and a
+// flat vocabulary would render that bug rather than report it.
+const CHECK_STATUSES = Object.keys(STATUS_ORDER);
+const DATASET_STATUSES = CHECK_STATUSES.concat(UNORDERED_STATUSES);
+// Fails rather than guessing, and that is the whole point. The previous
+// behaviour returned ANY truthy recorded status, so an unrecognised one
+// passed straight out to a rollup that could not order it -
+// STATUS_ORDER[unknown] is undefined, `undefined > 0` is false, and the
+// reduce kept its green seed. "I do not know what this is" became "this
+// is fine", which is the same conversion item 74 was about.
+//
+// This is a change from silently-wrong to noisily-broken. It is
+// deliberate: dashboard/check_dashboard_renders.py holds the built page
+// to zero console errors, so a malformed committed result now stops a
+// build that would previously have rendered a green tile.
+function recognisedStatus(value, readFrom, allowed){
+  const valid = allowed || CHECK_STATUSES;
+  if(valid.indexOf(value) !== -1) return value;
+  const note = DATASET_STATUSES.indexOf(value) !== -1
+    ? ` "${value}" is a real status, but not one a ${readFrom} may carry - something wrote a dataset-level status onto a check result.`
+    : "";
+  throw new Error(`unrecognised status "${value}" read from ${readFrom}; valid here are ${valid.join(", ")}.${note} An unrecognised status is not evidence of health, so it is refused rather than read as green - see status-cases.json.`);
+}
+// Worst-of, seeded green. Refuses anything it cannot order, INCLUDING a
+// recognised-but-deliberately-unordered status like "exhausted":
+// dropping it silently returns green, and ranking it invents an ordering
+// nobody agreed.
+function worstOf(list){
+  return list.reduce((w,s)=>{
+    if(!(s in STATUS_ORDER)){
+      const note = UNORDERED_STATUSES.indexOf(s) !== -1
+        ? ` "${s}" is recognised but deliberately unorderable - it is surfaced alongside a rolled-up status, never through one.`
+        : "";
+      throw new Error(`cannot order status "${s}" in a rollup; orderable statuses are ${Object.keys(STATUS_ORDER).join(", ")}.${note}`);
+    }
+    return STATUS_ORDER[s]>STATUS_ORDER[w]?s:w;
+  }, "green");
+}
+// The one rule for whether a check is retired, by `retired_as_of`
+// carrying a real hand-authored date - never inferred from absence.
+// A function because the two implementations expressed the same rule
+// differently and disagreed on one input: this side tested
+// `retired_as_of != null`, so an EMPTY STRING read as retired, while
+// Python tested truthiness and read the same check as active. This
+// side's reading was the dangerous one - it drops a LIVE check out of
+// the rollup entirely.
+function isRetired(check){ return !!(check && check.retired_as_of); }
+// The agreed vocabulary, as one value, so there is a single place on
+// this page that answers "what statuses exist and where may each
+// appear" - and so the parity suite can read it at all. These are
+// top-level `const` declarations in a classic script, which are NOT
+// reachable from outside it; a test written against them directly would
+// have been testing `undefined` while appearing to pass.
+function statusVocabulary(){
+  return {
+    ordered: Object.assign({}, STATUS_ORDER),
+    unordered: UNORDERED_STATUSES.slice(),
+    check: CHECK_STATUSES.slice(),
+    dataset: DATASET_STATUSES.slice(),
+    labels: Object.assign({}, STATUS_LABEL),
+  };
+}
 // plans/qa-pipeline.md item 74, Bug A (fixed 2026-09-19). The real tool
 // (dbt-core/Soda Core/datacontract-cli/Evidently) already decided whether
 // each run passed - that verdict rides along on every check as
@@ -846,12 +918,12 @@ function worstOf(list){ return list.reduce((w,s)=> STATUS_ORDER[s]>STATUS_ORDER[
 // 1939 into `1939 > 0` => red on every single run of all 7 datasets,
 // while the tools themselves all said pass.
 function checkStatus(check){
-  if(check.current_status) return check.current_status;
+  if(check.current_status) return recognisedStatus(check.current_status, "current_status");
   return statusForValue(check.current, check.warn, check.fail);
 }
 // The same rule for one history entry, preferring its own real verdict.
 function historyStatus(h, check){
-  if(h && h.status) return h.status;
+  if(h && h.status) return recognisedStatus(h.status, "status");
   return statusForValue(h ? h.value : 0, check.warn, check.fail);
 }
 
@@ -1117,7 +1189,7 @@ function buildRealDataset(d){
       // explicit metadata from check_lifecycle.py, never inferred from a
       // check going quiet. `retired` is the boolean the rest of the
       // dashboard actually branches on.
-      retired: ck.retired_as_of != null,
+      retired: isRetired(ck),
       retiredAsOf: ck.retired_as_of ? toDate(ck.retired_as_of) : null,
       retiredReason: ck.retired_reason,
       // changelog dates are already full ISO-8601 ("2026-09-17T00:00:00Z",

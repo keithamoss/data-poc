@@ -548,6 +548,8 @@ Rough layout:
   -> **~153s/1185 tests (2026-09-23, REQ-PIPE-053)**. Flat again, 31
   more tests - eleven of them real-browser e2e, which usually shows.
   JS suite 183 tests in ~13s.
+  -> **~148s/1217 tests (2026-09-23, REQ-QAC-047)**. Flat again, 32
+  more tests. JS suite 218 tests in ~15s.
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.

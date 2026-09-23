@@ -16,10 +16,134 @@ retired_as_of}, ...]}, ...]`, or - for Child Protection - one entry from
 that shape's `datasets` list) - never a live warehouse/DuckDB
 connection, matching CLAUDE.md's own hard rule that no "read committed
 history" code path may touch live data.
+
+REQ-QAC-047. This module and its browser twin are held to ONE committed
+table of cases - status-cases.json at the repo root - read by tests/
+test_status_parity.py and tests-js/status-parity.test.js. Neither suite
+owns the table, which is the point: a suite that writes its own expected
+answers blesses whatever its own side already does. That is not
+hypothetical here. A test written for REQ-PIPE-053 asserted that a
+rollup handed an unorderable status returns green, reasoning correctly
+about the implementation and wrongly about the rule, and it passed for a
+day.
+
+The behaviour change this brought is from silently-wrong to
+noisily-broken. An unrecognised recorded status used to fall through to
+threshold arithmetic here and return green; in the dashboard it passed
+straight out to a rollup that could not order it, where the reduce kept
+its green seed. Two routes, one false green. Both now raise.
 """
 from __future__ import annotations
 
-STATUS_ORDER = {"green": 0, "amber": 1, "red": 2}
+class UnknownStatusError(ValueError):
+    """A recorded status neither implementation recognises.
+
+    Raised rather than fallen back on, and that is the whole point of
+    REQ-QAC-047. The previous behaviour converted "I do not know what
+    this is" into "this is fine" - an unrecognised verdict fell through
+    to threshold arithmetic here, and passed straight out to a rollup
+    that could not order it in the dashboard, where the reduce kept its
+    green seed. Two different routes to the same false green.
+
+    This changes the failure mode from silently-wrong to noisily-broken.
+    That is deliberate: a malformed committed result now stops a
+    dashboard build that would previously have rendered a green tile."""
+
+
+# The agreed vocabulary. Held to status-cases.json by tests/
+# test_status_parity.py and tests-js/status-parity.test.js, which is what
+# stops this module and the dashboard's own STATUS_ORDER drifting apart
+# the way they did in plans/qa-pipeline.md item 74.
+#
+# The numbers ARE the rule: worst-of is a reduce seeded at green, so
+# nodata sits below green where it can only ever lose. "Nothing to show
+# yet" must not outrank a real green, and must not look like the worst
+# outcome either.
+ORDERED_STATUSES = {"nodata": -1, "green": 0, "amber": 1, "red": 2}
+
+# Recognised, but deliberately OUTSIDE the ordering so no rollup can
+# absorb them - a caller that needs one surfaces it ALONGSIDE the rolled
+# up status, never through it. Asked to order one, worst_of() fails,
+# because the only two honest answers are "throw" and "green", and green
+# is how item 74 happened.
+UNORDERED_STATUSES = {"exhausted"}
+
+RECOGNISED_STATUSES = set(ORDERED_STATUSES) | UNORDERED_STATUSES
+
+# Recognition is scoped to WHERE a status was read from, which the first
+# draft of this got wrong and the shared table's own cases caught.
+# `exhausted` is a property of a dataset's SCHEDULE; a check result
+# carrying it means something upstream wrote a dataset-level status onto
+# a check. A flat vocabulary would render that bug instead of reporting
+# it.
+CHECK_STATUSES = set(ORDERED_STATUSES)
+DATASET_STATUSES = RECOGNISED_STATUSES
+
+# Retained under its original name because callers outside this module
+# index it directly. Same mapping, now including nodata - whose absence
+# was the defect.
+STATUS_ORDER = ORDERED_STATUSES
+
+
+def is_retired(check: dict) -> bool:
+    """Whether a check is retired, by the one rule both implementations
+    apply: `retired_as_of` carries a real, hand-authored date. Never
+    inferred from absence.
+
+    A function rather than an inline truth test because the two sides
+    had expressed the same rule differently and disagreed on one input:
+    the dashboard tested `retired_as_of != null`, so an EMPTY STRING
+    read as retired, while this module tested truthiness and read the
+    same check as active. The dashboard's reading is the dangerous one -
+    it drops a live check out of the rollup entirely. Empty means nobody
+    wrote a date, so the check is active."""
+    return bool(check.get("retired_as_of"))
+
+
+def recognised_status(value: str, read_from: str, allowed=None) -> str:
+    """Returns a recorded status if it is one both implementations know
+    AT THIS LEVEL, and raises naming it and where it came from otherwise.
+
+    `read_from` is not decoration. Turning a silent wrong answer into a
+    loud one is only worth doing if the noise says enough to act on, and
+    a bare "unknown status" in a dashboard build tells nobody which of
+    four tools wrote it or onto which field."""
+    allowed = CHECK_STATUSES if allowed is None else allowed
+    if value in allowed:
+        return value
+    note = ""
+    if value in RECOGNISED_STATUSES:
+        note = (f" {value!r} is a real status, but not one a {read_from!r} "
+                "may carry - something wrote a dataset-level status onto a "
+                "check result.")
+    raise UnknownStatusError(
+        f"unrecognised status {value!r} read from {read_from!r}; "
+        f"valid here are {sorted(allowed)}.{note} An unrecognised "
+        "status is not evidence of health, so it is refused rather than "
+        "read as green - see status-cases.json."
+    )
+
+
+def worst_of(statuses) -> str:
+    """Worst-of across an orderable set, seeded green - the Python mirror
+    of the dashboard's own worstOf().
+
+    Fails on anything it cannot order, including a RECOGNISED but
+    deliberately unordered status like `exhausted`. Dropping it silently
+    returns green; ranking it invents an ordering nobody agreed."""
+    worst = "green"
+    for s in statuses:
+        if s not in ORDERED_STATUSES:
+            raise UnknownStatusError(
+                f"cannot order status {s!r} in a rollup; orderable statuses "
+                f"are {sorted(ORDERED_STATUSES)}"
+                + (f". {s!r} is recognised but deliberately unorderable - it "
+                   "is surfaced alongside a rolled-up status, never through "
+                   "one." if s in UNORDERED_STATUSES else "")
+            )
+        if ORDERED_STATUSES[s] > ORDERED_STATUSES[worst]:
+            worst = s
+    return worst
 
 # Each real check result carries its own tool's verdict - a real `status`
 # written by every qa_tools/*/run_*.py module from what dbt-core/Soda
@@ -70,8 +194,8 @@ def dashboard_status_of(record: dict, value_key: str, status_key: str,
     two callers below can't drift apart the way this module drifted from
     its own JS counterpart."""
     recorded = record.get(status_key)
-    if recorded in STATUS_ORDER:
-        return recorded
+    if recorded:
+        return recognised_status(recorded, status_key)
     return status_for_value(record.get(value_key) or 0, warn, fail)
 
 
@@ -100,7 +224,7 @@ def status_by_run(dataset: dict) -> dict[str, str]:
             for h in ck.get("history", []):
                 s = dashboard_status_of(h, "value", "status", ck["warn"], ck["fail"])
                 prev = by_run.get(h["run_id"], "green")
-                if STATUS_ORDER[s] > STATUS_ORDER[prev]:
+                if worst_of([s, prev]) != prev:
                     by_run[h["run_id"]] = s
     return by_run
 
@@ -113,12 +237,9 @@ def dataset_status(dataset: dict) -> str:
     "retired" the same way the dashboard treats it: `retired_as_of` is
     set (a real, hand-authored declaration, never inferred from
     absence)."""
-    worst = "green"
-    for col in dataset.get("columns", []):
-        for ck in col.get("checks", []):
-            if ck.get("retired_as_of"):
-                continue
-            s = dashboard_status_of(ck, "current", "current_status", ck["warn"], ck["fail"])
-            if STATUS_ORDER[s] > STATUS_ORDER[worst]:
-                worst = s
-    return worst
+    return worst_of(
+        dashboard_status_of(ck, "current", "current_status", ck["warn"], ck["fail"])
+        for col in dataset.get("columns", [])
+        for ck in col.get("checks", [])
+        if not is_retired(ck)
+    )

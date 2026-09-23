@@ -51,7 +51,14 @@ from __future__ import annotations
 # picks; the ticketing Action has no JS runtime), but that argues for
 # exactly TWO implementations - one JS, one Python - not four. This is
 # the Python one's only home; the JS one is guarded against it by a real
-# shared-fixture cross-check (tests/test_status_parity.py).
+# shared table of cases neither side owns (status-cases.json, read by
+# tests/test_status_parity.py and tests-js/status-parity.test.js).
+#
+# That cross-check was named here before it existed - this comment cited
+# tests/test_status_parity.py while no such file was in the repo, from
+# 2026-09-19 until REQ-QAC-047 built it on 2026-09-23. Left recorded
+# rather than quietly corrected: a comment describing a guard that is
+# not there reads exactly like one describing a guard that is.
 from qa_tools.common.check_id import TOOLS, try_parse
 from qa_tools.common.dataset_status import (  # noqa: F401
     STATUS_ORDER,

@@ -221,8 +221,28 @@ releases:
               period it covered and the file to edit. It says so at
               every level, so one ended calendar among thirty healthy
               datasets cannot go unnoticed.
+          - headline: One answer, two places
+            components: ["QA checks & contract", "Dashboard UI"]
+            description: >
+              The status you see on the page and the status behind your
+              tickets are now held to one shared list of agreed cases,
+              so the two cannot quietly disagree about the same check.
       - category: Fixed
         items:
+          - headline: An unknown result is no longer green
+            components: ["QA checks & contract", "Dashboard UI"]
+            description: >
+              A result neither side recognised used to read as healthy,
+              in both the dashboard and the ticketing. It now stops
+              things and says what it found, because not knowing what a
+              result means is not the same as it being fine.
+          - headline: A retired check that was not
+            components: ["Dashboard UI"]
+            description: >
+              A check whose retirement date was left blank was dropped
+              from the dashboard's totals while still counting
+              everywhere else, so a live check could vanish from the
+              status you were reading.
           - headline: Old links no longer break the page
             components: ["Dashboard UI"]
             description: >

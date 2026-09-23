@@ -4732,7 +4732,7 @@ requirements:
       green in the dashboard and mean something else to the automation
       that opens my ticket.
     moscow: must
-    status: not_started
+    status: built
     source: >
       plans/supply-model.md Thread I, verified against real code
       2026-09-21 - qa_tools/common/dataset_status.py has no nodata in
@@ -4831,6 +4831,114 @@ requirements:
         and the status this sprint exists for - per-check nodata - has no
         history at all yet. A verification that only sees what has
         already happened cannot catch a value that has not happened."
+      - "[BUILD] The defect turned out to be WORSE than the source note
+        said, and in the other implementation too. The note described
+        Python's missing nodata. Probing both sides first found that an
+        UNRECOGNISED status read green in BOTH, by two different routes:
+        Python fell through to threshold arithmetic, and the dashboard
+        returned any truthy recorded status straight out to a rollup
+        that could not order it - STATUS_ORDER[unknown] is undefined,
+        `undefined > 0` is false, so the reduce kept its green seed.
+        Neither side had a bug the other lacked; they had the same bug
+        written twice."
+      - "[BUILD] Decided recognition is scoped BY LEVEL - a check may
+        carry only the ordered statuses, a dataset those plus the
+        unordered ones. The first draft had one flat vocabulary, and
+        the table's own `exhausted-is-never-a-check-verdict` case caught
+        it: `exhausted` is a property of a dataset's SCHEDULE, so a
+        check carrying one means something upstream wrote a
+        dataset-level status onto a check. A flat vocabulary renders
+        that bug instead of reporting it."
+      - "[BUILD] A REAL PARITY GAP found while writing the table, which
+        no plan had predicted: the two sides expressed the retired-check
+        rule differently and disagreed on one input. The dashboard
+        tested `retired_as_of != null`, so an EMPTY STRING read as
+        RETIRED; Python tested truthiness, so the same check read as
+        ACTIVE. One character of difference, opposite answers, and the
+        dashboard's reading is the dangerous one - it drops a LIVE check
+        out of the rollup entirely. Both now call one named function.
+        This is the case for a table of INPUTS rather than a review of
+        two implementations: nobody reading either line would have
+        thought to try an empty string."
+      - "[BUILD] Decided `worst_of([\"nodata\"])` returning GREEN is
+        PINNED as-is rather than fixed, and the pin says so in the
+        table. It is a real false green - a rollup containing nothing
+        but nodata reads healthy - but both sides do it identically, so
+        it is a parity case and not a parity bug, and this requirement's
+        own earlier decision already says a structural fix elsewhere
+        (sprint 17's red-for-unrun) is not a reason to leave the path
+        untested. Changing the reduce's seed would be a behaviour change
+        across every rollup in the dashboard, on a requirement scoped to
+        parity. Pinning makes the eventual fix a deliberate edit to a
+        named line rather than a silent drift."
+      - "[BUILD] A test written for REQ-PIPE-053 EARLIER THE SAME DAY
+        asserted the defect as intended behaviour: `worstOf([\"exhausted\",
+        \"green\"])` returns `\"green\"`, with a comment reasoning that a
+        status with no rank simply loses every comparison. True of the
+        implementation, wrong about the rule, and it passed for a day.
+        This is the argument for the table in one incident - that suite
+        owned its own expectations, so it blessed whatever the page
+        already did. Corrected, with the reasoning left in place rather
+        than deleted."
+      - "[BUILD] `pipeline/dashboard_check_labels.py` had cited
+        `tests/test_status_parity.py` as an existing guard since
+        2026-09-19, while no such file was in the repo. Recorded rather
+        than quietly corrected when the file was finally written: a
+        comment describing a guard that is not there reads exactly like
+        one describing a guard that is, and this one had been read at
+        least once without anyone checking."
+      - "[BUILD] Made the dashboard expose `statusVocabulary()` rather
+        than testing its consts directly. Same jsdom constraint
+        REQ-PIPE-053 hit: a top-level `const` in a classic script is not
+        a window property, so a test reading STATUS_ORDER from outside
+        would have been comparing against `undefined` while appearing to
+        pass. One accessor is also the better page: a single place that
+        answers what statuses exist and where each may appear."
+      - "[BUILD] Asserted that the REAL committed history carries
+        nothing unrecognised, rather than assuming it. This change turns
+        a false green into a failed build, so the blast radius is worth
+        measuring - measured at green/amber/red only, across both
+        datasets."
+    linked_tests:
+      - tests/test_status_parity.py
+      - tests-js/status-parity.test.js
+      - tests-js/schedule-runway.test.js
+    implemented_by:
+      - qa_tools/common/dataset_status.py::UnknownStatusError
+      - qa_tools/common/dataset_status.py::recognised_status
+      - qa_tools/common/dataset_status.py::worst_of
+      - qa_tools/common/dataset_status.py::is_retired
+      - qa_tools/common/dataset_status.py::dashboard_status_of
+      - qa_tools/common/dataset_status.py::dataset_status
+    evidence:
+      - >
+        2026-09-23: both bugs were REPRODUCED before anything was
+        written. Python returned green for a recorded `nodata` and for
+        an unrecognised status alike; the dashboard returned the
+        unrecognised string itself and then rolled it up to green. The
+        probe output is what set the table's cases, not the plan text.
+      - >
+        2026-09-23: every fix was then confirmed to BITE by planting the
+        original code back. Python's original recognised-status test
+        fails 6 of its 32 cases; the dashboard's original `checkStatus`
+        fails 6 of its 35, and its original `worstOf` and
+        `retired_as_of != null` fail 5 more - including the empty-string
+        retired case, which is the gap no plan had predicted.
+      - >
+        2026-09-23: 22 cases live in status-cases.json, which NEITHER
+        suite owns. Both read the same file and run every case through
+        their own side. A case cannot be satisfied by one implementation
+        alone, and neither suite can reinterpret one.
+      - >
+        2026-09-23: the real committed history was checked against the
+        new, stricter vocabulary - green/amber/red only, across both
+        datasets, nothing unrecognised. Making an unknown status fatal
+        is safe against today's history, asserted rather than assumed.
+      - >
+        2026-09-23: 1217 Python tests and 218 JS tests pass, and all
+        nine mothman gates are green - including the real-browser render
+        check, which holds the built page to zero console errors and so
+        is what would catch a throw reaching a viewer.
 
   - id: REQ-PIPE-048
     title: One timezone parameter, and every stored instant carries its offset

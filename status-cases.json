@@ -1,0 +1,217 @@
+{
+  "_readme": [
+    "The agreed status vocabulary, and a table of cases both implementations",
+    "of it must answer identically. REQ-QAC-047.",
+    "",
+    "There are two implementations of dataset status in this repo and there",
+    "have to be: the dashboard computes it in the browser, and the GitHub",
+    "Issues ticketing automation computes it in a GitHub Action with no JS",
+    "runtime (qa_tools/common/dataset_status.py's own docstring explains the",
+    "split). They drifted once already - plans/qa-pipeline.md item 74 - and",
+    "the drift rendered a check with 14 real violations GREEN.",
+    "",
+    "This file is owned by NEITHER of them. It is read by tests/",
+    "test_status_parity.py and by tests-js/status-parity.test.js, which run",
+    "every case below through their own side and compare. Neither suite can",
+    "quietly reinterpret a case, because neither writes it.",
+    "",
+    "WHAT THIS COVERS THAT THE BROWSER CHECK DOES NOT. tests/",
+    "test_dashboard_e2e.py's TestStatusMatchesEachToolsOwnVerdict already",
+    "drives the real built dashboard over every committed result and",
+    "compares ~30k rendered statuses against the verdicts the real tools",
+    "recorded. That covers inputs nobody anticipated. It can only ever cover",
+    "statuses that APPEAR IN THE HISTORY, and the whole reason this file",
+    "exists is a status with no history at all yet: per-check nodata. A",
+    "verification that only sees what has already happened cannot catch a",
+    "value that has not happened. Neither half covers the other's gap.",
+    "",
+    "ADDING A STATUS. Add it to `vocabulary` and add at least one case. Both",
+    "suites then fail until both implementations recognise it, which is the",
+    "point - a status either side does not know about must never be read as",
+    "evidence of health."
+  ],
+
+  "vocabulary": {
+    "ordered": {
+      "_why": [
+        "Statuses a rollup can compare. The numbers ARE the rule: worst-of is",
+        "a reduce seeded at green, so nodata sits below green where it can",
+        "only ever lose. That is deliberate - 'nothing to show yet' must not",
+        "outrank a real green, and must not masquerade as the worst outcome",
+        "either."
+      ],
+      "nodata": -1,
+      "green": 0,
+      "amber": 1,
+      "red": 2
+    },
+    "by_level": {
+      "_why": [
+        "Recognition is scoped to WHERE a status was read from, which is a",
+        "distinction the first draft of this table missed and the cases",
+        "caught. `exhausted` is a property of a dataset's SCHEDULE. A check",
+        "result carrying it means something upstream wrote a dataset-level",
+        "status onto a check, and a vocabulary flat enough to accept it",
+        "everywhere would render that bug rather than report it.",
+        "",
+        "So a check may carry only the ordered statuses; a dataset tile may",
+        "carry those plus the unordered ones."
+      ],
+      "check": ["nodata", "green", "amber", "red"],
+      "dataset": ["nodata", "green", "amber", "red", "exhausted"]
+    },
+    "unordered": {
+      "_why": [
+        "Recognised, but deliberately OUTSIDE the ordering, so a rollup",
+        "cannot absorb them. A caller that needs one surfaces it alongside",
+        "the rolled-up status, never through it.",
+        "",
+        "An implementation asked to order one of these must fail rather than",
+        "return a number, because the only honest answers are 'throw' and",
+        "'green', and green is how item 74 happened."
+      ],
+      "exhausted": "The dataset's authored delivery dates have run out relative to the selected as-of date (REQ-PIPE-053). Not red: a supplier's clean dataset reading red because WE forgot to type next year's dates is an attribution error. Not nodata: nodata is filtered before every rollup, so it would vanish above the tile."
+    }
+  },
+
+  "check_cases": [
+    {
+      "id": "recorded-verdict-wins-green",
+      "why": "The real tool already decided. Its verdict is the authority; threshold math is only ever a fallback.",
+      "check": {"current": 9999, "warn": 5, "fail": 10, "current_status": "green"},
+      "expect": "green"
+    },
+    {
+      "id": "recorded-verdict-wins-red",
+      "why": "Same rule in the other direction - a recorded red is not second-guessed against thresholds that would have said green.",
+      "check": {"current": 0, "warn": 5, "fail": 10, "current_status": "red"},
+      "expect": "red"
+    },
+    {
+      "id": "recorded-nodata-is-nodata",
+      "why": "THE BUG THIS REQUIREMENT EXISTS FOR. Python had no nodata in its ordering at all, so a recorded nodata failed the recognised-status test, fell through to threshold arithmetic, and returned green. The dashboard returned nodata for the same input.",
+      "check": {"current": 0, "warn": 5, "fail": 10, "current_status": "nodata"},
+      "expect": "nodata"
+    },
+    {
+      "id": "no-recorded-verdict-falls-back-to-thresholds-red",
+      "why": "The fallback is legitimate and must stay - not every rule fits a warn/fail pair.",
+      "check": {"current": 11, "warn": 5, "fail": 10},
+      "expect": "red"
+    },
+    {
+      "id": "no-recorded-verdict-falls-back-to-thresholds-amber",
+      "why": "Above warn, below fail.",
+      "check": {"current": 7, "warn": 5, "fail": 10},
+      "expect": "amber"
+    },
+    {
+      "id": "null-threshold-is-absent-not-zero",
+      "why": "item 74's original bug. The ODCS rowCount rule is a two-sided mustBeBetween, so both single-sided bounds are legitimately null. Reading null as 0 turned a real row count of 1939 into red on every run of all 7 datasets while the tools themselves all said pass.",
+      "check": {"current": 1939, "warn": null, "fail": null},
+      "expect": "green"
+    },
+    {
+      "id": "unknown-recorded-verdict-is-fatal",
+      "why": "THE DEFECT BEHIND THE BUG, and worse than it. An unrecognised status read GREEN in BOTH implementations by two different routes: Python silently fell through to threshold arithmetic, and the dashboard passed the string straight out to a rollup that could not order it and kept its green seed. Both convert 'I do not know what this is' into 'this is fine'.",
+      "check": {"current": 0, "warn": 5, "fail": 10, "current_status": "definitely-not-a-status"},
+      "expect_error": true
+    },
+    {
+      "id": "unrecognised-status-is-not-health-even-when-thresholds-agree",
+      "why": "Stated separately because it is the criterion, not a duplicate: the failure must not depend on what the thresholds would have said. Here they would have said red, and the previous behaviour still managed to return red for the wrong reason - having discarded the recorded value entirely.",
+      "check": {"current": 11, "warn": 5, "fail": 10, "current_status": "definitely-not-a-status"},
+      "expect_error": true
+    },
+    {
+      "id": "empty-recorded-verdict-falls-back",
+      "why": "Absent and empty are the same thing - no verdict was recorded - and neither is an unknown verdict. Kept as a case because the distinction is exactly one character of implementation apart from the fatal case above.",
+      "check": {"current": 7, "warn": 5, "fail": 10, "current_status": ""},
+      "expect": "amber"
+    },
+    {
+      "id": "exhausted-is-never-a-check-verdict",
+      "why": "exhausted is a property of a dataset's schedule, not of a check result. A check claiming it means something upstream wrote a dataset-level status onto a check, which is a bug worth hearing about rather than rendering. This case is what forced recognition to be scoped by level rather than flat - see vocabulary.by_level.",
+      "check": {"current": 0, "warn": 5, "fail": 10, "current_status": "exhausted"},
+      "expect_error": true
+    }
+  ],
+
+  "rollup_cases": [
+    {
+      "id": "worst-wins",
+      "why": "The whole rule, in one case.",
+      "statuses": ["green", "amber", "red", "green"],
+      "expect": "red"
+    },
+    {
+      "id": "empty-is-green",
+      "why": "A reduce seeded at green. Recorded rather than assumed because it is how a table whose checks have ALL been retired renders green by vacuum in both implementations - reachable, and closed by a different gate (a zero-active-checks CI check), not here.",
+      "statuses": [],
+      "expect": "green"
+    },
+    {
+      "id": "nodata-loses-to-green",
+      "why": "nodata must never win against a real status. Five green and one nodata is green.",
+      "statuses": ["green", "green", "green", "green", "green", "nodata"],
+      "expect": "green"
+    },
+    {
+      "id": "nodata-alone-is-green-and-that-is-a-known-false-green",
+      "why": "Recorded as it really is, not as it should be. A reduce seeded at green with nodata below it means a rollup containing NOTHING BUT nodata still returns green - so a column whose only check has no data reads healthy. Both sides do this, identically, which is why it is a parity case and not a parity bug. It is a REAL false green and it is closed elsewhere: this requirement's own decision is that a structural fix elsewhere (sprint 17's red-for-unrun) is not a reason to leave the old path untested, and changing the seed here would be a behaviour change across every rollup in the dashboard on a requirement scoped to parity. Pinned so the fix is a deliberate edit to this line rather than a silent drift.",
+      "statuses": ["nodata"],
+      "expect": "green"
+    },
+    {
+      "id": "nodata-loses-to-red",
+      "why": "TS-19. The mechanism written to prevent a false green produces one the moment nodata becomes partial - which is why the path is tested even though red-for-unrun is intended to make it unreachable.",
+      "statuses": ["red", "nodata"],
+      "expect": "red"
+    },
+    {
+      "id": "unorderable-status-is-fatal",
+      "why": "The criterion is 'SHALL NOT return green', and throwing is the only other honest answer. Silently dropping it returns green; ordering it invents a ranking nobody agreed. This is the case that catches an exhausted dataset leaking into a rollup it was supposed to be surfaced beside.",
+      "statuses": ["green", "exhausted"],
+      "expect_error": true
+    },
+    {
+      "id": "unknown-status-in-a-rollup-is-fatal",
+      "why": "Separately from the check-level guard, because a rollup can be handed statuses from somewhere that never went through a check at all.",
+      "statuses": ["green", "definitely-not-a-status"],
+      "expect_error": true
+    },
+    {
+      "id": "unorderable-status-is-fatal-even-beside-red",
+      "why": "Stated because the previous case would also pass an implementation that only failed when the answer WOULD have been green. The failure is about not being able to order it, not about the result being flattering.",
+      "statuses": ["red", "exhausted"],
+      "expect_error": true
+    }
+  ],
+
+  "retired_cases": [
+    {
+      "id": "retired-check-is-excluded",
+      "why": "A retired check must never turn a dataset red. Both sides agree on the rule; they express it differently, which is what the next case is about.",
+      "check": {"current": 99, "warn": 5, "fail": 10, "retired_as_of": "2026-01-01"},
+      "expect_retired": true
+    },
+    {
+      "id": "null-retired-as-of-is-active",
+      "why": "Retirement is a hand-authored declaration, never inferred from absence.",
+      "check": {"current": 99, "warn": 5, "fail": 10, "retired_as_of": null},
+      "expect_retired": false
+    },
+    {
+      "id": "absent-retired-as-of-is-active",
+      "why": "Same, for a check whose definition predates the field.",
+      "check": {"current": 99, "warn": 5, "fail": 10},
+      "expect_retired": false
+    },
+    {
+      "id": "empty-retired-as-of-is-active",
+      "why": "A REAL PARITY GAP, found writing this table. The dashboard tests `retired_as_of != null`, so an empty string read as RETIRED; Python tests truthiness, so the same check read as ACTIVE. One character of difference, opposite answers, and the dashboard's reading is the dangerous one - it drops a live check from the rollup. Empty means nobody wrote a date, so the check is active.",
+      "check": {"current": 99, "warn": 5, "fail": 10, "retired_as_of": ""},
+      "expect_retired": false
+    }
+  ]
+}

@@ -479,15 +479,18 @@ comparisons against the expected-supply sequence.
    exercised against real data at all - and the injected shapes are how
    Keith sees any of it working.
 
-3. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Status parity
-   between the two implementations.** `qa_tools/common/dataset_status.py`
-   has no `nodata` at all, so a recorded `nodata` falls through to
-   threshold math and returns green (Thread I).
+3. **[done, 2026-09-23]** **[Pipeline & publishing]** **Status parity
+   between the two implementations.** BUILT as `REQ-QAC-047`, which now
+   owns the decisions - including three the build itself turned up. The
+   defect was worse than this entry said and present on BOTH sides: an
+   unrecognised status read green in each, by two different routes. A
+   second, unpredicted gap had the two disagreeing about whether a check
+   with an EMPTY retirement date was retired. And a test written for
+   `REQ-PIPE-053` earlier the same day had asserted the defect as
+   intended behaviour, which is the argument for a shared table in one
+   incident.
 
-   Must land BEFORE per-check `nodata` exists, or the new status meets a
-   silent misgrade on arrival - `plans/qa-pipeline.md` item 74's exact
-   failure mode, which that module's own docstring says it already
-   suffered once.
+   Landed BEFORE per-check `nodata` exists, which was the point.
 
 4. **[done, 2026-09-23]** **[Pipeline & publishing]** **Timezone
    parameter.** One repo-wide config value replacing
