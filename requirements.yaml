@@ -2486,6 +2486,9 @@ requirements:
       from every table's current version; Thread J dropped cross-period
       composition entirely. What survives is picking the newest version
       WITHIN one period, which is a different and much smaller thing.
+    signed_off:
+      by: Keith
+      date: "2026-09-23"
     acceptance_criteria:
       - THE SYSTEM SHALL execute a QA run against a single period's
         schema - the period whose slot the delivery under test claims -
