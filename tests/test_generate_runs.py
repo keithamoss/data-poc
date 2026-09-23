@@ -207,9 +207,16 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     before = {name: _fingerprint(path)
               for name, path in (("deliveries", delivery.DELIVERIES_DIR),
                                   ("receipts", delivery.RECEIPTS_DIR))}
-    assert before["deliveries"], "test precondition - the real delivery tree must exist to be protected"
     book_before = (delivery.BOOKKEEPING_PATH.read_bytes()
                    if delivery.BOOKKEEPING_PATH.exists() else None)
+    # NO PRECONDITION THAT THE REAL TREE EXISTS, and that was a real
+    # bug in this test's first version - it asserted one, passed
+    # locally where data/deliveries/ is populated, and failed in CI
+    # where that gitignored directory has never been generated. The
+    # guarantee does not need the tree to exist: an untouched ABSENT
+    # tree is still untouched, and a generator writing to its defaults
+    # would bring it into existence, which the comparison below catches
+    # either way.
 
     monkeypatch.setattr(generate_runs, "OUT_DIR", str(tmp_path / "raw"))
     monkeypatch.setattr(generate_runs, "DELIVERIES_DIR", tmp_path / "deliveries")
@@ -219,6 +226,7 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     generate_runs.main()
 
     assert list((tmp_path / "deliveries").iterdir()), "nothing was generated into the redirected tree"
+    assert _fingerprint(tmp_path / "deliveries"), "test precondition - the generator must have written somewhere"
     assert (tmp_path / "bookkeeping.json").exists()
     for name, path in (("deliveries", delivery.DELIVERIES_DIR), ("receipts", delivery.RECEIPTS_DIR)):
         assert _fingerprint(path) == before[name], f"the real {name} tree was written to by a test run"

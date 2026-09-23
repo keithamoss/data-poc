@@ -601,6 +601,20 @@ Rough layout:
     `export PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium` (the
     pre-installed build lags what the pinned package expects)
 
+  **The same fact cuts the other way for TESTS, and it produced a real
+  red CI on 2026-09-23**: a freshly-cloned container has no `data/`
+  either, so a test that ASSERTS a gitignored path exists passes
+  locally and fails in CI, every time. Two generator-isolation tests
+  did exactly that - `assert before["deliveries"], "test precondition -
+  the real delivery tree must exist"` - and were green locally for the
+  same reason they were red on the runner. Write the assertion so it
+  holds whether or not the artifact happens to be there: an untouched
+  ABSENT tree is still untouched, and a generator writing to its
+  defaults would bring one into existence, which a before/after
+  comparison catches either way. Verified by reproducing the CI
+  condition locally - move the gitignored tree aside, run the test -
+  which is the cheapest way to check this class before pushing.
+
   Two things worth knowing so this doesn't get mis-diagnosed next time:
   **CI is not affected** - `.github/workflows/test.yml` runs all three
   as real steps, so a red local suite with a green CI almost certainly
