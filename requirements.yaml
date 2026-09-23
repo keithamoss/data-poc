@@ -2491,6 +2491,10 @@ requirements:
         schema - the period whose slot the delivery under test claims -
         and SHALL NOT assemble a warehouse spanning more than one
         period.
+      - WHERE a delivery's tables claim slots in more than one period,
+        THE SYSTEM SHALL execute one QA run per period, each reading
+        that period's schema alone, and SHALL NOT compose tables from
+        different periods into a single run.
       - THE SYSTEM SHALL overlay the staged delivery's own tables on
         that period's promoted state, so that a check reads the
         candidate under test alongside the tables already promoted into
@@ -2607,6 +2611,43 @@ requirements:
         load-bearing if believed: it would rule out composing a staged
         candidate with promoted tables at all.
       - >
+        Decided a mixed-period delivery FANS OUT into one QA run per
+        period, rather than composing tables from different periods
+        into one run (Keith, 2026-09-23). Keith's own first instinct
+        was table-by-table composition, picking a different underlying
+        period schema per table; he changed to fan-out on the argument
+        that cross-period composition is exactly what Thread J killed,
+        and that the composed run produces a meaningless comparison -
+        a cross-table check reading August's clients against November's
+        notifications. His words: "we don't want to be munging things
+        across period schemas." Fan-out leaves the single-period
+        criterion above intact rather than weakening it.
+      - >
+        Decided the period is NEVER read from the file, which is what
+        dissolves the question of how a mixed-period delivery is even
+        recognised (Keith asked this directly, 2026-09-23). Thread B
+        rejected deriving the period from content as circular - it
+        would infer the filing decision from the very data whose
+        correctness is about to be tested, so a bad extract files
+        itself wrongly and is then QA'd against the wrong period,
+        failing silently. The period comes from arrival time plus
+        PER-DATASET slot state, so a mixed-period delivery arises with
+        nothing read from any file: two tables land at the same instant
+        and claim different periods because their slots were in
+        different states.
+      - >
+        Decided a mixed-period delivery NEVER auto-promotes, even when
+        green (Keith, 2026-09-23, restating Thread H's gate and
+        accepting it). His words: it is "a weird enough situation that
+        I'd rather a human makes a call". The promotion rule itself
+        belongs to the promotion sprint rather than here; recorded so
+        it is carried across when that batch is scoped. Thread H's
+        TS-33b warning travels with it: the gate's condition is
+        different PERIODS, not different SLOTS - an implementation
+        keyed on slots blocks auto-promotion on every healthy
+        multi-table delivery, since per-table slots mean an ordinary
+        six-table delivery already spans six slots in one period.
+      - >
         Note for whoever builds the overlay: the mechanism verified
         alongside the above is an EPHEMERAL per-run view schema. A view
         in a third schema composing staging and a period schema works, a
@@ -2649,7 +2690,9 @@ requirements:
       not. The trigger is now the delivery.
     acceptance_criteria:
       - WHEN a delivery has been loaded into staging, THE SYSTEM SHALL
-        run QA once over that delivery.
+        run QA once over that delivery, per period that delivery's
+        tables claim slots in - which for an ordinary delivery is
+        exactly one.
       - THE SYSTEM SHALL NOT trigger a separate QA run per table within
         a delivery.
       - THE SYSTEM SHALL NOT trigger a QA run on a clock, and SHALL NOT
