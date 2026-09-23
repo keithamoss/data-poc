@@ -1739,3 +1739,73 @@ resolving the file-per-dataset shape, because "add a dataset" currently
 means "copy-paste a file." Doing 29 without having resolved that is how
 the copy-paste cost gets multiplied rather than paid. Scope them
 together.
+
+30. **[todo, 2026-09-23]** **[QA checks & contract]** Go back and populate the new per-dataset config, once the sprints are done.
+
+Keith's own ask, 2026-09-23, during the sprint: *"remind me to go back
+and add some of the new config, like the expected time and claim
+window."* Timing is explicitly after the sprint sequence.
+
+**Why there is anything to go back FOR, which is the part worth
+recording.** `REQ-PIPE-049` built the CAPABILITY for both and
+deliberately did not populate either with real values:
+
+- **`expectedTime` / `latency` per dataset.** The parser now honours
+  `element:`, so a property naming a dataset overrides the
+  contract-wide default. Child Protection's six datasets currently all
+  take one contract-wide `expectedTime: "09:00"` and `latency: 480`,
+  which is honest - they genuinely do share one cadence today - but the
+  whole point of fixing the `element:` bug was that they need not.
+- **`claimWindow` per dataset.** The calendar carries the default (14d
+  quarterly, 4h daily) and a dataset may override it in its own
+  contract. No dataset does.
+
+Both were left empty on purpose rather than by omission: inventing a
+business fact Keith has not stated would ALSO have moved real arrival
+verdicts in committed history, and `REQ-PIPE-048`'s 150-arrival pin
+exists precisely to catch that. So this is a decision to revisit with
+him, not a gap to quietly fill - what are the real agreed times and
+windows, per dataset?
+
+**Sequence it with #29.** That item adds a few small datasets across
+several agencies with genuinely different shapes - which is exactly
+when differing expected times and claim windows stop being
+hypothetical and start being the thing the config is for. Populating
+them against today's two datasets would mean inventing differences;
+populating them alongside #29's new datasets means describing real
+ones.
+
+31. **[todo, 2026-09-23]** **[Dashboard UI]** Live documentation of the configuration files, in the dashboard.
+
+Keith's own ask, 2026-09-23, same conversation, and explicitly parked
+for after the sprints: *"park an item for after the sprints to do some
+live documentation in the dashboard of the configuration files."*
+
+**The mechanism already exists three times over**, which is most of why
+this is cheap and why it is worth doing rather than writing another
+Markdown file nobody opens. The dashboard already renders committed
+repo files as live tabs: `PLANS` from `plans/*.md`
+(`dashboard/plans_md.py`), `REQUIREMENTS` from `requirements.yaml`
+(`dashboard/requirements_yaml.py`), and `RELEASE_NOTES` from
+`CHANGELOG.yaml` (`dashboard/changelog_yaml.py`). A config tab is the
+same shape: a parser module, a const embedded by
+`dashboard/embed_dashboard_data.py`, a top-level tier.
+
+**What it would cover**, and the list grew a lot this sprint - which is
+the real reason Keith asked:
+- `contract/data-asset.yaml` - now the single statement of the
+  agency/collection/dataset hierarchy (`REQ-QAC-039`), the asset
+  timezone (`REQ-PIPE-048`), and the named, versioned delivery
+  calendars with their periods and claim windows (`REQ-PIPE-049`).
+- The two dataset contracts' `slaProperties` - cadence, expected time,
+  latency, and now per-dataset overrides via `element:`.
+- Whatever `REQ-PIPE-050`'s schedule gate ends up validating, since a
+  page explaining the rules and a gate enforcing them should not be
+  two independent accounts of the same thing.
+
+**The question to scope with him first**: is this a reference page
+(here is what the config says, rendered readably) or an explainer (here
+is what each setting MEANS and what breaks if it is wrong)? Those are
+different pages. `mothman schedule show` already does the first for
+calendars on the CLI, which argues the dashboard's version should be
+the second - but that is his call, not an assumption to build on.
