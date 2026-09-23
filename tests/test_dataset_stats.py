@@ -88,7 +88,7 @@ def test_bdm_earliest_extract_ignores_disordered_rows():
 
     arrival = bdm_stats._arrival(conn, "run_01")
 
-    assert arrival["earliest_extract"] == "2020-01-05 09:00:00"
+    assert arrival["earliest_extract"] == "2020-01-05T09:00:00+00:00"
 
 
 def test_bdm_earliest_extract_falls_back_to_min_if_every_row_disordered():
@@ -112,7 +112,7 @@ def test_bdm_earliest_extract_falls_back_to_min_if_every_row_disordered():
 
     arrival = bdm_stats._arrival(conn, "run_01")
 
-    assert arrival["earliest_extract"] == "2020-01-04 20:00:00"
+    assert arrival["earliest_extract"] == "2020-01-04T20:00:00+00:00"
 
 
 def test_cp_compute_dataset_stats_shape():

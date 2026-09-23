@@ -29,6 +29,7 @@ from typing import Any
 
 import duckdb
 
+from qa_tools.common import asset_time
 from pipeline.aggregate_values import categorical_aggregate, numeric_date_aggregate
 
 _SEX_VALID = ["M", "F", "X"]
@@ -127,7 +128,9 @@ def _arrival(conn: duckdb.DuckDBPyConnection, run_id: str) -> dict:
         earliest_extract = conn.execute(
             "SELECT MIN(extract_timestamp) FROM birth_registrations WHERE run_id = ?", [run_id]
         ).fetchone()[0]
-    return {"max_lag_hours": max_lag_hours, "earliest_extract": str(earliest_extract) if earliest_extract else None}
+    return {"max_lag_hours": max_lag_hours,
+            "earliest_extract": asset_time.record_source_instant(
+                earliest_extract, f"earliest_extract for run {run_id}")}
 
 
 def compute_dataset_stats(conn: duckdb.DuckDBPyConnection, run_id: str, manifest_entry: dict) -> dict[str, Any]:

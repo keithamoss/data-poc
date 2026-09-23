@@ -19,7 +19,6 @@ import json
 import os
 import sys
 import tempfile
-from datetime import datetime, timezone
 
 import rich_click as click
 from rich.console import Console
@@ -33,6 +32,7 @@ from qa_tools.common.local_check import run_id_from_path as local_run_id_from_pa
 from qa_tools.common.qa_results_reader import list_run_ids
 
 from . import common
+from qa_tools.common import asset_time
 
 AGENCY_ID = cp_common.AGENCY_ID
 COLLECTION_ID = cp_common.COLLECTION_ID
@@ -177,7 +177,7 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
     reuses orchestrate_cp.run_single(), same entry point the Synthetic
     flow above and Thread B's Lambda handler call. Returns (results,
     tmp_results_dir) - same tmp-dir-first Promote pattern as run_check()."""
-    run_date = run_date or datetime.now(timezone.utc).date().isoformat()
+    run_date = run_date or asset_time.now().date().isoformat()
     run_id = run_id or local_run_id_from_path(folder)
     reference_run_id = local_run_id_from_path(reference_folder, prefix="ref")
 
@@ -251,7 +251,7 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
             f"run generate-synthetic-data first? Single-table mode needs a known-good delivery "
             f"already on disk to source the other 5 tables from.")
 
-    run_date = run_date or datetime.now(timezone.utc).date().isoformat()
+    run_date = run_date or asset_time.now().date().isoformat()
     run_id = run_id or local_run_id_from_path(file_path, prefix="table")
 
     tmp_dir = common.new_tmp_results_dir()

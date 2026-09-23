@@ -30,13 +30,13 @@ FIXTURE_DATASET_STATS = {
     "run_01_2026-09-01": {
         "manifest_entry": FIXTURE_RUNS[0],
         "value_counts": {"sex": [["M", 1], ["F", 2], ["X", 0]]},
-        "arrival": {"max_lag_hours": 5.0, "earliest_extract": "2026-09-01 10:00:00"},
+        "arrival": {"max_lag_hours": 5.0, "earliest_extract": "2026-09-01T10:00:00+00:00"},
         "check_aggregates": {"sex": {"type": "categorical", "suppressed": False, "total_invalid": 0, "values": []}},
     },
     "run_02_2026-09-02": {
         "manifest_entry": FIXTURE_RUNS[1],
         "value_counts": {"sex": [["M", 2], ["F", 1], ["X", 1]]},
-        "arrival": {"max_lag_hours": 6.0, "earliest_extract": "2026-09-02 10:00:00"},
+        "arrival": {"max_lag_hours": 6.0, "earliest_extract": "2026-09-02T10:00:00+00:00"},
         "check_aggregates": {"sex": {"type": "categorical", "suppressed": False, "total_invalid": 1,
                                       "values": [{"value": "X", "count": 1}]}},
     },
@@ -165,9 +165,9 @@ def test_arrival_status_is_genuinely_computed_from_real_cadence(tmp_path, monkey
     mixed_stats = json.loads(json.dumps(FIXTURE_DATASET_STATS))
     # run_01: inside the grace window (expected 2026-09-01T06:00:00Z, 60
     # min grace) -> onTime.
-    mixed_stats["run_01_2026-09-01"]["arrival"]["earliest_extract"] = "2026-09-01 06:30:00"
+    mixed_stats["run_01_2026-09-01"]["arrival"]["earliest_extract"] = "2026-09-01T06:30:00+00:00"
     # run_02: hours after the grace window -> late.
-    mixed_stats["run_02_2026-09-02"]["arrival"]["earliest_extract"] = "2026-09-02 10:00:00"
+    mixed_stats["run_02_2026-09-02"]["arrival"]["earliest_extract"] = "2026-09-02T10:00:00+00:00"
     results_path = tmp_path / "results_bdm.json"
     results_path.write_text(json.dumps({
         "runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS, "dataset_stats": mixed_stats,

@@ -31,7 +31,6 @@ from collections.abc import Callable
 import json
 import os
 import sys
-from datetime import datetime, timezone
 
 import duckdb
 
@@ -46,6 +45,7 @@ from . import run_dbt_bdm
 from . import run_soda_bdm
 from . import run_datacontract_bdm
 from . import run_evidently_bdm
+from qa_tools.common import asset_time
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 MANIFEST_PATH = os.path.join(ROOT, "data", "raw", "manifest.json")
@@ -164,7 +164,7 @@ def run_single(run_id: str, csv_path: str, run_date: str, dirty_severity: str, r
     deliveries) explicitly tracking and passing it, which nothing does
     yet. Flagged in the design doc as a real open follow-up, not solved
     here."""
-    run_timestamp = datetime.now(timezone.utc).isoformat()
+    run_timestamp = asset_time.now().isoformat()
     run_by = run_by or get_run_by()
 
     os.makedirs(build_per_run_warehouses.RAW_DIR, exist_ok=True)
@@ -224,7 +224,7 @@ def run_pipeline(sequential: bool = False) -> dict:
     # file from a previous anchor date instead of failing loudly - see
     # plans/qa-pipeline.md for the regression test this got.
     reference_entry = manifest[0]
-    run_timestamp = datetime.now(timezone.utc).isoformat()
+    run_timestamp = asset_time.now().isoformat()
     # Fails loudly here, before any real tool runs, if git identity isn't
     # configured (Keith's call, 2026-09-16) - see git_identity.py's own
     # docstring for why this can't fall back to "unknown".

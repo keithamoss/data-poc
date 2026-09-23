@@ -32,6 +32,7 @@ from datetime import date, datetime
 from qa_tools.bdm.dataset_stats import AGGREGATE_SPEC
 from qa_tools.common.validate_check_lifecycle import collect_checks
 from pipeline.cadence import classify_arrival, parse_cadence_from_contract
+from qa_tools.common import asset_time
 from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, tool_ref, url_key
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -41,7 +42,10 @@ CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract
 
 
 def _parse_extract_timestamp(s: str) -> datetime:
-    return datetime.fromisoformat(s.replace(" ", "T"))
+    """One committed arrival instant. Delegates to asset_time so a value
+    stored without an offset fails loudly here rather than being read as
+    UTC by whichever caller got to it first (REQ-PIPE-048)."""
+    return asset_time.parse_instant(s, "arrival.earliest_extract in committed qa_results/")
 
 ENGINE_SHORT = {
     # Same short-name convention as build_cp_dashboard_data.py's own

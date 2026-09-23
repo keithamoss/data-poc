@@ -27,7 +27,7 @@ Two things this module does, deliberately kept separate:
    dates (see tests/test_cadence.py's own cross-check against
    generator/generate_cp_runs.py's _quarter_start(), which this
    generalizes).
-2. classify_arrival(cadence, run_date, earliest_extract_utc) - "was
+2. classify_arrival(cadence, run_date, arrived_at) - "was
    THIS SPECIFIC, ALREADY-HAPPENED delivery early, on time, or late?"
    A real timestamp comparison (this run's own real earliest_extract,
    already committed to qa_results/, against the expected UTC moment +
@@ -39,12 +39,11 @@ Two things this module does, deliberately kept separate:
    date someone later picks.
 """
 from __future__ import annotations
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 
 import yaml
 
-AWST_OFFSET = timedelta(hours=8)  # UTC+8, fixed - WA doesn't observe daylight saving
-
+from qa_tools.common import asset_time
 
 def _sla_properties_to_dict(items: list[dict]) -> dict:
     return {i["property"]: i for i in (items or []) if "property" in i}
@@ -105,33 +104,43 @@ def cycle_start(cadence: dict, on_or_before: date) -> date:
     raise ValueError(f"unknown cadence type {t!r}")
 
 
-def expected_moment_utc(cadence: dict, expected_day: date) -> datetime:
+def expected_moment(cadence: dict, expected_day: date) -> datetime:
     """`expected_day` (a plain date - the cycle's own expected day, from
-    cycle_start()) + cadence['expected_time'] (AWST wall-clock) -> the
-    real UTC instant that represents. AWST is a fixed UTC+8 offset (no
-    daylight saving in WA), so this is plain arithmetic, not a real
-    timezone-library conversion - deliberately, since that fixed offset
-    is all this data asset's real timezone (Western Australia) ever
-    needs."""
-    hour, minute = (int(x) for x in cadence["expected_time"].split(":"))
-    awst_naive = datetime(expected_day.year, expected_day.month, expected_day.day, hour, minute)
-    return (awst_naive - AWST_OFFSET).replace(tzinfo=timezone.utc)
+    cycle_start()) + cadence['expected_time'] (a wall-clock time) -> the
+    real instant that represents, in the data asset's own timezone.
+
+    Was `expected_moment_utc()` until REQ-PIPE-048, and subtracted a
+    hardcoded `AWST_OFFSET = timedelta(hours=8)` to get there. Same
+    answer today - Western Australia does not observe daylight saving,
+    so the offset and the zone agree - and a correct one for an asset
+    whose zone does. The rename is the point rather than tidiness: the
+    return value was never meaningfully UTC, it was an instant, and
+    naming a representation in the function encouraged callers to think
+    in offsets."""
+    return asset_time.wall_clock(expected_day, cadence["expected_time"])
 
 
-def classify_arrival(cadence: dict, run_date: date, earliest_extract_utc: datetime) -> str:
+def classify_arrival(cadence: dict, run_date: date, arrived_at: datetime,
+                      where: str = "classify_arrival(arrived_at)") -> str:
     """"early" | "onTime" | "late" - run_date is this specific real
     delivery's own date (used to resolve which cycle it belongs to, via
-    the same cycle_start() rule); earliest_extract_utc is that
-    delivery's own real, already-committed arrival timestamp (naive
-    values are treated as already UTC, matching how this repo's
-    dataset_stats.json/DuckDB timestamps are stored)."""
+    the same cycle_start() rule); arrived_at is that delivery's own
+    real, already-committed arrival instant.
+
+    A NAIVE arrived_at is a hard error (REQ-PIPE-048), not a value
+    quietly read as UTC. This function used to do exactly that, and its
+    own docstring said so - "naive values are treated as already UTC,
+    matching how this repo's timestamps are stored". Which was true, and
+    is the bug: a supply that arrived at 10pm in Perth classified
+    against a UTC reading of its own timestamp is being judged against
+    the following afternoon. `where` names the source in the error,
+    since the fix is always at the source rather than here."""
     expected_day = cycle_start(cadence, run_date)
-    expected = expected_moment_utc(cadence, expected_day)
+    expected = expected_moment(cadence, expected_day)
     grace_end = expected + timedelta(minutes=cadence["latency_minutes"])
-    if earliest_extract_utc.tzinfo is None:
-        earliest_extract_utc = earliest_extract_utc.replace(tzinfo=timezone.utc)
-    if earliest_extract_utc < expected:
+    arrived_at = asset_time.parse_instant(arrived_at, where)
+    if arrived_at < expected:
         return "early"
-    if earliest_extract_utc <= grace_end:
+    if arrived_at <= grace_end:
         return "onTime"
     return "late"

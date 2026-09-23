@@ -1158,3 +1158,56 @@ class TestTheRenderedTreeComesFromTheHierarchy:
         assert embedded is not None, "the built dashboard embedded no HIERARCHY"
         assert {a["id"] for a in embedded["agencies"]} == {
             agency_id for agency_id, _ in self._config_tree()}
+
+
+# =====================================================================
+# REQ-PIPE-048 - "today" is answered on the ASSET's clock, not on
+# whichever clock the person looking at the page happens to be on.
+#
+# This was a live bug, not a hypothetical one. liveNowDateStr() used
+# toISOString(), which is UTC, so between midnight and 08:00 in Perth
+# the dashboard's default as-of date was YESTERDAY - every working
+# morning, for eight hours. It went unnoticed because the page tends to
+# get opened later in the day, which is exactly why it needs a test
+# rather than a careful reader.
+#
+# Driven in a real browser with the viewer's timezone pinned, because
+# that IS the variable: no amount of reading the Python side can tell
+# you what a browser in New York does with it.
+# =====================================================================
+
+class TestTodayIsTheAssetsToday:
+    def _asset_today(self) -> str:
+        from qa_tools.common import asset_time
+        return asset_time.now().date().isoformat()
+
+    @pytest.mark.parametrize("viewer_tz", [
+        "UTC",                 # the old behaviour's own zone
+        "America/New_York",    # a day behind Perth for most of the day
+        "Pacific/Kiritimati",  # UTC+14, a day AHEAD of Perth
+        "Australia/Perth",     # the asset's own
+    ])
+    def test_the_default_as_of_date_is_the_assets_date_whatever_zone_the_viewer_is_in(
+            self, browser, built_dashboard_html, viewer_tz):
+        context = browser.new_context(timezone_id=viewer_tz)
+        try:
+            page = context.new_page()
+            page.goto(f"file://{built_dashboard_html}")
+            page.wait_for_timeout(400)
+            got = page.evaluate("() => ({today: liveNowDateStr(), default: defaultAsOf()})")
+        finally:
+            context.close()
+        assert got["today"] == self._asset_today(), (
+            f"a viewer in {viewer_tz} sees {got['today']} as today; the asset's date is "
+            f"{self._asset_today()}")
+        assert got["default"] == self._asset_today()
+
+    def test_the_page_knows_which_zone_that_is(self, clean_page, built_dashboard_html):
+        """Guards the assertions above against going green by accident.
+        With ASSET_TIMEZONE absent the page falls back to the viewer's
+        own clock, which agrees with the asset's for most of the day -
+        so every test above would pass on the broken build for sixteen
+        hours out of every twenty-four."""
+        from qa_tools.common import asset_time
+        _goto(clean_page, built_dashboard_html, {"tier": "executive"})
+        assert clean_page.evaluate("() => ASSET_TIMEZONE") == asset_time.asset_timezone().key

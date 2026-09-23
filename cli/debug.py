@@ -23,10 +23,10 @@ no committed history yet; for one that already has real history, expect
 checkout -- <path>` to discard it if the debug run wasn't meant to
 become part of the real record."""
 from __future__ import annotations
-from datetime import datetime, timezone
 
 import rich_click as click
 from rich.console import Console
+from qa_tools.common import asset_time
 
 console = Console()
 
@@ -64,7 +64,7 @@ def debug_group() -> None:
 @click.option("--run-id", required=True, help="An existing manifest run_id already on disk.")
 def run_dbt_command(dataset: str, run_id: str) -> None:
     """Run real dbt-core in isolation against one run already on disk."""
-    run_timestamp = datetime.now(timezone.utc).isoformat()
+    run_timestamp = asset_time.now().isoformat()
     if dataset == "bdm":
         from qa_tools.bdm.run_dbt_bdm import evaluate_dbt_bdm
         results = evaluate_dbt_bdm(run_id, run_timestamp)
@@ -79,7 +79,7 @@ def run_dbt_command(dataset: str, run_id: str) -> None:
 @click.option("--run-id", required=True, help="An existing manifest run_id already on disk.")
 def run_soda_command(dataset: str, run_id: str) -> None:
     """Run real Soda Core in isolation against one run already on disk."""
-    run_timestamp = datetime.now(timezone.utc).isoformat()
+    run_timestamp = asset_time.now().isoformat()
     if dataset == "bdm":
         from qa_tools.bdm.run_soda_bdm import evaluate_soda_bdm
         results = evaluate_soda_bdm(run_id, run_timestamp)
@@ -94,7 +94,7 @@ def run_soda_command(dataset: str, run_id: str) -> None:
 @click.option("--run-id", required=True, help="An existing manifest run_id already on disk.")
 def run_datacontract_command(dataset: str, run_id: str) -> None:
     """Run real datacontract-cli in isolation against one run already on disk."""
-    run_timestamp = datetime.now(timezone.utc).isoformat()
+    run_timestamp = asset_time.now().isoformat()
     if dataset == "bdm":
         from qa_tools.bdm.run_datacontract_bdm import evaluate_datacontract_bdm
         entry = _bdm_manifest_entry(run_id)
@@ -112,7 +112,7 @@ def run_datacontract_command(dataset: str, run_id: str) -> None:
               help="Defaults to the manifest's own first (clean-by-construction) entry.")
 def run_evidently_command(dataset: str, run_id: str, reference_run_id: str | None) -> None:
     """Run real Evidently AI in isolation against one run already on disk."""
-    run_timestamp = datetime.now(timezone.utc).isoformat()
+    run_timestamp = asset_time.now().isoformat()
     if dataset == "bdm":
         from qa_tools.bdm.run_evidently_bdm import evaluate_evidently_bdm
         entry = _bdm_manifest_entry(run_id)

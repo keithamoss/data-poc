@@ -3677,8 +3677,38 @@ requirements:
         "delivery" after this - a grep for the old field names should
         come back empty, and that is a cheap thing to verify.
       - Invoked through mothman only.
-    dependencies: []
+    dependencies: [REQ-PIPE-048, REQ-PIPE-049]
     decisions:
+      - >
+        CORRECTED 2026-09-23, with Keith: this requirement declared
+        dependencies: [] and that was simply wrong. It depends on
+        REQ-PIPE-048 and REQ-PIPE-049, and the register saying
+        otherwise is what let the "one combined regeneration" plan be
+        made and then reversed a day later. Recorded as a correction
+        rather than edited silently, because a dependency nothing
+        validates is exactly the failure being fixed.
+
+        WHY, concretely, from the real stored record rather than from
+        reading the criteria: all three requirements rewrite the SAME
+        object - the manifest entry inside every run's
+        dataset_stats.json. This one removes delivery_id,
+        delivery_date, attempt_number, is_resupply and
+        supersedes_run_id and changes run_id, which is also the
+        directory name. Its "carry the period a supply is intended for,
+        and that supply's own receipt instant" replaces delivery_date
+        and arrived_date - and arrived_date/run_date are the same
+        fields REQ-PIPE-048's "every stored timestamp carries its own
+        UTC offset" changes. REQ-PIPE-049 is what makes a period mean
+        anything at all; without it the generator would have to invent
+        period names, which this requirement's own last criterion
+        forbids.
+
+        The practical consequence, and the reason it is worth stating:
+        every way of splitting these costs an extra full-tree rewrite
+        of committed qa_results/ history. Building 048, then 049, then
+        this one - code and config first, ONE regeneration at the end -
+        costs a single rewrite. Splitting this requirement's
+        independent criteria from its blocked ones costs two.
       - Decided the GENERATOR adopts the model's vocabulary, not the
         reverse (Keith, 2026-09-22 - "the generator should be using the
         new names around slot and delivery and so forth. We shouldn't be
@@ -4317,7 +4347,7 @@ requirements:
       say what offset it is in, so that a supply that arrived at 10pm in
       Perth is not read as having arrived the following afternoon.
     moscow: must
-    status: not_started
+    status: built
     source: >
       Keith, 2026-09-21, plans/supply-model.md Thread H chaos-pass items
       4 and 6 - one repo-wide config parameter replacing
@@ -4364,7 +4394,116 @@ requirements:
         the class CLAUDE.md's item-74 lesson covers.
       - Config only, no data access, so nothing here constrains CI.
     dependencies: []
+    linked_tests:
+      - tests/test_asset_time.py
+      - tests/test_asset_time_semantics.py
+      - tests/test_cadence.py
+      - tests/test_dataset_stats.py
+      - tests/test_dashboard_e2e.py::TestTodayIsTheAssetsToday
+    implemented_by:
+      - qa_tools/common/asset_time.py::asset_timezone
+      - qa_tools/common/asset_time.py::parse_instant
+      - qa_tools/common/asset_time.py::record_source_instant
+      - qa_tools/common/asset_time.py::now
+      - qa_tools/common/asset_time.py::wall_clock
+      - qa_tools/common/asset_time.py::end_of_day
+      - pipeline/cadence.py::expected_moment
+      - pipeline/cadence.py::classify_arrival
+      - qa_tools/bdm/dataset_stats.py::_arrival
+      - contract/data-asset.yaml
+      - dashboard/qa-reporting-dashboard.template.html
+    evidence:
+      - >
+        2026-09-23: the semantics were PINNED BEFORE the refactor, as
+        this requirement's own NFR asks - every arrival in committed
+        history with the verdict the pre-048 code gave it, 150 across 7
+        datasets, 131 onTime / 16 early / 3 late. The pin was then
+        confirmed to bite by changing the offset by one hour and
+        watching real verdicts move, rather than trusting that it would.
+        It held across the whole refactor.
+      - >
+        2026-09-23: the hardcoded AWST_OFFSET = timedelta(hours=8) is
+        gone; the zone is one IANA name in contract/data-asset.yaml.
+        14:00 in Perth still resolves to 06:00 UTC, asserted as an
+        instant so the old offset arithmetic and the new zone lookup are
+        held to the same number.
+      - >
+        2026-09-23: A REAL, LIVE BUG, found by the criterion rather than
+        reasoned about. liveNowDateStr() used toISOString(), which is
+        UTC - so between midnight and 08:00 in Perth the dashboard's
+        default as-of date was YESTERDAY, every working morning, for
+        eight hours. It had gone unnoticed because the page tends to be
+        opened later in the day. Proved in a real browser at 07:40 Perth
+        on 2026-09-23, a moment when the two calendars genuinely
+        disagreed: viewers pinned to UTC, America/New_York and
+        Pacific/Kiritimati (UTC+14) now all read 2026-09-23.
+      - >
+        2026-09-23: zero naked instants remain in committed history -
+        16,609 carry an offset, 0 do not, measured across all 300
+        committed files. Before the regeneration there were 150, in
+        arrival.earliest_extract, on the CI dashboard-build path.
+      - >
+        2026-09-23: the read path now fails loudly and names its source.
+        Verified by running the real build against the pre-regeneration
+        history and reading the error, which named the field, the file
+        and the offending value.
+      - >
+        2026-09-23: 913 Python tests, 162 JS tests, all eight mothman
+        gates, plus check-lifecycle and the real-browser render check.
     decisions:
+      - >
+        Decided an IANA ZONE NAME, not an offset. An offset is one
+        zone's answer for one moment; Western Australia does not observe
+        daylight saving, so today the two agree - which is exactly why
+        it was worth fixing before they stop agreeing, in a second asset
+        somewhere that does.
+      - >
+        Decided the ONE remaining assumption lives at the SOURCE
+        BOUNDARY, visibly, in asset_time.record_source_instant(). A
+        supplier's extract_timestamp column arrives with no offset -
+        this project's own synthetic feed included, calibrated in
+        hours-from-midnight UTC - so somebody has to decide what it
+        means. The bug was never that an assumption existed; it was that
+        classify_arrival() made it INVISIBLY, at every read, forever, so
+        no record existed of a decision having been taken. Made once, at
+        the boundary, and written into the stored record permanently, it
+        is a different thing: the next reader sees what was decided
+        rather than inheriting it.
+      - >
+        Decided that boundary records UTC rather than the asset's own
+        zone, deliberately. Recording Perth would have moved every
+        arrival verdict in committed history, and criterion 5 says a
+        stored instant keeps the meaning it was written with. This
+        preserves today's meaning exactly and only writes it down -
+        which is what let the pin above stay green across the change.
+      - >
+        Decided the snapshot and local-check FILENAME stamps stay UTC
+        with their existing explicit Z suffix
+        (dashboard/snapshot_dashboard.py, qa_tools/common/local_check.py).
+        They are collision-resistant names, they already say which zone
+        they are in, and dashboard/snapshots/*.html.gz is committed -
+        renaming them would churn real history to satisfy the letter of
+        a criterion about stored instants that they already meet.
+      - >
+        Decided the generator's own anchor date (generator/
+        anchor_date.py's date.today()) is NOT moved onto the asset clock
+        here, even though it is a wall-clock computation. Doing so would
+        shift the whole generated history by a day and change every
+        run_id, which would have destroyed the pin this requirement
+        depends on. It belongs to REQ-GEN-042's own criterion that the
+        schedule derive from a fixed, committed anchor - a pinned anchor
+        makes the question moot rather than answering it twice.
+      - >
+        Decided clipDatasetToAsOf()'s date comparison keeps its
+        behaviour and gains a NAME (ranOnOrBeforeAsOf). Both sides are
+        YYYY-MM-DD in the asset's calendar, for which a lexicographic
+        comparison is exactly the end-of-day-inclusive answer criterion
+        6 asks for. This requirement's own NFR flags it as right by
+        COINCIDENCE - nothing said the boundary was inclusive or that
+        both sides shared a calendar - so what was missing was the
+        statement, not the arithmetic. Rejected rewriting it in Date
+        arithmetic, which would have introduced real timezone risk for
+        no change in outcome.
       - Decided the parameter lives at the data-asset level, in
         contract/data-asset.yaml, because asset-level config IS
         repo-level here - an asset is a separate deployment, not a row

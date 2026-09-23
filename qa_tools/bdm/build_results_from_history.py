@@ -26,10 +26,10 @@ a warehouse of its own, which is Phase 3's other half.
 from __future__ import annotations
 import json
 import os
-from datetime import datetime, timezone
 
 from . import bdm_common
 from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats, read_qa_results
+from qa_tools.common import asset_time
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
@@ -63,7 +63,7 @@ def build_results_from_history() -> dict:
     n_error = sum(1 for r in all_results if r["status"] == "error")
 
     output = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": asset_time.now().isoformat(),
         "dataset": f"{AGENCY_ID}.{COLLECTION_ID}.{DATASET_ID}",
         "runs": manifest,
         "dataset_stats": dataset_stats_by_run,

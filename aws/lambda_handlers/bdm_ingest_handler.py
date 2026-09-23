@@ -15,12 +15,12 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from datetime import datetime, timezone
 
 import qa_tools.bdm.orchestrate_bdm as orchestrate_bdm
 from qa_tools.common.file_arrival import match_arrival
 from qa_tools.common.lambda_results_dir import BDM_MODULES, patch_write_qa_result_for_lambda
 from qa_tools.common.results_s3_sink import upload_qa_result
+from qa_tools.common import asset_time
 
 # The proposed arrivalPattern contract extension (docs/aws-event-driven-
 # mvp-design.md's own "File-arrival contract matching" section) - a
@@ -81,7 +81,7 @@ def handler(event: dict, context=None) -> dict:
         # real S3 event notification shape, so run_date here is really
         # "when this Lambda processed it," not "when the file actually
         # arrived" - a real, small imprecision, not solved in this MVP.
-        run_date = datetime.now(timezone.utc).date().isoformat()
+        run_date = asset_time.now().date().isoformat()
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             local_csv = os.path.join(tmp_dir, os.path.basename(key))

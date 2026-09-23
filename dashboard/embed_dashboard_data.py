@@ -180,6 +180,7 @@ import re
 from dashboard.changelog_yaml import parse_changelog
 from dashboard.plans_md import parse_plans
 from dashboard.requirements_yaml import parse_requirements
+from qa_tools.common import asset_time
 from qa_tools.common import hierarchy
 from qa_tools.common.acceptance_sync import build_decisions
 from qa_tools.common.changelog import build_changelog
@@ -290,6 +291,12 @@ def embed() -> None:
             ag["collections"].append(col)
         col["datasets"].append({"id": entry.dataset_id, "name": entry.dataset_name})
     html = _replace_const(html, "HIERARCHY", json.dumps(tree, separators=(",", ":")))
+
+    # ASSET_TIMEZONE - REQ-PIPE-048. So the page answers "what day is
+    # it" on the asset's clock instead of the viewer's.
+    html = _replace_const(html, "ASSET_TIMEZONE",
+                           json.dumps(str(asset_time.asset_timezone().key)))
+    print(f"Re-embedded ASSET_TIMEZONE = {asset_time.asset_timezone().key}")
     print(f"Re-embedded HIERARCHY = {len(tree['agencies'])} agenc(ies), "
           f"{sum(len(a['collections']) for a in tree['agencies'])} collection(s), "
           f"{len(hierarchy.all_datasets())} dataset(s)")

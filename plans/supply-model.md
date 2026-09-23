@@ -477,12 +477,16 @@ comparisons against the expected-supply sequence.
    failure mode, which that module's own docstring says it already
    suffered once.
 
-4. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Timezone
+4. **[done, 2026-09-23]** **[Pipeline & publishing]** **Timezone
    parameter.** One repo-wide config value replacing
    `pipeline/cadence.py`'s hardcoded `AWST_OFFSET`; stored timestamps
-   carry their offset (Thread H).
+   carry their offset (Thread H). BUILT as `REQ-PIPE-048`, which now
+   owns the decisions - including one the build turned up: the
+   dashboard had been showing YESTERDAY's date every Perth morning.
 
-   Small, independent, and every later sprint compares instants.
+   Small, independent, and every later sprint compares instants. Built
+   out of sprint order for exactly that reason, once building
+   `REQ-GEN-042` showed it was a dependency rather than a sibling.
 
 5. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Schedule config
    and its validation gate.** Authored dates (quarterly) or cadence rule

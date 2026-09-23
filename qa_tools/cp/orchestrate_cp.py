@@ -25,7 +25,6 @@ from collections.abc import Callable
 import json
 import os
 import sys
-from datetime import datetime, timezone
 
 import duckdb
 
@@ -41,6 +40,7 @@ from . import run_dbt_cp
 from . import run_soda_cp
 from . import run_datacontract_cp
 from . import run_evidently_cp
+from qa_tools.common import asset_time
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 MANIFEST_PATH = os.path.join(ROOT, "data", "cp_raw", "manifest.json")
@@ -121,7 +121,7 @@ def run_single(entry: dict, reference_run_id: str, run_by: str | None = None,
     manifest.json's own real shape for the full convention; row_counts
     isn't required, dataset_stats.compute_dataset_stats() derives its own
     counts from the live warehouse instead of trusting a passed-in one)."""
-    run_timestamp = datetime.now(timezone.utc).isoformat()
+    run_timestamp = asset_time.now().isoformat()
     run_by = run_by or get_run_by()
     return _run_one(entry, run_timestamp, run_by, reference_run_id, on_step=on_step)
 
@@ -138,7 +138,7 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     # (generator/anchor_date.py) - see orchestrate_bdm.py's identical fix
     # and plans/qa-pipeline.md for the bug this was found as.
     reference_run_id = manifest[0]["run_id"]
-    run_timestamp = datetime.now(timezone.utc).isoformat()
+    run_timestamp = asset_time.now().isoformat()
     # Fails loudly here, before any real tool runs - see orchestrate_bdm.py's
     # identical comment and git_identity.py's own docstring.
     run_by = get_run_by()

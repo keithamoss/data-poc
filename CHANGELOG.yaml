@@ -132,6 +132,20 @@ releases:
               the dashboard.
       - category: Fixed
         items:
+          - headline: Yesterday's date, all morning
+            components: ["Dashboard UI"]
+            description: >
+              Open the dashboard before 8am in Perth and it defaulted to
+              yesterday, because it worked out the date in UTC. It now
+              uses the asset's own timezone, so everyone sees the same
+              day wherever they are.
+          - headline: Timestamps say their timezone
+            components: ["Pipeline & publishing"]
+            description: >
+              Arrival times were stored with no timezone on them, so a
+              supply that landed at 10pm could be read as the next
+              afternoon. Every stored time now carries its offset, and
+              anything missing one is rejected rather than guessed at.
           - headline: Contracts said the wrong thing
             components: ["QA checks & contract"]
             description: >

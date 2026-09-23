@@ -26,11 +26,11 @@ Run as `python3 -m qa_tools.cp.build_results_from_history`.
 from __future__ import annotations
 import json
 import os
-from datetime import datetime, timezone
 
 from qa_tools.common import hierarchy
 from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats, read_one, TOOL_ORDER
 from . import cp_common
+from qa_tools.common import asset_time
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
@@ -61,7 +61,7 @@ def build_results_from_history() -> dict:
     n_error = sum(1 for r in all_results if r["status"] == "error")
 
     output = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": asset_time.now().isoformat(),
         "collection": f"{cp_common.AGENCY_ID}.{cp_common.COLLECTION_ID}",
         "datasets": sorted(d.dataset_id for d in hierarchy.datasets_in_collection(cp_common.COLLECTION_ID)),
         "runs": manifest,

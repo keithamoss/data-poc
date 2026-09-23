@@ -68,10 +68,16 @@ def test_real_bdm_cadence_classifies_the_on_time_window_as_on_time():
     cadence = parse_cadence_from_contract(CONTRACT_PATH)
     run_date = date(2026, 6, 1)
 
-    from datetime import datetime
-    on_time_extract = datetime(2026, 6, 1, 6, 30)  # inside [6.0, 7.0]
-    early_extract = datetime(2026, 6, 1, 3, 0)  # inside [2.0, 6.0)
-    late_extract = datetime(2026, 6, 1, 9, 0)  # inside (7.0, 11.0]
+    # Aware instants, in UTC. This file's own calibration comment above
+    # is written in hours-from-midnight UTC, and since REQ-PIPE-048 that
+    # has to be SAID rather than assumed by whoever reads the value -
+    # classify_arrival() refuses a timestamp with no offset instead of
+    # quietly treating it as UTC, which is the bug that requirement is
+    # named for.
+    from datetime import datetime, timezone
+    on_time_extract = datetime(2026, 6, 1, 6, 30, tzinfo=timezone.utc)  # inside [6.0, 7.0]
+    early_extract = datetime(2026, 6, 1, 3, 0, tzinfo=timezone.utc)  # inside [2.0, 6.0)
+    late_extract = datetime(2026, 6, 1, 9, 0, tzinfo=timezone.utc)  # inside (7.0, 11.0]
 
     assert classify_arrival(cadence, run_date, on_time_extract) == "onTime"
     assert classify_arrival(cadence, run_date, early_extract) == "early"

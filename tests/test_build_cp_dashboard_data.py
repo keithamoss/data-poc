@@ -29,12 +29,12 @@ FIXTURE_DATASET_STATS = {
     # one - see that test's own docstring.
     "cp_run_01_2026-01-01": {
         "value_counts": {"concern_type": [["Neglect", 2], ["Physical abuse", 1]]},
-        "arrival": {"cp_notifications": {"max_lag_hours": 5.0, "earliest_extract": "2025-11-01 05:00:00"}},
+        "arrival": {"cp_notifications": {"max_lag_hours": 5.0, "earliest_extract": "2025-11-01T05:00:00+00:00"}},
         "check_aggregates": {},
     },
     "cp_run_02_2026-04-01": {
         "value_counts": {"concern_type": [["Neglect", 3], ["Physical abuse", 1]]},
-        "arrival": {"cp_notifications": {"max_lag_hours": 30.0, "earliest_extract": "2026-02-01 20:00:00"}},
+        "arrival": {"cp_notifications": {"max_lag_hours": 30.0, "earliest_extract": "2026-02-01T20:00:00+00:00"}},
         "check_aggregates": {},
     },
 }

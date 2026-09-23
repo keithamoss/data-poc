@@ -22,7 +22,6 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from datetime import datetime, timezone
 
 import qa_tools.cp.build_cp_warehouses as build_cp_warehouses
 import qa_tools.cp.orchestrate_cp as orchestrate_cp
@@ -30,6 +29,7 @@ from qa_tools.common.file_arrival import match_arrival
 from qa_tools.common.lambda_results_dir import CP_MODULES, patch_write_qa_result_for_lambda
 from qa_tools.common.results_s3_sink import upload_qa_result
 from qa_tools.cp.completion_tracker import ManifestMarkerCompletionTracker
+from qa_tools.common import asset_time
 
 # The proposed arrivalPattern extension - see bdm_ingest_handler.py's
 # identical note on why this is hardcoded here rather than in the real
@@ -112,7 +112,7 @@ def handler(event: dict, context=None) -> dict:
             summary["skipped"] += 1
             continue
 
-        run_date = datetime.now(timezone.utc).date().isoformat()
+        run_date = asset_time.now().date().isoformat()
         entry = {"run_id": run_id, "run_date": run_date, "dirty_severity": None}
         results = orchestrate_cp.run_single(entry, reference_run_id=REFERENCE_RUN_ID)
 

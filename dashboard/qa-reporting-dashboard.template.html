@@ -989,6 +989,20 @@ function groupChecksByCategory(checks){
 // data, so the two real agencies have to be written somewhere. What this
 // removes is the copy that anything a reader ever sees would use.
 const HIERARCHY = null;
+// ASSET_TIMEZONE — REQ-PIPE-048. The data asset's own IANA timezone,
+// from contract/data-asset.yaml, embedded so "what day is it" is
+// answered on the ASSET's clock rather than on whichever clock the
+// person looking at the page happens to be on.
+//
+// This fixed a real, live bug rather than a hypothetical one:
+// liveNowDateStr() below used toISOString(), which is UTC, so between
+// midnight and 08:00 in Perth the default as-of date was YESTERDAY -
+// every working morning, for eight hours. Nobody had noticed because
+// the dashboard was only ever opened later in the day.
+//
+// Falls back to the viewer's own zone when absent, which is the raw
+// template's case and no worse than what it did before.
+const ASSET_TIMEZONE = null;
 const REAL_BIRTH_REG_DATA = null;
 const REAL_CP_DATA = null;
 const SNAPSHOT_MANIFEST = [];
@@ -1323,8 +1337,27 @@ function cycleLabel(cadence, cycleStartStr){
   if(cadence.type==="weekly") return `Week of ${label}`;
   return `Cycle starting ${label}`;
 }
+// Does a run fall on or before the as-of date? (REQ-PIPE-048)
+//
+// A bare date used as a point in time means the END of that day in the
+// asset's own zone - so a run that landed at any hour of the as-of date
+// itself counts. Both arguments are YYYY-MM-DD in the asset's calendar,
+// and for that form a lexicographic string comparison gives exactly
+// that answer.
+//
+// It is a named function rather than an inline `<=` because it was
+// previously right BY COINCIDENCE: nothing said the boundary was meant
+// to be inclusive, or that both sides were on the same calendar, so
+// nobody could tell whether the next comparison written beside it
+// should copy the pattern. REQ-PIPE-048's own note calls this out by
+// name. The behaviour is deliberately unchanged - tests/
+// test_asset_time_semantics.py pins it - and only the intent is now
+// written down.
+function ranOnOrBeforeAsOf(runDateStr, asOfDateStr){
+  return runDateStr <= asOfDateStr;
+}
 function clipDatasetToAsOf(d, asOfDateStr){
-  const eligibleRuns = d.runs.filter(r => r.run_date <= asOfDateStr);
+  const eligibleRuns = d.runs.filter(r => ranOnOrBeforeAsOf(r.run_date, asOfDateStr));
   if(!eligibleRuns.length) return null; // never supplied yet as of this date
   const effectiveRun = eligibleRuns[eligibleRuns.length-1];
   // Phase 5j (plans/qa-pipeline.md, 2026-09-17 - replacing the flat
@@ -1599,7 +1632,16 @@ function dateStrDiffDays(fromDateStr, toDateStr_){
 // matters) once real time has moved on since the fixture was last
 // regenerated, which is exactly when a run-date-based default would
 // silently stop being "now minus offset" and nobody would notice.
-function liveNowDateStr(){ return toDateStr(new Date()); }
+// "Today" on the ASSET's clock, as YYYY-MM-DD. en-CA is used purely
+// because it formats as YYYY-MM-DD; the locale is a formatting detail,
+// the timeZone is the part that matters.
+function assetTodayDateStr(){
+  const tz = ASSET_TIMEZONE;
+  if(!tz) return toDateStr(new Date());  // raw template, no embedded config
+  try { return new Date().toLocaleDateString("en-CA", {timeZone: tz}); }
+  catch(e){ return toDateStr(new Date()); }  // unknown zone - never blank the page over it
+}
+function liveNowDateStr(){ return assetTodayDateStr(); }
 function defaultAsOf(){
   return liveNowDateStr();
 }

@@ -18,7 +18,6 @@ import json
 import os
 import sys
 import tempfile
-from datetime import datetime, timezone
 
 import rich_click as click
 from rich.console import Console
@@ -32,6 +31,7 @@ from qa_tools.common.local_check import copy_into, run_id_from_path as local_run
 from qa_tools.common.qa_results_reader import list_run_ids
 
 from . import common
+from qa_tools.common import asset_time
 
 AGENCY_ID = orchestrate_bdm.AGENCY_ID
 COLLECTION_ID = orchestrate_bdm.COLLECTION_ID
@@ -192,7 +192,7 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
     point both the Synthetic flow above and Thread B's Lambda handler
     call. Returns (results, tmp_results_dir) - same tmp-dir-first Promote
     pattern as run_check()."""
-    run_date = run_date or datetime.now(timezone.utc).date().isoformat()
+    run_date = run_date or asset_time.now().date().isoformat()
     run_id = run_id or local_run_id_from_path(csv_path)
     reference_run_id = local_run_id_from_path(reference_csv, prefix="ref")
     reference_csv_filename = f"{reference_run_id}.csv"

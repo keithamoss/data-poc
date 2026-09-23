@@ -21,6 +21,7 @@ from typing import Any
 import duckdb
 
 from qa_tools.common import hierarchy
+from qa_tools.common import asset_time
 from pipeline.aggregate_values import categorical_aggregate, numeric_date_aggregate
 
 # The six CP tables, in the order contract/data-asset.yaml declares
@@ -107,7 +108,9 @@ def _arrival(conn: duckdb.DuckDBPyConnection, run_date: str) -> dict[str, dict]:
             f"FROM raw.{table}"
         ).fetchone()[0]
         earliest_extract = conn.execute(f"SELECT MIN(extract_timestamp) FROM raw.{table}").fetchone()[0]
-        out[table] = {"max_lag_hours": max_lag_hours, "earliest_extract": str(earliest_extract) if earliest_extract else None}
+        out[table] = {"max_lag_hours": max_lag_hours,
+                      "earliest_extract": asset_time.record_source_instant(
+                          earliest_extract, f"earliest_extract for table {table}")}
     return out
 
 
