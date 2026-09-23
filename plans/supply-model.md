@@ -1495,6 +1495,38 @@ legitimate QA finding, non-circular because it is not making the call,
 and it is what turns a wrong default into something a human sees
 rather than something that sits there quietly.
 
+### Staged data lives IN the warehouse - IN DISCUSSION 2026-09-23
+
+**Keith, 2026-09-23, raised at REQ-PIPE-034's sign-off.** Captured
+immediately because it is a real model statement, not a wording
+question, and the conversation it came up in is still open. Refine or
+delete this section once it settles; do not treat it as settled.
+
+His words, in substance: **staging is not outside the warehouse.** It
+is a schema in it. "Data arrives, we load it as soon as we can into
+the warehouse, and then we just start doing QA on it while it's in the
+warehouse. We only not load it if it's an unpalatable file that we
+can't actually read."
+
+That is consistent with everything already settled here - QA runs
+before promotion, and a supply that cannot be loaded at all is red -
+but it fixes something Thread B left implicit. Thread B says
+"everything lands in staging on arrival" without saying where staging
+physically is, and the natural reading of "promotion moves it into a
+period schema" is that staging sits somewhere else. It does not.
+
+**What his operational database does today**: a promoted schema, and a
+MIRROR staging schema alongside it, per slot. He flagged he is open to
+changing that to a single global staging schema.
+
+**Genuinely unsettled, his own question**: where a REJECTED table is
+stored. Three options he named - in the promoted schema but labelled;
+in a separate rejected schema that is global; or in a rejected schema
+mirroring the staging one.
+
+Nothing here is decided. See the open-question list in Thread B once
+this lands.
+
 ### QA runs on staging, and that is arguably the point
 
 QA runs BEFORE promotion, and its results are what the promotion
