@@ -1653,3 +1653,81 @@ belongs to is not the same axis as when it turned up.** Every "as at"
 question has to pick one. A supply that belongs to Q1 but landed in
 March, and a correction to Q1 that landed in April, both belong to Q1 -
 so a resolution rule keyed only on arrival time gets them wrong.
+
+28. **[todo, 2026-09-23]** **[Dashboard UI]** Delete the illustrative mock data from the dashboard, once sprint 1 is built.
+
+Keith's own call, 2026-09-23, mid-sprint: *"I think it might be
+worthwhile if we just get rid of all the illustrative data from the
+dashboard. I think that's probably going to cause us more pain than we
+need."* Flagged rather than done - the timing is explicit, **after**
+sprint 1's build step, not now.
+
+**What "illustrative" currently means, so the scope is not guessed
+later.** The dashboard renders a tree of five agencies, of which two
+are real and three are entirely invented (`health-human-services`,
+`transportation`, plus the education/revenue collections beneath them),
+and the real `civil-registration` collection carries two invented
+siblings alongside Birth Registrations (`death-registrations`,
+`marriage-registrations`). All of it comes from `genDataset()` in
+`dashboard/qa-reporting-dashboard.template.html`, with its own
+`POOLS.*` generators. None of it is tagged "Real pipeline data", so the
+page is already honest about which is which - the cost is not
+dishonesty, it is that every structural change has to be made to work
+against two kinds of dataset at once.
+
+**Three real entanglements to expect**, all found while building
+REQ-QAC-039 and REQ-PIPE-048 and worth knowing before starting:
+- The template's HIERARCHY fallback exists *because* the raw,
+  unembedded template has to render with illustrative data
+  (REQ-QAC-039's own decision, Keith, 2026-09-23). Remove the
+  illustrative tree and that fallback's whole justification goes with
+  it - the real agencies could then come from HIERARCHY alone, which
+  was the option explicitly NOT taken at the time. Revisit that
+  decision rather than leaving a fallback nothing needs.
+- `tests-js/navigation.test.js` and several others drive the RAW
+  template, and assert against `registry-services` /
+  `civil-registration` / illustrative datasets. `tests/
+  test_dashboard_e2e.py` has its own raw-template-with-mock-data render
+  check, absorbed from `dashboard/check_dashboard_renders.py`.
+- `defaultAsOf()`/`clipDatasetToAsOf()` special-case illustrative
+  datasets ("Illustrative datasets are never clipped to the as-of
+  date"), so removing them simplifies that path rather than only
+  shrinking the file.
+
+**Do NOT treat this as "delete the mock and ship a two-dataset
+dashboard."** It pairs with item 29 below, which is the other half of
+Keith's same sentence - the point is to replace invented breadth with
+real breadth, not to lose the breadth.
+
+29. **[todo, 2026-09-23]** **[Data generation]** Build a few small, genuinely-real datasets across several agencies, once all the sprints are done.
+
+The other half of the same 2026-09-23 conversation, and the reason item
+28 is safe to do. Keith's own words: *"when we finish all these
+sprints, we'll just build a few small data sets across multiple
+agencies that have a sort of a few columns in a different shape, so we
+get back to the point of having a semi-realistic set of agencies and
+data sets."*
+
+Three things his phrasing actually specifies, worth keeping because
+they are easy to lose:
+- **SMALL.** Not another Child Protection. A few columns each.
+- **A DIFFERENT SHAPE.** The point is variety in the column shapes, not
+  more rows of the same thing - which is what would actually exercise
+  the generalisation this PoC claims.
+- **MULTIPLE AGENCIES.** Breadth across the tree, not depth in one
+  collection - so the agency and collection tiers have something real
+  to roll up.
+
+**Timing is explicitly the end of the sprint sequence**, not
+opportunistically along the way. Worth honouring: `plans/supply-model.md`'s
+own sprints are all specified against today's two datasets, and adding
+datasets mid-sequence would change what each sprint has to satisfy
+while it is being built.
+
+**This is the item that pays down `plans/running-thoughts.md` #23 and
+`plans/publishing-and-history.md` item 6**, which both say the same
+thing from the other direction: adding datasets is the trigger for
+resolving the file-per-dataset shape, because "add a dataset" currently
+means "copy-paste a file." Doing 29 without having resolved that is how
+the copy-paste cost gets multiplied rather than paid. Scope them
+together.
