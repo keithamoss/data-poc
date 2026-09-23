@@ -66,30 +66,49 @@ the whole spine: check identity, the generator and delivery format,
 status parity, the timezone parameter, schedule config and its gate,
 and periods/slots with runway.
 
-**The next thing needed is Keith's, not a session's.** Batch 3's
-requirements are already DRAFTED and are the blocker for everything
-after them, but none is signed off, and this project's own gate is that
-building does not start until they are. Six of them:
+**Batch 3 is SIGNED OFF, 2026-09-23** - all six requirements walked
+through with Keith one at a time and signed: `REQ-PIPE-034` (per-dataset
+arrival history), `REQ-PIPE-035` (one period's schema, staged delivery
+overlaid), `REQ-PIPE-036` (a delivery triggers one QA run), `REQ-QAC-037`
+(cross-table checks in their own scope), `REQ-PIPE-038` (committed
+history keyed per dataset, delivery log beside it), `REQ-DASH-041`
+(supply history and as-of viewing under per-dataset arrivals). Building
+can start.
 
-| | Needs signing |
-|---|---|
-| `REQ-PIPE-034` | Each dataset has its own arrival history |
-| `REQ-PIPE-035` | QA runs against one period's schema, staged delivery overlaid |
-| `REQ-PIPE-036` | A delivery triggers one QA run; each dataset stands alone |
-| `REQ-QAC-037` | A cross-table check belongs to the cross-table scope |
-| `REQ-PIPE-038` | `qa_results/` keyed per dataset, today's history regenerated |
-| `REQ-DASH-041` | Supply history and as-of viewing under per-dataset arrivals |
+**The walkthrough changed them substantially - read the requirements,
+not this summary.** Three of the six turned out to carry a SUPERSEDED
+MODEL, all drafted 2026-09-21 before staging, promotion and the period
+schemas were settled: `034`'s "current version" (split into most
+recently ARRIVED and most recently PROMOTED), `037`'s "composed
+warehouse" (the cross-period composition Thread J had killed), and
+`041`'s unqualified "arrival" (now explicitly the arrival, never the
+promoted supply). That is a pattern rather than three coincidences, and
+it is the reason to re-read a batch against the current model before
+building rather than trusting it was current when drafted.
 
-`REQ-QAC-037` carries one open question (where the cross-table scope
-physically lives in `qa_results/`), deliberately left for
-`delivery-architect` - a storage-shape question with the substance
-already settled, so it does not block sign-off.
+Substantive additions the walkthrough produced, each recorded on its own
+requirement: staged data lives IN the warehouse in one global staging
+schema with a separate global rejected schema (both departing
+deliberately from Keith's operational system); the overlay is an
+ephemeral per-run view schema, needed for logical-to-physical name
+resolution rather than for cross-schema reads - dbt and Soda were
+verified by real experiment to read across schemas perfectly well; a
+mixed-period delivery fans out into one QA run per period and never
+auto-promotes; a late table re-evaluates its own checks plus those that
+depend on it, within the same period only; cross-table checks record the
+physical table names they read; and the delivery log is one immutable
+file per delivery, queried in place by DuckDB with no second copy.
 
-**What that unblocks, in order**: `REQ-GEN-044`/`045` (the `[INJECT]`
-scenarios into committed history, signed off but BLOCKED - most of the
-set needs the staging overlay `REQ-PIPE-035`/`036` provide, per Keith's
-own capability-not-history hold, 2026-09-23), then `REQ-DASH-046` and
-`REQ-DASH-054`, which also want `REQ-DASH-041`.
+**One new requirement fell out**: `REQ-DASH-056`, showing what arrived
+alongside what is actually promoted - Keith's own ask once `041` settled
+that the as-of view shows the arrival. Unsigned, and deliberately scoped
+as information rather than a status. Its one open question - tile,
+detail panel, or both - is for the dashboard UX agents; Keith's own
+words, he has ideas but wants their thoughts first.
+
+**Placement stays with the architect**: where the delivery log and the
+cross-table scope physically live. Agreed as non-blocking, but not to
+stay parked.
 
 **Batches 4, 5 and 6 are not scoped yet** - sprints 11-24 have no
 requirements beyond the handful of dashboard ones already drafted. Batch
