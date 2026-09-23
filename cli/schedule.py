@@ -67,19 +67,34 @@ def _show_dataset(dataset: str, until: str | None, hierarchy, schedule) -> None:
     console.print(f"  calendar: {cal.name}")
     console.print(f"  delivery months: "
                    f"{', '.join(schedule.MONTH_NAMES[m - 1] for m in months) if months else 'all'}")
-    console.print(f"  claim window: {schedule.claim_window(dataset)}")
+    console.print(f"  claim window: {schedule.claim_window(dataset)} before each deadline "
+                   f"[dim](opens early, never closes)[/dim]")
 
-    periods = schedule.periods_for_dataset(
-        dataset, until=date.fromisoformat(until) if until else None)
-    table = Table("Period", "Date", "Expected", box=None, pad_edge=False)
+    stop = date.fromisoformat(until) if until else None
+    periods = schedule.periods_for_dataset(dataset, until=stop)
+
+    # THE SLOT IS WHAT THIS DATASET ACTUALLY OWES (REQ-PIPE-052), and
+    # showing periods without it would leave the one per-dataset fact
+    # somebody editing a calendar most needs - the deadline - off the
+    # page. Keyed by period name, because a not-expected period has no
+    # slot at all and that difference is the point.
+    from qa_tools.common import slots as slots_mod
+    by_period = {s.name: s for s in slots_mod.slots_for_dataset(dataset, until=stop)}
+
+    table = Table("Period", "Date", "Expected", "Due", "Claimable from",
+                   box=None, pad_edge=False)
     for p in periods:
         # A not-expected period is SHOWN, with its reason - never
         # dropped. "We agreed there would be no November file" and "we
         # forgot to configure November" must not look the same.
         expected = "yes" if p.expected else f"no - {p.not_expected_reason}"
-        table.add_row(p.name, p.date.isoformat(), expected)
+        slot = by_period.get(p.name)
+        table.add_row(p.name, p.date.isoformat(), expected,
+                       slot.due_at.strftime("%Y-%m-%d %H:%M %z") if slot else "-",
+                       slot.claim_opens_at.strftime("%Y-%m-%d %H:%M %z") if slot else "-")
     console.print(table)
-    console.print(f"  [dim]{len(periods)} period(s)[/dim]")
+    console.print(f"  [dim]{len(periods)} period(s), {len(by_period)} slot(s) - "
+                   f"a period nobody owes a supply for has no slot[/dim]")
 
 
 @schedule_group.command("candidate-dates")

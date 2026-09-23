@@ -521,11 +521,17 @@ comparisons against the expected-supply sequence.
    gate: it is measured in slots, and slots do not exist until sprint
    6, so it belongs to `REQ-PIPE-053`.
 
-6. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Periods and
-   slots.** The period sequence derived from the schedule, slots
-   derived as periods crossed with each dataset's participation, the
-   low-runway warning measured in slots, and the hard failure on an
-   exhausted schedule (Thread C).
+6. **[in-progress, 2026-09-23]** **[Pipeline & publishing]** **Periods and
+   slots.** The two DERIVATIONS are BUILT, 2026-09-23. `REQ-PIPE-051`
+   derives the period sequence version by version - which turned out to
+   fix a real latent bug, not just add a function: authoring a second
+   calendar version would have DELETED every earlier period rather than
+   leaving it alone. `REQ-PIPE-052` derives slots as periods crossed
+   with each dataset's own participation, each carrying its own due
+   instant, grace allowance and claim window. Both own their decisions.
+
+   What is LEFT is `REQ-PIPE-053`: the low-runway warning measured in
+   slots, and the hard failure on an exhausted schedule (Thread C).
 
    The spine. Nothing downstream can be built before it.
 

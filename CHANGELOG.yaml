@@ -184,6 +184,21 @@ releases:
               stops the build and tells you what to change. It used to
               leave that dataset quietly expecting nothing, which looks
               exactly like a dataset with nothing wrong.
+          - headline: Each table has its own deadline
+            components: ["Pipeline & publishing"]
+            description: >
+              A collection's tables each get their own expected supply,
+              with their own due time and their own allowance for being
+              late. One table arriving late now shows as one late
+              table, instead of dragging its punctual siblings down
+              with it.
+          - headline: See when a supply is due
+            components: ["Testing & dev tooling"]
+            description: >
+              `mothman schedule show --dataset <name>` now lists, for
+              every period, when that dataset's supply is due and the
+              moment it can first be filed against - so you can check a
+              calendar edit did what you meant before committing it.
           - headline: Last year's dates stay put
             components: ["Pipeline & publishing"]
             description: >

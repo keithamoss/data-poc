@@ -419,6 +419,89 @@ def dataset_dates_override(dataset_id: str) -> tuple[Period, ...] | None:
     return tuple(out)
 
 
+def _effect_windows(cal: Calendar) -> list[tuple[CalendarVersion, date, date | None]]:
+    """(version, from, until-exclusive) for each version, in order.
+
+    The last version's window has no end, which is what `None` means -
+    a calendar in force now stays in force.
+    """
+    starts = [v.effective_from for v in cal.versions]
+    return [(v, starts[i], starts[i + 1] if i + 1 < len(starts) else None)
+            for i, v in enumerate(cal.versions)]
+
+
+def periods_for_calendar(calendar_name: str, until: date | None = None) -> list[Period]:
+    """One calendar's full period sequence, in date order (REQ-PIPE-051).
+
+    DERIVED VERSION BY VERSION, and that is the whole point rather than
+    an implementation detail. Each version contributes only the periods
+    whose own date falls inside its own period of effect, so a version
+    authored today cannot reach back and change - or delete - a period
+    that a past supply was already filed against.
+
+    This replaced reading `calendar.current` for the entire sequence,
+    which was a real bug rather than a simplification. Adding a version
+    effective 2027 did not merely move the earlier periods; it replaced
+    them, so four years of history CEASED TO EXIST and every supply
+    filed against 2023-Q1 had no period at all. Latent only because no
+    second version has ever been authored - see
+    tests/test_schedule.py's own account.
+
+    A cadence-rule version generates one period per day across its own
+    window, named by its date, so a calendar can legitimately change
+    from a rule to authored dates or back.
+    """
+    cal = calendar(calendar_name)
+    out: list[Period] = []
+    for version, start, end in _effect_windows(cal):
+        stop = end - timedelta(days=1) if end is not None else until
+        if version.is_cadence_rule:
+            if stop is None:
+                raise ScheduleConfigError(
+                    f"calendar {calendar_name!r} is a cadence rule with no end - pass `until` "
+                    f"to say where to stop.")
+            out.extend(Period(name=(start + timedelta(days=i)).isoformat(),
+                               date=start + timedelta(days=i))
+                        for i in range((stop - start).days + 1))
+            continue
+        for period in version.periods:
+            if period.date < start:
+                continue
+            if end is not None and period.date >= end:
+                continue
+            out.append(period)
+    out.sort(key=lambda p: p.date)
+    if until is not None:
+        out = [p for p in out if p.date <= until]
+    return out
+
+
+def schema_name(period: Period) -> str:
+    """The warehouse schema this period's supplies are stored in
+    (REQ-PIPE-051 criterion 6).
+
+    ONE PERIOD, ONE SCHEMA - the physical storage model's own shape
+    (plans/supply-model.md Thread A). Which makes this function's
+    output a PHYSICAL NAME rather than a label: changing how a period
+    is named renames real schemas, so the NFR attached to this
+    criterion says to name it once and not revisit it, and this
+    docstring is where that warning has to live.
+
+    Lower-cased, non-alphanumerics folded to underscores, and prefixed
+    - `2026-Q1` becomes `period_2026_q1`, `2026-09-01` becomes
+    `period_2026_09_01`. The prefix is not decoration: an authored
+    period name is whatever the agency calls it, and a bare `2026_q1`
+    is not a legal unquoted identifier in every engine this might ever
+    touch, while a leading letter always is.
+    """
+    folded = re.sub(r"[^a-z0-9]+", "_", period.name.strip().lower()).strip("_")
+    if not folded:
+        raise ScheduleConfigError(
+            f"period {period.name!r} has no characters that can name a schema. A period "
+            f"name has to survive becoming a physical identifier.")
+    return f"period_{folded}"
+
+
 def periods_for_dataset(dataset_id: str, until: date | None = None) -> list[DatasetPeriod]:
     """Every period this dataset's schedule produces, in date order.
 
@@ -445,33 +528,46 @@ def periods_for_dataset(dataset_id: str, until: date | None = None) -> list[Data
     if override is not None:
         return _decorate([p for p in override if until is None or p.date <= until])
 
-    if version.is_cadence_rule:
-        if months is not None:
-            raise ScheduleConfigError(
-                f"dataset {dataset_id!r} names calendar {cal.name!r}, which is a cadence rule, "
-                f"AND names delivery_months. Months only mean something against authored dates; "
-                f"a dataset on a cadence rule participates in every period the rule generates. "
-                f"Rejected rather than ignored, because a key that is accepted and discarded is "
-                f"how a dataset ends up expecting something other than what its author wrote.")
-        if until is None:
-            raise ScheduleConfigError(
-                f"dataset {dataset_id!r} is on cadence calendar {cal.name!r}, which generates "
-                f"periods without end - pass `until` to say where to stop.")
-        first = version.effective_from
-        return _decorate([Period(name=(first + timedelta(days=i)).isoformat(),
-                                  date=first + timedelta(days=i))
-                           for i in range((until - first).days + 1)])
+    if version.is_cadence_rule and months is not None:
+        raise ScheduleConfigError(
+            f"dataset {dataset_id!r} names calendar {cal.name!r}, which is a cadence rule, "
+            f"AND names delivery_months. Months only mean something against authored dates; "
+            f"a dataset on a cadence rule participates in every period the rule generates. "
+            f"Rejected rather than ignored, because a key that is accepted and discarded is "
+            f"how a dataset ends up expecting something other than what its author wrote.")
+    if version.is_cadence_rule and until is None:
+        raise ScheduleConfigError(
+            f"dataset {dataset_id!r} is on cadence calendar {cal.name!r}, which generates "
+            f"periods without end - pass `until` to say where to stop.")
 
-    periods = list(version.periods)
-    if until is not None:
-        periods = [p for p in periods if p.date <= until]
+    # The CALENDAR's full sequence, version by version (REQ-PIPE-051),
+    # then this dataset's own participation applied to it. Derived here
+    # rather than re-read from `version` so that a dataset sees every
+    # period its calendar ever had, not only the newest version's.
+    periods = periods_for_calendar(cal.name, until=until)
     if months is not None:
         periods = [p for p in periods if p.date.month in months]
     return _decorate(periods)
 
 
 def claim_window(dataset_id: str, contract_value: str | None = None) -> timedelta:
-    """How long after a period's date a supply may still claim it.
+    """How long BEFORE a slot's due instant its claim window opens.
+
+    BEFORE, and the first line of this docstring used to say "after",
+    which was wrong in the one way that matters (found building
+    REQ-PIPE-052). A window measured forwards from the period's date
+    describes something that CLOSES - a deadline for claiming - and the
+    settled rule is the opposite: the window opens a configured
+    interval BEFORE the due instant and NEVER closes, because late is
+    always allowed (plans/supply-model.md Thread E).
+
+    The difference is not pedantry. What the window prevents is
+    claiming FORWARD into a slot that is not yet claimable, which is
+    what makes the forward cascade structurally impossible. Read as a
+    closing deadline it would instead make a late supply unfileable -
+    the exact opposite behaviour, from the same number.
+
+    qa_tools/common/slots.py is what applies it.
 
     The CALENDAR carries the default and a dataset may override it in
     its own contract - say nothing, get the default. `contract_value` is

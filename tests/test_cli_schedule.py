@@ -85,3 +85,34 @@ class TestCandidateDates:
                                  ["candidate-dates", "--calendar", "nope", "--year", "2029"])
         assert result.exit_code != 0
         assert "quarterly" in str(result.exception) + result.output
+
+
+def test_show_dataset_puts_the_deadline_on_the_page():
+    """REQ-PIPE-052. Periods without slots would leave the one
+    per-dataset fact somebody editing a calendar most needs - when the
+    supply is actually due - off the page entirely."""
+    from click.testing import CliRunner
+
+    from cli.schedule import schedule_group
+
+    result = CliRunner().invoke(schedule_group, ["show", "--dataset", "cp-clients"])
+    assert result.exit_code == 0, result.output
+    assert "Due" in result.output
+    assert "Claimable from" in result.output
+    assert "09:00" in result.output, "the dataset's own expected time of day"
+    assert "slot(s)" in result.output
+
+
+def test_show_dataset_says_the_window_opens_early_and_never_closes():
+    """The claim window reads as a deadline unless the page says
+    otherwise - and read that way it would mean the opposite of what it
+    does (Thread E)."""
+    from click.testing import CliRunner
+
+    from cli.schedule import schedule_group
+
+    result = CliRunner().invoke(schedule_group, ["show", "--dataset", "cp-clients"])
+    assert result.exit_code == 0, result.output
+    flat = " ".join(result.output.split())
+    assert "before each deadline" in flat
+    assert "never closes" in flat

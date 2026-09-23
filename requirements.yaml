@@ -5592,7 +5592,7 @@ requirements:
       changing their cadence does not turn periods they met into periods
       they breached.
     moscow: must
-    status: not_started
+    status: built
     source: >
       Keith, 2026-09-21, plans/supply-model.md Thread C, with period and
       slot separately defined 2026-09-22 after Keith noticed the concept
@@ -5665,6 +5665,73 @@ requirements:
         collide names - 2026-09-22 from a daily calendar and 2026-Q3 from
         a quarterly one are different buckets that must not share a
         schema."
+      - "[BUILD] Criterion 9 turned out to name a REAL BUG, not a
+        property to preserve. Period derivation read
+        `calendar.current` - the newest version - for the entire
+        sequence, so authoring a version effective 2027 did not merely
+        move the earlier periods, it REPLACED them: four years of
+        history ceased to exist and every supply filed against 2023-Q1
+        had no period at all. Reproduced before fixing. Latent only
+        because no second version has ever been authored, which is
+        exactly why it needed a test rather than a note - the day
+        somebody authors one is the day the history disappears."
+      - "[BUILD] Decided a version contributes only the periods whose
+        own date falls inside its own period of effect, so a later
+        version re-stating an earlier period cannot reach back and move
+        it. That is effective dating actually doing its job rather than
+        being recorded and then ignored at the one place it mattered."
+      - "[BUILD] Decided a schema name is `period_` plus the period
+        name folded to lower-case with non-alphanumerics as
+        underscores - `2026-Q1` becomes `period_2026_q1`. The prefix is
+        not decoration: an authored period name is whatever the agency
+        calls it, and a bare `2026_q1` is not a legal unquoted
+        identifier everywhere, while a leading letter always is. Named
+        once and not to be revisited, per this requirement's own NFR -
+        changing it renames real schemas."
+      - "[BUILD] Decided criterion 5 is asserted on the real
+        dataclasses rather than left to reading. A due instant, a grace
+        allowance and a claim window are all per-DATASET, and a period
+        is shared by every dataset on its calendar - attaching any of
+        the three here would flatten six datasets' different deadlines
+        into one, which is precisely the failure REQ-PIPE-052's story
+        describes."
+    linked_tests:
+      - tests/test_schedule.py
+      - tests/test_slots.py
+    implemented_by:
+      - qa_tools/common/schedule.py::periods_for_calendar
+      - qa_tools/common/schedule.py::periods_for_dataset
+      - qa_tools/common/schedule.py::schema_name
+      - qa_tools/common/schedule.py::_effect_windows
+      - qa_tools/common/schedule.py::Period
+    evidence:
+      - >
+        2026-09-23: the version bug was reproduced before being fixed -
+        adding a 2027-only version to the real quarterly calendar left
+        cp-clients with FOUR periods where it had twenty, all of them
+        2027. Five tests now cover it, all confirmed failing against
+        the old derivation first.
+      - >
+        2026-09-23: the real committed configuration derives exactly
+        what it did before - 20 quarterly periods per Child Protection
+        dataset, 10 for cp-case-workers on its Feb/August
+        participation, 1361 daily periods for Birth Registrations up to
+        the anchor. The fix changes what happens when a SECOND version
+        exists, and nothing else.
+      - >
+        2026-09-23: a period carries a name and a date and nothing
+        else, and a DatasetPeriod adds only whether a supply is
+        expected - asserted against the real dataclasses, so attaching
+        timing to either fails here rather than surfacing later as six
+        datasets sharing one deadline.
+      - >
+        2026-09-23: every schema name derived from the real
+        configuration is a legal bare identifier, and no two periods
+        share one - checked across both a quarterly and a daily
+        calendar rather than on the two hand-written examples.
+      - >
+        2026-09-23: 1154 Python tests, 166 JS tests, all nine mothman
+        gates.
 
   - id: REQ-PIPE-052
     title: Slots are derived, one per table per period it participates in
@@ -5675,7 +5742,7 @@ requirements:
       that one late table shows as one late table rather than dragging
       five punctual ones down with it.
     moscow: must
-    status: not_started
+    status: built
     source: >
       Keith, 2026-09-21, plans/supply-model.md Threads C, E and F - each
       table claims a slot independently, and a slot carries its own
@@ -5773,6 +5840,88 @@ requirements:
         slot must always have a window - assignment is defined against it
         - so the resolution happens here, at derivation, rather than
         being left to each consumer to fall back on."
+      - "[BUILD] Found that qa_tools/common/schedule.py's own
+        claim_window() docstring described the OPPOSITE of the settled
+        rule - \"how long AFTER a period's date a supply may still
+        claim it\". A window measured forwards is one that CLOSES; the
+        rule (Thread E) is that it opens a configured interval BEFORE
+        the due instant and never closes. Read the wrong way it would
+        make a late supply unfileable, from the same number. Corrected
+        where it was, rather than only getting it right here."
+      - "[BUILD] Decided Slot has no `closes_at` field at all, and that
+        the absence is asserted in a test. The tempting fix for a
+        boundary misfile is to close the window; closing it is what
+        would break late filing, and this requirement's own NFR says
+        the sizing is a genuine trade nobody should later 'fix'."
+      - "[BUILD] Decided `late_after` is a derived property rather than
+        a stored field, so a slot's due instant and its grace can never
+        disagree with the instant it computes."
+      - "[BUILD] Decided next_unfilled_claimable() implements only the
+        half of Thread E's assignment rule that config can answer, and
+        returns None rather than deciding the resupply case. Deciding
+        it needs promotion state, which needs data - that is
+        REQ-PIPE-034's, and guessing it here would put a filing
+        decision in a module that cannot see what it is filing."
+      - "[BUILD] Accepted an untidy layering rather than a second
+        parser: qa_tools/common/slots.py imports pipeline.cadence to
+        read a dataset's own slaProperties, because that array is
+        parsed in exactly one place and reading it again here would be
+        two parsers for one file. Named in the module docstring rather
+        than left as an oddity; the tidier fix is a refactor this
+        requirement does not need."
+    linked_tests:
+      - tests/test_slots.py
+      - tests/test_schedule.py
+      - tests/test_cli_schedule.py
+    implemented_by:
+      - qa_tools/common/slots.py::Slot
+      - qa_tools/common/slots.py::slots_for_dataset
+      - qa_tools/common/slots.py::is_claimable
+      - qa_tools/common/slots.py::is_overdue
+      - qa_tools/common/slots.py::next_unfilled_claimable
+      - cli/schedule.py::_show_dataset
+    evidence:
+      - >
+        2026-09-23: six Child Protection datasets in 2026-Q1 produce
+        six slots, one each - the requirement's own story asserted
+        directly, so one late table can show as one late table.
+      - >
+        2026-09-23: each slot carries its own timing from its own
+        contract, and the two datasets in this repo genuinely differ -
+        Birth Registrations due 14:00 with an hour's grace and a
+        four-hour claim window, Child Protection due 09:00 with eight
+        hours' grace and a fourteen-day one. Same code, different
+        answers, which is what the per-element read buys.
+      - >
+        2026-09-23: the claim window opens early and never closes,
+        asserted both ways - a supply arriving ten years late can still
+        claim its slot, and one arriving a second before the window
+        opens cannot claim anything at all. The second half is what
+        makes the forward cascade structurally impossible rather than
+        unlikely.
+      - >
+        2026-09-23: overdue-ness is a question, not a record. The same
+        slot answers differently as `now` moves and nothing is written
+        anywhere - which is what lets a dashboard built from
+        configuration alone say a slot is overdue even though the run
+        that would have reported it never happened.
+      - >
+        2026-09-23: a period a dataset declares not-expected produces
+        NO slot, while the period itself is still returned and flagged
+        with its reason. Both halves asserted together, because that is
+        the difference between "agreed, no November file" and a silent
+        gap.
+      - >
+        2026-09-23: deriving slots opens nothing under data/, asserted
+        by watching every Path.open during a real derivation.
+      - >
+        2026-09-23: `mothman schedule show --dataset X` now shows each
+        period's due instant and the instant it becomes claimable, so
+        the one per-dataset fact somebody editing a calendar most needs
+        is on the page rather than only in the model.
+      - >
+        2026-09-23: 1154 Python tests, 166 JS tests, all nine mothman
+        gates.
 
   - id: REQ-PIPE-053
     title: A schedule that runs out is loud, and only for its own dataset

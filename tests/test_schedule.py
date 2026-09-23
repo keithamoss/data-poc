@@ -240,6 +240,117 @@ class TestVersioningAndEffectiveDates:
         assert cal.version_in_force(date(2024, 1, 1)).changelog == ("earlier",)
 
 
+class TestPeriodsAreDerivedVersionByVersion:
+    """REQ-PIPE-051 criteria 4 and 9, and a real bug they name.
+
+    Before this, period derivation read `calendar.current` - the NEWEST
+    version - for the whole sequence. Adding a version effective 2027
+    therefore replaced every period, so the four years of history before
+    it did not merely move, they CEASED TO EXIST. Every supply ever
+    filed against 2023-Q1 would have had no period at all.
+
+    Latent, because the real config has one version per calendar and a
+    second one has never been authored. That is exactly why it is worth
+    a test rather than a note: the day somebody authors one is the day
+    four years of history disappears, and nothing else would have said
+    so.
+    """
+
+    def _two_versions(self):
+        return {"data_asset_id": "data-asset-1",
+                "calendars": [{"name": "c", "versions": [
+                    {"effective_from": "2023-01-01", "changelog": ["initial"],
+                     "claim_window": "14d",
+                     "dates": [{"period": "2023-Q1", "date": "2023-02-01"},
+                                {"period": "2024-Q1", "date": "2024-02-01"}]},
+                    {"effective_from": "2027-01-01", "changelog": ["moved to the 15th"],
+                     "claim_window": "14d",
+                     "dates": [{"period": "2027-Q1", "date": "2027-02-15"},
+                                {"period": "2028-Q1", "date": "2028-02-15"}]},
+                ]}],
+                "hierarchy": {"agencies": [{"id": "a", "name": "A", "collections": [
+                    {"id": "col", "name": "Col", "contract": "c.yaml", "datasets": [
+                        {"id": "d", "name": "D", "table": "t", "calendar": "c"}]}]}]}}
+
+    def test_a_new_version_leaves_every_earlier_period_untouched(self, tmp_path, monkeypatch):
+        _repoint(tmp_path, monkeypatch, self._two_versions())
+        periods = schedule.periods_for_calendar("c")
+        assert [(p.name, p.date) for p in periods] == [
+            ("2023-Q1", date(2023, 2, 1)),
+            ("2024-Q1", date(2024, 2, 1)),
+            ("2027-Q1", date(2027, 2, 15)),
+            ("2028-Q1", date(2028, 2, 15)),
+        ], "the earlier version's periods must survive a later version being authored"
+
+    def test_a_dataset_sees_the_same_full_sequence(self, tmp_path, monkeypatch):
+        _repoint(tmp_path, monkeypatch, self._two_versions())
+        assert [p.name for p in schedule.periods_for_dataset("d")] == [
+            "2023-Q1", "2024-Q1", "2027-Q1", "2028-Q1"]
+
+    def test_each_period_comes_from_the_version_in_force_on_its_own_date(self, tmp_path, monkeypatch):
+        """Criterion 9. A version contributes only the periods that fall
+        inside its own period of effect - so a later version re-stating
+        an earlier date cannot reach back and move it."""
+        doc = self._two_versions()
+        # The later version also re-states 2024-Q1, on a different date.
+        doc["calendars"][0]["versions"][1]["dates"].insert(
+            0, {"period": "2024-Q1", "date": "2024-02-20"})
+        _repoint(tmp_path, monkeypatch, doc)
+        by_name = {p.name: p.date for p in schedule.periods_for_calendar("c")}
+        assert by_name["2024-Q1"] == date(2024, 2, 1), \
+            "2024 belongs to the version in force in 2024, not to one effective from 2027"
+
+    def test_derivation_is_deterministic(self, tmp_path, monkeypatch):
+        _repoint(tmp_path, monkeypatch, self._two_versions())
+        first = [(p.name, p.date) for p in schedule.periods_for_calendar("c")]
+        assert first == [(p.name, p.date) for p in schedule.periods_for_calendar("c")]
+
+    def test_periods_are_in_date_order_across_versions(self, tmp_path, monkeypatch):
+        _repoint(tmp_path, monkeypatch, self._two_versions())
+        dates = [p.date for p in schedule.periods_for_calendar("c")]
+        assert dates == sorted(dates)
+
+
+class TestAPeriodIsANameAndADateAndNothingElse:
+    """Criterion 5. A due instant, a grace allowance and a claim window
+    all belong to a SLOT, because all three are per-DATASET and a period
+    is shared by every dataset on its calendar. Asserted on the real
+    dataclass rather than left to reading: attaching one here would
+    flatten six datasets' different deadlines into one."""
+
+    def test_a_period_carries_no_timing(self):
+        period = schedule.periods_for_calendar("quarterly")[0]
+        assert set(vars(period)) == {"name", "date"}
+
+    def test_a_dataset_period_adds_only_whether_a_supply_is_expected(self):
+        dataset_period = schedule.periods_for_dataset("cp-clients")[0]
+        assert set(vars(dataset_period)) == {"period", "expected", "not_expected_reason"}
+
+
+class TestAPeriodNamesAWarehouseSchema:
+    """Criterion 6, and the NFR's own warning attached to it: this is
+    the concept a schema is named after, so how a period is named is a
+    change to physical storage. Name it once and do not revisit."""
+
+    def test_an_authored_period_name_becomes_a_schema_name(self):
+        assert schedule.schema_name(schedule.Period("2026-Q1", date(2026, 2, 1))) == "period_2026_q1"
+
+    def test_a_cadence_rule_period_names_a_schema_from_its_date(self):
+        assert schedule.schema_name(
+            schedule.Period("2026-09-01", date(2026, 9, 1))) == "period_2026_09_01"
+
+    def test_a_schema_name_is_a_legal_bare_identifier(self):
+        import re
+        for dataset_id, until in (("cp-clients", None), ("birth-registrations", date(2026, 9, 5))):
+            for dataset_period in schedule.periods_for_dataset(dataset_id, until=until):
+                name = schedule.schema_name(dataset_period.period)
+                assert re.fullmatch(r"[a-z][a-z0-9_]*", name), name
+
+    def test_two_different_periods_never_share_a_schema_name(self):
+        names = [schedule.schema_name(p) for p in schedule.periods_for_calendar("quarterly")]
+        assert len(names) == len(set(names))
+
+
 class TestMalformedCalendars:
     def test_a_period_authored_twice_is_an_error(self, tmp_path, monkeypatch):
         _repoint(tmp_path, monkeypatch, _calendar_doc(dates=[
