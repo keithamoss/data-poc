@@ -2523,8 +2523,9 @@ requirements:
       - THE SYSTEM SHALL evaluate a check once, against the state
         current at that moment, and SHALL NOT recompute it for a
         historical arrival.
-      - THE SYSTEM SHALL hold all period schemas in one database, and
-        SHALL NOT create a database per run.
+      - THE SYSTEM SHALL hold all period schemas, the staging schema and
+        the rejected schema in one database, and SHALL NOT create a
+        database per run.
     non_functional_requirements:
       - CI must never open or query a warehouse. This is real-run-time
         work only, the same rule dataset_stats.py follows - anything a
@@ -2589,6 +2590,32 @@ requirements:
         case that keeps it - without that carve-out every new dataset
         starts life red on all its drift checks, which is how people
         learn to ignore a signal.
+      - >
+        VERIFIED BY EXPERIMENT, 2026-09-23, because a session claimed the
+        opposite to Keith and he pushed back: dbt and Soda BOTH read
+        across schemas perfectly well, so criterion 8 is not asking for
+        anything exotic. A real soda.scan.Scan over a two-schema DuckDB
+        resolved bare table names via `SET search_path =
+        'staging,promoted'` AND ran a fully-qualified cross-schema join
+        in a `fail query`, correctly failing it; a real `dbt run` with
+        two sources on different schemas compiled to `from
+        "wh"."staging"."placements" left join "wh"."promoted"."carers"`.
+        The constraint this repo actually recorded is a DIFFERENT one -
+        dbt and Soda have no `run_id`-scoped WHERE to filter ROWS by,
+        which is why per-run databases existed - and the two were
+        conflated. Worth keeping because the mistaken version is
+        load-bearing if believed: it would rule out composing a staged
+        candidate with promoted tables at all.
+      - >
+        Note for whoever builds the overlay: the mechanism verified
+        alongside the above is an EPHEMERAL per-run view schema. A view
+        in a third schema composing staging and a period schema works, a
+        staged table SHADOWS a promoted one of the same name, and DROP
+        SCHEMA ... CASCADE leaves both real schemas untouched - the
+        views hold no data, so nothing is lost by discarding them after
+        the run. Keith's own constraint, 2026-09-23: it must not hang
+        around clogging up the database. Not yet a criterion; recorded
+        so the experiment does not have to be repeated.
       - NOT decided here - "current version versus good version", ie
         whether a downstream consumer reads a red table or the last
         green one. The original wording of this requirement answered it

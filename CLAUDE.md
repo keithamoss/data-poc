@@ -1015,6 +1015,21 @@ Rough layout:
   `<title>` rather than just the status code.
 
   **Still genuinely blocked** (re-confirmed 2026-09-19, all `403`):
+  - **`docs.getdbt.com`**, **`docs.soda.io`**, **`duckdb.org`** - the
+    three tools this pipeline actually runs on. Hit 2026-09-23 when
+    Keith asked for confirmation that dbt and Soda really cannot read
+    across schemas (they can - see below). All three a real `curl: (56)
+    CONNECT tunnel failed, response 403`. Worth allow-listing: these
+    are the primary documentation for the project's own core
+    dependencies, not background research, and this is the first time
+    a factual question about them could not be checked against their
+    own docs. Answered instead by REAL EXPERIMENT against the installed
+    packages, which is a better primary source than documentation
+    anyway and needed no network at all - a real `soda.scan.Scan` over
+    a two-schema DuckDB, and a real `dbt run` whose compiled SQL joined
+    `"wh"."staging"."placements"` to `"wh"."promoted"."carers"`. Prefer
+    that route first for any question about a tool that is installed
+    here; it outranks the docs.
   - **`www.anthropic.com`** - Anthropic's own published multi-agent
     design guidance ("Building Effective Agents", the multi-agent
     research system writeup), wanted for the `delivery-*` subagent work
