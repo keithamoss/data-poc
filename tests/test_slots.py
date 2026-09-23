@@ -27,13 +27,24 @@ class TestSlotsAreDerivedNotAuthored:
     def test_nothing_in_the_configuration_names_a_slot(self):
         """Criterion 1 - a slot falls out of participation. Asserted
         against the real committed config, because "derived" stops
-        being true the moment somebody adds a slots: key."""
+        being true the moment somebody authors one.
+
+        Checked against PARSED KEYS rather than the file's text. The
+        first version of this grepped for "slots:" and started failing
+        the moment REQ-PIPE-053 added `runway_warning_slots` - a
+        substring match on a config file matches things that have
+        nothing to do with what is being asserted.
+        """
         import yaml
         from pathlib import Path
 
-        raw = Path("contract/data-asset.yaml").read_text()
-        assert "slot" not in yaml.safe_load(raw).get("hierarchy", {}).__repr__().lower() or True
-        assert "slots:" not in raw, "a slot is derived from participation, never written down"
+        doc = yaml.safe_load(Path("contract/data-asset.yaml").read_text())
+        for agency in doc["hierarchy"]["agencies"]:
+            for collection in agency["collections"]:
+                assert "slots" not in collection
+                for dataset in collection["datasets"]:
+                    assert "slots" not in dataset, \
+                        f"{dataset['id']} authors slots - they are derived from participation"
 
     def test_every_participating_period_produces_exactly_one_slot(self):
         for dataset_id in CP_DATASETS:

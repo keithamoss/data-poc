@@ -159,6 +159,12 @@ class Calendar:
     name: str
     description: str
     versions: tuple[CalendarVersion, ...]   # newest effective_from last
+    # How few future slots left before the runway warning fires
+    # (REQ-PIPE-053). NOT versioned, unlike the dates and the claim
+    # window: those are the supplier agreement, and this is an
+    # operational threshold for when WE want telling. None takes
+    # qa_tools.common.runway's own default.
+    runway_warning_slots: int | None = None
 
     def version_in_force(self, on: date) -> CalendarVersion:
         """The version a supply due on `on` is judged against.
@@ -293,8 +299,15 @@ def _load() -> dict[str, Calendar]:
         if not versions:
             raise ScheduleConfigError(f"calendar {name!r} has no versions")
         versions.sort(key=lambda v: v.effective_from)
+        runway = raw.get("runway_warning_slots")
+        if runway is not None and (not isinstance(runway, int) or isinstance(runway, bool)
+                                    or runway < 1):
+            raise ScheduleConfigError(
+                f"calendar {name!r}: runway_warning_slots is {runway!r}. It counts SLOTS, so it "
+                f"has to be a whole number of at least 1 - a threshold of 0 is a warning that "
+                f"only ever fires once the schedule has already run out.")
         out[name] = Calendar(name=name, description=(raw.get("description") or "").strip(),
-                              versions=tuple(versions))
+                              versions=tuple(versions), runway_warning_slots=runway)
     return out
 
 

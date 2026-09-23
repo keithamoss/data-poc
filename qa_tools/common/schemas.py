@@ -317,6 +317,10 @@ class CalendarConfig(_Strict):
     name: NonEmptyStr
     description: NonEmptyStr
     versions: list[CalendarVersionConfig] = Field(min_length=1)
+    # REQ-PIPE-053. Unversioned on purpose - the dates and the claim
+    # window are the supplier agreement; this is an operational
+    # threshold for when we want telling that they are running out.
+    runway_warning_slots: int | None = Field(default=None, ge=1)
 
 
 class NotExpectedPeriod(_Strict):

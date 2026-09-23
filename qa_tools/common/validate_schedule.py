@@ -48,7 +48,7 @@ from pathlib import Path
 
 import yaml
 
-from qa_tools.common import schedule
+from qa_tools.common import asset_time, schedule
 from qa_tools.common.schemas import DataAsset
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -739,7 +739,36 @@ def main(src: Source | None = None) -> int:
     n_datasets = len(list(_walk_datasets(yaml.safe_load(src.asset_path.read_text()))))
     print(f"schedule validation OK - {n_calendars} calendar(s), {n_datasets} dataset(s), "
           f"every one of them expecting something.")
+
+    # LOW RUNWAY IS A WARNING AND RETURNS 0, permanently (REQ-PIPE-053).
+    # A non-fatal warning that fails a build gets disabled, and then it
+    # is not there for the one that mattered. Printed AFTER the OK line
+    # rather than instead of it, so it reads as an additional thing to
+    # know rather than as the gate's verdict.
+    if src.asset_path == DATA_ASSET_YAML:
+        _warn_about_runway()
     return 0
+
+
+def _warn_about_runway() -> None:
+    """The low-runway warning, on stderr, never fatal.
+
+    Only for the REAL configuration - a test pointing this gate at a
+    synthetic one is asking whether that config is VALID, and answering
+    with a warning about its runway would be noise about a calendar
+    nobody maintains.
+    """
+    from qa_tools.common import runway
+
+    lines = runway.warning_lines(asset_time.local_date(asset_time.now()))
+    if not lines:
+        return
+    print("", file=sys.stderr)
+    for line in lines:
+        print(f"  {line}", file=sys.stderr)
+    note = runway.summary(asset_time.local_date(asset_time.now()))
+    if note:
+        print(f"\n  {note} The gate itself PASSED.", file=sys.stderr)
 
 
 if __name__ == "__main__":

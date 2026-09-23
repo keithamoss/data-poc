@@ -91,6 +91,17 @@ timezone: Australia/Perth
 # stays per-dataset instead of being flattened into one per period.
 calendars:
   - name: quarterly
+    # HOW FEW FUTURE SLOTS LEFT BEFORE WE SAY SO (REQ-PIPE-053).
+    # Counted in SLOTS, never in months - three months of runway on a
+    # quarterly calendar is ONE slot, which is already too late to act
+    # on. Four is a year of quarterly supplies: long enough that
+    # "please send next year's dates" is a calm request.
+    #
+    # Deliberately NOT inside `versions:` - the dates and the claim
+    # window are the supplier agreement and are effective-dated; this
+    # is an operational threshold for when WE want telling that they
+    # are running out.
+    runway_warning_slots: 4
     description: >
       Four authored delivery dates a year, anchored on the 1st of
       February, May, August and November. Child Protection's real
