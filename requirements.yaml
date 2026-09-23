@@ -1014,6 +1014,9 @@ requirements:
         tables for that snapshot have actually landed and been QA'd
         individually.
     linked_tests: []
+    open_questions:
+      - "WHEN is a delivery receipt written? Not designed anywhere. This document's own design parses the real S3 ObjectCreated event shape but predates the supply model and says nothing about receipts, while REQ-PIPE-057 now makes a delivery count as received only where our own receipt exists, REQ-PIPE-061 processes in receipt order and REQ-PIPE-066 classifies against it. What IS settled is only who writes it - we do, never the supplier, enforced structurally by write_delivery() refusing a receipts directory inside the deliveries directory. The hard part is that this is the same question as the delivery boundary: in S3 a supplier PUTs objects and events fire per object, with no delivery-is-finished signal, so 'when do we write the receipt' is exactly 'when does our boundary rule say this delivery is complete' - which Thread B requires to be arranged per source. See plans/running-thoughts.md #38."
+      - "What does a production receipt CARRY? Today a delivery name and an instant, nothing about provenance - not the transport, the principal or credential that delivered it, the source bucket and key or SFTP account, or a checksum. Receipts are immutable and accumulate, so a field added later cannot be backfilled and every earlier arrival stays permanently thinner. See plans/running-thoughts.md #37."
 
   - id: REQ-GEN-019
     title: Realistic Child Protection resupply simulation
@@ -7081,7 +7084,8 @@ requirements:
       - "THE SYSTEM SHALL take what constitutes a delivery from per-source configuration, so that a source whose transport expresses a boundary differently can be described rather than assumed."
       - "IF a source's configuration does not state what constitutes a delivery for that source, THEN THE SYSTEM SHALL fail for that source naming the missing configuration, and SHALL NOT infer a grouping from filenames, timestamps or arrival proximity."
       - "THE SYSTEM SHALL treat a delivery as received only where our own receipt record for it exists."
-      - "IF a delivery is present with no receipt record, THEN THE SYSTEM SHALL leave it unprocessed, SHALL continue processing every other delivery, and SHALL report it once it has been present for longer than a configured interval."
+      - "IF a delivery is present with no receipt record, THEN THE SYSTEM SHALL leave it unprocessed, SHALL continue processing every other delivery, and SHALL report it on every run as an informational observation."
+      - "THE SYSTEM SHALL NOT require a configured interval, a file modification time, or any record of how long a delivery has been present, in order to decide whether to report a missing receipt."
       - "THE SYSTEM SHALL derive which collection a delivery is for from the datasets its own files were attributed to."
       - "THE SYSTEM SHALL NOT derive the receipt instant, the period, the dataset, the collection or the processing order from a delivery's name."
       - "WHERE a delivery contains a file attributed to no dataset, THE SYSTEM SHALL record it as an unrecognised artefact, SHALL report it as informational, and SHALL NOT fail the delivery, check it or promote it."
@@ -7128,8 +7132,53 @@ requirements:
         malformed drop stopping a run that contains 29 healthy datasets
         is exactly the shape REQ-PIPE-053 already exists to prevent,
         which is how a check gets disabled wholesale rather than fixed.
-    open_questions:
-      - "A delivery directory present with no receipt record: is it an in-flight upload or a gap to investigate? Today read_receipt() makes it a hard error by a deliberate decision, whose reasoning is that an arrival we have no record of receiving is exactly the thing worth seeing. Against that, a real transport produces this state routinely for seconds at a time, and one such directory currently fails recognition for every delivery. Options - (a) hard error as today; (b) skip as in-flight and report only if it persists beyond a configured interval, which is the criterion drafted above; (c) skip silently. Recommended (b): it keeps the gap visible without letting a normal in-flight upload take the run down."
+
+      - >
+        SETTLED 2026-09-24 (Keith): a delivery with no receipt is
+        skipped as in-flight and reported on EVERY run as an
+        informational observation - no configured interval, no
+        threshold, no state. Persistence becomes visible through
+        repetition: if it is still there tomorrow you have seen it five
+        times. Chosen over reporting only once it has persisted beyond
+        an interval, which was the drafted criterion.
+      - >
+        Two things decided it. First, the hard error this replaces
+        bundled two separate decisions - read_receipt()'s docstring
+        justifies NEVER INVENTING A TIMESTAMP, which is right and
+        stays, but that reasoning does not also justify taking the run
+        down; only the second half was in question. Reproduced: one
+        receipt-less directory makes list_deliveries() raise, so all 60
+        deliveries become unreadable.
+      - >
+        Second, and it is why in-flight is the normal case rather than
+        an edge: under a real transport a delivery has no receipt until
+        OUR OWN BOUNDARY RULE says it is complete. In S3 a supplier PUTs
+        objects and events fire per object; there is no
+        delivery-is-finished signal, which is the boundary problem
+        Thread B already flagged as needing an operational arrangement
+        per source. So "files present, no receipt" means "we have seen
+        files, the boundary has not closed" - the normal state of every
+        delivery until it does, not an anomaly.
+      - >
+        The interval-based option also cost more than it looked. To know
+        how long a delivery has persisted needs either a directory
+        modification time - the exact signal this module refuses to
+        trust for the receipt instant - or new persistent state counting
+        runs. Reporting every run needs neither. Noted for contrast:
+        Thread E's rejection of magic numbers does not automatically
+        apply here, because there the threshold decided a FILING
+        outcome and silently misfiled data, whereas this one would only
+        decide when to complain. It was rejected on cost, not on that
+        principle.
+      - >
+        Rejected writing the receipt BEFORE the files, which would make
+        its absence genuinely anomalous. It works only because the PoC
+        controls both sides. In a real deployment a supplier pushes over
+        SFTP or S3 and we merely observe, so there is no moment at which
+        a receipt could precede the files existing. Building on it would
+        be a design that is safe only because today's data is
+        synthetic, which is the shape Keith rejected for
+        deploy-pages.yml.
 
   - id: REQ-PIPE-058
     title: A file's dataset comes from that dataset's own declared pattern, and the patterns are gated

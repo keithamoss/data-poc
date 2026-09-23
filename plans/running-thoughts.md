@@ -1981,3 +1981,74 @@ synthetic case cannot tell us.
 
 Present it to him as the actual directory layout plus what recognition
 reads out of it, not as a requirement diff.
+
+37. **[todo, 2026-09-24]** **[Pipeline & publishing]** The delivery
+receipt is thin - it carries a name and an instant, and nothing about
+provenance.
+
+Keith's own ask to log it, 2026-09-24, arising from asking what a
+receipt actually IS in production. Today the whole of it is:
+
+```json
+{"delivery": "EXTRACT_20260824", "received_at": "2026-08-24T14:36:03+08:00"}
+```
+
+**Why the thinness matters more than it looks.** The receipt is now the
+one trustworthy arrival fact in the whole model - `REQ-PIPE-057` makes a
+delivery count as received only where our own receipt exists,
+`REQ-PIPE-061` processes in receipt order, and `REQ-PIPE-066` classifies
+early/on-time/late against it. Everything downstream leans on it, and it
+records almost nothing about where the supply came from.
+
+In production you would plausibly want: which TRANSPORT it arrived on,
+which PRINCIPAL or credential delivered it, the source bucket and key or
+SFTP account, and possibly a checksum. That is what makes "who sent us
+this, and how" answerable a year later - the question that gets asked
+when a supply turns out to be wrong and nobody remembers which of three
+feeds it came down.
+
+**The reason to decide it early rather than when it hurts**: receipts
+are immutable and accumulate, so a field added later cannot be
+backfilled. Every arrival before the change is permanently thinner than
+every arrival after it, and the gap never closes.
+
+Not needed for the PoC, where one generator writes everything. Logged
+because the cost of adding it later is paid by the records that already
+exist.
+
+38. **[todo, 2026-09-24]** **[Pipeline & publishing]** Design WHEN a
+delivery receipt gets written, as part of moving to AWS.
+
+Keith's own ask, 2026-09-24. Not designed anywhere today:
+`docs/aws-event-driven-mvp-design.md` parses the real S3 `ObjectCreated`
+event shape but says nothing about receipts at all - it predates the
+supply model by weeks - and `REQ-PIPE-018` (the AWS MVP) is unsigned and
+not started.
+
+**What is settled** is only who writes it: **we do, never the supplier.**
+That is enforced structurally rather than by convention -
+`write_delivery()` refuses outright if the receipts directory sits inside
+the deliveries directory, because "the receipt record is ours and must
+live where a supplier has no path to write it" - and Thread H settled
+"our own receipt timestamp, never the supplier's".
+
+**What is not settled is the moment.** The PoC's `data/receipts/` is a
+stand-in for an ingest observation log; in production it is not a file
+at all but whatever the receiving component records - an S3
+`ObjectCreated` event, an SFTP watcher noticing a file, a batch
+endpoint's request completion.
+
+**The hard part, and it is the same problem as the delivery boundary.**
+In S3 a supplier PUTs objects and events fire PER OBJECT. There is no
+delivery-is-finished signal. So "when do we write the receipt" is
+exactly "when does our boundary rule say this delivery is complete",
+which Thread B already requires to be arranged per source - a folder
+convention, a trigger file, a batch endpoint. The two questions are one
+question, and answering the receipt half without the boundary half is
+not possible.
+
+Consequence already relied upon (`REQ-PIPE-057`, settled 2026-09-24): a
+delivery with files and no receipt means the boundary has not closed
+yet, so it is the NORMAL state of every delivery until it does - which
+is why that requirement skips it as in-flight and reports it
+informationally rather than treating it as an anomaly.
