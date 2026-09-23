@@ -57,9 +57,6 @@ def raw_dir() -> str:
     return build_cp_warehouses.CP_RAW_DIR
 
 
-def manifest_path() -> str:
-    return os.path.join(raw_dir(), "manifest.json")
-
 
 def generate_synthetic_data() -> None:
     """Runs the real generator directly - unlike Birth Registrations,

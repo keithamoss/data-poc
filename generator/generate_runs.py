@@ -44,11 +44,15 @@ plans/data-generation.md #4), left as the concrete input
 for designing what the reporting UI actually needs once delivery timing
 has no fixed rate, rather than guessed at up front.
 
-manifest.json is written in GENERATION order (by delivery, then by
-attempt within that delivery), not chronological arrival order - a
-resupply for an early delivery can easily arrive after a later delivery's
-own on-time first attempt. Any future consumer that needs "what actually
-happened, in the order it happened" must sort by received_at itself.
+The bookkeeping is written in GENERATION order (by slot, then by
+delivery within that slot), not in the order things actually arrived -
+a resupply for an early slot can easily land after a later slot's own
+on-time first delivery. Nothing downstream reads it, and that is the
+point: the pipeline recognises arrivals from disk and orders them by
+OUR receipt instant (REQ-GEN-043), so the two orders differ on purpose
+rather than by accident. Anything that DID read this would have to
+sort by received_at itself, which is the first sign it should not be
+reading it.
 """
 from __future__ import annotations
 import json
@@ -72,6 +76,22 @@ from qa_tools.common import asset_time, delivery, schedule
 DATASET_ID = "birth-registrations"
 
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
+
+# WHERE THIS GENERATOR WRITES, all of it, redirectable the same way
+# OUT_DIR is (read at call time, never captured into a default arg).
+#
+# Redirecting OUT_DIR alone used to isolate a test run. REQ-GEN-043
+# gave the generator two more outputs - the delivery tree and the
+# receipts beside it - plus a shared bookkeeping file, and all three
+# defaulted to the real ones under data/. So the module's own
+# isolation, which exists because "tests and production share an
+# output directory" was a real problem once (Keith, 2026-09-18),
+# quietly stopped covering most of what gets written. Named here so
+# there is one place to redirect and one place to notice a fourth.
+DELIVERIES_DIR = delivery.DELIVERIES_DIR
+RECEIPTS_DIR = delivery.RECEIPTS_DIR
+BOOKKEEPING_PATH = delivery.BOOKKEEPING_PATH
+
 ID_BLOCK = 100_000  # per-delivery id_offset spacing - well above any single delivery's row count
 
 # (day offset from delivery 1, base row count, first-attempt dirty severity or None)
@@ -359,7 +379,7 @@ def _write_bookkeeping(manifest: list[dict]) -> None:
     wrote last time, so a regeneration overwrites rather than
     accumulates.
     """
-    path = delivery.BOOKKEEPING_PATH
+    path = BOOKKEEPING_PATH
     book = {}
     if path.exists():
         with open(path) as f:
@@ -372,7 +392,7 @@ def _write_bookkeeping(manifest: list[dict]) -> None:
 
 def _previous_delivery_names() -> list[str]:
     """What this generator wrote last time, from its own bookkeeping."""
-    path = delivery.BOOKKEEPING_PATH
+    path = BOOKKEEPING_PATH
     if not path.exists():
         return []
     with open(path) as f:
@@ -392,8 +412,8 @@ def main() -> None:
     # (REQ-GEN-042), then seed uniqueness from whatever the OTHER
     # generator has on disk so two arrivals can never share a
     # directory (REQ-GEN-043).
-    delivery.remove_deliveries(_previous_delivery_names())
-    taken_names: set[str] = delivery.existing_delivery_names()
+    delivery.remove_deliveries(_previous_delivery_names(), DELIVERIES_DIR, RECEIPTS_DIR)
+    taken_names: set[str] = delivery.existing_delivery_names(DELIVERIES_DIR)
     previous_row_count = None  # the last RESOLVED delivery's row count, for
     # the row-count-growth check's dirty preset - deliberately NOT updated
     # mid-chain: a viewer comparing "is this delivery's row count
@@ -436,7 +456,8 @@ def main() -> None:
                 name,
                 {f"birth_registrations_{delivery_obj.received_date.isoformat()}.csv":
                     delivery_obj.payload.to_csv(index=False)},
-                received_at=asset_time.parse_instant(entry["received_at"], entry["run_id"]))
+                received_at=asset_time.parse_instant(entry["received_at"], entry["run_id"]),
+                deliveries_dir=DELIVERIES_DIR, receipts_dir=RECEIPTS_DIR)
 
             tag = f"DIRTY({delivery_obj.severity})" if delivery_obj.severity else "clean"
             resupply_tag = (f"  [resupply {n - 1}, received "
@@ -450,13 +471,16 @@ def main() -> None:
         manifest.extend(entries)
         previous_row_count = len(deliveries[-1].payload)  # this slot's final (resolved-or-abandoned) row count
 
-    manifest_path = os.path.join(OUT_DIR, "manifest.json")
-    with open(manifest_path, "w") as f:
-        json.dump(manifest, f, indent=2)
+    # NO manifest.json ANY MORE (REQ-GEN-043). It held exactly the
+    # list below, which _write_bookkeeping() also holds - two copies of
+    # the same bookkeeping, in two files, able to disagree. Nothing in
+    # the pipeline had read it since arrivals became recognised rather
+    # than declared, so the only thing it could still do was tempt
+    # somebody to wire it back up.
     _write_bookkeeping(manifest)
     n_red_chains = sum(1 for _, sev in RUN_PLAN if sev == "red")
     print(f"\nWrote {len(manifest)} deliveries across {len(RUN_PLAN)} scheduled slots "
-          f"({n_red_chains} of which went red and triggered a resupply chain) + manifest.json "
+          f"({n_red_chains} of which went red and triggered a resupply chain) "
           f"to {os.path.abspath(OUT_DIR)}")
 
 

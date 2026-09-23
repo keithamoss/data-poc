@@ -32,9 +32,11 @@ import re
 
 import json
 import os
+from pathlib import Path
 
 import pytest
 
+import generator_isolation
 from generator import generate_cp_runs
 from generator.generate_cp_runs import TABLES, _pick_dirty_tables
 from qa_tools.common import asset_time
@@ -42,18 +44,24 @@ from qa_tools.common import asset_time
 
 @pytest.fixture(scope="module")
 def raw_dir(tmp_path_factory):
-    original = generate_cp_runs.OUT_DIR
-    path = tmp_path_factory.mktemp("cp_raw")
-    generate_cp_runs.OUT_DIR = str(path)
-    yield path
-    generate_cp_runs.OUT_DIR = original
+    """Every one of generate_cp_runs' outputs, not just OUT_DIR - see
+    tests/generator_isolation.py and BDM's own counterpart."""
+    root = tmp_path_factory.mktemp("cp_gen")
+    restore = generator_isolation.redirect(generate_cp_runs, root)
+    yield Path(generate_cp_runs.OUT_DIR)
+    restore()
 
 
 @pytest.fixture(scope="module")
 def manifest(raw_dir):
+    """This generator's own BOOKKEEPING, which is the only place it is
+    written now (REQ-GEN-043) - data/{raw,cp_raw}/manifest.json held a
+    second copy of exactly this list and is retired. Still called
+    `manifest` because every test below reads it as "the list of what
+    was generated", which is what it is."""
     generate_cp_runs.main()
-    with open(raw_dir / "manifest.json") as f:
-        return json.load(f)
+    with open(generate_cp_runs.BOOKKEEPING_PATH) as f:
+        return json.load(f)[generate_cp_runs.DATASET_ID]
 
 
 def test_dirty_module_resolves_to_generators_own_copy():
@@ -217,3 +225,42 @@ def test_dirty_only_picks_2_or_3_of_the_6_tables():
         saw_2 |= len(picked) == 2
         saw_3 |= len(picked) == 3
     assert saw_2 and saw_3, "expected both 2-table and 3-table draws across 200 seeds"
+
+
+def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
+    """CP's counterpart to the same test in tests/test_generate_runs.py -
+    see that one for the real bug this guards. Both generators write
+    into ONE shared delivery tree, so one of them leaking is enough to
+    rewrite the other's deliveries too."""
+    import hashlib
+
+    from qa_tools.common import delivery
+
+    def _fingerprint(root):
+        root = Path(root)
+        if not root.is_dir():
+            return []
+        return [(str(p.relative_to(root)),
+                 hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else "dir",
+                 p.stat().st_mtime_ns)
+                for p in sorted(root.rglob("*"))]
+
+    before = {name: _fingerprint(path)
+              for name, path in (("deliveries", delivery.DELIVERIES_DIR),
+                                  ("receipts", delivery.RECEIPTS_DIR))}
+    assert before["deliveries"], "test precondition - the real delivery tree must exist to be protected"
+    book_before = (delivery.BOOKKEEPING_PATH.read_bytes()
+                   if delivery.BOOKKEEPING_PATH.exists() else None)
+
+    monkeypatch.setattr(generate_cp_runs, "OUT_DIR", str(tmp_path / "cp_raw"))
+    monkeypatch.setattr(generate_cp_runs, "DELIVERIES_DIR", tmp_path / "deliveries")
+    monkeypatch.setattr(generate_cp_runs, "RECEIPTS_DIR", tmp_path / "receipts")
+    monkeypatch.setattr(generate_cp_runs, "BOOKKEEPING_PATH", tmp_path / "bookkeeping.json")
+
+    generate_cp_runs.main()
+
+    assert list((tmp_path / "deliveries").iterdir()), "nothing was generated into the redirected tree"
+    for name, path in (("deliveries", delivery.DELIVERIES_DIR), ("receipts", delivery.RECEIPTS_DIR)):
+        assert _fingerprint(path) == before[name], f"the real {name} tree was written to by a test run"
+    assert (delivery.BOOKKEEPING_PATH.read_bytes()
+            if delivery.BOOKKEEPING_PATH.exists() else None) == book_before

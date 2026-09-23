@@ -71,11 +71,15 @@ def test_raw_dir_reads_build_per_run_warehouses_live_not_a_frozen_import_time_co
     """Real regression coverage for the exact bug class orchestrate_bdm.
     run_single()'s own docstring warns about (a module-level constant
     bound once at import time silently ignoring a later monkeypatch) -
-    cli/bdm.py's own raw_dir()/manifest_path() must re-read
-    build_per_run_warehouses.RAW_DIR fresh on every call, not cache it."""
+    cli/bdm.py's own raw_dir() must re-read
+    build_per_run_warehouses.RAW_DIR fresh on every call, not cache it.
+
+    It used to check manifest_path() alongside it. That helper is gone
+    with the file it named (REQ-GEN-043) - nothing reads a generator
+    manifest any more, so a function whose whole job was to build a
+    path to one was only a way back to it."""
     monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", "/some/other/path")
     assert bdm.raw_dir() == "/some/other/path"
-    assert bdm.manifest_path() == os.path.join("/some/other/path", "manifest.json")
 
 
 def test_default_reference_falls_back_to_manifest_first_entry_when_nothing_promoted(monkeypatch):

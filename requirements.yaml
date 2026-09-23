@@ -4300,7 +4300,25 @@ requirements:
         through a real `mothman debug capture-arrival-golden` command,
         and verified to fail on a planted eight-hour shift.
       - >
-        2026-09-23: 1048 Python tests, 166 JS tests, all eight mothman
+        2026-09-23: a real bug the switchover introduced and a check
+        caught - running the generator test modules was deleting and
+        rewriting all 60 REAL deliveries, their receipts and the shared
+        bookkeeping file. Redirecting the generator's OUT_DIR used to
+        isolate a test run; this requirement gave it three more outputs
+        that all defaulted to the real ones. Deterministic, so the
+        bytes came back identical and nothing noticed - proved by
+        directory modification times, not by content. Both generators
+        now name every output they write, and a regression test in each
+        fingerprints the real tree and requires it untouched.
+      - >
+        2026-09-23: data/raw/manifest.json and data/cp_raw/manifest.json
+        are retired. Each held exactly the list the bookkeeping file
+        already holds - two copies of the same generator bookkeeping,
+        able to disagree - and nothing had read either since arrivals
+        became recognised rather than declared. cli/bdm.py's and
+        cli/cp.py's manifest_path() went with them.
+      - >
+        2026-09-23: 1050 Python tests, 166 JS tests, all eight mothman
         gates.
 
   - id: REQ-GEN-044

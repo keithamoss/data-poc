@@ -107,6 +107,22 @@ ROOT = os.path.join(os.path.dirname(__file__), "..")
 
 OUT_DIR = os.path.join(ROOT, "data", "cp_raw")
 
+# WHERE THIS GENERATOR WRITES, all of it, redirectable the same way
+# OUT_DIR is (read at call time, never captured into a default arg).
+#
+# Redirecting OUT_DIR alone used to isolate a test run. REQ-GEN-043
+# gave the generator two more outputs - the delivery tree and the
+# receipts beside it - plus a shared bookkeeping file, and all three
+# defaulted to the real ones under data/. So the module's own
+# isolation, which exists because "tests and production share an
+# output directory" was a real problem once (Keith, 2026-09-18),
+# quietly stopped covering most of what gets written. Named here so
+# there is one place to redirect and one place to notice a fourth.
+DELIVERIES_DIR = delivery.DELIVERIES_DIR
+RECEIPTS_DIR = delivery.RECEIPTS_DIR
+BOOKKEEPING_PATH = delivery.BOOKKEEPING_PATH
+
+
 POPULATION_N = 70_000
 N_CASE_WORKERS = 60
 BASE_SEED = 5000  # distinct range from generate_runs.py's 1000s and generate.py's demo seeds
@@ -430,7 +446,7 @@ def _write_bookkeeping(manifest: list[dict]) -> None:
     wrote last time, so a regeneration overwrites rather than
     accumulates.
     """
-    path = delivery.BOOKKEEPING_PATH
+    path = BOOKKEEPING_PATH
     book = {}
     if path.exists():
         with open(path) as f:
@@ -443,7 +459,7 @@ def _write_bookkeeping(manifest: list[dict]) -> None:
 
 def _previous_delivery_names() -> list[str]:
     """What this generator wrote last time, from its own bookkeeping."""
-    path = delivery.BOOKKEEPING_PATH
+    path = BOOKKEEPING_PATH
     if not path.exists():
         return []
     with open(path) as f:
@@ -468,8 +484,8 @@ def main() -> None:
     # (REQ-GEN-042), then seed uniqueness from whatever the OTHER
     # generator has on disk so two arrivals can never share a
     # directory (REQ-GEN-043).
-    delivery.remove_deliveries(_previous_delivery_names())
-    taken_names: set[str] = delivery.existing_delivery_names()
+    delivery.remove_deliveries(_previous_delivery_names(), DELIVERIES_DIR, RECEIPTS_DIR)
+    taken_names: set[str] = delivery.existing_delivery_names(DELIVERIES_DIR)
     # The same quarterly calendar the pipeline judges these supplies
     # against - not a private copy of the cadence (REQ-GEN-042). A
     # generator carrying its own would place supplies against one
@@ -513,7 +529,8 @@ def main() -> None:
             entry["delivery"] = dname
             delivery.write_delivery(
                 dname, csvs,
-                received_at=asset_time.parse_instant(entry["received_at"], entry["run_id"]))
+                received_at=asset_time.parse_instant(entry["received_at"], entry["run_id"]),
+                deliveries_dir=DELIVERIES_DIR, receipts_dir=RECEIPTS_DIR)
 
             tag = f"DIRTY({delivery_obj.severity})" if delivery_obj.severity else "clean"
             resupply_tag = (f"  [resupply {n - 1}, received "
@@ -526,13 +543,16 @@ def main() -> None:
 
         manifest.extend(entries)
 
-    manifest_path = os.path.join(OUT_DIR, "manifest.json")
-    with open(manifest_path, "w") as f:
-        json.dump(manifest, f, indent=2)
+    # NO manifest.json ANY MORE (REQ-GEN-043). It held exactly the
+    # list below, which _write_bookkeeping() also holds - two copies of
+    # the same bookkeeping, in two files, able to disagree. Nothing in
+    # the pipeline had read it since arrivals became recognised rather
+    # than declared, so the only thing it could still do was tempt
+    # somebody to wire it back up.
     _write_bookkeeping(manifest)
     n_red_slots = sum(1 for _, sev in RUN_PLAN if sev == "red")
     print(f"\nWrote {len(manifest)} deliveries across {len(RUN_PLAN)} scheduled slots "
-          f"({n_red_slots} of which went red and triggered a resupply chain) + manifest.json "
+          f"({n_red_slots} of which went red and triggered a resupply chain) "
           f"to {os.path.abspath(OUT_DIR)}")
 
 

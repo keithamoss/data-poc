@@ -58,9 +58,6 @@ def raw_dir() -> str:
     return build_per_run_warehouses.RAW_DIR
 
 
-def manifest_path() -> str:
-    return os.path.join(raw_dir(), "manifest.json")
-
 
 def generate_synthetic_data() -> None:
     """Wraps pipeline.orchestrate.prepare_warehouse(regenerate=True) -

@@ -57,7 +57,6 @@ def test_raw_dir_reads_build_cp_warehouses_live_not_a_frozen_import_time_copy(mo
     fresh on every call, not cache it at import time."""
     monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", "/some/other/path")
     assert cp.raw_dir() == "/some/other/path"
-    assert cp.manifest_path() == os.path.join("/some/other/path", "manifest.json")
 
 
 def test_default_reference_falls_back_to_manifest_first_entry_when_nothing_promoted(monkeypatch, tmp_path):

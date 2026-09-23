@@ -20,19 +20,24 @@ directory") - see the `raw_dir` fixture's own docstring."""
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import json
 
 import pytest
 
+import generator_isolation
 from generator import generate_runs
 from qa_tools.common import asset_time
 
 
 @pytest.fixture(scope="module")
 def raw_dir(tmp_path_factory):
-    """Points generate_runs.OUT_DIR at a real tmp dir for the duration of
-    this module's tests, instead of the repo's own data/raw/ - running
+    """Points every one of generate_runs' outputs at a real tmp dir for
+    the duration of this module's tests, instead of the repo's own
+    data/raw/ (and, since REQ-GEN-043, data/deliveries/, data/receipts/
+    and data/generator_bookkeeping.json - see tests/generator_isolation.py
+    and the regression test at the bottom of this file) - running
     this test file used to mutate the SAME directory ./run_pipeline.sh
     and qa_tools.bdm.orchestrate_bdm read from/write to for real, purely
     as a side effect of testing (harmless in outcome, since generation
@@ -43,18 +48,22 @@ def raw_dir(tmp_path_factory):
     not the standard function-scoped `monkeypatch` fixture, which can't
     be depended on from a module-scoped fixture (a real ScopeMismatch),
     hence the manual save/restore instead."""
-    original = generate_runs.OUT_DIR
-    path = tmp_path_factory.mktemp("bdm_raw")
-    generate_runs.OUT_DIR = str(path)
-    yield path
-    generate_runs.OUT_DIR = original
+    root = tmp_path_factory.mktemp("bdm_gen")
+    restore = generator_isolation.redirect(generate_runs, root)
+    yield Path(generate_runs.OUT_DIR)
+    restore()
 
 
 @pytest.fixture(scope="module")
 def manifest(raw_dir):
+    """This generator's own BOOKKEEPING, which is the only place it is
+    written now (REQ-GEN-043) - data/{raw,cp_raw}/manifest.json held a
+    second copy of exactly this list and is retired. Still called
+    `manifest` because every test below reads it as "the list of what
+    was generated", which is what it is."""
     generate_runs.main()
-    with open(raw_dir / "manifest.json") as f:
-        return json.load(f)
+    with open(generate_runs.BOOKKEEPING_PATH) as f:
+        return json.load(f)[generate_runs.DATASET_ID]
 
 
 def test_manifest_has_one_entry_per_scheduled_slot_at_minimum(manifest):
@@ -159,3 +168,59 @@ def test_no_run_id_carries_a_date(manifest):
     for e in manifest:
         assert not re.search(r"\d{4}-\d{2}-\d{2}", e["run_id"]), \
             f"{e['run_id']} still carries a date"
+
+
+def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
+    """Real bug, found 2026-09-23 by checking rather than assuming:
+    redirecting generate_runs.OUT_DIR is no longer enough to isolate a
+    test run, because REQ-GEN-043 gave the generator a second and third
+    output - the delivery tree and the receipts beside it - and both
+    default to the real ones under data/.
+
+    So this module's own raw_dir fixture, whose whole purpose is that
+    "tests and production share an output directory" never happens
+    again (Keith's own call, 2026-09-18), had quietly stopped covering
+    most of what the generator writes. Running the suite deleted and
+    rewrote all 42 real Birth Registrations deliveries, their receipts,
+    and the shared bookkeeping file. Deterministic, so the bytes came
+    back identical and nothing ever noticed - but a run interrupted
+    mid-write leaves the real tree half-deleted, and identical bytes
+    are not the same thing as not having written them.
+
+    Fingerprints the real tree, generates into tmp with every output
+    redirected, and requires the real one to be untouched - including
+    its modification times, which is the half a content hash misses.
+    """
+    import hashlib
+
+    from qa_tools.common import delivery
+
+    def _fingerprint(root):
+        root = Path(root)
+        if not root.is_dir():
+            return []
+        return [(str(p.relative_to(root)),
+                 hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else "dir",
+                 p.stat().st_mtime_ns)
+                for p in sorted(root.rglob("*"))]
+
+    before = {name: _fingerprint(path)
+              for name, path in (("deliveries", delivery.DELIVERIES_DIR),
+                                  ("receipts", delivery.RECEIPTS_DIR))}
+    assert before["deliveries"], "test precondition - the real delivery tree must exist to be protected"
+    book_before = (delivery.BOOKKEEPING_PATH.read_bytes()
+                   if delivery.BOOKKEEPING_PATH.exists() else None)
+
+    monkeypatch.setattr(generate_runs, "OUT_DIR", str(tmp_path / "raw"))
+    monkeypatch.setattr(generate_runs, "DELIVERIES_DIR", tmp_path / "deliveries")
+    monkeypatch.setattr(generate_runs, "RECEIPTS_DIR", tmp_path / "receipts")
+    monkeypatch.setattr(generate_runs, "BOOKKEEPING_PATH", tmp_path / "bookkeeping.json")
+
+    generate_runs.main()
+
+    assert list((tmp_path / "deliveries").iterdir()), "nothing was generated into the redirected tree"
+    assert (tmp_path / "bookkeeping.json").exists()
+    for name, path in (("deliveries", delivery.DELIVERIES_DIR), ("receipts", delivery.RECEIPTS_DIR)):
+        assert _fingerprint(path) == before[name], f"the real {name} tree was written to by a test run"
+    assert (delivery.BOOKKEEPING_PATH.read_bytes()
+            if delivery.BOOKKEEPING_PATH.exists() else None) == book_before
