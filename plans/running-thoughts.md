@@ -1815,3 +1815,36 @@ fixture has to name its `data/cp_raw/<run_id>/` directories after the
 run_ids RECOGNITION will assign, because those two modules read them
 back by that name. A fixture that has to predict an id it does not
 control is the coupling showing through.
+
+33. **[todo, 2026-09-23]** **[Pipeline & publishing]** Does the
+warehouse stay ephemeral, or become a permanent thing?
+
+Keith, 2026-09-23, raised in passing while settling the delivery log's
+structure during `REQ-PIPE-038`'s walkthrough, and explicitly deferred -
+"we'll tackle that later, let's get the structures set up and get this
+thing working first". Logged rather than carried in conversation because
+it is exactly the kind of aside this project has lost before.
+
+His words, in substance: **as we work out how we roll this out for other
+people to test, we are going to have to tackle whether the warehouse
+remains ephemeral or becomes a permanent thing.** He is not sure yet.
+And the thing that makes it a real question rather than a tidy-up: **the
+operational database is an actual database running in Amazon**, not a
+DuckDB file that gets regenerated.
+
+**Why it matters more than it sounds.** Several decisions settled the
+same day assume the warehouse is disposable and the committed files are
+the durable record - the delivery log lives in git and the warehouse
+reads it through a view; arrival history must survive for years, so it
+cannot live only in a warehouse that is regenerated. None of that breaks
+if the warehouse becomes permanent, but the REASONING changes: today
+"committed is the source of truth" is forced by the warehouse being
+gitignored and rebuildable, and if that stops being true, someone will
+reasonably ask why there are two places. The answer would then have to
+be about the dashboard's no-live-data rule alone, which is a weaker
+argument on its own.
+
+**Related, not the same question**: `plans/wider.md`'s warehouse-choice
+item, and `REQ-PIPE-018`'s AWS MVP, which is unsigned. This one is
+narrower - not which engine, but whether the thing persists between
+runs, and what that does to the committed-versus-queryable split.

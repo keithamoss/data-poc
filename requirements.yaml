@@ -2466,6 +2466,19 @@ requirements:
         for years, and the dashboard build may never touch data/ so it
         could never read that table. Same pattern
         qa_tools/*/dataset_stats.py already uses.
+      - >
+        SUPERSEDED the same day, and corrected here rather than left to
+        disagree with REQ-PIPE-038. The decision above says the
+        warehouse's delivery log is "written from" the committed
+        record, which implies two copies that can drift. Keith asked
+        whether it had to be a database table at all, and testing it
+        showed DuckDB reads the committed JSON files straight into a
+        SQL view via read_json_auto over a glob - joinable against the
+        staging and period schemas, nothing synced, nothing duplicated.
+        So there is ONE copy: the committed files, with the warehouse
+        view being SQL access to them. Everything else in the decision
+        above stands, including why it cannot live only in the
+        warehouse. REQ-PIPE-038 owns the storage shape.
 
   - id: REQ-PIPE-035
     title: QA runs against one period's schema, with the staged delivery overlaid
@@ -2995,6 +3008,32 @@ requirements:
         regenerate, open or query any data.
       - THE SYSTEM SHALL expose regeneration as a mothman subcommand
         rather than a bare script.
+      - THE SYSTEM SHALL record every delivery as its own committed
+        file, written once when the delivery is recognised, and SHALL
+        NOT append to, edit or re-write a delivery's file afterwards.
+      - THE SYSTEM SHALL store those files outside the per-dataset QA
+        results, in a location of their own, because a delivery spans
+        datasets and is not a QA result.
+      - THE SYSTEM SHALL record, in a delivery's own file, every table
+        it carried, the dataset each was attributed to, whether each
+        loaded, and the physical table each loaded one became.
+      - WHERE a table in a delivery could not be loaded, THE SYSTEM
+        SHALL record that fact and the reason in the delivery's file,
+        so that an arrival with nothing loadable is still a recorded
+        arrival.
+      - THE SYSTEM SHALL make the delivery record queryable as SQL
+        directly from the committed files, and SHALL NOT maintain a
+        second copy of it in the warehouse.
+      - THE SYSTEM SHALL preserve the recorded offset of every instant
+        read back out of a delivery file, and SHALL NOT let it be
+        inferred as a naive or UTC-normalised value.
+      - THE SYSTEM SHALL store, with a QA run's own committed results,
+        which physical table each logical name resolved to for that
+        run.
+      - THE SYSTEM SHALL regenerate the delivery log from scratch
+        alongside the QA results, under the same delete-and-regenerate
+        rule, and SHALL NOT leave delivery records describing a history
+        that no longer exists.
     non_functional_requirements:
       - Deleting today's committed qa_results/ is a one-off exception to
         CLAUDE.md's rule that nothing in it is ever regenerated away. It
@@ -3050,6 +3089,56 @@ requirements:
         deploy-pages.yml. Deleting and regenerating is the same act
         stated honestly, which is why it is acceptable and re-running-
         as-migration would not have been.
+      - >
+        Decided the delivery log is ONE IMMUTABLE FILE PER DELIVERY in
+        a committed directory of its own, not a single append-only file
+        (Keith, 2026-09-23). Keith reached one-file-per-delivery from
+        runtime concurrency - several QA runs at once - but the
+        stronger reason is GIT: a single append-only file is a
+        merge-conflict magnet, since two branches, two CI runs or two
+        people each appending a line conflict every time. One file
+        written once by one writer never does, which is exactly the
+        discipline qa_results/ already uses and why that history has
+        never had a merge problem.
+      - >
+        Dropped partitioning the log by arrival date, which this
+        session had proposed to keep per-dataset reads bounded (Keith,
+        2026-09-23: "we're talking a tiny scale... hundreds or low
+        thousands of records", and indexes handle that without going to
+        "the nth degree of partitioning"). He was right and the
+        proposal was over-engineering. REQ-PIPE-034's NFR forbidding a
+        walk of every arrival was aimed at forbidding a MUTABLE POINTER
+        kept in step, not at mandating a partitioning scheme. The
+        arrival instant goes in the filename anyway, so newest-first
+        ordering is free from a directory listing with no structure at
+        all.
+      - >
+        Decided there is NO SECOND COPY of the delivery log in the
+        warehouse, which supersedes a decision recorded on
+        REQ-PIPE-034 earlier the same day that the warehouse table
+        would be "written from" the committed record. Keith asked
+        directly whether it had to be a database table; testing it
+        showed DuckDB reads the committed JSON files straight into a
+        SQL view via read_json_auto over a glob, joinable against the
+        staging and period schemas, with nothing synced and nothing
+        duplicated. Verified by real query - last-arrival-per-dataset
+        is one GROUP BY over the committed files. The earlier
+        two-copies version was strictly worse: two records that can
+        drift, for no gain.
+      - >
+        It still cannot live ONLY in the warehouse, which was Keith's
+        other question. The warehouse is gitignored and regenerated, so
+        arrival history spanning years would die on every rebuild; and
+        the dashboard build may never touch data/, so it could not read
+        that table at all. The committed files are the durable record
+        and the warehouse view is SQL access to them.
+      - >
+        Gotcha found while verifying the above, recorded so it is not
+        rediscovered: read_json_auto silently converted a recorded
+        +08:00 instant to a naive UTC value. REQ-PIPE-048 exists
+        precisely so every stored instant carries its offset, so that
+        column must be typed rather than inferred - which is what the
+        criterion about preserving the offset is for.
       - Note what regeneration is NOT doing. Birth Registrations' 1,760
         files do not need re-keying - they are already under their own
         dataset. What they need is the check_id rename from
