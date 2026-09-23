@@ -1951,3 +1951,33 @@ happens in the main session - no agent does the building. Build order is
 near-linear on the dependencies: `034` -> `035` -> `036` -> `037` ->
 `038` -> `041`. `034` is unblocked now and does NOT need the architect's
 placement answer, so it could start while the architect works.
+
+36. **[todo, 2026-09-23]** **[Data generation]** Keith wants one last
+review of the ON-DISK STRUCTURE for storing deliveries, once sprints
+7-10 come back from the scoper.
+
+His words, 2026-09-23: "when this all comes back, I do want to do one
+last review of what the delivery, like what the structure on disk looks
+like for storing the deliveries. Keen to see how that's settled. It's
+not super important, because it's only going to be the synth data in
+the PoC, but it'd be good to get eyes on that."
+
+**What already exists to review.** `docs/delivery-format.md` is marked
+NORMATIVE and is what `REQ-GEN-043` built - one directory per physical
+arrival, the directory itself being the boundary, with 42 real
+deliveries under `data/deliveries/` today. Sprint 7 (delivery
+recognition and file-to-dataset mapping) is the CONSUMER of that
+format, so scoping 7-10 is the point at which the format gets its first
+real test from the other side.
+
+**Why he is right that it is worth a look even though it is low stakes
+here.** The format is what a real supplier's transport has to be plumbed
+into - Thread B's "the delivery boundary is load-bearing and it comes
+from the transport", and a source that cannot express one needs one
+arranged operationally. In the PoC every delivery is a tidy directory
+the generator wrote. The review is about whether the format survives
+contact with a transport nobody controls, which is exactly what the
+synthetic case cannot tell us.
+
+Present it to him as the actual directory layout plus what recognition
+reads out of it, not as a requirement diff.
