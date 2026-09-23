@@ -1544,8 +1544,10 @@ green-but-superseded ones. His words: "a decision has been made, in
 essence" - so it should not be sitting in the queue.
 
 **Rejected is a DECISION state, not a QA verdict.** Red and nobody has
-looked at it yet is still STAGED. Red and a human said no is REJECTED.
-Reversible, via the un-decide operation already settled in Thread G.
+looked at it yet is still STAGED. Rejected means a human decided against
+promoting it - which covers both "this was bad" and "a better one came
+along", see the four-version scenario below. Reversible, via the
+un-decide operation already settled in Thread G.
 
 **Rejected is NOT a label in the promoted schema** - rejected on the
 day this was settled, and for a reason already load-bearing elsewhere:
@@ -1560,6 +1562,17 @@ Schema-per-period exists so a cross-table check reads one schema;
 rejected data is never in such a query by definition. Its intended slot
 is a fact in the decision log, and a supply rejected before assignment
 may have no slot to name at all.
+
+**The delivery log: the COMMITTED record is the source of truth, and
+the warehouse table is written from it** (Keith, 2026-09-23, agreeing).
+He had assumed a log of deliveries in the warehouse, which is right -
+QA and SQL need to query it there. It cannot be the only copy, for two
+independent reasons: the warehouse is gitignored and regenerated, while
+arrival history has to survive for years; and the dashboard build may
+never touch `data/`, so it could never read that table at all. Same
+pattern `qa_tools/*/dataset_stats.py` already uses - anything needing a
+live connection is computed once by whoever legitimately has one, and
+committed alongside.
 
 **An unloadable file gets NO table.** Keith, directly: there is no
 point creating an empty one when the delivery log already records that
@@ -1583,13 +1596,33 @@ the third one is: a human HAS looked and HAS decided, and the decision
 was neither promote nor reject. That is not the same state as "nobody
 has looked".
 
-**Open question this leaves - what is the terminal state of a staged
-supply that is never promoted and never explicitly rejected?** The
-third version above, once the fourth is promoted. It is not rejected -
-nothing was decided against it - but leaving it in staging is the
-dumping-ground problem returning by the back door. Keith has already
-observed the same residue in his own system ("potentially there's some
-stuff that's green that was superseded"). Unresolved as at 2026-09-23.
+**There is no SUPERSEDED state, and the reason is worth keeping**
+(Keith, 2026-09-23, correcting this session). Reading the scenario
+above, it looks as though the third version is orphaned once the fourth
+is promoted: not rejected, since nothing was decided against it, but
+left in staging, which is the dumping-ground problem returning by the
+back door. A fourth terminal state was proposed to close it.
+
+It is not needed, because the premise is wrong. **A human always makes
+the call on the third version.** Keith's own account: once the fourth
+arrives, either it is green and auto-promotes, at which point someone
+goes and rejects the third - or the fourth is rejected and the third is
+promoted instead. Staging drains because people drain it, not because
+of an automatic rule, and the queue is small enough for that to work.
+
+So **REJECTED means "a human decided against promoting this", not "this
+was bad"**. That is broader than it first reads, and deliberately: a
+perfectly good supply that simply lost to a better one is rejected, and
+nothing is being mislabelled. The decision log carries the actual
+reason.
+
+Also rejected, and recorded so it is not re-proposed: **promoting the
+loser into the period schema as a non-current version.** It is tempting
+because a period schema already holds a supply plus its resupplies, so
+it needs no new concept. It is wrong because promotion is a DECISION -
+for the quarterly asset a human's decision - and this would put data
+into the promoted schema that nobody approved, to avoid modelling a
+state that does not exist.
 
 ### QA runs on staging, and that is arguably the point
 

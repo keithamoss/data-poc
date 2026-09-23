@@ -2444,6 +2444,16 @@ requirements:
         rejected schema. Both depart deliberately from Keith's
         operational system, which runs staging per quarter and leaves
         rejected tables sitting in it.
+      - >
+        Decided the COMMITTED arrival record is the source of truth and
+        the warehouse's own delivery log is written from it (Keith,
+        2026-09-23). He had assumed a delivery log in the warehouse,
+        which is right - QA and SQL query it there - but it cannot be
+        the only copy, for two independent reasons: the warehouse is
+        gitignored and regenerated while arrival history must survive
+        for years, and the dashboard build may never touch data/ so it
+        could never read that table. Same pattern
+        qa_tools/*/dataset_stats.py already uses.
 
   - id: REQ-PIPE-035
     title: QA runs against one period's schema, with the staged delivery overlaid
