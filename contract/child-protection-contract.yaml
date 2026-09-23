@@ -1603,27 +1603,27 @@ customProperties:
     value:
       - type: nested_folder
         keyPattern: "cp/{delivery_id}/cp_clients.csv"
-        dataset_id: child-protection-casework
+        dataset_id: cp-clients
         extractTo: cp_clients
       - type: nested_folder
         keyPattern: "cp/{delivery_id}/cp_notifications.csv"
-        dataset_id: child-protection-casework
+        dataset_id: cp-notifications
         extractTo: cp_notifications
       - type: nested_folder
         keyPattern: "cp/{delivery_id}/cp_investigations.csv"
-        dataset_id: child-protection-casework
+        dataset_id: cp-investigations
         extractTo: cp_investigations
       - type: nested_folder
         keyPattern: "cp/{delivery_id}/cp_placements.csv"
-        dataset_id: child-protection-casework
+        dataset_id: cp-placements
         extractTo: cp_placements
       - type: nested_folder
         keyPattern: "cp/{delivery_id}/cp_carers.csv"
-        dataset_id: child-protection-casework
+        dataset_id: cp-carers
         extractTo: cp_carers
       - type: nested_folder
         keyPattern: "cp/{delivery_id}/cp_case_workers.csv"
-        dataset_id: child-protection-casework
+        dataset_id: cp-case-workers
         extractTo: cp_case_workers
     # qa_tools/common/file_arrival.py's real, tested pattern-matching
     # shape - one nested_folder pattern per real table, since one CP

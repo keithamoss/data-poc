@@ -359,7 +359,7 @@ def test_s3_config_reads_the_real_committed_contract():
     assert config["local_source"] == "data/raw"
     assert config["arrival_pattern"] == [
         {"type": "single_file", "keyPattern": "bdm/birth_registrations_{date}.csv",
-         "dataset_id": "bdm-birth-registrations"},
+         "dataset_id": "birth-registrations"},
     ]
 
 

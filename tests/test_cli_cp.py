@@ -273,7 +273,12 @@ def test_s3_config_reads_the_real_committed_contract():
     arrival = config["arrival_pattern"]
     assert len(arrival) == 6
     assert {p["extractTo"] for p in arrival} == set(cp.TABLES)
-    assert all(p["type"] == "nested_folder" and p["dataset_id"] == "child-protection-casework" for p in arrival)
+    # Each pattern names ITS OWN dataset, not the collection - a file's
+    # dataset has to be derivable from its filename (REQ-GEN-043).
+    assert all(p["type"] == "nested_folder" for p in arrival)
+    assert {p["dataset_id"] for p in arrival} == {
+        "cp-clients", "cp-notifications", "cp-investigations",
+        "cp-placements", "cp-carers", "cp-case-workers"}
 
 
 def test_run_check_s3_delivery_downloads_both_prefixes_then_delegates_to_local_folder_mode(monkeypatch):

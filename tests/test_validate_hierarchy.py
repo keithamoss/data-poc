@@ -117,3 +117,52 @@ class TestCollectionScopedContracts:
             "domain": "child-protection-family-support",
         }, "child-protection")
         assert validate_hierarchy.validate() == []
+
+
+class TestArrivalPatternsNameRealDatasets:
+    """REQ-GEN-043 criterion 3: a file's own dataset is derivable from
+    its name through that dataset's configured pattern - so a pattern
+    naming a dataset that does not exist derives nothing.
+
+    Added after the block turned out to have drifted in exactly the way
+    this gate exists to catch, and to have survived REQ-QAC-039's own
+    sweep the same morning because nothing looked INSIDE a
+    customProperty's value.
+    """
+
+    def _doc(self, dataset_ids):
+        return {"id": "birth-registrations", "name": "Birth Registrations",
+                "domain": "registry-services",
+                "customProperties": [{"property": "arrivalPattern", "value": [
+                    {"type": "single_file", "keyPattern": f"x/{i}.csv", "dataset_id": d}
+                    for i, d in enumerate(dataset_ids)]}]}
+
+    def test_the_real_contracts_name_only_real_datasets(self):
+        assert validate_hierarchy.validate() == []
+
+    def test_the_real_pre_fix_bdm_value_is_caught(self, tmp_path, monkeypatch):
+        """The id corrected hours earlier, still sitting in this block."""
+        _contract(tmp_path, monkeypatch, "c.yaml",
+                   self._doc(["bdm-birth-registrations"]), "birth-registrations")
+        errors = validate_hierarchy.validate()
+        assert len(errors) == 1
+        assert "bdm-birth-registrations" in errors[0]
+
+    def test_the_real_pre_fix_cp_value_is_caught(self, tmp_path, monkeypatch):
+        """Stale AND wrong in kind - it named the COLLECTION where a
+        per-file dataset belongs."""
+        _contract(tmp_path, monkeypatch, "c.yaml",
+                   self._doc(["child-protection-casework"]), "birth-registrations")
+        assert any("child-protection-casework" in e for e in validate_hierarchy.validate())
+
+    def test_every_offending_pattern_is_reported_not_just_the_first(self, tmp_path, monkeypatch):
+        _contract(tmp_path, monkeypatch, "c.yaml",
+                   self._doc(["nope-one", "nope-two", "cp-clients"]), "birth-registrations")
+        assert len(validate_hierarchy.validate()) == 2
+
+    def test_a_contract_with_no_arrival_pattern_is_fine(self, tmp_path, monkeypatch):
+        """Not every dataset has one yet, and absence is not drift."""
+        _contract(tmp_path, monkeypatch, "c.yaml",
+                   {"id": "birth-registrations", "name": "Birth Registrations",
+                    "domain": "registry-services"}, "birth-registrations")
+        assert validate_hierarchy.validate() == []

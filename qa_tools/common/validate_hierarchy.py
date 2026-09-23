@@ -30,6 +30,19 @@ left Child Protection's contract saying `id: child-protection` and
 exactly the kind of oddity a later reader 'fixes' without knowing why
 it was that way.
 
+IT ALSO CHECKS `arrivalPattern`, added 2026-09-23 (REQ-GEN-043) after
+that block turned out to have drifted in exactly the way this gate
+exists to catch - and to have survived REQ-QAC-039's own sweep the same
+morning, because nothing looked INSIDE a customProperty's value.
+
+What it had: BDM declared `dataset_id: bdm-birth-registrations`, an id
+corrected hours earlier and belonging to nothing; all six CP patterns
+declared `child-protection-casework`, which was both stale AND the
+COLLECTION rather than the per-file dataset. Since a file's own dataset
+has to be derivable from its filename through that dataset's
+configured pattern, a pattern naming a dataset that does not exist
+cannot derive anything.
+
 WHAT IT DOES NOT CHECK. The contract's schema, its quality rules, its
 check definitions - those are `validate_check_lifecycle.py`'s and the
 real tools' business. This gate answers one question: does this
@@ -70,6 +83,30 @@ def _describes(name: str) -> tuple[str, str, str]:
     return (first.collection_id, first.collection_name, first.agency_id)
 
 
+def _arrival_pattern_errors(filename: str, doc: dict) -> list[str]:
+    """Every arrivalPattern entry naming a dataset the hierarchy does
+    not define.
+
+    A contract with no arrivalPattern is fine - not every dataset has
+    one yet - but a pattern that HAS one must name something real.
+    """
+    errors: list[str] = []
+    entry = next((p for p in (doc.get("customProperties") or [])
+                  if p.get("property") == "arrivalPattern"), None)
+    if entry is None:
+        return errors
+    known = {d.dataset_id for d in hierarchy.all_datasets()}
+    for pattern in entry.get("value") or []:
+        dataset_id = pattern.get("dataset_id")
+        if dataset_id not in known:
+            errors.append(
+                f"{filename}: arrivalPattern {pattern.get('keyPattern')!r} names dataset "
+                f"{dataset_id!r}, which the hierarchy does not define. A file's own dataset is "
+                f"derivable from its name only through this pattern, so one naming a dataset "
+                f"that does not exist derives nothing. Known: {', '.join(sorted(known))}")
+    return errors
+
+
 def validate() -> list[str]:
     errors: list[str] = []
     for filename, describes in CONTRACTS:
@@ -95,6 +132,7 @@ def validate() -> list[str]:
                     f"Fix the contract, or fix contract/data-asset.yaml if the hierarchy is wrong - "
                     f"not both independently."
                 )
+        errors.extend(_arrival_pattern_errors(filename, doc))
     return errors
 
 
