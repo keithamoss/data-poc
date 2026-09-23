@@ -74,13 +74,13 @@ def test_default_reference_falls_back_when_last_promoted_runs_data_no_longer_exi
 
 
 def test_picker_choices_and_run_id_from_choice_round_trip():
-    manifest = [{"run_id": "cp_run_01_2023-02-01", "run_date": "2023-02-01", "dirty_severity": None},
-                {"run_id": "cp_run_02_2023-05-01", "run_date": "2023-05-01", "dirty_severity": "red"}]
+    manifest = [{"run_id": "cp_run_001", "received_at": "2023-02-01T01:00:00+00:00", "dirty_severity": None},
+                {"run_id": "cp_run_002", "received_at": "2023-05-01T01:00:00+00:00", "dirty_severity": "red"}]
     choices = cp.picker_choices(manifest)
     assert "clean" in choices[0]
     assert "red" in choices[1]
-    assert cp.run_id_from_choice(choices[0]) == "cp_run_01_2023-02-01"
-    assert cp.run_id_from_choice(choices[1]) == "cp_run_02_2023-05-01"
+    assert cp.run_id_from_choice(choices[0]) == "cp_run_001"
+    assert cp.run_id_from_choice(choices[1]) == "cp_run_002"
 
 
 def test_has_failures_true_on_fail_or_error_false_otherwise():

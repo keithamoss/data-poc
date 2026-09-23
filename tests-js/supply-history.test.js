@@ -6,7 +6,8 @@
 // and each arrival's own real aggregate red/amber/green status (the worst
 // status among every check's own history[] value vs its warn/fail
 // thresholds) - never from the generator's synthetic is_resupply/
-// delivery_id/delivery_date/supersedes_run_id bookkeeping, which a real
+// supersedes_run_id/attempt_number bookkeeping, which REQ-GEN-042 has
+// since retired from the generator outright, and which a real
 // production dashboard would never have. A RED arrival starts/continues a
 // chain; the chain closes on the first AMBER or GREEN after a RED (Keith's
 // own "keep it simple" rule).

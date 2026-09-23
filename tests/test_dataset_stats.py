@@ -27,7 +27,7 @@ def test_bdm_compute_dataset_stats_shape():
         ('run_01', 'Q', 'Fremantle', '2020-03-01', '2020-03-05', '2020-03-05 08:00:00'),
         ('run_02', 'M', 'Fremantle', '2021-01-01', '2021-01-05', '2021-01-05 10:00:00')
     """)
-    manifest_entry = {"run_id": "run_01", "run_date": "2020-01-05"}
+    manifest_entry = {"run_id": "run_01", "received_at": "2020-01-05T06:00:00+00:00"}
 
     stats = bdm_stats.compute_dataset_stats(conn, "run_01", manifest_entry)
 
@@ -53,7 +53,7 @@ def test_bdm_check_aggregates_are_scoped_by_run_id():
         ('run_02', 'Q', 'Fremantle', '2020-01-01', '2020-01-05', '2020-01-05 10:00:00')
     """)
 
-    stats = bdm_stats.compute_dataset_stats(conn, "run_01", {"run_id": "run_01", "run_date": "2020-01-05"})
+    stats = bdm_stats.compute_dataset_stats(conn, "run_01", {"run_id": "run_01", "received_at": "2020-01-05T06:00:00+00:00"})
 
     # run_02's invalid 'Q' must not leak into run_01's own aggregate
     assert stats["check_aggregates"]["sex"]["total_invalid"] == 0
@@ -134,7 +134,7 @@ def test_cp_compute_dataset_stats_shape():
         (NULL, NULL, 'Neglect', '2020-01-05 09:00:00'),
         (NULL, NULL, 'Not a real category', '2020-01-05 09:30:00')
     """)
-    manifest_entry = {"run_id": "cp_run_01", "run_date": "2020-01-05"}
+    manifest_entry = {"run_id": "cp_run_01", "received_at": "2020-01-05T06:00:00+00:00"}
 
     stats = cp_stats.compute_dataset_stats(conn, manifest_entry)
 

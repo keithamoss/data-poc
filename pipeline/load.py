@@ -23,6 +23,7 @@ import duckdb
 import pandas as pd
 
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
+from qa_tools.common import asset_time
 
 RAW_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "warehouse.duckdb")
@@ -53,7 +54,7 @@ def load_all(db_path: str = DB_PATH, raw_dir: str = RAW_DIR) -> None:
         path = os.path.join(raw_dir, entry["file"])
         df = read_csv_explicit_nulls(path, null_values)
         df["run_id"] = entry["run_id"]
-        df["run_date"] = entry["run_date"]
+        df["run_date"] = asset_time.local_date(entry["received_at"]).isoformat()
         df["dirty_severity"] = entry["dirty_severity"]
         frames.append(df)
 

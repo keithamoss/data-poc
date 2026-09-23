@@ -16,7 +16,7 @@ Both write the same way, scoped via `AskUserQuestion` for `/accept`
 comment on GitHub itself (this tool stays read-only, never a button in
 the dashboard - there's no backend to receive one); no `run_id` needs
 typing or copying (every real run already has a real arrival WINDOW -
-[this run's own arrived_date, the next run's arrived_date) sourced
+[this run's own received_at, the next run's received_at) sourced
 straight from committed qa_results/ history, qa_results_reader, no live
 data - a bare `/accept`/`/reject` comment is matched to whichever run's
 window contains the comment's own real timestamp); and the decision is
@@ -51,6 +51,7 @@ from pathlib import Path
 from qa_tools.common import hierarchy
 from qa_tools.common.qa_results_reader import QA_RESULTS_DIR, list_run_ids, read_dataset_stats
 from qa_tools.common.ticket_sync import TICKET_LABEL
+from qa_tools.common import asset_time
 
 ACCEPT_RE = re.compile(r"^/accept\b", re.IGNORECASE)
 REJECT_RE = re.compile(r"^/reject\b", re.IGNORECASE)
@@ -68,11 +69,11 @@ QA_RESULTS_SCOPE_FOR_DATASET = {d.dataset_id: d.qa_results_scope for d in hierar
 def _run_windows_for_dataset(dataset_id: str, qa_results_dir: Path | str = QA_RESULTS_DIR) -> list[tuple[str, date, date | None]]:
     """[(run_id, window_start, window_end_or_None), ...], oldest first,
     built purely from committed qa_results/ history - the same real
-    `arrived_date` the dashboard's own supply-history table already
+    receipt instant the dashboard's own supply-history table already
     groups by. The last run's own window end is None (open-ended - "any
     /accept from its own arrival onward, until a newer run exists").
 
-    Two real runs sharing the same arrived_date turn out to be common in
+    Two real runs sharing the same receipt DATE turn out to be common in
     this project's own real committed history (a real bug found live,
     2026-09-19, while adding /reject test coverage: 352 real BDM runs,
     only 123 distinct dates - this project's own full pipeline
@@ -98,7 +99,7 @@ def _run_windows_for_dataset(dataset_id: str, qa_results_dir: Path | str = QA_RE
         stats = read_dataset_stats(agency, dataset, run_id, qa_results_dir)
         if stats is None:
             continue
-        entries.append((run_id, date.fromisoformat(stats["manifest_entry"]["arrived_date"])))
+        entries.append((run_id, asset_time.local_date(stats["manifest_entry"]["received_at"])))
     entries.sort(key=lambda e: e[1])
     deduped: list[tuple[str, date]] = []
     seen_dates: set[date] = set()

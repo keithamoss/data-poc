@@ -10,11 +10,11 @@ from pipeline import build_cp_dashboard_data as bcd
 
 FIXTURE_RUNS = [
     {
-        "run_id": "cp_run_01_2026-01-01", "run_index": 1, "run_date": "2026-01-01",
+        "run_id": "cp_run_001", "run_index": 1, "received_at": "2026-01-01T05:00:00+00:00",
         "row_counts": {"cp_notifications": 3},
     },
     {
-        "run_id": "cp_run_02_2026-04-01", "run_index": 2, "run_date": "2026-04-01",
+        "run_id": "cp_run_002", "run_index": 2, "received_at": "2026-04-01T20:00:00+00:00",
         "row_counts": {"cp_notifications": 4},
     },
 ]
@@ -27,12 +27,12 @@ FIXTURE_DATASET_STATS = {
     # test_arrival_status_is_genuinely_computed_from_real_cadence below
     # can tell a real onTime/late classification apart from a hardcoded
     # one - see that test's own docstring.
-    "cp_run_01_2026-01-01": {
+    "cp_run_001": {
         "value_counts": {"concern_type": [["Neglect", 2], ["Physical abuse", 1]]},
         "arrival": {"cp_notifications": {"max_lag_hours": 5.0, "earliest_extract": "2025-11-01T05:00:00+00:00"}},
         "check_aggregates": {},
     },
-    "cp_run_02_2026-04-01": {
+    "cp_run_002": {
         "value_counts": {"concern_type": [["Neglect", 3], ["Physical abuse", 1]]},
         "arrival": {"cp_notifications": {"max_lag_hours": 30.0, "earliest_extract": "2026-02-01T20:00:00+00:00"}},
         "check_aggregates": {},
@@ -55,8 +55,8 @@ def _check(run_id, column_name, value, status="pass", **overrides):
 
 
 FIXTURE_RESULTS = [
-    _check("cp_run_01_2026-01-01", "concern_type", 0),
-    _check("cp_run_02_2026-04-01", "concern_type", 1, status="warn", row_count_invalid=1),
+    _check("cp_run_001", "concern_type", 0),
+    _check("cp_run_002", "concern_type", 1, status="warn", row_count_invalid=1),
 ]
 
 
@@ -66,11 +66,11 @@ def test_stats_by_run_carries_every_run_not_just_latest_and_previous():
     col = next(c for c in dataset["columns"] if c["name"] == "concern_type")
     by_run = col["stats"]["byRun"]
 
-    assert set(by_run) == {"cp_run_01_2026-01-01", "cp_run_02_2026-04-01"}
-    assert by_run["cp_run_01_2026-01-01"] == {
+    assert set(by_run) == {"cp_run_001", "cp_run_002"}
+    assert by_run["cp_run_001"] == {
         "total": 3, "invalid": 0, "valid": 3, "valueCounts": [["Neglect", 2], ["Physical abuse", 1]],
     }
-    assert by_run["cp_run_02_2026-04-01"] == {
+    assert by_run["cp_run_002"] == {
         "total": 4, "invalid": 1, "valid": 3, "valueCounts": [["Neglect", 3], ["Physical abuse", 1]],
     }
     # current/previous stay exactly as before, unaffected by byRun
@@ -87,8 +87,8 @@ def test_arrival_status_is_genuinely_computed_from_real_cadence():
     prove that."""
     dataset = bcd.build_one_table("cp_notifications", FIXTURE_RESULTS, FIXTURE_RUNS, FIXTURE_DATASET_STATS, {})
 
-    assert dataset["arrivalByRun"]["cp_run_01_2026-01-01"]["arrivalStatus"] == "onTime"
-    assert dataset["arrivalByRun"]["cp_run_02_2026-04-01"]["arrivalStatus"] == "late"
-    assert dataset["arrivalByRun"]["cp_run_02_2026-04-01"]["maxLagHours"] == 30.0
+    assert dataset["arrivalByRun"]["cp_run_001"]["arrivalStatus"] == "onTime"
+    assert dataset["arrivalByRun"]["cp_run_002"]["arrivalStatus"] == "late"
+    assert dataset["arrivalByRun"]["cp_run_002"]["maxLagHours"] == 30.0
     history_by_run = {h["run_id"]: h["arrivalStatus"] for h in dataset["arrivalHistory"]}
-    assert history_by_run == {"cp_run_01_2026-01-01": "onTime", "cp_run_02_2026-04-01": "late"}
+    assert history_by_run == {"cp_run_001": "onTime", "cp_run_002": "late"}

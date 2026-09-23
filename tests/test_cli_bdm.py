@@ -76,13 +76,13 @@ def test_default_reference_falls_back_when_last_promoted_runs_csv_no_longer_exis
 
 
 def test_picker_choices_and_run_id_from_choice_round_trip():
-    manifest = [{"run_id": "run_001_2026-01-01", "run_date": "2026-01-01", "dirty_severity": None},
-                {"run_id": "run_002_2026-01-02", "run_date": "2026-01-02", "dirty_severity": "red"}]
+    manifest = [{"run_id": "run_001", "received_at": "2026-01-01T06:00:00+00:00", "dirty_severity": None},
+                {"run_id": "run_002", "received_at": "2026-01-02T06:00:00+00:00", "dirty_severity": "red"}]
     choices = bdm.picker_choices(manifest)
     assert "clean" in choices[0]
     assert "red" in choices[1]
-    assert bdm.run_id_from_choice(choices[0]) == "run_001_2026-01-01"
-    assert bdm.run_id_from_choice(choices[1]) == "run_002_2026-01-02"
+    assert bdm.run_id_from_choice(choices[0]) == "run_001"
+    assert bdm.run_id_from_choice(choices[1]) == "run_002"
 
 
 def test_has_failures_true_on_fail_or_error_false_otherwise():

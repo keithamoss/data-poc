@@ -445,8 +445,13 @@ comparisons against the expected-supply sequence.
    First because it is baked into all 257 hand-authored checks; changing
    it later is a corpus-wide edit.
 
-2. **[todo, 2026-09-22]** **[Data generation]** **Generator delivers one
-   table at a time, and injects the scenario shapes.** `REQ-GEN-040`,
+2. **[in-progress, 2026-09-23]** **[Data generation]** **Generator delivers one
+   table at a time, and injects the scenario shapes.** The VOCABULARY
+   half is BUILT as `REQ-GEN-042` (2026-09-23) - slot vs delivery,
+   period vs receipt instant, dateless deterministic run ids, a pinned
+   anchor, and the schedule read from the shared calendar config. The
+   one-table-at-a-time delivery format and the injected scenario shapes
+   are `REQ-GEN-043`/`REQ-GEN-040` and are still to come. `REQ-GEN-040`,
    plus the `[INJECT]` set from the test scenario register below, plus
    the generated scenario map that says where each one landed.
 

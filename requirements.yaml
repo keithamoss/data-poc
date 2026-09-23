@@ -3617,7 +3617,7 @@ requirements:
       that reading the generator to learn how a delivery works teaches me
       the right concept rather than the opposite one.
     moscow: must
-    status: not_started
+    status: built
     source: >
       plans/supply-model.md concept inventory, "The collision: delivery
       already means something else", found 2026-09-22 by reading the real
@@ -3677,6 +3677,78 @@ requirements:
         "delivery" after this - a grep for the old field names should
         come back empty, and that is a cheap thing to verify.
       - Invoked through mothman only.
+    linked_tests:
+      - tests/test_resupply.py
+      - tests/test_generate_runs.py
+      - tests/test_generate_cp_runs.py
+      - tests/test_anchor_date.py
+      - tests/test_schedule.py
+    implemented_by:
+      - generator/resupply.py::Delivery
+      - generator/resupply.py::run_slot_chain
+      - generator/anchor_date.py::get_anchor_date
+      - generator/generate_runs.py::_manifest_entries_for_slot
+      - generator/generate_runs.py::_received_at
+      - generator/generate_cp_runs.py::_cp_manifest_entries_for_slot
+      - generator/generate_cp_runs.py::_cp_received_at
+      - qa_tools/common/asset_time.py::local_date
+      - pipeline/build_dashboard_data.py::_run_date
+      - pipeline/build_cp_dashboard_data.py::_run_date
+    evidence:
+      - >
+        2026-09-23: the vocabulary is reversed where it was wrong. A
+        SLOT is the logical obligation and run_slot_chain walks it; a
+        DELIVERY is one physical arrival and is what that chain yields.
+        The word survives unchanged in
+        qa_tools/cp/completion_tracker.py and qa_tools/common/
+        s3_source.py, checked rather than swept - there it already
+        meant one arrival, which is the sense the model keeps.
+      - >
+        2026-09-23: is_resupply, supersedes_run_id and attempt_number
+        are GONE from everything the generator emits, not renamed, and
+        two tests assert that against real generated output rather than
+        leaving it to a grep somebody remembers to run - including that
+        they have not returned under slot_-prefixed names. The chain
+        keeps an internal arrival counter, which is the bookkeeping it
+        needs to stop at MAX_ATTEMPTS, not an authority on the record.
+      - >
+        2026-09-23: the dashboard needed NO change to survive that
+        removal. It was already deriving resupply-ness from position in
+        the chain rather than from the flags - the comments naming them
+        were the only trace, and they are now updated. Confirmation
+        that the retirement was safe came from the JS and e2e suites
+        passing untouched.
+      - >
+        2026-09-23: every run_id is dateless and derived from the
+        manifest position - run_001 rather than
+        run_006_2026-09-14_resupply1. Regenerating twice in a row
+        produced BYTE-IDENTICAL output (md5 over every generated file),
+        and no second copy. Before pinning the anchor, a regeneration
+        left 84 BDM run directories where there should have been 42 -
+        the doubling, reproduced live.
+      - >
+        2026-09-23: the generator contains no call to date.today() or
+        datetime.now() at all any more, so the generated schedule
+        cannot depend on the day it is run. Verified by grep over
+        generator/, and by a test that freezes date.today() to
+        2099-12-31 and asserts the anchor does not move.
+      - >
+        2026-09-23: both generators read their schedule from
+        contract/data-asset.yaml's calendars (REQ-PIPE-049), not from a
+        private copy of the cadence. BDM takes the last 30 daily
+        periods up to the anchor, CP the last 15 quarterly ones, so the
+        generator places a supply against exactly the schedule the
+        pipeline judges it by.
+      - >
+        2026-09-23: the rebuild changed identity and vocabulary and
+        NOTHING ELSE, measured rather than asserted - the arrival
+        verdict distribution came back identical across it, 131 onTime
+        / 16 early / 3 late over the same 150 arrivals and 7 datasets.
+        That is REQ-PIPE-048's own pin doing the job it was written
+        for, one requirement later.
+      - >
+        2026-09-23: 980 Python tests, 162 JS tests, all eight mothman
+        gates.
     dependencies: [REQ-PIPE-048, REQ-PIPE-049]
     decisions:
       - >

@@ -1,0 +1,62 @@
+{
+  "run_timestamp": "2026-09-23T08:41:35.727132+08:00",
+  "run_by": "noreply@anthropic.com",
+  "raw_output": {
+    "manifest_entry": {
+      "run_id": "run_040",
+      "run_index": 40,
+      "slot_id": "slot_028",
+      "period": "2026-09-20",
+      "received_at": "2026-09-25T05:29:31.164075+00:00",
+      "n_rows_generated": 1958,
+      "dirty_severity": null,
+      "id_offset": 2800000,
+      "seed": 1028,
+      "file": "run_040.csv"
+    },
+    "value_counts": {
+      "sex": [
+        [
+          "M",
+          937
+        ],
+        [
+          "F",
+          990
+        ],
+        [
+          "X",
+          31
+        ]
+      ]
+    },
+    "arrival": {
+      "max_lag_hours": 13.591944444444444,
+      "earliest_extract": "2026-09-20T05:29:31.164075+00:00"
+    },
+    "check_aggregates": {
+      "sex": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 0,
+        "values": []
+      },
+      "place_of_birth_suburb": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 0,
+        "values": []
+      },
+      "date_of_birth": {
+        "type": "numeric_date",
+        "suppressed": false,
+        "total_invalid": 0,
+        "min": null,
+        "max": null,
+        "values": [],
+        "histogram": []
+      }
+    }
+  },
+  "verified": []
+}

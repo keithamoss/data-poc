@@ -1,8 +1,21 @@
 """
 Generic resupply-chain orchestration - the delay/retry/chaining behaviour
-of "a delivery that fails QA gets a resupply some working days later,
+of "a supply that fails QA gets a resupply some working days later,
 which might itself still be broken" (see plans/data-generation.md #5 for the
 original scoping, #13 for why this got pulled out of generate_runs.py).
+
+VOCABULARY, since this module is where the two words meet (REQ-GEN-042,
+2026-09-23). A SLOT is the logical obligation - one (dataset, period)
+pair actually expected, which is what `run_slot_chain` walks. A
+DELIVERY is ONE PHYSICAL ARRIVAL of one or more files, which is what it
+yields. One slot, many deliveries.
+
+That is a real reversal of what this file used to say: "delivery" here
+meant the logical obligation and "attempt" meant the arrival. The
+design does not bend to the code (Keith, 2026-09-22) - the generator
+adopts the model's vocabulary, because reading this module to learn how
+a delivery works should teach the right concept rather than the
+opposite one.
 
 Deliberately knows NOTHING about how a dataset's rows are made. It drives
 any dataset through DatasetProvider - three operations (generate the
@@ -22,14 +35,14 @@ module is deliberately generic but not yet exercised by a second dataset.
 
 GENERICIZED 2026-09-18 (item 80/CP resupply simulation, plans/qa-
 pipeline.md) once a second provider actually arrived: `DatasetProvider`/
-`Attempt`/`run_delivery_chain` are now generic over a payload type `T`
+`Delivery`/`run_slot_chain` are now generic over a payload type `T`
 instead of hardcoding `pd.DataFrame` - Birth Registrations' payload is
 still a single DataFrame, but Child Protection's is a whole delivery's
 worth of tables at once (`dict[str, pd.DataFrame]`, one entry per real
 table). The chain-walking loop itself never inspects payload internals -
 it only calls the three provider methods and threads whatever they
 return back into the next call - so this was a type-hint-only change,
-not a behaviour change; `Attempt.df` renamed to `Attempt.payload` since
+not a behaviour change; the payload field was renamed from `df` since
 it's no longer always a DataFrame (every call site updated alongside).
 `delay_days`/`delay_weights` also became real parameters (still
 defaulting to the exact BDM curve below, so BDM's own call site needed
@@ -112,26 +125,42 @@ def _add_business_days(start: date, n: int) -> date:
 
 
 @dataclass
-class Attempt(Generic[T]):
-    attempt_number: int
-    arrived_date: date
-    is_resupply: bool
-    severity: Optional[str]  # this attempt's own outcome: None | "amber" | "red"
+class Delivery(Generic[T]):
+    """ONE PHYSICAL ARRIVAL of one or more files (REQ-GEN-042).
+
+    That is the only thing the word "delivery" means in this repo now.
+    It used to mean the logical obligation - the thing a supplier owes
+    for a period, across however many attempts it takes - which is a
+    SLOT. One slot, many deliveries.
+
+    Note what this does NOT carry: no attempt_number, no is_resupply.
+    They were not renamed, they were RETIRED. A resupply is an arrival
+    landing in a slot that already has one - observed from the record,
+    never recorded as a flag by the thing that produced it. Keeping a
+    slot_-prefixed version of either would have preserved exactly the
+    bookkeeping this model stops trusting.
+    """
+
+    received_date: date
+    severity: Optional[str]  # this arrival's own outcome: None | "amber" | "red"
     payload: T
 
 
-def run_delivery_chain(provider: DatasetProvider[T], delivery_date: date, seed: int,
+def run_slot_chain(provider: DatasetProvider[T], slot_date: date, seed: int,
                         id_offset: int, n_rows: int, first_severity: Optional[str],
                         previous_row_count: Optional[int],
                         delay_days: np.ndarray = _DELAY_DAYS,
-                        delay_weights: np.ndarray = _DELAY_WEIGHTS) -> Iterator[Attempt[T]]:
-    """Walks one delivery through its full attempt chain, yielding each
-    attempt in order. Stops as soon as an attempt isn't red, or after
-    MAX_ATTEMPTS. The caller owns everything about *identity* (run_id,
-    delivery_id, supersedes_run_id, manifest/file writing) - this only
-    knows attempt numbers and dates. `delay_days`/`delay_weights` default
-    to Birth Registrations' own curve above; a provider whose real-world
-    turnaround differs (see generate_cp_runs.py) passes its own.
+                    delay_weights: np.ndarray = _DELAY_WEIGHTS) -> Iterator[Delivery[T]]:
+    """Walks ONE SLOT through its deliveries, yielding each arrival in
+    order. Stops as soon as one isn't red, or after MAX_ATTEMPTS.
+
+    A SLOT is the logical obligation - one (dataset, period) pair
+    actually expected. This walks the arrivals that fill it. The caller
+    owns everything about identity (run_id, manifest/file writing); this
+    only knows when each one landed. `delay_days`/`delay_weights`
+    default to Birth Registrations' own curve above; a provider whose
+    real-world turnaround differs (see generate_cp_runs.py) passes its
+    own.
 
     Tracks two lineages, not one (real bug found and fixed 2026-09-15 -
     see plans/qa-pipeline.md #31): `clean_payload` is churned forward
@@ -152,31 +181,35 @@ def run_delivery_chain(provider: DatasetProvider[T], delivery_date: date, seed: 
     same underlying rows attempt to attempt, per plans/data-generation.md #5's own
     design intent), just never carrying forward another attempt's
     injected defects."""
-    clean_payload = provider.generate(delivery_date, seed, n_rows, id_offset)
+    clean_payload = provider.generate(slot_date, seed, n_rows, id_offset)
     payload = (provider.dirty(clean_payload, first_severity, seed + 500, previous_row_count)
                if first_severity else clean_payload)
 
-    attempt_number = 1
-    arrived_date = delivery_date
+    # An internal counter, not an emitted field. The chain has to know
+    # how many arrivals it has produced to stop at MAX_ATTEMPTS and to
+    # vary its own RNG streams - what criterion 4 retires is RECORDING
+    # that number as an authority on the record.
+    arrival_count = 1
+    received_date = slot_date
     severity = first_severity
 
     while True:
-        yield Attempt(attempt_number, arrived_date, attempt_number > 1, severity, payload)
+        yield Delivery(received_date, severity, payload)
 
         if severity != "red":
             return  # resolved (or was never red to begin with)
-        if attempt_number >= MAX_ATTEMPTS:
+        if arrival_count >= MAX_ATTEMPTS:
             return  # giving up - hit the hard ceiling
 
-        resupply_rng = np.random.default_rng(seed + 700 + attempt_number)
+        resupply_rng = np.random.default_rng(seed + 700 + arrival_count)
         chosen_delay_days = int(resupply_rng.choice(delay_days, p=delay_weights))
-        arrived_date = _add_business_days(arrived_date, chosen_delay_days)
-        attempt_number += 1
+        received_date = _add_business_days(received_date, chosen_delay_days)
+        arrival_count += 1
 
-        clean_payload = provider.churn(clean_payload, seed + 800 + attempt_number, delivery_date,
-                                        id_offset + 50_000 + attempt_number * 100)
+        clean_payload = provider.churn(clean_payload, seed + 800 + arrival_count, slot_date,
+                                        id_offset + 50_000 + arrival_count * 100)
         if resupply_rng.random() < STILL_RED_PROB:
-            payload = provider.dirty(clean_payload, "red", seed + 900 + attempt_number, previous_row_count)
+            payload = provider.dirty(clean_payload, "red", seed + 900 + arrival_count, previous_row_count)
             severity = "red"
         else:
             payload = clean_payload

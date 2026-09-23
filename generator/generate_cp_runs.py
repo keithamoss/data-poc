@@ -84,7 +84,7 @@ before this was actually built).
 from __future__ import annotations
 import json
 import os
-from datetime import date
+from datetime import date, datetime
 
 import numpy as np
 import pandas as pd
@@ -92,7 +92,13 @@ import pandas as pd
 from qa_tools.common import hierarchy
 from generator.anchor_date import get_anchor_date
 from generator import dirty as dirty_mod
-from generator.resupply import MAX_ATTEMPTS, DatasetProvider, run_delivery_chain
+from generator.resupply import MAX_ATTEMPTS, DatasetProvider, run_slot_chain
+from qa_tools.common import asset_time, schedule
+
+# Which dataset's calendar this collection is scheduled against. All six
+# CP tables arrive together as one supply, so any of them names the same
+# quarterly calendar - cp-clients is simply the first.
+DATASET_ID = "cp-clients"
 from synthetic_data_generator.population import generate_population
 from synthetic_data_generator.child_protection import generate_child_protection_collection
 
@@ -346,34 +352,64 @@ class ChildProtectionProvider:
         return out
 
 
-def _cp_manifest_entries_for_delivery(attempts: list, i: int, delivery_id: str, delivery_date: date,
+
+def _cp_received_at(payload: dict, received_date: date, where: str) -> str:
+    """This delivery's own receipt instant, across all six tables.
+
+    Same rule as Birth Registrations' own `_received_at`, for the same
+    reasons: the DATE comes from the chain, because a resupply lands
+    days after the slot it fills, and the TIME OF DAY comes from the
+    data, because the arrival calibration already lives there. Taking
+    both from the payload would give every arrival in one slot the same
+    instant, days apart in reality.
+
+    Across six tables, the earliest legitimate extract wins - the
+    collection arrives as one supply, so it has one receipt instant.
+    """
+    earliest = None
+    for name in TABLES:
+        df = payload[name]
+        if "extract_timestamp" not in df.columns:
+            continue
+        stamps = pd.to_datetime(df["extract_timestamp"], errors="coerce").dropna()
+        if stamps.empty:
+            continue
+        candidate = pd.Timestamp(stamps.min()).to_pydatetime()
+        if earliest is None or candidate < earliest:
+            earliest = candidate
+    if earliest is None:  # no table carries one - defensive
+        return asset_time.record_source_instant(
+            datetime.combine(received_date, datetime.min.time()), where)
+    return asset_time.record_source_instant(
+        datetime.combine(received_date, earliest.time()), where)
+
+def _cp_manifest_entries_for_slot(deliveries: list, slot_id: str, period: str,
                                        run_index_start: int, seed: int) -> list[dict]:
-    """Pure manifest-entry construction for one delivery's full attempt
-    chain - the CP counterpart to generate_runs.py's own
-    _manifest_entries_for_delivery(), same run_id/supersedes_run_id
-    chaining convention, but `row_counts` (one count per real table)
-    instead of a single `n_rows_generated`/`file` (CP writes one
-    directory of 6 CSVs per attempt, not one CSV)."""
+    """Pure manifest-entry construction for the deliveries filling ONE
+    SLOT - the CP counterpart to generate_runs.py's own
+    _manifest_entries_for_slot(), same dateless run_id convention, but
+    `row_counts` (one count per real table) instead of a single
+    `n_rows_generated`/`file`, since CP writes one directory of 6 CSVs
+    per delivery rather than one CSV."""
     entries = []
-    previous_run_id = None
-    for attempt in attempts:
-        suffix = "" if attempt.attempt_number == 1 else f"_resupply{attempt.attempt_number - 1}"
-        run_id = f"cp_run_{i:02d}_{attempt.arrived_date.isoformat()}{suffix}"
+    for delivery in deliveries:
+        # Dateless and derived from the manifest position, so a
+        # regeneration overwrites in place instead of writing a second
+        # history beside the first (REQ-GEN-042). No resupply marker
+        # either - which arrival is a resupply is observed from the
+        # record, not asserted by whatever produced it.
+        run_index = run_index_start + len(entries) + 1
+        run_id = f"cp_run_{run_index:03d}"
         entries.append({
             "run_id": run_id,
-            "run_index": run_index_start + len(entries) + 1,
-            "delivery_id": delivery_id,
-            "delivery_date": delivery_date.isoformat(),
-            "attempt_number": attempt.attempt_number,
-            "arrived_date": attempt.arrived_date.isoformat(),
-            "run_date": attempt.arrived_date.isoformat(),  # the date this attempt's extract was actually received
-            "is_resupply": attempt.is_resupply,
-            "supersedes_run_id": previous_run_id,
-            "dirty_severity": attempt.severity,  # None | "amber" | "red" - this ATTEMPT's own outcome
+            "run_index": run_index,
+            "slot_id": slot_id,
+            "period": period,
+            "received_at": None,  # filled in by main() from the payload's own earliest extract
+            "dirty_severity": delivery.severity,  # None | "amber" | "red" - this ARRIVAL's own outcome
             "seed": seed,
-            "row_counts": {name: int(len(attempt.payload[name])) for name in TABLES},
+            "row_counts": {name: int(len(delivery.payload[name])) for name in TABLES},
         })
-        previous_run_id = run_id
     return entries
 
 
@@ -388,32 +424,42 @@ def main() -> None:
 
     provider: DatasetProvider = ChildProtectionProvider(base_tables)
     manifest = []
-    for i, (quarter_offset, severity) in enumerate(RUN_PLAN, start=1):
-        snapshot_date = _add_quarters(START_DATE, quarter_offset)
-        delivery_id = f"cp_delivery_{i:02d}"
+    # The same quarterly calendar the pipeline judges these supplies
+    # against - not a private copy of the cadence (REQ-GEN-042). A
+    # generator carrying its own would place supplies against one
+    # schedule while the pipeline measured them against another, and the
+    # disagreement would read as a model failure rather than a config
+    # duplication.
+    periods = schedule.periods_for_dataset(DATASET_ID, until=get_anchor_date())[-len(RUN_PLAN):]
+
+    for i, ((_, severity), period) in enumerate(zip(RUN_PLAN, periods), start=1):
+        snapshot_date = period.date
+        slot_id = f"cp_slot_{i:02d}"
         seed = BASE_SEED + i
 
-        attempts = list(run_delivery_chain(
+        deliveries = list(run_slot_chain(
             provider, snapshot_date, seed, id_offset=0, n_rows=0,
             first_severity=severity, previous_row_count=None,
             delay_days=_CP_DELAY_DAYS, delay_weights=_CP_DELAY_WEIGHTS,
         ))
-        entries = _cp_manifest_entries_for_delivery(attempts, i, delivery_id, snapshot_date, len(manifest), seed)
+        entries = _cp_manifest_entries_for_slot(deliveries, slot_id, period.name, len(manifest), seed)
 
-        for attempt, entry in zip(attempts, entries):
+        for n, (delivery, entry) in enumerate(zip(deliveries, entries), start=1):
             run_dir = os.path.join(OUT_DIR, entry["run_id"])
             os.makedirs(run_dir, exist_ok=True)
             for name in TABLES:
-                df = attempt.payload[name]
+                df = delivery.payload[name]
                 cols = [c for c in df.columns if not c.startswith("_")]
                 df[cols].to_csv(os.path.join(run_dir, f"{name}.csv"), index=False)
-            tag = f"DIRTY({attempt.severity})" if attempt.severity else "clean"
-            resupply_tag = (f"  [resupply attempt {attempt.attempt_number - 1}, "
-                             f"arrived {attempt.arrived_date.isoformat()}]") if attempt.attempt_number > 1 else ""
+            entry["received_at"] = _cp_received_at(
+                delivery.payload, delivery.received_date, f"received_at for {entry['run_id']}")
+            tag = f"DIRTY({delivery.severity})" if delivery.severity else "clean"
+            resupply_tag = (f"  [resupply {n - 1}, received "
+                             f"{delivery.received_date.isoformat()}]") if n > 1 else ""
             print(f"{entry['run_id']}: {entry['row_counts']['cp_notifications']:5d} notifications  "
                   f"[{tag}]{resupply_tag}  -> {run_dir}")
-            if attempt.severity == "red" and attempt.attempt_number >= MAX_ATTEMPTS:
-                print(f"  -> still red after {attempt.attempt_number} attempts - "
+            if delivery.severity == "red" and n >= MAX_ATTEMPTS:
+                print(f"  -> still red after {n} deliveries - "
                       f"giving up (hit MAX_ATTEMPTS={MAX_ATTEMPTS})")
 
         manifest.extend(entries)
@@ -421,9 +467,9 @@ def main() -> None:
     manifest_path = os.path.join(OUT_DIR, "manifest.json")
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
-    n_red_deliveries = sum(1 for _, sev in RUN_PLAN if sev == "red")
-    print(f"\nWrote {len(manifest)} attempts across {len(RUN_PLAN)} scheduled deliveries "
-          f"({n_red_deliveries} of which went red and triggered a resupply chain) + manifest.json "
+    n_red_slots = sum(1 for _, sev in RUN_PLAN if sev == "red")
+    print(f"\nWrote {len(manifest)} deliveries across {len(RUN_PLAN)} scheduled slots "
+          f"({n_red_slots} of which went red and triggered a resupply chain) + manifest.json "
           f"to {os.path.abspath(OUT_DIR)}")
 
 

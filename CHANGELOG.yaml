@@ -138,6 +138,13 @@ releases:
               says which calendar it is on and which months it takes
               part in, and can say a period has no supply coming, with a
               reason.
+          - headline: A supply knows its period
+            components: ["Data generation"]
+            description: >
+              Every supply now records which period it is for and when
+              it actually turned up, as two separate things. A late
+              resupply belongs to the quarter it was meant for, not the
+              one it arrived in.
           - headline: Next year's dates, suggested
             components: ["Testing & dev tooling"]
             description: >
@@ -148,6 +155,13 @@ releases:
 
       - category: Fixed
         items:
+          - headline: Regenerating no longer doubles the history
+            components: ["Data generation"]
+            description: >
+              Rebuilding the demo data on a different day used to leave
+              two complete copies of the history side by side rather
+              than replacing it. It now overwrites itself, and rebuilds
+              identically whatever day you run it.
           - headline: Six datasets, one deadline
             components: ["Pipeline & publishing"]
             description: >

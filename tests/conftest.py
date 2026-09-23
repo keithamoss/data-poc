@@ -77,8 +77,8 @@ def bdm_raw_dir(tmp_path_factory):
     dirty_df.to_csv(raw_dir / f"{_DIRTY_RUN_ID}.csv", index=False)
 
     manifest = [
-        {"run_id": _REF_RUN_ID, "file": f"{_REF_RUN_ID}.csv", "run_date": "2026-01-01", "dirty_severity": None},
-        {"run_id": _DIRTY_RUN_ID, "file": f"{_DIRTY_RUN_ID}.csv", "run_date": "2026-01-02", "dirty_severity": "red"},
+        {"run_id": _REF_RUN_ID, "file": f"{_REF_RUN_ID}.csv", "received_at": "2026-01-01T06:00:00+00:00", "dirty_severity": None},
+        {"run_id": _DIRTY_RUN_ID, "file": f"{_DIRTY_RUN_ID}.csv", "received_at": "2026-01-02T06:00:00+00:00", "dirty_severity": "red"},
     ]
     with open(raw_dir / "manifest.json", "w") as f:
         json.dump(manifest, f)
@@ -140,7 +140,7 @@ def cp_raw_dir(tmp_path_factory):
             cols = [c for c in df.columns if not c.startswith("_")]
             df[cols].to_csv(run_dir / f"{name}.csv", index=False)
             row_counts[name] = int(len(df))
-        return {"run_id": run_id, "run_index": 1, "run_date": run_date,
+        return {"run_id": run_id, "run_index": 1, "received_at": f"{run_date}T06:00:00+00:00",
                 "dirty_severity": dirty_severity, "seed": 91000, "row_counts": row_counts}
 
     ref_entry = _write_run(_CP_REF_RUN_ID, "2026-01-01", base_tables, None)

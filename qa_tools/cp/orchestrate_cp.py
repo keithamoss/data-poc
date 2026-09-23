@@ -117,7 +117,7 @@ def run_single(entry: dict, reference_run_id: str, run_by: str | None = None,
     completion-signal design exists to prevent.
 
     `entry` is a manifest-entry-shaped dict for this one delivery
-    (run_id/run_date/dirty_severity at minimum - see data/cp_raw/
+    (run_id/received_at/dirty_severity at minimum - see data/cp_raw/
     manifest.json's own real shape for the full convention; row_counts
     isn't required, dataset_stats.compute_dataset_stats() derives its own
     counts from the live warehouse instead of trusting a passed-in one)."""

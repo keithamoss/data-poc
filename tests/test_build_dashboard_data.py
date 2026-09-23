@@ -17,23 +17,23 @@ from pipeline import build_dashboard_data as bdd
 
 FIXTURE_RUNS = [
     {
-        "run_id": "run_01_2026-09-01", "run_index": 1, "delivery_id": "delivery_01",
-        "run_date": "2026-09-01", "n_rows_generated": 3, "dirty_severity": None,
+        "run_id": "run_001", "run_index": 1, "slot_id": "slot_001", "period": "2026-09-01",
+        "received_at": "2026-09-01T10:00:00+00:00", "n_rows_generated": 3, "dirty_severity": None,
     },
     {
-        "run_id": "run_02_2026-09-02", "run_index": 2, "delivery_id": "delivery_02",
-        "run_date": "2026-09-02", "n_rows_generated": 4, "dirty_severity": "amber",
+        "run_id": "run_002", "run_index": 2, "slot_id": "slot_002", "period": "2026-09-02",
+        "received_at": "2026-09-02T10:00:00+00:00", "n_rows_generated": 4, "dirty_severity": "amber",
     },
 ]
 
 FIXTURE_DATASET_STATS = {
-    "run_01_2026-09-01": {
+    "run_001": {
         "manifest_entry": FIXTURE_RUNS[0],
         "value_counts": {"sex": [["M", 1], ["F", 2], ["X", 0]]},
         "arrival": {"max_lag_hours": 5.0, "earliest_extract": "2026-09-01T10:00:00+00:00"},
         "check_aggregates": {"sex": {"type": "categorical", "suppressed": False, "total_invalid": 0, "values": []}},
     },
-    "run_02_2026-09-02": {
+    "run_002": {
         "manifest_entry": FIXTURE_RUNS[1],
         "value_counts": {"sex": [["M", 2], ["F", 1], ["X", 1]]},
         "arrival": {"max_lag_hours": 6.0, "earliest_extract": "2026-09-02T10:00:00+00:00"},
@@ -58,8 +58,8 @@ def _check(run_id, column_name, value, status="pass", **overrides):
 
 
 FIXTURE_RESULTS = [
-    _check("run_01_2026-09-01", "sex", 0),
-    _check("run_02_2026-09-02", "sex", 1, status="warn", row_count_invalid=1),
+    _check("run_001", "sex", 0),
+    _check("run_002", "sex", 1, status="warn", row_count_invalid=1),
 ]
 
 
@@ -135,19 +135,19 @@ def test_stats_by_run_carries_every_run_not_just_latest_and_previous(tmp_path, m
     sex_col = next(c for c in data["columns"] if c["name"] == "sex")
     by_run = sex_col["stats"]["byRun"]
 
-    assert set(by_run) == {"run_01_2026-09-01", "run_02_2026-09-02"}
+    assert set(by_run) == {"run_001", "run_002"}
     # run_01 is clean (metric_value 0) - matches "previous" above
-    assert by_run["run_01_2026-09-01"] == {
+    assert by_run["run_001"] == {
         "total": 3, "invalid": 0, "valid": 3, "valueCounts": [["M", 1], ["F", 2], ["X", 0]],
     }
     # run_02 matches "current" above (metric_value 1)
-    assert by_run["run_02_2026-09-02"] == {
+    assert by_run["run_002"] == {
         "total": 4, "invalid": 1, "valid": 3, "valueCounts": [["M", 2], ["F", 1], ["X", 1]],
     }
     # a column with no real check (the honest-placeholder path) still
     # gets a byRun entry per run, all zero - never crashes or gets skipped
     uncovered = next(c for c in data["columns"] if c["name"] == "date_registered")
-    assert set(uncovered["stats"]["byRun"]) == {"run_01_2026-09-01", "run_02_2026-09-02"}
+    assert set(uncovered["stats"]["byRun"]) == {"run_001", "run_002"}
 
 
 def test_arrival_status_is_genuinely_computed_from_real_cadence(tmp_path, monkeypatch):
@@ -165,9 +165,9 @@ def test_arrival_status_is_genuinely_computed_from_real_cadence(tmp_path, monkey
     mixed_stats = json.loads(json.dumps(FIXTURE_DATASET_STATS))
     # run_01: inside the grace window (expected 2026-09-01T06:00:00Z, 60
     # min grace) -> onTime.
-    mixed_stats["run_01_2026-09-01"]["arrival"]["earliest_extract"] = "2026-09-01T06:30:00+00:00"
+    mixed_stats["run_001"]["arrival"]["earliest_extract"] = "2026-09-01T06:30:00+00:00"
     # run_02: hours after the grace window -> late.
-    mixed_stats["run_02_2026-09-02"]["arrival"]["earliest_extract"] = "2026-09-02T10:00:00+00:00"
+    mixed_stats["run_002"]["arrival"]["earliest_extract"] = "2026-09-02T10:00:00+00:00"
     results_path = tmp_path / "results_bdm.json"
     results_path.write_text(json.dumps({
         "runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS, "dataset_stats": mixed_stats,
@@ -176,11 +176,11 @@ def test_arrival_status_is_genuinely_computed_from_real_cadence(tmp_path, monkey
 
     data = bdd.build()
 
-    assert data["arrivalByRun"]["run_01_2026-09-01"]["arrivalStatus"] == "onTime"
-    assert data["arrivalByRun"]["run_01_2026-09-01"]["maxLagHours"] == 5.0
-    assert data["arrivalByRun"]["run_02_2026-09-02"]["arrivalStatus"] == "late"
+    assert data["arrivalByRun"]["run_001"]["arrivalStatus"] == "onTime"
+    assert data["arrivalByRun"]["run_001"]["maxLagHours"] == 5.0
+    assert data["arrivalByRun"]["run_002"]["arrivalStatus"] == "late"
     history_by_run = {h["run_id"]: h["arrivalStatus"] for h in data["arrivalHistory"]}
-    assert history_by_run == {"run_01_2026-09-01": "onTime", "run_02_2026-09-02": "late"}
+    assert history_by_run == {"run_001": "onTime", "run_002": "late"}
 
 
 def test_a_retired_checks_metadata_is_carried_through(tmp_path, monkeypatch):
@@ -267,11 +267,11 @@ def _rowcount_results():
     """A real two-sided-range check: no expressible one-sided threshold,
     a large legitimate metric value, and a real `pass` from the tool."""
     return [
-        _check("run_01_2026-09-01", "sex", 1939, status="pass",
+        _check("run_001", "sex", 1939, status="pass",
                check_name="datacontract:rowCount", label="Row count",
                warn_threshold=None, fail_threshold=None,
                check_id=ROWCOUNT_CHECK_ID, engine="datacontract-cli 1.2.0"),
-        _check("run_02_2026-09-02", "sex", 2119, status="pass",
+        _check("run_002", "sex", 2119, status="pass",
                check_name="datacontract:rowCount", label="Row count",
                warn_threshold=None, fail_threshold=None,
                check_id=ROWCOUNT_CHECK_ID, engine="datacontract-cli 1.2.0"),
@@ -334,9 +334,9 @@ def test_a_violation_count_checks_zero_tolerance_is_not_regressed(tmp_path, monk
     results_path.write_text(json.dumps({
         "runs": FIXTURE_RUNS,
         "results": [
-            _check("run_01_2026-09-01", "sex", 0, status="pass",
+            _check("run_001", "sex", 0, status="pass",
                    check_name="dbt:not_null", warn_threshold=None, fail_threshold=None),
-            _check("run_02_2026-09-02", "sex", 14, status="fail",
+            _check("run_002", "sex", 14, status="fail",
                    check_name="dbt:not_null", warn_threshold=None, fail_threshold=None),
         ],
         "dataset_stats": FIXTURE_DATASET_STATS,
@@ -366,7 +366,7 @@ def _build_with_authored_check(tmp_path, monkeypatch, **authored):
     results_path = tmp_path / "results_bdm.json"
     results_path.write_text(json.dumps({
         "runs": FIXTURE_RUNS,
-        "results": [_check("run_02_2026-09-02", "sex", 0, status="pass",
+        "results": [_check("run_002", "sex", 0, status="pass",
                            check_id=check_id)],
         "dataset_stats": FIXTURE_DATASET_STATS,
     }))
@@ -456,10 +456,10 @@ def test_two_checks_sharing_a_display_name_stay_separate(tmp_path, monkeypatch):
     results_path.write_text(json.dumps({
         "runs": FIXTURE_RUNS,
         "results": [
-            _custom_sql("run_01_2026-09-01", 5, "fail", RANGE_ID),
-            _custom_sql("run_01_2026-09-01", 0, "pass", FRESH_ID),
-            _custom_sql("run_02_2026-09-02", 0, "pass", RANGE_ID),
-            _custom_sql("run_02_2026-09-02", 1, "fail", FRESH_ID),
+            _custom_sql("run_001", 5, "fail", RANGE_ID),
+            _custom_sql("run_001", 0, "pass", FRESH_ID),
+            _custom_sql("run_002", 0, "pass", RANGE_ID),
+            _custom_sql("run_002", 1, "fail", FRESH_ID),
         ],
         "dataset_stats": FIXTURE_DATASET_STATS,
     }))
@@ -475,10 +475,10 @@ def test_two_checks_sharing_a_display_name_stay_separate(tmp_path, monkeypatch):
     def value(check, run_id):
         return next(h["value"] for h in check["history"] if h["run_id"] == run_id)
 
-    assert value(by_id[RANGE_ID], "run_01_2026-09-01") == 5
-    assert value(by_id[FRESH_ID], "run_01_2026-09-01") == 0
-    assert value(by_id[RANGE_ID], "run_02_2026-09-02") == 0
-    assert value(by_id[FRESH_ID], "run_02_2026-09-02") == 1
+    assert value(by_id[RANGE_ID], "run_001") == 5
+    assert value(by_id[FRESH_ID], "run_001") == 0
+    assert value(by_id[RANGE_ID], "run_002") == 0
+    assert value(by_id[FRESH_ID], "run_002") == 1
 
 
 def test_a_table_level_check_lands_in_a_pseudo_column(tmp_path, monkeypatch):
@@ -495,13 +495,13 @@ def test_a_table_level_check_lands_in_a_pseudo_column(tmp_path, monkeypatch):
     results_path.write_text(json.dumps({
         "runs": FIXTURE_RUNS,
         "results": [
-            _check("run_01_2026-09-01", "(table)", 3, check_name="datacontract:row_count",
+            _check("run_001", "(table)", 3, check_name="datacontract:row_count",
                    engine="datacontract-cli 1.2.0", check_id="a.b.c.d.rowCount_datacontract"),
-            _check("run_02_2026-09-02", "(table)", 4, check_name="datacontract:row_count",
+            _check("run_002", "(table)", 4, check_name="datacontract:row_count",
                    engine="datacontract-cli 1.2.0", check_id="a.b.c.d.rowCount_datacontract"),
-            _check("run_01_2026-09-01", "(table)", 0, check_name="dbt:escalation_completeness",
+            _check("run_001", "(table)", 0, check_name="dbt:escalation_completeness",
                    check_id="a.b.c.d.escalation_completeness_dbt"),
-            _check("run_02_2026-09-02", "(table)", 0, check_name="dbt:escalation_completeness",
+            _check("run_002", "(table)", 0, check_name="dbt:escalation_completeness",
                    check_id="a.b.c.d.escalation_completeness_dbt"),
         ],
         "dataset_stats": FIXTURE_DATASET_STATS,

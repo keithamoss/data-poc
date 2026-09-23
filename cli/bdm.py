@@ -147,7 +147,7 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
     patch_write_qa_result_for_lambda(BDM_MODULES, tmp_dir)
 
     results = _run_single_preserving_manifest(
-        run_id, csv_path, entry["run_date"], entry["dirty_severity"],
+        run_id, csv_path, asset_time.local_date(entry["received_at"]).isoformat(), entry["dirty_severity"],
         reference_run_id, reference_csv, run_by=run_by,
         previous_run_id=previous_entry["run_id"] if previous_entry else None,
         previous_csv=previous_entry["file"] if previous_entry else None,
@@ -252,7 +252,7 @@ def has_failures(results: list[dict]) -> bool:
 
 
 def picker_choices(manifest: list[dict]) -> list[str]:
-    return [f'{e["run_id"]}  ({e["run_date"]}, {e["dirty_severity"] or "clean"})' for e in manifest]
+    return [f'{e["run_id"]}  ({asset_time.local_date(e["received_at"])}, {e["dirty_severity"] or "clean"})' for e in manifest]
 
 
 def run_id_from_choice(choice: str) -> str:

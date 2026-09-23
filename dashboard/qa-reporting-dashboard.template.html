@@ -1256,7 +1256,10 @@ function datasetStatusByRun(d){
 // Keith's own critique of the original design: "suppliers won't actually
 // label a resupply as against the original supply. It will just appear
 // at a certain time" - so this no longer trusts the generator's own
-// is_resupply/delivery_id/delivery_date/supersedes_run_id bookkeeping
+// is_resupply/supersedes_run_id/attempt_number bookkeeping, which
+// REQ-GEN-042 has since RETIRED from the generator entirely - this
+// page was already deriving it the right way, so that removal
+// required no change here
 // (real for the SYNTHETIC DATA's own generation, but nothing a real
 // production dashboard would ever have). Chain membership is now derived
 // purely from two real, cadence-agnostic facts: cycleStartDate() (only
@@ -1305,7 +1308,7 @@ function buildSupplyHistory(d){
       status,
       // arrivalStatus only means anything for the FIRST arrival of a
       // chain (item 69's own reasoning, now derived from real chain
-      // position instead of the synthetic is_resupply flag): every
+      // position instead of the since-retired is_resupply flag): every
       // later attempt in an open chain reuses its predecessor's real
       // row data via the generator's churn design, so comparing its
       // stale extract_timestamp against whatever cycle it eventually
@@ -1315,7 +1318,7 @@ function buildSupplyHistory(d){
       // "how long since the previous supply or resupply" (Keith's own
       // framing) - now just the previous entry in this SAME chain,
       // walked in chronological order, rather than a separate
-      // supersedes_run_id lookup - the chain itself already IS that
+      // supersedes_run_id lookup (also since retired) - the chain itself already IS that
       // sequence.
       daysSincePrevious: previous ? dateStrDiffDays(previous.run_date, run.run_date) : null,
       rowCount: rowCountAtRun(d, run.run_id),

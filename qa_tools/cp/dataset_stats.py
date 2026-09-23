@@ -127,5 +127,5 @@ def compute_dataset_stats(conn: duckdb.DuckDBPyConnection, manifest_entry: dict)
         "manifest_entry": manifest_entry,
         "value_counts": {"concern_type": _concern_type_value_counts(conn)},
         "check_aggregates": _check_aggregates(conn),
-        "arrival": _arrival(conn, manifest_entry["run_date"]),
+        "arrival": _arrival(conn, asset_time.local_date(manifest_entry["received_at"]).isoformat()),
     }

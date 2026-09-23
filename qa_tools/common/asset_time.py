@@ -172,6 +172,19 @@ def as_of_instant(day: date) -> datetime:
     return end_of_day(day)
 
 
+def local_date(value) -> date:
+    """The calendar date an instant falls on, ON THE ASSET'S CLOCK.
+
+    The bridge between the supply model's receipt INSTANT and every
+    consumer that legitimately wants a date - a warehouse partition, a
+    cadence cycle, a row in a supply-history table. Reading the date off
+    the string would answer in whatever zone it happens to be stored in,
+    which for a 10pm Perth arrival stored as UTC is the following day -
+    the exact bug REQ-PIPE-048 is named for, reintroduced one layer up.
+    """
+    return localise(parse_instant(value, "local_date()")).date()
+
+
 def isoformat(value: datetime) -> str:
     """One instant as the string this project stores.
 

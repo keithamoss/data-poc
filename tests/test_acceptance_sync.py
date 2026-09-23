@@ -185,7 +185,7 @@ class TestRunWindowsWithTiedArrivedDates:
     """Real bug found live, 2026-09-19, while adding /reject test
     coverage against real current committed history: this project's own
     full BDM pipeline regeneration (same day) left MOST real runs
-    sharing their own arrived_date with another real run (352 real runs,
+    sharing their own receipt date with another real run (352 real runs,
     only 123 distinct dates, AS THE TREE STOOD THEN - BDM's history was
     cut to 30 deliveries on 2026-09-23, so today's counts are smaller;
     the tie condition this class covers is unaffected, since it is
@@ -199,9 +199,9 @@ class TestRunWindowsWithTiedArrivedDates:
     documented intent, and a real run a human could never actually
     accept/reject via a same-day comment."""
 
-    def _fake_stats(self, arrived_dates_by_run):
+    def _fake_stats(self, received_dates_by_run):
         def read_dataset_stats(agency, dataset, run_id, qa_results_dir=None):
-            return {"manifest_entry": {"arrived_date": arrived_dates_by_run[run_id]}}
+            return {"manifest_entry": {"received_at": f"{received_dates_by_run[run_id]}T06:00:00+00:00"}}
         return read_dataset_stats
 
     def test_the_first_of_two_same_day_runs_gets_a_real_non_empty_window(self, monkeypatch):

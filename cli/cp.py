@@ -19,6 +19,7 @@ import json
 import os
 import sys
 import tempfile
+from datetime import date
 
 import rich_click as click
 from rich.console import Console
@@ -187,7 +188,8 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
     _load_delivery_from_folder(reference_folder, reference_run_id)
     _load_delivery_from_folder(folder, run_id)
 
-    entry = {"run_id": run_id, "run_date": run_date, "dirty_severity": None}
+    entry = {"run_id": run_id, "dirty_severity": None,
+             "received_at": asset_time.isoformat(asset_time.start_of_day(date.fromisoformat(run_date)))}
     results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id, run_by=run_by,
                                         on_step=on_step)
     return results, tmp_dir
@@ -266,7 +268,8 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
     build_cp_warehouses.add_table_to_run(
         run_id, table, file_path, out_dir=build_cp_warehouses.OUT_DIR, raw_dir=build_cp_warehouses.CP_RAW_DIR)
 
-    entry = {"run_id": run_id, "run_date": run_date, "dirty_severity": None}
+    entry = {"run_id": run_id, "dirty_severity": None,
+             "received_at": asset_time.isoformat(asset_time.start_of_day(date.fromisoformat(run_date)))}
     results = orchestrate_cp.run_single(entry, reference_run_id=other_tables_run_id, run_by=run_by,
                                         on_step=on_step)
     return results, tmp_dir
@@ -313,7 +316,7 @@ def has_failures(results: list[dict]) -> bool:
 
 
 def picker_choices(manifest: list[dict]) -> list[str]:
-    return [f'{e["run_id"]}  ({e["run_date"]}, {e["dirty_severity"] or "clean"})' for e in manifest]
+    return [f'{e["run_id"]}  ({asset_time.local_date(e["received_at"])}, {e["dirty_severity"] or "clean"})' for e in manifest]
 
 
 def run_id_from_choice(choice: str) -> str:

@@ -1,0 +1,122 @@
+{
+  "run_timestamp": "2026-09-23T08:43:52.200849+08:00",
+  "run_by": "noreply@anthropic.com",
+  "raw_output": {
+    "manifest_entry": {
+      "run_id": "cp_run_002",
+      "run_index": 2,
+      "slot_id": "cp_slot_02",
+      "period": "2023-Q2",
+      "received_at": "2023-05-01T01:00:00+00:00",
+      "dirty_severity": "amber",
+      "seed": 5002,
+      "row_counts": {
+        "cp_clients": 527,
+        "cp_notifications": 1001,
+        "cp_investigations": 181,
+        "cp_placements": 242,
+        "cp_carers": 289,
+        "cp_case_workers": 60
+      }
+    },
+    "value_counts": {
+      "concern_type": [
+        [
+          "Neglect",
+          379
+        ],
+        [
+          "Physical abuse",
+          118
+        ],
+        [
+          "Emotional abuse",
+          212
+        ],
+        [
+          "Sexual abuse",
+          36
+        ],
+        [
+          "Domestic violence exposure",
+          134
+        ],
+        [
+          "Parental substance use",
+          69
+        ],
+        [
+          "Parental mental health concern",
+          38
+        ],
+        [
+          "(invalid code)",
+          15
+        ]
+      ]
+    },
+    "check_aggregates": {
+      "cp_clients.postcode": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 0,
+        "values": []
+      },
+      "cp_clients.date_of_birth": {
+        "type": "numeric_date",
+        "suppressed": false,
+        "total_invalid": 0,
+        "min": null,
+        "max": null,
+        "values": [],
+        "histogram": []
+      },
+      "cp_notifications.concern_type": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 15,
+        "values": [
+          {
+            "value": "Code 9",
+            "count": 7
+          },
+          {
+            "value": "Pending classification",
+            "count": 5
+          },
+          {
+            "value": "Unspecified",
+            "count": 3
+          }
+        ]
+      }
+    },
+    "arrival": {
+      "cp_clients": {
+        "max_lag_hours": 7.0,
+        "earliest_extract": "2023-05-01T01:00:00+00:00"
+      },
+      "cp_notifications": {
+        "max_lag_hours": 7.0,
+        "earliest_extract": "2023-05-01T01:00:00+00:00"
+      },
+      "cp_investigations": {
+        "max_lag_hours": 7.0,
+        "earliest_extract": "2023-05-01T01:00:00+00:00"
+      },
+      "cp_placements": {
+        "max_lag_hours": 7.0,
+        "earliest_extract": "2023-05-01T01:00:00+00:00"
+      },
+      "cp_carers": {
+        "max_lag_hours": 7.0,
+        "earliest_extract": "2023-05-01T01:00:00+00:00"
+      },
+      "cp_case_workers": {
+        "max_lag_hours": 7.0,
+        "earliest_extract": "2023-05-01T01:00:00+00:00"
+      }
+    }
+  },
+  "verified": []
+}

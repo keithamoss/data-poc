@@ -1,0 +1,110 @@
+{
+  "run_timestamp": "2026-09-23T08:41:35.727132+08:00",
+  "run_by": "noreply@anthropic.com",
+  "raw_output": {
+    "manifest_entry": {
+      "run_id": "run_021",
+      "run_index": 21,
+      "slot_id": "slot_016",
+      "period": "2026-09-08",
+      "received_at": "2026-09-08T06:04:51.065085+00:00",
+      "n_rows_generated": 1507,
+      "dirty_severity": "amber",
+      "id_offset": 1600000,
+      "seed": 1016,
+      "file": "run_021.csv"
+    },
+    "value_counts": {
+      "sex": [
+        [
+          "M",
+          719
+        ],
+        [
+          "F",
+          743
+        ],
+        [
+          "X",
+          28
+        ],
+        [
+          "(invalid code)",
+          17
+        ]
+      ]
+    },
+    "arrival": {
+      "max_lag_hours": 6.814166666666667,
+      "earliest_extract": "2026-09-08T06:04:51.065085+00:00"
+    },
+    "check_aggregates": {
+      "sex": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 17,
+        "values": [
+          {
+            "value": "U",
+            "count": 6
+          },
+          {
+            "value": "9",
+            "count": 6
+          },
+          {
+            "value": "O",
+            "count": 5
+          }
+        ]
+      },
+      "place_of_birth_suburb": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 6,
+        "values": [
+          {
+            "value": "Unknown",
+            "count": 4
+          },
+          {
+            "value": "TBC",
+            "count": 1
+          },
+          {
+            "value": "Freemantle",
+            "count": 1
+          }
+        ]
+      },
+      "date_of_birth": {
+        "type": "numeric_date",
+        "suppressed": false,
+        "total_invalid": 4,
+        "min": "1750-01-01",
+        "max": "1850-06-15",
+        "values": [
+          {
+            "value": "1850-06-15",
+            "count": 3
+          },
+          {
+            "value": "1750-01-01",
+            "count": 1
+          }
+        ],
+        "histogram": [
+          {
+            "bucket": "1750-01-01 to 1766-09-28",
+            "count": 1
+          },
+          {
+            "bucket": "1833-09-17 to 1850-06-15",
+            "count": 3
+          }
+        ]
+      }
+    }
+  },
+  "verified": []
+}

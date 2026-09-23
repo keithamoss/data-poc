@@ -48,6 +48,25 @@ def _parse_extract_timestamp(s: str) -> datetime:
     UTC by whichever caller got to it first (REQ-PIPE-048)."""
     return asset_time.parse_instant(s, "arrival.earliest_extract in committed qa_results/")
 
+
+def _run_date(entry: dict) -> str:
+    """One manifest entry's receipt DATE, as a string.
+
+    The manifest carries a receipt INSTANT since REQ-GEN-042 - the
+    generator's own `received_at` - and the two axes it separates
+    (which period a supply is for, when it actually turned up) are the
+    point of that change. Everything below wants a date, for a cadence
+    cycle or a row in a supply-history table, so it is derived here in
+    one place rather than at eleven call sites.
+
+    `run_date` survives as the DASHBOARD-FACING name deliberately. The
+    vocabulary change is the generator's; renaming a presentation field
+    the template, the JS tests and the e2e suite all key on would be
+    churn this requirement did not ask for, and `run_date` is not one
+    of the names it retires.
+    """
+    return asset_time.local_date(entry["received_at"]).isoformat()
+
 ENGINE_SHORT = {
     # Same short-name convention as build_cp_dashboard_data.py's own
     # ENGINE_SHORT for these 4 tags. No "(real)" suffix on the tag itself
@@ -128,7 +147,7 @@ ALL_COLUMNS = list(COLUMN_META.keys())
 def build() -> dict:
     with open(REAL_RESULTS_PATH) as f:
         payload = json.load(f)
-    manifest = sorted(payload["runs"], key=lambda r: r["run_date"])
+    manifest = sorted(payload["runs"], key=_run_date)
     results = payload["results"]
     dataset_stats = payload["dataset_stats"]
 
@@ -193,7 +212,7 @@ def build() -> dict:
             history = []
             for run_id in run_ids_in_order:
                 if run_id in slot["by_run"]:
-                    run_date = next(m["run_date"] for m in manifest if m["run_id"] == run_id)
+                    run_date = next(_run_date(m) for m in manifest if m["run_id"] == run_id)
                     aggregate_values = None
                     if attach_aggregate:
                         aggregate_values = dataset_stats[run_id]["check_aggregates"].get(col)
@@ -277,7 +296,7 @@ def build() -> dict:
                 # it is not a failure, so green is the truthful answer.
                 "dimension": "", "unit": "count", "warn": None, "fail": None,
                 "current": 0, "current_status": "green", "previous": 0,
-                "history": [{"run_id": m["run_id"], "run_date": m["run_date"], "value": 0,
+                "history": [{"run_id": m["run_id"], "run_date": _run_date(m), "value": 0,
                              "status": "green"} for m in manifest],
                 "note": "Neither the ODCS contract nor the Soda/dbt check files define a rule for this "
                         "column today — this is a real gap, not a hidden failure.",
@@ -370,7 +389,7 @@ def build() -> dict:
     max_lag_hours = dataset_stats[latest_run]["arrival"]["max_lag_hours"]
     earliest_extract = dataset_stats[latest_run]["arrival"]["earliest_extract"]
     latest_status = classify_arrival(
-        cadence, date.fromisoformat(latest_entry["run_date"]), _parse_extract_timestamp(earliest_extract))
+        cadence, date.fromisoformat(_run_date(latest_entry)), _parse_extract_timestamp(earliest_extract))
 
     # Genuinely per-run now, not a hardcoded True for every run but the
     # latest - every run's own max_lag_hours/earliest_extract already
@@ -387,12 +406,12 @@ def build() -> dict:
         run_id = m["run_id"]
         arrival = dataset_stats[run_id]["arrival"]
         status = classify_arrival(
-            cadence, date.fromisoformat(m["run_date"]), _parse_extract_timestamp(arrival["earliest_extract"]))
+            cadence, date.fromisoformat(_run_date(m)), _parse_extract_timestamp(arrival["earliest_extract"]))
         arrival_by_run[run_id] = {
             "arrivedAt": arrival["earliest_extract"], "arrivalStatus": status,
             "maxLagHours": round(arrival["max_lag_hours"], 1),
         }
-        arrival_history.append({"run_id": run_id, "run_date": m["run_date"], "arrivalStatus": status})
+        arrival_history.append({"run_id": run_id, "run_date": _run_date(m), "arrivalStatus": status})
 
     return {
         "id": "birth-registrations",
@@ -401,7 +420,7 @@ def build() -> dict:
         "deliveryFormat": "CSV (S3 drop) — Parquet planned",
         "sla": {"cadence": cadence},
         "lastArrival": {
-            "run_date": latest_entry["run_date"],
+            "run_date": _run_date(latest_entry),
             "arrivedAt": earliest_extract,
             "arrivalStatus": latest_status,
             "maxLagHours": round(max_lag_hours, 1),
@@ -413,7 +432,17 @@ def build() -> dict:
         # Per-run row counts aren't duplicated into their own dict here -
         # "runs" (below) already carries n_rows_generated per manifest
         # entry, so Thread C's as-of UI can read it straight from there.
-        "runs": manifest,
+        # Each run as the PAGE sees it: the manifest entry plus a
+        # derived `run_date`. The manifest itself carries a receipt
+        # INSTANT since REQ-GEN-042 (`received_at`), and the template,
+        # the JS tests and the e2e suite all key supply history on a
+        # date - so the date is derived once, here, at the last
+        # transform before the page.
+        #
+        # Spread-then-add rather than a hand-listed copy, deliberately:
+        # a hand-maintained allowlist silently drops every field added
+        # later, which is CLAUDE.md's own standing lesson from item 74.
+        "runs": [{**m, "run_date": _run_date(m)} for m in manifest],
         "columns": columns_out,
         "_provenance": "Computed by qa_tools/bdm/orchestrate_bdm.py - actual dbt-core, Soda Core, datacontract-cli "
                         "and Evidently runs against real generated CSVs, the real ODCS contract, the real Soda "

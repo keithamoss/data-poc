@@ -9,11 +9,17 @@ reading the new code. It has to be measured against what the old code
 actually produced.
 
 tests/fixtures/arrival_semantics_golden.json is that measurement: every
-run in committed history, with the arrival instant and the early/onTime/
-late verdict the pre-048 code gave it. Regenerate it ONLY when the
-committed history is legitimately rebuilt (REQ-GEN-042's regeneration
-will), never to make a failing test pass - a diff here after a timezone
-change is the finding, not the noise.
+run in committed history, with its arrival instant and its
+early/onTime/late verdict. Regenerate it ONLY when the committed
+history is legitimately rebuilt, never to make a failing test pass - a
+diff here after a timezone change is the finding, not the noise.
+
+REGENERATED ONCE, 2026-09-23, for REQ-GEN-042's rebuild, which renamed
+every run_id. Checked rather than assumed before accepting it: the
+verdict distribution came back IDENTICAL across the rebuild - 131
+onTime, 16 early, 3 late over the same 150 arrivals and 7 datasets - so
+the regeneration changed identity and vocabulary and nothing else,
+which is exactly what that requirement claims.
 
 WHAT 048 DELIBERATELY DOES CHANGE, so it is not mistaken for a
 regression: a timestamp with no offset currently gets silently treated

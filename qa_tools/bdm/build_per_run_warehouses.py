@@ -24,6 +24,7 @@ import os
 import duckdb
 
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
+from qa_tools.common import asset_time
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 RAW_DIR = os.path.join(ROOT, "data", "raw")
@@ -89,7 +90,8 @@ def build_all(raw_dir: str = RAW_DIR, out_dir: str = OUT_DIR) -> list[str]:
     paths = []
     for entry in manifest:
         db_path = build_one(
-            entry["run_id"], os.path.join(raw_dir, entry["file"]), entry["run_date"], entry["dirty_severity"],
+            entry["run_id"], os.path.join(raw_dir, entry["file"]),
+            asset_time.local_date(entry["received_at"]).isoformat(), entry["dirty_severity"],
             out_dir=out_dir)
         paths.append(db_path)
 

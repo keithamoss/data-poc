@@ -126,7 +126,7 @@ class TestAsOfDatePicking:
         run_ids = list_run_ids("registry-services", "civil-registration")
         assert run_ids, "no real committed BDM history to test against"
         earliest_run_date = min(
-            read_dataset_stats("registry-services", "civil-registration", rid)["manifest_entry"]["run_date"]
+            read_dataset_stats("registry-services", "civil-registration", rid)["manifest_entry"]["received_at"][:10]
             for rid in run_ids
         )
         before_all_history = (date.fromisoformat(earliest_run_date) - timedelta(days=1000)).isoformat()
@@ -419,7 +419,7 @@ def _real_amber_bdm_runs() -> list[tuple[str, str]]:
     produce different sets of runs, and the proxy is the wrong one.
 
     It also drops any run whose acceptance window is zero-width. Two
-    runs sharing an arrived_date leave the first with
+    runs sharing a receipt date leave the first with
     window_start == window_end, which `created >= start and created <
     end` can never match - see TestRunWindowsWithTiedArrivedDates. A
     run like that renders amber but no comment can ever attach to it,

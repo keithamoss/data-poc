@@ -107,7 +107,8 @@ def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_prese
     monkeypatch.setattr(orchestrate_cp, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(orchestrate_cp, "CP_DUCKDB_RUNS_DIR", cp_duckdb_dir)
 
-    entry = {"run_id": _CP_DIRTY_RUN_ID, "run_date": "2026-04-01", "dirty_severity": "red"}
+    entry = {"run_id": _CP_DIRTY_RUN_ID, "received_at": "2026-04-01T09:00:00+08:00",
+             "dirty_severity": "red"}
     results = orchestrate_cp.run_single(entry, reference_run_id=_CP_REF_RUN_ID, run_by="test@example.com")
 
     assert results, "run_single() produced no real CP check results at all"

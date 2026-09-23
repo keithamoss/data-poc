@@ -19,12 +19,14 @@ explicit call: "fix the issue where tests and production share an output
 directory") - see the `raw_dir` fixture's own docstring."""
 from __future__ import annotations
 
+import re
+
 import json
-from datetime import datetime
 
 import pytest
 
 from generator import generate_runs
+from qa_tools.common import asset_time
 
 
 @pytest.fixture(scope="module")
@@ -55,9 +57,9 @@ def manifest(raw_dir):
         return json.load(f)
 
 
-def test_manifest_has_one_entry_per_scheduled_delivery_at_minimum(manifest):
-    delivery_ids = {e["delivery_id"] for e in manifest}
-    assert len(delivery_ids) == len(generate_runs.RUN_PLAN)
+def test_manifest_has_one_entry_per_scheduled_slot_at_minimum(manifest):
+    slot_ids = {e["slot_id"] for e in manifest}
+    assert len(slot_ids) == len(generate_runs.RUN_PLAN)
 
 
 def test_every_manifest_entry_has_a_real_file_on_disk(manifest, raw_dir):
@@ -68,49 +70,92 @@ def test_every_manifest_entry_has_a_real_file_on_disk(manifest, raw_dir):
 
 
 def test_severity_counts_match_run_plan(manifest):
-    first_attempts = [e for e in manifest if e["attempt_number"] == 1]
-    assert len(first_attempts) == len(generate_runs.RUN_PLAN)
+    """The FIRST delivery into each slot, in generation order.
 
-    expected = [severity for (_, _, severity) in generate_runs.RUN_PLAN]
-    # sort by run_index (a real int, matching RUN_PLAN's own generation
-    # order), not delivery_id (a zero-padded string) - a plain string
-    # sort broke for real once N_DELIVERIES crossed a fixed padding
-    # width ("delivery_100" < "delivery_11"), which this test itself
-    # caught (2026-09-17); see generate_runs.py's own comment on the
-    # :02d -> :03d fix and qa_results_reader.py's natural-sort fix for
-    # the two real (non-test) places the same bug class was reachable.
-    actual = [e["dirty_severity"] for e in sorted(first_attempts, key=lambda e: e["run_index"])]
+    There is no attempt_number to filter on any more (REQ-GEN-042
+    retired it), so "first" is read from position - the lowest run_index
+    within each slot - which is how the rest of the system now decides
+    it too."""
+    first_by_slot = {}
+    for e in sorted(manifest, key=lambda e: e["run_index"]):
+        first_by_slot.setdefault(e["slot_id"], e)
+    assert len(first_by_slot) == len(generate_runs.RUN_PLAN)
+
+    expected = [severity for (_, severity) in generate_runs.RUN_PLAN]
+    # Sort by run_index (a real int, matching RUN_PLAN's own generation
+    # order), not slot_id (a zero-padded string) - a plain string sort
+    # broke for real once the count crossed a fixed padding width
+    # ("slot_100" < "slot_11"), which this test itself caught
+    # (2026-09-17).
+    actual = [e["dirty_severity"]
+              for e in sorted(first_by_slot.values(), key=lambda e: e["run_index"])]
     assert actual == expected
 
 
-def test_resupply_attempts_only_follow_red_first_attempts(manifest):
-    by_delivery: dict[str, list[dict]] = {}
+def test_a_resupply_only_ever_follows_a_red_delivery(manifest):
+    by_slot: dict[str, list[dict]] = {}
     for e in manifest:
-        by_delivery.setdefault(e["delivery_id"], []).append(e)
+        by_slot.setdefault(e["slot_id"], []).append(e)
 
-    for delivery_id, attempts in by_delivery.items():
-        attempts = sorted(attempts, key=lambda e: e["attempt_number"])
-        if len(attempts) > 1:
-            assert attempts[0]["dirty_severity"] == "red", \
-                f"{delivery_id} has resupply attempts but first attempt wasn't red"
-        for attempt in attempts[:-1]:
-            assert attempt["dirty_severity"] == "red", \
-                f"{delivery_id} attempt {attempt['attempt_number']} isn't red but chain continued"
+    for slot_id, deliveries in by_slot.items():
+        deliveries = sorted(deliveries, key=lambda e: e["run_index"])
+        if len(deliveries) > 1:
+            assert deliveries[0]["dirty_severity"] == "red", \
+                f"{slot_id} has more than one delivery but the first wasn't red"
+        for delivery in deliveries[:-1]:
+            assert delivery["dirty_severity"] == "red", \
+                f"{slot_id}: {delivery['run_id']} isn't red but the chain continued"
 
 
-def test_resupply_arrival_dates_always_fall_on_weekdays(manifest):
+def test_every_resupply_arrives_on_a_weekday(manifest):
+    """A resupply is identified by POSITION - anything after the first
+    arrival in a slot - because the is_resupply flag was retired rather
+    than renamed. That is the same rule the dashboard has always used."""
+    by_slot: dict[str, list[dict]] = {}
+    for e in sorted(manifest, key=lambda e: e["run_index"]):
+        by_slot.setdefault(e["slot_id"], []).append(e)
+
+    checked = 0
+    for deliveries in by_slot.values():
+        for delivery in deliveries[1:]:
+            received = asset_time.local_date(delivery["received_at"])
+            assert received.weekday() < 5, \
+                f"{delivery['run_id']} arrived on a weekend: {received}"
+            checked += 1
+    assert checked > 0, "no resupplies in the generated history to check"
+
+
+def test_deliveries_in_one_slot_advance_in_time(manifest):
+    """What the supersedes_run_id chain used to assert, re-expressed
+    without it: the record itself orders the arrivals, so a pointer
+    from each to its predecessor was bookkeeping the data already
+    carried."""
+    by_slot: dict[str, list[dict]] = {}
+    for e in sorted(manifest, key=lambda e: e["run_index"]):
+        by_slot.setdefault(e["slot_id"], []).append(e)
+
+    for slot_id, deliveries in by_slot.items():
+        instants = [asset_time.parse_instant(e["received_at"], e["run_id"]) for e in deliveries]
+        assert instants == sorted(instants), \
+            f"{slot_id}: deliveries are not in receipt order"
+        assert len({e["period"] for e in deliveries}) == 1, \
+            f"{slot_id}: deliveries disagree about which period they are for"
+
+
+def test_no_manifest_entry_carries_a_retired_field(manifest):
+    """The NFR stated directly, against real generated output: nothing
+    should be able to use the retired sense of "delivery" after this."""
+    retired = ("delivery_id", "delivery_date", "attempt_number", "is_resupply",
+               "supersedes_run_id", "arrived_date", "run_date",
+               "slot_attempt_number", "slot_is_resupply")
     for e in manifest:
-        if e["is_resupply"]:
-            arrived = datetime.fromisoformat(e["arrived_date"]).date()
-            assert arrived.weekday() < 5, f"{e['run_id']} arrived on a weekend: {arrived}"
+        present = [f for f in retired if f in e]
+        assert present == [], f"{e['run_id']} still carries {present}"
 
 
-def test_supersedes_chain_is_well_formed(manifest):
-    by_run_id = {e["run_id"]: e for e in manifest}
+def test_no_run_id_carries_a_date(manifest):
+    """The identity half. A dated run_id is what made a regeneration on
+    a different calendar day write a second history beside the first."""
     for e in manifest:
-        if e["supersedes_run_id"] is not None:
-            assert e["supersedes_run_id"] in by_run_id, \
-                f"{e['run_id']} supersedes a run_id not present in the manifest"
-            prior = by_run_id[e["supersedes_run_id"]]
-            assert prior["delivery_id"] == e["delivery_id"]
-            assert prior["attempt_number"] == e["attempt_number"] - 1
+        assert not re.search(r"\d{4}-\d{2}-\d{2}", e["run_id"]), \
+            f"{e['run_id']} still carries a date"
