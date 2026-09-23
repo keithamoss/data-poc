@@ -2522,8 +2522,16 @@ requirements:
       - THE SYSTEM SHALL load every table in a delivery into staging
         before running QA over that delivery, so that a check is never
         evaluated against a table still mid-load.
-      - THE SYSTEM SHALL record, for every QA run, which version of each
-        table it read.
+      - THE SYSTEM SHALL resolve each logical table name a check uses to
+        exactly one physical table, through a per-run schema containing
+        only views, and SHALL discard that schema once the run
+        completes.
+      - THE SYSTEM SHALL record, for every QA run, which physical
+        version of each table it read, in committed history that
+        outlives the discarded per-run schema.
+      - THE SYSTEM SHALL name a per-run schema so that one left behind
+        by an interrupted run is identifiable and removable without
+        reference to any other record.
       - THE SYSTEM SHALL evaluate a check once, against the state
         current at that moment, and SHALL NOT recompute it for a
         historical arrival.
@@ -2647,6 +2655,39 @@ requirements:
         keyed on slots blocks auto-promotion on every healthy
         multi-table delivery, since per-table slots mean an ordinary
         six-table delivery already spans six slots in one period.
+      - >
+        Decided the overlay is an EPHEMERAL per-run view schema (Keith,
+        2026-09-23), one view per logical table pointing at the one
+        physical table that run should read, dropped when the run
+        completes. His words: "that feels nicer than littering the
+        database with a bunch of views for every single QA run."
+        Two WRONG justifications were given for it first and are
+        recorded so they are not repeated. It is not because dbt and
+        Soda cannot read across schemas - verified false. It is not
+        because composition needs it - `search_path` handles that. The
+        REAL reason is that logical and physical names differ here:
+        Thread A settled that physical table names carry the arrival
+        timestamp, so neither staging nor a period schema contains a
+        table literally named `placements`, and staging can hold
+        several versions of one at once. Something has to bridge a
+        stable name to one version per run, and that need exists even
+        if everything lived in one schema.
+      - >
+        Consequence of the views being ephemeral, caught only after
+        agreeing to it: the view definitions CANNOT be the record of
+        which version was read. That was claimed a message earlier and
+        is wrong - dropping the schema drops the record. So the
+        resolution map is written into committed history during the
+        run, the same dataset_stats.py pattern of computing once while
+        a legitimate live connection exists. The view is the mechanism;
+        it is not also the audit trail.
+      - >
+        Rejected templating sources.yml and the SodaCL checks file per
+        run with fully-qualified physical table names, which would work
+        and needs no views. It breaks a property this project
+        deliberately has and the README states explicitly - that the
+        schema/checks files do not need to change to run the real
+        tools.
       - >
         Note for whoever builds the overlay: the mechanism verified
         alongside the above is an EPHEMERAL per-run view schema. A view
