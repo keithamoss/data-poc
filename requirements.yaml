@@ -2907,8 +2907,6 @@ requirements:
         belongs to the same period as the arrival, and SHALL NOT
         re-evaluate a cross-table check that does not depend on the
         arriving table or that belongs to another period.
-      - THE SYSTEM SHALL record, against each cross-table result, which
-        version of each participating dataset it was evaluated against.
       - WHEN a cross-table check's result changes without the dataset a
         viewer is looking at having changed, THE SYSTEM SHALL name the
         arrival that caused the re-evaluation.
@@ -2936,6 +2934,27 @@ requirements:
         check actually depends on, not by any arrival in the collection
         and not on its own cadence (Keith, 2026-09-21). Precise, with no
         re-evaluations recorded that nothing caused.
+      - >
+        DELETED a criterion from this requirement on 2026-09-23 (Keith),
+        and recorded here so the rule is findable from the requirement
+        that used to hold it. It read "record, against each cross-table
+        result, which version of each participating dataset it was
+        evaluated against". REQ-PIPE-036's criterion covering the same
+        ground now owns it: "record with that check's own result the
+        physical table name of every table it read".
+        036's is the better home on three counts, not just the newer
+        one. It is the SUPERSET - it covers any check reading a table
+        other than its own, including a single-dataset drift check with
+        a temporal reference, where this one covered cross-table checks
+        alone. It names an IMMUTABLE FORM - a physical table name -
+        where "which version" names no form at all, and an implementer
+        could satisfy it with a run id, an arrival timestamp, a version
+        counter or a table name. And "participating DATASETS" arguably
+        misses the previous-period table, which is the same dataset in a
+        different period - the very thing Keith had asked to have
+        recorded an hour earlier.
+        Kept as one rule in one place rather than two worded
+        differently, which is how two implementations diverge.
     open_questions:
       - Where the cross-table scope physically lives in qa_results/ and
         what it is called. Left for delivery-architect - a storage-shape
