@@ -14,7 +14,6 @@ datacontract-cli/Evidently chain via orchestrate_bdm.run_single(), just
 reached from a browsable questionary.path() prompt or --file/
 --reference-file flags instead of a positional CSV argument."""
 from __future__ import annotations
-import json
 import os
 import sys
 import tempfile
@@ -75,12 +74,24 @@ def generate_synthetic_data() -> None:
 
 
 def load_manifest() -> list[dict]:
-    with open(manifest_path()) as f:
-        return json.load(f)
+    """Every arrival, RECOGNISED FROM DISK (REQ-GEN-043).
+
+    Named `load_manifest` still because every caller here treats it as
+    "the list of runs", but it no longer opens the generator's
+    manifest.json - that is bookkeeping, and reading it would file
+    supplies from a declaration rather than from what arrived.
+    """
+    from qa_tools.common import arrivals
+    return [a.as_entry()
+                | {"csv_path": str(a.path_for("birth-registrations"))}
+            for a in arrivals.arrivals_for("civil-registration", "run_")]
 
 
 def manifest_exists() -> bool:
-    return os.path.exists(manifest_path())
+    """Is there anything to pick from? A real question now: with no
+    deliveries on disk there are no arrivals, which is what the picker
+    needs to know."""
+    return bool(load_manifest())
 
 
 def default_reference(manifest: list[dict]) -> tuple[str, str]:
@@ -89,17 +100,24 @@ def default_reference(manifest: list[dict]) -> tuple[str, str]:
     that's actually in the real, permanent qa_results/ history), falling
     back to the manifest's own first (always-clean-by-construction) entry
     - the same reference run_pipeline() itself already uses - if nothing
-    has been Promoted yet, or if a previously-Promoted run's own CSV no
-    longer exists locally (RUN_PLAN's size has changed across versions of
-    this repo before; regeneration is deterministic only for run_ids the
-    CURRENT RUN_PLAN still produces)."""
+    has been Promoted yet, or if a previously-Promoted run is no longer
+    among the arrivals recognised on disk (RUN_PLAN's size has changed
+    across versions of this repo before; regeneration is deterministic
+    only for run_ids the CURRENT RUN_PLAN still produces).
+
+    "Still there" is asked of the RECOGNISED ARRIVALS, not of a
+    <run_id>.csv sitting in raw_dir() (REQ-GEN-043). A delivery's file
+    is named by the supplier, not after our run_id, so the old check
+    asked a question the delivery tree cannot answer - and the path to
+    hand downstream is the arrival's own, not one built from a run_id."""
     promoted = list_run_ids(AGENCY_ID, COLLECTION_ID)
     if promoted:
         candidate = promoted[-1]
-        if os.path.exists(os.path.join(raw_dir(), f"{candidate}.csv")):
-            return candidate, f"{candidate}.csv"
+        entry = next((e for e in manifest if e["run_id"] == candidate), None)
+        if entry is not None:
+            return candidate, entry["csv_path"]
     first = manifest[0]
-    return first["run_id"], first["file"]
+    return first["run_id"], first["csv_path"]
 
 
 def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
@@ -111,73 +129,68 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
     tmp-dir-first pattern qa_tools/bdm/check_file.py's own --commit
     handling already uses (qa_tools.common.lambda_results_dir).
 
-    Real bug found live while building this (a manual smoke test actually
-    corrupted the real data/raw/manifest.json from 176 entries down to 1):
-    orchestrate_bdm.run_single() unconditionally OVERWRITES RAW_DIR/
-    manifest.json with its own synthetic 1-or-2-entry manifest - correct
-    and intentional for its real Lambda use case (no pre-existing manifest
-    there at all - see that function's own docstring), but a real
-    collision here, since this CLI's own run picker reads that same path
-    as the real, full generate_runs.py batch manifest. Backs the real
-    manifest up and restores it around the call rather than changing
-    run_single()'s own already-tested Lambda-path contract. Also passes
-    the REAL immediately-preceding manifest entry as previous_run_id/
-    previous_csv while we're already reading the real manifest anyway -
-    real row-count-growth check coverage instead of the silent skip the
-    Lambda MVP path settles for when nothing supplies those."""
+    This used to do two extra things, both of which REQ-GEN-043 removed
+    the NEED for rather than the code for, which is worth saying so the
+    absence does not read as an oversight. It backed up and restored
+    raw_dir()'s manifest.json around the call, because run_single()
+    overwrote it with its own synthetic one (a real bug, found live: a
+    manual smoke test corrupted the real data/raw/manifest.json from 176
+    entries down to 1). And it passed the immediately-preceding manifest
+    entry down as previous_run_id/previous_csv, so the row-count-growth
+    check had a previous run to compare against.
+
+    Neither exists now. run_single() writes no manifest, and the
+    row-count-growth check finds the preceding arrival from the
+    deliveries RECOGNISED on disk - which is the same answer this used
+    to hand it, arrived at without anyone declaring it."""
     manifest = load_manifest()
     idx = next((i for i, e in enumerate(manifest) if e["run_id"] == run_id), None)
     if idx is None:
         raise click.ClickException(
             f"No manifest entry for run_id={run_id!r} - run generate-synthetic-data first?")
     entry = manifest[idx]
-    previous_entry = manifest[idx - 1] if idx > 0 else None
 
     if reference_run_id is None:
         reference_run_id, reference_csv = default_reference(manifest)
     else:
-        reference_csv = f"{reference_run_id}.csv"
-    if not os.path.exists(os.path.join(raw_dir(), f"{reference_run_id}.csv")):
-        raise click.ClickException(
-            f"Reference run {reference_run_id!r}'s CSV isn't in {raw_dir()} - "
-            f"run generate-synthetic-data first?")
+        # Resolved against the recognised arrivals, for the reason
+        # default_reference() gives - a supplier's filename is not
+        # f"{run_id}.csv", so there is nothing to build a path from.
+        reference_entry = next((e for e in manifest if e["run_id"] == reference_run_id), None)
+        if reference_entry is None:
+            raise click.ClickException(
+                f"Reference run {reference_run_id!r} isn't among the arrivals recognised on disk - "
+                f"run generate-synthetic-data first?")
+        reference_csv = reference_entry["csv_path"]
 
-    csv_path = os.path.join(raw_dir(), entry["file"])
+    csv_path = entry["csv_path"]
     tmp_dir = common.new_tmp_results_dir()
     patch_write_qa_result_for_lambda(BDM_MODULES, tmp_dir)
 
     results = _run_single_preserving_manifest(
-        run_id, csv_path, asset_time.local_date(entry["received_at"]).isoformat(), entry["dirty_severity"],
+        run_id, csv_path, asset_time.local_date(entry["received_at"]).isoformat(),
         reference_run_id, reference_csv, run_by=run_by,
-        previous_run_id=previous_entry["run_id"] if previous_entry else None,
-        previous_csv=previous_entry["file"] if previous_entry else None,
         on_step=on_step,
     )
     return results, tmp_dir
 
 
 def _run_single_preserving_manifest(*args, **kwargs) -> list[dict]:
-    """Calls orchestrate_bdm.run_single(*args, **kwargs), backing up and
-    restoring raw_dir()'s real manifest.json around the call - see
-    run_check()'s own docstring for the real bug this guards against
-    (run_single() unconditionally overwrites it with its own synthetic
-    1-or-2-entry manifest, correct for its real Lambda use case but a
-    real collision against the full generate_runs.py batch manifest this
-    CLI's own run picker reads from). Local files mode (Phase 2) hits
-    this exact same collision - a real CSV a human downloaded has
-    nothing to do with the batch manifest, but run_single() would still
-    clobber it - so this helper is shared, not just run_check()'s own."""
-    real_manifest_path = manifest_path()
-    real_manifest_backup = None
-    if os.path.exists(real_manifest_path):
-        with open(real_manifest_path) as f:
-            real_manifest_backup = f.read()
-    try:
-        return orchestrate_bdm.run_single(*args, **kwargs)
-    finally:
-        if real_manifest_backup is not None:
-            with open(real_manifest_path, "w") as f:
-                f.write(real_manifest_backup)
+    """Calls orchestrate_bdm.run_single(*args, **kwargs).
+
+    THIS USED TO BACK UP AND RESTORE raw_dir()'s manifest.json around
+    the call, because run_single() overwrote it with its own synthetic
+    one - correct for its Lambda use case, a real collision against the
+    batch manifest this CLI's run picker read from.
+
+    REQ-GEN-043 removed the cause rather than the symptom: run_single()
+    writes no manifest at all now, and the picker recognises arrivals
+    from disk instead of reading one. The wrapper is kept as a single
+    named seam for the two callers that share it, and because deleting
+    it would spread orchestrate_bdm.run_single() across two more call
+    sites for no gain.
+    """
+    return orchestrate_bdm.run_single(*args, **kwargs)
 
 
 def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
@@ -202,7 +215,7 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
     patch_write_qa_result_for_lambda(BDM_MODULES, tmp_dir)
 
     results = _run_single_preserving_manifest(
-        run_id, csv_path, run_date, None,
+        run_id, csv_path, run_date,
         reference_run_id=reference_run_id, reference_csv=reference_csv_filename, run_by=run_by,
         on_step=on_step,
     )
@@ -252,7 +265,11 @@ def has_failures(results: list[dict]) -> bool:
 
 
 def picker_choices(manifest: list[dict]) -> list[str]:
-    return [f'{e["run_id"]}  ({asset_time.local_date(e["received_at"])}, {e["dirty_severity"] or "clean"})' for e in manifest]
+    # The delivery it came from, not an injected severity - the picker
+    # shows what arrived, and severity is generator bookkeeping the CLI
+    # has no business reading (REQ-GEN-043).
+    return [f'{e["run_id"]}  ({asset_time.local_date(e["received_at"])}, {e["delivery"]})'
+            for e in manifest]
 
 
 def run_id_from_choice(choice: str) -> str:

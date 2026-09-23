@@ -201,7 +201,7 @@ class TestRunWindowsWithTiedArrivedDates:
 
     def _fake_stats(self, received_dates_by_run):
         def read_dataset_stats(agency, dataset, run_id, qa_results_dir=None):
-            return {"manifest_entry": {"received_at": f"{received_dates_by_run[run_id]}T06:00:00+00:00"}}
+            return {"arrival_record": {"received_at": f"{received_dates_by_run[run_id]}T06:00:00+00:00"}}
         return read_dataset_stats
 
     def test_the_first_of_two_same_day_runs_gets_a_real_non_empty_window(self, monkeypatch):

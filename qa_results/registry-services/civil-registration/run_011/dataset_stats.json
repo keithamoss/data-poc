@@ -1,83 +1,82 @@
 {
-  "run_timestamp": "2026-09-23T08:41:35.727132+08:00",
+  "run_timestamp": "2026-09-23T10:45:10.195822+08:00",
   "run_by": "noreply@anthropic.com",
   "raw_output": {
-    "manifest_entry": {
+    "arrival_record": {
       "run_id": "run_011",
       "run_index": 11,
-      "slot_id": "slot_009",
-      "period": "2026-09-01",
-      "received_at": "2026-09-04T02:13:03.987266+00:00",
-      "n_rows_generated": 1261,
-      "dirty_severity": "red",
-      "id_offset": 900000,
-      "seed": 1009,
-      "file": "run_011.csv"
+      "received_at": "2026-09-03T02:11:03.987266+00:00",
+      "delivery": "02092026_PROD"
     },
+    "row_count": 1304,
     "value_counts": {
       "sex": [
         [
           "M",
-          600
+          605
         ],
         [
           "F",
-          608
+          638
         ],
         [
           "X",
-          17
+          24
         ],
         [
           "(invalid code)",
-          36
+          37
         ]
       ]
     },
     "arrival": {
-      "max_lag_hours": 12.370833333333334,
-      "earliest_extract": "2026-09-01T02:13:03.987266+00:00"
+      "max_lag_hours": 12.323611111111111,
+      "earliest_extract": "2026-09-02T02:11:03.987266+00:00"
     },
     "check_aggregates": {
       "sex": {
         "type": "categorical",
         "suppressed": false,
-        "total_invalid": 36,
+        "total_invalid": 37,
         "values": [
           {
-            "value": "U",
-            "count": 14
-          },
-          {
             "value": "9",
-            "count": 12
+            "count": 17
           },
           {
             "value": "O",
-            "count": 10
+            "count": 11
+          },
+          {
+            "value": "U",
+            "count": 9
           }
         ]
       },
       "place_of_birth_suburb": {
         "type": "categorical",
         "suppressed": false,
-        "total_invalid": 26,
+        "total_invalid": 28,
         "values": [
           {
-            "value": "TBC",
-            "count": 8
+            "value": "Not stated",
+            "count": 11
           },
           {
             "value": "Unknown",
-            "count": 7
-          },
-          {
-            "value": "Freemantle",
             "count": 6
           },
           {
+            "value": "TBC",
+            "count": 4
+          },
+          {
+            "value": "Freemantle",
+            "count": 4
+          },
+          {
             "value": "Perth Metro",
-            "count": 5
+            "count": 3
           }
         ]
       },
@@ -89,30 +88,30 @@
         "max": "1899-01-01",
         "values": [
           {
+            "value": "1820-11-30",
+            "count": 6
+          },
+          {
             "value": "1750-01-01",
-            "count": 11
+            "count": 5
           },
           {
             "value": "1850-06-15",
             "count": 5
           },
           {
-            "value": "1820-11-30",
-            "count": 4
-          },
-          {
             "value": "1899-01-01",
-            "count": 1
+            "count": 5
           }
         ],
         "histogram": [
           {
             "bucket": "1750-01-01 to 1774-11-01",
-            "count": 11
+            "count": 5
           },
           {
             "bucket": "1799-09-01 to 1824-07-02",
-            "count": 4
+            "count": 6
           },
           {
             "bucket": "1849-05-02 to 1874-03-02",
@@ -120,7 +119,7 @@
           },
           {
             "bucket": "1874-03-02 to 1899-01-01",
-            "count": 1
+            "count": 5
           }
         ]
       }

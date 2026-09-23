@@ -4014,7 +4014,7 @@ requirements:
       agreed format rather than reverse-engineering whatever the
       generator happened to do five sprints ago.
     moscow: must
-    status: not_started
+    status: built
     source: >
       Keith, 2026-09-22, settling that sprint 2 DEFINES the on-disk
       delivery format sprint 7 consumes - "it must be a DELIBERATE
@@ -4145,6 +4145,163 @@ requirements:
         precisely what TS-32 forbids. The boundary is that the record
         lives outside the delivery, in a location the supplier cannot
         write to."
+      - "[BUILD] Decided run identity comes from RECEIPT ORDER, and
+        accepted that this can disagree with the order the generator
+        produced things in. It did: 23 of 42 Birth Registrations run_ids
+        came back carrying a different receipt instant, because a
+        resupply for an earlier period that arrived after a later
+        period's first delivery now sorts where it actually landed. That
+        is the model working, not a regression - proved by checking the
+        multiset of instants was unchanged and that mapping instant ->
+        arrival verdict (rather than run_id -> verdict) gave zero
+        differences."
+      - "[BUILD] Worth keeping because it nearly went the other way: the
+        arrival verdict DISTRIBUTION was identical across that rebuild -
+        131 onTime / 16 early / 3 late - which looks like proof and is
+        not. A permutation preserves a distribution. The instant-level
+        check is the one that settles it."
+      - "[BUILD] Removed orchestrate_bdm.run_single()'s previous_run_id/
+        previous_csv parameters rather than keeping them and ignoring
+        them. The row-count-growth check finds the preceding run from
+        recognised arrivals now, so nothing reads them - and a caller
+        DECLARING which delivery came before this one is the same shape
+        this requirement exists to remove. Rejected plumbing them
+        through to the Evidently evaluator for the same reason."
+      - "[BUILD] Removed run_single()'s dirty_severity parameter on the
+        same grounds. It was already always None from the one real
+        caller, with a comment explaining that a real arriving file
+        carries no such label - which is an argument for deleting the
+        parameter, not for passing None into it."
+      - "[BUILD] Decided criterion 7 is enforced STATICALLY, by parsing
+        every module under qa_tools/, pipeline/, dashboard/ and cli/ for
+        a reference to the bookkeeping artefact or an import of the
+        generator, rather than only by checking that today's committed
+        history happens to be clean. The rule is about what may READ the
+        bookkeeping at all, and an observational test says nothing about
+        the next module somebody adds. Both halves are kept: the static
+        one cannot see history written before it existed."
+      - "[BUILD] Decided the CP tools' remaining data/cp_raw/<run_id>/
+        coupling is NOT this requirement's to fix. They reconstruct a
+        path from a run_id the generator wrote down, which works only
+        because generator order and receipt order agree today - exactly
+        the assumption this requirement just broke elsewhere. It is
+        staged data rather than bookkeeping, so no criterion here covers
+        it, and fixing it properly is filing work. Logged as
+        plans/running-thoughts.md #32 rather than left unwritten."
+    linked_tests:
+      - tests/test_delivery.py
+      - tests/test_arrivals.py
+      - tests/test_fixture_ids.py
+      - tests/test_asset_time_semantics.py
+      - tests/test_orchestrate_single_run.py
+      - tests/test_pipeline_load.py
+      - tests/test_cli_bdm.py
+      - tests/test_cli_cp.py
+      - tests/test_dataset_stats.py
+      - tests/test_generate_runs.py
+      - tests/test_generate_cp_runs.py
+    implemented_by:
+      - docs/delivery-format.md
+      - qa_tools/common/delivery.py::write_delivery
+      - qa_tools/common/delivery.py::read_delivery
+      - qa_tools/common/delivery.py::list_deliveries
+      - qa_tools/common/delivery.py::files_by_dataset
+      - qa_tools/common/arrivals.py::recognise
+      - qa_tools/common/arrivals.py::arrivals_for
+      - qa_tools/common/arrivals.py::unplaceable
+      - qa_tools/common/arrivals.py::Arrival
+      - generator/delivery_names.py::delivery_name
+      - generator/generate_runs.py::_write_bookkeeping
+      - generator/generate_cp_runs.py::_write_bookkeeping
+      - qa_tools/bdm/dataset_stats.py::_arrival_record
+      - qa_tools/bdm/build_per_run_warehouses.py::build_all
+      - qa_tools/cp/build_cp_warehouses.py::build_all
+      - pipeline/load.py::load_all
+      - cli/bdm.py::load_manifest
+      - cli/cp.py::load_manifest
+      - cli/debug.py::capture_arrival_golden_command
+    evidence:
+      - >
+        2026-09-23: docs/delivery-format.md is the normative
+        specification and it landed in the same change that first
+        emitted the format, which is the criterion rather than a nicety
+        - sprint 7 reads the spec, not the generator.
+      - >
+        2026-09-23: the boundary is one directory and is observable from
+        a listing. 60 real deliveries on disk, 42 Birth Registrations
+        and 18 Child Protection, with 60 receipts held OUTSIDE them in a
+        directory the delivery format refuses to let a supplier write
+        to. 0 unplaceable.
+      - >
+        2026-09-23: two real collisions found live, both of which would
+        have silently merged unrelated arrivals. Names collided within
+        one generator (01022026_SRC three times), then ACROSS the two
+        generators (2026-08-corrected written by both), which turned 60
+        arrivals into 59 directories. Fixed by seeding uniqueness from
+        what is already on disk AND by write_delivery() refusing to
+        write over an existing delivery - a refusal, not a merge.
+      - >
+        2026-09-23: the delivery tree is byte-identical across re-runs,
+        fingerprinted over every file. An intermediate version was not:
+        seeding uniqueness from disk made a re-run avoid its own prior
+        names and write a second history, 84 BDM deliveries where there
+        should have been 42. Each generator now clears its own prior
+        output first.
+      - >
+        2026-09-23: nothing in committed QA history carries the
+        generator's bookkeeping. Checked across all 60 dataset_stats.json
+        files for dirty_severity, seed, id_offset, slot_id, period,
+        n_rows_generated, manifest_entry, attempt_number and
+        is_resupply, and kept as a test rather than a one-off grep.
+      - >
+        2026-09-23: the criterion-7 firewall is enforced by parsing the
+        code, not by observing output - no module under qa_tools/,
+        pipeline/, dashboard/ or cli/ may name the bookkeeping artefact
+        or import the generator, with two named exceptions whose job is
+        to RUN it. Verified to bite by planting both violations in
+        pipeline/build_dashboard_data.py and confirming both tests fail.
+      - >
+        2026-09-23: row counts reaching the dashboard are MEASURED from
+        the data that landed, not the generator's declared
+        n_rows_generated - computed at the one point in the pipeline
+        with a legitimate live warehouse connection.
+      - >
+        2026-09-23: three real leaks of the REAL data/deliveries/ tree
+        into test fixtures, found while switching the suite over and
+        each fixed by making the caller pass the tree explicitly rather
+        than defaulting to it - cp_duckdb_dir was building 18 real CP
+        warehouses into a pytest tmp dir, pipeline/load.py's own tests
+        were loading 42 real deliveries, and the Evidently row-count
+        check was looking for its previous run in the real tree.
+      - >
+        2026-09-23: the awkward shapes - a split extract, a covering
+        note, a file that is not what its name claims - are emittable
+        and recognised, proved by writing each one as a real delivery
+        and reading it back. Stated plainly because it would be easy to
+        read as more than it is: today's generated history contains
+        NONE of them. "Able to emit" is what this requirement asks for;
+        actually injecting them into the generated history is
+        REQ-GEN-044's obligation, not this one's.
+      - >
+        2026-09-23: delivery names follow no common pattern, which is
+        what stops recognition passing by parsing a name we wrote
+        ourselves. Across the 60 real deliveries: bare hex blobs, dated
+        prefixes in four different house styles, "upload-6018",
+        "2026-08-corrected", and "Data Extract 22 Sep 2026" with spaces
+        in it.
+      - >
+        2026-09-23: REQ-PIPE-048's 150-arrival pin caught this rebuild,
+        which is what it was written for. 16 runs came back with a
+        different verdict under the same run_id; investigated rather
+        than re-captured, and shown to be a relabelling with zero
+        instant-level verdict changes. The pin's own instant half turned
+        out to be VACUOUS - every golden arrivedAt was None, so it had
+        been comparing None to None 150 times - now fixed, re-captured
+        through a real `mothman debug capture-arrival-golden` command,
+        and verified to fail on a planted eight-hour shift.
+      - >
+        2026-09-23: 1048 Python tests, 166 JS tests, all eight mothman
+        gates.
 
   - id: REQ-GEN-044
     title: Every injected scenario exists in the generated history

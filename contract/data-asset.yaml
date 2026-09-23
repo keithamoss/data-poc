@@ -208,6 +208,11 @@ hierarchy:
       collections:
         - id: civil-registration
           name: Civil Registration
+          # The ODCS contract covering this collection - where its
+          # arrivalPattern lives, so "which dataset does this file
+          # belong to" resolves through one lookup rather than a map
+          # somebody maintains (REQ-GEN-043).
+          contract: bdm-birth-registrations-contract.yaml
           datasets:
             - id: birth-registrations
               name: Birth Registrations
@@ -228,6 +233,7 @@ hierarchy:
       collections:
         - id: child-protection
           name: Child Protection
+          contract: child-protection-contract.yaml
           datasets:
             - id: cp-clients
               name: Client Register

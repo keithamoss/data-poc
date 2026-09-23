@@ -16,14 +16,13 @@ sees the same representation DuckDB itself would use for a BOOLEAN column
 cast from an integer.
 """
 from __future__ import annotations
-import json
 import os
 
 import duckdb
 import pandas as pd
 
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
-from qa_tools.common import asset_time
+from qa_tools.common import arrivals, asset_time
 
 RAW_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "warehouse.duckdb")
@@ -39,10 +38,22 @@ COLUMNS = [
 ]
 
 
-def load_all(db_path: str = DB_PATH, raw_dir: str = RAW_DIR) -> None:
-    manifest_path = os.path.join(raw_dir, "manifest.json")
-    with open(manifest_path) as f:
-        manifest = json.load(f)
+def load_all(db_path: str = DB_PATH, raw_dir: str = RAW_DIR,
+              deliveries_dir=None, receipts_dir=None) -> None:
+    """`raw_dir` is now only scratch space for the combined CSV this
+    stages through - the rows themselves come from recognised arrivals,
+    which is why deliveries_dir/receipts_dir exist (REQ-GEN-043, same
+    shape as build_per_run_warehouses.build_all()). A caller that wants
+    an isolated tree has to say so: defaulting to the real one is how a
+    test quietly ends up loading 42 real deliveries."""
+    # RECOGNISED FROM DISK, not read from a declaration (REQ-GEN-043).
+    # This used to open the generator's manifest.json and take run ids,
+    # file paths, arrival dates and an injected severity from it -
+    # which is filing decisions made from a declaration rather than
+    # from what actually arrived, and is the supplier manifest Thread B
+    # rejected wearing our own badge.
+    recognised = arrivals.arrivals_for("civil-registration", "run_",
+                                        deliveries_dir, receipts_dir)
 
     if os.path.exists(db_path):
         os.remove(db_path)
@@ -50,12 +61,10 @@ def load_all(db_path: str = DB_PATH, raw_dir: str = RAW_DIR) -> None:
 
     null_values = load_null_values_by_column(CONTRACT_PATH).get(TABLE, {})
     frames = []
-    for entry in manifest:
-        path = os.path.join(raw_dir, entry["file"])
-        df = read_csv_explicit_nulls(path, null_values)
-        df["run_id"] = entry["run_id"]
-        df["run_date"] = asset_time.local_date(entry["received_at"]).isoformat()
-        df["dirty_severity"] = entry["dirty_severity"]
+    for arrival in recognised:
+        df = read_csv_explicit_nulls(str(arrival.path_for("birth-registrations")), null_values)
+        df["run_id"] = arrival.run_id
+        df["run_date"] = asset_time.local_date(arrival.received_at).isoformat()
         frames.append(df)
 
     full = pd.concat(frames, ignore_index=True)

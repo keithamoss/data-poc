@@ -21,6 +21,7 @@ from typing import Any
 import duckdb
 
 from qa_tools.common import hierarchy
+from qa_tools.bdm import dataset_stats as bdm_stats
 from qa_tools.common import asset_time
 from pipeline.aggregate_values import categorical_aggregate, numeric_date_aggregate
 
@@ -114,18 +115,33 @@ def _arrival(conn: duckdb.DuckDBPyConnection, run_date: str) -> dict[str, dict]:
     return out
 
 
-def compute_dataset_stats(conn: duckdb.DuckDBPyConnection, manifest_entry: dict) -> dict[str, Any]:
+def compute_dataset_stats(conn: duckdb.DuckDBPyConnection, arrival: dict) -> dict[str, Any]:
     """`conn` is a connection to this run's own per-run warehouse
     (data/cp_duckdb_runs/<run_id>.duckdb, `raw` schema) - the same one
     build_cp_dashboard_data.py used to open directly per run. No run_id
     scoping needed in the queries themselves (unlike BDM's combined
     warehouse) - this file only ever holds this one run's data.
-    `manifest_entry` is this run's own entry from data/cp_raw/
-    manifest.json, embedded for the same reason dataset_stats.py's BDM
-    counterpart does."""
+
+    THE ARRIVAL RECORD, NOT THE GENERATOR'S MANIFEST ENTRY
+    (REQ-GEN-043 criterion 7). This used to embed the whole entry -
+    injected severity, seed, id_offset, which slot it filled - into
+    committed qa_results/, where acceptance_sync.py then read it back.
+    That put the generator's own bookkeeping inside the permanent QA
+    record and let a downstream module file supplies from a
+    declaration.
+
+    What survives is what the pipeline legitimately observed: which run
+    this is, when WE received it, and which delivery it came from. The
+    rest is in data/generator_bookkeeping.json, which nothing here may
+    read.
+    """
     return {
-        "manifest_entry": manifest_entry,
+        "arrival_record": bdm_stats._arrival_record(arrival),
+        # Measured per table, for the reason BDM's own counterpart
+        # gives - the generator's row_counts were bookkeeping.
+        "row_counts": {t: conn.execute(f"SELECT COUNT(*) FROM raw.{t}").fetchone()[0]
+                        for t in TABLES},
         "value_counts": {"concern_type": _concern_type_value_counts(conn)},
         "check_aggregates": _check_aggregates(conn),
-        "arrival": _arrival(conn, asset_time.local_date(manifest_entry["received_at"]).isoformat()),
+        "arrival": _arrival(conn, asset_time.local_date(arrival["received_at"]).isoformat()),
     }

@@ -9,7 +9,7 @@ sources:
   - name: raw
     description: >
       Runs loaded straight from the generator's CSVs, tagged with
-      run_id/run_date/dirty_severity. One row per birth registration
+      run_id/run_date. One row per birth registration
       record, undifferentiated across runs.
     tables:
       - name: birth_registrations

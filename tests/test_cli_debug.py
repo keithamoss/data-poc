@@ -17,9 +17,12 @@ import cli.debug as debug_cli
 
 _runner = CliRunner()
 
+# `csv_path` is the real file INSIDE the delivery that arrived
+# (REQ-GEN-043) - an absolute path with a supplier's own filename, not
+# f"{run_id}.csv", which is why these look nothing like the run ids.
 _BDM_MANIFEST = [
-    {"run_id": "run_001", "file": "run_001.csv"},
-    {"run_id": "run_002", "file": "run_002.csv"},
+    {"run_id": "run_001", "csv_path": "/x/BDM_20260101/birth_registrations_2026-01-01.csv"},
+    {"run_id": "run_002", "csv_path": "/x/drop-4471/birth_registrations_2026-01-02.csv"},
 ]
 _CP_MANIFEST = [{"run_id": "cp_run_01"}, {"run_id": "cp_run_02"}]
 
@@ -36,7 +39,7 @@ def _patch_cp_manifest(monkeypatch, manifest=_CP_MANIFEST):
 
 def test_bdm_manifest_entry_returns_matching_entry(monkeypatch):
     _patch_bdm_manifest(monkeypatch)
-    assert debug_cli._bdm_manifest_entry("run_002") == {"run_id": "run_002", "file": "run_002.csv"}
+    assert debug_cli._bdm_manifest_entry("run_002") == _BDM_MANIFEST[1]
 
 
 def test_bdm_manifest_entry_raises_click_exception_when_missing(monkeypatch):
@@ -95,7 +98,7 @@ def test_run_datacontract_bdm_passes_the_manifest_csv_filename(monkeypatch):
     result = _runner.invoke(debug_cli.debug_group, ["run-datacontract", "--dataset", "bdm", "--run-id", "run_002"])
 
     assert result.exit_code == 0, result.output
-    assert seen == {"run_id": "run_002", "csv_filename": "run_002.csv"}
+    assert seen == {"run_id": "run_002", "csv_filename": _BDM_MANIFEST[1]["csv_path"]}
 
 
 def test_run_datacontract_bdm_unknown_run_id_fails_clearly(monkeypatch):
@@ -141,7 +144,7 @@ def test_run_evidently_bdm_defaults_reference_to_manifests_first_entry(monkeypat
     assert result.exit_code == 0, result.output
     assert seen["run_id"] == "run_002"
     assert seen["reference_run_id"] == "run_001"
-    assert seen["reference_csv"] == "run_001.csv"
+    assert seen["reference_csv"] == _BDM_MANIFEST[0]["csv_path"]
 
 
 def test_run_evidently_bdm_honours_an_explicit_reference_run_id(monkeypatch):
@@ -161,7 +164,7 @@ def test_run_evidently_bdm_honours_an_explicit_reference_run_id(monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert seen["reference_run_id"] == "run_002"
-    assert seen["reference_csv"] == "run_002.csv"
+    assert seen["reference_csv"] == _BDM_MANIFEST[1]["csv_path"]
 
 
 def test_run_evidently_cp_defaults_reference_to_manifests_first_run_id(monkeypatch):

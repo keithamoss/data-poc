@@ -49,9 +49,8 @@ def test_bdm_handler_downloads_matched_file_and_calls_run_single(monkeypatch, tm
 
     captured = {}
 
-    def fake_run_single(run_id, csv_path, run_date, dirty_severity, reference_run_id, reference_csv):
+    def fake_run_single(run_id, csv_path, run_date, reference_run_id, reference_csv):
         captured["run_id"] = run_id
-        captured["dirty_severity"] = dirty_severity
         captured["reference_run_id"] = reference_run_id
         with open(csv_path) as f:
             captured["csv_content"] = f.read()
@@ -62,7 +61,8 @@ def test_bdm_handler_downloads_matched_file_and_calls_run_single(monkeypatch, tm
     result = bdm_ingest_handler.handler(_s3_created_event("raw-bucket", "bdm/birth_registrations_run_099.csv"))
 
     assert captured["run_id"] == "run_099"
-    assert captured["dirty_severity"] is None, "a real arrival has no synthetic-data severity label to guess from"
+    assert "dirty_severity" not in captured, \
+        "a real arrival has no synthetic-data severity label, and the pipeline no longer has a place to put one"
     assert captured["reference_run_id"] == bdm_ingest_handler.REFERENCE_RUN_ID
     assert "1" in captured["csv_content"]
     body = json.loads(result["body"])

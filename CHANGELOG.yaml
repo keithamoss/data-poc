@@ -111,8 +111,9 @@ intro: >
 releases:
   - date: "2026-09-23"
     summary: >
-      Every check now says which collection it belongs to, and the
-      agency and collection names come from one place.
+      Supplies are now recognised from what actually arrived, checks say
+      which collection they belong to, and the names behind both come
+      from one place.
     changes:
       - category: Improved
         items:
@@ -159,6 +160,21 @@ releases:
               delivery dates for you to check, edit and commit, and
               flags any that land on a weekend rather than quietly
               moving them. Nothing is judged against its suggestions.
+          - headline: Supplies arrive, rather than announce themselves
+            components: ["Data generation", "Pipeline & publishing"]
+            description: >
+              The tool used to be handed a list of what had been sent.
+              It now works out what arrived by looking at what actually
+              landed - which files, in which drop, and when we received
+              them - so nothing a supplier could write decides how a
+              supply is filed.
+          - headline: A drop can be awkward
+            components: ["Data generation"]
+            description: >
+              The demo data can now include the drops that cause real
+              trouble: a covering note nobody asked for, an extract
+              split across two files, a file that is not what its name
+              claims, and names in whatever shape a supplier fancies.
 
       - category: Fixed
         items:
@@ -209,6 +225,13 @@ releases:
               Birth Registrations results were filed without a
               collection while Child Protection's had one. They now
               match, so the two read the same way everywhere.
+          - headline: Two drops, one folder
+            components: ["Data generation"]
+            description: >
+              Two unrelated deliveries that happened to pick the same
+              name were quietly merged into one folder, losing the
+              contents of the first. A drop now refuses to write over
+              one that is already there.
 
   - date: "2026-09-20"
     summary: >

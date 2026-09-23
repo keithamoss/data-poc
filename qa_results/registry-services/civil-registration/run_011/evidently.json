@@ -1,5 +1,5 @@
 {
-  "run_timestamp": "2026-09-23T08:41:35.727132+08:00",
+  "run_timestamp": "2026-09-23T10:45:10.195822+08:00",
   "run_by": null,
   "raw_output": {
     "psi": {
@@ -29,7 +29,7 @@
             "method": "psi",
             "threshold": 0.1
           },
-          "value": 0.1326942590607242
+          "value": 0.13622160473349498
         }
       ],
       "tests": []
@@ -42,7 +42,7 @@
           "config": {
             "type": "evidently:metric_v2:RowCount"
           },
-          "value": 1261.0
+          "value": 1304.0
         }
       ],
       "tests": []
@@ -59,14 +59,14 @@
       "dimension": "consistency",
       "label": "Distribution drift",
       "run_id": "run_011",
-      "run_timestamp": "2026-09-23T08:41:35.727132+08:00",
-      "metric_value": 0.1327,
+      "run_timestamp": "2026-09-23T10:45:10.195822+08:00",
+      "metric_value": 0.1362,
       "unit": "PSI",
       "warn_threshold": 0.1,
       "fail_threshold": 0.25,
       "status": "warn",
       "on_fail_action": "flag",
-      "row_count_total": 1261,
+      "row_count_total": 1304,
       "row_count_invalid": null,
       "engine": "Evidently 0.7",
       "reference_run_id": "run_001"
@@ -81,14 +81,14 @@
       "dimension": "timeliness",
       "label": "Row count vs. previous run",
       "run_id": "run_011",
-      "run_timestamp": "2026-09-23T08:41:35.727132+08:00",
-      "metric_value": 0.08,
+      "run_timestamp": "2026-09-23T10:45:10.195822+08:00",
+      "metric_value": 0.15,
       "unit": "%",
       "warn_threshold": 10.0,
       "fail_threshold": 25.0,
       "status": "pass",
       "on_fail_action": "flag",
-      "row_count_total": 1261,
+      "row_count_total": 1304,
       "row_count_invalid": null,
       "engine": "Evidently 0.7",
       "reference_run_id": null

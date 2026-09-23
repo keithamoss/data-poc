@@ -19,10 +19,14 @@ import qa_tools.bdm.run_evidently_bdm as run_evidently_bdm
 import qa_tools.bdm.run_soda_bdm as run_soda_bdm
 import qa_tools.cp.orchestrate_cp as orchestrate_cp
 
-_REF_RUN_ID = "pytest_bdm_ref"
-_DIRTY_RUN_ID = "pytest_bdm_dirty"
-_CP_REF_RUN_ID = "pytest_cp_ref"
-_CP_DIRTY_RUN_ID = "pytest_cp_dirty"
+from fixture_ids import (BDM_DIRTY_RUN_ID as _DIRTY_RUN_ID, BDM_REF_RUN_ID as _REF_RUN_ID,
+                          CP_DIRTY_RUN_ID as _CP_DIRTY_RUN_ID, CP_REF_RUN_ID as _CP_REF_RUN_ID)
+
+# The flat CSVs tests/conftest.py writes alongside its deliveries - the
+# "a human downloaded this file" shape run_single() exists for, which is
+# deliberately NOT a delivery and so has no recognised run_id of its own.
+_REF_CSV = "pytest_bdm_ref.csv"
+_DIRTY_CSV = "pytest_bdm_dirty.csv"
 
 
 def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
@@ -59,21 +63,24 @@ def test_run_single_bdm_produces_real_results_without_touching_the_manifest(monk
     # RAW_DIR under its final name - exactly the "arrived somewhere else"
     # shape a Lambda's /tmp download would have.
     arrived_csv = tmp_path / "incoming.csv"
-    with open(os.path.join(bdm_raw_dir, f"{_DIRTY_RUN_ID}.csv"), "rb") as src, open(arrived_csv, "wb") as dst:
+    with open(os.path.join(bdm_raw_dir, _DIRTY_CSV), "rb") as src, open(arrived_csv, "wb") as dst:
         dst.write(src.read())
 
     # The reference run must already be resolvable under RAW_DIR (this
     # test's own stand-in for "already present" - see the design doc's
     # own open question on where this lives in real production) - copy
     # the fixture's clean reference CSV in under its own name first.
-    with open(os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"), "rb") as src:
+    with open(os.path.join(bdm_raw_dir, _REF_CSV), "rb") as src:
         with open(os.path.join(raw_dir, f"{_REF_RUN_ID}.csv"), "wb") as dst:
             dst.write(src.read())
-    build_per_run_warehouses.build_one(_REF_RUN_ID, os.path.join(raw_dir, f"{_REF_RUN_ID}.csv"), "2026-01-01", None,
+    build_per_run_warehouses.build_one(_REF_RUN_ID, os.path.join(raw_dir, f"{_REF_RUN_ID}.csv"), "2026-01-01",
                                         out_dir=duckdb_dir)
 
+    # No injected severity is passed - run_single() has nowhere to put
+    # one any more (REQ-GEN-043), which is the point: a real arriving
+    # file carries no such label.
     results = orchestrate_bdm.run_single(
-        _DIRTY_RUN_ID, str(arrived_csv), "2026-01-02", "red",
+        _DIRTY_RUN_ID, str(arrived_csv), "2026-01-02",
         reference_run_id=_REF_RUN_ID, reference_csv=f"{_REF_RUN_ID}.csv", run_by="test@example.com")
 
     assert results, "run_single() produced no real check results at all"
@@ -107,8 +114,11 @@ def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_prese
     monkeypatch.setattr(orchestrate_cp, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(orchestrate_cp, "CP_DUCKDB_RUNS_DIR", cp_duckdb_dir)
 
-    entry = {"run_id": _CP_DIRTY_RUN_ID, "received_at": "2026-04-01T09:00:00+08:00",
-             "dirty_severity": "red"}
+    # An ARRIVAL RECORD, not a manifest entry: what we observed, and
+    # nothing the generator knew (REQ-GEN-043).
+    entry = {"run_id": _CP_DIRTY_RUN_ID, "run_index": 2,
+             "received_at": "2026-04-01T09:00:00+08:00",
+             "delivery": "cp-drop-9104"}
     results = orchestrate_cp.run_single(entry, reference_run_id=_CP_REF_RUN_ID, run_by="test@example.com")
 
     assert results, "run_single() produced no real CP check results at all"

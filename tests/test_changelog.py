@@ -33,7 +33,7 @@ def test_build_changelog_resolves_run_by_run_timestamp_and_commit_info(tmp_path)
     repo = _init_repo(tmp_path)
     qa_results_dir = repo / "qa_results"
     write_qa_result("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
-                     "dataset_stats", {"manifest_entry": {"run_id": "run_01"}},
+                     "dataset_stats", {"arrival_record": {"run_id": "run_01"}},
                      run_by="keith@example.com", results_dir=qa_results_dir)
     _commit_qa_results(repo)
     expected_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo,
@@ -59,10 +59,10 @@ def test_build_changelog_keeps_separate_datasets_from_the_same_commit_apart(tmp_
     repo = _init_repo(tmp_path)
     qa_results_dir = repo / "qa_results"
     write_qa_result("agency-a", "birth-registrations", "run_01", "2026-01-01T09:00:00+00:00",
-                     "dataset_stats", {"manifest_entry": {}}, run_by="keith@example.com",
+                     "dataset_stats", {"arrival_record": {}}, run_by="keith@example.com",
                      results_dir=qa_results_dir)
     write_qa_result("agency-b", "child-protection", "cp_run_01", "2026-01-01T09:05:00+00:00",
-                     "dataset_stats", {"manifest_entry": {}}, run_by="colleague@example.com",
+                     "dataset_stats", {"arrival_record": {}}, run_by="colleague@example.com",
                      results_dir=qa_results_dir)
     _commit_qa_results(repo, "QA both datasets in one commit")
 
@@ -84,14 +84,14 @@ def test_build_changelog_finds_the_right_commit_across_multiple_regenerations(tm
     qa_results_dir = repo / "qa_results"
 
     write_qa_result("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
-                     "dataset_stats", {"manifest_entry": {}}, run_by="keith@example.com",
+                     "dataset_stats", {"arrival_record": {}}, run_by="keith@example.com",
                      results_dir=qa_results_dir)
     _commit_qa_results(repo, "first QA event")
     first_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo,
                                 capture_output=True, text=True, check=True).stdout.strip()
 
     write_qa_result("agency-a", "dataset-a", "run_02", "2026-01-08T09:00:00+00:00",
-                     "dataset_stats", {"manifest_entry": {}}, run_by="colleague@example.com",
+                     "dataset_stats", {"arrival_record": {}}, run_by="colleague@example.com",
                      results_dir=qa_results_dir)
     _commit_qa_results(repo, "second QA event, a week later")
     second_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo,

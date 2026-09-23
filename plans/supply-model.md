@@ -446,23 +446,19 @@ comparisons against the expected-supply sequence.
    it later is a corpus-wide edit.
 
 2. **[in-progress, 2026-09-23]** **[Data generation]** **Generator delivers one
-   table at a time, and injects the scenario shapes.** The VOCABULARY
-   half is BUILT as `REQ-GEN-042` (2026-09-23) - slot vs delivery,
-   period vs receipt instant, dateless deterministic run ids, a pinned
-   anchor, and the schedule read from the shared calendar config. The
-   one-table-at-a-time delivery format and the injected scenario shapes
-   are `REQ-GEN-043`/`REQ-GEN-040` and are still to come. `REQ-GEN-040`,
-   plus the `[INJECT]` set from the test scenario register below, plus
-   the generated scenario map that says where each one landed.
+   table at a time, and injects the scenario shapes.** Two of the three
+   parts are BUILT, both 2026-09-23. `REQ-GEN-042` did the VOCABULARY -
+   slot vs delivery, period vs receipt instant, dateless deterministic
+   run ids, a pinned anchor, and the schedule read from the shared
+   calendar config. `REQ-GEN-043` did the ON-DISK DELIVERY FORMAT,
+   specified in `docs/delivery-format.md` and emitted by both
+   generators, and took the pipeline off the generator's manifest onto
+   recognised arrivals - that requirement now owns the decisions,
+   including six the build itself turned up.
 
-   **This sprint DEFINES THE ON-DISK DELIVERY FORMAT** that sprint 7
-   then consumes - settled with Keith, 2026-09-22. Because the generator
-   is built first, whatever shape it emits becomes what delivery
-   recognition has to read. That is fine (synthetic data standing in for
-   a real feed), but it must be a DELIBERATE ARTEFACT of this sprint -
-   written down as the format - rather than something sprint 7
-   reverse-engineers five sprints later from whatever the generator
-   happened to do.
+   What is LEFT is `REQ-GEN-040`: one table at a time, plus the
+   `[INJECT]` set from the test scenario register below, plus the
+   generated scenario map that says where each one landed.
 
    **Moved here from sprint 6** (Keith, 2026-09-22). It gates roughly
    two-thirds of the test scenario register: the generator today emits

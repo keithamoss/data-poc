@@ -1,60 +1,119 @@
 {
-  "run_timestamp": "2026-09-23T08:41:35.727132+08:00",
+  "run_timestamp": "2026-09-23T10:45:10.195822+08:00",
   "run_by": "noreply@anthropic.com",
   "raw_output": {
-    "manifest_entry": {
+    "arrival_record": {
       "run_id": "run_012",
       "run_index": 12,
-      "slot_id": "slot_009",
-      "period": "2026-09-01",
-      "received_at": "2026-09-08T02:11:03.987266+00:00",
-      "n_rows_generated": 2012,
-      "dirty_severity": null,
-      "id_offset": 900000,
-      "seed": 1009,
-      "file": "run_012.csv"
+      "received_at": "2026-09-03T06:26:33.698367+00:00",
+      "delivery": "monthly_extract_sep2026"
     },
+    "row_count": 1565,
     "value_counts": {
       "sex": [
         [
           "M",
-          992
+          768
         ],
         [
           "F",
-          982
+          757
         ],
         [
           "X",
-          38
+          27
+        ],
+        [
+          "(invalid code)",
+          13
         ]
       ]
     },
     "arrival": {
-      "max_lag_hours": 14.102222222222222,
-      "earliest_extract": "2026-09-01T02:11:03.987266+00:00"
+      "max_lag_hours": 7.175833333333333,
+      "earliest_extract": "2026-09-03T06:26:33.698367+00:00"
     },
     "check_aggregates": {
       "sex": {
         "type": "categorical",
         "suppressed": false,
-        "total_invalid": 0,
-        "values": []
+        "total_invalid": 13,
+        "values": [
+          {
+            "value": "O",
+            "count": 6
+          },
+          {
+            "value": "9",
+            "count": 4
+          },
+          {
+            "value": "U",
+            "count": 3
+          }
+        ]
       },
       "place_of_birth_suburb": {
         "type": "categorical",
         "suppressed": false,
-        "total_invalid": 0,
-        "values": []
+        "total_invalid": 5,
+        "values": [
+          {
+            "value": "Not stated",
+            "count": 2
+          },
+          {
+            "value": "Freemantle",
+            "count": 2
+          },
+          {
+            "value": "Unknown",
+            "count": 1
+          }
+        ]
       },
       "date_of_birth": {
         "type": "numeric_date",
         "suppressed": false,
-        "total_invalid": 0,
-        "min": null,
-        "max": null,
-        "values": [],
-        "histogram": []
+        "total_invalid": 7,
+        "min": "1750-01-01",
+        "max": "1899-01-01",
+        "values": [
+          {
+            "value": "1750-01-01",
+            "count": 2
+          },
+          {
+            "value": "1850-06-15",
+            "count": 2
+          },
+          {
+            "value": "1899-01-01",
+            "count": 2
+          },
+          {
+            "value": "1820-11-30",
+            "count": 1
+          }
+        ],
+        "histogram": [
+          {
+            "bucket": "1750-01-01 to 1774-11-01",
+            "count": 2
+          },
+          {
+            "bucket": "1799-09-01 to 1824-07-02",
+            "count": 1
+          },
+          {
+            "bucket": "1849-05-02 to 1874-03-02",
+            "count": 2
+          },
+          {
+            "bucket": "1874-03-02 to 1899-01-01",
+            "count": 2
+          }
+        ]
       }
     }
   },

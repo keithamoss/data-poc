@@ -163,7 +163,10 @@ models:
   - name: stg_birth_registrations
     description: >
       One row per birth registration, across all loaded runs
-      (run_id/run_date/dirty_severity identify which run a row came from).
+      (run_id/run_date identify which run a row came from). dirty_severity
+      was dropped by REQ-GEN-043: it is generator bookkeeping, and a
+      pipeline reading it is filing from a declaration rather than from
+      what arrived.
     # Model-level tests (2026-09-15, dbt_utils switch - see plans/qa-
     # pipeline.md) - dbt_utils.expression_is_true/recency both operate
     # across the model as a whole (a cross-field comparison; a max()

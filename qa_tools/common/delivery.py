@@ -91,6 +91,40 @@ class Delivery:
         return tuple(self.path / name for name in self.files)
 
 
+def remove_deliveries(names, deliveries_dir: Path | None = None,
+                       receipts_dir: Path | None = None) -> int:
+    """Deletes the named deliveries and their receipts. Returns the
+    count removed.
+
+    WHY A GENERATOR NEEDS THIS. Two guarantees pull against each other:
+    delivery names must be unique across the whole directory (or two
+    arrivals silently merge), and a regeneration must OVERWRITE its own
+    history rather than accumulate beside it (REQ-GEN-042). Seeding
+    uniqueness from what is on disk satisfies the first and breaks the
+    second - a re-run simply avoids its own previous names and writes a
+    whole second history. Measured: 42 Birth Registrations deliveries
+    became 84.
+
+    So a generator clears what IT wrote, from its own bookkeeping,
+    before writing again. Each one owns its own output, and neither
+    needs to know which deliveries belong to the other.
+    """
+    deliveries_dir = Path(deliveries_dir or DELIVERIES_DIR)
+    receipts_dir = Path(receipts_dir or RECEIPTS_DIR)
+    removed = 0
+    for name in names:
+        path = deliveries_dir / name
+        if path.is_dir():
+            for child in path.iterdir():
+                child.unlink()
+            path.rmdir()
+            removed += 1
+        receipt = receipts_dir / f"{name}.json"
+        if receipt.exists():
+            receipt.unlink()
+    return removed
+
+
 def existing_delivery_names(deliveries_dir: Path | None = None) -> set[str]:
     """Every delivery name already on disk.
 

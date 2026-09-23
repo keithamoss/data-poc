@@ -22,16 +22,49 @@ import qa_tools.bdm.run_soda_bdm as run_soda_bdm
 _REF_RUN_ID = "pytest_bdm_ref"
 _DIRTY_RUN_ID = "pytest_bdm_dirty"
 
+# The run_ids the same two fixture runs get once they are RECOGNISED as
+# arrivals rather than read from a declaration (REQ-GEN-043). They are
+# not the filenames above and cannot be: a delivery's files are named by
+# the supplier, so a run_id is assigned in received_at order by
+# qa_tools.common.arrivals, which is what the Synthetic --run-id flow
+# picks from. The flat `pytest_bdm_*.csv` names above still matter for
+# the Local files mode, which takes a real path to a real file.
+_ARRIVAL_REF_RUN_ID = "run_001"
+_ARRIVAL_DIRTY_RUN_ID = "run_002"
+
 _runner = CliRunner()
 
 
 def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
+    # The run picker recognises arrivals from disk now (REQ-GEN-043),
+    # so pointing it at the fixture means pointing the DELIVERY
+    # directories at it - patching RAW_DIR alone would leave these
+    # tests reading the real data/deliveries/ tree.
+    from pathlib import Path
+
+    from qa_tools.common import delivery
+    monkeypatch.setattr(delivery, "DELIVERIES_DIR", Path(raw_dir) / "deliveries")
+    monkeypatch.setattr(delivery, "RECEIPTS_DIR", Path(raw_dir) / "receipts")
     monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", raw_dir)
     monkeypatch.setattr(build_per_run_warehouses, "OUT_DIR", duckdb_dir)
     monkeypatch.setattr(run_datacontract_bdm, "RAW_DIR", raw_dir)
     monkeypatch.setattr(run_evidently_bdm, "RAW_DIR", raw_dir)
     monkeypatch.setattr(run_dbt_bdm, "DUCKDB_RUNS_DIR", duckdb_dir)
     monkeypatch.setattr(run_soda_bdm, "DUCKDB_RUNS_DIR", duckdb_dir)
+
+
+def _patch_delivery_dirs(monkeypatch, root):
+    """Point arrival recognition at an isolated tree (REQ-GEN-043).
+
+    Patching build_per_run_warehouses.RAW_DIR alone is no longer enough
+    for anything that asks "is there data yet?": that question is now
+    answered by recognising deliveries on disk, so an unpatched test
+    would read - and answer from - the real data/deliveries/ tree."""
+    from pathlib import Path
+
+    from qa_tools.common import delivery
+    monkeypatch.setattr(delivery, "DELIVERIES_DIR", Path(root) / "deliveries")
+    monkeypatch.setattr(delivery, "RECEIPTS_DIR", Path(root) / "receipts")
 
 
 def test_raw_dir_reads_build_per_run_warehouses_live_not_a_frozen_import_time_copy(monkeypatch):
@@ -45,42 +78,55 @@ def test_raw_dir_reads_build_per_run_warehouses_live_not_a_frozen_import_time_co
     assert bdm.manifest_path() == os.path.join("/some/other/path", "manifest.json")
 
 
-def test_default_reference_falls_back_to_manifest_first_entry_when_nothing_promoted(monkeypatch, tmp_path):
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(tmp_path))
-    (tmp_path / "run_001.csv").write_text("id\n1\n")
-    manifest = [{"run_id": "run_001", "file": "run_001.csv"}, {"run_id": "run_002", "file": "run_002.csv"}]
+def test_default_reference_falls_back_to_manifest_first_entry_when_nothing_promoted(monkeypatch):
+    manifest = [
+        {"run_id": "run_001", "csv_path": "/x/BDM_20260101/birth_registrations_2026-01-01.csv"},
+        {"run_id": "run_002", "csv_path": "/x/drop-4471/birth_registrations_2026-01-02.csv"},
+    ]
 
     monkeypatch.setattr(bdm, "list_run_ids", lambda agency, dataset: [])
-    assert bdm.default_reference(manifest) == ("run_001", "run_001.csv")
+    assert bdm.default_reference(manifest) == (
+        "run_001", "/x/BDM_20260101/birth_registrations_2026-01-01.csv")
 
 
-def test_default_reference_uses_last_promoted_run_when_its_csv_still_exists(monkeypatch, tmp_path):
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(tmp_path))
-    (tmp_path / "run_050.csv").write_text("id\n1\n")
-    manifest = [{"run_id": "run_001", "file": "run_001.csv"}]
+def test_default_reference_uses_last_promoted_run_when_it_is_still_a_recognised_arrival(monkeypatch):
+    """And hands back the arrival's OWN path, not one built from its
+    run_id - a supplier names its own files (REQ-GEN-043), so
+    f"{run_id}.csv" would point at nothing."""
+    manifest = [{"run_id": "run_001",
+                 "csv_path": "/x/BDM_20260101/birth_registrations_2026-01-01.csv"},
+                {"run_id": "run_050",
+                 "csv_path": "/x/drop-4471/birth_registrations_2026-03-04.csv"}]
 
     monkeypatch.setattr(bdm, "list_run_ids", lambda agency, dataset: ["run_010", "run_050"])
-    assert bdm.default_reference(manifest) == ("run_050", "run_050.csv")
+    assert bdm.default_reference(manifest) == (
+        "run_050", "/x/drop-4471/birth_registrations_2026-03-04.csv")
 
 
-def test_default_reference_falls_back_when_last_promoted_runs_csv_no_longer_exists(monkeypatch, tmp_path):
+def test_default_reference_falls_back_when_last_promoted_run_is_no_longer_recognised(monkeypatch):
     """RUN_PLAN's size has changed across versions of this repo before -
     a Promoted run_id from an older, larger RUN_PLAN might not regenerate
-    under today's code at all."""
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(tmp_path))
-    (tmp_path / "run_001.csv").write_text("id\n1\n")
-    manifest = [{"run_id": "run_001", "file": "run_001.csv"}]
+    under today's code at all, in which case no delivery on disk carries
+    it and there is nothing to use as a reference."""
+    manifest = [{"run_id": "run_001",
+                 "csv_path": "/x/BDM_20260101/birth_registrations_2026-01-01.csv"}]
 
     monkeypatch.setattr(bdm, "list_run_ids", lambda agency, dataset: ["run_999_no_longer_generated"])
-    assert bdm.default_reference(manifest) == ("run_001", "run_001.csv")
+    assert bdm.default_reference(manifest) == (
+        "run_001", "/x/BDM_20260101/birth_registrations_2026-01-01.csv")
 
 
 def test_picker_choices_and_run_id_from_choice_round_trip():
-    manifest = [{"run_id": "run_001", "received_at": "2026-01-01T06:00:00+00:00", "dirty_severity": None},
-                {"run_id": "run_002", "received_at": "2026-01-02T06:00:00+00:00", "dirty_severity": "red"}]
+    manifest = [{"run_id": "run_001", "received_at": "2026-01-01T06:00:00+00:00", "delivery": "BDM_20260101",
+                 "csv_path": "/x/BDM_20260101/birth_registrations_2026-01-01.csv"},
+                {"run_id": "run_002", "received_at": "2026-01-02T06:00:00+00:00", "delivery": "drop-4471",
+                 "csv_path": "/x/drop-4471/birth_registrations_2026-01-02.csv"}]
     choices = bdm.picker_choices(manifest)
-    assert "clean" in choices[0]
-    assert "red" in choices[1]
+    # The picker shows the DELIVERY each run came from, not an
+    # injected severity - severity is generator bookkeeping the CLI has
+    # no business reading (REQ-GEN-043).
+    assert "BDM_20260101" in choices[0]
+    assert "drop-4471" in choices[1]
     assert bdm.run_id_from_choice(choices[0]) == "run_001"
     assert bdm.run_id_from_choice(choices[1]) == "run_002"
 
@@ -91,24 +137,39 @@ def test_has_failures_true_on_fail_or_error_false_otherwise():
     assert bdm.has_failures([{"status": "error"}]) is True
 
 
-def test_run_check_does_not_clobber_the_real_batch_manifest(monkeypatch, tmp_path, bdm_raw_dir, bdm_duckdb_dir):
-    """Real bug, found live while building this (a manual smoke test
-    actually corrupted the real data/raw/manifest.json from 176 entries
-    down to 1): orchestrate_bdm.run_single() unconditionally overwrites
-    RAW_DIR/manifest.json with its own synthetic 1-or-2-entry manifest -
-    correct and intentional for its real Lambda use case (no pre-existing
-    manifest there at all), but a real collision when called against a
-    RAW_DIR that already holds the real, full generate_runs.py batch
-    manifest this CLI's own run picker reads from. run_check() must
-    leave the real manifest exactly as it found it.
+def test_run_check_leaves_the_arrival_record_on_disk_exactly_as_it_found_it(
+        monkeypatch, tmp_path, bdm_raw_dir, bdm_duckdb_dir):
+    """Re-pointed from the retired `..._does_not_clobber_the_real_batch_
+    manifest` test (REQ-GEN-043), which is worth spelling out rather than
+    quietly deleting. The original guarded a real bug found live - a
+    manual smoke test corrupted the real data/raw/manifest.json from 176
+    entries down to 1, because orchestrate_bdm.run_single()
+    unconditionally overwrote it with its own synthetic 1-or-2-entry
+    manifest. REQ-GEN-043 removed the cause: run_single() writes no
+    manifest at all now, and the run picker recognises arrivals from the
+    delivery tree on disk instead of reading a declaration.
+
+    So the specific thing that test asserted can no longer be false. The
+    GUARANTEE behind it still can be, and is what this asserts instead:
+    running a check against an existing arrival is a READ of the arrival
+    record, never a write. If anything reintroduced a manifest write, or
+    wrote into a delivery or receipt, the recognised arrival list - or
+    the bytes underneath it - would move.
 
     Works on a real COPY of bdm_raw_dir, not the shared session fixture
-    directly - this test is specifically probing a destructive side
-    effect, and bdm_raw_dir is reused by every other test in this file."""
+    directly, for the same reason the original did: this test is
+    specifically probing a destructive side effect."""
+    import hashlib
     import shutil
+    from pathlib import Path
+
+    from qa_tools.common import delivery
+
     raw_copy = tmp_path / "raw_copy"
     shutil.copytree(bdm_raw_dir, raw_copy)
 
+    monkeypatch.setattr(delivery, "DELIVERIES_DIR", raw_copy / "deliveries")
+    monkeypatch.setattr(delivery, "RECEIPTS_DIR", raw_copy / "receipts")
     monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(raw_copy))
     monkeypatch.setattr(build_per_run_warehouses, "OUT_DIR", bdm_duckdb_dir)
     monkeypatch.setattr(run_datacontract_bdm, "RAW_DIR", str(raw_copy))
@@ -116,13 +177,29 @@ def test_run_check_does_not_clobber_the_real_batch_manifest(monkeypatch, tmp_pat
     monkeypatch.setattr(run_dbt_bdm, "DUCKDB_RUNS_DIR", bdm_duckdb_dir)
     monkeypatch.setattr(run_soda_bdm, "DUCKDB_RUNS_DIR", bdm_duckdb_dir)
 
-    before = bdm.load_manifest()
-    assert len(before) == 2, "test precondition - the real fixture manifest must have both entries"
+    def _fingerprint() -> list[tuple[str, str]]:
+        out = []
+        for root in ("deliveries", "receipts"):
+            for path in sorted((raw_copy / root).rglob("*")):
+                if path.is_file():
+                    out.append((str(path.relative_to(raw_copy)),
+                                hashlib.sha256(path.read_bytes()).hexdigest()))
+        return out
 
-    bdm.run_check(_REF_RUN_ID, "test@example.com", reference_run_id=_REF_RUN_ID)
+    before_arrivals = bdm.load_manifest()
+    before_bytes = _fingerprint()
+    assert len(before_arrivals) == 2, "test precondition - the fixture must recognise both arrivals"
+    assert before_bytes, "test precondition - there must be real delivery files to fingerprint"
 
-    after = bdm.load_manifest()
-    assert after == before, "run_check() must not mutate the real batch manifest.json as a side effect"
+    bdm.run_check(_ARRIVAL_REF_RUN_ID, "test@example.com", reference_run_id=_ARRIVAL_REF_RUN_ID)
+
+    assert bdm.load_manifest() == before_arrivals, \
+        "run_check() must not change which arrivals are recognised on disk"
+    assert _fingerprint() == before_bytes, \
+        "run_check() must not write into the delivery or receipt tree it read"
+    assert not (raw_copy / "manifest.json").exists(), \
+        "nothing may reintroduce a written manifest - arrivals are recognised, not declared"
+    assert not list(Path(raw_copy / "deliveries").glob("manifest.json"))
 
 
 def test_qa_command_flag_mode_reports_real_results_and_never_touches_real_qa_results(
@@ -131,7 +208,8 @@ def test_qa_command_flag_mode_reports_real_results_and_never_touches_real_qa_res
     fake_qa_results = tmp_path / "not_the_real_qa_results"
     monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
 
-    result = _runner.invoke(bdm.qa_command, ["--run-id", _REF_RUN_ID, "--reference-run-id", _REF_RUN_ID])
+    result = _runner.invoke(bdm.qa_command,
+                             ["--run-id", _ARRIVAL_REF_RUN_ID, "--reference-run-id", _ARRIVAL_REF_RUN_ID])
 
     assert result.exit_code == 0, result.output
     assert "local-only check" in result.output
@@ -146,11 +224,13 @@ def test_qa_command_flag_mode_commit_promotes_into_the_patched_qa_results_dir(
     monkeypatch.setattr(bdm, "get_run_by", lambda: "test@example.com")
 
     result = _runner.invoke(bdm.qa_command,
-                             ["--run-id", _REF_RUN_ID, "--reference-run-id", _REF_RUN_ID, "--commit"])
+                             ["--run-id", _ARRIVAL_REF_RUN_ID, "--reference-run-id", _ARRIVAL_REF_RUN_ID,
+                              "--commit"])
 
     assert result.exit_code == 0, result.output
     assert "Promoted" in result.output
-    dataset_stats_path = fake_qa_results / bdm.AGENCY_ID / bdm.COLLECTION_ID / _REF_RUN_ID / "dataset_stats.json"
+    dataset_stats_path = (fake_qa_results / bdm.AGENCY_ID / bdm.COLLECTION_ID
+                           / _ARRIVAL_REF_RUN_ID / "dataset_stats.json")
     assert dataset_stats_path.exists()
     with open(dataset_stats_path) as f:
         assert json.load(f)["run_by"] == "test@example.com"
@@ -160,7 +240,8 @@ def test_qa_command_reports_real_failures_and_exits_nonzero(monkeypatch, tmp_pat
     _patch_bdm_dirs(monkeypatch, bdm_raw_dir, bdm_duckdb_dir)
     monkeypatch.setattr(common, "QA_RESULTS_DIR", tmp_path / "unused")
 
-    result = _runner.invoke(bdm.qa_command, ["--run-id", _DIRTY_RUN_ID, "--reference-run-id", _REF_RUN_ID])
+    result = _runner.invoke(bdm.qa_command,
+                             ["--run-id", _ARRIVAL_DIRTY_RUN_ID, "--reference-run-id", _ARRIVAL_REF_RUN_ID])
 
     assert result.exit_code == 1, result.output
     assert "fail" in result.output.lower()
@@ -173,9 +254,11 @@ def test_qa_command_unknown_run_id_is_a_real_clean_error(monkeypatch, bdm_raw_di
     assert "no manifest entry" in result.output.lower()
 
 
-def test_generate_synthetic_data_command_skips_when_declined(monkeypatch, tmp_path):
+def test_generate_synthetic_data_command_skips_when_declined(monkeypatch, tmp_path, bdm_raw_dir):
     monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(tmp_path))
-    (tmp_path / "manifest.json").write_text("[]")
+    # Real deliveries already on disk - so there IS something to
+    # overwrite, and the command must ask before it does.
+    _patch_delivery_dirs(monkeypatch, bdm_raw_dir)
     called = []
     monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: called.append(True))
     monkeypatch.setattr(common, "confirm", lambda *a, **k: False)
@@ -187,9 +270,9 @@ def test_generate_synthetic_data_command_skips_when_declined(monkeypatch, tmp_pa
     assert "not regenerated" in result.output.lower()
 
 
-def test_generate_synthetic_data_command_yes_flag_skips_confirmation(monkeypatch, tmp_path):
+def test_generate_synthetic_data_command_yes_flag_skips_confirmation(monkeypatch, tmp_path, bdm_raw_dir):
     monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(tmp_path))
-    (tmp_path / "manifest.json").write_text("[]")
+    _patch_delivery_dirs(monkeypatch, bdm_raw_dir)
     called = []
     monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: called.append(True))
 
@@ -200,9 +283,10 @@ def test_generate_synthetic_data_command_yes_flag_skips_confirmation(monkeypatch
 
 
 def test_generate_synthetic_data_command_no_prompt_needed_on_first_run(monkeypatch, tmp_path):
-    """No manifest.json yet - nothing to overwrite, so this shouldn't even
-    ask."""
+    """No deliveries on disk yet - nothing to overwrite, so this
+    shouldn't even ask."""
     monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(tmp_path))
+    _patch_delivery_dirs(monkeypatch, tmp_path)
     called = []
     monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: called.append(True))
 

@@ -8,14 +8,17 @@ from __future__ import annotations
 
 from pipeline import build_cp_dashboard_data as bcd
 
+# ARRIVAL RECORDS, not manifest entries (REQ-GEN-043) - and row counts
+# now sit in dataset_stats, MEASURED from the data that landed, rather
+# than travelling with the run as something the generator declared.
 FIXTURE_RUNS = [
     {
-        "run_id": "cp_run_001", "run_index": 1, "received_at": "2026-01-01T05:00:00+00:00",
-        "row_counts": {"cp_notifications": 3},
+        "run_id": "cp_run_001", "run_index": 1, "delivery": "CP_20260101",
+        "received_at": "2026-01-01T05:00:00+00:00",
     },
     {
-        "run_id": "cp_run_002", "run_index": 2, "received_at": "2026-04-01T20:00:00+00:00",
-        "row_counts": {"cp_notifications": 4},
+        "run_id": "cp_run_002", "run_index": 2, "delivery": "cp-drop-9104",
+        "received_at": "2026-04-01T20:00:00+00:00",
     },
 ]
 
@@ -28,11 +31,13 @@ FIXTURE_DATASET_STATS = {
     # can tell a real onTime/late classification apart from a hardcoded
     # one - see that test's own docstring.
     "cp_run_001": {
+        "row_counts": {"cp_notifications": 3},
         "value_counts": {"concern_type": [["Neglect", 2], ["Physical abuse", 1]]},
         "arrival": {"cp_notifications": {"max_lag_hours": 5.0, "earliest_extract": "2025-11-01T05:00:00+00:00"}},
         "check_aggregates": {},
     },
     "cp_run_002": {
+        "row_counts": {"cp_notifications": 4},
         "value_counts": {"concern_type": [["Neglect", 3], ["Physical abuse", 1]]},
         "arrival": {"cp_notifications": {"max_lag_hours": 30.0, "earliest_extract": "2026-02-01T20:00:00+00:00"}},
         "check_aggregates": {},

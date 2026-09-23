@@ -12,11 +12,11 @@ writes one directory per run_id with 6 CSVs (cp_clients.csv,
 cp_notifications.csv, ...) - see data/cp_raw/manifest.json for the run list.
 """
 from __future__ import annotations
-import json
 import os
 
 import duckdb
 
+from qa_tools.common import arrivals
 from qa_tools.common import hierarchy
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
 
@@ -78,15 +78,19 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, out_dir: str = OUT_
     return db_path
 
 
-def build_all(raw_dir: str = CP_RAW_DIR, out_dir: str = OUT_DIR) -> list[str]:
-    with open(os.path.join(raw_dir, "manifest.json")) as f:
-        manifest = json.load(f)
-
+def build_all(raw_dir: str = CP_RAW_DIR, out_dir: str = OUT_DIR,
+               deliveries_dir=None, receipts_dir=None) -> list[str]:
+    """One warehouse per recognised arrival - see the BDM counterpart
+    for why `raw_dir` is kept but no longer read."""
     os.makedirs(out_dir, exist_ok=True)
     paths = []
-    for entry in manifest:
-        run_id = entry["run_id"]
-        run_dir = os.path.join(raw_dir, run_id)
+    # One directory per arrival, recognised from disk (REQ-GEN-043) -
+    # the six CP tables land together as ONE delivery, which is why the
+    # run directory IS the delivery.
+    for arrival in arrivals.arrivals_for("child-protection", "cp_run_",
+                                          deliveries_dir, receipts_dir):
+        run_id = arrival.run_id
+        run_dir = str(arrival.path)
         db_path = os.path.join(out_dir, f"{run_id}.duckdb")
         if os.path.exists(db_path):
             os.remove(db_path)

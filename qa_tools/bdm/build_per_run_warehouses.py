@@ -18,13 +18,12 @@ Nothing about the SQL model or schema.yml/checks.yml changes; only which
 physical DuckDB file the tool connects to for a given run.
 """
 from __future__ import annotations
-import json
 import os
 
 import duckdb
 
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
-from qa_tools.common import asset_time
+from qa_tools.common import arrivals, asset_time
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 RAW_DIR = os.path.join(ROOT, "data", "raw")
@@ -32,7 +31,7 @@ OUT_DIR = os.path.join(ROOT, "data", "duckdb_runs")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
 
 
-def build_one(run_id: str, csv_path: str, run_date: str, dirty_severity: str, out_dir: str = OUT_DIR,
+def build_one(run_id: str, csv_path: str, run_date: str, out_dir: str = OUT_DIR,
               contract_path: str = CONTRACT_PATH) -> str:
     """Builds exactly one data/duckdb_runs/<run_id>.duckdb from one already-
     on-disk CSV - the single-arrival counterpart to build_all()'s per-
@@ -50,7 +49,6 @@ def build_one(run_id: str, csv_path: str, run_date: str, dirty_severity: str, ou
     df = read_csv_explicit_nulls(csv_path, null_values)
     df["run_id"] = run_id
     df["run_date"] = run_date
-    df["dirty_severity"] = dirty_severity
 
     combined_csv = os.path.join(out_dir, f"_{run_id}.csv")
     df.to_csv(combined_csv, index=False)
@@ -83,15 +81,20 @@ def build_one(run_id: str, csv_path: str, run_date: str, dirty_severity: str, ou
     return db_path
 
 
-def build_all(raw_dir: str = RAW_DIR, out_dir: str = OUT_DIR) -> list[str]:
-    with open(os.path.join(raw_dir, "manifest.json")) as f:
-        manifest = json.load(f)
+def build_all(raw_dir: str = RAW_DIR, out_dir: str = OUT_DIR,
+               deliveries_dir=None, receipts_dir=None) -> list[str]:
+    """One warehouse per recognised arrival.
 
+    `raw_dir` is kept for callers that still pass it and is no longer
+    read: since REQ-GEN-043 the runs come from deliveries on disk, not
+    from a manifest in a raw directory.
+    """
     paths = []
-    for entry in manifest:
+    for arrival in arrivals.arrivals_for("civil-registration", "run_",
+                                          deliveries_dir, receipts_dir):
         db_path = build_one(
-            entry["run_id"], os.path.join(raw_dir, entry["file"]),
-            asset_time.local_date(entry["received_at"]).isoformat(), entry["dirty_severity"],
+            arrival.run_id, str(arrival.path_for("birth-registrations")),
+            asset_time.local_date(arrival.received_at).isoformat(),
             out_dir=out_dir)
         paths.append(db_path)
 

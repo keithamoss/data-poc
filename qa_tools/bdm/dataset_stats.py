@@ -133,16 +133,46 @@ def _arrival(conn: duckdb.DuckDBPyConnection, run_id: str) -> dict:
                 earliest_extract, f"earliest_extract for run {run_id}")}
 
 
-def compute_dataset_stats(conn: duckdb.DuckDBPyConnection, run_id: str, manifest_entry: dict) -> dict[str, Any]:
+def _arrival_record(arrival: dict) -> dict:
+    """The observed facts about one arrival, and nothing else.
+
+    An allowlist rather than a copy-minus-some-keys, deliberately: a
+    field added to the arrival dict later must not silently find its
+    way into committed history. Criterion 7 is a rule about what may
+    be in qa_results/, and a permissive shape would let the next field
+    through without anybody deciding.
+    """
+    return {key: arrival[key] for key in ("run_id", "run_index", "received_at", "delivery")
+            if key in arrival}
+
+
+def compute_dataset_stats(conn: duckdb.DuckDBPyConnection, run_id: str, arrival: dict) -> dict[str, Any]:
     """`conn` is a connection to the combined warehouse (birth_registrations
     table, tagged by run_id) - the same one build_dashboard_data.py used
-    to open directly. `manifest_entry` is this run's own entry from
-    data/raw/manifest.json (delivery date, resupply flags, etc.) -
-    embedded here so it becomes part of committed history too, rather
-    than build_results_from_history.py needing to keep reading local,
-    regenerated data/raw/manifest.json on top of qa_results/."""
+    to open directly.
+
+    THE ARRIVAL RECORD, NOT THE GENERATOR'S MANIFEST ENTRY
+    (REQ-GEN-043 criterion 7). This used to embed the whole entry -
+    injected severity, seed, id_offset, which slot it filled - into
+    committed qa_results/, where acceptance_sync.py then read it back.
+    That put the generator's own bookkeeping inside the permanent QA
+    record and let a downstream module file supplies from a
+    declaration.
+
+    What survives is what the pipeline legitimately observed: which run
+    this is, when WE received it, and which delivery it came from. The
+    rest is in data/generator_bookkeeping.json, which nothing here may
+    read.
+    """
     return {
-        "manifest_entry": manifest_entry,
+        "arrival_record": _arrival_record(arrival),
+        # MEASURED, not declared. This used to reach the dashboard as
+        # the generator's own `n_rows_generated` - a number from
+        # bookkeeping rather than from the data that actually landed
+        # (REQ-GEN-043 criterion 7). Counted here because this is the
+        # one point in the pipeline with a legitimate live connection.
+        "row_count": conn.execute(
+            "SELECT COUNT(*) FROM birth_registrations WHERE run_id = ?", [run_id]).fetchone()[0],
         "value_counts": {"sex": _sex_value_counts(conn, run_id)},
         "arrival": _arrival(conn, run_id),
         "check_aggregates": _check_aggregates(conn, run_id),

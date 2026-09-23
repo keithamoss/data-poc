@@ -124,7 +124,10 @@ both share it (`build_all()` now just calls `build_one()` per manifest
 entry — verified byte-identical output via the existing pipeline run).
 
 `qa_tools/bdm/orchestrate_bdm.py` gained `run_single(run_id, csv_path,
-run_date, dirty_severity, reference_run_id, reference_csv, run_by=None)`
+run_date, reference_run_id, reference_csv, run_by=None)` (it took a
+`dirty_severity` too until REQ-GEN-043 removed it — a synthetic-data
+generator concept that had no business crossing into the pipeline, and
+which a real arriving file never carries)
 — builds that one warehouse, resolves `run_by` via `get_run_by()`
 (picking up the Lambda-context fallback below) if not passed explicitly,
 calls `_run_one()` with a synthetic one-entry manifest dict, and returns
@@ -481,20 +484,31 @@ not hypothetical, and both now have a real, working fix, but worth
 naming explicitly since neither was anticipated when this design was
 first sketched:
 
-1. **The row-count-growth Evidently check reads `RAW_DIR/manifest.json`
-   directly** to find "the immediately preceding run" - there's no
-   manifest at all once a Lambda is invoked per arriving file.
-   `run_single()` now writes a small, synthetic manifest (just this
-   run's own entry, or `[previous_entry, this_entry]` if the new,
-   optional `previous_run_id`/`previous_csv` parameters are supplied) so
-   the existing check logic keeps working unmodified. **Nobody passes
-   `previous_run_id`/`previous_csv` yet** - the Lambda handlers below
-   don't track "what was the last delivery for this dataset", so this
-   check is silently skipped for every Lambda-triggered run in this MVP
-   (the same behavior a genuinely-first-ever run already gets locally -
-   not a new failure mode, just a wider one). A real fix needs something
-   to track recent-delivery history across invocations (DynamoDB again,
-   most likely) - flagged as a real follow-up, not built tonight.
+1. **The row-count-growth Evidently check needs "the immediately
+   preceding run"**, and there is no batch context at all once a Lambda
+   is invoked per arriving file.
+
+   *Originally solved* by having `run_single()` WRITE a small, synthetic
+   manifest — just this run's own entry, or `[previous_entry,
+   this_entry]` if the caller supplied optional `previous_run_id`/
+   `previous_csv` parameters — so the check, which read
+   `RAW_DIR/manifest.json` directly, kept working unmodified. Nobody
+   ever passed them.
+
+   *Superseded by REQ-GEN-043.* The check now resolves the preceding run
+   from the deliveries RECOGNISED on disk, so there is no manifest to
+   write and nothing reads one; and a caller DECLARING which delivery
+   came before this one is exactly the shape that requirement exists to
+   remove. The parameters are gone rather than kept and ignored.
+
+   What that changes in practice: for a run that is part of the
+   recognised delivery history, the check now works without anyone
+   passing anything. For an arrival that lands OUTSIDE the delivery tree
+   — which is every Lambda arrival in this MVP — it is still silently
+   skipped, the same behaviour a genuinely-first-ever run already gets
+   locally. A real fix is for a Lambda arrival to become a delivery on
+   the receiving side, which is the supply model's own subject rather
+   than this document's.
 2. **`dataset_stats.compute_dataset_stats()` needs a connection to the
    COMBINED, all-runs warehouse** (`pipeline/load.py`'s `data/
    warehouse.duckdb`, `main.birth_registrations` with a `run_id`

@@ -31,10 +31,12 @@ from collections.abc import Callable
 import json
 import os
 import sys
+from datetime import date
 
 import duckdb
 
 from . import bdm_common
+from qa_tools.common import arrivals
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
@@ -82,7 +84,9 @@ def _announce(on_step, label: str) -> None:
 def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str, reference_csv: str,
              on_step: Callable[[str], None] | None = None) -> list[dict]:
     run_id = entry["run_id"]
-    csv_filename = entry["file"]
+    # The real file inside the delivery that arrived (REQ-GEN-043),
+    # not a name taken from a manifest we were handed.
+    csv_filename = entry["csv_path"]
     print(f"--- {run_id} ---")
 
     results: list[dict] = []
@@ -115,9 +119,8 @@ def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str
     return results
 
 
-def run_single(run_id: str, csv_path: str, run_date: str, dirty_severity: str, reference_run_id: str,
-               reference_csv: str, run_by: str | None = None, previous_run_id: str | None = None,
-               previous_csv: str | None = None,
+def run_single(run_id: str, csv_path: str, run_date: str, reference_run_id: str,
+               reference_csv: str, run_by: str | None = None,
                on_step: Callable[[str], None] | None = None) -> list[dict]:
     """The single-arrival counterpart to run_pipeline()'s full-manifest
     batch loop - built for the AWS event-driven MVP (plans/running-
@@ -147,23 +150,28 @@ def run_single(run_id: str, csv_path: str, run_date: str, dirty_severity: str, r
     already present, e.g. bundled with the Lambda deployment or fetched
     separately before this is called).
 
-    A second, separate real gap found while building this (not the same
-    as the reference-run one above): run_evidently_bdm.evaluate_evidently_
-    bdm()'s row-count-growth check reads RAW_DIR/manifest.json directly to
-    find "the immediately preceding run" - there's no manifest at all in
-    a single-arrival Lambda world, so this writes one, synthetically,
-    containing just [previous_entry (if given), this_entry] - the same
-    two-entry shape _previous_run_file() already knows how to read.
-    Without previous_run_id/previous_csv (the MVP default - no caller
-    passes them yet), the row-count-growth check is silently SKIPPED for
-    every single Lambda-triggered run, exactly as it already is for any
-    genuinely-first run today (_previous_run_file() returns None) - a
-    real, deliberate MVP simplification, not a bug: knowing "what
-    immediately preceded this delivery" needs either a real manifest
-    concept or the caller (a Lambda handler, or whatever tracks recent
-    deliveries) explicitly tracking and passing it, which nothing does
-    yet. Flagged in the design doc as a real open follow-up, not solved
-    here."""
+    THE ROW-COUNT-GROWTH CHECK'S "PREVIOUS RUN", AND WHY THIS NO LONGER
+    TAKES previous_run_id/previous_csv (REQ-GEN-043). This used to WRITE
+    a synthetic two-entry manifest.json into RAW_DIR so that
+    run_evidently_bdm._previous_run_file() - which read that file - had
+    something to read, with the preceding entry supplied by the caller.
+    Two things changed. The check now resolves "the immediately
+    preceding run" from the arrivals RECOGNISED on disk, so there is no
+    file to write; and a caller DECLARING which delivery came before
+    this one is exactly the shape REQ-GEN-043 exists to remove - a
+    supply filed from an assertion rather than from what arrived.
+
+    So the parameters are gone rather than kept and ignored. For a run
+    that is genuinely part of the recognised delivery history (the
+    Synthetic CLI flow), the check now works better than it did: the
+    real preceding arrival is found from disk without anyone passing
+    it. For a run that is NOT - an ad-hoc local file, an S3 key, a
+    Lambda arrival landing outside the delivery tree - the check is
+    silently SKIPPED, exactly as it already is for any genuinely-first
+    run (_previous_run_file() returns None). That is the same real MVP
+    simplification as before, reached by a different route: knowing what
+    preceded an arrival that was never filed as a delivery still needs
+    something this function does not have."""
     run_timestamp = asset_time.now().isoformat()
     run_by = run_by or get_run_by()
 
@@ -174,13 +182,14 @@ def run_single(run_id: str, csv_path: str, run_date: str, dirty_severity: str, r
         with open(csv_path, "rb") as src, open(dest_path, "wb") as dst:
             dst.write(src.read())
 
-    entry = {"run_id": run_id, "file": csv_filename, "run_date": run_date, "dirty_severity": dirty_severity}
-    synthetic_manifest = []
-    if previous_run_id is not None:
-        synthetic_manifest.append({"run_id": previous_run_id, "file": previous_csv})
-    synthetic_manifest.append(entry)
-    with open(os.path.join(build_per_run_warehouses.RAW_DIR, "manifest.json"), "w") as f:
-        json.dump(synthetic_manifest, f)
+    # An arrival-shaped entry for this ONE file, carrying only what we
+    # observed: which run, when we received it, where the file is. No
+    # injected severity - that is generator bookkeeping and nothing in
+    # the pipeline may read it (REQ-GEN-043).
+    entry = {"run_id": run_id, "run_index": 1, "csv_path": dest_path,
+              "received_at": asset_time.isoformat(
+                  asset_time.start_of_day(date.fromisoformat(run_date))),
+              "delivery": run_id}
 
     # out_dir passed explicitly, read off the module attribute rather than
     # relying on build_one()'s own default parameter value - a real bug
@@ -190,7 +199,7 @@ def run_single(run_id: str, csv_path: str, run_date: str, dirty_severity: str, r
     # silently ignored and this would write into the REAL data/duckdb_runs/
     # instead - reproduced for real (a stray pytest_bdm_dirty.duckdb
     # actually appeared there) before this fix.
-    db_path = build_per_run_warehouses.build_one(run_id, dest_path, run_date, dirty_severity,
+    db_path = build_per_run_warehouses.build_one(run_id, dest_path, run_date,
                                                   out_dir=build_per_run_warehouses.OUT_DIR)
 
     # _run_one()'s own dataset_stats computation connects to the module-
@@ -211,8 +220,12 @@ def run_single(run_id: str, csv_path: str, run_date: str, dirty_severity: str, r
 def run_pipeline(sequential: bool = False) -> dict:
     build_per_run_warehouses.build_all()
 
-    with open(MANIFEST_PATH) as f:
-        manifest = json.load(f)
+    # RECOGNISED FROM DISK, never read from a declaration
+    # (REQ-GEN-043). The generator's manifest.json is bookkeeping, and
+    # a pipeline reading it would be filing supplies from what it was
+    # told rather than from what arrived.
+    manifest = [a.as_entry() | {"csv_path": str(a.path_for("birth-registrations"))}
+                for a in arrivals.arrivals_for("civil-registration", "run_")]
 
     # The first manifest entry (run_01, always clean by RUN_PLAN
     # construction) - NOT run_evidently_bdm.REFERENCE_RUN_ID, a hardcoded
@@ -230,7 +243,8 @@ def run_pipeline(sequential: bool = False) -> dict:
     # docstring for why this can't fall back to "unknown".
     run_by = get_run_by()
     all_results = parallel_orchestrate.run_manifest(
-        manifest, _run_one, run_timestamp, run_by, reference_entry["run_id"], reference_entry["file"],
+        manifest, _run_one, run_timestamp, run_by, reference_entry["run_id"],
+        reference_entry["csv_path"],
         sequential=sequential)
 
     # Read back rather than threaded through _run_one's own return value -

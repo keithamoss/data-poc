@@ -2,8 +2,8 @@
 1-2): generate-synthetic-data and the Quality Assurance flow against
 Synthetic and Local files source modes. Same wizard/flags duality as
 cli/bdm.py, adapted for CP's real differences from Birth Registrations:
-a 6-table-per-run collection (not one CSV), no row-count-growth/
-previous_run_id concept, and orchestrate_cp.run_single() needing all 6
+a 6-table-per-run collection (not one CSV), no row-count-growth check
+at all, and orchestrate_cp.run_single() needing all 6
 tables already loaded into that run's warehouse (via
 build_cp_warehouses.add_table_to_run()) before it's called at all.
 
@@ -15,7 +15,6 @@ datacontract-cli/Evidently chain via orchestrate_cp.run_single(), just
 reached from a browsable questionary.path() prompt or --folder/
 --reference-folder flags instead of a positional folder argument."""
 from __future__ import annotations
-import json
 import os
 import sys
 import tempfile
@@ -74,12 +73,23 @@ def generate_synthetic_data() -> None:
 
 
 def load_manifest() -> list[dict]:
-    with open(manifest_path()) as f:
-        return json.load(f)
+    """Every arrival, RECOGNISED FROM DISK (REQ-GEN-043).
+
+    Named `load_manifest` still because every caller here treats it as
+    "the list of runs", but it no longer opens the generator's
+    manifest.json - that is bookkeeping, and reading it would file
+    supplies from a declaration rather than from what arrived.
+    """
+    from qa_tools.common import arrivals
+    return [a.as_entry()
+            for a in arrivals.arrivals_for("child-protection", "cp_run_")]
 
 
 def manifest_exists() -> bool:
-    return os.path.exists(manifest_path())
+    """Is there anything to pick from? A real question now: with no
+    deliveries on disk there are no arrivals, which is what the picker
+    needs to know."""
+    return bool(load_manifest())
 
 
 def default_reference(manifest: list[dict]) -> str:
@@ -316,7 +326,9 @@ def has_failures(results: list[dict]) -> bool:
 
 
 def picker_choices(manifest: list[dict]) -> list[str]:
-    return [f'{e["run_id"]}  ({asset_time.local_date(e["received_at"])}, {e["dirty_severity"] or "clean"})' for e in manifest]
+    # See cli/bdm.py's identical picker.
+    return [f'{e["run_id"]}  ({asset_time.local_date(e["received_at"])}, {e["delivery"]})'
+            for e in manifest]
 
 
 def run_id_from_choice(choice: str) -> str:

@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import qa_tools.cp.run_soda_cp as run_soda_cp
 
-_REF_RUN_ID = "pytest_cp_ref"
-_DIRTY_RUN_ID = "pytest_cp_dirty"
+from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_RUN_ID
 
 
 def _run(monkeypatch, cp_duckdb_dir, run_id, run_timestamp):

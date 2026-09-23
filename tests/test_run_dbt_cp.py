@@ -10,12 +10,11 @@ import pytest
 
 import qa_tools.cp.run_dbt_cp as run_dbt_cp
 
-# Must match conftest.py's own _CP_REF_RUN_ID/_CP_DIRTY_RUN_ID exactly -
-# see tests/test_run_dbt_bdm.py's own comment on why (real parallel-test
+# The run_ids cp_duckdb_dir's fixture deliveries are RECOGNISED as - see
+# tests/test_run_dbt_bdm.py's own comment on why (real parallel-test
 # safety for dbt's target-path output lives in evaluate_dbt_cp() itself,
 # not here - plans/running-thoughts.md #12).
-_REF_RUN_ID = "pytest_cp_ref"
-_DIRTY_RUN_ID = "pytest_cp_dirty"
+from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_RUN_ID
 
 
 @pytest.fixture

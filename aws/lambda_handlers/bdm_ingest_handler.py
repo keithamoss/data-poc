@@ -87,13 +87,14 @@ def handler(event: dict, context=None) -> dict:
             local_csv = os.path.join(tmp_dir, os.path.basename(key))
             s3_client.download_file(bucket, key, local_csv)
 
-            # dirty_severity is a synthetic-data-generator-only concept
-            # (generator/dirty.py's own calibrated defect injection,
-            # never a real production signal) - a real arriving file has
-            # no such label at all, so this is always None here, never
-            # guessed from anything about the file itself.
+            # This used to pass an explicit dirty_severity=None, with a
+            # comment explaining that a real arriving file carries no
+            # such label. REQ-GEN-043 removed the parameter outright for
+            # exactly that reason - it was a synthetic-data-generator
+            # concept (generator/dirty.py's calibrated defect injection)
+            # that had no business crossing into the pipeline at all.
             results = orchestrate_bdm.run_single(
-                run_id, local_csv, run_date, None,
+                run_id, local_csv, run_date,
                 reference_run_id=REFERENCE_RUN_ID, reference_csv=REFERENCE_CSV)
 
         run_dir = os.path.join(qa_results_root, AGENCY_ID, COLLECTION_ID, run_id)

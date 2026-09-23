@@ -110,8 +110,8 @@ class TestFailsLoudly:
         self._write(tmp_path, monkeypatch, {
             "data_asset_id": "a",
             "hierarchy": {"agencies": [{"id": "ag", "name": "Ag", "collections": [
-                {"id": "c1", "name": "C1", "datasets": [{"id": "d", "name": "D", "table": "t1"}]},
-                {"id": "c2", "name": "C2", "datasets": [{"id": "d", "name": "D", "table": "t2"}]},
+                {"id": "c1", "name": "C1", "contract": "c.yaml", "datasets": [{"id": "d", "name": "D", "table": "t1"}]},
+                {"id": "c2", "name": "C2", "contract": "c.yaml", "datasets": [{"id": "d", "name": "D", "table": "t2"}]},
             ]}]},
         })
         with pytest.raises(ValueError, match="defined twice"):

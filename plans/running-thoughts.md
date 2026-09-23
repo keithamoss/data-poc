@@ -572,12 +572,15 @@ in the design doc as a possible future nicety, not built.
 **Two real architectural gaps found live while writing the single-run
 integration tests** (not anticipated when this was first sketched, both
 now fixed, both documented in the design doc's own "Two more real gaps"
-section): the row-count-growth Evidently check needs a manifest to find
-"the previous run," which doesn't exist per-arrival - `run_single()` now
-writes a small synthetic one (optionally two-entry, if a caller ever
-supplies `previous_run_id`/`previous_csv` - nothing does yet, so this
-check is silently skipped for every Lambda-triggered run in this MVP,
-flagged as a real follow-up); and `dataset_stats` computation needs the
+section): the row-count-growth Evidently check needs to find "the
+previous run," which does not exist per-arrival - originally solved by
+having `run_single()` write a small synthetic manifest, since
+SUPERSEDED by `REQ-GEN-043`, which has the check resolve the preceding
+run from the deliveries recognised on disk instead and removed the
+`previous_run_id`/`previous_csv` parameters nobody ever passed (an
+arrival landing outside the delivery tree still skips the check, which
+is the same real follow-up in a different place); and `dataset_stats`
+computation needs the
 COMBINED warehouse, not a per-run one - fixed by having `build_one()`
 also create a `main.birth_registrations` VIEW over its own per-run table,
 and having `run_single()` point `WAREHOUSE_DB_PATH` at that file for the
@@ -1766,3 +1769,49 @@ is what each setting MEANS and what breaks if it is wrong)? Those are
 different pages. `mothman schedule show` already does the first for
 calendars on the CLI, which argues the dashboard's version should be
 the second - but that is his call, not an assumption to build on.
+
+32. **[investigate, 2026-09-23]** **[QA pipeline]** Child Protection's
+    two real-tool modules still resolve their CSVs from
+    `data/cp_raw/<run_id>/`, which couples them to a run_id the
+    GENERATOR wrote down.
+
+Found while fixing test fixtures for `REQ-GEN-043`, not looked for -
+worth writing down because it is the last place the pipeline still
+depends on the generator having named something, and it works today
+only by coincidence.
+
+**What it is.** `qa_tools/cp/run_datacontract_cp.py:82` and
+`qa_tools/cp/run_evidently_cp.py:45,47` both build a path as
+`CP_RAW_DIR/<run_id>/<table>.csv`. Nothing hands them the delivery they
+are checking; they reconstruct a path from the run_id. Meanwhile
+`generator/generate_cp_runs.py:494` writes exactly that directory,
+naming it `cp_run_{run_index:03d}` - a run_id it assigns itself.
+
+**Why it currently works, and why that is not reassuring.** Arrival
+recognition assigns `cp_run_001`, `cp_run_002`... in receipt order, and
+the generator numbers its runs in the same order, so the two agree. They
+agree by construction of one synthetic generator, not by anything the
+pipeline can check. The moment a real supply arrives out of order - which
+is the entire subject of the supply model, and the exact thing that
+permuted 23 Birth Registrations run_ids this same sprint - CP would
+silently read the wrong delivery's CSVs. Silently, because a
+`cp_run_007` directory would exist and parse fine.
+
+**BDM does not have this.** Its equivalents take a `csv_path` that came
+off the recognised arrival (`Arrival.path_for()`), so the file they read
+is the file that arrived.
+
+**Why it was not just fixed.** `REQ-GEN-043`'s criteria are about what a
+delivery may declare and what may be read back out of one; the three
+readers its NFRs actually name have all been retired. `data/cp_raw/` is
+staged data, not bookkeeping, so nothing in that requirement forbids
+this. Fixing it properly means threading the arrival's own path through
+`evaluate_datacontract_cp()`/`evaluate_evidently_cp()`, which is filing
+work and belongs with `REQ-PIPE-034`/`035`/`036` rather than bolted onto
+a generator sprint.
+
+**The tell, if this is ever picked up**: `tests/conftest.py`'s CP
+fixture has to name its `data/cp_raw/<run_id>/` directories after the
+run_ids RECOGNITION will assign, because those two modules read them
+back by that name. A fixture that has to predict an id it does not
+control is the coupling showing through.

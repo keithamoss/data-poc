@@ -27,11 +27,18 @@ def test_bdm_compute_dataset_stats_shape():
         ('run_01', 'Q', 'Fremantle', '2020-03-01', '2020-03-05', '2020-03-05 08:00:00'),
         ('run_02', 'M', 'Fremantle', '2021-01-01', '2021-01-05', '2021-01-05 10:00:00')
     """)
-    manifest_entry = {"run_id": "run_01", "received_at": "2020-01-05T06:00:00+00:00"}
+    arrival = {"run_id": "run_01", "run_index": 1, "delivery": "BDM_20200105",
+               "received_at": "2020-01-05T06:00:00+00:00",
+               # Generator bookkeeping, deliberately offered to prove it
+               # is dropped rather than carried (REQ-GEN-043 criterion 7).
+               "dirty_severity": "red", "seed": 12345, "slot_id": "2020-01"}
 
-    stats = bdm_stats.compute_dataset_stats(conn, "run_01", manifest_entry)
+    stats = bdm_stats.compute_dataset_stats(conn, "run_01", arrival)
 
-    assert stats["manifest_entry"] == manifest_entry
+    assert stats["arrival_record"] == {"run_id": "run_01", "run_index": 1,
+                                        "delivery": "BDM_20200105",
+                                        "received_at": "2020-01-05T06:00:00+00:00"}
+    assert stats["row_count"] == 3, "measured from the warehouse, not taken from the arrival"
     assert stats["value_counts"]["sex"] == [["M", 1], ["F", 1], ["X", 0], ["(invalid code)", 1]]
     assert stats["check_aggregates"]["sex"]["total_invalid"] == 1  # the 'Q' row
     assert stats["arrival"]["max_lag_hours"] is not None
@@ -134,11 +141,16 @@ def test_cp_compute_dataset_stats_shape():
         (NULL, NULL, 'Neglect', '2020-01-05 09:00:00'),
         (NULL, NULL, 'Not a real category', '2020-01-05 09:30:00')
     """)
-    manifest_entry = {"run_id": "cp_run_01", "received_at": "2020-01-05T06:00:00+00:00"}
+    arrival = {"run_id": "cp_run_01", "run_index": 1, "delivery": "cp-drop-1",
+               "received_at": "2020-01-05T06:00:00+00:00",
+               # As above - offered, and required not to survive.
+               "dirty_severity": "red", "seed": 12345, "slot_id": "2020-01"}
 
-    stats = cp_stats.compute_dataset_stats(conn, manifest_entry)
+    stats = cp_stats.compute_dataset_stats(conn, arrival)
 
-    assert stats["manifest_entry"] == manifest_entry
+    assert stats["arrival_record"] == {"run_id": "cp_run_01", "run_index": 1,
+                                        "delivery": "cp-drop-1",
+                                        "received_at": "2020-01-05T06:00:00+00:00"}
     assert stats["value_counts"]["concern_type"] == [["Neglect", 1], ["(invalid code)", 1]]
     assert stats["check_aggregates"]["cp_clients.postcode"]["total_invalid"] == 1  # the '9999' row
     assert set(stats["arrival"].keys()) == set(cp_stats.TABLES)

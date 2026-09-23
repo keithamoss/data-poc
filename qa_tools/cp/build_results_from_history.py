@@ -45,7 +45,7 @@ def build_results_from_history() -> dict:
         stats = read_dataset_stats(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id)
         if stats is None:
             continue
-        manifest.append(stats["manifest_entry"])
+        manifest.append(stats["arrival_record"])
         dataset_stats_by_run[run_id] = stats
     manifest.sort(key=lambda m: m["run_index"])
 

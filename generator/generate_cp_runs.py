@@ -414,6 +414,42 @@ def _cp_manifest_entries_for_slot(deliveries: list, slot_id: str, period: str,
     return entries
 
 
+
+def _write_bookkeeping(manifest: list[dict]) -> None:
+    """The generator's own record, OUTSIDE every delivery (criterion 6).
+
+    Which slot each delivery was built to fill, which scenario it came
+    from, what severity was injected - real and worth keeping, because
+    it is how a test asserts that recognition got the right answer.
+
+    NO PIPELINE, QA OR DASHBOARD-BUILD MODULE MAY READ IT (criterion 7).
+    One that did would be making filing decisions from a declaration
+    rather than from arrival plus slot state, which is the
+    supplier-declared manifest Thread B rejected wearing our own badge.
+    The generator reads it back for one purpose only: to delete what it
+    wrote last time, so a regeneration overwrites rather than
+    accumulates.
+    """
+    path = delivery.BOOKKEEPING_PATH
+    book = {}
+    if path.exists():
+        with open(path) as f:
+            book = json.load(f)
+    book[DATASET_ID] = manifest
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(book, f, indent=2)
+
+
+def _previous_delivery_names() -> list[str]:
+    """What this generator wrote last time, from its own bookkeeping."""
+    path = delivery.BOOKKEEPING_PATH
+    if not path.exists():
+        return []
+    with open(path) as f:
+        book = json.load(f)
+    return [e["delivery"] for e in book.get(DATASET_ID, []) if e.get("delivery")]
+
 def main() -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -427,6 +463,12 @@ def main() -> None:
     manifest = []
     # Arbitrary names can collide, and a collision would merge two
     # arrivals into one directory. Enforced, not hoped for.
+    # Clear what THIS generator wrote last time, so a regeneration
+    # overwrites its own history rather than accumulating beside it
+    # (REQ-GEN-042), then seed uniqueness from whatever the OTHER
+    # generator has on disk so two arrivals can never share a
+    # directory (REQ-GEN-043).
+    delivery.remove_deliveries(_previous_delivery_names())
     taken_names: set[str] = delivery.existing_delivery_names()
     # The same quarterly calendar the pipeline judges these supplies
     # against - not a private copy of the cadence (REQ-GEN-042). A
@@ -487,6 +529,7 @@ def main() -> None:
     manifest_path = os.path.join(OUT_DIR, "manifest.json")
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
+    _write_bookkeeping(manifest)
     n_red_slots = sum(1 for _, sev in RUN_PLAN if sev == "red")
     print(f"\nWrote {len(manifest)} deliveries across {len(RUN_PLAN)} scheduled slots "
           f"({n_red_slots} of which went red and triggered a resupply chain) + manifest.json "

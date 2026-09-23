@@ -28,6 +28,7 @@ import sys
 
 import duckdb
 
+from qa_tools.common import arrivals
 from qa_tools.common import hierarchy
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common.git_identity import get_run_by
@@ -129,8 +130,9 @@ def run_single(entry: dict, reference_run_id: str, run_by: str | None = None,
 def run_pipeline_cp(sequential: bool = False) -> dict:
     build_cp_warehouses.build_all()
 
-    with open(MANIFEST_PATH) as f:
-        manifest = json.load(f)
+    # RECOGNISED FROM DISK, never read from a declaration
+    # (REQ-GEN-043) - see orchestrate_bdm.py's identical comment.
+    manifest = [a.as_entry() for a in arrivals.arrivals_for("child-protection", "cp_run_")]
 
     # The first manifest entry (cp_run_01, always clean by RUN_PLAN
     # construction) - NOT run_evidently_cp.REFERENCE_RUN_ID, a hardcoded

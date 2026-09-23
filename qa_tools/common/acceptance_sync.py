@@ -99,7 +99,7 @@ def _run_windows_for_dataset(dataset_id: str, qa_results_dir: Path | str = QA_RE
         stats = read_dataset_stats(agency, dataset, run_id, qa_results_dir)
         if stats is None:
             continue
-        entries.append((run_id, asset_time.local_date(stats["manifest_entry"]["received_at"])))
+        entries.append((run_id, asset_time.local_date(stats["arrival_record"]["received_at"])))
     entries.sort(key=lambda e: e[1])
     deduped: list[tuple[str, date]] = []
     seen_dates: set[date] = set()

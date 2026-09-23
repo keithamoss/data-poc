@@ -15,26 +15,33 @@ import json
 from qa_tools.common.check_lifecycle import CheckMetadata
 from pipeline import build_dashboard_data as bdd
 
+# ARRIVAL RECORDS, not manifest entries (REQ-GEN-043). What the
+# pipeline observed - which run, when we received it, which delivery -
+# and nothing the generator knew: no slot, no period, no injected
+# severity, and no declared row count (measured as `row_count` below,
+# from the data that actually landed).
 FIXTURE_RUNS = [
     {
-        "run_id": "run_001", "run_index": 1, "slot_id": "slot_001", "period": "2026-09-01",
-        "received_at": "2026-09-01T10:00:00+00:00", "n_rows_generated": 3, "dirty_severity": None,
+        "run_id": "run_001", "run_index": 1, "delivery": "BDM_20260901",
+        "received_at": "2026-09-01T10:00:00+00:00",
     },
     {
-        "run_id": "run_002", "run_index": 2, "slot_id": "slot_002", "period": "2026-09-02",
-        "received_at": "2026-09-02T10:00:00+00:00", "n_rows_generated": 4, "dirty_severity": "amber",
+        "run_id": "run_002", "run_index": 2, "delivery": "drop-4471",
+        "received_at": "2026-09-02T10:00:00+00:00",
     },
 ]
 
 FIXTURE_DATASET_STATS = {
     "run_001": {
-        "manifest_entry": FIXTURE_RUNS[0],
+        "arrival_record": FIXTURE_RUNS[0],
+        "row_count": 3,
         "value_counts": {"sex": [["M", 1], ["F", 2], ["X", 0]]},
         "arrival": {"max_lag_hours": 5.0, "earliest_extract": "2026-09-01T10:00:00+00:00"},
         "check_aggregates": {"sex": {"type": "categorical", "suppressed": False, "total_invalid": 0, "values": []}},
     },
     "run_002": {
-        "manifest_entry": FIXTURE_RUNS[1],
+        "arrival_record": FIXTURE_RUNS[1],
+        "row_count": 4,
         "value_counts": {"sex": [["M", 2], ["F", 1], ["X", 1]]},
         "arrival": {"max_lag_hours": 6.0, "earliest_extract": "2026-09-02T10:00:00+00:00"},
         "check_aggregates": {"sex": {"type": "categorical", "suppressed": False, "total_invalid": 1,

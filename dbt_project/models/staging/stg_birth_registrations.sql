@@ -25,5 +25,4 @@ select
     extract_timestamp,
     run_id,
     run_date,
-    dirty_severity
 from source

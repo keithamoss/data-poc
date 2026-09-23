@@ -87,11 +87,10 @@ def evaluate_evidently_cp(run_id: str, run_timestamp: str,
 
 
 if __name__ == "__main__":
-    import json
     from datetime import datetime, timezone
 
-    with open(os.path.join(CP_RAW_DIR, "manifest.json")) as f:
-        manifest = json.load(f)
+    from qa_tools.common import arrivals
+    manifest = [a.as_entry() for a in arrivals.arrivals_for("child-protection", "cp_run_")]
     reference_run_id = manifest[0]["run_id"]  # not the module-level REFERENCE_RUN_ID default - see orchestrate_cp.py
     for entry in manifest:
         res = evaluate_evidently_cp(entry["run_id"], datetime.now(timezone.utc).isoformat(),

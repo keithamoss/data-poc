@@ -196,7 +196,7 @@ def build() -> dict:
     # base run's run_date (e.g. run_54_2026-09-10 and
     # run_54_2026-09-10_resupply1) - so byRun below keys directly on
     # run_id via each history entry's own "run_id" field, not run_date.
-    row_count_by_run = {m["run_id"]: m["n_rows_generated"] for m in manifest}
+    row_count_by_run = {run_id: st["row_count"] for run_id, st in dataset_stats.items()}
 
     columns_out = []
     for col in ALL_COLUMNS:
@@ -308,8 +308,8 @@ def build() -> dict:
         # generated row count for that run (every column shares one table,
         # so this is the same for all of them - what differs per column is
         # how many of those rows the *primary* check, checks[0], flagged).
-        total_latest_manifest = next(m for m in manifest if m["run_id"] == latest_run)["n_rows_generated"]
-        total_prev_manifest = next(m for m in manifest if m["run_id"] == prev_run)["n_rows_generated"]
+        total_latest_manifest = dataset_stats[latest_run]["row_count"]
+        total_prev_manifest = dataset_stats[prev_run]["row_count"]
 
         stats = {
             "current": {"total": total_latest_manifest, "invalid": 0, "valid": total_latest_manifest, "valueCounts": None},
@@ -379,7 +379,6 @@ def build() -> dict:
     # dataset-level: row counts + arrival, from the real generated manifest
     # and extract_timestamp data.
     latest_entry = next(m for m in manifest if m["run_id"] == latest_run)
-    prev_entry = next(m for m in manifest if m["run_id"] == prev_run)
 
     # Named explicitly even though this contract holds one dataset -
     # its slaProperties carry `element: birth_registrations`, and since
@@ -427,10 +426,10 @@ def build() -> dict:
         },
         "arrivalHistory": arrival_history,
         "arrivalByRun": arrival_by_run,
-        "rowCount": latest_entry["n_rows_generated"],
-        "prevRowCount": prev_entry["n_rows_generated"],
+        "rowCount": dataset_stats[latest_run]["row_count"],
+        "prevRowCount": dataset_stats[prev_run]["row_count"],
         # Per-run row counts aren't duplicated into their own dict here -
-        # "runs" (below) already carries n_rows_generated per manifest
+        # "runs" (below) already carries each arrival record per
         # entry, so Thread C's as-of UI can read it straight from there.
         # Each run as the PAGE sees it: the manifest entry plus a
         # derived `run_date`. The manifest itself carries a receipt

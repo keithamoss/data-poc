@@ -57,7 +57,10 @@ def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypat
     monkeypatch.setattr(orchestrate_bdm, "write_qa_result", lambda *a, **k: tmp_path / "unused.json")
     monkeypatch.setattr(orchestrate_bdm.duckdb, "connect", lambda *a, **k: _FakeConn())
 
-    entry = {"run_id": "run_05_2099-01-05", "file": "run_05_2099-01-05.csv"}
+    # An arrival record's own shape (REQ-GEN-043) - `csv_path` is the
+    # real file inside the delivery, not a name built from the run_id.
+    entry = {"run_id": "run_05_2099-01-05",
+             "csv_path": "/x/2099-01-drop/birth_registrations_2099-01-05.csv"}
     # A reference deliberately different from run_evidently_bdm's own
     # hardcoded REFERENCE_RUN_ID default - the whole point being that
     # _run_one must forward exactly what it's given, not fall back.

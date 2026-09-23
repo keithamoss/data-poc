@@ -59,7 +59,7 @@ def _calendar_doc(**version_overrides):
     return {"data_asset_id": "data-asset-1",
             "calendars": [{"name": "c", "versions": [version]}],
             "hierarchy": {"agencies": [{"id": "a", "name": "A", "collections": [
-                {"id": "col", "name": "Col", "datasets": [
+                {"id": "col", "name": "Col", "contract": "c.yaml", "datasets": [
                     {"id": "d", "name": "D", "table": "t", "calendar": "c"}]}]}]}}
 
 

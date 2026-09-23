@@ -10,8 +10,7 @@ from __future__ import annotations
 
 import qa_tools.cp.run_evidently_cp as run_evidently_cp
 
-_REF_RUN_ID = "pytest_cp_ref"
-_DIRTY_RUN_ID = "pytest_cp_dirty"
+from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_RUN_ID
 
 
 def _run(monkeypatch, cp_raw_dir, run_id, run_timestamp, reference_run_id=_REF_RUN_ID):

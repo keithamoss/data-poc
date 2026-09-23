@@ -103,7 +103,7 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
      `_load_delivery()` already established for local-folder CP checks,
      reused here against an existing Synthetic manifest run's own
      `data/cp_raw/<run_id>/` directory instead of an arbitrary folder),
-     and no row-count-growth/`previous_run_id` concept (CP has none).
+     and no row-count-growth concept at all (CP has none).
      `mothman cp generate-synthetic-data` and `mothman cp qa
      [--run-id/--reference-run-id/--commit]` are real, working, both
      flag-invocable and TUI-navigable - verified against the real

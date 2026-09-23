@@ -537,6 +537,10 @@ Rough layout:
   -> **~96s/833 tests (2026-09-20 night, REQ-GHUB-027)**. Flat, 21 more
   tests.
   -> **~98s/839 tests (2026-09-20 night, REQ-DASH-033)**. Flat.
+  -> **~154s/1048 tests (2026-09-23, REQ-GEN-043)**. Up ~56s on 209
+  more tests, and that is where the growth went - no new hot spot.
+  Worth knowing for the next fresh sandbox: the test count has grown
+  ~25% in three days across the supply-model sprints.
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.

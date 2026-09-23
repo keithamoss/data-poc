@@ -84,8 +84,22 @@ _LABEL_BY_CHECK_TAIL = {
 CHECK_NAME_BY_ID = name_by_check_id(parse_contract_check_metadata(CONTRACT_PATH))
 
 
+
+def _resolve_csv(csv_path: str) -> str:
+    """A delivery's CSV, given either an absolute path or a name
+    relative to RAW_DIR.
+
+    Two real callers, two real shapes: the pipeline passes an absolute
+    path to a file inside a recognised delivery (REQ-GEN-043), while
+    `mothman bdm qa`'s local-file mode passes a bare filename it
+    dropped into RAW_DIR. os.path.join happens to do the right thing
+    for both, which is exactly why this is spelled out - a behaviour
+    that works by accident is one somebody later "fixes".
+    """
+    return csv_path if os.path.isabs(csv_path) else os.path.join(RAW_DIR, csv_path)
+
 def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str) -> list[dict]:
-    run = run_against_local_server(CONTRACT_PATH, os.path.join(RAW_DIR, csv_filename))
+    run = run_against_local_server(CONTRACT_PATH, _resolve_csv(csv_filename))
 
     results = []
     for c in run.checks:
@@ -150,14 +164,14 @@ def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str
 
 
 if __name__ == "__main__":
-    import json
     from datetime import datetime, timezone
 
-    with open(os.path.join(RAW_DIR, "manifest.json")) as f:
-        manifest = json.load(f)
-    for entry in manifest[:1] + [e for e in manifest if e["dirty_severity"]]:
-        res = evaluate_datacontract_bdm(entry["run_id"], entry["file"], datetime.now(timezone.utc).isoformat())
-        print(f"--- {entry['run_id']} ({entry['dirty_severity']}) ---")
+    from qa_tools.common import arrivals
+    manifest = [a.as_entry() | {"csv_path": str(a.path_for("birth-registrations"))}
+                for a in arrivals.arrivals_for("civil-registration", "run_")]
+    for entry in manifest:
+        res = evaluate_datacontract_bdm(entry["run_id"], entry["csv_path"], datetime.now(timezone.utc).isoformat())
+        print(f"--- {entry['run_id']} ({entry['delivery']}) ---")
         for r in res:
             if r["status"] != "pass":
                 print(" ", r["column_name"], r["check_name"], r["status"], r["metric_value"], r["unit"])

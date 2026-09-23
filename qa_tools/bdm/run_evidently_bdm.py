@@ -22,7 +22,6 @@ how many categories the shift is binned into. See README.md's
 known-disagreements section.
 """
 from __future__ import annotations
-import json
 import os
 
 from . import bdm_common
@@ -65,11 +64,25 @@ def _status_for_row_drop(rate_drop: float) -> str:
     return "pass"
 
 
+
+def _resolve_csv(csv_path: str) -> str:
+    """A delivery's CSV, given either an absolute path or a name
+    relative to RAW_DIR.
+
+    Two real callers, two real shapes: the pipeline passes an absolute
+    path to a file inside a recognised delivery (REQ-GEN-043), while
+    `mothman bdm qa`'s local-file mode passes a bare filename it
+    dropped into RAW_DIR. os.path.join happens to do the right thing
+    for both, which is exactly why this is spelled out - a behaviour
+    that works by accident is one somebody later "fixes".
+    """
+    return csv_path if os.path.isabs(csv_path) else os.path.join(RAW_DIR, csv_path)
+
 def _row_count(csv_filename: str) -> tuple[int, dict]:
     from evidently import Report
     from evidently.metrics import RowCount
 
-    df = read_csv_explicit_nulls(os.path.join(RAW_DIR, csv_filename), _NULL_VALUES)
+    df = read_csv_explicit_nulls(_resolve_csv(csv_filename), _NULL_VALUES)
     snapshot = Report(metrics=[RowCount()]).run(df, None)
     result = snapshot.dict()
     return int(result["metrics"][0]["value"]), result
@@ -82,15 +95,15 @@ def _previous_run_file(manifest: list[dict], run_id: str) -> str | None:
     fixed reference."""
     for i, entry in enumerate(manifest):
         if entry["run_id"] == run_id:
-            return manifest[i - 1]["file"] if i > 0 else None
+            return manifest[i - 1]["csv_path"] if i > 0 else None
     return None
 
 
 def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
                                  reference_run_id: str = REFERENCE_RUN_ID,
                                  reference_csv: str = f"{REFERENCE_RUN_ID}.csv") -> list[dict]:
-    reference = read_csv_explicit_nulls(os.path.join(RAW_DIR, reference_csv), _NULL_VALUES)[["sex"]]
-    current = read_csv_explicit_nulls(os.path.join(RAW_DIR, csv_filename), _NULL_VALUES)[["sex"]]
+    reference = read_csv_explicit_nulls(_resolve_csv(reference_csv), _NULL_VALUES)[["sex"]]
+    current = read_csv_explicit_nulls(_resolve_csv(csv_filename), _NULL_VALUES)[["sex"]]
     n_total = len(current)
 
     psi, psi_snapshot = compute_psi(current, reference, "sex")
@@ -120,8 +133,9 @@ def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
         "reference_run_id": reference_run_id,
     }]
 
-    with open(os.path.join(RAW_DIR, "manifest.json")) as f:
-        manifest = json.load(f)
+    from qa_tools.common import arrivals
+    manifest = [a.as_entry() | {"csv_path": str(a.path_for("birth-registrations"))}
+                for a in arrivals.arrivals_for("civil-registration", "run_")]
     previous_file = _previous_run_file(manifest, run_id)
     if previous_file is not None:
         current_count, row_count_snapshot = _row_count(csv_filename)
@@ -164,12 +178,13 @@ def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
 if __name__ == "__main__":
     from datetime import datetime, timezone
 
-    with open(os.path.join(RAW_DIR, "manifest.json")) as f:
-        manifest = json.load(f)
+    from qa_tools.common import arrivals
+    manifest = [a.as_entry() | {"csv_path": str(a.path_for("birth-registrations"))}
+                for a in arrivals.arrivals_for("civil-registration", "run_")]
     ref = manifest[0]  # not the module-level REFERENCE_RUN_ID default - see orchestrate_bdm.py
     for entry in manifest:
-        res = evaluate_evidently_bdm(entry["run_id"], entry["file"], datetime.now(timezone.utc).isoformat(),
-                                      reference_run_id=ref["run_id"], reference_csv=ref["file"])
+        res = evaluate_evidently_bdm(entry["run_id"], entry["csv_path"], datetime.now(timezone.utc).isoformat(),
+                                      reference_run_id=ref["run_id"], reference_csv=ref["csv_path"])
         psi, growth = res[0], (res[1] if len(res) > 1 else None)
         growth_str = f"row_growth={growth['metric_value']:+.1f}%  status={growth['status']:5s}" if growth else "row_growth=n/a (first run)"
         print(f"{entry['run_id']:25s} PSI={psi['metric_value']}  status={psi['status']:5s}  |  {growth_str}")

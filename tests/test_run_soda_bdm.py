@@ -8,8 +8,7 @@ from __future__ import annotations
 
 import qa_tools.bdm.run_soda_bdm as run_soda_bdm
 
-_REF_RUN_ID = "pytest_bdm_ref"
-_DIRTY_RUN_ID = "pytest_bdm_dirty"
+from fixture_ids import BDM_DIRTY_RUN_ID as _DIRTY_RUN_ID, BDM_REF_RUN_ID as _REF_RUN_ID
 
 
 def _run(monkeypatch, bdm_duckdb_dir, run_id, run_timestamp):

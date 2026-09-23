@@ -19,13 +19,14 @@ since genuinely testing "does this correctly parse the real tool's
 real output" requires actually running the real tool."""
 from __future__ import annotations
 
-import json
 import os
 from datetime import date
 
 import pytest
 
+import fixture_ids
 from generator.daily_batch import generate_daily_batch
+from qa_tools.common import asset_time, delivery
 from generator.dirty import apply_birth_registrations_presets
 
 
@@ -76,14 +77,30 @@ def bdm_raw_dir(tmp_path_factory):
     dirty_df = apply_birth_registrations_presets(dirty_df, severity="red", seed=90003, previous_row_count=600)
     dirty_df.to_csv(raw_dir / f"{_DIRTY_RUN_ID}.csv", index=False)
 
-    manifest = [
-        {"run_id": _REF_RUN_ID, "file": f"{_REF_RUN_ID}.csv", "received_at": "2026-01-01T06:00:00+00:00", "dirty_severity": None},
-        {"run_id": _DIRTY_RUN_ID, "file": f"{_DIRTY_RUN_ID}.csv", "received_at": "2026-01-02T06:00:00+00:00", "dirty_severity": "red"},
-    ]
-    with open(raw_dir / "manifest.json", "w") as f:
-        json.dump(manifest, f)
+    # AND AS REAL DELIVERIES (REQ-GEN-043) - the shape the pipeline
+    # actually reads now. Two arrivals, arbitrary supplier-shaped names,
+    # filenames matching the real arrivalPattern, receipts OUTSIDE the
+    # deliveries. The flat CSVs above stay because the ad-hoc
+    # `mothman bdm qa --local-file` path still drops a file into a raw
+    # directory; nothing reads a manifest from it any more.
+    deliveries = raw_dir / "deliveries"
+    receipts = raw_dir / "receipts"
+    for run_id, name, when, df in (
+            (_REF_RUN_ID, "REF_20260101", "2026-01-01T06:00:00+00:00", ref_df),
+            (_DIRTY_RUN_ID, "drop-9002", "2026-01-02T06:00:00+00:00", dirty_df)):
+        delivery.write_delivery(
+            name, {f"birth_registrations_{when[:10]}.csv": df.to_csv(index=False)},
+            received_at=asset_time.parse_instant(when, run_id),
+            deliveries_dir=deliveries, receipts_dir=receipts)
 
     return str(raw_dir)
+
+
+@pytest.fixture(scope="session")
+def bdm_delivery_dirs(bdm_raw_dir):
+    """(deliveries_dir, receipts_dir) for the fixture above."""
+    from pathlib import Path
+    return Path(bdm_raw_dir) / "deliveries", Path(bdm_raw_dir) / "receipts"
 
 
 @pytest.fixture(scope="session")
@@ -94,13 +111,23 @@ def bdm_duckdb_dir(tmp_path_factory, bdm_raw_dir):
     hand-rolled copy of it."""
     from qa_tools.bdm.build_per_run_warehouses import build_all
 
+    from pathlib import Path
+
     out_dir = tmp_path_factory.mktemp("bdm_duckdb_runs")
-    build_all(raw_dir=bdm_raw_dir, out_dir=str(out_dir))
+    build_all(out_dir=str(out_dir),
+               deliveries_dir=Path(bdm_raw_dir) / "deliveries",
+               receipts_dir=Path(bdm_raw_dir) / "receipts")
     return str(out_dir)
 
 
-_CP_REF_RUN_ID = "pytest_cp_ref"
-_CP_DIRTY_RUN_ID = "pytest_cp_dirty"
+# The run_ids recognition will assign these two deliveries - see
+# tests/fixture_ids.py. The flat data/cp_raw/<run_id>/ copy below has to
+# be named for them because qa_tools/cp/run_datacontract_cp.py and
+# run_evidently_cp.py still read their CSVs from that path, exactly as
+# the real generator writes it. That coupling is real and outlives this
+# fixture; it is logged as a follow-up rather than papered over here.
+_CP_REF_RUN_ID = fixture_ids.CP_REF_RUN_ID
+_CP_DIRTY_RUN_ID = fixture_ids.CP_DIRTY_RUN_ID
 
 
 @pytest.fixture(scope="session")
@@ -131,19 +158,24 @@ def cp_raw_dir(tmp_path_factory):
     pop = generate_population(45000, seed=91001)
     base_tables = generate_child_protection_collection(pop, seed=91002, n_case_workers=15)
 
-    def _write_run(run_id: str, run_date: str, tables: dict, dirty_severity: str | None):
+    def _write_run(run_id: str, run_date: str, tables: dict, delivery_name: str):
+        """One arrival: the six CP tables landing together as ONE
+        delivery (REQ-GEN-043), plus the flat data/cp_raw/<run_id>/ copy
+        the ad-hoc `mothman cp qa --local-dir` path still browses."""
         run_dir = raw_dir / run_id
         run_dir.mkdir()
-        row_counts = {}
+        files = {}
         for name in tables_list:
             df = _add_extract_timestamp(tables[name], date.fromisoformat(run_date), None, seed=91003)
             cols = [c for c in df.columns if not c.startswith("_")]
             df[cols].to_csv(run_dir / f"{name}.csv", index=False)
-            row_counts[name] = int(len(df))
-        return {"run_id": run_id, "run_index": 1, "received_at": f"{run_date}T06:00:00+00:00",
-                "dirty_severity": dirty_severity, "seed": 91000, "row_counts": row_counts}
+            files[f"{name}.csv"] = df[cols].to_csv(index=False)
+        delivery.write_delivery(
+            delivery_name, files,
+            received_at=asset_time.parse_instant(f"{run_date}T06:00:00+00:00", run_id),
+            deliveries_dir=raw_dir / "deliveries", receipts_dir=raw_dir / "receipts")
 
-    ref_entry = _write_run(_CP_REF_RUN_ID, "2026-01-01", base_tables, None)
+    _write_run(_CP_REF_RUN_ID, "2026-01-01", base_tables, "CP_20260101")
 
     dirty_tables = {name: base_tables[name].copy() for name in tables_list}
     dirty_tables["cp_notifications"] = dirty_mod.apply_cp_notifications_presets(
@@ -158,12 +190,16 @@ def cp_raw_dir(tmp_path_factory):
     dirty_tables["cp_clients"] = dirty_mod.apply_cp_clients_presets(dirty_tables["cp_clients"], "red", seed=91104)
     dirty_tables["cp_carers"] = dirty_mod.apply_cp_carers_presets(dirty_tables["cp_carers"], "red", seed=91105)
     dirty_tables["cp_case_workers"] = dirty_mod.apply_cp_case_workers_presets(dirty_tables["cp_case_workers"], "red", seed=91106)
-    dirty_entry = _write_run(_CP_DIRTY_RUN_ID, "2026-04-01", dirty_tables, "red")
-
-    with open(raw_dir / "manifest.json", "w") as f:
-        json.dump([ref_entry, dirty_entry], f)
+    _write_run(_CP_DIRTY_RUN_ID, "2026-04-01", dirty_tables, "cp-drop-9104")
 
     return str(raw_dir)
+
+
+@pytest.fixture(scope="session")
+def cp_delivery_dirs(cp_raw_dir):
+    """(deliveries_dir, receipts_dir) for the fixture above."""
+    from pathlib import Path
+    return Path(cp_raw_dir) / "deliveries", Path(cp_raw_dir) / "receipts"
 
 
 @pytest.fixture(scope="session")
@@ -173,6 +209,15 @@ def cp_duckdb_dir(tmp_path_factory, cp_raw_dir):
     exact loading code path the real pipeline uses."""
     from qa_tools.cp.build_cp_warehouses import build_all
 
+    from pathlib import Path
+
     out_dir = tmp_path_factory.mktemp("cp_duckdb_runs")
-    build_all(raw_dir=cp_raw_dir, out_dir=str(out_dir))
+    # deliveries_dir/receipts_dir passed EXPLICITLY. Without them
+    # build_all() recognises arrivals from the real data/deliveries/
+    # tree (REQ-GEN-043) - a real leak this fixture hit for exactly one
+    # run, building 18 real CP warehouses into a pytest tmp dir while
+    # the fixture's own two sat unread.
+    build_all(raw_dir=cp_raw_dir, out_dir=str(out_dir),
+               deliveries_dir=Path(cp_raw_dir) / "deliveries",
+               receipts_dir=Path(cp_raw_dir) / "receipts")
     return str(out_dir)

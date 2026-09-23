@@ -48,7 +48,7 @@ def build_results_from_history() -> dict:
         stats = read_dataset_stats(AGENCY_ID, COLLECTION_ID, run_id)
         if stats is None:
             continue  # shouldn't happen for any real committed run - see dataset_stats.py
-        manifest.append(stats["manifest_entry"])
+        manifest.append(stats["arrival_record"])
         dataset_stats_by_run[run_id] = stats
     # run_index (not run_date) matches the original generation order - a
     # resupply attempt's own run_date is when it actually arrived, which

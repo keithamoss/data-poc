@@ -14,15 +14,14 @@ import pytest
 
 import qa_tools.bdm.run_dbt_bdm as run_dbt_bdm
 
-# Must match conftest.py's own _REF_RUN_ID/_DIRTY_RUN_ID exactly - those
-# are the literal names bdm_duckdb_dir's fixture builds the real per-run
-# DuckDB files under, and evaluate_dbt_bdm() looks up db_path purely from
-# this run_id, so the two can never drift apart. (Real parallel-test
-# safety for dbt's own target-path output lives in evaluate_dbt_bdm()
-# itself now - see that function's own comment, plans/running-thoughts.md
-# #12 - not here.)
-_REF_RUN_ID = "pytest_bdm_ref"
-_DIRTY_RUN_ID = "pytest_bdm_dirty"
+# The run_ids bdm_duckdb_dir's fixture deliveries are RECOGNISED as, not
+# the names the fixture wrote (REQ-GEN-043) - evaluate_dbt_bdm() looks up
+# db_path purely from this run_id, so the two can never drift apart. See
+# tests/fixture_ids.py, and tests/test_fixture_ids.py for the guard that
+# keeps it honest. (Real parallel-test safety for dbt's own target-path
+# output lives in evaluate_dbt_bdm() itself now - see that function's own
+# comment, plans/running-thoughts.md #12 - not here.)
+from fixture_ids import BDM_DIRTY_RUN_ID as _DIRTY_RUN_ID, BDM_REF_RUN_ID as _REF_RUN_ID
 
 
 @pytest.fixture

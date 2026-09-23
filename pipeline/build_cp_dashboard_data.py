@@ -219,7 +219,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
     # run_date alone can't key a run uniquely (see build_dashboard_data.
     # py's identical comment) - byRun below keys on run_id via each
     # history entry's own "run_id" field.
-    row_count_by_run = {m["run_id"]: m["row_counts"][table] for m in manifest}
+    row_count_by_run = {run_id: st["row_counts"][table] for run_id, st in dataset_stats.items()}
 
     columns_out = []
     for col in all_columns:
@@ -319,8 +319,8 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
 
         rank_for_headline(checks_out)
 
-        total_latest = next(m for m in manifest if m["run_id"] == latest_run)["row_counts"][table]
-        total_prev = next(m for m in manifest if m["run_id"] == prev_run)["row_counts"][table]
+        total_latest = dataset_stats[latest_run]["row_counts"][table]
+        total_prev = dataset_stats[prev_run]["row_counts"][table]
 
         stats = {
             "current": {"total": total_latest, "invalid": 0, "valid": total_latest, "valueCounts": None},
@@ -372,7 +372,6 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
     # day" cadence model BDM does, just quarterly with a much larger
     # latency tolerance - see pipeline/cadence.py.
     latest_entry = next(m for m in manifest if m["run_id"] == latest_run)
-    prev_entry = next(m for m in manifest if m["run_id"] == prev_run)
 
     # Per DATASET, not per contract (REQ-PIPE-049). `table` is this
     # dataset's own element in a contract that holds six, so its own
@@ -417,10 +416,10 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         },
         "arrivalHistory": arrival_history,
         "arrivalByRun": arrival_by_run,
-        "rowCount": latest_entry["row_counts"][table],
-        "prevRowCount": prev_entry["row_counts"][table],
+        "rowCount": dataset_stats[latest_run]["row_counts"][table],
+        "prevRowCount": dataset_stats[prev_run]["row_counts"][table],
         # Per-run row counts aren't duplicated into their own dict here -
-        # "runs" (below) already carries row_counts[table] per manifest
+        # "runs" (below) already carries each arrival record per
         # entry, same as build_dashboard_data.py's identical comment.
         # Each run as the PAGE sees it: the manifest entry plus a
         # derived `run_date`. The manifest itself carries a receipt

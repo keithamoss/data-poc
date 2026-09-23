@@ -21,13 +21,27 @@ import qa_tools.cp.run_dbt_cp as run_dbt_cp
 import qa_tools.cp.run_evidently_cp as run_evidently_cp
 import qa_tools.cp.run_soda_cp as run_soda_cp
 
-_REF_RUN_ID = "pytest_cp_ref"
-_DIRTY_RUN_ID = "pytest_cp_dirty"
+from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_RUN_ID
 
 _runner = CliRunner()
 
 
-def _patch_cp_dirs(monkeypatch, raw_dir, duckdb_dir):
+def _patch_delivery_dirs(monkeypatch, delivery_dirs):
+    """Point arrival recognition at an isolated tree (REQ-GEN-043) -
+    see tests/test_cli_bdm.py's identical helper for why patching the
+    raw dir alone is no longer enough."""
+    from qa_tools.common import delivery
+    monkeypatch.setattr(delivery, "DELIVERIES_DIR", delivery_dirs[0])
+    monkeypatch.setattr(delivery, "RECEIPTS_DIR", delivery_dirs[1])
+
+
+def _patch_cp_dirs(monkeypatch, raw_dir, duckdb_dir, delivery_dirs=None):
+    # The run picker recognises arrivals from disk now (REQ-GEN-043),
+    # so pointing it at the fixture means pointing the DELIVERY
+    # directories at it - patching CP_RAW_DIR alone would leave these
+    # tests reading the real data/deliveries/ tree.
+    if delivery_dirs is not None:
+        _patch_delivery_dirs(monkeypatch, delivery_dirs)
     monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", raw_dir)
     monkeypatch.setattr(build_cp_warehouses, "OUT_DIR", duckdb_dir)
     monkeypatch.setattr(run_datacontract_cp, "CP_RAW_DIR", raw_dir)
@@ -74,11 +88,12 @@ def test_default_reference_falls_back_when_last_promoted_runs_data_no_longer_exi
 
 
 def test_picker_choices_and_run_id_from_choice_round_trip():
-    manifest = [{"run_id": "cp_run_001", "received_at": "2023-02-01T01:00:00+00:00", "dirty_severity": None},
-                {"run_id": "cp_run_002", "received_at": "2023-05-01T01:00:00+00:00", "dirty_severity": "red"}]
+    manifest = [{"run_id": "cp_run_001", "received_at": "2023-02-01T01:00:00+00:00", "delivery": "DCP_20230201"},
+                {"run_id": "cp_run_002", "received_at": "2023-05-01T01:00:00+00:00", "delivery": "2023-05-final"}]
     choices = cp.picker_choices(manifest)
-    assert "clean" in choices[0]
-    assert "red" in choices[1]
+    # See tests/test_cli_bdm.py's identical picker assertion.
+    assert "DCP_20230201" in choices[0]
+    assert "2023-05-final" in choices[1]
     assert cp.run_id_from_choice(choices[0]) == "cp_run_001"
     assert cp.run_id_from_choice(choices[1]) == "cp_run_002"
 
@@ -90,8 +105,8 @@ def test_has_failures_true_on_fail_or_error_false_otherwise():
 
 
 def test_qa_command_flag_mode_reports_real_results_and_never_touches_real_qa_results(
-        monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir):
-    _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir)
+        monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir, cp_delivery_dirs):
+    _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir, cp_delivery_dirs)
     fake_qa_results = tmp_path / "not_the_real_qa_results"
     monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
 
@@ -103,8 +118,8 @@ def test_qa_command_flag_mode_reports_real_results_and_never_touches_real_qa_res
 
 
 def test_qa_command_flag_mode_commit_promotes_into_the_patched_qa_results_dir(
-        monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir):
-    _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir)
+        monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir, cp_delivery_dirs):
+    _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir, cp_delivery_dirs)
     fake_qa_results = tmp_path / "not_the_real_qa_results"
     monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
     monkeypatch.setattr(cp, "get_run_by", lambda: "test@example.com")
@@ -120,8 +135,9 @@ def test_qa_command_flag_mode_commit_promotes_into_the_patched_qa_results_dir(
         assert json.load(f)["run_by"] == "test@example.com"
 
 
-def test_qa_command_reports_real_failures_and_exits_nonzero(monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir):
-    _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir)
+def test_qa_command_reports_real_failures_and_exits_nonzero(
+        monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir, cp_delivery_dirs):
+    _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir, cp_delivery_dirs)
     monkeypatch.setattr(common, "QA_RESULTS_DIR", tmp_path / "unused")
 
     result = _runner.invoke(cp.qa_command, ["--run-id", _DIRTY_RUN_ID, "--reference-run-id", _REF_RUN_ID])
@@ -137,9 +153,11 @@ def test_qa_command_unknown_run_id_is_a_real_clean_error(monkeypatch, cp_raw_dir
     assert "no manifest entry" in result.output.lower()
 
 
-def test_generate_synthetic_data_command_skips_when_declined(monkeypatch, tmp_path):
+def test_generate_synthetic_data_command_skips_when_declined(monkeypatch, tmp_path, cp_delivery_dirs):
     monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", str(tmp_path))
-    (tmp_path / "manifest.json").write_text("[]")
+    # Real deliveries already on disk - so there IS something to
+    # overwrite, and the command must ask before it does.
+    _patch_delivery_dirs(monkeypatch, cp_delivery_dirs)
     called = []
     monkeypatch.setattr(cp, "generate_synthetic_data", lambda: called.append(True))
     monkeypatch.setattr(common, "confirm", lambda *a, **k: False)
@@ -151,9 +169,9 @@ def test_generate_synthetic_data_command_skips_when_declined(monkeypatch, tmp_pa
     assert "not regenerated" in result.output.lower()
 
 
-def test_generate_synthetic_data_command_yes_flag_skips_confirmation(monkeypatch, tmp_path):
+def test_generate_synthetic_data_command_yes_flag_skips_confirmation(monkeypatch, tmp_path, cp_delivery_dirs):
     monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", str(tmp_path))
-    (tmp_path / "manifest.json").write_text("[]")
+    _patch_delivery_dirs(monkeypatch, cp_delivery_dirs)
     called = []
     monkeypatch.setattr(cp, "generate_synthetic_data", lambda: called.append(True))
 
@@ -164,9 +182,10 @@ def test_generate_synthetic_data_command_yes_flag_skips_confirmation(monkeypatch
 
 
 def test_generate_synthetic_data_command_no_prompt_needed_on_first_run(monkeypatch, tmp_path):
-    """No manifest.json yet - nothing to overwrite, so this shouldn't even
-    ask."""
+    """No deliveries on disk yet - nothing to overwrite, so this
+    shouldn't even ask."""
     monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", str(tmp_path))
+    _patch_delivery_dirs(monkeypatch, (tmp_path / "deliveries", tmp_path / "receipts"))
     called = []
     monkeypatch.setattr(cp, "generate_synthetic_data", lambda: called.append(True))
 

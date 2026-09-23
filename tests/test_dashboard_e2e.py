@@ -136,7 +136,7 @@ class TestAsOfDatePicking:
         run_ids = list_run_ids("registry-services", "civil-registration")
         assert run_ids, "no real committed BDM history to test against"
         earliest_run_date = min(
-            read_dataset_stats("registry-services", "civil-registration", rid)["manifest_entry"]["received_at"][:10]
+            read_dataset_stats("registry-services", "civil-registration", rid)["arrival_record"]["received_at"][:10]
             for rid in run_ids
         )
         before_all_history = (date.fromisoformat(earliest_run_date) - timedelta(days=1000)).isoformat()

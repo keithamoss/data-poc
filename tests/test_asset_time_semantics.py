@@ -14,12 +14,39 @@ early/onTime/late verdict. Regenerate it ONLY when the committed
 history is legitimately rebuilt, never to make a failing test pass - a
 diff here after a timezone change is the finding, not the noise.
 
-REGENERATED ONCE, 2026-09-23, for REQ-GEN-042's rebuild, which renamed
-every run_id. Checked rather than assumed before accepting it: the
-verdict distribution came back IDENTICAL across the rebuild - 131
-onTime, 16 early, 3 late over the same 150 arrivals and 7 datasets - so
-the regeneration changed identity and vocabulary and nothing else,
-which is exactly what that requirement claims.
+REGENERATED TWICE, both times on 2026-09-23, both times checked rather
+than assumed - and `mothman debug capture-arrival-golden` is how, so
+the one operation that can silently destroy this pin has a recorded
+procedure instead of an ad-hoc script.
+
+  1. For REQ-GEN-042's rebuild, which renamed every run_id. The verdict
+     distribution came back IDENTICAL - 131 onTime, 16 early, 3 late
+     over the same 150 arrivals and 7 datasets.
+
+  2. For REQ-GEN-043's, where 16 Birth Registrations runs came back
+     with a DIFFERENT verdict under the same run_id, which is exactly
+     the shape this pin exists to catch and was not waved through.
+     What it turned out to be: run identity now comes from RECEIPT
+     ORDER rather than from the generator's slot order, so a resupply
+     for an earlier period that arrived after a later period's first
+     delivery now sorts where it actually landed. Proved, not assumed,
+     by comparing the committed history before and after: the multiset
+     of 42 receipt instants is identical, 23 run_ids carry a different
+     one, and mapping instant -> verdict instead of run_id -> verdict
+     gives ZERO differences. The verdicts never moved; the labels did.
+
+     That check is worth repeating verbatim next time, because the
+     distribution staying at 131/16/3 would have looked like proof on
+     its own and is not - a permutation preserves it.
+
+THE INSTANT HALF OF THIS PIN MEASURED NOTHING until that second
+capture. `arrivalHistory` rows carry no instant, so every `arrivedAt`
+in the golden was None and test_no_arrival_instant_changed compared
+None to None, 150 times. The instants live in `arrivalByRun`, which is
+where the capture command reads them from now. A pin that cannot fail
+is worse than no pin, and this one was written specifically to catch a
+verdict-preserving eight-hour shift - precisely the case the vacuous
+field would have missed.
 
 WHAT 048 DELIBERATELY DOES CHANGE, so it is not mistaken for a
 regression: a timestamp with no offset currently gets silently treated
@@ -122,12 +149,16 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         built = _built_datasets()
         moved = []
         for ds_id, runs in golden.items():
-            actual = {a["run_id"]: a for a in built[ds_id].get("arrivalHistory") or []}
+            # arrivalByRun, not arrivalHistory - a history row carries
+            # no instant at all, and reading it from there is what made
+            # this test compare None to None 150 times over.
+            actual = built[ds_id].get("arrivalByRun") or {}
             for run_id, expected in runs.items():
-                was = _instant_as_written_before_048(expected["arrivedAt"])
-                now_ = _instant_as_written_before_048(actual[run_id].get("arrivedAt"))
-                if was != now_:
-                    moved.append(f"{ds_id}/{run_id}: {expected['arrivedAt']} -> {actual[run_id].get('arrivedAt')}")
+                got = (actual.get(run_id) or {}).get("arrivedAt")
+                assert expected["arrivedAt"] is not None, \
+                    f"{ds_id}/{run_id}: the golden carries no instant - re-capture it, this test cannot fail as is"
+                if _instant_as_written_before_048(expected["arrivedAt"]) != _instant_as_written_before_048(got):
+                    moved.append(f"{ds_id}/{run_id}: {expected['arrivedAt']} -> {got}")
         assert moved == [], "arrival instants moved:\n  " + "\n  ".join(moved)
 
     def test_the_distribution_is_the_one_that_was_measured(self):

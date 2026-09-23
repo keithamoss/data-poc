@@ -98,7 +98,7 @@ def run_datacontract_command(dataset: str, run_id: str) -> None:
     if dataset == "bdm":
         from qa_tools.bdm.run_datacontract_bdm import evaluate_datacontract_bdm
         entry = _bdm_manifest_entry(run_id)
-        results = evaluate_datacontract_bdm(run_id, entry["file"], run_timestamp)
+        results = evaluate_datacontract_bdm(run_id, entry["csv_path"], run_timestamp)
     else:
         from qa_tools.cp.run_datacontract_cp import evaluate_datacontract_cp
         results = evaluate_datacontract_cp(run_id, run_timestamp)
@@ -117,8 +117,8 @@ def run_evidently_command(dataset: str, run_id: str, reference_run_id: str | Non
         from qa_tools.bdm.run_evidently_bdm import evaluate_evidently_bdm
         entry = _bdm_manifest_entry(run_id)
         ref_entry = _bdm_manifest_entry(reference_run_id) if reference_run_id else _bdm_manifest_first_entry()
-        results = evaluate_evidently_bdm(run_id, entry["file"], run_timestamp,
-                                          reference_run_id=ref_entry["run_id"], reference_csv=ref_entry["file"])
+        results = evaluate_evidently_bdm(run_id, entry["csv_path"], run_timestamp,
+                                          reference_run_id=ref_entry["run_id"], reference_csv=ref_entry["csv_path"])
     else:
         from qa_tools.cp.run_evidently_cp import evaluate_evidently_cp
         reference_run_id = reference_run_id or _cp_manifest_first_run_id()
@@ -153,3 +153,60 @@ def changelog_command(agency: str, dataset: str) -> None:
     import json
     from qa_tools.common.changelog import build_changelog
     click.echo(json.dumps(build_changelog(agency, dataset), indent=2))
+
+
+@debug_group.command("capture-arrival-golden")
+@click.option("--yes", is_flag=True, help="Skip the confirmation prompt.")
+def capture_arrival_golden_command(yes: bool) -> None:
+    """Re-capture tests/fixtures/arrival_semantics_golden.json from the built reports.
+
+    THE PIN, NOT A CONVENIENCE. That fixture is the characterization
+    measurement REQ-PIPE-048 was refactored against - every arrival in
+    committed history, with its instant and its early/onTime/late
+    verdict. Re-capturing it makes a failing test pass by definition,
+    so it is only ever legitimate when the committed history itself has
+    been rebuilt, and never to quiet a diff. A moved verdict on
+    unchanged history is the finding.
+
+    It exists as a real command because it used to be an ad-hoc
+    throwaway script, which meant the one operation that can silently
+    destroy the pin was also the one with no recorded procedure.
+    """
+    import json
+    from pathlib import Path
+
+    from . import common
+
+    root = Path(__file__).resolve().parent.parent
+    golden = root / "tests" / "fixtures" / "arrival_semantics_golden.json"
+    reports = ["birth_registrations_dashboard.json", "child_protection_dashboard.json"]
+
+    missing = [r for r in reports if not (root / "reports" / r).exists()]
+    if missing:
+        raise click.ClickException(
+            f"{', '.join(missing)} not built - run `mothman dashboard build-data` first.")
+
+    if not common.confirm(
+            "Re-capture the arrival golden? Only correct if committed history was legitimately rebuilt.",
+            yes=yes, default=False):
+        console.print("Not re-captured.", style="yellow")
+        return
+
+    captured: dict[str, dict] = {}
+    for name in reports:
+        doc = json.loads((root / "reports" / name).read_text())
+        for ds in (doc["datasets"] if "datasets" in doc else [doc]):
+            by_run = ds.get("arrivalByRun") or {}
+            captured[ds["id"]] = {
+                a["run_id"]: {"arrivalStatus": a["arrivalStatus"],
+                              # From arrivalByRun, not from the history
+                              # row - the history row carries no instant,
+                              # and capturing None here is what made the
+                              # "did the instant move" half of the pin
+                              # measure nothing at all.
+                              "arrivedAt": (by_run.get(a["run_id"]) or {}).get("arrivedAt")}
+                for a in ds.get("arrivalHistory") or []}
+
+    golden.write_text(json.dumps(captured, indent=2, sort_keys=True) + "\n")
+    n = sum(len(v) for v in captured.values())
+    console.print(f"Captured {n} arrivals across {len(captured)} datasets -> {golden}", style="green")

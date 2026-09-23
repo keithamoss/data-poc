@@ -77,6 +77,7 @@ class Dataset:
     dataset_id: str
     dataset_name: str
     table: str
+    contract: str          # the ODCS contract file covering this collection
 
     @property
     def qa_results_scope(self) -> tuple[str, str]:
@@ -93,6 +94,19 @@ class Dataset:
         happening on its own (Keith, 2026-09-23).
         """
         return (self.agency_id, self.collection_id)
+
+
+def _require(node: dict, key: str, where: str):
+    """One required config key, or an error naming where it is missing.
+
+    A bare KeyError here surfaces as the word 'contract' with no
+    context, three frames below whatever was actually being asked -
+    which is what it did the first time a config without one was
+    loaded.
+    """
+    if key not in node:
+        raise ValueError(f"{DATA_ASSET_YAML}: {where} declares no `{key}:`")
+    return node[key]
 
 
 @functools.lru_cache(maxsize=1)
@@ -118,6 +132,8 @@ def _load() -> tuple[str, dict[str, Dataset]]:
                     dataset_id=dataset["id"],
                     dataset_name=dataset["name"],
                     table=dataset["table"],
+                    contract=_require(collection, "contract",
+                                       f"collection {collection.get('id')!r}"),
                 )
                 # A duplicate id would make every lookup for it
                 # ambiguous and silently resolve to whichever came
@@ -173,6 +189,17 @@ def dataset_for_table(table: str) -> Dataset:
         f"no dataset maps to table {table!r} in {DATA_ASSET_YAML.name}. "
         f"Known tables: {', '.join(sorted(d.table for d in all_datasets()))}"
     )
+
+
+def contract_path(collection_id: str) -> Path:
+    """The ODCS contract file covering one collection.
+
+    Stated in the hierarchy rather than in a map beside each consumer,
+    for the reason REQ-QAC-039 exists: a second copy is a copy that
+    drifts, and this one is how a file's own dataset gets resolved from
+    its name (REQ-GEN-043).
+    """
+    return DATA_ASSET_YAML.parent / datasets_in_collection(collection_id)[0].contract
 
 
 def datasets_in_collection(collection_id: str) -> list[Dataset]:
