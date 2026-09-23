@@ -2764,6 +2764,13 @@ requirements:
         other than the one the arriving table claims, even where that
         check declares a temporal reference to the arriving table's
         period.
+      - WHERE a check reads any table other than the one it is filed
+        against - a cross-table check, a referential-integrity check, or
+        a check declaring a temporal reference - THE SYSTEM SHALL record
+        with that check's own result the physical table name of every
+        table it read.
+      - THE SYSTEM SHALL NOT record, alongside that check's result, the
+        status of any other table it read.
       - IF a QA run fails partway through, THEN THE SYSTEM SHALL fail
         loudly, naming the dataset and the tool, and SHALL NOT record a
         partial run as a complete one.
@@ -2835,6 +2842,29 @@ requirements:
         which REQ-PIPE-035 forbids - checks are evaluated once against
         the state current at the time and never recomputed for a
         historical arrival.
+      - >
+        Decided a cross-table, referential-integrity or temporal check
+        records the PHYSICAL TABLE NAMES it read, alongside its own
+        result (Keith, 2026-09-23). This is finer-grained than
+        REQ-PIPE-035's run-level record of which version each run read,
+        and the dependency-triggered re-run above is what makes the
+        finer grain necessary: the SAME cross-table check is evaluated
+        twice against two different versions of clients while
+        placements never changed, so without a per-check record the two
+        results look identical while having read different data. "Red
+        against what?" is the first question asked of a failing
+        cross-table check.
+      - >
+        Rejected carrying the OTHER table's status alongside the
+        result. Keith considered it in the same breath and decided
+        against - "just flagging the tables, the underlying tables it
+        ran against". It is the right call for a reason worth keeping:
+        a physical table name is immutable, because tables are
+        immutable once written, whereas a status is a live value that
+        can change afterwards. Copying a status in would freeze a value
+        that may later be wrong, in a result that is never recomputed.
+        A name can always be resolved to a current status; a copied
+        status cannot be un-staled.
       - >
         Note on why this makes REQ-QAC-037 load-bearing rather than
         merely tidy. Re-running a cross-table check when clients arrives
