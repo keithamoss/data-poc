@@ -1596,17 +1596,37 @@ cross-table check now runs. If green, clients promotes and August's slot
 fills. `qa_results/` keeps **both** runs - the period's current state is
 the latest, its history is all of them.
 
-**TS-15 `[unit]` Something arrived that has nowhere to live.**
-A table the schedule does not list for that period - or, **Keith's own
-broadening, 2026-09-22, "wildly crazy shit"**: a `test.png`, a garbage
-filename, any artefact that maps to no slot at all.
+**TS-15a `[unit]` An UNEXPECTED TABLE - recognised, but not owed.**
+A file that MATCHES a dataset's arrival pattern, for a dataset with no
+slot in that period.
 **Expect**: it does **not** break the delivery or block readiness, which
-are defined over EXPECTED tables. It is **not** QA'd (no checks exist
-for something we do not know about) and **not** promoted (no slot). It
-is **logged to the activity feed as informational** - Keith settled the
-earlier red-or-informational question this way: it is not a data quality
-failure, it is a supplier telling us something changed without saying
-so.
+are defined over EXPECTED tables. Not QA'd, not promoted (no slot).
+**Informational** in the activity feed - Keith settled the earlier
+red-or-informational question this way, 2026-09-22: it is not a data
+quality failure, it is a supplier telling us something changed without
+saying so. Unchanged by the 2026-09-24 severity decision below, because
+we know exactly what this file is; it is merely surplus.
+
+**TS-15b `[unit]` An UNRECOGNISED ARTEFACT - matches nothing.**
+A file matching no dataset's pattern at all. Keith's own broadening,
+2026-09-22, "wildly crazy shit": a `test.png`, a garbage filename.
+**Expect**: still does not break the delivery, still not QA'd, still not
+promoted. **WARNING, not informational** (Keith, 2026-09-24) - because
+this is indistinguishable at runtime from a supply we FAILED TO CLAIM,
+which is the TS-38 shape below, and a near-miss that reports quietly
+produces a false-complete.
+
+**Open, and it is a real tension between two of Keith's own calls.** On
+2026-09-22 he settled `test.png` as informational; on 2026-09-24 he
+settled unrecognised-matches-nothing as a warning. Both apply to the
+same input, because nothing at runtime tells a junk file from a renamed
+resupply. A **non-heuristic discriminator does exist** and is worth
+deciding before this is built: the contract already declares each
+dataset's `format` (`format: csv`), so an unrecognised file whose
+extension matches no declared format could stay informational
+(`test.png`), while one whose extension DOES match becomes a warning
+(`cp_clients_v2.csv`). That separates the two cases on a fact from
+config rather than a guess about intent. Not yet decided.
 
 **TS-16 `[unit]` Per-table classification.**
 `cp_clients` lands 09:00, `cp_placements` 14:00, one of them late.
@@ -1855,6 +1875,64 @@ as such, the same family as TS-3, so a later session does not "fix" it
 by adding the obvious tie-break. `REQ-PIPE-059` records why each such
 rule was rejected: every one is a guess dressed as a policy, and the
 dropped file is exactly the one a supplier will later say they sent.
+
+**TS-36 `[unit]` One delivery, two collections.**
+A drop containing Birth Registrations' file alongside two Child
+Protection tables - one folder, two collections.
+**Expect**: that delivery is HELD and reported; every OTHER delivery in
+the run is processed normally (Keith, 2026-09-24). This CHANGES BUILT
+BEHAVIOUR - `qa_tools/common/arrivals.py` raises today, and because
+recognition walks the whole tree one such drop currently takes the run
+down for all 60 deliveries, which was reproduced before deciding. The
+rejected alternative is recorded on `REQ-PIPE-057`: a delivery spanning
+two collections means the TRANSPORT BOUNDARY is wrong, which is a real
+argument, but the hold reports it just as visibly and loses only the
+blast radius.
+
+**TS-37 `[unit]` A delivery directory with no receipt record.**
+Files present under `data/deliveries/<name>/`, nothing at
+`data/receipts/<name>.json`.
+**Expect**: skipped as in-flight, reported **on every run** as an
+informational observation, and every other delivery processed normally.
+NOT a hard error - reproduced 2026-09-24 that one such directory makes
+`list_deliveries()` raise, taking all 60 with it. NO configured
+interval, NO file modification time, NO state counting runs: persistence
+shows through repetition. The reason this is the normal case rather than
+an edge - under a real transport a delivery has no receipt until our own
+BOUNDARY RULE says it is complete, and in S3 events fire per object with
+no delivery-is-finished signal, so "files present, no receipt" is the
+state of every delivery until the boundary closes.
+
+**TS-38 `[INJECT]` A resupply whose filename no longer matches.**
+**Keith's own case, 2026-09-24, and the most dangerous shape in this
+register.** A catch-up Child Protection delivery: the current
+`cp_clients` and `cp_placements` arrive with filenames that match their
+patterns, and the RESUPPLIES of those same two tables arrive with
+filenames that do not - a renamed extract, a split part, a different
+convention from the upstream system.
+**Expect**: the matched files are attributed and processed; the
+unmatched ones are reported as unrecognised artefacts at **warning**
+level. Critically, the supply is **NOT** silently treated as complete -
+the warning is the only thing standing between this and a promoted,
+green, HALF supply. Had the resupplies matched, this would instead be
+the duplicate-match hold of TS-34, which is louder still.
+**Why `[INJECT]`**: the failure is one of ATTENTION, not computation. A
+unit test asserts the warning is emitted; only a rendered dashboard
+shows whether a person scanning the activity feed would actually notice
+it among that run's other events. That is the whole question here.
+
+**TS-39 `[unit]` A split extract, once patterns are regexes.**
+`cp_clients.csv` and `cp_clients_part2.csv` in one delivery, with
+`cp-clients`' pattern written to match both.
+**Expect**: a duplicate match, so the dataset is HELD (TS-34's
+machinery), not a silent choice between them. Verified 2026-09-24 that
+under today's `keyPattern` reuse this is NOT reachable for Child
+Protection - `cp/{delivery_id}/cp_clients.csv` reduces to
+`^cp_clients\.csv$`, so `part2` matches nothing and falls out as
+unrecognised instead, which is the TS-38 shape. Reachable for Birth
+Registrations only because its pattern carries a `{date}` placeholder.
+This scenario is what proves the regex change (`REQ-PIPE-058`,
+2026-09-24) actually closed the gap.
 
 ### The mixed-period delivery gate
 
