@@ -149,8 +149,6 @@ button{font:inherit; color:inherit;}
 .pill.sm .ico{width:7px;height:7px;}
 .pill.tag{background:var(--accent-soft); color:var(--accent-ink); border:1px solid var(--accent-soft-line);}
 .pill.tag .ico{background:var(--accent); border-radius:2px;}
-.pill.illustrative{background:var(--surface-alt); color:var(--ink-muted); border:1px solid var(--line-strong);}
-.pill.illustrative .ico{background:var(--ink-faint); border-radius:2px;}
 .pill.nodata{background:var(--surface-alt); color:var(--ink-faint); border:1px dashed var(--line-strong);}
 .pill.nodata .ico{background:var(--ink-faint); border-radius:2px;}
 
@@ -543,7 +541,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
   <main id="view"></main>
 
   <footer>
-    Proof-of-concept reporting layer over the central QA pipeline — worst-of status rollup, Agency → Data Collection → Dataset → Column. Registry Services → Civil Registration → <strong>Birth Registrations</strong> is real: its figures are computed by running the actual dbt-core, Soda Core, datacontract-cli, and Evidently AI binaries against real generated pipeline runs. The Department for Child Protection and Family Support → Child Protection collection (all 6 datasets) is also real, computed the same way — including cross-table foreign-key and business-rule checks, not just single-column rules (see the "Real pipeline data" tag on each real dataset). Every other dataset on this page remains illustrative synthetic data for design review, not live production values.
+    Proof-of-concept reporting layer over the central QA pipeline — worst-of status rollup, Agency → Data Collection → Dataset → Column. Registry Services → Civil Registration → <strong>Birth Registrations</strong> is real: its figures are computed by running the actual dbt-core, Soda Core, datacontract-cli, and Evidently AI binaries against real generated pipeline runs. The Department for Child Protection and Family Support → Child Protection collection (all 6 datasets) is also real, computed the same way — including cross-table foreign-key and business-rule checks, not just single-column rules Every dataset on this page is real, computed the same way — the illustrative mock datasets that used to sit alongside them were removed on 2026-09-23.
     <br><br>
     <em>Internal project codename: Mothman.</em>
   </footer>
@@ -983,11 +981,13 @@ function groupChecksByCategory(checks){
 // from here, so renaming a collection in that one file cannot leave the
 // real dataset tiles hanging under a stale id with a dead URL.
 //
-// null in the raw template, like every other const here - and unlike
-// the others, the literals in buildData() are its real fallback rather
-// than decoration: the template must render standalone with illustrative
-// data, so the two real agencies have to be written somewhere. What this
-// removes is the copy that anything a reader ever sees would use.
+// null in the raw template, like every other const here - and since
+// REQ-DASH-055 that means the raw template renders NO TREE AT ALL
+// rather than falling back to literals. That is the point: there is
+// no second copy of the tree left to go stale, so a rename in
+// contract/data-asset.yaml cannot leave one behind. The page says
+// plainly that nothing is embedded rather than appearing to show real
+// content.
 const HIERARCHY = null;
 // ASSET_TIMEZONE — REQ-PIPE-048. The data asset's own IANA timezone,
 // from contract/data-asset.yaml, embedded so "what day is it" is
@@ -1143,10 +1143,7 @@ function buildRealDataset(d){
     // Phase 5d: the dataset's own full run manifest, kept around (not
     // just its .length like realRunCount above) so trendChart() can tell
     // "no result for this check between two of its history points" apart
-    // from "no REAL RUN happened at all in that window" - undefined for
-    // illustrative mock datasets (genDataset() below never sets this),
-    // which is fine: trendChart() only attempts reporting-gap detection
-    // when it's given a real runs list.
+    // from "no REAL RUN happened at all in that window".
     runs: d.runs,
   };
 }
@@ -1448,32 +1445,28 @@ function noDataDataset(id, name, provider, deliveryFormat, sla){
   };
 }
 
-// Both fall back to the same illustrative-mock generator the other 14
-// datasets already use (genDataset(), defined below - forward-referenced
-// here since these two functions are only ever actually CALLED after it
-// exists, at DATA-construction time) whenever the real consts are still
-// the template's own null/empty placeholders - opening dashboard/qa-
-// reporting-dashboard.template.html directly (before embed_dashboard_
-// data.py has ever run) must render cleanly, not crash. genDataset()
-// never sets isReal, so the fallback correctly shows as "Illustrative
-// mock data" (see the ds.isReal ternaries below), the same honest signal
-// every other non-real tile already gives - not a special case to
-// maintain, just the existing mechanism doing exactly what it's for.
-// Illustrative datasets are never clipped to the as-of date - only real,
-// pipeline-tracked history has genuine per-run data worth "as of"-ing.
+// WITH NO DATA EMBEDDED, THESE RETURN NULL and the caller renders a
+// "no data" tile (REQ-DASH-055). They used to fall back to an
+// illustrative mock generator so the raw template had something to
+// draw; that generator is gone, and with it the page's two kinds of
+// dataset.
+//
+// Null rather than a no-data tile built here, because only the caller
+// knows the dataset's name - it has the hierarchy entry, and these
+// functions only have the embedded feed that is missing.
+//
+// Real datasets ARE clipped to the as-of date; a dataset whose history
+// starts after it genuinely has nothing to show as at that date, which
+// is what noDataDataset() is for.
 function buildBirthRegistrations(asOfDateStr){
-  if(!REAL_BIRTH_REG_DATA) return genDataset(
-    "registry-services.civil-registration.birth-registrations", "Birth Registrations",
-    "Registry of Births, Deaths & Marriages (BDM)", "CSV (S3 drop)", POOLS.death);
+  if(!REAL_BIRTH_REG_DATA) return null;
   const clipped = clipDatasetToAsOf(REAL_BIRTH_REG_DATA, asOfDateStr);
   return clipped ? buildRealDataset(clipped)
     : noDataDataset(REAL_BIRTH_REG_DATA.id, REAL_BIRTH_REG_DATA.name, REAL_BIRTH_REG_DATA.provider,
                      REAL_BIRTH_REG_DATA.deliveryFormat, REAL_BIRTH_REG_DATA.sla);
 }
 function buildChildProtectionDatasets(asOfDateStr){
-  if(!REAL_CP_DATA) return [genDataset(
-    "child-protection-family-support.child-protection.cp-clients", "Client Register",
-    "Department for Child Protection and Family Support", "CSV (S3 drop)", POOLS.enrollment)];
+  if(!REAL_CP_DATA) return [];
   return REAL_CP_DATA.datasets.map(d => {
     const clipped = clipDatasetToAsOf(d, asOfDateStr);
     return clipped ? buildRealDataset(clipped)
@@ -1495,90 +1488,21 @@ function rawRealDatasetById(datasetId){
 
 
 /* =========================================================================
-   3. PROCEDURAL GENERATOR for every other dataset — same worst-of logic,
-      lighter-fidelity synthetic data so the Executive/Agency tiers feel
-      fully populated without hand-authoring every column.
+   3. ROLLUPS
+   The procedural mock-data generator that used to live here - a check
+   library, genCheck/genColumn/genDataset and a set of column pools,
+   roughly 90 lines - is GONE (REQ-DASH-055, 2026-09-23). It populated
+   fourteen invented datasets across three invented agencies so the
+   Executive and Agency tiers felt full.
+   It was never dishonest: every tile it produced carried an
+   "Illustrative mock data" label and none claimed to be real. What it
+   cost was that every structural change to this page had to work
+   against two kinds of dataset at once, which is the pain Keith's own
+   words named when he asked for it to go.
+   Real breadth replaces it rather than nothing does - a few small
+   datasets across several agencies, with genuinely different column
+   shapes (plans/running-thoughts.md #29).
 ========================================================================= */
-const CHECK_LIBRARY = [
-  {label:"Null rate", dim:"Completeness", unit:"%"},
-  {label:"Invalid values", dim:"Validity", unit:"%"},
-  {label:"Duplicate rate", dim:"Uniqueness", unit:"%"},
-  {label:"Out-of-range values", dim:"Validity", unit:"%"},
-  {label:"Freshness lag", dim:"Timeliness", unit:"hrs"},
-];
-
-function genCheck(rand, forcedStatus){
-  const spec = CHECK_LIBRARY[Math.floor(rand()*CHECK_LIBRARY.length)];
-  const warn = spec.unit==="hrs" ? (4+rand()*6) : (0.5+rand()*3);
-  const fail = warn * (1.8+rand()*1.2);
-  let current;
-  if(forcedStatus==="red") current = fail*(1.05+rand()*0.5);
-  else if(forcedStatus==="amber") current = warn*(1.15+rand()*0.6);
-  else current = warn*(rand()*0.45);              // comfortably green
-  const baselineGreen = warn*(rand()*0.3);
-  const n=60, rampStart=n-14;
-  const values=[];
-  for(let i=0;i<n;i++){
-    if(forcedStatus!=="green" && i>=rampStart){
-      const t=(i-rampStart)/(n-1-rampStart);       // recent-onset incident, not a permanent state
-      values.push(Math.max(0, baselineGreen + t*(current-baselineGreen) + (rand()-0.5)*warn*0.08));
-    } else {
-      values.push(Math.max(0, baselineGreen + (rand()-0.5)*warn*0.15));
-    }
-  }
-  values[n-1]=current;
-  values[n-2] = forcedStatus==="green" ? values[n-2] : current*(0.82+rand()*0.12);
-  const runs = values.map((v,i)=>({idx:i, date:new Date(TODAY.getTime()-(n-1-i)*DAY), value:v}));
-  return { name:spec.label, dimension:spec.dim, unit:spec.unit, warn, fail, current, previous:values[n-2], history:runs };
-}
-
-function genColumn(rand, colName, forcedStatus){
-  const nChecks = 1 + (rand()<0.4?1:0);
-  const checks=[genCheck(rand, forcedStatus)];
-  for(let i=1;i<nChecks;i++) checks.push(genCheck(rand, "green"));
-  const status = worstOf(checks.map(checkStatus));
-  return { name: colName, logicalType: rand()<0.5?"string":"numeric", description:"", checks, status,
-    stats:{ current:{total: 1000+Math.floor(rand()*9000), invalid:Math.floor(rand()*50), valid:0, valueCounts:null},
-            previous:{total: 1000+Math.floor(rand()*9000), invalid:Math.floor(rand()*50), valid:0, valueCounts:null} } };
-}
-
-function genDataset(seedStr, name, provider, format, columnPool, opts){
-  opts = opts || {};
-  const target = opts.target || "green";
-  const rand = rngFor(seedStr);
-  const nCols = Math.min(columnPool.length, 6+Math.floor(rand()*3));
-  const picked = [...columnPool].sort(()=>rand()-0.5).slice(0,nCols);
-  // exactly one column carries the dataset's target status, so the
-  // worst-of rollup lands precisely where the narrative intends —
-  // the rest of the dataset is unremarkable, same as most real datasets.
-  const columns = picked.map((cn,i)=> genColumn(rand, cn, i===0?target:"green"));
-  const arrival=[]; for(let i=0;i<60;i++) arrival.push({idx:i, date:new Date(TODAY.getTime()-(59-i)*DAY), arrivalStatus: rand()>0.05 ? "onTime" : "late"});
-  const lateToday = opts.lateToday || false;
-  return {
-    id: seedStr.split(".").pop(), name, provider, deliveryFormat:format,
-    // Illustrative only - real datasets' cadence comes from their own
-    // ODCS contract's slaProperties: (pipeline/cadence.py, Phase 5j).
-    sla:{ cadence: { type:"daily", expected_time:"06:00", latency_minutes:60 } },
-    lastArrival:{ date: runDate(0), arrivedAt: lateToday? "07:40 local":"05:0"+Math.floor(rand()*9)+" local", arrivalStatus: lateToday ? "late" : "onTime" },
-    arrivalHistory: arrival,
-    rowCount: 200+Math.floor(rand()*40000), prevRowCount: 200+Math.floor(rand()*40000),
-    columns,
-  };
-}
-
-const POOLS = {
-  death:["death_registration_number","deceased_given_names","deceased_family_name","date_of_death","place_of_death","cause_of_death_code","informant_relationship","date_registered"],
-  marriage:["marriage_registration_number","partner_1_name","partner_2_name","date_of_marriage","place_of_marriage","celebrant_id","date_registered"],
-  immunisation:["patient_id","dose_number","vaccine_code","administration_date","provider_id","batch_number","consent_flag","clinic_region"],
-  discharge:["admission_id","admission_date","discharge_date","primary_diagnosis_code","facility_code","length_of_stay_days","discharge_disposition","funding_source"],
-  licensing:["licence_number","licence_class","issue_date","expiry_date","holder_dob","endorsement_codes","medical_review_outcome","photo_captured_flag"],
-  vehicle:["plate_number","vin","make_model","registration_expiry","owner_id","vehicle_class","odometer_reading"],
-  enrollment:["student_id","school_code","enrollment_date","year_level","home_language","transport_mode","attendance_rate"],
-  assessment:["student_id","assessment_code","sitting_date","raw_score","scaled_score","result_band","moderation_flag","marker_id"],
-  business:["business_id","business_name","entity_type","registration_date","status_code","industry_code","postcode","gst_flag"],
-  tax:["filer_id","filing_period","filing_date","lodgement_channel","assessed_flag","amendment_count","agent_id","jurisdiction_code"],
-};
-
 // Datasets with no data as of the currently-selected as-of date
 // (ds.noDataAsOf, Thread C) are excluded from the worst-of - "no data"
 // is a different KIND of signal from a real green/amber/red and must
@@ -1674,97 +1598,52 @@ let CURRENT_AS_OF = asOfFromUrl() || DEFAULT_AS_OF;
 // scratch against that date rather than mutating anything in place, same
 // "no leftover state from the old view" principle as navigate() already
 // uses for drill-down transitions.
-// One real agency/collection node's id and display name, from the
-// embedded HIERARCHY when there is one, falling back to the literal the
-// raw template needs to render standalone (REQ-QAC-039). `fb` is that
-// fallback, and is also what names WHICH node to look up - the template
-// has to say where the real dataset tiles hang, and naming a node is a
-// reference to the tree rather than a second statement of it.
-function hierAgency(fb){
-  const a = HIERARCHY && (HIERARCHY.agencies||[]).find(x => x.id === fb.id);
-  return a ? {id:a.id, name:a.name} : fb;
+// THE WHOLE TREE COMES FROM HIERARCHY (REQ-DASH-055). Every agency,
+// every collection, every dataset - no literals here, and no fallback
+// for the raw template either.
+//
+// That is a deliberate step past REQ-QAC-039, which left the two real
+// agency nodes as literals because the unembedded template had to
+// render with illustrative mock data. Removing that mock data removed
+// the justification with it, so this page is now a pure renderer:
+// contract/data-asset.yaml is the single statement of the tree, and a
+// rename there cannot leave a stale copy behind because there is no
+// copy to go stale (Keith, 2026-09-23).
+//
+// A dataset's own tile comes from whichever real feed backs it. A
+// dataset the hierarchy defines but no embedded data covers renders as
+// "no data" rather than disappearing - "we have not loaded it" and "it
+// does not exist" are different things, and a missing tile says the
+// second when it means the first.
+const AGENCY_BLURB = {
+  "registry-services": "Civil registration of life events for the whole state.",
+  "child-protection-family-support":
+    "Casework for children and families needing protection or support services.",
+};
+
+// Presentation copy, not hierarchy: a blurb is how the page describes
+// an agency, which contract/data-asset.yaml has no business knowing.
+// An agency with none simply shows no blurb.
+function datasetTile(datasetId, asOfDateStr){
+  if(datasetId === "birth-registrations") return buildBirthRegistrations(asOfDateStr);
+  const cp = buildChildProtectionDatasets(asOfDateStr);
+  return cp.find(d => d.id === datasetId) || null;
 }
-function hierCollection(agencyFb, fb){
-  const a = HIERARCHY && (HIERARCHY.agencies||[]).find(x => x.id === agencyFb.id);
-  const c = a && (a.collections||[]).find(x => x.id === fb.id);
-  return c ? {id:c.id, name:c.name} : fb;
-}
-const AG_REGISTRY = {id:"registry-services", name:"Registry Services"};
-const AG_CHILD_PROTECTION = {id:"child-protection-family-support",
-                             name:"Department for Child Protection and Family Support"};
-const COL_CIVIL_REGISTRATION = {id:"civil-registration", name:"Civil Registration"};
-const COL_CHILD_PROTECTION = {id:"child-protection", name:"Child Protection"};
 
 function buildData(asOfDateStr){
-  const data = {
-  agencies:[
-    {
-      ...hierAgency(AG_REGISTRY), blurb:"Civil registration of life events for the whole state.",
-      collections:[
-        { ...hierCollection(AG_REGISTRY, COL_CIVIL_REGISTRATION),
-          datasets:[
-            buildBirthRegistrations(asOfDateStr),
-            genDataset("registry-services.civil-registration.death-registrations","Death Registrations","Registry of Births, Deaths & Marriages (BDM)","CSV (S3 drop)",POOLS.death),
-            genDataset("registry-services.civil-registration.marriage-registrations","Marriage Registrations","Registry of Births, Deaths & Marriages (BDM)","CSV (S3 drop)",POOLS.marriage),
-          ]},
-      ]},
-    {
-      ...hierAgency(AG_CHILD_PROTECTION),
-      blurb:"Casework for children and families needing protection or support services.",
-      collections:[
-        { ...hierCollection(AG_CHILD_PROTECTION, COL_CHILD_PROTECTION),
-          datasets: buildChildProtectionDatasets(asOfDateStr) },
-      ]},
-    {
-      id:"health-human-services", name:"Health & Human Services", blurb:"Public health programs and hospital system oversight.",
-      collections:[
-        { id:"immunisation", name:"Immunisation Records", datasets:[
-            genDataset("health-human-services.immunisation.childhood","Childhood Immunisation","State Immunisation Register","CSV (SFTP)",POOLS.immunisation),
-            genDataset("health-human-services.immunisation.workforce","Workforce Immunisation","Occupational Health Unit","Parquet (S3)",POOLS.immunisation),
-        ]},
-        { id:"hospital-discharge", name:"Hospital Discharge Data", datasets:[
-            genDataset("health-human-services.discharge.public","Public Hospital Discharges","Hospital Information System","CSV (SFTP)",POOLS.discharge),
-            genDataset("health-human-services.discharge.private","Private Hospital Discharges","Private Facility Reporting Portal","CSV (SFTP)",POOLS.discharge),
-        ]},
-      ]},
-    {
-      id:"transportation", name:"Transportation", blurb:"Driver and vehicle licensing across the state network.",
-      collections:[
-        { id:"driver-licensing", name:"Driver Licensing", datasets:[
-            genDataset("transportation.licensing.renewals","Licence Renewals","Driver & Vehicle Services","CSV (S3 drop)",POOLS.licensing,{target:"red", lateToday:true}),
-            genDataset("transportation.licensing.new-issue","New Licence Issuance","Driver & Vehicle Services","CSV (S3 drop)",POOLS.licensing),
-        ]},
-        { id:"vehicle-registration", name:"Vehicle Registration", datasets:[
-            genDataset("transportation.vehicle.registrations","Vehicle Registrations","Driver & Vehicle Services","Parquet (S3)",POOLS.vehicle),
-            genDataset("transportation.vehicle.transfers","Ownership Transfers","Driver & Vehicle Services","Parquet (S3)",POOLS.vehicle),
-        ]},
-      ]},
-    {
-      id:"education", name:"Education", blurb:"School enrollment and system-wide assessment data.",
-      collections:[
-        { id:"enrollment", name:"School Enrollment", datasets:[
-            genDataset("education.enrollment.public","Public School Enrollment","School Data Collection Unit","CSV (SFTP)",POOLS.enrollment),
-            genDataset("education.enrollment.independent","Independent School Enrollment","School Data Collection Unit","CSV (SFTP)",POOLS.enrollment,{target:"amber"}),
-        ]},
-        { id:"assessment", name:"Assessment Results", datasets:[
-            genDataset("education.assessment.national","National Assessment Program","Assessment Authority","Parquet (S3)",POOLS.assessment),
-            genDataset("education.assessment.diagnostic","Diagnostic Testing","Assessment Authority","Parquet (S3)",POOLS.assessment),
-        ]},
-      ]},
-    {
-      id:"revenue-taxation", name:"Revenue & Taxation", blurb:"Business registration and tax administration data.",
-      collections:[
-        { id:"business-registrations", name:"Business Registrations", datasets:[
-            genDataset("revenue-taxation.business.new","New Business Registrations","Business Registry","CSV (S3 drop)",POOLS.business),
-            genDataset("revenue-taxation.business.changes","Business Detail Changes","Business Registry","CSV (S3 drop)",POOLS.business),
-        ]},
-        { id:"tax-filings", name:"Tax Filings", datasets:[
-            genDataset("revenue-taxation.tax.individual","Individual Filings","Tax Administration System","Parquet (S3)",POOLS.tax),
-            genDataset("revenue-taxation.tax.business","Business Filings","Tax Administration System","Parquet (S3)",POOLS.tax),
-        ]},
-      ]},
-  ],
-  };
+  const agencies = ((HIERARCHY && HIERARCHY.agencies) || []).map(ag => ({
+    id: ag.id,
+    name: ag.name,
+    blurb: AGENCY_BLURB[ag.id] || "",
+    collections: (ag.collections || []).map(col => ({
+      id: col.id,
+      name: col.name,
+      datasets: (col.datasets || []).map(d =>
+        datasetTile(d.id, asOfDateStr)
+        || noDataDataset(d.id, d.name, "", "", null)),
+    })),
+  }));
+  const data = {agencies};
   // wire up rollup statuses bottom-up. A noDataAsOf dataset already
   // carries its own "nodata" status from noDataDataset() above - its
   // (empty) columns list must never be re-derived over the top of that,
@@ -2163,8 +2042,8 @@ function ticketBadge(datasetId, size){
 // GitHub", 2026-09-18) - same real-link-or-nothing treatment as
 // ticketBadge() above: GITHUB_LINKS is only ever non-empty on the real
 // built dashboard (embedded by dashboard/embed_dashboard_data.py from
-// qa_tools/common/github_links.py), so this degrades to a no-op against
-// the raw template's own illustrative mock data, same as every other
+// qa_tools/common/github_links.py), so this degrades to a no-op
+// against the raw, unembedded template, same as every other
 // embedded-const-backed feature on this page.
 function githubCheckLink(check){
   const url = GITHUB_LINKS.checks && GITHUB_LINKS.checks[check.check_id];
@@ -2375,6 +2254,26 @@ function render(){
 
 function renderExec(view){
   setRail([{tier:"Tier 1", label:"Executive", nav:{tier:"exec"}}]);
+  // NOTHING EMBEDDED (REQ-DASH-055). Since the whole tree comes from
+  // HIERARCHY, opening the raw template directly gives an empty page -
+  // and an empty page that renders the ordinary chrome reads as "this
+  // asset has no agencies", which is a very different statement from
+  // "no configuration has been loaded". The first is a finding; the
+  // second is a file that has not been built yet. Say which.
+  if(!DATA.agencies.length){
+    view.innerHTML = `
+      <div class="view-head">
+        <div>
+          <h2>No data embedded</h2>
+          <div class="view-sub">This is the dashboard TEMPLATE, opened directly. It carries no
+            agencies, datasets or QA results of its own — they are embedded at build time from
+            <code>contract/data-asset.yaml</code> and the committed <code>qa_results/</code>
+            history. Run <code>mothman pipeline run</code> (or <code>mothman dashboard
+            embed</code>) and open the built file instead.</div>
+        </div>
+      </div>`;
+    return;
+  }
   const redCount = DATA.agencies.filter(a=>a.status==="red").length;
   const amberCount = DATA.agencies.filter(a=>a.status==="amber").length;
   view.innerHTML = `
@@ -2406,8 +2305,33 @@ function renderExec(view){
   wireCards(grid);
 }
 
+// A URL POINTING AT SOMETHING THAT NO LONGER EXISTS is an ordinary
+// event, not a broken page: someone bookmarks a dataset, it is later
+// renamed or removed, and the bookmark still gets opened. Before this,
+// renderAgency() and renderDataset() dereferenced whatever find()
+// returned without checking, so a stale link threw an uncaught
+// TypeError and rendered nothing at all - the reader saw a blank page
+// with no hint of why.
+//
+// Found while removing fourteen datasets at once (REQ-DASH-055), which
+// is what made the case easy to hit, but it was always reachable.
+function renderNotFound(view, what, id){
+  setRail([{tier:"Tier 1", label:"Executive", nav:{tier:"exec"}}]);
+  view.innerHTML = `
+    <div class="view-head">
+      <div>
+        <h2>${what} not found</h2>
+        <div class="view-sub">This link points at a ${what.toLowerCase()} called
+          <code>${escHtml(id == null ? "" : String(id))}</code>, which this dashboard does not
+          have. It may have been renamed or removed since the link was made. Use the trail above
+          to go back to the executive overview.</div>
+      </div>
+    </div>`;
+}
+
 function renderAgency(view, agencyId){
   const ag = DATA.agencies.find(a=>a.id===agencyId);
+  if(!ag) return renderNotFound(view, "Agency", agencyId);
   setRail([{tier:"Tier 1",label:"Executive",nav:{tier:"exec"}}, {tier:"Tier 2",label:ag.name, nav:{tier:"agency",agencyId}}]);
   view.innerHTML = `
     <div class="view-head">
@@ -2442,7 +2366,7 @@ function renderAgency(view, agencyId){
           // one dataset's own columns.
           const dsSpark = aggregateSparkline(ds.columns);
           return `<tr data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
-            <td><div class="dataset-name">${ds.name}${ds.isReal?` <span class="pill tag sm"><span class="ico"></span>Real pipeline data</span>`:""}</div><div class="dataset-provider">${ds.provider}</div></td>
+            <td><div class="dataset-name">${ds.name}</div><div class="dataset-provider">${ds.provider}</div></td>
             <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
             <td>${arrivalPillHtml} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${fmtArrival(ds.lastArrival)}</span></td>
             <td class="mono">${fmtInt(ds.rowCount)}</td>
@@ -2572,8 +2496,11 @@ function wireSupplyHistorySection(container){
 
 function renderDataset(view, agencyId, collectionId, datasetId){
   const ag = DATA.agencies.find(a=>a.id===agencyId);
+  if(!ag) return renderNotFound(view, "Agency", agencyId);
   const col = ag.collections.find(c=>c.id===collectionId);
+  if(!col) return renderNotFound(view, "Collection", collectionId);
   const ds = col.datasets.find(d=>d.id===datasetId);
+  if(!ds) return renderNotFound(view, "Dataset", datasetId);
   setRail([
     {tier:"Tier 1",label:"Executive",nav:{tier:"exec"}},
     {tier:"Tier 2",label:ag.name, nav:{tier:"agency",agencyId}},
@@ -2611,8 +2538,8 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   view.innerHTML = `
     <div class="view-head">
       <div>
-        <h2>${ds.name}${ds.isReal?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:` <span class="pill illustrative"><span class="ico"></span>Illustrative mock data</span>`}</h2>
-        <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${ds.isReal?" · figures below are computed by real dbt/Soda/datacontract-cli/Evidently tools against real generated runs — not fabricated in the browser.":""}</div>
+        <h2>${ds.name}${ds.realRunCount?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:""}</h2>
+        <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${ds.realRunCount?" · figures below are computed by real dbt/Soda/datacontract-cli/Evidently tools against real generated runs — not fabricated in the browser.":""}</div>
       </div>
       <div style="display:flex; align-items:center; gap:8px;">${pill(ds.status)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
     </div>
@@ -2705,7 +2632,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   // Phase 5j Stage 2 - "a final view of how the refresh period went."
   // Needs the RAW (unclipped, full-history) dataset object, not `ds`
   // (already as-of-clipped) - see rawRealDatasetById()'s own comment.
-  const rawDs = ds.isReal ? rawRealDatasetById(datasetId) : null;
+  const rawDs = rawRealDatasetById(datasetId);
   const historyWrap = document.getElementById("supply-history-wrap");
   if(rawDs){
     const cycles = buildSupplyHistory(rawDs);
@@ -2735,7 +2662,7 @@ function openColumnDrawer(ag, col, ds, column, opts){
     STATE = {tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id, columnName:columnKey(column)};
     history.pushState(STATE, "", stateToHash(STATE));
   }
-  document.getElementById("drawer-eyebrow").innerHTML = `<span>${ag.name} / ${col.name} / ${ds.name}</span>${ds.isReal?` <span class="pill tag sm"><span class="ico"></span>Real</span>`:""}`;
+  document.getElementById("drawer-eyebrow").innerHTML = `<span>${ag.name} / ${col.name} / ${ds.name}</span>`;
   document.getElementById("drawer-title").textContent = column.name;
   const body = document.getElementById("drawer-body");
 

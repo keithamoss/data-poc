@@ -10,12 +10,20 @@
 // hand-authored single-file source (CLAUDE.md's own description of it)
 // stays exactly that.
 //
-// With no REAL_BIRTH_REG_DATA/REAL_CP_DATA embedded (the template's own
-// placeholder consts - null here, real data only once dashboard/
-// embed_dashboard_data.py has run), the dashboard's own existing
-// illustrative-mock-data fallback kicks in - the same "degrades safely for
-// illustrative mock datasets too" behaviour already relied on by
-// dashboard/check_dashboard_renders.py's raw-template render check.
+// With nothing embedded (the template's own placeholder consts - null
+// here, real data only once dashboard/embed_dashboard_data.py has run)
+// the page renders its "no data embedded" state, because since
+// REQ-DASH-055 the whole agency/collection/dataset tree comes from the
+// embedded HIERARCHY and the template carries no tree of its own.
+//
+// A test that needs a tree passes one to loadDashboard({hierarchy}),
+// which embeds it the same way the real build does - by replacing the
+// const in the HTML before jsdom ever parses it. That is deliberately
+// the real mechanism rather than assigning to window afterwards: these
+// are `const` declarations in a non-module script, so they are not
+// window properties and could not be set that way even if we wanted to,
+// and going through the same substitution the build uses keeps the test
+// honest about what it is exercising.
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -57,9 +65,19 @@ function stubMatchMedia(window) {
  * Caller must call `close()` when done (afterEach) - jsdom windows aren't
  * garbage-collected on their own the way a real browser tab is.
  */
-export function loadDashboard({ html } = {}) {
+export function loadDashboard({ html, hierarchy } = {}) {
+  let source = html ?? readFileSync(TEMPLATE_PATH, "utf-8");
+  if (hierarchy !== undefined) {
+    const line = `const HIERARCHY = ${JSON.stringify(hierarchy)};`;
+    const before = source;
+    source = source.replace(/const HIERARCHY = .*?;\n/, `${line}\n`);
+    if (source === before) {
+      throw new Error("could not find `const HIERARCHY = ...;` to replace - has the template changed?");
+    }
+  }
+
   const errors = [];
-  const dom = new JSDOM(html ?? readFileSync(TEMPLATE_PATH, "utf-8"), {
+  const dom = new JSDOM(source, {
     url: "http://localhost/",
     runScripts: "dangerously",
     pretendToBeVisual: true,
@@ -83,3 +101,40 @@ export function loadDashboard({ html } = {}) {
     close: () => dom.window.close(),
   };
 }
+
+
+/**
+ * The smallest tree that still exercises real drill-down: two agencies,
+ * one collection each, the real ids the rest of this suite navigates by.
+ *
+ * Deliberately the REAL ids rather than invented ones - these tests
+ * assert that a URL like /agency/registry-services/collection/... still
+ * resolves, and inventing ids here would let the page and the config
+ * disagree without any test noticing.
+ */
+export const MINIMAL_HIERARCHY = {
+  agencies: [
+    {
+      id: "registry-services",
+      name: "Registry Services",
+      collections: [
+        {
+          id: "civil-registration",
+          name: "Civil Registration",
+          datasets: [{ id: "birth-registrations", name: "Birth Registrations" }],
+        },
+      ],
+    },
+    {
+      id: "child-protection-family-support",
+      name: "Department for Child Protection and Family Support",
+      collections: [
+        {
+          id: "child-protection",
+          name: "Child Protection",
+          datasets: [{ id: "cp-clients", name: "Client Register" }],
+        },
+      ],
+    },
+  ],
+};

@@ -2773,6 +2773,143 @@ requirements:
         REQ-QAC-039, which regeneration delivers for free rather than as
         a rewrite of committed files.
 
+  - id: REQ-DASH-055
+    title: The dashboard shows real datasets only
+    date_written: "2026-09-23"
+    story: >
+      As someone changing how the dashboard works, I want every tile on
+      it to be a real dataset, so that a structural change has one kind
+      of dataset to work against rather than two.
+    moscow: should
+    status: built
+    signed_off:
+      by: Keith
+      date: "2026-09-23"
+    source: >
+      Keith, 2026-09-23, mid-sprint - "I think it might be worthwhile if
+      we just get rid of all the illustrative data from the dashboard. I
+      think that's probably going to cause us more pain than we need."
+      Logged as plans/running-thoughts.md #28 with his own timing:
+      after sprint 1's build step, which REQ-GEN-042 completed the same
+      day. Pairs with #29, which replaces the invented breadth with real
+      breadth once the sprints are done.
+    acceptance_criteria:
+      - THE SYSTEM SHALL present only datasets backed by real pipeline
+        history, and SHALL NOT present invented agencies, collections or
+        datasets alongside them.
+      - THE SYSTEM SHALL NOT retain a generator for mock check results,
+        columns, datasets or value pools.
+      - WHERE a real dataset has no history at or before the selected
+        as-of date, THE SYSTEM SHALL say so on that dataset's own tile
+        rather than omitting the dataset.
+      - THE SYSTEM SHALL keep every rollup, navigation and as-of
+        behaviour it has today for the datasets that remain.
+      - THE SYSTEM SHALL NOT carry a second statement of the
+        agency/collection/dataset tree once the illustrative one is
+        gone.
+      - WHEN the template is opened with no data embedded, THE SYSTEM
+        SHALL render without console errors and SHALL make plain that
+        nothing is embedded, rather than appearing to show real
+        content.
+    non_functional_requirements:
+      - The "Illustrative mock data" label is the page's own honesty
+        mechanism and disappears with the thing it labels. Nothing that
+        remains may read as illustrative, and nothing illustrative may
+        remain unlabelled - there is no third state.
+      - Removal must be verified by what the page RENDERS, not by what
+        the source no longer contains. CLAUDE.md's standing lesson -
+        assert at the last transform before the user.
+      - Real coverage exists for the raw, unembedded template
+        (tests/test_dashboard_e2e.py) and for its inline JS against
+        mock data (tests-js/navigation.test.js). Both change meaning
+        here and must be re-pointed deliberately, not deleted to make a
+        suite go green.
+      - Config only and render only - nothing here touches data/, a
+        warehouse, or committed history.
+    linked_tests:
+      - tests-js/navigation.test.js
+      - tests-js/dashboard-loads.test.js
+      - tests/test_dashboard_e2e.py::test_raw_template_renders_with_zero_console_errors
+      - tests/test_check_dashboard_renders.py
+    implemented_by:
+      - dashboard/qa-reporting-dashboard.template.html
+      - tests-js/support/loadDashboard.js
+    evidence:
+      - >
+        2026-09-23: the procedural mock generator is gone - a check
+        library, genCheck/genColumn/genDataset and the column pools,
+        85 lines - along with the three invented agencies, the two
+        invented siblings beside Birth Registrations, and the
+        "Illustrative mock data" pill that labelled them. 24
+        genDataset() call sites, now zero.
+      - >
+        2026-09-23: buildData() builds the whole tree from HIERARCHY
+        and carries no literals at all, so the template is a pure
+        renderer. Verified in a real browser both ways: the built file
+        renders 2 agencies with zero console errors, the raw template
+        renders 0 and says "No data embedded" rather than "0 agencies".
+      - >
+        2026-09-23: A REAL BUG FOUND BY DOING THIS, and it was always
+        reachable rather than introduced here. renderAgency() and
+        renderDataset() dereferenced whatever find() returned without
+        checking, so a URL pointing at a renamed or removed dataset
+        threw an uncaught TypeError and rendered a blank page. Removing
+        fourteen datasets at once is what made it easy to hit. Three
+        tests were written first and confirmed failing against the
+        bug - they also took an existing passing test down with them -
+        then the not-found state was added and all four passed.
+      - >
+        2026-09-23: only ONE JS test genuinely depended on the mock
+        data, fewer than the plans entry predicted. Both it and
+        tests-js/navigation.test.js were re-pointed deliberately rather
+        than deleted: navigation now embeds a minimal tree through the
+        same const substitution the real build uses, so it still
+        asserts that a real deep link resolves.
+      - >
+        2026-09-23: 980 Python tests, 166 JS tests, all eight mothman
+        gates.
+    dependencies: [REQ-QAC-039]
+    decisions:
+      - >
+        Decided the trigger is the COST OF TWO KINDS OF DATASET, not
+        tidiness (Keith, 2026-09-23). The page was already honest -
+        every invented tile carries an "Illustrative mock data" label
+        and none claims to be real - so nothing here fixes a lie. What
+        it removes is that every structural change has to work against
+        both a real dataset and a generated one, which is the pain his
+        own words name.
+      - >
+        Decided this pairs with plans/running-thoughts.md #29 and is
+        not a standalone shrink. The point is to replace invented
+        breadth with REAL breadth - a few small datasets across several
+        agencies, with genuinely different column shapes, once the
+        sprints are done. Recorded because reading this requirement
+        alone would suggest shipping a permanently two-dataset
+        dashboard, which is not what was asked for.
+      - >
+        Recorded because it is the non-obvious consequence, found while
+        building REQ-QAC-039 rather than while scoping this: the
+        template's HIERARCHY fallback exists PRECISELY BECAUSE the raw,
+        unembedded template has to render with illustrative data. Take
+        the illustrative tree away and that justification goes with it,
+        so the fallback is not something to preserve out of caution -
+        it is the open question below.
+      - >
+        ANSWERED 2026-09-23 by Keith, taking the fuller change: the
+        raw, unembedded template renders NOTHING until HIERARCHY is
+        embedded. That removes the last literal copy of the
+        agency/collection/dataset tree and finishes what REQ-QAC-039
+        started - every node now comes from contract/data-asset.yaml
+        with no exceptions, so a rename there cannot leave a stale
+        fallback behind. Rejected keeping the two real agencies as
+        literal fallbacks showing no-data tiles, which was the smaller
+        change and kept tests-js/navigation.test.js working as written,
+        but would have preserved in the template exactly the duplicate
+        this project spent 2026-09-23 removing everywhere else. The
+        cost accepted: the raw-template render check now asserts a
+        different thing, and one JS test file embeds a minimal tree
+        before driving the page.
+
   - id: REQ-QAC-039
     title: One hierarchy, stated once, including in a check's own identity
     date_written: "2026-09-21"

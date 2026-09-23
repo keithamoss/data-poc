@@ -138,6 +138,13 @@ releases:
               says which calendar it is on and which months it takes
               part in, and can say a period has no supply coming, with a
               reason.
+          - headline: Every dataset on the page is real
+            components: ["Dashboard UI"]
+            description: >
+              The invented agencies and datasets that filled out the
+              overview are gone. Everything you see is now backed by a
+              real pipeline run, and more real datasets are coming to
+              take their place.
           - headline: A supply knows its period
             components: ["Data generation"]
             description: >
@@ -155,6 +162,13 @@ releases:
 
       - category: Fixed
         items:
+          - headline: Old links no longer break the page
+            components: ["Dashboard UI"]
+            description: >
+              A bookmark pointing at a dataset that has since been
+              renamed or removed used to open a blank page with no
+              explanation. It now tells you what the link is looking
+              for and offers a way back.
           - headline: Regenerating no longer doubles the history
             components: ["Data generation"]
             description: >

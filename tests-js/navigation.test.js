@@ -4,7 +4,7 @@
 // end-to-end navigate() call through jsdom, driving the actual DOM the
 // same way a click on an agency card does.
 import { afterEach, describe, expect, it } from "vitest";
-import { loadDashboard } from "./support/loadDashboard.js";
+import { MINIMAL_HIERARCHY, loadDashboard } from "./support/loadDashboard.js";
 
 let dashboard;
 
@@ -13,8 +13,15 @@ afterEach(() => {
   dashboard = undefined;
 });
 
+// Every test here drives real drill-down, which needs a tree to drill
+// into - and since REQ-DASH-055 the template carries none of its own.
+// So a minimal one is embedded the same way the real build embeds the
+// real one. The ids are the real ids on purpose: these tests assert
+// that a URL like /agency/registry-services/collection/civil-registration
+// still resolves, and inventing ids would let the page and the config
+// disagree with nothing noticing.
 function load() {
-  dashboard = loadDashboard();
+  dashboard = loadDashboard({ hierarchy: MINIMAL_HIERARCHY });
   return dashboard.window;
 }
 
@@ -133,9 +140,9 @@ describe("navigate() - real drill-down through the DOM", () => {
     const w = load();
     const cards = dashboard.document.querySelectorAll("#agency-grid .card");
     expect(cards.length).toBeGreaterThan(0);
-    // the real registry-services agency (birth registrations' own agency,
-    // stable across the illustrative mock dataset - buildData()'s own
-    // hardcoded id) is one of them
+    // registry-services comes from the embedded hierarchy now, not from
+    // a hardcoded id in buildData() - which is the whole point of
+    // REQ-DASH-055.
     const navs = [...cards].map((c) => JSON.parse(c.dataset.nav));
     expect(navs.some((n) => n.agencyId === "registry-services")).toBe(true);
   });
@@ -165,5 +172,41 @@ describe("navigate() - real drill-down through the DOM", () => {
     const w = load();
     expect(w.resolveContext({ agencyId: "does-not-exist" })).toBeNull();
     expect(w.resolveContext(null)).toBeNull();
+  });
+});
+
+// A STALE DEEP LINK IS AN ORDINARY EVENT, not a broken page. Someone
+// bookmarks a dataset, the dataset is later renamed or removed, and the
+// bookmark still gets opened. REQ-DASH-055 made that concrete by
+// removing fourteen datasets at once, but the case was always reachable
+// - renderAgency() and renderDataset() both dereferenced whatever
+// find() returned without checking, so the page threw an uncaught
+// TypeError and rendered nothing at all.
+describe("a URL pointing at something that no longer exists", () => {
+  it("shows a not-found state for a removed dataset instead of throwing", () => {
+    const w = load();
+    w.navigate({
+      tier: "dataset", agencyId: "registry-services",
+      collectionId: "civil-registration", datasetId: "death-registrations",
+    });
+    expect(dashboard.errors).toEqual([]);
+    const view = dashboard.document.getElementById("view").textContent;
+    expect(view).toMatch(/not found/i);
+    expect(view).toMatch(/death-registrations/);
+  });
+
+  it("shows a not-found state for a removed agency instead of throwing", () => {
+    const w = load();
+    w.navigate({ tier: "agency", agencyId: "transportation" });
+    expect(dashboard.errors).toEqual([]);
+    expect(dashboard.document.getElementById("view").textContent).toMatch(/not found/i);
+  });
+
+  it("still offers a way back to the executive tier from a not-found state", () => {
+    const w = load();
+    w.navigate({ tier: "agency", agencyId: "transportation" });
+    // A dead end with no exit is the other half of this bug: rendering
+    // nothing and rendering something unusable are the same to a reader.
+    expect(dashboard.document.getElementById("rail").textContent).toContain("Executive");
   });
 });

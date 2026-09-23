@@ -1662,55 +1662,12 @@ question has to pick one. A supply that belongs to Q1 but landed in
 March, and a correction to Q1 that landed in April, both belong to Q1 -
 so a resolution rule keyed only on arrival time gets them wrong.
 
-28. **[todo, 2026-09-23]** **[Dashboard UI]** Delete the illustrative mock data from the dashboard, once sprint 1 is built.
-
-Keith's own call, 2026-09-23, mid-sprint: *"I think it might be
-worthwhile if we just get rid of all the illustrative data from the
-dashboard. I think that's probably going to cause us more pain than we
-need."* Flagged rather than done - the timing is explicit, **after**
-sprint 1's build step, not now.
-
-**What "illustrative" currently means, so the scope is not guessed
-later.** The dashboard renders a tree of five agencies, of which two
-are real and three are entirely invented (`health-human-services`,
-`transportation`, plus the education/revenue collections beneath them),
-and the real `civil-registration` collection carries two invented
-siblings alongside Birth Registrations (`death-registrations`,
-`marriage-registrations`). All of it comes from `genDataset()` in
-`dashboard/qa-reporting-dashboard.template.html`, with its own
-`POOLS.*` generators. None of it is tagged "Real pipeline data", so the
-page is already honest about which is which - the cost is not
-dishonesty, it is that every structural change has to be made to work
-against two kinds of dataset at once.
-
-**Three real entanglements to expect**, all found while building
-REQ-QAC-039 and REQ-PIPE-048 and worth knowing before starting:
-- The template's HIERARCHY fallback exists *because* the raw,
-  unembedded template has to render with illustrative data
-  (REQ-QAC-039's own decision, Keith, 2026-09-23). Remove the
-  illustrative tree and that fallback's whole justification goes with
-  it - the real agencies could then come from HIERARCHY alone, which
-  was the option explicitly NOT taken at the time. Revisit that
-  decision rather than leaving a fallback nothing needs.
-- `tests-js/navigation.test.js` and several others drive the RAW
-  template, and assert against `registry-services` /
-  `civil-registration` / illustrative datasets. `tests/
-  test_dashboard_e2e.py` has its own raw-template-with-mock-data render
-  check, absorbed from `dashboard/check_dashboard_renders.py`.
-- `defaultAsOf()`/`clipDatasetToAsOf()` special-case illustrative
-  datasets ("Illustrative datasets are never clipped to the as-of
-  date"), so removing them simplifies that path rather than only
-  shrinking the file.
-
-**Do NOT treat this as "delete the mock and ship a two-dataset
-dashboard."** It pairs with item 29 below, which is the other half of
-Keith's same sentence - the point is to replace invented breadth with
-real breadth, not to lose the breadth.
-
 29. **[todo, 2026-09-23]** **[Data generation]** Build a few small, genuinely-real datasets across several agencies, once all the sprints are done.
 
-The other half of the same 2026-09-23 conversation, and the reason item
-28 is safe to do. Keith's own words: *"when we finish all these
+The other half of the same 2026-09-23 conversation, and the reason
+deleting the illustrative data was safe to do. That deletion is BUILT -
+`REQ-DASH-055`, 2026-09-23, which now owns its decisions; this item is
+what makes it a replacement rather than a loss. Keith's own words: *"when we finish all these
 sprints, we'll just build a few small data sets across multiple
 agencies that have a sort of a few columns in a different shape, so we
 get back to the point of having a semi-realistic set of agencies and

@@ -112,13 +112,23 @@ class TestBuiltDashboardRenders:
 
 
 def test_raw_template_renders_with_zero_console_errors(clean_page):
-    """The raw-template-with-illustrative-mock-data scenario - stays its
-    own explicit test (module docstring) since TestBuiltDashboardRenders
-    above only ever exercises the real built output."""
+    """The raw, unembedded template - stays its own explicit test
+    (module docstring) since TestBuiltDashboardRenders above only ever
+    exercises the real built output.
+
+    WHAT THIS ASSERTS CHANGED with REQ-DASH-055. The template used to
+    fall back to an illustrative mock generator, so this checked that
+    agency cards appeared. That generator is gone and the whole tree now
+    comes from the embedded HIERARCHY, so an unembedded template
+    correctly renders NO cards - and has to say why, because a page
+    showing "0 agencies" claims something quite different from a page
+    nobody has built yet."""
     _goto(clean_page, TEMPLATE_HTML)
-    view_html = clean_page.locator("#view").inner_html()
-    assert view_html.strip()
-    assert clean_page.locator("#agency-grid .card").count() > 0
+    view_text = clean_page.locator("#view").inner_text()
+    assert view_text.strip()
+    assert clean_page.locator("#agency-grid .card").count() == 0
+    assert "no data embedded" in view_text.lower()
+    assert "0 agencies" not in view_text
 
 
 class TestAsOfDatePicking:
@@ -399,7 +409,7 @@ class TestTicketBadge:
     def test_a_dataset_with_no_open_ticket_shows_no_badge(self, clean_page, dashboard_html_with_ticket):
         _goto(
             clean_page, dashboard_html_with_ticket,
-            state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "death-registrations"},
+            state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "cp-clients"},
         )
         assert clean_page.locator("a.pill.tag[href*='github.com'][href*='issues']").count() == 0
 
