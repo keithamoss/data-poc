@@ -2897,11 +2897,16 @@ requirements:
         the datasets it touches.
       - THE SYSTEM SHALL NOT duplicate a cross-table check's result
         against each dataset it touches.
-      - THE SYSTEM SHALL evaluate cross-table checks against the
-        composed warehouse, so that both sides are real current data.
+      - THE SYSTEM SHALL evaluate a cross-table check against a single
+        period's schema with the staged delivery overlaid, the same
+        surface REQ-PIPE-035 defines, so that both sides are real data
+        for that period, and SHALL NOT compose data from more than one
+        period.
       - WHEN a dataset a cross-table check depends on receives an
-        arrival, THE SYSTEM SHALL re-evaluate that check, and SHALL NOT
-        re-evaluate cross-table checks that do not depend on it.
+        arrival, THE SYSTEM SHALL re-evaluate that check where the check
+        belongs to the same period as the arrival, and SHALL NOT
+        re-evaluate a cross-table check that does not depend on the
+        arriving table or that belongs to another period.
       - THE SYSTEM SHALL record, against each cross-table result, which
         version of each participating dataset it was evaluated against.
       - WHEN a cross-table check's result changes without the dataset a
