@@ -1890,7 +1890,9 @@ the orchestration doc - on the dashboard-facing ones; and
 `delivery-cli-ux-critic` on the CLI-facing ones, which drives the real
 running command via `scripts/dev/tui_drive.py`.
 
-**Worth doing as ONE pass rather than twelve.** Several of these touch
+**ONE pass rather than twelve - Keith confirmed, 2026-09-23** ("happy
+to do one pass with that, that's fine, rather than twelve"), so this is
+his call rather than a session's judgement. Several of these touch
 the same surfaces (`REQ-PIPE-053`'s exhausted notice and `REQ-QAC-047`'s
 status vocabulary are the same pills on the same tiles), so a critic
 looking at them together will catch interaction problems that a
@@ -1904,3 +1906,48 @@ sprint 8's filing layer. It will flag them as unmet, correctly. That is
 expected rather than a finding - the requirement's own `[BUILD]`
 decision says so - but a session reading the report cold will not know
 that.
+
+35. **[todo, 2026-09-23]** **[Testing & dev tooling]** Batch 3 goes to
+`delivery-architect` and the UX agents next - CONDITIONALLY
+pre-authorised by Keith.
+
+Keith, 2026-09-23, immediately after batch 3's sign-off: "if the scoper
+comes back with no significant findings, I'm happy for you to send what
+we've got on to the architect and the UX agents as well. Um, before we
+build."
+
+**The condition is load-bearing, so state it plainly.** The
+authorisation is to proceed WITHOUT checking back only if the
+`delivery-scoper` sense-check returns nothing significant. If it returns
+real findings - a decision carried in no requirement, a further
+superseded model, a genuine gap - those go to Keith FIRST. He has not
+pre-approved acting on findings, only proceeding in their absence.
+
+**Why the scoper pass is running at all** (Keith's own call, over a
+session's suggestion that the carry-over check alone would do): these
+six were never run through `delivery-scoper` as a batch. All six were
+hand-drafted 2026-09-21 from `plans/publishing-and-history.md` item 6,
+before the batching scheme existed, and were later labelled batch 3.
+Three of the six turned out at sign-off to carry a superseded model,
+where the requirements the scoper DID produce needed no such
+corrections. His words: "even if it won't come back with much, it'll be
+a good sense check."
+
+**What goes next, per `docs/agent-orchestration.md`**: `delivery-architect`
+always, and `delivery-dashboard-ux` for `REQ-DASH-041` (worth including
+the unsigned `REQ-DASH-056` in the same pass - same surface, same
+viewer, and its open question about tile-versus-detail-panel is exactly
+what that agent is for; Keith has ideas but wants their thoughts first).
+`delivery-cli-ux` is arguable for `REQ-PIPE-038`'s regeneration
+subcommand, which is a thin CLI surface.
+
+The architect has two questions waiting for it BY NAME, and they are one
+decision rather than two: where the delivery log lives, and where the
+cross-table scope lives in `qa_results/`. Both are "committed history
+that is not one dataset's QA results".
+
+Then Keith reviews both notes and confirms the approach, and the build
+happens in the main session - no agent does the building. Build order is
+near-linear on the dependencies: `034` -> `035` -> `036` -> `037` ->
+`038` -> `041`. `034` is unblocked now and does NOT need the architect's
+placement answer, so it could start while the architect works.
