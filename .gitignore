@@ -5,6 +5,14 @@ __pycache__/
 .ruff_cache/
 data/raw/
 data/cp_raw/
+# REQ-GEN-043's delivery format. In a real deployment these hold real
+# Birth Registrations and Child Protection extracts, so no part of the
+# format may require committing a delivery's contents - see
+# docs/delivery-format.md. data/receipts/ is OURS rather than a
+# supplier's, and is gitignored for the same reason: it is generated.
+data/deliveries/
+data/receipts/
+data/generator_bookkeeping.json
 data/warehouse.duckdb
 data/warehouse.db
 data/duckdb_runs/
