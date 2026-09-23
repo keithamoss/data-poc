@@ -227,7 +227,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2 # need HEAD~1 for the check-lifecycle old-vs-new diff
+          fetch-depth: 2 # need HEAD~1 for the check-lifecycle and schedule diffs
 
       - name: Install uv
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
@@ -266,6 +266,13 @@ jobs:
 
       - name: Gate - hierarchy validation (REQ-QAC-039)
         run: uv run mothman dashboard validate-hierarchy
+
+      # Needs HEAD~1 for its past-date guard - the same fetch-depth: 2
+      # this job already sets for the check-lifecycle diff below, which
+      # is exactly why that guard was affordable enough to build
+      # (REQ-PIPE-050).
+      - name: Gate - schedule and asset config validation (REQ-PIPE-050)
+        run: uv run mothman schedule validate
 
       - name: Gate - check-lifecycle validation (Thread D)
         run: uv run mothman dashboard validate-check-lifecycle --require-explanations

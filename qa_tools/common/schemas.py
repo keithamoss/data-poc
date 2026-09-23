@@ -277,3 +277,86 @@ def format_error(err: dict, where: str) -> str:
         if text.strip():
             msg = f"{msg} - got {text[:60]!r}"
     return f"{where}: {field} - {msg}"
+
+
+# ---------------------------------------------------------------------
+# contract/data-asset.yaml (REQ-PIPE-050).
+#
+# Declared here rather than in the gate that uses it, for the reason
+# this module exists at all: one statement of a hand-authored file's
+# shape, not one per reader. `_Strict` does the heavy lifting - a
+# mistyped KEY is the failure this whole requirement is about, and
+# extra="forbid" is what catches it. A dropped `delivery_months` gives
+# a dataset every quarterly date when its author meant two, and nothing
+# about the result looks wrong.
+
+
+class CalendarDate(_Strict):
+    period: NonEmptyStr
+    date: str
+
+
+class CadenceRule(_Strict):
+    rule: NonEmptyStr
+
+
+class CalendarVersionConfig(_Strict):
+    """`dates` and `cadence` are both optional HERE and mutually
+    exclusive in practice - the gate says which, because "exactly one of
+    these two" with a useful error is not something a schema says
+    readably."""
+
+    effective_from: str
+    changelog: list[NonEmptyStr]
+    claim_window: str | None = None
+    dates: list[CalendarDate] | None = None
+    cadence: CadenceRule | None = None
+
+
+class CalendarConfig(_Strict):
+    name: NonEmptyStr
+    description: NonEmptyStr
+    versions: list[CalendarVersionConfig] = Field(min_length=1)
+
+
+class NotExpectedPeriod(_Strict):
+    """A reason is REQUIRED, not decoration: "no November file" with
+    nothing beside it is indistinguishable, six months later, from
+    somebody having forgotten to configure November."""
+
+    period: NonEmptyStr
+    reason: NonEmptyStr
+
+
+class DatasetConfig(_Strict):
+    id: NonEmptyStr
+    name: NonEmptyStr
+    table: NonEmptyStr
+    calendar: NonEmptyStr
+    delivery_months: list[NonEmptyStr] | None = None
+    dates: list[CalendarDate] | None = None
+    not_expected: list[NotExpectedPeriod] | None = None
+
+
+class CollectionConfig(_Strict):
+    id: NonEmptyStr
+    name: NonEmptyStr
+    contract: NonEmptyStr
+    datasets: list[DatasetConfig] = Field(min_length=1)
+
+
+class AgencyConfig(_Strict):
+    id: NonEmptyStr
+    name: NonEmptyStr
+    collections: list[CollectionConfig] = Field(min_length=1)
+
+
+class HierarchyConfig(_Strict):
+    agencies: list[AgencyConfig] = Field(min_length=1)
+
+
+class DataAsset(_Strict):
+    data_asset_id: NonEmptyStr
+    timezone: NonEmptyStr
+    calendars: list[CalendarConfig] = Field(min_length=1)
+    hierarchy: HierarchyConfig

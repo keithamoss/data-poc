@@ -5322,7 +5322,7 @@ requirements:
       a build, so that a dataset does not quietly stop expecting anything
       and sit green for a year because somebody wrote Febuary.
     moscow: must
-    status: not_started
+    status: built
     source: >
       Keith, 2026-09-21, plans/supply-model.md Thread K - the new asset
       and schedule YAML gets validated like everything else, as a
@@ -5480,14 +5480,109 @@ requirements:
         criterion instead: nothing is ever hidden, and the count in the
         header is the true count. The grouping and ordering criteria
         above are what carry the scale problem instead."
-    open_questions:
-      - Whether the retrospective-edit guard is built after all, now that
-        a much cheaper mechanism than the one rejected is known to exist
-        and already runs in CI. Deferred by Keith 2026-09-23 to when this
-        sprint is actually built. Recorded here rather than left in
-        conversation precisely because the third option he was offered -
-        letting whoever builds it decide - is how an undecided thing gets
-        decided badly by someone who does not know it was ever open.
+      - "[BUILD] The retrospective-edit guard IS BUILT (Keith,
+        2026-09-23), closing the question this requirement carried. He
+        took the reopened option once the cost was confirmed rather
+        than estimated: one `git show HEAD~1:<path>` of a single file,
+        measured at about 3ms, at the fetch-depth CI already sets for
+        validate_check_lifecycle.py''s own old-vs-new diff. The version
+        rejected on 2026-09-22 needed a deep clone and a history walk,
+        which is a different thing."
+      - "[BUILD] Decided the guard is deliberately NARROW, because a
+        gate that fires on legitimate work gets turned off. It is
+        silent for: a date still in the FUTURE (editing those is the
+        whole point of `mothman schedule candidate-dates`), a date that
+        differs between VERSIONS (authoring a new effective-dated
+        version is the sanctioned way to change a schedule), and a
+        missing previous commit (a shallow checkout is not a finding).
+        A changelog entry on the version clears it - this is a say-what-
+        you-did gate, not a freeze, which is what Thread E actually
+        asks for."
+      - "[BUILD] Decided the organising sentence is also asked
+        DIRECTLY, not only enforced through the specific rules. Each
+        rule catches one way a dataset ends up expecting nothing; a
+        final check derives what each dataset actually expects and says
+        so if the answer is nothing. That catches the combinations no
+        single rule does - every month real, every month on the
+        calendar, and every resulting period then excluded by
+        not_expected. It stays silent where an earlier error already
+        fired for the same dataset, so one mistake is one error."
+      - "[BUILD] Decided the schema lives in qa_tools/common/schemas.py
+        beside requirements.yaml''s and CHANGELOG.yaml''s, rather than
+        inside the gate. That module exists so a hand-authored file''s
+        shape is stated once, and _Strict''s extra=\"forbid\" is what
+        makes a mistyped KEY fail - which is the failure this whole
+        requirement is about."
+      - "[BUILD] Decided every error carries a separate `fix` alongside
+        its `problem`. Naming the rule that was broken leaves the
+        reader to work out what to type, and a gate that interrupts a
+        build owes them better - the NFR asks for an error a human can
+        act on immediately, which is a shape, not an aspiration."
+    linked_tests:
+      - tests/test_validate_schedule.py
+      - tests/test_schedule.py
+    implemented_by:
+      - qa_tools/common/validate_schedule.py::validate
+      - qa_tools/common/validate_schedule.py::_schema_errors
+      - qa_tools/common/validate_schedule.py::_calendar_errors
+      - qa_tools/common/validate_schedule.py::_dataset_errors
+      - qa_tools/common/validate_schedule.py::_expects_nothing_errors
+      - qa_tools/common/validate_schedule.py::_contract_errors
+      - qa_tools/common/validate_schedule.py::_retrospective_edit_errors
+      - qa_tools/common/schemas.py::DataAsset
+      - cli/schedule.py::validate_command
+    evidence:
+      - >
+        2026-09-23: every rule is tested by BREAKING the real committed
+        configuration in one specific way and requiring the gate to say
+        so - a misspelt month, a month the calendar has no date in, a
+        calendar that does not exist, a mistyped key, duplicate
+        calendars, duplicate periods, duplicate dates, out-of-order
+        versions, a bare claim window, delivery_months against a
+        cadence rule, a contract that does not exist and a contract
+        nothing names. A validator tested only against valid input has
+        never been shown to do anything.
+      - >
+        2026-09-23: the past-date guard was proved end to end against
+        REAL git, not only against a stubbed comparison - moving
+        2026-Q1 from 1 February to the 15th in the working tree made
+        the real `mothman schedule validate` exit 1 and name the
+        period, the old date, the new one and the version with no
+        changelog entry.
+      - >
+        2026-09-23: and it stays quiet for every legitimate edit, which
+        is the half that decides whether a gate survives - editing a
+        future date, adding future dates, authoring a new
+        effective-dated version, adding a changelog entry alongside the
+        change, an unchanged file, a missing previous commit, and a
+        previous version that does not parse.
+      - >
+        2026-09-23: it reads ONE file at ONE ref. Asserted by watching
+        subprocess calls during a real validate() - exactly one git
+        call, `git show HEAD~1:...` - because the deep-clone history
+        walk this was rejected on in September is precisely what it
+        must not become.
+      - >
+        2026-09-23: runtime is in line with the other fast gates -
+        1339ms end to end against 1275ms for hierarchy and 1237ms for
+        changelog, nearly all of it `uv run` startup; validate() itself
+        is 141ms. It stays in the cheap-first group rather than joining
+        the slow tail.
+      - >
+        2026-09-23: it opens nothing under data/, asserted by watching
+        every Path.open during a real run rather than by reading the
+        code. This gate runs on every push, and a config validator that
+        reached into data/ would be exactly the accident the standing
+        rule exists for.
+      - >
+        2026-09-23: every offending item is reported individually and
+        the header count is the true count - seven datasets naming a
+        missing calendar produce seven errors, not one summary. Keith's
+        own call against a recommendation to suppress caused errors.
+      - >
+        2026-09-23: 1114 Python tests, 166 JS tests, all nine mothman
+        gates - this one now among them.
+
   - id: REQ-PIPE-051
     title: Periods are derived from the schedule, and never move
     date_written: "2026-09-22"

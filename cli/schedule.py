@@ -116,3 +116,16 @@ def candidate_dates_command(calendar_name: str, year: int) -> None:
         table.add_row(period.name, period.date.isoformat(),
                        period.date.strftime("%A"), note or "")
     console.print(table)
+
+
+@schedule_group.command("validate")
+def validate_command() -> None:
+    """Gate: a config error can never silently produce zero slots (REQ-PIPE-050).
+
+    Here rather than under `dashboard` with the other validators,
+    because this is the group somebody editing a calendar is already
+    in - and because `mothman check` runs it either way.
+    """
+    from qa_tools.common.validate_schedule import main as validate_main
+    if validate_main() != 0:
+        raise click.ClickException("schedule validation failed - see output above.")

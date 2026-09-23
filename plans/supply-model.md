@@ -500,18 +500,26 @@ comparisons against the expected-supply sequence.
    out of sprint order for exactly that reason, once building
    `REQ-GEN-042` showed it was a dependency rather than a sibling.
 
-5. **[in-progress, 2026-09-23]** **[Pipeline & publishing]** **Schedule config
-   and its validation gate.** The CONFIG half is BUILT as
-   `REQ-PIPE-049` (2026-09-23), which now owns its decisions; the
-   validation GATE is `REQ-PIPE-050` and is still to come. Built ahead
-   of sprints 2 and 3 because `REQ-GEN-042` turned out to depend on it
-   rather than sit beside it. Authored dates (quarterly) or cadence rule
-   (daily), `delivery_months` participation, `effective_from` plus
-   changelog, `not_expected` (Thread C); `mothman check`'s
-   `validate-config` (Thread K).
+5. **[done, 2026-09-23]** **[Pipeline & publishing]** **Schedule config
+   and its validation gate.** Both halves BUILT, 2026-09-23.
+   `REQ-PIPE-049` did the CONFIG - authored dates (quarterly) or
+   cadence rule (daily), `delivery_months` participation,
+   `effective_from` plus changelog, `not_expected`. `REQ-PIPE-050` did
+   the GATE, as `mothman schedule validate`, registered in `mothman
+   check` and in the deploy workflow. Built ahead of sprints 2 and 3
+   because `REQ-GEN-042` turned out to depend on it rather than sit
+   beside it. Each requirement owns its own decisions.
 
-   The gate ships WITH the config, not after: a typo silently yields zero
-   slots, which is the exhausted-schedule state arriving by accident.
+   **The retrospective-edit guard was built after all** - the open
+   question `REQ-PIPE-050` carried, settled by Keith 2026-09-23 once
+   the cost was confirmed as one `git show` of one file rather than the
+   deep clone the rejected version needed. Moving a delivery date that
+   has already passed now fails the build unless the version's
+   changelog says what changed.
+
+   Runway is the one thing Thread K listed here that is NOT in the
+   gate: it is measured in slots, and slots do not exist until sprint
+   6, so it belongs to `REQ-PIPE-053`.
 
 6. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Periods and
    slots.** The period sequence derived from the schedule, slots

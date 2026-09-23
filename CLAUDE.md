@@ -541,6 +541,8 @@ Rough layout:
   more tests, and that is where the growth went - no new hot spot.
   Worth knowing for the next fresh sandbox: the test count has grown
   ~25% in three days across the supply-model sprints.
+  -> **~149s/1114 tests (2026-09-23, REQ-PIPE-050)**. Flat against the
+  previous entry despite 66 more tests.
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.

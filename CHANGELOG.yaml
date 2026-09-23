@@ -176,7 +176,21 @@ releases:
               split across two files, a resupply of only the tables
               that were wrong. They are not in the demo data yet; the
               handling that reads them is.
-
+          - headline: Typos fail the build
+            components: ["Pipeline & publishing", "Testing & dev tooling"]
+            description: >
+              A mistake in a delivery calendar - a misspelt month, a
+              calendar that does not exist, a month with no date - now
+              stops the build and tells you what to change. It used to
+              leave that dataset quietly expecting nothing, which looks
+              exactly like a dataset with nothing wrong.
+          - headline: Last year's dates stay put
+            components: ["Pipeline & publishing"]
+            description: >
+              Changing a delivery date that has already passed would
+              silently rewrite whether past supplies were on time. You
+              can still correct one, but you now have to say what you
+              changed and why.
       - category: Fixed
         items:
           - headline: Old links no longer break the page

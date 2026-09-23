@@ -62,6 +62,8 @@ _GATES: tuple[tuple[str, list[str], str], ...] = (
      ".claude/agents/*.md frontmatter actually parses"),
     ("hierarchy", ["uv", "run", "mothman", "dashboard", "validate-hierarchy"],
      "every contract agrees with the one agency/collection/dataset tree"),
+    ("schedule", ["uv", "run", "mothman", "schedule", "validate"],
+     "a config typo can never leave a dataset expecting nothing"),
     ("requirements", ["uv", "run", "mothman", "dashboard", "validate-requirements"],
      "every linked test and implemented_by symbol still exists"),
     ("changelog", ["uv", "run", "mothman", "dashboard", "validate-changelog"],
