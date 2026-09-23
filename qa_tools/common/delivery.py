@@ -91,6 +91,24 @@ class Delivery:
         return tuple(self.path / name for name in self.files)
 
 
+def existing_delivery_names(deliveries_dir: Path | None = None) -> set[str]:
+    """Every delivery name already on disk.
+
+    THE UNIQUENESS OF A DELIVERY NAME IS GLOBAL TO THE DIRECTORY, not
+    to whatever produced it. Found the hard way, 2026-09-23: the two
+    generators each kept their own set of taken names and wrote into
+    one shared directory, so a Birth Registrations drop and a Child
+    Protection drop both landed as `2026-08-corrected` - 60 arrivals
+    became 59 directories, and two unrelated deliveries were silently
+    merged into one. Seeding from disk is what makes the guarantee hold
+    across every writer rather than within each one.
+    """
+    deliveries_dir = Path(deliveries_dir or DELIVERIES_DIR)
+    if not deliveries_dir.is_dir():
+        return set()
+    return {p.name for p in deliveries_dir.iterdir() if p.is_dir()}
+
+
 def validate_delivery_name(name: str) -> str:
     """A delivery name is arbitrary but must be a usable directory name.
 
@@ -140,6 +158,11 @@ def write_delivery(name: str, files: dict[str, str | bytes], received_at: dateti
             f"has no path to write it.")
 
     path = deliveries_dir / name
+    if path.exists():
+        raise DeliveryFormatError(
+            f"delivery {name!r} already exists at {path}. Two arrivals sharing a directory would "
+            f"silently merge deliveries that never arrived together - pass a name that is unique "
+            f"across the whole deliveries directory, not just within one writer.")
     path.mkdir(parents=True, exist_ok=True)
     for filename, content in files.items():
         if "/" in filename or "\\" in filename:
@@ -231,3 +254,56 @@ def list_deliveries(deliveries_dir: Path | None = None,
     out = [read_delivery(p.name, deliveries_dir, receipts_dir)
            for p in sorted(deliveries_dir.iterdir()) if p.is_dir()]
     return sorted(out, key=lambda d: d.received_at)
+
+
+# ---- Which dataset does a file belong to? (criterion 3) --------------
+
+def _filename_pattern_to_regex(key_pattern: str) -> re.Pattern:
+    """One arrivalPattern keyPattern as a FILENAME matcher.
+
+    The configured patterns are S3-key shaped (`bdm/birth_registrations_
+    {date}.csv`), because that is the transport they were written for.
+    Criterion 3 asks for the dataset to be derivable from the FILENAME
+    alone, so only the last segment is used - a delivery's own directory
+    name is arbitrary and carries no meaning, which means it cannot be
+    part of a match.
+
+    `{placeholder}` matches any run of characters that is not a path
+    separator or a dot, the same shape file_arrival.py already uses.
+    """
+    basename = key_pattern.rsplit("/", 1)[-1]
+    out, last = [], 0
+    for m in re.finditer(r"\{(\w+)\}", basename):
+        out.append(re.escape(basename[last:m.start()]))
+        out.append(r"[^/.]+")
+        last = m.end()
+    out.append(re.escape(basename[last:]))
+    return re.compile("^" + "".join(out) + "$")
+
+
+def dataset_for_filename(filename: str, patterns: list[dict]) -> str | None:
+    """The dataset a file belongs to, or None if no pattern matches.
+
+    None is a REAL ANSWER, not a failure: a covering note, a
+    spreadsheet of notes or a PDF is something suppliers genuinely
+    send, and the pipeline has to have somewhere to put it. It is
+    reported, never swallowed (criterion 9).
+    """
+    for pattern in patterns or []:
+        if _filename_pattern_to_regex(pattern.get("keyPattern", "")).match(filename):
+            return pattern.get("dataset_id")
+    return None
+
+
+def files_by_dataset(delivery: "Delivery", patterns: list[dict]) -> dict[str, list[str]]:
+    """{dataset_id: [filename, ...]} for one delivery, plus the
+    unmatched files under the key None.
+
+    A LIST per dataset, not one filename, because a supplier splitting
+    a large extract across two files is ordinary (criterion 8) and a
+    shape that could only hold one would lose the second silently.
+    """
+    out: dict[str, list[str]] = {}
+    for name in delivery.files:
+        out.setdefault(dataset_for_filename(name, patterns), []).append(name)
+    return out

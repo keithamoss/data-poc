@@ -92,8 +92,9 @@ import pandas as pd
 from qa_tools.common import hierarchy
 from generator.anchor_date import get_anchor_date
 from generator import dirty as dirty_mod
+from generator import delivery_names
 from generator.resupply import MAX_ATTEMPTS, DatasetProvider, run_slot_chain
-from qa_tools.common import asset_time, schedule
+from qa_tools.common import asset_time, delivery, schedule
 
 # Which dataset's calendar this collection is scheduled against. All six
 # CP tables arrive together as one supply, so any of them names the same
@@ -392,7 +393,7 @@ def _cp_manifest_entries_for_slot(deliveries: list, slot_id: str, period: str,
     `n_rows_generated`/`file`, since CP writes one directory of 6 CSVs
     per delivery rather than one CSV."""
     entries = []
-    for delivery in deliveries:
+    for delivery_obj in deliveries:
         # Dateless and derived from the manifest position, so a
         # regeneration overwrites in place instead of writing a second
         # history beside the first (REQ-GEN-042). No resupply marker
@@ -406,9 +407,9 @@ def _cp_manifest_entries_for_slot(deliveries: list, slot_id: str, period: str,
             "slot_id": slot_id,
             "period": period,
             "received_at": None,  # filled in by main() from the payload's own earliest extract
-            "dirty_severity": delivery.severity,  # None | "amber" | "red" - this ARRIVAL's own outcome
+            "dirty_severity": delivery_obj.severity,  # None | "amber" | "red" - this ARRIVAL's own outcome
             "seed": seed,
-            "row_counts": {name: int(len(delivery.payload[name])) for name in TABLES},
+            "row_counts": {name: int(len(delivery_obj.payload[name])) for name in TABLES},
         })
     return entries
 
@@ -424,6 +425,9 @@ def main() -> None:
 
     provider: DatasetProvider = ChildProtectionProvider(base_tables)
     manifest = []
+    # Arbitrary names can collide, and a collision would merge two
+    # arrivals into one directory. Enforced, not hoped for.
+    taken_names: set[str] = delivery.existing_delivery_names()
     # The same quarterly calendar the pipeline judges these supplies
     # against - not a private copy of the cadence (REQ-GEN-042). A
     # generator carrying its own would place supplies against one
@@ -444,21 +448,37 @@ def main() -> None:
         ))
         entries = _cp_manifest_entries_for_slot(deliveries, slot_id, period.name, len(manifest), seed)
 
-        for n, (delivery, entry) in enumerate(zip(deliveries, entries), start=1):
+        for n, (delivery_obj, entry) in enumerate(zip(deliveries, entries), start=1):
             run_dir = os.path.join(OUT_DIR, entry["run_id"])
             os.makedirs(run_dir, exist_ok=True)
+            csvs = {}
             for name in TABLES:
-                df = delivery.payload[name]
+                df = delivery_obj.payload[name]
                 cols = [c for c in df.columns if not c.startswith("_")]
                 df[cols].to_csv(os.path.join(run_dir, f"{name}.csv"), index=False)
+                csvs[f"{name}.csv"] = df[cols].to_csv(index=False)
             entry["received_at"] = _cp_received_at(
-                delivery.payload, delivery.received_date, f"received_at for {entry['run_id']}")
-            tag = f"DIRTY({delivery.severity})" if delivery.severity else "clean"
+                delivery_obj.payload, delivery_obj.received_date, f"received_at for {entry['run_id']}")
+
+            # AND AS A REAL DELIVERY (REQ-GEN-043). All six tables in
+            # ONE directory, because they arrive together as one
+            # extract - six deliveries would be six arrivals that never
+            # happened (criterion 11). Each filename matches its own
+            # dataset's configured arrivalPattern, so which dataset a
+            # file belongs to is derivable from the name alone.
+            dname = delivery_names.delivery_name(snapshot_date, seed, attempt=n, taken=taken_names)
+            taken_names.add(dname)
+            entry["delivery"] = dname
+            delivery.write_delivery(
+                dname, csvs,
+                received_at=asset_time.parse_instant(entry["received_at"], entry["run_id"]))
+
+            tag = f"DIRTY({delivery_obj.severity})" if delivery_obj.severity else "clean"
             resupply_tag = (f"  [resupply {n - 1}, received "
-                             f"{delivery.received_date.isoformat()}]") if n > 1 else ""
+                             f"{delivery_obj.received_date.isoformat()}]") if n > 1 else ""
             print(f"{entry['run_id']}: {entry['row_counts']['cp_notifications']:5d} notifications  "
-                  f"[{tag}]{resupply_tag}  -> {run_dir}")
-            if delivery.severity == "red" and n >= MAX_ATTEMPTS:
+                  f"[{tag}]{resupply_tag}  -> {dname}/")
+            if delivery_obj.severity == "red" and n >= MAX_ATTEMPTS:
                 print(f"  -> still red after {n} deliveries - "
                       f"giving up (hit MAX_ATTEMPTS={MAX_ATTEMPTS})")
 

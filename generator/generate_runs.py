@@ -62,8 +62,9 @@ import pandas as pd
 from generator.anchor_date import get_anchor_date
 from generator.daily_batch import generate_daily_batch
 from generator.dirty import apply_birth_registrations_presets, inject_stale_delivery
+from generator import delivery_names
 from generator.resupply import MAX_ATTEMPTS, DatasetProvider, run_slot_chain
-from qa_tools.common import asset_time, schedule
+from qa_tools.common import asset_time, delivery, schedule
 
 # Which dataset this generator produces - the one literal it needs, so
 # it can look its own calendar up rather than carrying a private copy of
@@ -311,7 +312,7 @@ def _manifest_entries_for_slot(deliveries: list, slot_id: str, period: str,
     one - not asserted by the thing that produced it.
     """
     entries = []
-    for delivery in deliveries:
+    for delivery_obj in deliveries:
         # :03d, and the padding must stay WIDE ENOUGH for every id to
         # sort correctly as a plain string: a real bug caught by
         # test_severity_counts_match_run_plan when this was :02d
@@ -333,8 +334,8 @@ def _manifest_entries_for_slot(deliveries: list, slot_id: str, period: str,
             # A single delivery_date conflated them.
             "period": period,
             "received_at": None,  # filled in by main() from the payload's own earliest extract
-            "n_rows_generated": int(len(delivery.payload)),
-            "dirty_severity": delivery.severity,  # None | "amber" | "red" - this ARRIVAL's own outcome
+            "n_rows_generated": int(len(delivery_obj.payload)),
+            "dirty_severity": delivery_obj.severity,  # None | "amber" | "red" - this ARRIVAL's own outcome
             "id_offset": id_offset,
             "seed": seed,
             "file": f"{run_id}.csv",
@@ -346,6 +347,11 @@ def main() -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
     provider: DatasetProvider = BirthRegistrationsProvider()
     manifest = []
+    # Delivery names are arbitrary BY DESIGN, which means they can
+    # collide - and a collision would write two arrivals into one
+    # directory, silently merging deliveries that never arrived
+    # together. Uniqueness is enforced rather than hoped for.
+    taken_names: set[str] = delivery.existing_delivery_names()
     previous_row_count = None  # the last RESOLVED delivery's row count, for
     # the row-count-growth check's dirty preset - deliberately NOT updated
     # mid-chain: a viewer comparing "is this delivery's row count
@@ -365,9 +371,9 @@ def main() -> None:
         entries = _manifest_entries_for_slot(deliveries, slot_id, period.name,
                                               len(manifest), id_offset, seed)
 
-        for n, (delivery, entry) in enumerate(zip(deliveries, entries), start=1):
+        for n, (delivery_obj, entry) in enumerate(zip(deliveries, entries), start=1):
             out_path = os.path.join(OUT_DIR, entry["file"])
-            delivery.payload.to_csv(out_path, index=False)
+            delivery_obj.payload.to_csv(out_path, index=False)
             # THE RECEIPT INSTANT IS THE DATA'S OWN, not a separately
             # invented one: the earliest extract_timestamp in the file
             # that just landed. That is the same value
@@ -375,12 +381,27 @@ def main() -> None:
             # earliest_extract, so the manifest and the warehouse cannot
             # disagree about when a supply turned up.
             entry["received_at"] = _received_at(
-                delivery.payload, delivery.received_date, f"received_at for {entry['run_id']}")
-            tag = f"DIRTY({delivery.severity})" if delivery.severity else "clean"
+                delivery_obj.payload, delivery_obj.received_date, f"received_at for {entry['run_id']}")
+
+            # AND AS A REAL DELIVERY (REQ-GEN-043): one directory, an
+            # arbitrary supplier-shaped name, a filename matching this
+            # dataset's own configured arrivalPattern, and a receipt
+            # record written OUTSIDE it. See docs/delivery-format.md.
+            name = delivery_names.delivery_name(slot_date, seed, attempt=n, taken=taken_names)
+            taken_names.add(name)
+            entry["delivery"] = name
+            delivery.write_delivery(
+                name,
+                {f"birth_registrations_{delivery_obj.received_date.isoformat()}.csv":
+                    delivery_obj.payload.to_csv(index=False)},
+                received_at=asset_time.parse_instant(entry["received_at"], entry["run_id"]))
+
+            tag = f"DIRTY({delivery_obj.severity})" if delivery_obj.severity else "clean"
             resupply_tag = (f"  [resupply {n - 1}, received "
-                             f"{delivery.received_date.isoformat()}]") if n > 1 else ""
-            print(f"{entry['run_id']}: {len(delivery.payload):5d} rows  [{tag}]{resupply_tag}  -> {out_path}")
-            if delivery.severity == "red" and n >= MAX_ATTEMPTS:
+                             f"{delivery_obj.received_date.isoformat()}]") if n > 1 else ""
+            print(f"{entry['run_id']}: {len(delivery_obj.payload):5d} rows  [{tag}]{resupply_tag}"
+                  f"  -> {name}/")
+            if delivery_obj.severity == "red" and n >= MAX_ATTEMPTS:
                 print(f"  -> still red after {n} deliveries - "
                       f"giving up (hit MAX_ATTEMPTS={MAX_ATTEMPTS})")
 

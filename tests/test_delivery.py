@@ -226,3 +226,40 @@ class TestTheAwkwardDeliveriesRecognitionMustHandle:
         blob = bytes(range(256))
         _write(dirs, files={"extract.parquet": blob})
         assert (delivery.read_delivery("BDM_20260824", d, r).path / "extract.parquet").read_bytes() == blob
+
+
+class TestTwoArrivalsCanNeverShareADirectory:
+    """A real bug, found by counting rather than by reading
+    (2026-09-23). The two generators each kept their own set of taken
+    names and wrote into one shared directory, so a Birth Registrations
+    drop and a Child Protection drop both landed as
+    `2026-08-corrected`: 60 arrivals became 59 directories and two
+    unrelated deliveries were silently merged.
+
+    Silent is the word that matters. Nothing failed, no count was
+    checked, and the merged directory looked like an ordinary delivery
+    holding seven files.
+    """
+
+    def test_writing_over_an_existing_delivery_is_refused(self, dirs):
+        _write(dirs, "2026-08-corrected")
+        with pytest.raises(delivery.DeliveryFormatError, match="silently merge"):
+            _write(dirs, "2026-08-corrected", {"cp_clients.csv": "a\n1\n"})
+
+    def test_the_refusal_leaves_the_first_delivery_untouched(self, dirs):
+        d, r = dirs
+        _write(dirs, "shared", {"birth_registrations.csv": "first\n"})
+        with pytest.raises(delivery.DeliveryFormatError):
+            _write(dirs, "shared", {"cp_clients.csv": "second\n"})
+        got = delivery.read_delivery("shared", d, r)
+        assert got.files == ("birth_registrations.csv",)
+
+    def test_existing_names_are_readable_so_a_writer_can_avoid_them(self, dirs):
+        """The fix itself: uniqueness is global to the directory, not
+        to whatever produced it, so a second writer has to be able to
+        see what a first one already wrote."""
+        d, _ = dirs
+        assert delivery.existing_delivery_names(d) == set()
+        _write(dirs, "one")
+        _write(dirs, "two", {"cp_clients.csv": "a\n"})
+        assert delivery.existing_delivery_names(d) == {"one", "two"}
