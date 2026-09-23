@@ -1848,3 +1848,59 @@ argument on its own.
 item, and `REQ-PIPE-018`'s AWS MVP, which is unsigned. This one is
 narrower - not which engine, but whether the thing persists between
 runs, and what that does to the committed-versus-queryable split.
+
+34. **[todo, 2026-09-23]** **[Testing & dev tooling]** Run the
+POST-BUILD subagents over the supply-model build work - the batch-3
+build when it happens, AND the twelve requirements already built in
+sprints 1-6, which never had a critic pass at all.
+
+Keith's own ask, 2026-09-23, at the end of batch 3's sign-off: "let's
+also remember once we've done this bit of build work to turn the
+post-build sub agents back at this work and the previous build work
+from the other sprints."
+
+**The gap is real and it is not small.** `docs/agent-orchestration.md`
+prescribes `delivery-critic` after EVERY build, plus the surface-specific
+critics. Twelve requirements were built across 2026-09-21..23 and not one
+went through any of them - the sprints ran build, gate, commit, next.
+Nothing was skipped deliberately; the post-build half of the pipeline
+simply never got invoked while the sprints were moving fast.
+
+Built, and owed a pass:
+
+| Requirement | Surfaces |
+|---|---|
+| `REQ-QAC-039` | functional |
+| `REQ-GEN-040` | functional |
+| `REQ-GEN-042` | functional |
+| `REQ-GEN-043` | functional |
+| `REQ-QAC-047` | functional + dashboard (the status vocabulary renders) |
+| `REQ-PIPE-048` | functional + dashboard (the as-of default date) |
+| `REQ-PIPE-049` | functional |
+| `REQ-PIPE-050` | functional + CLI (`mothman schedule validate`) |
+| `REQ-PIPE-051` | functional |
+| `REQ-PIPE-052` | functional + CLI (`mothman schedule show`) |
+| `REQ-PIPE-053` | functional + dashboard (the exhausted notice) + CLI (the runway warning) |
+| `REQ-DASH-055` | functional + dashboard |
+
+Which critics: `delivery-critic` on all of them (acceptance criteria,
+real test coverage); `delivery-dashboard-ux-critic` then
+`delivery-dashboard-visual-critic` - in that order, not parallel, per
+the orchestration doc - on the dashboard-facing ones; and
+`delivery-cli-ux-critic` on the CLI-facing ones, which drives the real
+running command via `scripts/dev/tui_drive.py`.
+
+**Worth doing as ONE pass rather than twelve.** Several of these touch
+the same surfaces (`REQ-PIPE-053`'s exhausted notice and `REQ-QAC-047`'s
+status vocabulary are the same pills on the same tiles), so a critic
+looking at them together will catch interaction problems that a
+per-requirement pass would not - and twelve separate runs of a
+real-browser critic is a lot of wall-clock for a lot of repetition.
+
+**One thing to watch when it happens**: `delivery-critic` checks work
+against its requirement's own acceptance criteria, and `REQ-PIPE-053` is
+marked `built` while three of its criteria are explicitly deferred to
+sprint 8's filing layer. It will flag them as unmet, correctly. That is
+expected rather than a finding - the requirement's own `[BUILD]`
+decision says so - but a session reading the report cold will not know
+that.
