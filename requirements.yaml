@@ -2557,6 +2557,16 @@ requirements:
         exactly one physical table, through a per-run schema containing
         only views, and SHALL discard that schema once the run
         completes.
+      - THE SYSTEM SHALL route every read of supply data through that
+        per-run schema, and SHALL NOT query a physical table directly
+        from any check, tool invocation or downstream reader.
+      - WHERE a logical name has more than one candidate physical table
+        and no basis on which to choose, THE SYSTEM SHALL NOT create a
+        view for it, and SHALL treat that name as absent for the run
+        rather than selecting one of the candidates.
+      - THE SYSTEM SHALL treat a table as present for the run only where
+        it resolves to exactly one version, and SHALL NOT treat the mere
+        existence of files claiming that name as presence.
       - THE SYSTEM SHALL record, for every QA run, which physical
         version of each table it read, in committed history that
         outlives the discarded per-run schema.
@@ -2744,6 +2754,30 @@ requirements:
         schema, and a red supply is never auto-promoted.
 
 
+      - >
+        AMENDED AFTER SIGN-OFF, 2026-09-24, with Keith's agreement in the
+        conversation that produced it. The view schema was specified as
+        how a CHECK resolves a name; he restated it as the stronger
+        invariant that actually makes it safe - nothing queries a
+        physical table directly, every read goes through a view, and
+        composing the views IS the mechanism. Without that, the
+        resolution rule is a convention one reader can bypass; with it,
+        an unresolvable name is unqueryable by construction rather than
+        by everyone remembering.
+      - >
+        The case that forced it, Keith's own: a Child Protection
+        delivery carrying eight files where cp_clients and cp_placements
+        each appear twice. Two files claim one logical name, there is no
+        basis to choose between them - the period is never read from a
+        file - so no view can be built. Under the stronger invariant
+        those two tables are simply unqueryable for that run, and
+        nothing can accidentally read "whichever one the loop saw last".
+        The earlier wording left a real hole: REQ-PIPE-035's own
+        red-for-unrun criterion fires when a dependency "is not present
+        in the staged delivery", and in this case two files ARE present,
+        so read literally the criterion would not fire and an
+        implementer could conclude the table was available. Presence now
+        means resolving to exactly one version.
       - >
         VERIFIED HARD BLOCKER FOUND AFTER SIGN-OFF, 2026-09-23. The
         one-database rule cannot hold alongside parallel runs as things
@@ -7075,9 +7109,27 @@ requirements:
       - "Decided a delivery's NAME means nothing and is required to follow no pattern, so that recognition cannot pass by parsing a name we wrote ourselves (docs/delivery-format.md, REQ-GEN-043 criterion 15). The real generated set already contains spaces, bare hex strings and four different naming conventions."
       - "Decided nothing in the pipeline may read data/generator_bookkeeping.json. It knows which slot each delivery was built to fill, and a pipeline reading it would be filing from a declaration rather than from arrival plus slot state - the rejected supplier manifest wearing our own badge. Tests may read it; nothing that files a supply may."
       - "Decided a mixed-COLLECTION delivery is held rather than raising. Today qa_tools/common/arrivals.py raises DeliveryFormatError on one, which stops the whole run over one malformed drop - the same shape as failing 29 healthy datasets for one exhausted schedule, which REQ-PIPE-053 exists to prevent. Note this is different from the mixed-PERIOD delivery, which runs QA and never auto-promotes (TS-33a, sprint 11)."
+
+      - >
+        SETTLED 2026-09-24 (Keith): a delivery whose files map to more
+        than one collection is HELD and reported, and everything else in
+        the run keeps processing. This CHANGES BUILT BEHAVIOUR -
+        qa_tools/common/arrivals.py raises today, and because
+        recognition walks the whole tree, one such delivery currently
+        takes the run down for every delivery in it.
+      - >
+        The argument for keeping the hard error was real and is recorded
+        rather than dismissed: a delivery spanning two collections means
+        the TRANSPORT BOUNDARY itself is wrong, not the data, so every
+        arrival fact derived from that boundary is suspect and a loud
+        stop is arguably the honest response. It lost on two counts. The
+        hold still reports it, so the boundary problem stays visible and
+        actionable - nothing is lost but the blast radius. And one
+        malformed drop stopping a run that contains 29 healthy datasets
+        is exactly the shape REQ-PIPE-053 already exists to prevent,
+        which is how a check gets disabled wholesale rather than fixed.
     open_questions:
       - "A delivery directory present with no receipt record: is it an in-flight upload or a gap to investigate? Today read_receipt() makes it a hard error by a deliberate decision, whose reasoning is that an arrival we have no record of receiving is exactly the thing worth seeing. Against that, a real transport produces this state routinely for seconds at a time, and one such directory currently fails recognition for every delivery. Options - (a) hard error as today; (b) skip as in-flight and report only if it persists beyond a configured interval, which is the criterion drafted above; (c) skip silently. Recommended (b): it keeps the gap visible without letting a normal in-flight upload take the run down."
-      - "The mixed-collection criterion above CHANGES BUILT BEHAVIOUR - qa_tools/common/arrivals.py raises today - so it needs a yes rather than an assumption. Options - (a) hold the delivery and continue, which is the criterion as drafted; (b) keep the hard error, on the grounds that a delivery spanning two collections means the transport boundary itself is wrong and everything downstream is suspect. Recommended (a): one malformed drop taking down a run that has 29 healthy datasets in it is the shape REQ-PIPE-053 already exists to prevent."
 
   - id: REQ-PIPE-058
     title: A file's dataset comes from that dataset's own declared pattern, and the patterns are gated
@@ -7140,8 +7192,40 @@ requirements:
       - "Decided this hold, rather than a separate mechanism, is also what catches a delivery carrying two periods of the SAME table - a catch-up drop with August's and November's cp_clients is two files matching one dataset's pattern, so nothing reads a declared period and no new machinery is needed (Thread H second chaos pass #4). The residual case, different tables landing in different periods, is a promotion gate in sprint 11."
       - "Decided the built behaviour already refuses rather than guessing: Arrival.path_for() raises when a dataset matched several files, with its own docstring saying that taking the first would silently drop a supplier's second file. This requirement turns that refusal into a handled operational state instead of an exception."
       - "The TUI affordance Keith asked for - run QA on the held files and decide which slot each belongs to - is the write path, and belongs with the decision log in sprint 12. Recorded here so the hold is not built as a dead end."
-    open_questions:
-      - "Does a held supply get QA'd while it is held? Options - (a) no checks until it is filed, because REQ-PIPE-035 runs QA against the period schema the supply's slot names and a held supply has no slot; (b) run only the checks that read that table alone, leaving cross-table and temporal ones unrun; (c) run against the most recent period, which risks evaluating a supply against a period it does not belong to. Recommended (a), with the hold itself being the signal - this is the same question as REQ-PIPE-064's, and both should be answered the same way."
+
+      - >
+        SETTLED 2026-09-24 (Keith), answering the open question this
+        requirement carried, and REQ-PIPE-064's identical one, together.
+        A held supply IS LOADED into staging but is NOT QA'd
+        automatically. Keith's reasoning, which is sharper than the
+        options as drafted: the single-table checks could run without a
+        period, but drift and previous-period comparison cannot, so
+        partial QA produces a verdict that has to be thrown away once
+        the slot is known - and worse, possibly a GREEN one sitting in
+        history against no period at all.
+      - >
+        The resolution path, and it is what stops the hold being a dead
+        end: the hold surfaces as an event needing action; a human then
+        either ASSIGNS each file to a slot, or REJECTS one of them
+        (Keith added the reject case, 2026-09-24). Assignment is what
+        unblocks QA, which then runs against the right period's schema.
+        So this is not simply "no checks until filed" - there is a
+        human-initiated path, and it is the same act as resolving the
+        hold. The write path itself belongs with the decision log in
+        sprint 12.
+      - >
+        What the run actually does meanwhile, worked through on Keith's
+        own eight-file Child Protection example (cp_clients and
+        cp_placements each arriving twice): the two duplicated datasets
+        get no view, because REQ-PIPE-035 now forbids choosing between
+        candidates, so they are unqueryable for that run. The other four
+        datasets are processed, assigned and QA'd normally. Any
+        cross-table check reading a held table reads RED naming it -
+        which for cp_clients is real and not hypothetical, since
+        cp_notifications, cp_investigations and cp_placements all carry
+        a referential check against it. Holding one table reddens checks
+        on others; the blast radius is not zero, it is scoped to what
+        actually depends on the held thing.
 
   - id: REQ-PIPE-060
     title: Staging asserts only arrival facts, and a table is there or it is not
@@ -7315,8 +7399,40 @@ requirements:
       - "Decided this is a standing principle rather than a one-off, and Keith endorsed it as such: where a rule genuinely cannot know, SAY SO rather than commit silently. It has now produced three separate requirements in this area alone - this one, the ambiguity marking in REQ-PIPE-065, and the duplicate-file hold in REQ-PIPE-059."
       - "Decided a held supply stays STAGED rather than being rejected or discarded. Staging asserts only that this landed at this time, which is true regardless of where it eventually files, so holding costs nothing and loses nothing."
       - "The reachable case, so the test has something real to drive: a slot is skipped, a later slot is filled, monotonic filling closes the skipped one, and the genuine backfill for it then turns up. Nothing is claimable and nothing may be invented (TS-6c's tail, TS-7)."
-    open_questions:
-      - "Does a held supply get checked while it is held? Same fork as REQ-PIPE-059's, and they should be answered together. Options - (a) no checks until it is filed, because QA runs against the period schema the supply's slot names and a held supply has no slot; (b) run only the checks reading that table alone; (c) run against the most recent period. Recommended (a): the hold is the signal, and checking a supply against a period it may not belong to produces a verdict that has to be thrown away."
+
+      - >
+        SETTLED 2026-09-24 (Keith), answering the open question this
+        requirement carried, and REQ-PIPE-064's identical one, together.
+        A held supply IS LOADED into staging but is NOT QA'd
+        automatically. Keith's reasoning, which is sharper than the
+        options as drafted: the single-table checks could run without a
+        period, but drift and previous-period comparison cannot, so
+        partial QA produces a verdict that has to be thrown away once
+        the slot is known - and worse, possibly a GREEN one sitting in
+        history against no period at all.
+      - >
+        The resolution path, and it is what stops the hold being a dead
+        end: the hold surfaces as an event needing action; a human then
+        either ASSIGNS each file to a slot, or REJECTS one of them
+        (Keith added the reject case, 2026-09-24). Assignment is what
+        unblocks QA, which then runs against the right period's schema.
+        So this is not simply "no checks until filed" - there is a
+        human-initiated path, and it is the same act as resolving the
+        hold. The write path itself belongs with the decision log in
+        sprint 12.
+      - >
+        What the run actually does meanwhile, worked through on Keith's
+        own eight-file Child Protection example (cp_clients and
+        cp_placements each arriving twice): the two duplicated datasets
+        get no view, because REQ-PIPE-035 now forbids choosing between
+        candidates, so they are unqueryable for that run. The other four
+        datasets are processed, assigned and QA'd normally. Any
+        cross-table check reading a held table reads RED naming it -
+        which for cp_clients is real and not hypothetical, since
+        cp_notifications, cp_investigations and cp_placements all carry
+        a referential check against it. Holding one table reddens checks
+        on others; the blast radius is not zero, it is scoped to what
+        actually depends on the held thing.
 
   - id: REQ-PIPE-065
     title: An uncertain assignment says it is uncertain, and an arrival into a filled slot is reported

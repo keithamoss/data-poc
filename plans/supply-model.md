@@ -1823,6 +1823,39 @@ in favour of our own receipt time. A file's metadata reflects the
 supplier's clock, timezone and bugs; staging's whole justification is
 that it asserts only facts we can vouch for.
 
+**TS-34 `[INJECT]` One delivery, two files for each of two datasets.**
+Keith's own scenario, 2026-09-24. A Child Protection delivery carrying
+EIGHT files: the usual six, plus a second `cp_clients` and a second
+`cp_placements` - a catch-up drop where two tables arrive for an earlier
+period alongside the current six. Nothing in the files says which period
+any of them is for, and nothing may read that from them.
+**Expect**: `cp_clients` and `cp_placements` are HELD, each reported as
+needing action naming every file that matched. No view is built for
+either, so they are unqueryable for that run. The other four datasets
+are staged, assigned, classified and QA'd normally. Every cross-table
+check reading a held table reads RED naming it - which is three real
+checks against `cp_clients` alone (`cp_notifications`,
+`cp_investigations`, `cp_placements` each carry a referential check on
+`cp_client_id`). Neither held dataset's slot is filled, so both go
+overdue in the ordinary way.
+**Why it is worth injecting rather than unit-testing**: the interesting
+part is not the hold, it is that the blast radius is neither zero nor
+the whole delivery. Only a rendered dashboard shows whether a reader can
+tell "two tables need a human" apart from "three datasets are red", and
+those are the same event seen from two ends.
+
+**TS-35 `[unit]` A held supply is never chosen between, even when one
+file is obviously newer.**
+The same delivery, but one `cp_clients` file is larger and has a later
+filesystem mtime than the other.
+**Expect**: still held. No rule consults size, mtime, lexical order or
+directory position. This asserts that a KNOWN-TEMPTING heuristic stays
+unimplemented rather than that the system computes something - label it
+as such, the same family as TS-3, so a later session does not "fix" it
+by adding the obvious tie-break. `REQ-PIPE-059` records why each such
+rule was rejected: every one is a guess dressed as a policy, and the
+dropped file is exactly the one a supplier will later say they sent.
+
 ### The mixed-period delivery gate
 
 **TS-33a `[unit]` A delivery whose tables land in DIFFERENT PERIODS.**
