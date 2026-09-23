@@ -3809,8 +3809,8 @@ requirements:
     title: Supply history and as-of viewing hold up under per-dataset arrivals
     date_written: "2026-09-21"
     story: >
-      As a data owner using the as-of picker, I want the supply history
-      to still read correctly when each table arrives on its own
+      As a data engineer using the as-of picker, I want the supply
+      history to still read correctly when each table arrives on its own
       schedule, so that the feature that survived a chain-building test
       in the lab also survives on the page.
     moscow: must
@@ -3827,11 +3827,13 @@ requirements:
       - THE SYSTEM SHALL offer as-of viewing across datasets whose
         arrival dates do not line up.
       - WHEN a viewer picks an as-of date, THE SYSTEM SHALL show each
-        dataset as at its own most recent arrival on or before that
-        date.
+        dataset as at its own most recent ARRIVAL on or before that
+        date, and SHALL NOT show it as at its most recently promoted
+        supply instead.
       - IF a dataset has no arrival on or before the chosen as-of date,
-        THEN THE SYSTEM SHALL say so plainly rather than render an empty
-        or stale panel.
+        THEN THE SYSTEM SHALL continue to render the existing
+        no-data-as-of state rather than an empty or stale panel, and
+        SHALL NOT introduce a further quiet state alongside it.
       - THE SYSTEM SHALL render all of this with zero console errors in
         a real browser.
     non_functional_requirements:
@@ -3841,12 +3843,48 @@ requirements:
         on, and the reason this requirement exists separately at all.
       - Covered by both toolchains - tests-js for the template's inline
         logic, tests/test_dashboard_e2e.py for the built page.
-      - The dashboard build path must stay a pure function of committed
-        qa_results history, with no live data access.
+      - >
+        The dashboard build path must stay a pure function of committed
+        history - the per-dataset QA results AND the delivery log that
+        REQ-PIPE-038 adds beside them - with no live data access. The
+        delivery log matters particularly here, because this
+        requirement is entirely about arrivals and that is where
+        arrivals live.
       - A collection whose tables arrive on six different schedules
         should not look like a bug.
     dependencies: [REQ-PIPE-034, REQ-PIPE-038]
     decisions:
+      - >
+        Decided the as-of view shows the most recent ARRIVAL, never the
+        most recently promoted supply (Keith, 2026-09-23). The criterion
+        said "arrival" before staging and promotion were split apart, so
+        it was ambiguous rather than wrong; it now says so explicitly.
+        Keith's reasoning: "QA is all about doing something as soon as
+        it's arrived - promotion is a thing that happens after QA." The
+        consequence accepted: a supplier's broken Tuesday file makes the
+        tile red while the operational warehouse is still serving
+        Monday's good data, which is a different claim from the one the
+        page makes today. Showing the promoted state instead would be a
+        false green of exactly the kind this project keeps finding.
+      - >
+        Keith also wants the DISTINCTION itself visible - "latest supply
+        is red and staged, promoted version is Monday's" - and agreed it
+        is probably another requirement rather than a criterion here.
+        Drafted as REQ-DASH-056, unsigned.
+      - >
+        Criterion 4 was reworded from "SHALL say so plainly" to
+        "SHALL continue to render the existing no-data-as-of state",
+        because the behaviour it describes is ALREADY BUILT - the page
+        even documents the promise in its own help text. A criterion
+        that restates shipped behaviour as new work invites a second
+        mechanism alongside the first. It also now forbids adding a
+        further quiet state, because there are already three with
+        different meanings - no run at all as of the date, a run older
+        than the cadence window, and a schedule whose dates ran out -
+        and the first two both collapse into `nodata`, which rollup()
+        filters out before worst-of. A fourth would either duplicate
+        one of them or land in the bucket that vanishes from every tier
+        above it.
       - The chain-building half was verified before this was written -
         buildSupplyHistory reads only the dataset object it is handed,
         and cp-placements cut to 9 of its 18 runs produced 7 well-formed
@@ -6832,3 +6870,79 @@ requirements:
         prevents it. Removing the error case beats handling it; the
         by-URL path still needs the recovery, since a bound on the input
         cannot constrain a pasted link."
+
+  - id: REQ-DASH-056
+    title: A dataset shows what arrived and what is actually promoted, not one
+      standing for the other
+    date_written: "2026-09-23"
+    story: >
+      As a data engineer triaging a red dataset, I want to see both the
+      supply that just arrived and the one currently promoted, so that I
+      can tell "their latest file is bad" apart from "the data everyone
+      downstream is using is bad" - which today look identical.
+    moscow: should
+    status: not_started
+    source: >
+      Keith, 2026-09-23, during REQ-DASH-041's sign-off. Settling that
+      the as-of view shows the most recent ARRIVAL rather than the most
+      recently promoted supply left a gap he named immediately - "latest
+      supply is red and staged, promoted version is Monday's. Yes, I do
+      want that" - and agreed it is probably a requirement of its own
+      rather than a criterion on 041.
+    acceptance_criteria:
+      - WHERE a dataset's most recent arrival is not the supply
+        currently promoted, THE SYSTEM SHALL show both, and SHALL NOT
+        show either alone.
+      - THE SYSTEM SHALL make clear which of the two a status refers
+        to.
+      - WHERE a dataset's most recent arrival IS the promoted supply,
+        THE SYSTEM SHALL NOT clutter the view with the distinction.
+      - THE SYSTEM SHALL state, for an arrival that is not promoted,
+        why it is not - whether it is awaiting a decision, was rejected,
+        or cannot be promoted because its schedule has no slot for it.
+      - THE SYSTEM SHALL compute this from committed history alone, with
+        no live data access.
+    non_functional_requirements:
+      - >
+        This is the operational state Keith's team actually manages,
+        which is why it earns its own requirement rather than a
+        footnote. A tile that says only "red" when the red thing is
+        sitting unpromoted in staging tells a viewer the wrong thing
+        about what downstream consumers are getting.
+      - >
+        It must not become a second status. There are already three
+        quiet states and one deliberately-unorderable one, and
+        REQ-PIPE-053's own experience is that anything landing in the
+        nodata bucket vanishes from every rollup above it. This is
+        additional INFORMATION on a dataset, not a new value in the
+        status vocabulary that status-cases.json governs.
+      - >
+        At 30 datasets the common case is that arrival and promoted are
+        the same supply, so the distinction has to be invisible when it
+        does not apply, or it becomes noise that trains people to stop
+        reading it.
+      - Verify at the render layer in a real browser, both toolchains.
+    dependencies: [REQ-DASH-041, REQ-PIPE-034, REQ-PIPE-038]
+    decisions:
+      - >
+        Decided this is its own requirement rather than a criterion on
+        REQ-DASH-041 (Keith, 2026-09-23). 041 is about supply history
+        and as-of viewing holding up under per-dataset arrivals; this is
+        a new thing to show, with its own empty state, its own wording
+        and its own noise risk at 30 datasets.
+      - >
+        Decided it is INFORMATION rather than a status. The tempting
+        implementation is a new status value meaning "arrived but not
+        promoted", and that is how it would get swallowed - the status
+        vocabulary is shared with the Python side through
+        status-cases.json, and a fourth quiet state was explicitly
+        forbidden on REQ-DASH-041 the same day.
+    open_questions:
+      - >
+        Where it appears - the dataset tile, the detail panel, or both.
+        A tile is where a viewer forms their first impression, which
+        argues for it being there; but the Tier-2 row is already carrying
+        an exhausted-schedule marker, and two annotations competing for
+        one row is how a row stops being readable. Needs the dashboard
+        UX pass rather than a decision here.
+
