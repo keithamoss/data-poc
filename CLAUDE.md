@@ -591,6 +591,24 @@ Rough layout:
   Estimating it from elapsed work feels reasonable and is exactly the
   reasoning that produced a three-hour error.
 
+  **The same rule, once more, for the gate run itself: the last edit
+  must come BEFORE the last gate run, not after it.** Real incident,
+  2026-09-23: `mothman check` came back all-green, then `plans/
+  supply-model.md` was edited, then the commit went out claiming all
+  nine gates green. Both CI workflows went red on the stale
+  `plans/INDEX.md` that edit had just invalidated. No gate was missing
+  - `tests/test_plans_index.py` covers it and would have caught it -
+  and the claim in the commit message was not invented; it was true of
+  a state that was never committed.
+
+  That is the whole shape, and it is why this sits with the fabricated
+  test count rather than with the CI bullet: a result is about a
+  particular tree, and a result attached to a different tree is not a
+  weaker result, it is a different claim. So the order is mechanical.
+  Edit, then gate, then commit - and if anything at all is touched
+  after the gates, including a plans file or a changelog entry, the
+  gates run again before the commit does.
+
 - **In a fresh session, do the environment setup UP FRONT - before
   running any test suite - rather than discovering what's missing from
   test failures.** Keith's own explicit ask, 2026-09-19, after watching
