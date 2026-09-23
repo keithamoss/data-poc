@@ -7379,9 +7379,43 @@ requirements:
       - "Decided ARRIVAL triggers checks, never promotion, because promotion-as-trigger LOOPS - a promotion decision made on a check result that was itself triggered by a promotion. No requirement held this; REQ-PIPE-036 carries delivery-triggered QA without the reason it is not the other way round."
       - "Decided a delivery is loaded as one package and is not atomic in the roll-back sense: the five-tables-land-one-fails case requires the five to be staged and checked, so a failed sixth does not refuse the delivery (TS-12, which Keith called 'a really important one' from real operational experience)."
       - "Decided RETENTION IS EXPLICITLY OUT OF SCOPE for the PoC (Keith, 2026-09-23): staging and rejected only grow, and that is accepted - 'we'll need that eventually but it's not a priority right now'. The future question he named is not just dropping data but whether QA history is kept alongside it, kept after it, or dropped with it. Recorded as a deliberate no rather than an unasked question."
+
+      - >
+        BUILD ORDER SETTLED 2026-09-24 (Keith): SPRINT 13 IS SPLIT. Its
+        single-database half - retiring the per-run warehouses, one
+        database per test worker - moves forward to sit with staging at
+        sprint 8, because staging has nowhere to stage into without a
+        durable database holding a staging schema. The schema-per-period
+        half stays at sprint 13.
+      - >
+        Rejected building staging against today's per-run databases and
+        migrating at 13: it is the only option that builds the same
+        thing twice, and the second build is not a refinement but a
+        replacement under a model the first one contradicts - per-run
+        databases are exactly what REQ-PIPE-035 removes. Also rejected
+        moving sprint 8 later, which does not move one sprint but four:
+        sprints 9 and 10 both assume arrivals are staged, so the whole
+        filing chain slides.
+      - >
+        Also rejected moving sprint 13 forward WHOLE, which was the
+        scoper's recommendation. Sprint 13 is two things, and only one
+        of them staging needs. Moving both would build the period
+        schemas before slot assignment exists to fill them - shelves
+        years before anything decides what goes on them.
+      - >
+        WHY THE SPLIT IS SAFE, and the condition that would break it,
+        stated because it was verified rather than assumed. Thread J's
+        argument for retiring per-run databases is that schema-per-period
+        supplies the same ISOLATION. Moving the single-database half
+        forward without it leaves a window with one database and no
+        per-run isolation, which is survivable ONLY because nothing runs
+        QA between sprint 8 and sprint 15. The same reason disposes of
+        the verified one-process-per-database blocker here: dbt is the
+        concurrent writer, and it does not run until QA does. If QA ever
+        moves earlier than sprint 15, this split stops holding and both
+        halves must move together.
     open_questions:
       - "Where does 'this delivery has already been processed' live, given REQ-PIPE-038 writes a delivery's file ONCE at recognition and never rewrites it? Options - (a) re-process a delivery from the beginning whenever its staged tables are incomplete, staging fresh tables under new names and leaving the partial ones as garbage for a later sweep; (b) a separate append-only processing marker committed beside the delivery log, which is new state but readable without a warehouse; (c) derive completeness from the warehouse catalogue, which needs no new committed state but is pipeline-side only and invisible to the dashboard build. Recommended (c) for completeness plus (a) for recovery: the dashboard never needs to know, and a re-staged table under a new name is cheap while a half-loaded one read as real data is not."
-      - "Build order, not design. This requirement needs the one-database-many-schemas model that REQ-PIPE-035 specifies and sprint 13 builds, but sprint 8 comes five sprints earlier. Options - move the single-database work forward to sit with staging; or build staging against today's per-run databases and migrate it at sprint 13; or move sprint 8 later. Recommended the first: staging has no meaning without a durable schema to stage into, and building it twice is the most expensive of the three."
 
   - id: REQ-PIPE-061
     title: Arrivals are processed in receipt order, and an interrupted run loses nothing

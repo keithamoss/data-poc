@@ -1127,6 +1127,25 @@ comparisons against the expected-supply sequence.
    drain - the rule `REQ-PIPE-053` already depends on by name). Both
    unsigned.
 
+   **SPRINT 13 SPLIT, and its single-database half moves HERE** (Keith,
+   2026-09-24). Staging has nowhere to stage into otherwise: it needs
+   one durable database holding a staging schema, which is the part of
+   sprint 13 that retires the per-run warehouses and gives each test
+   worker its own database. The SCHEMA-PER-PERIOD half stays at 13,
+   where it belongs - building period schemas here would mean shelves
+   years before anything decides what goes on them.
+
+   **Why the split is safe, stated precisely because it stops being
+   safe if the order changes.** Thread J's argument for retiring per-run
+   databases is that schema-per-period gives the same ISOLATION. Move
+   the single-database half forward without it and there is a window
+   with one database and no per-run isolation - which is fine ONLY
+   because nothing runs QA between here and sprint 15. Two consequences
+   travel with that: dbt, the concurrent writer behind the verified
+   one-process-per-database blocker, does not run until QA does, so that
+   blocker does not bite here either. If QA ever moves earlier than 15,
+   this split stops holding and both halves have to move together.
+
 9. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Slot
    assignment.** Claim windows, on-time-wins-for-the-current-slot,
    monotonic filling, and hold-for-a-human when nothing is confidently
@@ -1190,13 +1209,22 @@ comparisons against the expected-supply sequence.
     the triggering event, so a cancelled run costs nothing. Settled
     2026-09-22, see Thread H.
 
-13. **[todo, 2026-09-21]** **[Pipeline & publishing]** **One database,
-    many schemas.** Retire the per-run warehouses; one database per test
-    worker (Thread J).
+13. **[todo, 2026-09-21]** **[Pipeline & publishing]** **SPLIT
+    2026-09-24 (Keith). What remains here is SCHEMA-PER-PERIOD**; the
+    single-database half - retiring the per-run warehouses, one database
+    per test worker (Thread J) - **moved to sprint 8**, because staging
+    has nowhere to stage into without it.
 
-    Test isolation is deliberate here, not incidental - the per-run
+    Test isolation is deliberate rather than incidental - the per-run
     databases were providing it by accident and `pytest-xdist` is the
-    default.
+    default - and it travels with the single-database half, since tests
+    run from sprint 8 onward.
+
+    See sprint 8 for why the split is safe and the one condition that
+    would break it: Thread J's argument for retiring per-run databases
+    is that schema-per-period supplies the same isolation, so the gap
+    between the two halves is only survivable while nothing runs QA in
+    it.
 
 14. **[todo, 2026-09-21]** **[Pipeline & publishing]** **`qa_results/`
     keyed per dataset.** `REQ-PIPE-038`, including regenerating today's
