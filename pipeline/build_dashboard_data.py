@@ -33,6 +33,7 @@ from qa_tools.bdm.dataset_stats import AGGREGATE_SPEC
 from qa_tools.common.validate_check_lifecycle import collect_checks
 from pipeline.cadence import classify_arrival, parse_cadence_from_contract
 from qa_tools.common import asset_time
+from qa_tools.common import hierarchy
 from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, tool_ref, url_key
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -361,7 +362,10 @@ def build() -> dict:
     latest_entry = next(m for m in manifest if m["run_id"] == latest_run)
     prev_entry = next(m for m in manifest if m["run_id"] == prev_run)
 
-    cadence = parse_cadence_from_contract(CONTRACT_PATH)
+    # Named explicitly even though this contract holds one dataset -
+    # its slaProperties carry `element: birth_registrations`, and since
+    # REQ-PIPE-049 that means something rather than being ignored.
+    cadence = parse_cadence_from_contract(CONTRACT_PATH, element=hierarchy.dataset("birth-registrations").table)
 
     max_lag_hours = dataset_stats[latest_run]["arrival"]["max_lag_hours"]
     earliest_extract = dataset_stats[latest_run]["arrival"]["earliest_extract"]

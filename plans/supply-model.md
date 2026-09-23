@@ -488,8 +488,12 @@ comparisons against the expected-supply sequence.
    out of sprint order for exactly that reason, once building
    `REQ-GEN-042` showed it was a dependency rather than a sibling.
 
-5. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Schedule config
-   and its validation gate.** Authored dates (quarterly) or cadence rule
+5. **[in-progress, 2026-09-23]** **[Pipeline & publishing]** **Schedule config
+   and its validation gate.** The CONFIG half is BUILT as
+   `REQ-PIPE-049` (2026-09-23), which now owns its decisions; the
+   validation GATE is `REQ-PIPE-050` and is still to come. Built ahead
+   of sprints 2 and 3 because `REQ-GEN-042` turned out to depend on it
+   rather than sit beside it. Authored dates (quarterly) or cadence rule
    (daily), `delivery_months` participation, `effective_from` plus
    changelog, `not_expected` (Thread C); `mothman check`'s
    `validate-config` (Thread K).

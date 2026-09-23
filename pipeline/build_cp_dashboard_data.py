@@ -355,7 +355,12 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
     latest_entry = next(m for m in manifest if m["run_id"] == latest_run)
     prev_entry = next(m for m in manifest if m["run_id"] == prev_run)
 
-    cadence = parse_cadence_from_contract(CONTRACT_PATH)
+    # Per DATASET, not per contract (REQ-PIPE-049). `table` is this
+    # dataset's own element in a contract that holds six, so its own
+    # expectedTime and latency win over the contract-wide defaults.
+    # Before this the element was parsed and discarded, so all six
+    # inherited cp_clients' values whether or not they had their own.
+    cadence = parse_cadence_from_contract(CONTRACT_PATH, element=table)
 
     max_lag_hours = dataset_stats[latest_run]["arrival"][table]["max_lag_hours"]
     earliest_extract = dataset_stats[latest_run]["arrival"][table]["earliest_extract"]

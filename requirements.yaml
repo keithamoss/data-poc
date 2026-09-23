@@ -4537,7 +4537,7 @@ requirements:
       that a supply is late because it missed what we agreed, not because
       a calendar library and a public holiday disagreed.
     moscow: must
-    status: not_started
+    status: built
     source: >
       Keith, 2026-09-21, plans/supply-model.md Thread C - quarterly uses
       authored dates, daily uses a cadence rule, the asset owns the
@@ -4615,6 +4615,71 @@ requirements:
       - A duration string is a new thing to parse and therefore a new
         thing to get wrong. One accepted form per unit, validated by the
         gate, rejected rather than coerced.
+    linked_tests:
+      - tests/test_schedule.py
+      - tests/test_cli_schedule.py
+      - tests/test_cadence.py
+      - tests/test_daily_batch.py
+    implemented_by:
+      - qa_tools/common/schedule.py::calendar_for_dataset
+      - qa_tools/common/schedule.py::periods_for_dataset
+      - qa_tools/common/schedule.py::delivery_months
+      - qa_tools/common/schedule.py::not_expected_periods
+      - qa_tools/common/schedule.py::dataset_dates_override
+      - qa_tools/common/schedule.py::claim_window
+      - qa_tools/common/schedule.py::parse_duration
+      - qa_tools/common/schedule.py::parse_month_name
+      - qa_tools/common/schedule.py::candidate_dates
+      - qa_tools/common/schedule.py::Calendar::version_in_force
+      - pipeline/cadence.py::_sla_properties_to_dict
+      - pipeline/cadence.py::parse_claim_window_from_contract
+      - cli/schedule.py::show_command
+      - cli/schedule.py::candidate_dates_command
+      - contract/data-asset.yaml
+      - contract/child-protection-contract.yaml
+    evidence:
+      - >
+        2026-09-23: two named calendars in contract/data-asset.yaml -
+        quarterly with 20 authored dates through 2027, daily as a
+        cadence rule - and every one of the 7 real datasets names one.
+        The authored dates were checked against the cadence the data is
+        actually generated against (generate_cp_runs.py's Feb/May/Aug/
+        Nov anchor) and against every delivery in committed history, so
+        the schedule cannot judge supplies against dates nothing ever
+        delivered on.
+      - >
+        2026-09-23: THE `element:` BUG IS REAL AND IS FIXED, and it was
+        a capability being built rather than one preserved.
+        pipeline/cadence.py's _sla_properties_to_dict keyed on
+        `property` alone and discarded `element:`, so Child Protection's
+        six datasets all silently inherited whatever cp_clients
+        declared. It went unnoticed because all six genuinely do share
+        one cadence, so the wrong answer and the right answer coincided.
+        A property with no element is now a contract-wide default and
+        one naming an element overrides it; both dashboard builders pass
+        their own dataset's element explicitly.
+      - >
+        2026-09-23: no arrival verdict moved across the element fix -
+        REQ-PIPE-048's own 150-arrival pin was re-run after it and held.
+        That is what made it safe to change a parser every arrival
+        classification in the repo depends on.
+      - >
+        2026-09-23: `mothman schedule candidate-dates --calendar
+        quarterly --year 2026` flags all three of that year's weekend
+        dates (1 Feb Sunday, 1 Aug Saturday, 1 Nov Sunday) rather than
+        moving them, and prints that nothing evaluates against its
+        output. Exercised against the real calendars, not a fixture.
+      - >
+        2026-09-23: 50 schedule tests and 10 CLI tests, most of them
+        REJECTIONS - a duplicate period, dates running backwards, months
+        on a cadence-rule calendar, a version with no changelog, a
+        not-expected period with no reason, seven malformed durations
+        and six rejected month forms. A schedule that quietly accepts
+        config it cannot honour is how a dataset ends up expecting
+        something other than what its author wrote.
+      - >
+        2026-09-23: 973 Python tests, 162 JS tests, all eight mothman
+        gates.
     dependencies: [REQ-QAC-039, REQ-PIPE-048]
     decisions:
       - Decided quarterly uses authored DATES and daily uses a cadence

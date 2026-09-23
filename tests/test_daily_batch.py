@@ -65,7 +65,7 @@ def test_real_bdm_cadence_classifies_the_on_time_window_as_on_time():
     falls inside _draw_arrival_base_offset_hours' on-time range must
     genuinely classify as "onTime" via the real parsed cadence, not just
     by this test's own assumptions about what "on time" means."""
-    cadence = parse_cadence_from_contract(CONTRACT_PATH)
+    cadence = parse_cadence_from_contract(CONTRACT_PATH, element="birth_registrations")
     run_date = date(2026, 6, 1)
 
     # Aware instants, in UTC. This file's own calibration comment above

@@ -1461,6 +1461,14 @@ table.
 
 23. **[todo, 2026-09-20]** **[Pipeline & publishing]** Adding two more datasets is the trigger for resolving the file-per-dataset shape.
 
+**Scope this together with #29** (Keith, 2026-09-23). #29 is the
+concrete version of "adding two more datasets" - a few small ones
+across several agencies, at the end of the sprint sequence - so the
+trigger this item describes and the act that pulls it are one piece of
+work, not two. Cross-referenced from both directions deliberately:
+finding one and not the other is how the copy-paste cost gets
+multiplied instead of paid.
+
 Keith, 2026-09-20 night, immediately after authorising the
 `delivery-scoper` run on `plans/publishing-and-history.md` item 6: once
 that item's restructure is done, add another couple of datasets, and

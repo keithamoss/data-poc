@@ -55,6 +55,119 @@ data_asset_id: data-asset-1
 timezone: Australia/Perth
 
 # ---------------------------------------------------------------------
+# DELIVERY CALENDARS (REQ-PIPE-049) - what QA judges a supply against.
+#
+# THE DATES ARE THE SUPPLIER AGREEMENT. That is the whole design, in one
+# line (plans/supply-model.md Thread C). A holiday library PREDICTS what
+# was probably agreed; it does not CONSTITUTE it. So the quarterly dates
+# below are AUTHORED, never computed at evaluation time - which is also
+# the only shape with somewhere to record a date that differs from what
+# a rule would have generated, because a supplier asked for it.
+# `mothman schedule candidate-dates` prints next year's suggestions for
+# a human to review, edit and commit; nothing evaluates against its
+# output.
+#
+# SEVERAL NAMED CALENDARS, each dataset naming exactly one. Not
+# generality bought for a hypothetical future: two cadences already
+# share this one asset - Birth Registrations daily, Child Protection
+# quarterly - so one asset-wide calendar could never have worked here.
+#
+# WHY THE ASSET OWNS THE CALENDAR AND A DATASET OWNS ITS PARTICIPATION:
+# the quarterly asset is heading for ~30 datasets, of which roughly 70%
+# arrive every quarter and the rest once or twice a year, still landing
+# on one of the same four dates. Thirty independent date lists would
+# drift - dataset A saying 2 February and dataset B saying 3 February
+# for the same window is a class of bug nothing would ever flag.
+#
+# EVERY CALENDAR IS VERSIONED, effective-dated, with a changelog entry
+# per version - the same shape check lifecycle already uses. A supply is
+# judged against the calendar that was in force when it was due, so
+# editing next year's dates can never retroactively make a past supply
+# late.
+#
+# A CALENDAR DATE CARRIES NO TIME OF DAY, deliberately. The instant a
+# supply is due comes from the dataset's own expectedTime in its own
+# contract, applied to the calendar's date - so a per-dataset deadline
+# stays per-dataset instead of being flattened into one per period.
+calendars:
+  - name: quarterly
+    description: >
+      Four authored delivery dates a year, anchored on the 1st of
+      February, May, August and November. Child Protection's real
+      agreed cadence (Keith, 2026-09-17: "1 February being the expected
+      date of supply, then working forwards in three month
+      increments") - deliberately NOT calendar quarters.
+    versions:
+      - effective_from: "2023-01-01"
+        changelog:
+          - "2023-01-01: Initial quarterly calendar - Feb/May/Aug/Nov, authored through 2027."
+        # Default claim window for datasets on this calendar. A duration
+        # carrying its own unit, so the same property reads naturally at
+        # quarterly and daily scale - 14 days here, hours on the daily
+        # calendar below. A dataset may override it in its own contract.
+        claim_window: 14d
+        # PERIOD NAMES ARE AUTHORED, not derived from the date. A period
+        # is a named bucket on the asset's calendar; the name is what
+        # people call it, and deriving it would lose that. Q1 here is
+        # the February-anchored quarter, matching the anchor above
+        # rather than the calendar year - Keith's to rename if the
+        # agency calls them something else.
+        dates:
+          - period: "2023-Q1"
+            date: "2023-02-01"
+          - period: "2023-Q2"
+            date: "2023-05-01"
+          - period: "2023-Q3"
+            date: "2023-08-01"
+          - period: "2023-Q4"
+            date: "2023-11-01"
+          - period: "2024-Q1"
+            date: "2024-02-01"
+          - period: "2024-Q2"
+            date: "2024-05-01"
+          - period: "2024-Q3"
+            date: "2024-08-01"
+          - period: "2024-Q4"
+            date: "2024-11-01"
+          - period: "2025-Q1"
+            date: "2025-02-01"
+          - period: "2025-Q2"
+            date: "2025-05-01"
+          - period: "2025-Q3"
+            date: "2025-08-01"
+          - period: "2025-Q4"
+            date: "2025-11-01"
+          - period: "2026-Q1"
+            date: "2026-02-01"
+          - period: "2026-Q2"
+            date: "2026-05-01"
+          - period: "2026-Q3"
+            date: "2026-08-01"
+          - period: "2026-Q4"
+            date: "2026-11-01"
+          - period: "2027-Q1"
+            date: "2027-02-01"
+          - period: "2027-Q2"
+            date: "2027-05-01"
+          - period: "2027-Q3"
+            date: "2027-08-01"
+          - period: "2027-Q4"
+            date: "2027-11-01"
+
+  - name: daily
+    description: >
+      Every day, expressed as a rule rather than an enumerated list -
+      365 authored dates a year would be absurd, and the agreement
+      genuinely IS "every day". Birth Registrations' real cadence.
+    versions:
+      - effective_from: "2023-01-01"
+        changelog:
+          - "2023-01-01: Initial daily calendar."
+        claim_window: 4h
+        cadence:
+          rule: daily
+
+# ---------------------------------------------------------------------
 # THE HIERARCHY, stated once (REQ-QAC-039).
 #
 # Until 2026-09-23 this lived as literals in TWELVE Python files - four
@@ -99,6 +212,16 @@ hierarchy:
             - id: birth-registrations
               name: Birth Registrations
               table: birth_registrations
+              # Names a calendar, and says nothing else - a dataset that
+              # names no delivery_months participates in every period
+              # its calendar generates, which for a cadence rule is the
+              # only coherent reading. Naming months here would be an
+              # ERROR rather than an ignored key: a daily feed that
+              # "participates in February" is a config author saying
+              # something the model cannot honour, and accepting it
+              # silently is how a dataset ends up expecting something
+              # other than what its author wrote.
+              calendar: daily
 
     - id: child-protection-family-support
       name: Department for Child Protection and Family Support
@@ -109,18 +232,38 @@ hierarchy:
             - id: cp-clients
               name: Client Register
               table: cp_clients
+              calendar: quarterly
             - id: cp-notifications
               name: Notifications
               table: cp_notifications
+              calendar: quarterly
             - id: cp-investigations
               name: Investigations
               table: cp_investigations
+              calendar: quarterly
             - id: cp-placements
               name: Placements
               table: cp_placements
+              calendar: quarterly
             - id: cp-carers
               name: Carer Register
               table: cp_carers
+              calendar: quarterly
             - id: cp-case-workers
               name: Case Workers
               table: cp_case_workers
+              calendar: quarterly
+              # The worked example of partial participation. Month
+              # NAMES, in full, never numbers or positions - an index
+              # breaks silently the moment the calendar is edited or
+              # reordered, and a name stays meaningful and matches how
+              # people talk about it. Case Workers is a staffing
+              # register rather than casework, so it is resupplied
+              # twice a year rather than quarterly.
+              #
+              # Note the key is delivery_months and never `months`: it
+              # names when a supply ARRIVES, not the period it covers.
+              # A February delivery is often for the November-January
+              # window, so the short form invites exactly the wrong
+              # reading.
+              delivery_months: [February, August]

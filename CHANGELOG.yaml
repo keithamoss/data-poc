@@ -130,8 +130,31 @@ releases:
               twelve places that could quietly disagree, and several
               had. Change one now and the whole tool follows, including
               the dashboard.
+          - headline: Delivery dates are written down
+            components: ["Pipeline & publishing"]
+            description: >
+              The dates a supplier agreed to deliver on are now recorded
+              as dates, not worked out from a rule each time. A dataset
+              says which calendar it is on and which months it takes
+              part in, and can say a period has no supply coming, with a
+              reason.
+          - headline: Next year's dates, suggested
+            components: ["Testing & dev tooling"]
+            description: >
+              `mothman schedule candidate-dates` proposes next year's
+              delivery dates for you to check, edit and commit, and
+              flags any that land on a weekend rather than quietly
+              moving them. Nothing is judged against its suggestions.
+
       - category: Fixed
         items:
+          - headline: Six datasets, one deadline
+            components: ["Pipeline & publishing"]
+            description: >
+              Child Protection's six datasets all shared whichever
+              delivery time the first one declared, because the
+              per-dataset setting was being read and thrown away. Each
+              can now have its own.
           - headline: Yesterday's date, all morning
             components: ["Dashboard UI"]
             description: >

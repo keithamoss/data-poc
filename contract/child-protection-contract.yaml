@@ -1547,23 +1547,31 @@ slaProperties:
   # daily 60 min - Keith's own call: a quarterly refresh's own latency
   # tolerance is a real but much less pressing concern than a daily
   # feed's.
+  #
+  # These five carry NO `element:`, which now means something rather
+  # than nothing (REQ-PIPE-049, 2026-09-23). A property without an
+  # element is a contract-wide DEFAULT applying to every dataset in it;
+  # one naming an element overrides the default for that dataset alone.
+  #
+  # They used to say `element: cp_clients` while applying, in practice,
+  # to all six - because pipeline/cadence.py keyed on `property` alone
+  # and threw the element away. The right answer and the wrong answer
+  # coincided, since all six genuinely do share one quarterly cadence,
+  # which is why nothing noticed. Declaring them contract-wide says what
+  # is actually true; a dataset that ever needs its own expectedTime or
+  # latency adds an entry naming its own element, and that now wins.
   - property: cadenceType
     value: quarterly
-    element: cp_clients
   - property: cadenceAnchorMonths
     value: "2,5,8,11"
-    element: cp_clients
   - property: cadenceDayOfMonth
     value: 1
-    element: cp_clients
   - property: expectedTime
     value: "09:00"
-    element: cp_clients
     description: Agreed quarterly delivery time, AWST.
   - property: latency
     value: 480
     unit: min
-    element: cp_clients
     description: How late (past expectedTime) a delivery can arrive before it counts as late rather than on time.
 
 customProperties:

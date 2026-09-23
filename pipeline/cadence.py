@@ -45,11 +45,34 @@ import yaml
 
 from qa_tools.common import asset_time
 
-def _sla_properties_to_dict(items: list[dict]) -> dict:
-    return {i["property"]: i for i in (items or []) if "property" in i}
+def _sla_properties_to_dict(items: list[dict], element: str | None = None) -> dict:
+    """The slaProperties array as {property: entry}, resolved FOR ONE
+    ELEMENT (REQ-PIPE-049).
+
+    A property carrying no `element:` applies to the whole contract - a
+    default for every dataset in it. A property naming an element
+    applies to that element only, and overrides the default.
+
+    THIS USED TO DISCARD `element:` ENTIRELY, and that was a real bug
+    rather than a simplification. It keyed on `property` alone, so
+    Child Protection's six datasets all silently inherited whatever
+    cp_clients declared - the per-dataset discriminator was sitting in
+    the contract, correctly authored, and thrown away on read. It went
+    unnoticed because all six genuinely do share one cadence today, so
+    the wrong answer and the right answer coincided. Found by
+    delivery-architect reading the parser rather than the config
+    (2026-09-22), after this session had asserted the opposite from the
+    config alone.
+    """
+    defaults = {i["property"]: i for i in (items or []) if "property" in i and not i.get("element")}
+    if element is None:
+        return defaults
+    overrides = {i["property"]: i for i in (items or [])
+                 if "property" in i and i.get("element") == element}
+    return {**defaults, **overrides}
 
 
-def parse_cadence_from_contract(contract_path: str) -> dict:
+def parse_cadence_from_contract(contract_path: str, element: str | None = None) -> dict:
     """Reads the real `slaProperties:` array from an ODCS contract file.
     Returns {"type": "daily"|"weekly"|"quarterly", "weekday": int|None
     (0=Monday, matching date.weekday()), "anchor_months": list[int]|None,
@@ -57,10 +80,15 @@ def parse_cadence_from_contract(contract_path: str) -> dict:
     "latency_minutes": int} - the one place this repo's cadence config
     gets parsed, so both build_dashboard_data.py (BDM) and
     build_cp_dashboard_data.py (CP) read the exact same real contract
-    data rather than each hand-maintaining their own copy."""
+    data rather than each hand-maintaining their own copy.
+
+    `element` names ONE dataset's own table within a contract that holds
+    several - Child Protection's six. Its own expectedTime and latency
+    override the contract-wide defaults; omitting it reads the defaults
+    alone, which is every single-dataset contract's case."""
     with open(contract_path) as f:
         doc = yaml.safe_load(f)
-    props = _sla_properties_to_dict(doc.get("slaProperties"))
+    props = _sla_properties_to_dict(doc.get("slaProperties"), element)
 
     cadence_type = props["cadenceType"]["value"]
     cadence: dict = {"type": cadence_type}
@@ -144,3 +172,19 @@ def classify_arrival(cadence: dict, run_date: date, arrived_at: datetime,
     if arrived_at <= grace_end:
         return "onTime"
     return "late"
+
+
+def parse_claim_window_from_contract(contract_path: str, element: str | None = None) -> str | None:
+    """A dataset's own `claimWindow` slaProperty, or None if it has none.
+
+    Returned as the raw duration STRING rather than a timedelta, so the
+    one parser for that form stays in qa_tools/common/schedule.py - this
+    function's job is reading the contract, not deciding what `14d`
+    means. Absent is a real answer here, not an error: the calendar
+    carries the default, and saying nothing is how a dataset takes it
+    (REQ-PIPE-049).
+    """
+    with open(contract_path) as f:
+        doc = yaml.safe_load(f) or {}
+    entry = _sla_properties_to_dict(doc.get("slaProperties"), element).get("claimWindow")
+    return None if entry is None else str(entry["value"])
