@@ -2977,14 +2977,17 @@ requirements:
         question, with the thing that matters already settled.
 
   - id: REQ-PIPE-038
-    title: qa_results is keyed per dataset, and today's history is regenerated
+    title: Committed history is keyed per dataset, logs deliveries beside it,
+      and is regenerated from scratch
     date_written: "2026-09-21"
     story: >
-      As whoever reads this QA history years from now, I want every
-      run's files under the dataset they actually describe, so that
-      finding one table's history is opening a directory rather than
-      opening a collection-level file and filtering it through a map
-      somebody maintained by hand.
+      As whoever reads this history years from now, I want every run's
+      files under the dataset they actually describe, and every arrival
+      recorded beside them, so that finding one table's history is
+      opening a directory rather than filtering a collection-level file
+      through a map somebody maintained by hand - and so that what
+      arrived, and when, is still answerable long after the warehouse
+      that held it was rebuilt.
     moscow: must
     status: not_started
     source: >
@@ -3089,6 +3092,17 @@ requirements:
         deploy-pages.yml. Deleting and regenerating is the same act
         stated honestly, which is why it is acceptable and re-running-
         as-migration would not have been.
+      - >
+        WIDENED on 2026-09-23 (Keith) from "qa_results is keyed per
+        dataset, and today's history is regenerated" to cover the
+        delivery log as well. The delivery log is not a QA result and
+        lives somewhere else entirely, so this was real scope creep
+        rather than a detail - the alternative offered was splitting it
+        into a seventh requirement. Widening won on one argument: the
+        delete-and-regenerate rule has to cover BOTH or the regenerated
+        history ends up with delivery records describing runs that no
+        longer exist. One requirement owning "what committed history
+        looks like on disk" cannot produce that mismatch; two can.
       - >
         Decided the delivery log is ONE IMMUTABLE FILE PER DELIVERY in
         a committed directory of its own, not a single append-only file
