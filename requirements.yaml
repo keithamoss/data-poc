@@ -7088,7 +7088,8 @@ requirements:
       - "THE SYSTEM SHALL NOT require a configured interval, a file modification time, or any record of how long a delivery has been present, in order to decide whether to report a missing receipt."
       - "THE SYSTEM SHALL derive which collection a delivery is for from the datasets its own files were attributed to."
       - "THE SYSTEM SHALL NOT derive the receipt instant, the period, the dataset, the collection or the processing order from a delivery's name."
-      - "WHERE a delivery contains a file attributed to no dataset, THE SYSTEM SHALL record it as an unrecognised artefact, SHALL report it as informational, and SHALL NOT fail the delivery, check it or promote it."
+      - "WHERE a delivery contains a file attributed to no dataset, THE SYSTEM SHALL record it as an unrecognised artefact, SHALL report it at WARNING level rather than informational, and SHALL NOT fail the delivery, check it or promote it."
+      - "THE SYSTEM SHALL distinguish an unrecognised artefact, which matches no pattern, from an unexpected table, which matches a pattern for a dataset with no slot in that period, and SHALL report the latter as informational."
       - "IF a delivery contains a file asserting what that delivery is for, or a file resembling our own receipt record, THEN THE SYSTEM SHALL report it as an anomaly and SHALL NOT read any value out of it."
       - "IF no file in a delivery is attributed to any dataset, THEN THE SYSTEM SHALL report the delivery as unplaceable, and SHALL NOT fail the run."
       - "IF a delivery holds files attributed to more than one collection, THEN THE SYSTEM SHALL hold it for a human, SHALL NOT split it across collections, and SHALL continue processing every other delivery."
@@ -7180,6 +7181,34 @@ requirements:
         synthetic, which is the shape Keith rejected for
         deploy-pages.yml.
 
+
+      - >
+        SETTLED 2026-09-24 (Keith): an unrecognised artefact - a file
+        matching no pattern - is reported at WARNING level, not
+        informational. His reasoning is that it is the mitigation for
+        having no history gate: a pattern that is too narrow shows up as
+        a repeated, prominent warning on the activity screen rather than
+        as silence.
+      - >
+        The case that prompted it is his own, and it is the dangerous
+        one: a catch-up delivery whose CURRENT cp_clients and
+        cp_placements match their patterns but whose RESUPPLIES of the
+        same tables use a different filename that does not. The matched
+        files are attributed, assigned, QA'd and promoted as if they
+        were the whole supply, while the unmatched ones raise only an
+        informational note. A near-miss is silent; a match would have
+        been a loud hold. That is a false-complete, which is the
+        direction this design exists to eliminate.
+      - >
+        This does NOT overturn the 2026-09-22 decision that an
+        UNEXPECTED TABLE is informational, and the distinction is worth
+        keeping because the two sit adjacent in the same feed at
+        different levels. An unexpected table MATCHES a pattern, for a
+        dataset with no slot that period - fully understood, merely
+        surplus. An unrecognised artefact matches NOTHING - not
+        understood at all, and the dangerous reading is that it is a
+        supply we failed to claim. Knowing what something is, is the
+        difference.
   - id: REQ-PIPE-058
     title: A file's dataset comes from that dataset's own declared pattern, and the patterns are gated
     date_written: "2026-09-23"
@@ -7190,7 +7219,9 @@ requirements:
     acceptance_criteria:
       - "THE SYSTEM SHALL attribute each file in a delivery to at most one dataset, using that dataset's own declared arrival pattern."
       - "THE SYSTEM SHALL match that pattern against the file's own name alone, and SHALL NOT use the delivery's name, its path or the file's position in it as any part of the match."
-      - "THE SYSTEM SHALL hold one arrival pattern per dataset, in that dataset's own configuration."
+      - "THE SYSTEM SHALL hold one arrival pattern per dataset, in that dataset's own configuration, as a regular expression in a field of its own."
+      - "THE SYSTEM SHALL NOT reuse the S3 keyPattern as the filename matcher, so that a transport concern and a filename concern stop sharing one value."
+      - "THE SYSTEM SHALL anchor each pattern to the whole filename, so that an unanchored pattern cannot match a substring and attribute a file it was never meant to claim."
       - "THE SYSTEM SHALL evaluate patterns independently of the order they are declared in, so that no attribution depends on which pattern happened to be checked first."
       - "WHEN the configuration gate runs, THE SYSTEM SHALL fail if a dataset that has slots declares no arrival pattern."
       - "WHEN the configuration gate runs, THE SYSTEM SHALL fail if any filename can be attributed to more than one dataset."
@@ -7211,9 +7242,43 @@ requirements:
       - "FOUND WHILE SCOPING, and it matters for sprint 7's own test coverage: under the real committed patterns, Child Protection's six datasets match EXACTLY one filename each (cp_clients.csv and so on), so the split-extract shape docs/delivery-format.md lists as legitimate - cp_clients.csv alongside cp_clients_part2.csv - matches nothing at all, and the second file would be reported as unrecognised rather than triggering the duplicate-match hold. Verified by running the real matcher over the real patterns. Two files matching one dataset is therefore currently unreachable for Child Protection and reachable for Birth Registrations only because its pattern carries a {date} placeholder."
       - "Rejected attributing an unmatched file by elimination - for instance, assuming the one file in a Birth Registrations delivery must be Birth Registrations. It reads reasonable and it is how a garbage file quietly becomes a supply."
       - "Rejected deriving the dataset from the delivery's directory name, which is arbitrary by design and would make recognition pass by parsing a name we wrote ourselves."
-    open_questions:
-      - "What form should the per-dataset pattern take? Options - (a) keep reusing the S3 keyPattern's last segment, which is what is built and needs no config change, but leaves one value doing two jobs and cannot express the split-extract shape; (b) add an explicit filename pattern per dataset alongside the keyPattern, so the S3 concern and the filename concern stop sharing a field; (c) a real regular expression per dataset, which is Keith's own stated instinct and the most expressive, at the cost of untrusted-input matching and a config form that is easy to get subtly wrong. Recommended (b), with the pattern form kept to placeholders rather than raw regex - it fixes the double duty and the split-extract gap without putting a regex engine on the supplier's side of the boundary."
 
+
+      - >
+        SETTLED 2026-09-24 (Keith): the arrival pattern is a REGULAR
+        EXPRESSION in a field of its own, not the S3 keyPattern reused.
+        His own instinct from Thread H, and the fork was decided on
+        expressiveness. The drafted middle option - placeholders in a
+        dedicated field - cannot express the split-extract shape without
+        gaining optionality, then repetition, then alternation, which is
+        reinventing regex badly.
+      - >
+        One objection to regex is recorded as OVERSTATED rather than
+        accepted. It was raised as "regex over untrusted input", which
+        implies an injection risk. WE author the pattern; the filename is
+        the input. A ReDoS needs a pathological pattern AND crafted
+        input, and the pattern is ours, so the real risk is us writing a
+        subtly wrong one rather than a supplier attacking. Keith's call
+        on that: "I'm kind of willing to accept the risk of someone
+        stuffing up a regex."
+      - >
+        What makes that risk acceptable is that it is ASYMMETRICALLY
+        PROTECTED. A pattern that is too BROAD means one filename can be
+        claimed by two datasets, which the configuration gate already
+        fails on. A pattern that is too NARROW is the dangerous one, and
+        nothing catches it at config time - which is what the warning
+        level on REQ-PIPE-057 now compensates for.
+      - >
+        REJECTED a second gate proposed in this conversation - that every
+        file in the committed delivery history must still match exactly
+        one pattern. Keith's objection is decisive and had been
+        underweighted: a downstream extraction system can legitimately
+        change its filename structure, and that is a change we WANT to
+        accept. Such a gate would force the old pattern to be kept
+        forever, so patterns could only ever grow alternations,
+        accumulating every historical naming scheme across thirty
+        datasets over years. It punishes exactly the change that should
+        be cheap. So there is ONE gate, the duplicate-attribution one.
   - id: REQ-PIPE-059
     title: Two files for one dataset in one delivery are held, never chosen between
     date_written: "2026-09-23"
