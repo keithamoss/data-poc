@@ -3008,12 +3008,19 @@ requirements:
         run_by/run_timestamp plus git history. After regeneration it
         will show one burst rather than the current spread. Inspect the
         feed rather than assuming it survives.
-      - Measure committed size and file count before and after. Today it
-        is 1,850 files and 129MB - 1,760/118MB of it Birth
-        Registrations. raw_output is ~78% of a file's bytes and stops
-        being duplicated, while CP's 18 collection-level run directories
-        become a per-dataset shape, so the net is a real question rather
-        than an obvious win.
+      - >
+        Measure committed size and file count before and after.
+        Measured on 2026-09-23 - 300 files and 26MB, of which 210
+        files/13MB Birth Registrations and 90 files/11MB Child
+        Protection. This line previously read 1,850 files and 129MB,
+        stale by roughly 5x and 6x, and that is recorded rather than
+        quietly corrected - a "before" figure nobody re-measures makes
+        the before-and-after comparison this NFR asks for meaningless,
+        so re-measure at the time rather than trusting this line
+        either. raw_output is the bulk of a file's bytes and stops
+        being duplicated, while CP's collection-level run directories
+        become a per-dataset shape, so the net is a real question
+        rather than an obvious win.
       - Regeneration must be idempotent and re-runnable, since it will
         be got wrong at least once.
       - Seeded and deterministic, so regenerating twice produces the
