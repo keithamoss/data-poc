@@ -2366,12 +2366,23 @@ requirements:
       every table, because that's just the reality of how it works",
       2026-09-20. Scoped by delivery-scoper, forks settled with Keith
       2026-09-21.
+    signed_off:
+      by: Keith
+      date: "2026-09-23"
     acceptance_criteria:
       - THE SYSTEM SHALL record each arrival of a dataset's data as an
         arrival of that dataset alone, carrying its own identifier and
         its own arrival timestamp.
       - THE SYSTEM SHALL hold, for every dataset, the identity of its
-        current version - the one that arrived most recently.
+        most recently ARRIVED supply, including one that could not be
+        loaded.
+      - THE SYSTEM SHALL hold, for every dataset, the identity of its
+        most recently PROMOTED supply, and SHALL NOT report a supply
+        that has arrived but not been promoted as the promoted one.
+      - THE SYSTEM SHALL derive both from append-only records, and
+        SHALL NOT maintain a mutable pointer to either.
+      - WHERE a supply could not be loaded at all, THE SYSTEM SHALL
+        still record its arrival, and SHALL NOT create a table for it.
       - WHEN one dataset in a collection receives an arrival, THE SYSTEM
         SHALL NOT create or imply an arrival for any other dataset.
       - THE SYSTEM SHALL NOT require the datasets in a collection to
@@ -2391,8 +2402,9 @@ requirements:
         anything under data/ to answer "when did this dataset last
         arrive".
       - Must stay cheap once a dataset has years of arrivals rather than
-        today's 18 - no walk of every arrival ever received to find the
-        current one.
+        today's 18. Answering either question must not cost a walk of
+        every arrival ever received, and must not be bought by keeping
+        a stored pointer in step.
       - Any new entry point gets a mothman subcommand in the same change.
     dependencies: [REQ-GEN-040]
     decisions:

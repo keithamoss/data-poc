@@ -609,6 +609,30 @@ Rough layout:
   after the gates, including a plans file or a changelog entry, the
   gates run again before the commit does.
 
+  **And the same rule for an EDIT: confirm it is on disk, by reading it
+  back.** Real incident, 2026-09-23, an hour after the entry above. A
+  multi-edit Python heredoc made three replacements to
+  `requirements.yaml`; the third `assert` failed, Python exited before
+  `write_text()`, and so NONE of the three were saved. The first two
+  asserts had passed, which is what made it invisible - a passing
+  assert says the text was FOUND, never that the file was CHANGED. The
+  validator then reported OK, correctly, on a file nothing had touched.
+
+  The cost was real rather than cosmetic: the changes were described to
+  Keith as though they had landed, and he signed off a requirement
+  against criteria the file did not contain. The record and the
+  conversation disagreed, and only a later count of the criteria caught
+  it.
+
+  So: **an edit script is not evidence of an edit.** After writing to a
+  structured file, read the field back and look at it - `yaml.safe_load`
+  and print the thing that was supposed to change, not the exit code of
+  the script that changed it. And prefer one edit per script, or
+  `raise SystemExit` per failure, over a batch where one bad match
+  silently discards the good ones. The general shape is this bullet's
+  own: a check that passed is about something specific, and here the
+  specific thing was not what it looked like.
+
 - **In a fresh session, do the environment setup UP FRONT - before
   running any test suite - rather than discovering what's missing from
   test failures.** Keith's own explicit ask, 2026-09-19, after watching
