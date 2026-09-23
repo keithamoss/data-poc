@@ -1495,37 +1495,101 @@ legitimate QA finding, non-circular because it is not making the call,
 and it is what turns a wrong default into something a human sees
 rather than something that sits there quietly.
 
-### Staged data lives IN the warehouse - IN DISCUSSION 2026-09-23
+### Staged data lives IN the warehouse - SETTLED 2026-09-23
 
-**Keith, 2026-09-23, raised at REQ-PIPE-034's sign-off.** Captured
-immediately because it is a real model statement, not a wording
-question, and the conversation it came up in is still open. Refine or
-delete this section once it settles; do not treat it as settled.
-
-His words, in substance: **staging is not outside the warehouse.** It
-is a schema in it. "Data arrives, we load it as soon as we can into
-the warehouse, and then we just start doing QA on it while it's in the
-warehouse. We only not load it if it's an unpalatable file that we
-can't actually read."
-
-That is consistent with everything already settled here - QA runs
-before promotion, and a supply that cannot be loaded at all is red -
-but it fixes something Thread B left implicit. Thread B says
+**Keith, 2026-09-23, at REQ-PIPE-034's sign-off.** Thread B above says
 "everything lands in staging on arrival" without saying where staging
-physically is, and the natural reading of "promotion moves it into a
+physically IS, and the natural reading of "promotion moves it into a
 period schema" is that staging sits somewhere else. It does not.
 
-**What his operational database does today**: a promoted schema, and a
-MIRROR staging schema alongside it, per slot. He flagged he is open to
-changing that to a single global staging schema.
+**Staging is a schema in the warehouse.** His words: data is loaded as
+soon as it can be, QA runs on it there, and the only thing not loaded
+is a file that cannot be read at all. Consistent with everything
+already settled - QA runs before promotion, an unloadable supply is red
+- but it had been implicit.
 
-**Genuinely unsettled, his own question**: where a REJECTED table is
-stored. Three options he named - in the promoted schema but labelled;
-in a separate rejected schema that is global; or in a rejected schema
-mirroring the staging one.
+**Three schemas, and two of them DEPART from Keith's operational
+system.** Recorded with the departures called out, because "it matches
+the real operational database" was a genuine argument for
+schema-per-period elsewhere in this design, and a later session could
+"correct" these back without knowing they were deliberate.
 
-Nothing here is decided. See the open-question list in Thread B once
-this lands.
+| Schema | Holds | vs. the operational system |
+|---|---|---|
+| period schemas, one per period | promoted supplies | unchanged |
+| **ONE GLOBAL staging schema** | everything on arrival | **DEPARTS** - today he runs one staging schema PER QUARTER |
+| **ONE GLOBAL rejected schema** | supplies a human decided against | **DEPARTS** - today rejected tables just stay in staging |
+
+**Why global staging rather than per-slot.** A supply's slot is not
+known when it lands, and that is the whole point of staging - Thread B:
+it "asserts only the thing actually known (this landed at this time),
+so it can never be wrong". A slot-mirrored staging schema forces the
+slot to be named at LOAD time, which is exactly the filing decision
+staging exists to defer. Three cases have no slot to name: an early
+supply not yet inside its claim window, a supply held for a human
+because nothing is confidently claimable, and a mixed-period delivery
+whose tables belong to different periods. A mirror would need an
+"unassigned" schema alongside it, ending up with global AND mirrors -
+worse than either. Keith's own summary on agreeing: "we don't know
+where it should go, or indeed we need a human to make a decision."
+
+**Why a rejected schema at all**, given a red supply that was never
+promoted already has a home - it stays in staging. The argument is not
+correctness, it is that staging otherwise becomes a work queue and a
+graveyard at once, and "awaiting a decision" stops being
+distinguishable from "decided against six months ago". Keith confirmed
+this is a real problem in his own system: once a quarter's supplies are
+done, his staging schema holds only rejected things plus some
+green-but-superseded ones. His words: "a decision has been made, in
+essence" - so it should not be sitting in the queue.
+
+**Rejected is a DECISION state, not a QA verdict.** Red and nobody has
+looked at it yet is still STAGED. Red and a human said no is REJECTED.
+Reversible, via the un-decide operation already settled in Thread G.
+
+**Rejected is NOT a label in the promoted schema** - rejected on the
+day this was settled, and for a reason already load-bearing elsewhere:
+schema-per-period beat the per-run databases precisely because dbt and
+Soda have no `run_id`-scoped `WHERE`. They equally have no "and not
+rejected". Isolation by schema, not by label. A filter every query must
+remember to apply is a false-green generator.
+
+**Why the rejected schema is global rather than mirroring periods.**
+Nothing queries rejected data - layout follows what reads it.
+Schema-per-period exists so a cross-table check reads one schema;
+rejected data is never in such a query by definition. Its intended slot
+is a fact in the decision log, and a supply rejected before assignment
+may have no slot to name at all.
+
+**An unloadable file gets NO table.** Keith, directly: there is no
+point creating an empty one when the delivery log already records that
+something arrived and could not be read. The arrival is a fact; the
+table is not.
+
+**Retention is explicitly OUT of scope for the PoC** (Keith,
+2026-09-23). Staging and rejected only grow, and that is accepted -
+"we'll need that eventually but it's not a priority right now". The
+future question he named is not just dropping data but whether QA
+history is kept alongside it, kept after it, or dropped with it.
+Recorded as a deliberate no rather than an unasked question.
+
+**Keith's real four-version scenario**, worth keeping because it is
+what the states have to survive: a supplier sends a broken version,
+rejected; a second broken one, rejected; a third that is "not perfect,
+but we do need to get data through" - deliberately NOT rejected, kept
+while they are asked for one more; then a fourth that is green. Two
+versions are in staging at once until the fourth is promoted. Note what
+the third one is: a human HAS looked and HAS decided, and the decision
+was neither promote nor reject. That is not the same state as "nobody
+has looked".
+
+**Open question this leaves - what is the terminal state of a staged
+supply that is never promoted and never explicitly rejected?** The
+third version above, once the fourth is promoted. It is not rejected -
+nothing was decided against it - but leaving it in staging is the
+dumping-ground problem returning by the back door. Keith has already
+observed the same residue in his own system ("potentially there's some
+stuff that's green that was superseded"). Unresolved as at 2026-09-23.
 
 ### QA runs on staging, and that is arguably the point
 

@@ -2402,6 +2402,48 @@ requirements:
         be reconstructed later if it is not recorded now, and without it
         a real whole-collection delivery is indistinguishable from six
         coincidental arrivals.
+      - >
+        Decided "current version" SPLITS into most recently ARRIVED and
+        most recently PROMOTED (Keith, 2026-09-23, at sign-off). The
+        single criterion this replaces was written 2026-09-21, before
+        staging and promotion were settled, and the two diverge exactly
+        when it matters: a supplier sends a broken file on Tuesday, so
+        it is the latest arrival, while the warehouse still holds
+        Monday's good one and should. The dashboard needs the first for
+        an arrival timeline; a cross-table check needs the second.
+        Conflating them reads fine until a red supply arrives.
+      - >
+        Decided both are DERIVED from append-only records rather than
+        stored as a pointer (Keith, 2026-09-23, who asked for an option
+        not needing a second set of state). The two have different
+        natural sources, which is what makes it free.
+        Most-recently-promoted is the FILING itself - the newest table
+        for the dataset in the newest period schema holding one, found
+        by walking periods newest-first from config (REQ-PIPE-051) and
+        stopping at the first hit, so it is bounded by periods since
+        that dataset last supplied rather than by total arrivals.
+        Most-recently-arrived comes from the committed arrival record.
+        Rejected a mutable pointer: it is state that can drift from what
+        is actually true, whereas an append-only log with a max over it
+        cannot.
+      - >
+        Decided most-recently-arrived must NOT be derived from the
+        warehouse catalogue, and the unloadable-file case is why. Such a
+        supply is red with no table anywhere (Keith, 2026-09-23: there is
+        no point creating an empty one when the delivery log already
+        records that something arrived and could not be read). Derive
+        arrival from the catalogue and a supplier sending garbage on
+        Tuesday becomes invisible - the timeline would show Monday. This
+        is forced rather than merely preferable: the dashboard build may
+        never touch data/, so it cannot read the catalogue at all.
+      - >
+        Context, settled the same day but recorded in
+        plans/supply-model.md Thread B rather than here because it
+        belongs to the warehouse sprint: staged data lives IN the
+        warehouse, in ONE GLOBAL staging schema, with a separate global
+        rejected schema. Both depart deliberately from Keith's
+        operational system, which runs staging per quarter and leaves
+        rejected tables sitting in it.
 
   - id: REQ-PIPE-035
     title: QA runs against one period's schema, with the staged delivery overlaid
