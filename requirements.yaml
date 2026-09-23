@@ -2480,6 +2480,21 @@ requirements:
         above stands, including why it cannot live only in the
         warehouse. REQ-PIPE-038 owns the storage shape.
 
+
+      - >
+        DEFECT FOUND AFTER SIGN-OFF, 2026-09-23. The decision deriving
+        "most recently PROMOTED" as the newest table in the newest
+        period schema is a WAREHOUSE CATALOGUE read - and the decision
+        directly above it forbids exactly that reasoning for the ARRIVED
+        side, because the dashboard build may never touch data/ so it
+        cannot read the catalogue at all. The identical argument applies
+        to the promoted side and was not applied. Concretely
+        REQ-DASH-056, which wants the dashboard to show that the latest
+        supply is red and staged while the promoted version is Monday's,
+        cannot be computed at all under this derivation. The right
+        source is Thread G's committed append-only decision log, which
+        does not exist until batch 4 - a build-order fact to record, not
+        a design to ship.
   - id: REQ-PIPE-035
     title: QA runs against one period's schema, with the staged delivery overlaid
     date_written: "2026-09-21"
@@ -2728,6 +2743,23 @@ requirements:
         question does not arise - promotion decides what is in a period
         schema, and a red supply is never auto-promoted.
 
+
+      - >
+        VERIFIED HARD BLOCKER FOUND AFTER SIGN-OFF, 2026-09-23. The
+        one-database rule cannot hold alongside parallel runs as things
+        stand. Tested with genuinely separate processes - while one holds
+        a read-write DuckDB connection, a second writer fails AND a
+        read-only reader fails, "IO Error: Could not set lock on file".
+        It is one PROCESS, not one writer. mothman pipeline run is
+        parallel by default, and dbt runs as its own writing process
+        (dbt build --store-failures materialises a model plus an audit
+        table per failing test into the same file). The per-run
+        databases providing that isolation today are removed by this
+        same requirement, and its only isolation NFR covers TEST workers
+        rather than production concurrency. A workable shape - a private
+        scratch database per run for dbt, the shared warehouse ATTACHed
+        read-only, all shared writes serialised through one
+        load/promotion step - needs deciding before build.
   - id: REQ-PIPE-036
     title: A delivery triggers one QA run, and each dataset's results stand alone
     date_written: "2026-09-21"
@@ -2890,6 +2922,25 @@ requirements:
         cross-table scope is what makes this refinement safe, so the two
         have to land together rather than in either order.
 
+
+      - >
+        CONTRADICTION FOUND AFTER SIGN-OFF, 2026-09-23, three-way and
+        unresolved. Criterion 4 scopes each tool invocation to one
+        dataset so its raw output "needs neither duplicating nor
+        filtering"; REQ-QAC-037 requires a cross-table result filed
+        against its own scope and not duplicated; REQ-PIPE-038's
+        decision says splitting a raw output per dataset means copying
+        or filtering it, which breaks the genuinely-unmodified
+        guarantee. A cross-table check is DECLARED inside one dataset's
+        block, so under per-dataset invocations its result lands in that
+        dataset's raw output. Sharper: REQ-QAC-039 (built) bakes the
+        dataset into every check_id, so a result whose identity
+        permanently names cp-notifications is to be filed under a scope
+        that is explicitly not cp-notifications. This is not the
+        placement question REQ-QAC-037 parked for the architect - it is
+        whether identity and filing may disagree. A third invocation
+        kind (per-scope, with its own raw output) is the likely answer
+        and would change criterion 4.
   - id: REQ-QAC-037
     title: A cross-table check belongs to the cross-table scope, not to one dataset
     date_written: "2026-09-21"
@@ -2971,6 +3022,24 @@ requirements:
         recorded an hour earlier.
         Kept as one rule in one place rather than two worded
         differently, which is how two implementations diverge.
+
+      - >
+        DEFECT FOUND AFTER SIGN-OFF, 2026-09-23 - do not build criterion
+        6 as written. It says cross-table checks keep "the section of
+        their own that REQ-DASH-033 gives them". REQ-DASH-033 gives them
+        no such section; it created SUPPLY-LEVEL and TABLE-LEVEL
+        sections, which are about same-table rules. Verified against the
+        real built data - the canonical cross-table check, "Client
+        reference", renders as an ordinary COLUMN check on cp_client_id
+        with scope None across notifications, investigations and
+        placements. Worse, REQ-DASH-033 folds those checks into the
+        dataset's own status, which is exactly what Thread I settled
+        against. The real requirement is Thread I's table - blocked
+        table red with a chip, healthy neighbour green with a pointer
+        NAMING the blocker, the red landing at COLLECTION level - which
+        is new behaviour, not a "continue to". The error came from
+        publishing-and-history item 6 answer 2 and propagated unchecked
+        into a signed criterion.
     open_questions:
       - Where the cross-table scope physically lives in qa_results/ and
         what it is called. Left for delivery-architect - a storage-shape
@@ -3894,6 +3963,23 @@ requirements:
         chains carrying all 9 entries, zero console errors. This
         requirement covers what that check did not reach.
 
+
+      - >
+        CONTRADICTION FOUND AFTER SIGN-OFF, 2026-09-23. Criterion 3 says
+        the as-of view shows the most recent ARRIVAL. Thread H wrinkle 1
+        says "as at T = the latest version PROMOTED on or before T";
+        wrinkle 7 names clipDatasetToAsOf() directly and says filtering
+        on arrival "becomes wrong the moment promotion lands"; and TS-28,
+        approved by Keith 2026-09-22, expects a supply promoted on Friday
+        to be ABSENT from the as-at-Wednesday view. The 2026-09-23
+        decision is newer and wins, but TS-28 carries the standing
+        obligation that every scenario gets a unit test, so someone will
+        write a test asserting the opposite of a signed criterion. The
+        likely clean resolution - the WAREHOUSE's as-at is
+        promotion-filtered while the DASHBOARD's as-of is
+        arrival-filtered, because the dashboard reports QA rather than
+        warehouse contents - is not written anywhere, and TS-28 needs
+        rewording either way.
   - id: REQ-DOCS-028
     title: A "What's New" feed written for the people who use the tool
     date_written: "2026-09-20"

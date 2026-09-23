@@ -66,14 +66,22 @@ the whole spine: check identity, the generator and delivery format,
 status parity, the timezone parameter, schedule config and its gate,
 and periods/slots with runway.
 
-**Batch 3 is SIGNED OFF, 2026-09-23** - all six requirements walked
-through with Keith one at a time and signed: `REQ-PIPE-034` (per-dataset
+**Six requirements were SIGNED OFF on 2026-09-23 - but they are NOT
+batch 3, and building cannot start.** They were walked through with
+Keith one at a time and signed: `REQ-PIPE-034` (per-dataset
 arrival history), `REQ-PIPE-035` (one period's schema, staged delivery
 overlaid), `REQ-PIPE-036` (a delivery triggers one QA run), `REQ-QAC-037`
 (cross-table checks in their own scope), `REQ-PIPE-038` (committed
 history keyed per dataset, delivery log beside it), `REQ-DASH-041`
-(supply history and as-of viewing under per-dataset arrivals). Building
-can start.
+(supply history and as-of viewing under per-dataset arrivals).
+
+**They are sprints 13, 14, 15, 16 and 19** - not sprints 7-10 as the
+batch label claimed - and a `delivery-scoper` sense-check run the same
+evening found four defects in them plus a long carry-over list. See
+"Batch 3's scoper sense-check" above for all of it. **Keith's sequencing
+decision, 2026-09-23: scope sprints 7-10 FIRST**, then bring these six
+back where they actually fit the sprint order, fixing the four defects
+as and when each is reached.
 
 **The walkthrough changed them substantially - read the requirements,
 not this summary.** Three of the six turned out to carry a SUPERSEDED
@@ -128,7 +136,7 @@ reaching into the next one.
 |---|---|---|
 | **1 · Preconditions** | 1-4 | check identity, generator + delivery format, status parity, timezone |
 | **2 · Schedule and slots** | 5-6 | schedule config + validation, slot derivation |
-| **3 · Arrival and filing** | 7-10 | delivery recognition, arrival/staging, assignment, classification |
+| **3 · Arrival and filing** | 7-10 | delivery recognition, arrival/staging, assignment, classification - **STILL UNSCOPED as at 2026-09-23, see below** |
 | **4 · Decisions and storage** | 11-14 | promotion, decision log, warehouse, `qa_results/` |
 | **5 · QA under the new model** | 15-18 | delivery-triggered QA, check deps, red-for-unrun, drift |
 | **6 · Dashboard** | 19-24 | supply history, freshness, decision-log display, activity feed, snapshots, time-granular as-of, plus the embedded period sequences moved here 2026-09-23 |
@@ -137,6 +145,14 @@ Batch 2 is only two sprints, deliberately: they are the SPINE -
 everything downstream is defined as a comparison against the slot
 sequence - so it gets its own pass rather than being buried in a batch
 of six.
+
+**The batch table above describes the PLAN, and on 2026-09-23 the plan
+and the register disagreed.** Six requirements were signed off believing
+they were batch 3; they are actually sprints 13-16 plus 19, and sprints
+7-10 have no requirement at all. See "Batch 3's scoper sense-check"
+below for the full account. Keith's call: scope 7-10 first, then place
+those six where they really belong. **Check a batch's contents against
+this table before trusting either one.**
 
 Batch 6 is the biggest at six. Homogeneous enough to hold together, but
 **split it at 19-21 / 22-24 if it comes back sprawling** - the seam is
@@ -339,6 +355,312 @@ did not). Both remain `not_started` and UNSIGNED.
 anything `delivery-scoper` produces is a PROPOSAL. `CLAUDE.md`'s
 sign-off rule applies before any of it is built - scoping is not
 sign-off. See Thread G.
+## Batch 3's scoper sense-check - findings, 2026-09-23
+
+**Status:** todo (2026-09-23) · **Category:** Pipeline & publishing
+
+Keith's call to run the six signed batch-3 requirements through
+`delivery-scoper` as a sense-check, after this session found they had
+never been through it. His words: "even if it won't come back with much,
+it'll be a good sense check." It came back with a great deal. Recorded
+here in full because the agent transcript does not survive, and because
+the carry-over list below is the thing that has never been done for this
+batch.
+
+### The finding that reframes the rest: these six are not sprints 7-10
+
+**Verified against the sprint list, not taken on trust.** The six map to:
+
+| Requirement | Actual sprint |
+|---|---|
+| `REQ-PIPE-034` arrival history | ~8, and only the RECORD, not staging |
+| `REQ-PIPE-035` period schema + overlay | **13** - one database, many schemas |
+| `REQ-PIPE-038` `qa_results/` keying | **14** |
+| `REQ-PIPE-036` delivery-triggered QA | **15** |
+| `REQ-QAC-037` cross-table scope | **16** |
+| `REQ-DASH-041` supply history / as-of | **19** |
+
+So they are sprints 13-16 plus 19 - batches 4, 5 and 6 - and **sprints
+7, 8, 9 and 10 have NO requirement at all**: delivery recognition and
+file-to-dataset mapping (`REQ-GEN-043` built only the FORMAT, nothing
+consumes it), staging load, slot assignment, and arrival classification.
+
+They were hand-drafted 2026-09-21 from `plans/publishing-and-history.md`
+item 6, before the batching scheme existed, then labelled "batch 3"
+because the batch table said batch 3 was sprints 7-10. Nobody checked
+the label against the contents.
+
+**Two BUILT, SIGNED requirements already wrote IOUs against a batch 3
+that does not contain them:**
+- `REQ-PIPE-052` defers "oldest claimable unfilled slot,
+  on-time-wins-for-the-current-slot, monotonic filling, hold for a
+  human" to batch 3. Those phrases appear exactly once in the whole
+  register - in that deferral. "hold for a human" appears zero times.
+- `REQ-PIPE-053` depends by name on "replaying the backlog in
+  arrival-timestamp order, which is batch 3's rule", and on a filing
+  layer for three of its own criteria.
+
+**Consequence**: building these six requires inventing slot assignment -
+which this file itself calls "the highest-risk sprint in the plan - two
+cascades were found here by stress-testing, one created by the fix for
+the other" - with no requirement, no acceptance criteria and therefore
+no sign-off, which CLAUDE.md's gate forbids. The obvious implementation
+("oldest unfilled slot") is precisely the one Thread E proves
+catastrophic.
+
+**Keith's decision, 2026-09-23**: scope sprints 7-10 FIRST. These six
+come back afterwards, placed where they actually fit the sprint order,
+and the four defects below get fixed as and when they are reached.
+
+### Four defects in the signed six
+
+**D1. `REQ-QAC-037` criterion 6 is factually wrong.** It says cross-table
+checks keep "the section of their own that `REQ-DASH-033` gives them".
+`033` gives them no such section - it created SUPPLY-LEVEL and
+TABLE-LEVEL sections, which are about same-table rules. Verified against
+the real built data: the canonical cross-table check, "Client reference",
+renders as an ordinary COLUMN check on `cp_client_id` with `scope: None`
+in all three of notifications, investigations and placements. Worse,
+`033`'s own criterion folds those checks into the dataset's own status -
+exactly what Thread I settled against. The real requirement is Thread
+I's table: blocked table red with a chip, healthy neighbour green with a
+pointer NAMING the blocker, the red landing at COLLECTION level. That is
+new dashboard behaviour, not a "continue to". The error originates in
+item 6's answer 2 and propagated unchecked into a signed criterion.
+
+**D2. `REQ-DASH-041` c3 contradicts TS-28 and Thread H.** 041 says the
+as-of view shows the most recent ARRIVAL, never the promoted supply
+(Keith, 2026-09-23). Thread H wrinkle 1 says "as at T = the latest
+version PROMOTED on or before T"; wrinkle 7 names `clipDatasetToAsOf()`
+directly and says filtering on arrival "becomes wrong the moment
+promotion lands"; and TS-28, approved by Keith 2026-09-22, expects a
+supply promoted on Friday to be ABSENT from the as-at-Wednesday view.
+The 2026-09-23 decision is newer and wins, but TS-28 carries the
+standing obligation that every scenario gets a unit test, and its
+expected result is now the opposite of a signed criterion. Someone will
+write that test. A clean resolution probably exists - the WAREHOUSE's
+"as at T" is promotion-filtered, the DASHBOARD's as-of is
+arrival-filtered, because the dashboard reports QA rather than warehouse
+contents - but nothing says so and TS-28 needs rewording.
+
+**D3. A three-way contradiction about where a cross-table result lives.**
+`REQ-PIPE-036` c4 scopes each tool invocation to one dataset "so that
+the tool's raw output describes that dataset alone and needs neither
+duplicating nor filtering". `REQ-QAC-037` c1/c2 require a cross-table
+result filed against its own scope, not duplicated. `REQ-PIPE-038`'s own
+decision says splitting a raw output per dataset means either copying it
+or filtering it, which "breaks the genuinely-unmodified guarantee".
+A cross-table check is DECLARED inside one dataset's block
+(`contract/child-protection-soda-checks.yml`, under `cp_notifications`),
+so under per-dataset invocations its result lands in that dataset's raw
+output, and filing it elsewhere needs exactly the copying-or-filtering
+038 forbids. Sharper still: `REQ-QAC-039` (built) bakes the dataset into
+every `check_id` - the real id reads
+`...child-protection.cp-notifications.cp_client_id.relationships_soda` -
+so a result whose identity permanently names `cp-notifications` is to be
+filed under a scope that is explicitly not `cp-notifications`. This is
+not the placement question 037 parked for the architect; it is whether
+identity and filing may disagree.
+
+**D4. `REQ-PIPE-034`'s "most recently PROMOTED" cannot be answered by
+anything forbidden to touch `data/`.** Its decision derives it as the
+newest table in the newest period schema holding one - a WAREHOUSE
+CATALOGUE read. The neighbouring decision, written in the same session,
+forbids exactly that reasoning for the ARRIVED side because "the
+dashboard build may never touch data/, so it cannot read the catalogue
+at all". The identical argument applies to the promoted side and was not
+applied. Concretely, `REQ-DASH-056` wants the dashboard to show "latest
+supply is red and staged, promoted version is Monday's" - and under 034's
+derivation the dashboard build cannot compute that at all. The right
+source is Thread G's committed append-only decision log, which does not
+exist until batch 4. A build-order fact to record, not a design to ship.
+
+### Carry-over: decisions in the threads that NO requirement holds
+
+The mechanical check CLAUDE.md requires per batch, never done for these
+six. Only the NOT-CARRIED items are listed - carried ones need no
+action. Rejected alternatives are marked X, because those are what get
+re-proposed once prose is deleted.
+
+**Thread A - storage.** A resupply is a NEW TABLE in the same schema,
+not an overwrite (`build_cp_warehouses.py` does `CREATE OR REPLACE`
+today, so the cheapest implementation satisfies 035's read-the-newest
+criterion by keeping exactly one version and destroys the history that
+criterion exists for). Table contents immutable once written BUT tables
+CAN move between schemas - the movability half is what makes
+promotion/demotion/re-file cheap. Physical table names carry the arrival
+timestamp, stated once as a rule rather than inferred from two
+requirements that depend on it. "Show me Q3" and "show me as at 30 June"
+become different questions once early arrivals exist - Keith's call was
+to stick with as-at. And a live item: nothing in the dashboard says
+which axis it is on.
+
+**Thread B - staging and promotion.** X "file by arrival, period as
+correctable metadata". Staging asserts only what is known, so it can
+never be wrong. The quarterly/daily difference is ONLY who pulls the
+trigger. **The content check survives as a DETECTOR, not a decider** -
+"this supply does not look like the period it is filed under" is a
+legitimate non-circular QA finding, and it is the only thing that turns
+a wrong default filing into something a human sees; no requirement owns
+it. WHY global staging rather than per-slot (034 records the departure
+from Keith's operational system WITHOUT the reason, which is the worst
+combination - a later session sees the difference and no argument, and
+corrects it back). Why a rejected schema at all. "Rejected" is a
+DECISION state, not a QA verdict. X rejected-as-a-LABEL in the promoted
+schema, because "a filter every query must remember to apply is a
+false-green generator". Why the rejected schema is global. Retention
+explicitly out of scope. The four-version scenario and there being NO
+superseded state. X promoting the loser as a non-current version.
+Red never auto-promotes. An unexpected table is INFORMATIONAL.
+
+**Thread D - arrival classification (sprint 10, no requirement).** Every
+substantive decision is uncarried. Classify against the period the
+supply was FILED to, never one re-derived from the arrival date -
+symptom of getting it wrong: "filed to Q3, reported late for Q2".
+Classification REMOVES a property rather than adding one. **Slot
+ASSIGNMENT and PROMOTION are two steps, not one** - assignment is a
+derivation with no human in it, promotion is a decision - and a REJECTED
+supply still gets classified, because "arrived three weeks late AND was
+bad" is what belongs on the record. The verdict stops being a frozen
+historical fact once re-filing exists, which contradicts
+`pipeline/cadence.py`'s current docstring. The dashboard's JS never
+recomputes classification.
+
+**Thread E - slot assignment (sprint 9, no requirement).** The rule
+itself: assign to the oldest slot whose claim window is open and which
+is unfilled; if none, it is a RESUPPLY of the most recently filled slot.
+NEVER CLAIM FORWARD, and why the risk is asymmetric - backwards is one
+contained error, forwards cascades through every future delivery. The
+ambiguous case defaults but is MARKED as assigned under ambiguity and
+surfaced. What a boundary misfile actually costs: the reporting is wrong
+TWICE - a punctual supplier recorded as a very late resupply, and the
+next slot left unfilled so it goes overdue as a phantom. Arrival into a
+filled slot never auto-promotes whatever its status. X a "within X of
+the window opening" trigger, because X is a magic number. Resupply after
+REJECTION is routine, after ACCEPTANCE is odd. **Punctuality is evidence
+of which slot a supply is for** - the backward-cascade fix. X closing a
+slot's window when the next opens, and X a finite lateness tolerance.
+`not_expected` versus MARKED MISSED, and why the distinction stops
+supplier reliability becoming whatever people were willing to excuse.
+
+**Thread H - chaos findings.** Assign in ARRIVAL-TIMESTAMP order, never
+discovery order, with a defined tiebreak - `REQ-PIPE-053` already
+depends on this by name. **Monotonic filling** - a slot stops being
+claimable once a later slot is filled - plus its named limit, hold for a
+human when nothing is confidently claimable; without it a missed
+delivery is recorded as MET, which the thread rates worse than a cascade
+because it manufactures a delivery that never happened. Two files in one
+delivery matching one dataset's pattern - hold for a human (sprint 7).
+Conflicting decisions record both, last wins, serialised, each run
+drains the backlog. Re-filing into an occupied slot supersedes and
+warns.
+
+**Thread I - the multi-table nodata seam.** The existing `nodata` is a
+different KIND from the new per-check one. Cross-cadence checks: closed
+by SCOPE rather than answered (Keith: "we won't have cross cadence
+checks"), and that closure exists only in prose. ARRIVAL triggers QA,
+never promotion, because promotion-as-trigger LOOPS. A supply's
+promotion decision considers every check its arrival caused to run, not
+only checks defined on that table. **I6, which the thread itself labels
+LOAD-BEARING and no requirement holds: check results are CONDITIONAL on
+that supply being promoted, a period's status is computed from promoted
+supplies only, and a rejected candidate leaves its period's dependent
+checks back at cannot-run.** The load-bearing case is TS-18 - the
+cross-table check evaluates GREEN and the candidate is then rejected for
+a different reason; keep the verdict and a check reads green for a
+period whose data never entered the warehouse. Promotion does not re-run
+anything, it promotes the VERDICT alongside the data - which rests on
+tables being immutable. That identity holds only if QA and promotion are
+SERIALISED per period. The trap to be written down as INTENDED
+behaviour: a multi-table check refusing to run reads red even though
+data exists for every table it spans, and "would be helpfully 'fixed' by
+a later session without the reasoning attached". X exclude-from-worst-of
+plus an "18 of 24 checks evaluated" count. What each level shows - the
+healthy neighbour green with an informational POINTER naming the
+blocker, the red landing at COLLECTION level, and it is a pointer, NOT a
+duplicated result. **Checks must DECLARE their participating tables
+(`depends_on`), and the cannot-run rule is NOT COMPUTABLE without it** -
+`grep depends_on requirements.yaml` returns zero, while three signed
+criteria depend on it. The three temporal reference kinds
+(`previous_period` / `baseline` / rolling `window`) as real design
+choices per check, not settings.
+
+**Test scenario register.** TS-3's "what this family is FOR" note - the
+four sub-tests assert that a KNOWN IMPERFECTION STAYS CONTAINED rather
+than that the system gets the right answer, and the register says
+explicitly to label them so a later session does not "fix" them.
+
+### Further points worth keeping
+
+- A crash between staging load and QA has no defined behaviour. 038
+  writes a delivery's file ONCE at recognition and never rewrites it, so
+  after a crash mid-load the delivery is on record, some tables are
+  staged, possibly partially written, and nothing says whether the next
+  run skips it or re-processes it. A truncated table in a global staging
+  schema is indistinguishable from a real short supply and would be QA'd
+  as real data. 035 names orphaned VIEW schemas; nothing names orphaned
+  STAGED TABLES.
+- `read_json_auto` over immutable multi-year delivery files needs an
+  explicit column spec, so the first added field breaks the view or is
+  silently dropped. A `format_version` per delivery file is cheap
+  insurance.
+- A CROSS-AGENCY check has no collection to be lifted to. 035
+  deliberately spans the whole asset per period so cross-agency checks
+  are ordinary same-schema queries; Thread I resolves cross-table filing
+  as "the COLLECTION's". At 30 datasets across agencies this stops being
+  hypothetical.
+- `REQ-PIPE-035` does not carry the mothman-only constraint, although it
+  introduces new entry points (schema creation, staging load). 034, 036
+  and 038 do.
+- PRIVACY, judged rather than asked: 035 names the period schema as the
+  most sensitive artefact this design creates, correctly, but does not
+  name the GLOBAL STAGING and GLOBAL REJECTED schemas - new, never
+  emptied, spanning every agency, holding every supply ever received
+  INCLUDING ones rejected because they were wrong. An extract with
+  columns nobody should have sent sits there forever. Retention being
+  out of PoC scope is the right PoC call; what is missing is that the
+  deferral is recorded only in prose due for deletion.
+- `REQ-PIPE-038`'s regeneration is sequenced before promotion exists
+  (sprint 11), so a regeneration run now produces a history where
+  nothing is ever promoted, every period schema is empty and every
+  cross-table and drift check is red-for-unrun - the whole of Child
+  Protection permanently red in committed history. And once the
+  warehouse's contents are a function of human promotion decisions it is
+  no longer regenerable from `data/` alone; rebuilding needs the
+  decision log replayed.
+- `REQ-PIPE-035`'s one-database rule is a VERIFIED HARD BLOCKER against
+  parallel runs. Tested with genuinely separate processes: while one
+  holds a read-write connection, a second writer fails AND a read-only
+  reader fails - `IO Error: Could not set lock on file`. It is one
+  PROCESS, not one writer. `mothman pipeline run` is parallel by
+  default, and dbt runs as its own writing process
+  (`dbt build --store-failures` materialises a model plus an audit table
+  per failing test into the same file). The per-run databases that
+  currently provide this isolation for free are removed by the same
+  requirement. A workable shape exists - a private scratch database per
+  run for dbt's materialisation and audit tables, with the shared
+  warehouse ATTACHed read-only and all shared writes serialised through
+  one load/promotion step - but it needs deciding.
+
+### Four questions the scoper prepared, still open
+
+1. **One DuckDB database and concurrent QA runs** - private scratch per
+   run with the warehouse attached read-only; or one writer with
+   everything serialised; or per-run databases for dbt only.
+2. **Where a cross-table result is filed, given its identity permanently
+   names one dataset** - let identity and filing disagree; give
+   cross-table checks their own identity segment (a second rename,
+   needing its own exception); or file under the defining dataset and
+   lift at render time.
+3. **As-of: arrival or promotion, and what TS-28 now asserts** - two
+   different views both correct, with TS-28 retagged as a warehouse
+   scenario; invert TS-28 to match 041; or carry both axes explicitly
+   in the dashboard.
+4. **When committed history is regenerated** - twice; or build 038's
+   shape now and regenerate once after batch 4; or regenerate now and
+   accept a wall-to-wall red Child Protection for however long batch 4
+   takes.
+
 ## Concept inventory
 
 **Status:** todo (2026-09-22) · **Category:** Pipeline & publishing

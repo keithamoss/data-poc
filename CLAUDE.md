@@ -843,6 +843,52 @@ Rough layout:
   looking, which a sign-off step makes structurally impossible because
   the requirement has to be read aloud to be signed.
 
+- **Before walking a BATCH of requirements through sign-off, verify two
+  things about it: that it went through `delivery-scoper`, and that its
+  contents actually match the sprints its label claims.** Keith's own
+  explicit ask, 2026-09-23, and his words on the failure it follows:
+  "you should have flagged that we were scoping stuff that hadn't gone
+  to the scoper. That's ridiculous. Address that in future, please."
+
+  **What happened.** Six requirements were presented and signed off one
+  at a time as "batch 3, delivery sprints 7-10". Neither claim was
+  true. Only one of the six had ever been through `delivery-scoper` -
+  the rest were hand-drafted 2026-09-21 from `plans/publishing-and-
+  history.md` item 6, before the batching scheme existed, and were
+  LABELLED batch 3 afterwards because the batch table said batch 3 was
+  sprints 7-10. Checked properly, they are sprints 13, 14, 15, 16 and
+  19, and **sprints 7, 8, 9 and 10 have no requirement at all** -
+  including slot assignment, which this project's own plan calls the
+  highest-risk sprint in it.
+
+  Two things make this worse than a mislabel. Three of the six turned
+  out during sign-off to carry a SUPERSEDED MODEL, which is exactly
+  what a scoper pass against the current threads would have caught -
+  and the requirements the scoper HAD produced needed no such
+  corrections. And two already-built requirements had written IOUs
+  against a "batch 3" that did not contain them, so the work they
+  deferred had no owner and nobody knew.
+
+  **The specific failure mode to avoid is narrower than "check things".**
+  Provenance was checked only when Keith asked directly; scope was never
+  checked at all, even after the provenance answer came back "no". One
+  unverified label was carried through an entire sign-off session and
+  into six `signed_off:` fields. So, mechanically, before the first
+  requirement of a batch is presented:
+  - `grep` each requirement's `source:` for `delivery-scoper`. If a
+    requirement has no scoper pass, SAY SO before presenting it, rather
+    than after being asked.
+  - Map each requirement onto the real sprint list and check the batch
+    label against what is actually in it. A batch table is a plan; the
+    requirements are the thing.
+  - `grep` the register for work other requirements have DEFERRED to
+    this batch by name. `REQ-PIPE-052`'s deferral of slot assignment
+    appeared exactly once in the whole file - in that deferral.
+
+  Same family as the rest of this section: the failure is never
+  carelessness, it is that a label read true and nobody asked it to
+  prove itself.
+
 - **Never change an authoring standard without Keith's explicit
   approval - propose the exact wording, get a yes, then edit.** His own
   standing instruction, 2026-09-20. It covers two files:
