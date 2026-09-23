@@ -25,6 +25,7 @@ import pytest
 
 from qa_tools.common.dataset_status import (
     CHECK_STATUSES,
+    dashboard_status,
     DATASET_STATUSES,
     ORDERED_STATUSES,
     UNORDERED_STATUSES,
@@ -143,29 +144,48 @@ class TestTheErrorSaysEnoughToActOn:
 
 class TestTheRealCommittedHistoryStillPasses:
     """Making an unrecognised status fatal is only safe if nothing in the
-    real committed history carries one. Asserted rather than assumed -
-    this is the change that turns a false green into a failed build, so
-    the blast radius is worth measuring rather than trusting."""
+    real history carries one. Asserted rather than assumed - this is the
+    change that turns a false green into a failed build, so the blast
+    radius is worth measuring rather than trusting.
 
-    def test_every_recorded_status_in_the_built_reports_is_recognised(self):
-        reports = Path(__file__).resolve().parents[1] / "reports"
-        paths = [reports / "birth_registrations_dashboard.json",
-                 reports / "child_protection_dashboard.json"]
-        present = [p for p in paths if p.exists()]
-        if not present:
-            pytest.skip("dashboard JSON not built in this environment")
-        known = set(ORDERED_STATUSES) | UNORDERED_STATUSES
+    Read from committed `qa_results/` rather than from `reports/*.json`,
+    and that is a correction rather than a preference. The first version
+    read the built dashboard JSON, which is a REGENERATED artifact: in a
+    parallel run tests/test_dashboard_e2e.py's build fixture rewrites
+    those same files, and this test failed intermittently against one
+    mid-rewrite. That hazard is already documented (plans/tooling.md
+    #10) and this walked straight into it. Committed history is also the
+    truer subject - it is the permanent record, and `reports/` is a view
+    of it."""
+
+    ROOT = Path(__file__).resolve().parents[1]
+
+    def _recorded_tool_verdicts(self) -> set[str]:
         seen = set()
-        for path in present:
-            data = json.loads(path.read_text())
-            for ds in data.get("datasets") or [data]:
-                for col in ds.get("columns", []):
-                    for ck in col.get("checks", []):
-                        seen.add(ck.get("current_status"))
-                        for h in ck.get("history", []):
-                            seen.add(h.get("status"))
-        unrecognised = {s for s in seen if s and s not in known}
-        assert unrecognised == set(), (
-            f"real committed results carry {unrecognised}, which both "
-            "implementations would now refuse"
+        for path in sorted((self.ROOT / "qa_results").glob("*/*/*/*.json")):
+            if path.name == "dataset_stats.json":
+                continue
+            for record in json.loads(path.read_text()).get("verified") or []:
+                seen.add(record.get("status"))
+        return seen
+
+    def test_the_history_is_actually_there_to_check(self):
+        """Without this, an empty glob makes every assertion below pass
+        by finding nothing - which is the same shape of false green this
+        whole requirement is about."""
+        assert self._recorded_tool_verdicts(), "no committed QA history found"
+
+    def test_every_recorded_tool_verdict_maps_to_a_known_status(self):
+        unmapped = {v for v in self._recorded_tool_verdicts()
+                    if v and dashboard_status(v) is None}
+        assert unmapped == set(), (
+            f"committed history carries tool verdicts {unmapped} that map "
+            "to no dashboard status"
+        )
+
+    def test_every_status_the_history_maps_to_is_one_a_check_may_carry(self):
+        mapped = {dashboard_status(v) for v in self._recorded_tool_verdicts() if v}
+        assert mapped <= CHECK_STATUSES, (
+            f"committed history maps to {mapped - CHECK_STATUSES}, which "
+            "both implementations would now refuse on a check"
         )

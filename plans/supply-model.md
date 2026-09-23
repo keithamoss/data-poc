@@ -60,6 +60,43 @@ feeding them to the delivery scoper after that."**
    below, reviewed with Keith.
 4. **Feed requirements to `delivery-scoper`, in the batches below.**
 
+**Where this actually stands, 2026-09-23.** Batches 1 and 2 are BUILT -
+sprints 1 through 6, every requirement `built` and signed off. That is
+the whole spine: check identity, the generator and delivery format,
+status parity, the timezone parameter, schedule config and its gate,
+and periods/slots with runway.
+
+**The next thing needed is Keith's, not a session's.** Batch 3's
+requirements are already DRAFTED and are the blocker for everything
+after them, but none is signed off, and this project's own gate is that
+building does not start until they are. Six of them:
+
+| | Needs signing |
+|---|---|
+| `REQ-PIPE-034` | Each dataset has its own arrival history |
+| `REQ-PIPE-035` | QA runs against one period's schema, staged delivery overlaid |
+| `REQ-PIPE-036` | A delivery triggers one QA run; each dataset stands alone |
+| `REQ-QAC-037` | A cross-table check belongs to the cross-table scope |
+| `REQ-PIPE-038` | `qa_results/` keyed per dataset, today's history regenerated |
+| `REQ-DASH-041` | Supply history and as-of viewing under per-dataset arrivals |
+
+`REQ-QAC-037` carries one open question (where the cross-table scope
+physically lives in `qa_results/`), deliberately left for
+`delivery-architect` - a storage-shape question with the substance
+already settled, so it does not block sign-off.
+
+**What that unblocks, in order**: `REQ-GEN-044`/`045` (the `[INJECT]`
+scenarios into committed history, signed off but BLOCKED - most of the
+set needs the staging overlay `REQ-PIPE-035`/`036` provide, per Keith's
+own capability-not-history hold, 2026-09-23), then `REQ-DASH-046` and
+`REQ-DASH-054`, which also want `REQ-DASH-041`.
+
+**Batches 4, 5 and 6 are not scoped yet** - sprints 11-24 have no
+requirements beyond the handful of dashboard ones already drafted. Batch
+4 is the next `delivery-scoper` pass, and it chains off batch 3's
+answers, so it waits on the sign-off above rather than running beside
+it.
+
 ### Scoper batches
 
 Settled with Keith, 2026-09-22, replacing the two-batch split agreed

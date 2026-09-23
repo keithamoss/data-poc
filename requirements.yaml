@@ -4931,9 +4931,21 @@ requirements:
         alone, and neither suite can reinterpret one.
       - >
         2026-09-23: the real committed history was checked against the
-        new, stricter vocabulary - green/amber/red only, across both
-        datasets, nothing unrecognised. Making an unknown status fatal
-        is safe against today's history, asserted rather than assumed.
+        new, stricter vocabulary - 240 files of `qa_results/`, carrying
+        only pass/warn/fail, every one mapping to a status a check may
+        carry. Making an unknown status fatal is safe against today's
+        history, asserted rather than assumed, and confirmed to bite by
+        planting an unmappable verdict into a real committed file.
+      - >
+        2026-09-23: that check reads COMMITTED history, not the built
+        `reports/*.json`, and the correction is worth recording. The
+        first version read the dashboard JSON - a regenerated artifact
+        that tests/test_dashboard_e2e.py's build fixture rewrites during
+        a parallel run - and failed intermittently against one
+        mid-rewrite. The hazard was already documented (plans/tooling.md
+        #10) and this walked into it anyway. Committed history is also
+        the truer subject: it is the permanent record, and reports/ is a
+        view of it.
       - >
         2026-09-23: 1217 Python tests and 218 JS tests pass, and all
         nine mothman gates are green - including the real-browser render
