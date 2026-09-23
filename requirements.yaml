@@ -2719,11 +2719,13 @@ requirements:
     title: A delivery triggers one QA run, and each dataset's results stand alone
     date_written: "2026-09-21"
     story: >
-      As a data team leader, I want QA to run when a delivery lands and
-      to report on my dataset by itself, so that I am not waiting on
-      five other tables from other teams before I learn whether mine is
-      any good, and so that a normal delivery does not flash red while
-      its own tables are still landing.
+      As the data team leader in the central agency whose team manages
+      every incoming supply, I want QA to run as a delivery lands and to
+      report on each dataset as soon as that dataset has been checked,
+      so that I am not waiting on the other tables in the same supply,
+      or on another agency's tables entirely, before I see any result at
+      all - and so that a normal delivery does not flash red while its
+      own tables are still landing.
     moscow: must
     status: not_started
     source: >
@@ -2754,6 +2756,14 @@ requirements:
         delivery.
       - WHEN a table missing from an earlier delivery arrives later, THE
         SYSTEM SHALL treat it as its own delivery and run QA over it.
+      - WHEN a table arrives, THE SYSTEM SHALL evaluate that table's own
+        checks together with every check in the same period that
+        declares a dependency on it, and SHALL NOT re-evaluate a check
+        that does not depend on it.
+      - THE SYSTEM SHALL NOT re-evaluate a check belonging to a period
+        other than the one the arriving table claims, even where that
+        check declares a temporal reference to the arriving table's
+        period.
       - IF a QA run fails partway through, THEN THE SYSTEM SHALL fail
         loudly, naming the dataset and the tool, and SHALL NOT record a
         partial run as a complete one.
@@ -2805,6 +2815,34 @@ requirements:
       - Decided a delivery is not atomic in the roll-back sense. Five
         tables landing and one failing requires the five to be staged
         and QA'd; a failed sixth does not refuse the delivery.
+      - >
+        Decided a late-arriving table re-evaluates its own checks plus
+        the checks that DEPEND on it, rather than triggering a full run
+        for its period (Keith, 2026-09-23). This session had flagged the
+        full run as a cost to accept; Keith proposed the narrower rule
+        and worked it through on clients and placements - placements
+        arrives green and promotes, clients arrives red, clients is
+        resupplied, and the resupply has to re-run the cross-table
+        checks tied to clients even though placements itself did not
+        change. Narrower, cheaper, and it scales at 30 datasets where a
+        full-period run per dribbling table would not.
+      - >
+        Boundary drawn explicitly because the obvious implementation of
+        the rule above breaks a criterion already signed off: "every
+        check that depends on it" must mean within the SAME PERIOD. A
+        drift check in a later period declares a temporal reference to
+        this one, so a naive dependency walk would recompute history,
+        which REQ-PIPE-035 forbids - checks are evaluated once against
+        the state current at the time and never recomputed for a
+        historical arrival.
+      - >
+        Note on why this makes REQ-QAC-037 load-bearing rather than
+        merely tidy. Re-running a cross-table check when clients arrives
+        would otherwise change a result on PLACEMENTS' history on a day
+        placements did not change - the exact complaint REQ-QAC-037's
+        own story is written about. Filing cross-table checks in the
+        cross-table scope is what makes this refinement safe, so the two
+        have to land together rather than in either order.
 
   - id: REQ-QAC-037
     title: A cross-table check belongs to the cross-table scope, not to one dataset
