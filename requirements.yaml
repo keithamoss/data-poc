@@ -7700,6 +7700,9 @@ requirements:
   - id: REQ-PIPE-061
     title: Arrivals are processed in receipt order, and an interrupted run loses nothing
     date_written: "2026-09-23"
+    signed_off:
+      by: Keith
+      date: "2026-09-24"
     story: "As an agency data owner, I want two files that landed in the same batch to be filed the same way whatever order the pipeline happened to pick them up in, so that where a supply ends up is a fact about when it arrived rather than about a directory listing."
     moscow: must
     status: not_started
@@ -7707,7 +7710,7 @@ requirements:
     acceptance_criteria:
       - "THE SYSTEM SHALL process arrivals in ascending order of our own receipt instant."
       - "THE SYSTEM SHALL NOT process arrivals in the order they were discovered, listed or named."
-      - "WHERE two arrivals share a receipt instant, THE SYSTEM SHALL order them by a defined, deterministic tiebreak."
+      - "WHERE two arrivals share a receipt instant, THE SYSTEM SHALL order them by the order their receipt records were written, and SHALL NOT order them by a delivery's name, by a directory listing or by sort stability."
       - "THE SYSTEM SHALL order arrivals by receipt instant across every collection, and SHALL NOT order them within one collection at a time."
       - "THE SYSTEM SHALL produce identical filings for a given set of arrivals whatever order they were presented in."
       - "WHEN a run processes arrivals, THE SYSTEM SHALL process every arrival not yet processed since its recorded marker, rather than only the arrival that triggered the run."
@@ -7725,6 +7728,27 @@ requirements:
       - "Decided the receipt instant is the only ordering fact. A supplier-provided timestamp reflects their clock, their timezone and their bugs, and staging's whole justification is that it asserts only facts we can vouch for (TS-32). A delivery's name is arbitrary by design, so sorting by it would be inventing an order out of a supplier's naming habits."
       - "Decided each run DRAINS THE BACKLOG - reading everything unprocessed since a marker rather than only the triggering event. Settled for decision processing in Thread H's second pass, and it is the same discipline here rather than a second one. The reason it matters generally: GitHub holds only ONE pending run per concurrency group, so three rapid triggers silently lose the middle one, and the opt-in queueing mode was rejected by Keith as edition-gated. Draining works on any edition, at any volume, and survives a run failing for reasons that have nothing to do with concurrency."
       - "Decided the tiebreak must be deterministic and stated rather than left to sort stability, because a stable sort over a directory listing is still a directory listing."
+      - >
+        SETTLED 2026-09-24 (Keith): the tiebreak is THE ORDER THE
+        RECEIPT RECORDS WERE WRITTEN. The criterion used to require a
+        tiebreak that was "defined" without defining it, so two
+        implementers could both satisfy it with different tiebreaks and
+        get different filings - the exact non-determinism this
+        requirement exists to remove.
+      - >
+        The obvious choice was already forbidden and nothing said so.
+        Sorting ties by delivery NAME is what most people reach for
+        first, and REQ-PIPE-057 criterion 8 - signed earlier the same
+        day - states the system shall not derive the processing order
+        from a delivery's name. Recorded here because the prohibition
+        lives in a different requirement, so someone reading only this
+        one would never find it.
+      - >
+        Receipt-record write order was chosen over the surviving
+        alternative, run identity assigned at recognition, because it is
+        the SAME FACT the primary sort already uses, just at finer
+        grain - one ordering rule rather than two, and no second concept
+        to keep correct.
       - >
         SETTLED 2026-09-24 (Keith): receipt order is GLOBAL, not
         per-collection. It follows from REQ-PIPE-057 allowing one
