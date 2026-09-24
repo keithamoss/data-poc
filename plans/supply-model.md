@@ -1354,12 +1354,36 @@ comparisons against the expected-supply sequence.
     concept, adjacent to promotion and rejection (sprint 11) rather than
     part of either, and it has no requirement anywhere yet.
 
-    **The situation.** A dataset's slot for a period goes unfilled, the
-    period passes, and a human concludes the supply is not coming. The
-    period's data is not missing in a business sense - last period's
-    data is still the best available answer - but today nothing lets
-    anyone SAY that. The slot stays overdue forever and the period
-    schema stays empty.
+    **NAME COLLISION, FLAGGED FIRST because this file has been bitten
+    by exactly this before** (see "The collision: delivery already means
+    something else" in the concept inventory). Keith, 2026-09-24, uses
+    "carry forward" for TWO DIFFERENT THINGS. This sprint is one of
+    them. The other - a regularly scheduled dataset whose supplies are
+    FOR THE FOLLOWING PERIOD, so data arriving in January fills Q2 and
+    not Q1 - is a scheduling property, is not in these sprints, and
+    lives at `plans/road-testing.md` item 3. They share a phrase and
+    nothing else. His own alternative names for THIS one are
+    **backfill** or **patch**; the real name is still his to pick, and
+    picking one that the other concept cannot also claim is part of the
+    job.
+
+    **Who it is for: DOWNSTREAM CONSUMERS, not reporting** (Keith,
+    2026-09-24, correcting an earlier reading here that had it the other
+    way round). This is not primarily about making the dashboard say
+    something sensible about an empty period. It is about the people and
+    systems querying the warehouse, who need SOMETHING to resolve for
+    the current period rather than an empty table or a broken query.
+
+    **The situation, in his own framing.** A dataset's slot for a period
+    goes unfilled, the period passes, and a human decides the data is
+    not coming - "a data set's been red and no data supplied all
+    throughout the cycle". We still need something, and **the best
+    something we have is the last GREEN supply**. So a human makes the
+    call and takes the action.
+
+    **The write path is a human decision through GitHub or the TUI** -
+    both, in his own words, rather than one settled channel. The trigger
+    is lateness, which opens a ticket (see below).
 
     **The trigger is LATENESS, and it goes through GitHub Issues like
     every other decision** (Keith, 2026-09-24, correcting an earlier

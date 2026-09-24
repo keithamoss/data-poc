@@ -115,19 +115,42 @@ anything here that turns into real build work becomes a requirement in
    without fixing the first risks two unexplained figures instead of
    one.
 
-3. **[done, 2026-09-24]** **[Pipeline & publishing]** **A
-   delivery that belongs to the NEXT period rather than the current
-   one, decided per dataset.**
+3. **[todo, 2026-09-24]** **[Pipeline & publishing]** **A
+   regularly scheduled dataset whose supplies are FOR THE FOLLOWING
+   PERIOD.** Keith's own worked example, 2026-09-24: data arriving in
+   January does not fill Q1 - it fills **Q2**. Operational reality is
+   that some datasets deliver for the current period and some for the
+   next, and this is a per-dataset property.
 
-   **RESOLVED 2026-09-24 at `REQ-PIPE-062`'s sign-off, and the answer
-   is recorded there.** It is NOT an exception to criterion 5, which
-   stays absolute: the SCHEDULE expresses it, not the rule. That
-   dataset's slot for the following period carries a due instant and
-   claim window already open when the supply arrives, so nothing claims
-   forward. Slots are already per-dataset, so no new configuration axis
-   is needed. Same mechanism as the daily-cutoff and arrives-a-week-
-   early cases that requirement already deleted. The rest of this entry
-   is kept as the record of how it was raised. Keith's own ask, 2026-09-24. Some
+   **The DESIGN QUESTION is settled; the WORK is not, and is
+   deliberately not in these sprints.** Corrected 2026-09-24 after this
+   entry was briefly marked done at `REQ-PIPE-062`'s sign-off - the
+   sign-off resolved how it fits the model, which is not the same as
+   building it. Keith's own placement: "that can go into the future log
+   in the road testing plan file".
+
+   **What is settled** (recorded on `REQ-PIPE-062`): it is NOT an
+   exception to criterion 5, which stays absolute. The SCHEDULE
+   expresses it, not the rule - that dataset's slot for the following
+   period carries a due instant and claim window already open when the
+   supply arrives, so nothing claims forward. Slots are already
+   per-dataset, so no new configuration axis is needed. Same mechanism
+   as the daily-cutoff and arrives-a-week-early cases that requirement
+   deleted.
+
+   **What is NOT built**: nothing declares, per dataset, that its
+   supplies are for the following period, and nothing generates its
+   slot calendar accordingly. Today a dataset's slots are derived on
+   the assumption that a period's supply arrives within that period.
+
+   **NAME COLLISION - do not merge this with `plans/supply-model.md`
+   sprint 25.** Keith used "carry forward" for both on 2026-09-24, and
+   they share a phrase and nothing else. Sprint 25 is a HUMAN DECISION
+   that a supply is never coming, pointing a period's view at the last
+   green supply so downstream consumers have something to query. THIS
+   is a SCHEDULING PROPERTY of a healthy, punctual dataset. Sprint 25
+   is being renamed for exactly this reason (backfill or patch are his
+   candidates); this entry should not inherit whichever name it loses. Keith's own ask, 2026-09-24. Some
    datasets' supplies are for the period they arrive in; others' are
    for the following one. His own framing: "does it appear in a slot in
    this period, or does it need to go into a slot in the next period?"

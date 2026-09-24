@@ -7838,12 +7838,20 @@ requirements:
         principle worth carrying is the one the cutoff decision already
         states - when an arrival seems to belong to a different period,
         the answer is almost always that the CALENDAR is wrong, never
-        that the rule needs a special case. Originally raised as
-        plans/road-testing.md item 3, which this closes.
+        that the rule needs a special case. Raised as
+        plans/road-testing.md item 3, which this answers in PRINCIPLE
+        only - the capability is not built and is deliberately not in
+        these sprints (Keith, 2026-09-24), so that entry stays OPEN as
+        future work rather than being closed by this sign-off. Nothing
+        today declares, per dataset, that its supplies are for the
+        following period, or generates its slot calendar accordingly.
 
   - id: REQ-PIPE-063
     title: A slot stops being claimable once a later one is filled
     date_written: "2026-09-23"
+    signed_off:
+      by: Keith
+      date: "2026-09-24"
     story: "As an agency data owner, I want a delivery that never arrived to stay recorded as not arrived, so that a later resupply of a different day cannot be quietly filed against it and turn a service failure into a met obligation."
     moscow: must
     status: not_started
@@ -7868,6 +7876,25 @@ requirements:
       - "Decided NOT_EXPECTED and MARKED MISSED must never blur, and the distinction is about what the record ends up saying rather than when it was agreed. not_expected in config changes what was OWED - the slot never existed, nothing is overdue, the record says nothing was due. A slot marked missed records an obligation that was NOT MET - it existed, it was owed, it did not arrive, and it stays in the record as a failure with a reason. Marking a slot missed is closing it while recording that it WAS owed; the acknowledgement is 'it is not coming', never 'it was not due'. Without the distinction, supplier reliability becomes whatever people were willing to excuse after the fact."
       - "Timing follows as a CONSEQUENCE rather than being the rule: you can only legitimately say nothing is owed BEFORE the fact. A supplier saying next week 'we are upgrading Tue-Wed, no files' is not_expected; finding out at 9pm Tuesday that it is already not coming is marked-missed. Editing config retrospectively to make red history disappear is exactly what must not happen."
       - "Recorded as a build-order fact: marking a slot missed is a human decision and belongs to the decision log in sprint 12. Until it exists, a slot closed by monotonic filling simply stays unfilled and overdue, which is correct but unresolvable - the dashboard will show a permanently red slot nobody can close."
+      - >
+        SETTLED 2026-09-24 (Keith), guarding against a blur this
+        requirement's own reasoning invites: "FILLED" MEANS DATA
+        RESOLVES FOR THAT PERIOD, NEVER THAT A SUPPLY ARRIVED. The
+        carry-forward in plans/supply-model.md sprint 25 fills a slot by
+        pointing its view at the last green supply, and that is a
+        statement about DOWNSTREAM AVAILABILITY - consumers need
+        something to query - not a statement that the supplier
+        delivered.
+      - >
+        Why it needs saying here: this requirement is emphatic that
+        not_expected and marked-missed must never blur, because
+        "supplier reliability becomes whatever people were willing to
+        excuse after the fact". A carried-forward slot reading as an
+        ordinary filled slot would be that same erasure by a different
+        route - a supplier credited for a delivery they never made. The
+        carried-forward QUALIFIER CHIP is what keeps the two readable
+        apart, which is why Keith made it a requirement of that concept
+        rather than a presentation nicety.
 
   - id: REQ-PIPE-064
     title: When nothing is confidently claimable, hold it for a human
