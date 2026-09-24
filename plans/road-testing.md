@@ -646,13 +646,45 @@ anything here that turns into real build work becomes a requirement in
     - a bare **`unique`** check on the event column would fail by
       design, since every event legitimately appears six times.
 
+    **The expected set GROWS, on a known five-year cadence** (Keith,
+    2026-09-24, confirming this is a certainty rather than the
+    hypothetical the first draft of this entry treated it as). ABS runs
+    a census every five years, so a seventh year arrives, then an
+    eighth. That makes the expected set a function of time, not a
+    constant, and it splits the check into two genuinely different
+    questions that are easy to conflate:
+
+    - *Does every event have a row for every census year that EXISTS?*
+      On this reading, the day a new census is processed, every
+      historical event in the table is instantly incomplete until it is
+      backfilled - the whole dataset goes red at once, for a reason
+      that is real but not a data-quality failure.
+    - *Does every event have a row for every census year it was
+      geocoded AGAINST?* Nothing ever goes red, and a backfill that
+      never happened is invisible, because nothing expected it.
+
+    Neither is right on its own. The likely answer is that the expected
+    set is DECLARED rather than inferred, and widening it is an explicit
+    act - so a backfill is something someone decides to require, and
+    the check goes red only against a set we have said we expect.
+
+    **And this project already has the machinery for that**, which is
+    worth saying because it looks like it needs something new. A
+    declared set widening every five years is exactly a check-definition
+    change: `check_lifecycle.py` already validates hand-authored check
+    metadata, `changelog:` already records dated definition changes, and
+    the trend chart already draws a real break at a breaking one so a
+    before/after comparison is not silently made across a moved
+    goalpost. What is unusual here - and useful - is that the change
+    date is known YEARS in advance, which is a strong argument for the
+    set being declared data rather than derived from whatever happens
+    to be in the table.
+
     **Open:** where the expected set of census years is DECLARED - a
     literal list in the contract beside the column, which is how
     `valid values` already works, or derived from the data, which would
     make a wholly-missing year invisible because nothing would expect
-    it; whether six is fixed or grows, since a new census adds a
-    seventh and every historical event then looks incomplete unless the
-    expected set is scoped to when the event was geocoded; whether the
+    it; whether the
     check reports per event or as a percentage of events, which is
     `REQ-QAC`-style tiering and pairs with item 6's tolerance bands;
     and which tool runs it - this is a `GROUP BY ... HAVING` shape,
