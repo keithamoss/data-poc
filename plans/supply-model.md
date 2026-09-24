@@ -1962,6 +1962,26 @@ Registrations only because its pattern carries a `{date}` placeholder.
 This scenario is what proves the regex change (`REQ-PIPE-058`,
 2026-09-24) actually closed the gap.
 
+**TS-40 `[unit]` A run dies mid-load, and the next run must not trust
+what it finds.**
+Six CP tables staging; the process is killed after three have loaded, or
+during the fourth, or during the SIXTH.
+**Expect**: every table without a committed load record is treated as
+unloaded and replaced, whatever is sitting in the staging schema. The
+delivery is not considered processed until every attributed file has a
+record.
+**The case that decides this one is the LAST table**, and it is why
+deriving completeness from the warehouse catalogue was rejected: a crash
+during the sixth load leaves six of six tables present with one
+truncated, which a catalogue check reads as complete and skips forever.
+A truncated table is indistinguishable from a genuinely short supply and
+would be QA'd as real data.
+**Also assert the ordering**, because it is the thing most likely to be
+got backwards and both orders look correct in review: the record is
+written only AFTER the load is durable. Kill the process between load
+and record, and the table is re-loaded - wasteful and safe. The opposite
+order would skip a table that never loaded.
+
 ### The mixed-period delivery gate
 
 **TS-33a `[unit]` A delivery whose tables land in DIFFERENT PERIODS.**

@@ -3127,12 +3127,12 @@ requirements:
         results, in a location of their own, because a delivery spans
         datasets and is not a QA result.
       - THE SYSTEM SHALL record, in a delivery's own file, every table
-        it carried, the dataset each was attributed to, whether each
-        loaded, and the physical table each loaded one became.
-      - WHERE a table in a delivery could not be loaded, THE SYSTEM
-        SHALL record that fact and the reason in the delivery's file,
-        so that an arrival with nothing loadable is still a recorded
-        arrival.
+        it carried and the dataset each was attributed to, and SHALL NOT
+        record in it any outcome that is not known at recognition time.
+      - THE SYSTEM SHALL record each table's LOAD OUTCOME as its own
+        committed record, separate from the delivery's file, so that an
+        arrival with nothing loadable is still a recorded arrival
+        without the delivery's file ever being rewritten.
       - THE SYSTEM SHALL make the delivery record queryable as SQL
         directly from the committed files, and SHALL NOT maintain a
         second copy of it in the warehouse.
@@ -3268,6 +3268,25 @@ requirements:
         REQ-QAC-039, which regeneration delivers for free rather than as
         a rewrite of committed files.
 
+
+      - >
+        CONTRADICTION FIXED 2026-09-24, in a requirement already signed.
+        Three criteria could not all hold: the delivery file is "written
+        once when the delivery is recognised" and never rewritten, yet
+        it had to record "whether each loaded, and the physical table
+        each loaded one became", and the reason where one could not be
+        loaded. RECOGNITION HAPPENS BEFORE LOADING, so a file written at
+        recognition cannot carry load outcomes. Introduced by this
+        session on 2026-09-23 while drafting the delivery-log criteria,
+        and not noticed at sign-off.
+      - >
+        Resolved by the processing log Keith chose for REQ-PIPE-060,
+        which makes the boring option the correct one rather than merely
+        the safe one: the delivery file holds RECOGNITION facts - what
+        arrived, what it was attributed to - and the processing log
+        holds LOAD facts - what loaded, into which physical table, or
+        why it did not. Two files, two moments, both written once and
+        neither ever rewritten.
   - id: REQ-DASH-055
     title: The dashboard shows real datasets only
     date_written: "2026-09-23"
@@ -7361,6 +7380,14 @@ requirements:
       - "THE SYSTEM SHALL trigger checks from the arrival of a delivery, and SHALL NOT trigger them from a promotion."
       - "THE SYSTEM SHALL use only our own receipt instant as a supply's arrival time, and SHALL NOT use a timestamp inside the supplier's files, a column in their data or a file modification time."
       - "THE SYSTEM SHALL expose the staging load through a mothman subcommand."
+
+      - "THE SYSTEM SHALL record each table's load outcome as its own committed record, written only after that table's load is durable."
+      - "THE SYSTEM SHALL NOT write a table's load record before its load is durable."
+      - "THE SYSTEM SHALL treat a table with no load record as unloaded, and SHALL replace whatever is present for it rather than trusting it."
+      - "THE SYSTEM SHALL consider a delivery processed only where every file attributed to a dataset has a load record."
+      - "THE SYSTEM SHALL NOT automatically retry a load recorded as failed."
+      - "WHERE a load is recorded as failed, THE SYSTEM SHALL surface it as needing human action, resolvable either by rejecting that supply or by reprocessing it after a fix."
+      - "WHEN a failed load is reprocessed, THE SYSTEM SHALL write a new load record rather than editing the failed one, and SHALL take the latest record for that table as current."
     non_functional_requirements:
       - "A crash between the staging load and QA currently has no defined behaviour, and the failure is silent in the worst direction: a truncated table in a global staging schema is indistinguishable from a real short supply and would be checked as real data. Loading must be all-or-nothing per table, and a partially-processed delivery must be recognisable as such."
       - "DuckDB permits one PROCESS per database file - verified: while one holds a read-write connection a second writer fails AND a read-only reader fails with 'IO Error: Could not set lock on file'. mothman pipeline run is parallel by default and dbt runs as its own writing process, and the per-run databases that provide isolation for free today are removed by REQ-PIPE-035. This is a hard blocker, not a tuning concern."
@@ -7414,8 +7441,73 @@ requirements:
         concurrent writer, and it does not run until QA does. If QA ever
         moves earlier than sprint 15, this split stops holding and both
         halves must move together.
-    open_questions:
-      - "Where does 'this delivery has already been processed' live, given REQ-PIPE-038 writes a delivery's file ONCE at recognition and never rewrites it? Options - (a) re-process a delivery from the beginning whenever its staged tables are incomplete, staging fresh tables under new names and leaving the partial ones as garbage for a later sweep; (b) a separate append-only processing marker committed beside the delivery log, which is new state but readable without a warehouse; (c) derive completeness from the warehouse catalogue, which needs no new committed state but is pipeline-side only and invisible to the dashboard build. Recommended (c) for completeness plus (a) for recovery: the dashboard never needs to know, and a re-staged table under a new name is cheap while a half-loaded one read as real data is not."
+
+      - >
+        SETTLED 2026-09-24 (Keith): a committed PROCESSING LOG, one
+        record per table, written only after that table's load is
+        durable. His words - the safer and more boring option - and he
+        refined the drafted version from per-delivery to PER TABLE,
+        which is what closes the hole.
+      - >
+        Rejected deriving completeness from the warehouse catalogue,
+        which had been the recommendation. The catalogue says a table
+        EXISTS, not that it is COMPLETE, and the failure lands exactly
+        at the boundary: crash after three of six tables leaves three
+        present, correctly read as partial; crash during the LAST table
+        leaves six of six present with one truncated, read as complete
+        and skipped forever. A truncated table in staging is
+        indistinguishable from a genuinely short supply and would be
+        QA'd as real data, which is the precise failure this question
+        exists to prevent.
+      - >
+        Also rejected loading a delivery's tables in ONE TRANSACTION,
+        which would have dissolved the partial state entirely - verified
+        by experiment that DuckDB DDL is transactional and that a real
+        SIGKILL before COMMIT leaves no tables at all on reopen, not
+        even truncated ones. Keith's objection is about scale rather
+        than correctness: some deliveries carry very large tables, and
+        the whole-delivery transaction rests on an untested assumption
+        about memory and WAL. The experiment is recorded because it
+        would become the better answer if that assumption were ever
+        measured and held.
+      - >
+        THE ORDERING IS THE LOAD-BEARING PART and deserves its own
+        criterion because the two orders look identical in review and
+        fail in opposite directions. Record AFTER the load is durable -
+        a crash between them re-loads a table that was already fine,
+        which is wasteful and safe. Record BEFORE - a crash between them
+        skips a table that never loaded, which is a silently missing
+        supply. That asymmetry is why a re-load must also be safe
+        against whatever is already there: no record means untrusted,
+        so it is replaced rather than appended to.
+      - >
+        Decided a FAILED load is never retried automatically (Keith,
+        2026-09-24). It is for a human, and the call is one of two
+        things in his own framing: reject that supply, or fix a genuine
+        bug and reprocess through the TUI. The second case is distinct
+        and worth naming - the FILE is unchanged and OUR ability to read
+        it changed, which works without special handling because
+        deliveries are immutable on disk, so a reprocess re-reads the
+        same bytes.
+      - >
+        That makes the failed-load path structurally the SAME as the
+        held-supply path in REQ-PIPE-059 and REQ-PIPE-064 - a state
+        needing human action, resolved by either an operation or a
+        rejection, through the TUI, with the write path belonging to the
+        decision log in sprint 12. One affordance serves both rather
+        than two mechanisms, and records are append-only with the latest
+        taken as current, which is the same shape REQ-PIPE-034 settled
+        for arrivals.
+      - >
+        Decided the log is COMMITTED, beside the delivery log, rather
+        than held in the warehouse. The warehouse is gitignored and
+        whether it stays ephemeral is an open question
+        (plans/running-thoughts.md #33), so putting processing state
+        there would bind this decision to that unresolved one. Committed
+        is also readable without a warehouse, which the dashboard build
+        requires. Growth is one small file per table per delivery -
+        roughly 11k a year at thirty datasets daily, the same order as
+        qa_results/ already.
 
   - id: REQ-PIPE-061
     title: Arrivals are processed in receipt order, and an interrupted run loses nothing
