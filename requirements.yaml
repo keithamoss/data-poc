@@ -7267,6 +7267,9 @@ requirements:
   - id: REQ-PIPE-058
     title: A file's dataset comes from that dataset's own declared pattern, and the patterns are gated
     date_written: "2026-09-23"
+    signed_off:
+      by: Keith
+      date: "2026-09-24"
     story: "As whoever plumbs in a new dataset, I want to declare how that dataset's files are named and have the pipeline attribute them on that alone, so that adding a dataset is a configuration change rather than a code change, and so that two datasets can never quietly claim the same file."
     moscow: must
     status: not_started
@@ -7279,14 +7282,15 @@ requirements:
       - "THE SYSTEM SHALL anchor each pattern to the whole filename, so that an unanchored pattern cannot match a substring and attribute a file it was never meant to claim."
       - "THE SYSTEM SHALL evaluate patterns independently of the order they are declared in, so that no attribution depends on which pattern happened to be checked first."
       - "WHEN the configuration gate runs, THE SYSTEM SHALL fail if a dataset that has slots declares no arrival pattern."
-      - "WHEN the configuration gate runs, THE SYSTEM SHALL fail if any filename can be attributed to more than one dataset."
+      - "WHEN the configuration gate runs, THE SYSTEM SHALL fail if any filename in the committed delivery history matches more than one dataset's arrival pattern."
+      - "IF a file matches more than one dataset's arrival pattern, THEN THE SYSTEM SHALL hold that file for a human, SHALL NOT attribute it to any dataset, SHALL report it at no lower than WARNING level, and SHALL NOT fail the delivery or the run."
       - "THE SYSTEM SHALL report a file matching no pattern as unrecognised, and SHALL NOT attribute it by elimination, by proximity or by the collections the rest of the delivery belongs to."
       - "THE SYSTEM SHALL allow one dataset's pattern to match more than one file in a single delivery, and SHALL NOT silently take one of them."
       - "THE SYSTEM SHALL record, with each attributed file, which dataset's pattern attributed it."
       - "THE SYSTEM SHALL expose the pattern gate through mothman check."
     non_functional_requirements:
       - "A supplier renaming their extract is ordinary. Changing the pattern must be a configuration edit with no code change, or the ~30-dataset case becomes a code change per supplier whim."
-      - "The gate is the whole protection at 30 datasets. Two datasets quietly claiming one filename produces a supply filed against the wrong table, which is the false-green direction, and nothing about it is visible by reading either contract on its own."
+      - "Two datasets quietly claiming one filename produces a supply filed against the wrong table - the false-green direction, and nothing about it is visible by reading either contract on its own. The protection is a PAIR, and each half does a different job: the configuration gate gives early warning at edit time but only sees collisions a real filename has already witnessed, while the runtime hold sees every collision that actually occurs and is the half that cannot be bypassed. Neither alone is sufficient at 30 datasets."
       - "Supplier filenames are untrusted input matched against configured patterns. If the pattern form is a raw regular expression, a pathological pattern plus a long filename is a real denial of service, so either the form is constrained or the matching is bounded."
       - "Only ~30 datasets' patterns exist, but every file in every delivery is matched against all of them on every run. Keep the matching linear and cheap rather than compiling a pattern per file."
       - "Patterns are configuration a human writes rarely and reads under pressure, so the gate's failure message must name the two datasets and the example filename that collide, not just report a conflict."
@@ -7339,6 +7343,54 @@ requirements:
         gate and is untouched by this - the two are easy to read as
         contradicting each other, which is why the distinction is
         spelled out rather than left to the count.
+
+      - >
+        SETTLED 2026-09-24 (Keith): duplicate attribution is caught by a
+        PAIR - a configuration gate over the committed filename history,
+        plus a runtime hold when a file actually matches two patterns.
+        The drafted criterion said the gate must fail "if any filename
+        can be attributed to more than one dataset", which is a
+        universal claim over every string that could ever exist and is
+        therefore not testable as written. Someone would have
+        implemented the corpus version and believed they had
+        implemented the universal one.
+      - >
+        REJECTED proving non-overlap properly. It is genuinely
+        decidable - regexes are finite automata, so the question is
+        whether two languages intersect, answerable by a product
+        automaton - and it would catch a collision no real file has ever
+        witnessed. The worked example is two patterns overlapping on
+        exactly one shape of name: ^cp_clients(_part\d+)?\.csv$ and
+        ^cp_.*_part\d+\.csv$ collide only on cp_clients_part2.csv, so a
+        corpus check stays green until the day a split extract arrives.
+        It lost on cost: Python's re offers nothing for this, so it
+        means a library or a few hundred lines of automata code, AND it
+        works only on the truly regular subset, so the pattern form
+        would have to exclude backreferences and lookarounds - a second
+        thing the gate must then enforce. What it buys over the pair is
+        only EARLIER notice of a collision the runtime hold would have
+        held anyway, before anything was filed.
+      - >
+        Why the runtime hold is the half that matters: it cannot be
+        wrong. It does not care whether the pattern form is regular,
+        whether the gate's own reasoning has a bug, or whether anyone
+        remembered to run the gate. The corpus gate is nearly free on
+        top and catches careless edits when they are cheapest to fix,
+        which is why both are kept rather than the hold alone.
+      - >
+        Note this is NOT the history gate rejected above, and the
+        distinction is easy to lose. That one demanded every historical
+        file still match exactly one pattern, which forces a dataset's
+        old naming to be carried in its pattern forever. This one only
+        looks for OVERLAP between two datasets on known names, so a
+        supplier renaming their extract is still free - old names simply
+        stop matching anything, which is not a gate failure.
+      - >
+        Note also what the runtime hold is NOT. Criterion 11 covers ONE
+        dataset's pattern matching TWO files, which is the legitimate
+        split-extract shape. This is TWO datasets matching ONE file,
+        which is always a configuration error. They are adjacent in the
+        same code path and produce opposite correct behaviour.
   - id: REQ-PIPE-059
     title: Two files for one dataset in one delivery are held, never chosen between
     date_written: "2026-09-23"

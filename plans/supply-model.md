@@ -1948,6 +1948,30 @@ review. Assert explicitly that no hold, no anomaly and no warning is
 raised for the spanning itself - an unrecognised artefact inside such a
 delivery still warns on its own terms, which is a different thing.
 
+**TS-36c `[unit]` One file, two datasets' patterns - the runtime hold.**
+Two arrival patterns configured so that one filename matches both. The
+worked example, which is the one to build the fixture from:
+`^cp_clients(_part\d+)?\.csv$` and `^cp_.*_part\d+\.csv$` overlap on
+exactly `cp_clients_part2.csv` and on nothing else.
+**Expect**: that file is HELD, attributed to NEITHER dataset, reported
+at no lower than WARNING, and the delivery and run both continue
+(Keith, 2026-09-24, `REQ-PIPE-058` criterion 9).
+
+**TS-36d `[unit]` The same collision, caught by the configuration gate.**
+The same two patterns, with `cp_clients_part2.csv` present in committed
+delivery history.
+**Expect**: `mothman check` FAILS, naming both datasets and the example
+filename. **And the negative half matters as much**: with that filename
+ABSENT from history the gate PASSES, which is the known, accepted limit
+of the corpus approach - real regex intersection was rejected on cost
+(`REQ-PIPE-058`). A test asserting the gate catches an unwitnessed
+collision is asserting the rejected design.
+
+**Do not confuse either with TS-15's split extract.** One dataset
+matching two files is legitimate (`REQ-PIPE-058` criterion 11); two
+datasets matching one file is always a configuration error. Same code
+path, opposite correct behaviour.
+
 **TS-37 `[unit]` A delivery directory with no receipt record.**
 Files present under `data/deliveries/<name>/`, nothing at
 `data/receipts/<name>.json`.
