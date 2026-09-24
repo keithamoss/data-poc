@@ -8026,6 +8026,9 @@ requirements:
   - id: REQ-PIPE-066
     title: Early, on time and late are measured against the slot the supply was filed to
     date_written: "2026-09-23"
+    signed_off:
+      by: Keith
+      date: "2026-09-24"
     story: "As an agency data owner, I want lateness measured against the period a supply was actually filed to, so that a supply filed to Q3 is never reported late for Q2 and a genuinely early one is never reported twelve weeks late."
     moscow: must
     status: not_started
@@ -8041,6 +8044,7 @@ requirements:
       - "WHERE a supply has no assigned slot, THE SYSTEM SHALL report it as unfiled, and SHALL NOT report it as early, on time or late."
       - "THE SYSTEM SHALL record the classification with the supply, and every consumer SHALL read that record rather than recomputing it."
       - "THE SYSTEM SHALL retire the classification derived from an arrival date, and SHALL NOT leave two derivations of arrival classification in the codebase."
+      - "THE SYSTEM SHALL retire every path that suppresses or reinterprets a recorded arrival classification, so that what a reader is shown is what was recorded."
     non_functional_requirements:
       - "Two implementations of one concept that can disagree is item 74's exact failure mode, and it is the reason this is a signature change rather than an addition. The visible symptom of getting it wrong is 'filed to Q3, reported late for Q2', and the current derivation is live in BOTH dashboard build paths - pipeline/build_dashboard_data.py and pipeline/build_cp_dashboard_data.py."
       - "The usual seeded regenerate-and-diff check does NOT apply here, and that has to be said out loud before the work starts. Today's generated history measures 0 early, 240 on time, 112 late under the arrival-date derivation; the new derivation will legitimately produce different numbers, so a diff against today's output is evidence of the change working, not of a regression."
@@ -8055,6 +8059,35 @@ requirements:
       - "Decided classification is PER TABLE, not per delivery (TS-16). If cp_clients lands 09:00 and cp_placements 14:00, each gets its own verdict rather than the whole delivery taking the worst - a single late table stops dragging five punctual ones down. It follows from slots being per-table."
       - "Decided nothing measures how early a supply is in order to assign it; earliness is a reported consequence of the assignment (TS-9). That is what makes classification a pure function of arrival instant and assigned slot."
       - "Decided the grace allowance used is the SLOT's own, which is per-dataset. The two datasets in this repo genuinely differ - Birth Registrations an hour, Child Protection eight hours - so taking a collection-level or asset-level grace would be one table's answer imposed on the rest."
+      - >
+        SETTLED 2026-09-24 (Keith): criterion 11 added, because
+        criterion 10 retires the old DERIVATION and the resupply case
+        escapes between the words. buildSupplyHistory() in the dashboard
+        template blanks arrivalStatus for every resupply
+        (idx===0 ? arrival.arrivalStatus : undefined). That is not a
+        second derivation - it is a DELETION of the recorded answer, in
+        a different language, in a different file, so a criterion about
+        derivations does not reach it.
+      - >
+        Its own comment justifies the blanking as a category error: a
+        later attempt "reuses its predecessor's real row data via the
+        generator's churn design, so comparing its stale
+        extract_timestamp against whatever cycle it eventually lands in"
+        means nothing. That reasoning was right, and it rests on exactly
+        the two things this requirement removes - the supplier's
+        extract_timestamp, replaced by OUR receipt instant, and a cycle
+        inferred from the arrival date, replaced by the assigned slot. A
+        resupply has both a receipt instant and an assigned
+        relationship, so under this requirement its classification is
+        real and meaningful for the first time.
+      - >
+        Left unfixed, the failure is quiet and durable: the work would
+        be done, a correct answer produced for resupplies, and the
+        screen would still show nothing - with a comment beside it that
+        still reads as sound, so the next reader leaves it alone. Worth
+        noting the justification also leans on a GENERATOR artefact (the
+        churn design) rather than on a fact about real supply, which is
+        a second reason it should not outlive the change.
 
   - id: REQ-PIPE-067
     title: An arrival verdict follows its filing, and is never a frozen fact
