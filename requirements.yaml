@@ -8360,12 +8360,29 @@ requirements:
       - >
         Keith's call, and it survives that correction rather than
         resting on the version first put to him: this is a PoC, one
-        person runs it, and --sequential already exists. Staging runs
-        SEQUENTIALLY until sprint 15 makes real concurrency worth
-        solving - a deliberate, stated constraint rather than a gap, at
-        the cost of a flag the tool already has. The genuine concurrency
+        person runs it, and staging runs SEQUENTIALLY until sprint 15
+        makes real concurrency worth solving - a deliberate, stated
+        constraint rather than a gap. The genuine concurrency
         problem is dbt as a second writing process, and it belongs to
         sprint 15.
+      - >
+        CORRECTED 2026-09-24, the same day, by delivery-architect and
+        verified here against the real code: this decision originally
+        said the cost was "a flag the tool already has", meaning
+        --sequential. That is WRONG in a way that matters. --sequential
+        is a single flag on qa_tools/common/parallel_orchestrate.py's
+        run_in_parallel(), and there is ONE fan-out covering everything
+        a run does per manifest entry - so setting it does not make
+        STAGING sequential, it makes THE WHOLE PIPELINE sequential and
+        gives up the parallel default Keith moved to on 2026-09-19.
+      - >
+        What this requirement actually needs is the STAGING PASS LIFTED
+        OUT of the ProcessPoolExecutor fan-out and run once before it,
+        so staging is serial and everything after stays parallel. That
+        is a control-flow change, not a flag. Recorded because the cheap
+        reading - "we already have --sequential, we are done" - is the
+        one a builder reaches for first, and it silently costs the
+        parallel default for the entire suite.
       - >
         SETTLED 2026-09-24 (Keith): THIS REQUIREMENT OWNS THE PROCESSING
         LOG OUTRIGHT, and REQ-PIPE-038's criterion 8 was dropped. That
