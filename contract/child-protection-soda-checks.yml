@@ -548,6 +548,33 @@ checks for cp_investigations:
           self-evident
         changelog: []
 
+  # --- Investigation date ordering --------------------------------------
+  # Cross-field consistency (ODCS's "consistency" dimension), the same
+  # shape as Birth Registrations' own date_registered/date_of_birth rule.
+  # Two things about the condition are load-bearing and invisible, hence
+  # this comment. A NULL end_date is an OPEN investigation - a legitimate
+  # and common state - and must not fail: SQL's three-valued logic
+  # already handles it, since `end_date < start_date` evaluates to NULL
+  # rather than TRUE for those rows, so they are never selected. And the
+  # condition is strictly-before, so an investigation opened and closed
+  # on the same day passes, which is a real shape rather than an edge
+  # case. Explicit high ceiling - see the escalation-completeness check's
+  # own comment for why (GitHub sodadata/soda-core#1985).
+  - failed rows:
+      fail condition: end_date < start_date
+      name: end_date is not earlier than start_date
+      samples limit: 100000
+      attributes:
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.end_date.date_ordering_soda
+        name: Ended on or after it started
+        category: consistency
+        introduced_date: "2026-09-24"
+        description: >
+          An investigation must not be dated as ending before it began.
+        failure_indicates: >
+          self-evident
+        changelog: []
+
   - invalid_percent(substantiated):
       valid values: ["Substantiated", "Not substantiated", "Inconclusive"]
       warn: when > 0%

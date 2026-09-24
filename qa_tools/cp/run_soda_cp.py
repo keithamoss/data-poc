@@ -50,6 +50,7 @@ _BUSINESS_RULE_DIMENSION = {
 # table-level pseudo-column) since they're not really about one column.
 _CUSTOM_CHECK_COLUMN = {
     "date_of_birth out of range": "date_of_birth",
+    "end_date is not earlier than start_date": "end_date",
 }
 
 
