@@ -355,6 +355,212 @@ did not). Both remain `not_started` and UNSIGNED.
 anything `delivery-scoper` produces is a PROPOSAL. `CLAUDE.md`'s
 sign-off rule applies before any of it is built - scoping is not
 sign-off. See Thread G.
+## Batch 3's pre-build review - architect and both UX agents, 2026-09-24
+
+**Status:** todo (2026-09-24) · **Category:** Pipeline & publishing
+
+`delivery-architect`, `delivery-dashboard-ux` and `delivery-cli-ux`, one
+pass each over the whole of `REQ-PIPE-057`..`067` after all eleven were
+signed off. Run in parallel, which `docs/agent-orchestration.md` permits
+because each takes the requirements as input rather than each other's
+output. Each got the SIGNED versions, not the scoper's drafts - nine of
+the eleven changed during sign-off - and none was told how this session
+thinks any of it should be built, per that doc's own rule that
+implementation reasoning at this stage biases the check.
+
+Recorded here in full because the agent transcripts do not survive.
+
+### What this session VERIFIED rather than relayed
+
+Checked against the real code before writing any of it down, because a
+subagent's finding is a claim until it is.
+
+- **CONFIRMED, and it invalidates a criterion this session drafted the
+  same night.** `REQ-PIPE-058` criterion 8 gates "any filename in the
+  committed delivery history". There is no such corpus.
+  `data/deliveries/` and `data/receipts/` are gitignored, and no
+  committed `dataset_stats.json` contains `.csv` anywhere across all 60
+  files. Filenames DO appear in committed `datacontract.json`, but as an
+  absolute local path inside one tool's raw output
+  (`/home/user/data-poc/data/deliveries/c81bb133d984/birth_registrations_2026-08-28.csv`)
+  - incidental debris from one tool, not a corpus to gate on. So the
+  gate as written would read `data/` and pass VACUOUSLY in CI and on
+  every fresh clone, which is the exact failure `REQ-PIPE-057`'s own NFR
+  warns about. **This session proposed that option to Keith without
+  checking the corpus existed**; recorded as its own error rather than
+  as an agent finding.
+- **CONFIRMED, and nobody owns it.** `qa_tools/common/arrivals.py`
+  assigns `run_id=f"{run_id_prefix}{index:03d}"` BY POSITION in the
+  receipt-ordered list. `REQ-PIPE-057` changes what is in that list
+  twice over - receipt-less deliveries become skipped, and a
+  multi-collection delivery now joins two sequences - and every
+  committed `qa_results/<agency>/<dataset>/<run_id>/` path is keyed by
+  that number. A behaviour change in recognition therefore RENAMES
+  COMMITTED QA HISTORY. `REQ-PIPE-038` (sprint 14) owns re-keying; no
+  requirement in this batch owns this.
+- **CONFIRMED.** `cli/app.py`'s main menu offers two items
+  (`_MAIN_MENU_QA`, `_MAIN_MENU_GENERATE`) against nine command groups;
+  `schedule` is already unreachable from it.
+- **CONFIRMED.** `cli/check.py`'s `_GATES` is an aggregator of nine
+  gates, nearly all of which delegate to a real subcommand
+  (`mothman dashboard validate-hierarchy`, `mothman schedule validate`
+  and so on). Only `agents` is a bare module invocation. So `058`
+  criterion 13's "expose the pattern gate through `mothman check`" would
+  be built literally and wrongly, as another bare-module entry
+  unreachable from the group a person editing patterns is already in.
+- **CONFIRMED.** `arrivalStatusLabel()` in the dashboard template maps
+  anything that is not `early` or `late` to green "On time". `066`
+  criterion 8 introduces `unfiled`, which would therefore render as a
+  confident punctuality verdict - item 74's exact shape, at the last
+  transform before the user.
+- **CITATION CORRECTED.** `delivery-cli-ux` attributed the
+  group-placement precedent to `REQ-PIPE-049`. It is `REQ-PIPE-050`,
+  whose decision explicitly rejected "fold in now, move to a
+  `mothman supply` group when batches 3-6 justify one - because moving a
+  command later breaks whatever docs and muscle memory have formed, and
+  renames are how a CLI surface rots". The substance is exactly as
+  reported, and THIS IS BATCH 3, so the question that decision deferred
+  has arrived.
+
+### The one finding all three converged on, independently
+
+**This batch produces records and events that no requirement owns the
+READING of.** Each agent met it from its own side:
+
+- `delivery-dashboard-ux`: the eleven emit at least fourteen
+  dashboard-facing obligations and **not one criterion names the
+  dashboard**. Every dashboard sentence that exists lives in an NFR or a
+  decision, none of which is checkable. The surface they all land on -
+  the `CHANGELOG_FEED` to activity-feed conversion - is sprint 22 and
+  has no requirement at all.
+- `delivery-cli-ux`: three requirements add `mothman` surface and none
+  says which group; the human-action queue has no command at all.
+- `delivery-architect`: the same feed gap, plus the run-id renumbering
+  above.
+
+Six producers (`057`, `058`, `059`, `060`, `064`, `065`) each carry a
+"report it as needing action / at WARNING / as informational" criterion,
+and the rule governing how those COMBINE sits in two NFRs on two of the
+six. Build them independently and each honours its own criterion while
+the aggregate obligation is met by nobody. That is the same unowned-IOU
+shape `CLAUDE.md` records from the batch-3 failure, and the same one
+`REQ-PIPE-065`'s sign-off fixed by pulling the never-auto-promote
+carve-out in as criterion 9.
+
+### Where the two UX agents disagree, usefully
+
+`delivery-cli-ux` says ONE queue serves all the human-action states.
+`delivery-dashboard-ux` says TWO - a persistent queue plus a
+time-ordered feed - on the grounds that `REQ-PIPE-064`'s NFRs demand
+both "re-presented on every run until resolved" and "must not become
+thirty banners at 30 datasets", which one time-ordered feed cannot do at
+once: a feed is scanned and discarded, a queue is drained.
+
+Both agree the four (or six) producers should share ONE affordance
+rather than one each. They differ on whether non-blocking review items
+(`065`'s uncertain assignments) belong in the same place as blocking
+ones.
+
+### Blocks the START of sprint 8
+
+- **`REQ-PIPE-035` is one signed requirement covering three things** -
+  single database, schema-per-period, and the per-run view schema - and
+  `REQ-PIPE-060`'s own build-order decision moved only the FIRST into
+  sprint 8. `status: built` is CI-enforced across every criterion, so
+  the register cannot record half a requirement as built. Either 035 is
+  split, or staging is built against a database that does not exist, or
+  an explicit IOU is written - and the third is the shape already
+  recorded as a failure.
+- **`REQ-PIPE-058` criterion 8 has no corpus**, above. Needs an answer
+  before the gate is built, and the criterion was signed on 2026-09-24
+  so changing it is Keith's call.
+
+### Other findings worth carrying, not yet actioned
+
+- **Child Protection does not use pattern attribution at all.**
+  `qa_tools/cp/build_cp_warehouses.py` loads by hardcoded filename in a
+  loop, while Birth Registrations goes through `arrival.path_for()`.
+  So `058`'s NFR - "changing the pattern must be a configuration edit
+  with no code change" - is FALSE for CP today and stays false unless
+  that loop is rewritten in this batch.
+- **`REQ-PIPE-060` would be the fourth CSV-to-DuckDB loader.** Three
+  live today. If staging lands beside them rather than replacing them,
+  the repo has four, two live and two "to be deleted later" - the
+  precise condition that produced the `generator/`/
+  `synthetic_data_generator/` signature drift.
+- **`arrivals_for()` is called from ten sites, each a full tree walk**,
+  and `path_for()` is called unconditionally at six of them - so `057`'s
+  read-once-per-run NFR and `059`'s hold are a refactor across all of
+  them, not a local change.
+- **"Stage sequentially" is a control-flow change, not a flag.**
+  `--sequential` makes the whole QA batch serial; what `060` needs is
+  the staging pass lifted OUT of the `ProcessPoolExecutor` fan-out and
+  run once before it, so the rest stays parallel.
+- **The most dangerous misreading in the batch**: a builder can
+  "satisfy" `058` c11 by making `path_for()` return the FIRST file
+  instead of raising, at which point c11 and `059` both read as met and
+  a supplier's second file is dropped silently - the exact failure
+  `059` exists to prevent. Worth naming as an anti-pattern in the work.
+- **`dataset_stats.json`'s `arrival` block becomes orphaned.**
+  `earliest_extract` is `MIN(extract_timestamp)` over the SUPPLIER's
+  column - what `060` c11 forbids as an arrival time - and carries a
+  20-line workaround whose only justification was feeding the
+  classification `066` replaces.
+- **`docs/delivery-format.md` is normative and `058` falsifies it** -
+  it currently says a file's dataset comes from the `arrivalPattern`
+  block matched by `file_arrival.py`. Same change, not a follow-up.
+- **Security, all cheap and structural**: validate the delivery name at
+  the new CLI boundary (`read_delivery()`/`read_receipt()` do no
+  validation today, safe only because the name comes from `iterdir()`);
+  build staged table names from our own dataset id and receipt instant,
+  never from a supplier filename; cap filename length before matching
+  and use `re.fullmatch` so `058` c5's anchoring is structural rather
+  than a review item; and this repo is public, so any reported filename
+  becomes a published string and must reach the DOM via `textContent`.
+
+### The twelve questions, ordered by what they block
+
+**Must be answered before sprint 8 starts:**
+1. `REQ-PIPE-035` - split it, build it whole, or write an IOU?
+2. `REQ-PIPE-058` c8's corpus - read `data/` (vacuous in CI), start
+   committing attributed filenames (publishes supplier filenames to a
+   public repo), or gate over a small committed fixture corpus (catches
+   only collisions someone thought to add)?
+
+**Must be answered before the new commands are built:**
+3. Where do the new supply commands live - a new `mothman supply` group,
+   or folded into `pipeline`?
+4. Does the human-action queue get a bare-`mothman` main-menu entry in
+   this batch, or wait for sprint 12's write path?
+5. Is "why was this supply filed here" readable from the CLI in this
+   batch, or explicitly deferred?
+
+**Must be answered before the presentation is built:**
+6. One affordance or two - a queue plus a feed, or everything in the
+   feed with severity filtering?
+7. Do `065`'s uncertain assignments share the queue with the blocking
+   states, or get their own review surface?
+8. Who owns the presentation - one new dashboard requirement drafted
+   now, or left to sprint 22?
+9. `063`'s closed-unfilled slot - render as "obligation awaiting a
+   decision" now, or leave as ordinary red until sprint 12?
+10. The in-flight delivery reported every run - one row carrying a run
+    count, or a literal row per run per delivery? Note `057` c6 forbids
+    requiring "any record of how long a delivery has been present", and
+    a derived count may or may not cross that line.
+
+**Can wait, but not indefinitely:**
+11. What happens to `dataset_stats.json`'s `arrival` block - drop,
+    rename as a genuine extract-to-receipt lag measure, or revisit at
+    `REQ-PIPE-038`?
+12. The `delivery_id` collision, still unresolved from batch 1, and now
+    sitting inside the config `058` rewrites
+    (`keyPattern: "cp/{delivery_id}/cp_clients.csv"`).
+
+**Unowned and not a question**: the severity-bearing activity feed
+(nothing owns it), and the run-id renumbering of committed history
+(nothing owns it).
+
 ## Batch 3's scoper sense-check - findings, 2026-09-23
 
 **Status:** todo (2026-09-23) · **Category:** Pipeline & publishing
