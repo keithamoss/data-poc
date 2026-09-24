@@ -413,3 +413,81 @@ anything here that turns into real build work becomes a requirement in
    check never runs at all. The third is the most in keeping with how
    this project already gates check lifecycle, and would not have
    caught the change-over-time case, which only fails at run time.
+
+8. **[investigate, 2026-09-24]** **[Dashboard UI]** **Closing a check
+   panel navigates back TWO levels, landing on the agency view instead
+   of the dataset.** Keith's own sighting, 2026-09-24, and this one is a
+   real bug rather than a design gap - closing a panel should return you
+   to what you were looking at, and instead it throws away a level of
+   drill-down.
+
+   **What the code says, read but NOT yet reproduced** - recorded this
+   way on purpose, because the reading and the symptom disagree and that
+   disagreement is the lead:
+
+   - `openCheckPanel()` sets `STATE = {...STATE, checkKey:check.key,
+     compareIdx:undefined}` and does ONE `history.pushState`.
+   - `closeCheckPanel()` does ONE `history.back()` when
+     `STATE.checkKey` is set.
+   - `renderFromState()` then re-renders and reopens the drawer if the
+     restored state still carries `columnName`.
+
+   One push, one back - so on this reading it should land exactly one
+   level down, on the dataset view with the drawer open. It does not.
+   **So the wrong assumption is about what sits UNDERNEATH the pushed
+   entry**, not about the count of history steps, and that is what to
+   check first: whether the entry the check panel was pushed on top of
+   was a dataset-tier entry at all. Two candidates worth testing before
+   anything else - a check panel opened from somewhere that never
+   pushed its own dataset-tier entry, and a `navigate()` call
+   (`hideCheckPanel(); hideDrawer(); hideAllPanelsDom(); render();
+   pushState`) collapsing two conceptual levels into one entry.
+
+   **Reproduce in a real browser before touching anything.** Per
+   `CLAUDE.md` this gets a test that fails against the current code
+   first, then the fix - and `tests-js/navigation.test.js` already
+   covers drill-down navigation in a real jsdom window, so there is an
+   obvious home for it. `tests/test_dashboard_e2e.py` is the heavier
+   option if the bug turns out to need real history semantics jsdom
+   does not model.
+
+9. **[todo, 2026-09-24]** **[Dashboard UI]** **A value-distribution
+   histogram in the drill-down, this supply beside the previous one.**
+   Keith's own ask, 2026-09-24, for categorical columns where it makes
+   sense: show what is in the column now and what was in it last
+   supply, side by side, so a reader gets an immediate visual sense of
+   how much has shifted.
+
+   **His own framing of why, and it is the part worth keeping**: this is
+   a HUMAN COMFORT feature, not a check. Drift detection will exist for
+   the variables that warrant it, but we will not want a drift check on
+   every column - and for all the rest, a picture gives you the same
+   reassurance at a glance for no configuration and no threshold to
+   argue about. It answers "does this look like it always does" rather
+   than "is this within tolerance", and those are genuinely different
+   questions.
+
+   **The data already exists and needs no new collection.**
+   `dataset_stats.json` already carries value-count distributions, and
+   the drawer already has the previous run in hand for its
+   current-vs-previous comparison. So this is a rendering job over
+   committed history, not a new computation - which also keeps it on
+   the right side of `CLAUDE.md`'s rule that the dashboard build never
+   touches `data/`.
+
+   **Open, and mostly about restraint rather than mechanism:** which
+   columns qualify as "where that makes sense" - a bounded categorical
+   like `sex` is obvious, a 600-value suburb field is a different chart
+   and possibly a top-N one, and a free-text name column is neither;
+   whether a small count is shown at all, since a category with two
+   rows renders as a bar indistinguishable from zero; whether the
+   comparison is previous SUPPLY or previous PERIOD, which differ the
+   moment a resupply exists; and how it reads for a column whose
+   categories CHANGED between the two supplies, where the honest
+   rendering has to show a bar that appeared and one that vanished
+   rather than quietly aligning the lists.
+
+   Note the overlap with item 4: cardinality drift answers the same
+   question numerically for high-cardinality columns where a histogram
+   would be unreadable. Worth designing the two together so they do not
+   end up as two unrelated treatments of one concern.
