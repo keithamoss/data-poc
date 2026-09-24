@@ -2202,3 +2202,43 @@ forbidden.
 the whole design problem - a date column's range, a row-count profile,
 a comparison against the previous supply, or something per-dataset and
 declared. Belongs with batch 5's check work.
+
+43. **[todo, 2026-09-24]** **[QA checks & contract]** EXTRACT-TO-RECEIPT
+LAG as a real check - how long between a supplier extracting their data
+and us receiving it.
+
+Keith's call, 2026-09-24, settling pre-build question 11: the arrival
+block in `dataset_stats.json` goes (`REQ-PIPE-066` criterion 12), and
+what was worth keeping in it becomes a check instead. His own words:
+"that should not be in the JSON, that should be like a check that we
+craft."
+
+**What is being deleted, and why the useful part is not simply
+renamed.** That block held `earliest_extract`, a `MIN(extract_timestamp)`
+over the SUPPLIER's own column - which `REQ-PIPE-060` criterion 11
+forbids as an arrival time - and `max_lag_hours`, which despite sitting
+in a block called "arrival" measures `MAX(extract_timestamp -
+date_registered)`, a within-supply staleness figure that is computed,
+committed, carried through both dashboard build paths and **rendered
+nowhere**.
+
+**The genuine finding underneath them** is different from both: the gap
+between when a supplier EXTRACTED their data and when WE RECEIVED it.
+That is real signal about supplier behaviour - a supplier whose extracts
+are consistently three days stale by the time they arrive is telling you
+something - and it is a different question from whether the supply was
+on time, which `REQ-PIPE-066` now answers from the assigned slot.
+
+**Why it has to be a check rather than a stat**, which is the part of
+Keith's framing worth keeping: a lag figure with no threshold is a
+number nobody acts on. As a check it gets a tolerance, a verdict, and a
+place in the same amber/red vocabulary as everything else - and it
+inherits the tiering discussion from `plans/road-testing.md` item 6.
+
+**Not scoped.** It needs `REQ-PIPE-066`'s receipt instant to compute, so
+it cannot be built before that lands. Open: whether the measure is the
+earliest extract in the supply, the latest, or a distribution; whether
+the tolerance is per-dataset like the grace allowance; and whether a
+deliberately-disordered row should be excluded (the deleted code
+filtered them out to protect the classification - a check arguably wants
+to SEE them, and there is already a separate ordering check that does).

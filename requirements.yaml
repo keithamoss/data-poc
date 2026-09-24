@@ -8640,6 +8640,7 @@ requirements:
       - "THE SYSTEM SHALL record the classification with the supply, and every consumer SHALL read that record rather than recomputing it."
       - "THE SYSTEM SHALL retire the classification derived from an arrival date, and SHALL NOT leave two derivations of arrival classification in the codebase."
       - "THE SYSTEM SHALL retire every path that suppresses or reinterprets a recorded arrival classification, so that what a reader is shown is what was recorded."
+      - "THE SYSTEM SHALL retire the arrival block committed with a run's dataset statistics, and SHALL NOT carry a supplier-derived arrival time or a lag measure through the dashboard build."
     non_functional_requirements:
       - "Two implementations of one concept that can disagree is item 74's exact failure mode, and it is the reason this is a signature change rather than an addition. The visible symptom of getting it wrong is 'filed to Q3, reported late for Q2', and the current derivation is live in BOTH dashboard build paths - pipeline/build_dashboard_data.py and pipeline/build_cp_dashboard_data.py."
       - "The usual seeded regenerate-and-diff check does NOT apply here, and that has to be said out loud before the work starts. Today's generated history measures 0 early, 240 on time, 112 late under the arrival-date derivation; the new derivation will legitimately produce different numbers, so a diff against today's output is evidence of the change working, not of a regression."
@@ -8683,6 +8684,40 @@ requirements:
         noting the justification also leans on a GENERATOR artefact (the
         churn design) rather than on a fact about real supply, which is
         a second reason it should not outlive the change.
+      - >
+        SETTLED 2026-09-24 (Keith), resolving pre-build Q11: the arrival
+        block in dataset_stats.json GOES. His own framing - "that should
+        not be in the JSON, that should be like a check that we craft".
+        Criterion 12 retires it.
+      - >
+        It held two things with different reasons for going.
+        EARLIEST_EXTRACT is MIN(extract_timestamp) over the SUPPLIER's
+        own column, which REQ-PIPE-060 criterion 11 forbids as an
+        arrival time, and it carried a 20-line filter whose stated
+        justification was that deliberately-disordered rows "directly
+        distort pipeline.cadence.classify_arrival()'s real
+        early/onTime/late classification" - the very classification this
+        requirement deletes. The workaround's reason for existing goes
+        with it.
+      - >
+        MAX_LAG_HOURS is not an arrival measure at all despite its
+        position in that block: it is MAX(extract_timestamp minus
+        date_registered), a WITHIN-SUPPLY staleness figure. Verified
+        2026-09-24 that it is computed, committed, carried through both
+        dashboard build paths as maxLagHours - AND RENDERED NOWHERE. The
+        only references outside the pipeline are tests asserting it was
+        carried. Dead weight with a misleading name.
+      - >
+        REJECTED keeping either, renamed, as a presentation statistic.
+        The real finding in here is EXTRACT-TO-RECEIPT LAG - the gap
+        between when a supplier extracted their data and when we
+        received it, genuine signal about supplier behaviour and quite
+        different from whether the supply was on time. Keith's call is
+        that it belongs as a CHECK rather than a committed stat, which
+        is also where a tolerance and a verdict can live. Logged as
+        plans/running-thoughts.md #43. Note it needs THIS requirement's
+        receipt instant to compute, so it is not the deleted field
+        wearing a new name.
 
   - id: REQ-PIPE-067
     title: An arrival verdict follows its filing, and is never a frozen fact
