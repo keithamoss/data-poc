@@ -563,3 +563,46 @@ anything here that turns into real build work becomes a requirement in
     `docs/remediation-workflow-design.md` draws); and whether the
     breakdown should also show the compared run, which is item 9's
     question arriving from the other direction.
+
+11. **[todo, 2026-09-24]** **[Dashboard UI]** **Supply history: columns
+    do not line up across cycles, and the dates are raw.** Keith's own
+    sighting, 2026-09-24. Two small things in one place, both in
+    `renderSupplyHistorySection()` / `renderSupplyCycleRows()`.
+
+    **The alignment.** Every row emits the same five `<td>`s, so the
+    cell COUNT is not the problem. The problem is that **each supply
+    cycle renders its own `<table class="dataset-table">`**, stacked
+    vertically down the section. Table layout is auto, so every table
+    sizes its columns independently from its own content - and a cycle
+    containing a resupply sizes differently in two columns at once: the
+    trailing column has to fit a "Resupply, attempt N" chip instead of
+    being empty, and the Timing column holds "N days since previous"
+    text rather than an arrival pill plus a timestamp. So two cycles
+    stacked one above the other put their column edges in different
+    places, which is exactly what Keith is seeing. Read from the code
+    rather than reproduced in a browser, but independent auto-layout
+    tables genuinely cannot align, so the mechanism is not in much
+    doubt. Likely fixes: one shared `<colgroup>` with `table-layout:
+    fixed`, or one table for the whole section with cycle header rows
+    instead of a table per cycle.
+
+    **The dates, and there are two different raw values, not one.**
+    - The **Arrived** column renders `e.run_date` straight into a
+      `mono` cell - a bare `2026-07-01`, where the rest of this
+      dashboard uses `fmtDate()` and reads "Jul 1, 2026".
+    - The **Timing** column renders `e.arrivedAt` raw, and in supply
+      history that is a **full ISO timestamp** - `arrival
+      ["earliest_extract"]` straight out of
+      `pipeline/build_dashboard_data.py`. Note this is a DIFFERENT
+      value from the `arrivedAt` the dataset header shows, which
+      `buildRealDataset()` slices to `HH:MM` and labels " UTC". Same
+      field name, two shapes, one of them unformatted.
+
+    **Do this with item 5, not before it.** That raw timestamp is UTC,
+    so making it readable is the same edit as making it Perth - format
+    it through `ASSET_TIMEZONE` rather than just prettifying a UTC
+    reading into a nicer-looking wrong answer.
+
+    `tests-js/supply-history.test.js` already covers this section's
+    grouping logic and is the obvious home for anything asserting the
+    rendered output.
