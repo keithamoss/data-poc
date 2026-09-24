@@ -7547,6 +7547,8 @@ requirements:
       - "THE SYSTEM SHALL record every artefact it declined to act on alongside the delivery it came in, so that a supplier changing their extract is visible rather than silent."
       - "WHERE no deliveries are present at all, THE SYSTEM SHALL report no arrivals and SHALL NOT fail."
       - "THE SYSTEM SHALL expose delivery recognition as a subcommand of a mothman command group of its own, named supply, and SHALL NOT place it under a group documented as not human-facing."
+      - "THE SYSTEM SHALL keep a run's identity stable against a change in which deliveries are recognised, and SHALL NOT derive a run id from a delivery's position in a list that recognition can reorder or shorten."
+      - "IF a change to recognition would alter the run id of any run already present in committed history, THEN THE SYSTEM SHALL fail, naming the affected runs, and SHALL NOT rewrite or silently re-key that history."
     non_functional_requirements:
       - "Recognition runs on every pipeline run and reads every delivery present. At ~30 datasets with years of history this is thousands of deliveries, and today's shape re-reads the whole tree once per collection - it must scale by reading each delivery once per run, not once per collection."
       - "Recognition must work on a freshly-cloned machine where data/ does not exist at all. A test that asserts a gitignored tree is present passes locally and fails in CI - a real red on 2026-09-23 - so absence is a state to handle, not a precondition to assert."
@@ -7754,6 +7756,40 @@ requirements:
         WHETHER TO REPORT; reporting stays unconditional on every run,
         and a reader deriving persistence from run history afterwards is
         not the decision input.
+      - >
+        SETTLED 2026-09-24 (Keith), closing a finding that had NO OWNER
+        after the pre-build review and would have surfaced as a red CI
+        run rather than as a design question. Criteria 18 and 19 now own
+        RUN IDENTITY.
+      - >
+        The mechanism, verified rather than assumed:
+        qa_tools/common/arrivals.py's arrivals_for() assigns
+        run_id = f"{run_id_prefix}{index:03d}" from a delivery's
+        POSITION in the receipt-ordered, collection-filtered list. This
+        requirement changes what is in that list twice over - a
+        receipt-less delivery becomes SKIPPED where today read_receipt()
+        raises and takes every delivery with it, and a delivery spanning
+        collections now joins TWO sequences. Every committed
+        qa_results/<agency>/<dataset>/<run_id>/ path is keyed by that
+        number, so a behaviour change in recognition RENAMES COMMITTED
+        QA HISTORY.
+      - >
+        delivery-architect called this the likeliest "we found out when
+        CI went red" item in the batch, and it is: the change looks
+        local to recognition, the breakage is in paths nothing in this
+        requirement mentions. Criterion 19 makes it a loud, named
+        failure instead - listing the affected runs rather than
+        rewriting them - because re-keying committed history is
+        REQ-PIPE-038's job, under its own delete-and-regenerate rule and
+        Keith's one-off regeneration exception, not something
+        recognition may do as a side effect.
+      - >
+        Criterion 18 states the underlying rule rather than only
+        guarding the symptom: a run's identity must not be derived from
+        a position in a list that recognition can reorder or shorten.
+        Written that way deliberately - a guard alone would leave the
+        fragile derivation in place and turn every future recognition
+        change into a history migration.
 
       - >
         SETTLED 2026-09-24 (Keith): a delivery with no receipt is
@@ -7945,6 +7981,37 @@ requirements:
         segment MEANS; the segment's contents catch up there. Recorded
         because a half-renamed concept is exactly the state a later
         reader would otherwise find and mistake for an oversight.
+      - >
+        ANTI-PATTERN, named because a builder can satisfy two criteria
+        at once and still ship the failure they exist to prevent.
+        Criterion 11 says one dataset's pattern matching several files
+        must not error and must not silently take one; REQ-PIPE-059 says
+        hold. Both read as MET if Arrival.path_for() is changed to
+        return the FIRST file instead of raising - it no longer errors,
+        and nothing appears to be chosen because the choice is invisible.
+        A supplier's second file is then dropped silently, which is
+        precisely what REQ-PIPE-059 exists to stop and what
+        path_for()'s current docstring already refuses to do. Found by
+        delivery-architect, 2026-09-24.
+      - >
+        docs/delivery-format.md IS NORMATIVE AND THIS REQUIREMENT
+        FALSIFIES IT. It currently states that a file's dataset comes
+        from the arrivalPattern block matched by
+        qa_tools/common/file_arrival.py - which criterion 4 explicitly
+        forbids reusing as the filename matcher. It must be updated in
+        the SAME change, not as a follow-up: leaving it stale makes the
+        spec and the code disagree with nothing saying which wins, and
+        this project has already been bitten once by a normative doc
+        outliving the design it described.
+      - >
+        SCOPE, recorded because the NFR above is FALSE TODAY for one of
+        the two datasets: Child Protection does not use pattern
+        attribution at all. qa_tools/cp/build_cp_warehouses.py loads by
+        hardcoded filename in a loop, while Birth Registrations goes
+        through arrival.path_for(). So "changing the pattern must be a
+        configuration edit with no code change" holds for BDM and not
+        for CP until that loop is rewritten, which is part of this
+        requirement's work rather than a separate tidy-up.
 
       - >
         SETTLED 2026-09-24 (Keith): duplicate attribution is caught by a
@@ -8394,6 +8461,36 @@ requirements:
         two collections produces two runs, because a run is the
         per-collection QA unit. Only the ORDER in which arrivals are
         processed is global, and the marker with it.
+      - >
+        SETTLED 2026-09-24 (Keith), closing the second finding left
+        without an owner by the pre-build review: BUILDING THIS BATCH IS
+        WHAT MAKES REQ-PIPE-053'S FILING-LAYER CRITERIA TESTABLE, AND
+        THEY MUST GAIN THEIR linked_tests IN THE SAME CHANGE.
+      - >
+        REQ-PIPE-053 is `built` and admits the gap itself: "the criteria
+        about failing at filing, accepting supplies while exhausted, and
+        a run summary naming what it skipped describe a filing layer
+        that does not exist yet". Those are its criteria 4, 5, 6, 7, 9
+        and 22. This batch builds that filing layer, so they stop being
+        aspirational the moment it lands.
+      - >
+        Nothing will catch it if it is skipped, which is why it is
+        written down rather than left to good practice: the CI gate
+        enforces linked_tests only at the transition to `built`, and
+        REQ-PIPE-053 crossed that line already with four tests covering
+        the half that was real. It is never asked again, so a
+        requirement that overclaims stays overclaiming, silently and
+        permanently.
+      - >
+        Noted while resolving it: criterion 9 here and REQ-PIPE-053's
+        criterion 7 are the same SHALL - a dataset whose schedule is
+        exhausted still accepts and records its arrivals. That
+        duplication is deliberate rather than accidental, and this
+        requirement's own first NFR explains why: 053 made the claim
+        without the mechanism and this is the mechanism. Left in place,
+        unlike the duplications resolved elsewhere today, because
+        dropping either copy would cost one of the two requirements its
+        readability.
 
   - id: REQ-PIPE-062
     title: A supply is assigned to a slot by rule, and the rule can never claim forward

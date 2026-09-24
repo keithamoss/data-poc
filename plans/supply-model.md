@@ -665,9 +665,33 @@ warning comes.
 
 **All twelve pre-build questions are now settled.**
 
-**Unowned and not a question**: the severity-bearing activity feed
-(nothing owns it), and the run-id renumbering of committed history
-(nothing owns it).
+**Unowned findings - ALL NOW OWNED, 2026-09-24.** Recorded because
+"nothing owns this" is the failure mode this project keeps hitting, and
+because the fix is different in each case:
+
+- The severity-bearing **activity feed / human-action queue** -> a new
+  requirement, `REQ-DASH-070`, signed.
+- **Run-id renumbering of committed history** -> `REQ-PIPE-057`
+  criteria 18 and 19. `arrivals_for()` assigns `run_id` from a
+  delivery's POSITION in the receipt-ordered list, and this batch
+  changes what is in that list twice over, so building recognition
+  would have RENAMED committed QA history. Criterion 18 forbids
+  deriving identity from that position at all; criterion 19 makes any
+  remaining change a loud, named failure rather than a silent re-key,
+  because re-keying is `REQ-PIPE-038`'s job. `delivery-architect`
+  called this the likeliest "we found out when CI went red" item in
+  the batch.
+- **`REQ-PIPE-053`'s filing-layer criteria (4, 5, 6, 7, 9, 22)** ->
+  `REQ-PIPE-061`'s decisions. That requirement is `built` and admits
+  it describes "a filing layer that does not exist yet"; this batch
+  builds it, so those criteria must gain their `linked_tests` in the
+  same change. Nothing would have caught it otherwise - CI enforces
+  `linked_tests` only at the transition to `built`, which 053 crossed
+  already.
+- **The `path_for()` anti-pattern**, **`docs/delivery-format.md` being
+  normative and falsified**, and **Child Protection not using pattern
+  attribution at all** -> `REQ-PIPE-058`'s decisions, as builder-facing
+  traps and in-scope work rather than follow-ups.
 
 ## Batch 3's scoper sense-check - findings, 2026-09-23
 
