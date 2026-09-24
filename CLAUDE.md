@@ -101,8 +101,19 @@ already scoped.
   `plans/qa-pipeline.md` (real bugs found running the real tools) just
   because it turns out to be one of those after investigation; write
   down what was seen first, move it once it's understood.
+- `plans/post-build-review.md` - what the post-build critic agents
+  found when turned at work that is already BUILT AND SHIPPED, and what
+  was decided about each finding. Created 2026-09-24 at Keith's own
+  ask, deliberately separate from the files above because those hold
+  work not yet done and this holds judgements about code already
+  running. **It carries a standing rule stricter than the pre-build
+  one: Keith signs off EVERY finding before anything in shipped code
+  changes** - not a "trivially safe" fix, not a one-liner - and a
+  critic's report is a claim to be verified against the real code
+  before it is written up, not a verdict. Read it before acting on any
+  post-build critic output.
 
-**Finding what's currently PRIORITY, without reading all eight files.**
+**Finding what's currently PRIORITY, without reading all nine files.**
 Some items carry an explicit priority line Keith has set (`Priority:
 work through today/tomorrow`, `Priority: HIGH - to FIX`, ...). They're
 scattered across files by design - priority is a property of an item,
