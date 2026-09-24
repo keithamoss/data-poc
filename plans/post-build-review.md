@@ -1029,6 +1029,17 @@ post-build critic should see a requirement's own `evidence:`.
     glance. The visual critic is looking at that half in both colour
     schemes.
 
+    **DECIDED 2026-09-25**: keep the message prominent, **and show the
+    last known results below it**. Keith agreed the lean.
+
+    The reasoning to build against: **"nothing is expected" and
+    "nothing ever happened" are different statements**, and replacing
+    the whole page conflates them. `cp-case-workers` has 18 real
+    committed runs behind that message; a reader who drilled in to see
+    the last known state currently gets nothing and no way to ask for
+    it. The message stays first and stays loud - this is not a demotion
+    of it, it is putting history back underneath it.
+
 14. **[todo, 2026-09-24]** **[Dashboard UI]** **[U7] The asset's own
     timezone is configured, and the page still shows two zones side by
     side.** A dataset page reads `SLA: … by 09:00 AWST` next to
@@ -1063,6 +1074,33 @@ post-build critic should see a requirement's own `evidence:`.
 
     **Recorded as reported** - the visual critic has this one in scope
     and may add measurements.
+
+### A standing decision that closes several findings at once
+
+**THE PHONE IS NOT A TARGET. Decided 2026-09-25, Keith's own words:**
+"no, it's not critical that it works on the phone. Shave off some of
+the rough edges, but I'm happy to accept a substandard experience
+there. Everyone will be using it on desktop screens or on laptop
+screens."
+
+**What that settles**, so the mobile findings stop being re-raised as
+though nobody had looked at them:
+
+- **#16** (the agency page overflowing at 390px), **#52** (the badge
+  row as the real widest element, and the collection count marker
+  clipped by 10px) and the tap-target half of **#57** are all accepted
+  as known, deliberate limitations rather than defects to fix.
+- **"Shave off some of the rough edges" is still a real instruction**,
+  not a dismissal. The cheap ones that cost nothing at desktop width -
+  a `flex-wrap` on the badge row, a `white-space` fix on the
+  breadcrumb, not clipping a status marker - are worth doing because
+  they are one line each and make the phone view untidy rather than
+  broken. What is NOT worth doing is a responsive strategy for the
+  Tier-2 table, which is the expensive half.
+- **It does not license regressions at desktop width**, and it does not
+  touch accessibility: keyboard, focus and screen-reader work
+  (#8/#9/#10/#55) was about operability on the machines people
+  actually use.
 
 ### From `delivery-cli-ux-critic` (2026-09-24)
 
@@ -1339,6 +1377,23 @@ just now, not by reading the critic's transcript.
     **Cost:** moderate - a fourth outcome in `mothman check`, which is a
     change to every gate's contract with it, not just this one.
 
+    **DECIDED 2026-09-25: yes, `mothman check` should be able to report
+    a warning.** Keith's own call.
+
+    The argument recorded for the build: **a gate that can only shout
+    or stay silent gets ignored for shouting.** Today the low-runway
+    warning prints, the row reads green `passed`, and the closing line
+    says "Every gate passed" - so the only way to make it visible is to
+    make it fail, which is precisely what `REQ-PIPE-053` forbids
+    ("a non-fatal warning that fails a build gets disabled, and then it
+    is not there for the one that mattered").
+
+    **What the build has to settle:** a warning must not change the
+    exit code - the fourth outcome is a REPORTING state, not a new
+    failure - and every gate needs a way to say "passed, with
+    something to know", which today they cannot express through a
+    return code alone.
+
 24. **[todo, 2026-09-24]** **[Testing & dev tooling]** **[B1/B2/B3]
     Ordinary wrong input produces Python tracebacks.**
 
@@ -1458,6 +1513,16 @@ just now, not by reading the critic's transcript.
     supply due today, and am I past it?* - has no answer short of
     dumping three years. `slots.is_overdue()` and
     `next_unfilled_claimable()` exist in the model with no CLI surface.
+
+    **DECIDED 2026-09-25**: default to a **window** - the last few and
+    the next few - with `--all` for the full dump. Keith agreed the
+    lean.
+
+    So `--until` stops being required for a daily calendar, which also
+    removes the traceback in #24 that a missing `--until` produces. The
+    reader's actual question - *is my next supply due, and am I past
+    it?* - becomes the default answer rather than something to be
+    extracted from 1370 lines.
 
 30. **[todo, 2026-09-24]** **[Testing & dev tooling, Docs & process]**
     **[B11/B12] Help text and footers explain things the reader never
