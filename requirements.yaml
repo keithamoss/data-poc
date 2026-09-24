@@ -907,6 +907,9 @@ requirements:
   - id: REQ-PIPE-068
     title: One database, and every read of supply data goes through a per-run view schema
     date_written: "2026-09-24"
+    signed_off:
+      by: Keith
+      date: "2026-09-24"
     story: >
       As whoever maintains this pipeline, I want one durable database
       and one place where a logical table name becomes a physical
@@ -1002,17 +1005,12 @@ requirements:
         and does not run until QA does. If QA ever moves earlier than
         sprint 15, this stops holding.
       - >
-        DUPLICATION FLAGGED, not resolved, and it needs Keith: criterion
-        5 here (record which physical version each run read) and
-        REQ-PIPE-038's own surviving criterion 9 (store, with a QA run's
-        committed results, which physical table each logical name
-        resolved to) are the same obligation stated twice in two signed
-        requirements. One of them should go.
-    open_questions:
-      - >
-        Which of this requirement's criterion 5 and REQ-PIPE-038's
-        criterion 9 survives - they are the same obligation in two
-        places.
+        SETTLED 2026-09-24 (Keith): criterion 5 here is the single copy,
+        and REQ-PIPE-038's criterion 9 was DROPPED. The two stated one
+        obligation - record which physical table each run read - across
+        two signed requirements. It belongs with the mechanism that does
+        the resolving, which is this requirement; 038 owns re-keying
+        committed history and merely restated it.
 
   - id: REQ-PIPE-069
     title: Every delivery is recorded as its own committed file, written once at recognition
@@ -3340,9 +3338,6 @@ requirements:
         committed record, separate from the delivery's file, so that an
         arrival with nothing loadable is still a recorded arrival
         without the delivery's file ever being rewritten.
-      - THE SYSTEM SHALL store, with a QA run's own committed results,
-        which physical table each logical name resolved to for that
-        run.
     non_functional_requirements:
       - Deleting today's committed qa_results/ is a one-off exception to
         CLAUDE.md's rule that nothing in it is ever regenerated away. It
@@ -3390,11 +3385,21 @@ requirements:
       - >
         Criteria 8, 9, 10, 12, 13 and 15 as signed are now
         REQ-PIPE-069's criteria 1-6, unchanged in wording. Criteria 11
-        and 14 were deliberately NOT moved: 11 (record each table's load
-        outcome) restates REQ-PIPE-060 criterion 13, and 14 (which
-        physical table each logical name resolved to) restates what is
-        now REQ-PIPE-068 criterion 5. Both duplications are flagged as
-        open questions rather than silently resolved by the split.
+        and 14 were deliberately NOT moved, because both were
+        duplications rather than delivery-log criteria.
+      - >
+        CRITERION DROPPED 2026-09-24 (Keith): the former criterion 14 -
+        store, with a QA run's committed results, which physical table
+        each logical name resolved to - is gone. It stated the same
+        obligation as REQ-PIPE-068 criterion 5, and that is where it
+        belongs, with the mechanism that does the resolving. This
+        requirement owns re-keying committed history and merely
+        restated it.
+      - >
+        STILL DUPLICATED, and the last one outstanding from the split:
+        the surviving criterion 8 here (record each table's LOAD OUTCOME
+        as its own committed record) restates REQ-PIPE-060 criterion 13.
+        Two signed requirements own the processing log between them.
       - Decided to DELETE and regenerate rather than migrate (Keith,
         2026-09-21, in as many words - "because the current data is all
         synthetic, I'm happy to delete it all and regenerate it. We
@@ -3504,6 +3509,11 @@ requirements:
         holds LOAD facts - what loaded, into which physical table, or
         why it did not. Two files, two moments, both written once and
         neither ever rewritten.
+    open_questions:
+      - >
+        Whether this requirement's criterion 8 or REQ-PIPE-060 criterion
+        13 owns the processing log, since both now state it.
+
   - id: REQ-DASH-055
     title: The dashboard shows real datasets only
     date_written: "2026-09-23"
