@@ -150,3 +150,69 @@ anything here that turns into real build work becomes a requirement in
    VIEWING offset and data-asset-level rather than per-dataset, or a
    genuinely separate concept that merely rhymes with it. They must not
    be conflated by accident.
+
+4. **[todo, 2026-09-24]** **[QA checks & contract]** **Cardinality
+   drift - watch how many distinct values a column has, not which ones
+   they are.** Keith's own ask, 2026-09-24, and his own worked example:
+   a suburb field holding ~600 values. New suburbs appearing is normal
+   and uninteresting. Fifty appearing at once is a question. What we
+   want is a threshold of acceptable change that lights amber or red,
+   over the COUNT of distinct values - "we don't really care what the
+   values are".
+
+   **This is a genuinely different check from the drift we have**, which
+   matters because the obvious move is to point the existing one at
+   suburb and call it done. Today's drift check
+   (`qa_tools/bdm/run_evidently_bdm.py`) computes **PSI** - a
+   distribution-shift measure - on the `sex` column against a FIXED
+   reference run. PSI answers "have the proportions moved", which is the
+   right question for a handful of categories and the wrong one for 600
+   suburbs: it bins, and a value that never appeared in the reference
+   has no well-defined contribution, so the measure has to be smoothed
+   precisely where Keith's signal lives. Counting distinct values is a
+   different metric, not a re-parameterisation of this one.
+
+   **A real, separate reason to like it, worth recording because it is
+   not why he asked for it.** A check that records only a COUNT records
+   no data. Today's `dataset_stats.json` carries value-count
+   distributions and per-check failing-value aggregates - real values,
+   committed to a PUBLIC repository, which is fine while the data is
+   synthetic and is exactly the shape that has to be re-judged on real
+   deployment terms. A cardinality check is the same signal with none of
+   that exposure, in a Birth Registrations or Child Protection context
+   where a list of distinct values is the sensitive part.
+
+   **The forks, none of them settled, and the first two are the ones
+   that decide whether this works at all:**
+
+   - **Threshold of WHAT.** An absolute jump (+50 values), a percentage
+     change, or a rate relative to row growth? A supply with twice as
+     many rows will naturally carry more suburbs, so an absolute
+     threshold fires on a legitimately larger extract and a percentage
+     one fires on a small column. Keith said "threshold of acceptable
+     change" without picking, and the pick changes what the check means.
+   - **New values only, or disappearing ones too?** 600 becoming 650 is
+     his stated case. 600 becoming 550 is arguably the more alarming
+     one - a truncated extract or a dropped join - and a NET count hides
+     both against each other: 50 gained and 50 lost reads as no change
+     at all. Counting appearances and disappearances separately needs
+     the previous run's value SET, not just its count, which partly
+     gives back the privacy property above unless the comparison happens
+     at run time and only the counts are kept.
+   - **Compared against what.** The previous run, the previous PERIOD,
+     or a fixed reference? Today's PSI check uses a fixed reference run,
+     which ages badly for a field that legitimately grows - the baseline
+     drifts further from reality every period and the check gets
+     noisier on purpose.
+   - **Does a resupply count as change?** A resupply of a period already
+     supplied should not read as drift against the supply it replaces.
+   - **The first run has no baseline**, same shape as the existing
+     reference-run special case.
+   - **Which columns get it**, presumably declared per column in the
+     contract alongside every other check definition, with the three
+     hand-authored prose fields `docs/check-authoring-rules.md` requires.
+
+   Relates to item 1: whatever this check reports becomes another line
+   on the per-check trend chart, under a y-axis that currently has no
+   title. A count of distinct values is exactly the metric a reader
+   would otherwise assume was a row count.
