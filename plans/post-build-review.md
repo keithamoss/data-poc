@@ -141,6 +141,25 @@ at thirty datasets' worth of collections below it, more. The fix is
 `.card-meta{margin-top:auto}` - no count anywhere, and it is correct at
 any number of agencies.
 
+**SIGNED OFF AND FIXED, 2026-09-24 evening** ("make sure you fix how the
+cards align internally"). One line, `margin-top:auto` on `.card-meta`.
+
+**One correction to the critic, found while fixing it.** Its finding
+said "`.card` is plain block flow" - it is not, and never was. `.card`
+has been `display:flex; flex-direction:column` since it was written.
+The cards are equal height because the grid stretches them, and the
+slack fell below the meta row because nothing pushed it down. Right
+conclusion, wrong premise - the fourth of these, and the reason the
+standing rule says a critic's finding is a claim until it has been
+checked.
+
+**Failing test first**, per that rule:
+`tests/test_dashboard_e2e.py::TestQuietStatesAreVisiblyBuilt::
+test_every_agency_card_pins_its_meta_row_to_the_same_place` measures,
+in a real browser, how far each card's meta row sits above its own
+bottom edge. Before: `[69, 19]`, matching the critic's own numbers.
+After: equal on every card. The whole module passes, 60 tests.
+
 ### Q2. The exhausted count markers duplicate the pill beside them
 
 **What is there.** `exhaustedMarker()` adds a count pill at each tier.
@@ -196,6 +215,33 @@ cannot reach a dataset), #9 (focusable controls inside `aria-hidden`
 drawers), #10 and #55 (seven of eleven focusable types have no designed
 focus ring). Those four are already one job waiting to happen, and the
 muted-token audit belongs with them rather than ahead of them.
+
+**SIGNED OFF AND FIXED, 2026-09-24 evening** ("yeah, fix that"), taken
+as approving that blend: the border now, the text contrast into the
+accessibility pass.
+
+**What changed:** `.pill.nodata`'s border token moves from
+`--line-strong` to `--ink-faint` - the same token as its own label. It
+measures 2.81:1 light / 3.55:1 dark instead of 1.51:1, so the dashed
+edge is as visible as the words inside it, while staying quieter than
+exhausted's 5.35:1.
+
+**Why the same token rather than a hand-picked colour:** when the
+accessibility pass raises `--ink-faint` to clear AA, this border is
+lifted with it. A bespoke value would have to be found again.
+
+**Failing test first**, in both themes:
+`test_the_nodata_pills_border_is_at_least_as_visible_as_its_own_label`
+asserts the border's measured contrast against its own fill is at least
+the label's. The bar is deliberately that, not WCAG's 3:1 for non-text
+contrast - the muted tokens do not meet 3:1 yet, and raising them is
+the wider decision this defers. Before: 1.51 against 2.81 and 3.55.
+After: equal in both.
+
+**It also largely settles #48.** With a visible border the pill still
+reads as a pill when its fill merges into a hovered row. The root - one
+token serving both the pill's fill and the row's hover - is untouched
+and remains #48's to decide.
 
 ### Q4. Two render sites disagree about the clock, and one shows raw ISO strings
 
@@ -284,6 +330,77 @@ change what gets built - for Keith, before drafting:**
    `data-asset.yaml`, where `2027-11-01` matches the file and
    `Monday, 1 November` does not. Does the standard cover config-echoing
    output, or only prose?
+
+**ANSWERED 2026-09-24 evening, three of the five:**
+
+1. **The year is shown.** Keith's own call ("that should actually
+   mention the year - good point"). Taken as always, not
+   only-when-not-this-year, which is the reading that needs no rule and
+   never surprises anybody. Reversible if he meant the narrower one.
+2. **The absence of a timezone means everything is in asset time** -
+   his own words, and this is the substantive answer to Q4. Every
+   user-facing instant is rendered on the asset's clock, and carries no
+   zone label because there is only one. `#3`, `#14` and `#51` all
+   resolve to this.
+3. **Relative versus absolute:** he asked for a pass now rather than an
+   item later. It follows.
+
+Still open: **punctuation** (the two dictated examples differ on the
+comma) and **whether config-echoing CLI output is covered**.
+
+### The relative-time pass (Keith's ask, 2026-09-24 evening)
+
+"If you want to just do a pass now and find some of the high value
+areas to add relatives, that'd be handy."
+
+**What already exists, and it is less than it looks.**
+`fmtRelativeTime()` (template:3679) does minutes, hours and days, then
+**gives up at 30 days and returns an absolute date** - so Keith's weeks,
+months and years are not built. It is called from **exactly one place**,
+the Recent activity panel. And the masthead's `Live · updated Ns ago`
+clock (:4359) does its own seconds-and-minutes arithmetic inline rather
+than calling it - a second implementation of the same idea, which is
+the shape this project has been bitten by four times (`plans/qa-
+pipeline.md` item 74, and #34 in this very file).
+
+**Where relative genuinely earns its place** - the test being whether
+the reader's real question is "how long has it been?" rather than "which
+day was it?":
+
+| Site | Today | Worth it? |
+|---|---|---|
+| **`Last QA run` column**, Tier 2 (:2643) | `Sep 22, 2026` | **Highest value on the page.** The question is "is this stale?", and a date makes you do the arithmetic yourself. "2 days ago" answers it outright. |
+| **`Latest arrival`**, Tier 2 and the SLA tile | absolute time | **Both.** The absolute is needed to judge against the SLA deadline; the relative answers "has anything landed lately?". Absolute primary, relative alongside. |
+| **Past snapshots panel** (:3617) | `Sep 20, 2026 · 14:32` | **High.** You are choosing among archives, and "3 weeks ago" is how people pick one. |
+| **Release notes and Plans dates** | absolute | **Medium.** "How current is this thinking?" is a real question about both. |
+| **Recent activity** | already relative | Extend past 30 days to weeks/months/years. |
+| **The `Live · updated` clock** | its own inline maths | Point it at the one helper. |
+| **Supply history TIMING column** | `1 day since previous` + a raw ISO string | The between-rows relative is already right and should stay. The raw string becomes an absolute formatted one (#51). A third "ago" per row would be noise on a historical table. |
+| **`Retired <date>`, `Definition changed <date>`** | absolute | **Leave absolute.** These are records of when something was decided, not elapsed time. Relative belongs in the tooltip if anywhere. |
+| **The as-of chip, trend-axis labels** | absolute | **Never relative.** The as-of is a date somebody chose; "3 days ago" for a deliberate selection would be actively wrong. |
+
+**Two traps the pass turned up, and the first is the important one:**
+
+1. **Relative to WHOSE now?** Every relative string on this page would
+   be computed from the browser's real clock - but the dashboard is
+   routinely read **as of a past or future date**. Viewing as of
+   2027-09-01, a `Last QA run` reading "2 days ago" against the real
+   2026 clock is not merely unhelpful, it is false. **Relative time on
+   this page must be relative to `CURRENT_AS_OF`, not to `new Date()`**,
+   everywhere except the masthead clock (which genuinely is about now).
+   That is a rule the standard has to carry, and nothing in the
+   dictated version implies it.
+2. **The standard has no future tense.** "X ago" covers the past.
+   `mothman schedule show` is a table of **future** dates - Due,
+   Claimable from - and the runway warning counts forward. Those want
+   "in 3 days" / "in 2 quarters". Worth settling with the same
+   conversation rather than discovering it mid-build.
+
+**Recommendation:** one requirement, covering the absolute format, the
+relative format in both directions, the as-of-relative rule, and a
+single helper that both the dashboard and the CLI resolve through - not
+two more implementations. It supersedes #3, #14, #51 and road-testing
+items 5 and 11.
 
 ## Findings
 

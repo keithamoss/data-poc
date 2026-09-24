@@ -1332,3 +1332,91 @@ class TestAnExhaustedScheduleIsLoud:
             _goto(page, built_dashboard_html, as_of=as_of)
             _goto(page, built_dashboard_html, state=self.DS, as_of=as_of)
         assert errors == []
+
+
+def _contrast(a: tuple[float, float, float], b: tuple[float, float, float]) -> float:
+    """WCAG relative-luminance contrast ratio between two sRGB triples."""
+    def lum(rgb):
+        chan = []
+        for v in rgb:
+            v /= 255
+            chan.append(v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4)
+        return 0.2126 * chan[0] + 0.7152 * chan[1] + 0.0722 * chan[2]
+    hi, lo = max(lum(a), lum(b)), min(lum(a), lum(b))
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def _rgb(css: str) -> tuple[float, float, float]:
+    nums = [float(n) for n in re.findall(r"[\d.]+", css)]
+    return tuple(nums[:3])
+
+
+class TestQuietStatesAreVisiblyBuilt:
+    """Two post-build critic findings, verified at the layer a human
+    sees (plans/post-build-review.md #49 and #54, signed off by Keith
+    2026-09-24).
+
+    Both are asserted against RENDERED values in a real browser rather
+    than against the CSS rule that produces them, because both defects
+    were invisible in source and only turned up when something was
+    actually measured - which is CLAUDE.md's own "verify at the LAST
+    transform before the user" lesson, and the reason these live here
+    rather than in tests-js/ (jsdom computes no layout and no cascade).
+    """
+
+    def _cards(self, page):
+        return page.evaluate("""() => [...document.querySelectorAll('#agency-grid .card')].map(card => {
+            const meta = card.querySelector('.card-meta');
+            if(!meta) return null;
+            return Math.round(card.getBoundingClientRect().bottom - meta.getBoundingClientRect().bottom);
+        }).filter(v => v !== null)""")
+
+    def test_every_agency_card_pins_its_meta_row_to_the_same_place(self, clean_page, built_dashboard_html):
+        """A one-line agency title and a three-line one must not put the
+        meta row at two different heights.
+
+        The grid stretches every card in a row to one height, so a card
+        whose content is shorter gets the slack as dead space at the
+        BOTTOM unless the meta row is pushed down - which is what a
+        reader reads as "this card is unfinished". Measured 69px against
+        19px on the two real cards before the fix.
+        """
+        _goto(clean_page, built_dashboard_html)
+        gaps = self._cards(clean_page)
+        assert len(gaps) >= 2, "needs at least two real agency cards to compare"
+        assert len(set(gaps)) == 1, (
+            f"agency cards end their meta rows at {gaps} px above the card's own bottom edge - "
+            "they should all be the card's own padding, so the rows line up across cards")
+
+    @pytest.mark.parametrize("theme", ["light", "dark"])
+    def test_the_nodata_pills_border_is_at_least_as_visible_as_its_own_label(
+            self, clean_page, built_dashboard_html, theme):
+        """`.pill.nodata` is distinguished from `.pill.exhausted` by a
+        DASHED rather than solid border - the template's own comment
+        says so. That distinction is only real if the border can be
+        seen: it measured 1.51:1 against its own fill in both themes,
+        which is not visible at all, while the label beside it measured
+        2.81:1 light / 3.55:1 dark.
+
+        The bar here is deliberately "at least as visible as the text
+        next to it" rather than WCAG's 3:1 for non-text contrast. The
+        muted tokens do not meet 3:1 yet and raising them is a separate,
+        wider decision (post-build-review #49, folded into one
+        accessibility pass with #8/#9/#10/#55) - this test guards the
+        narrower property that was actually signed off, and will keep
+        holding when that pass raises the token.
+        """
+        _goto(clean_page, built_dashboard_html, as_of="2027-09-01")
+        clean_page.evaluate(f"document.documentElement.setAttribute('data-theme', '{theme}')")
+        pill = clean_page.locator(".pill.nodata").first
+        pill.wait_for(state="attached")
+        styles = pill.evaluate("""el => {
+            const s = getComputedStyle(el);
+            return {bg: s.backgroundColor, border: s.borderTopColor, text: s.color};
+        }""")
+        bg = _rgb(styles["bg"])
+        border_contrast = _contrast(_rgb(styles["border"]), bg)
+        text_contrast = _contrast(_rgb(styles["text"]), bg)
+        assert border_contrast >= text_contrast - 0.05, (
+            f"{theme}: the nodata pill's border is {border_contrast:.2f}:1 against its own fill while "
+            f"its label is {text_contrast:.2f}:1 - a border nobody can see is not a distinction")

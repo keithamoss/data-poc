@@ -112,8 +112,24 @@ releases:
   - date: "2026-09-24"
     summary: >
       Child Protection investigations are now checked for dates that run
-      backwards.
+      backwards, and two quiet states on the dashboard are easier to read.
     changes:
+      - category: Fixed
+        items:
+          - headline: Agency cards line up again
+            components: ["Dashboard UI"]
+            description: >
+              The summary row at the foot of each agency card now sits at
+              the same height on every card, whatever the length of the
+              agency's name. A card with a short name used to leave a gap
+              below its figures that read as though something was missing.
+          - headline: The "No data" tag has an outline you can actually see
+            components: ["Dashboard UI"]
+            description: >
+              The dashed outline that tells "No data" apart from "Schedule
+              ended" was too faint to make out, so at a glance the two
+              looked alike. It is now as clear as the label inside it, and
+              it no longer disappears when you hover the row.
       - category: New
         items:
           - headline: An investigation cannot end before it began
