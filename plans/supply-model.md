@@ -471,9 +471,75 @@ ones.
   split, or staging is built against a database that does not exist, or
   an explicit IOU is written - and the third is the shape already
   recorded as a failure.
-- **`REQ-PIPE-058` criterion 8 has no corpus**, above. Needs an answer
-  before the gate is built, and the criterion was signed on 2026-09-24
-  so changing it is Keith's call.
+- **`REQ-PIPE-058` criterion 8 has no corpus**, above. **RESOLVED
+  2026-09-24 (Keith) - the corpus is the DELIVERY LOG**, see below.
+
+### Blocker 2 resolved - the delivery log is the corpus
+
+Keith's own answer, 2026-09-24, arrived by asking whether the warehouse
+is committed (it is not - zero files under `data/` are tracked) and then
+asking what the delivery log would give us if it were not gitignored.
+
+**`REQ-PIPE-038` already specifies exactly what the gate needs, and is
+already signed** (Keith, 2026-09-23):
+
+- criterion 10 records, in a delivery's own file, **every table it
+  carried and the dataset each was attributed to** - the attribution
+  pairs the collision gate has to check;
+- criterion 9 stores those files in a committed location of their own,
+  outside the per-dataset QA results, because a delivery spans datasets;
+- criterion 12 makes the record **queryable as SQL directly from the
+  committed files**, and its decisions record that this was verified by
+  real query rather than assumed: DuckDB reads the committed JSON into a
+  view via `read_json_auto` over a glob, joinable against the staging
+  and period schemas, nothing synced and nothing duplicated.
+
+**Why this beats the fixture corpus this session had recommended**: it
+is the REAL history rather than examples somebody thought to add, which
+was that option's whole weakness. And it sits correctly on the
+read-committed-history path - the gate reads committed files, never
+`data/` - which matters because `deploy-pages.yml` is where the gate
+runs, and a `data/` read there would break the standing rule outright
+rather than merely being vacuous.
+
+**Three things to resolve before it works, none fatal:**
+
+1. **Sequencing.** `REQ-PIPE-038` is delivery sprint 14; the gate is
+   sprint 7. The corpus does not exist when the gate is built. Either
+   the gate ships later than the requirement specifying it, or the
+   delivery-log criteria move forward to sit with recognition - which is
+   the same manoeuvre already approved for `REQ-PIPE-035`, for the same
+   underlying reason, and has the additional logic that RECOGNITION IS
+   WHAT WRITES THEM.
+2. **Table name or filename?** Criterion 10 says "every TABLE it
+   carried". If that resolves to `cp_clients` rather than
+   `cp_clients.csv`, it is a table corpus and the gate needs FILENAMES -
+   and a file's name is precisely what attribution reads. 038 is signed
+   but not started, so making this explicit is cheap now and expensive
+   at build time.
+3. **The privacy question has already had its hearing.** Committing the
+   delivery log means committing what each delivery carried, and Keith
+   signed that on 2026-09-23. So "this publishes supplier filenames" is
+   not a new cost this batch introduces; it is a consequence of a
+   decision already taken. Worth being conscious of rather than
+   sleepwalking into, and worth re-reading on real-deployment terms when
+   the data stops being synthetic.
+
+**Rejected on the way here**, recorded so they are not re-proposed:
+*gate reads `data/deliveries/`* - not merely vacuous in CI and on a
+fresh clone, it would put a `data/` read into the deploy path and break
+the standing rule; *a committed fixture corpus* - works everywhere but
+only catches collisions someone thought to include, strictly worse than
+real history once real history exists; *run the gate in `test.yml`
+instead*, where generated data legitimately exists - avoids the deploy
+path but leaves the gate outside `mothman check`, which criterion 13
+requires, and it would see only filenames the generator happens to
+produce.
+
+**Note what did NOT change**: `REQ-PIPE-058` criterion 9, the runtime
+hold, is untouched and remains the half that cannot be wrong. Nothing is
+misfiled under any of these options; what varied was only how early the
+warning comes.
 
 ### Other findings worth carrying, not yet actioned
 
