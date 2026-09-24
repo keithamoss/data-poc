@@ -454,12 +454,12 @@ from the start rather than retrofitting them for something they were
 never built to do.
 
 ```bash
-./mothman pipeline run --dataset cp
+./mothman pipeline run --collection cp
 ```
 
 (Generates data/cp_raw/'s 15 quarterly snapshots, runs the real tools ->
 reports/results_cp.json, reshapes -> reports/child_protection_dashboard.json,
-then re-embeds BOTH real datasets into the dashboard HTML. `--dataset all`,
+then re-embeds BOTH real datasets into the dashboard HTML. `--collection all`,
 the default, does the same for Birth Registrations too in one call.)
 
 A few things specific to this collection, each found by actually running

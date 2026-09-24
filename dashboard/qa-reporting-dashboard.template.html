@@ -180,6 +180,12 @@ button{font:inherit; color:inherit;}
 .legend-key span{display:inline-flex; align-items:center; gap:6px;}
 .legend-key i{width:8px;height:8px;border-radius:50%;display:inline-block;}
 .legend-key i.green{background:var(--good);} .legend-key i.amber{background:var(--warn-fill);} .legend-key i.red{background:var(--bad);}
+/* The quiet states get legend swatches too (post-build-review #1).
+   Square rather than round, matching their own pills' markers, so the
+   legend reads as the same vocabulary the page uses rather than as
+   three colours plus two footnotes. */
+.legend-key i.nodata{background:var(--ink-faint); border-radius:2px;}
+.legend-key i.exhausted{background:var(--ink-muted); border-radius:2px;}
 
 /* ============ Plans tab (running-thoughts.md #10) ============ */
 .plans-filterbar{margin-top:16px; padding:14px; background:var(--surface-alt); border:1px solid var(--line); border-radius:var(--radius-md);}
@@ -2544,8 +2550,23 @@ function renderExec(view){
       </div>`;
     return;
   }
-  const redCount = DATA.agencies.filter(a=>a.status==="red").length;
-  const amberCount = DATA.agencies.filter(a=>a.status==="amber").length;
+  // COUNTED, NEVER SUBTRACTED (plans/post-build-review.md #1, Keith's
+  // option (b), 2026-09-24). Green used to be `total - red - amber`, so
+  // an agency whose status was `nodata` or `exhausted` was reported as
+  // green by arithmetic - the most prominent number on the landing page
+  // stating that every agency was healthy directly above a notice
+  // saying six datasets could not be processed. A subtraction cannot be
+  // checked against anything; a count can, and tests/test_dashboard_e2e
+  // .py now asserts the figures sum to the number of agencies.
+  const agencyCount = s => DATA.agencies.filter(a=>a.status===s).length;
+  // The quiet states appear only when they are real. Two permanent
+  // "(0)" counters would be furniture on the ordinary page, and this
+  // legend is also the page's own statement of its colour language -
+  // which named three statuses while the vocabulary has five.
+  const quietKeys = ["nodata","exhausted"]
+    .filter(s=> agencyCount(s) > 0)
+    .map(s=> `<span><i class="${s}"></i>${STATUS_LABEL[s]} (${agencyCount(s)})</span>`)
+    .join("");
   view.innerHTML = `
     <div class="view-head">
       <div>
@@ -2554,9 +2575,10 @@ function renderExec(view){
       </div>
     </div>
     <div class="legend-key">
-      <span><i class="green"></i>Green — within threshold (${DATA.agencies.length-redCount-amberCount} agencies)</span>
-      <span><i class="amber"></i>Amber — warning band (${amberCount})</span>
-      <span><i class="red"></i>Red — fail band (${redCount})</span>
+      <span><i class="green"></i>Green — within threshold (${agencyCount("green")} agencies)</span>
+      <span><i class="amber"></i>Amber — warning band (${agencyCount("amber")})</span>
+      <span><i class="red"></i>Red — fail band (${agencyCount("red")})</span>
+      ${quietKeys}
     </div>
     ${exhaustedNotice()}
     <div class="grid" id="agency-grid"></div>

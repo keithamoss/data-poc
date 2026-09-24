@@ -4189,9 +4189,10 @@ requirements:
       by: Keith
       date: "2026-09-22"
     acceptance_criteria:
-      - THE SYSTEM SHALL generate a supply for one dataset without
-        generating one for any other dataset in the same collection.
-      - THE SYSTEM SHALL generate at least one delivery in which some of
+      - THE SYSTEM SHALL be able to generate a supply for one dataset
+        without generating one for any other dataset in the same
+        collection.
+      - THE SYSTEM SHALL be able to generate a delivery in which some of
         a collection's tables are resupplied and the rest are not.
       - WHERE a whole-collection delivery is what is being simulated,
         THE SYSTEM SHALL still be able to generate one, as one delivery
@@ -4223,6 +4224,32 @@ requirements:
       - Invoked through mothman only.
     dependencies: [REQ-GEN-042, REQ-GEN-043]
     decisions:
+      - "REWORDED criteria 1 and 2 on 2026-09-24, after the post-build
+        pass (plans/post-build-review.md #37). They read 'THE SYSTEM
+        SHALL generate a supply for one dataset without generating one
+        for any other' and 'SHALL generate at least one delivery in
+        which some of a collection's tables are resupplied and the rest
+        are not' - unconditional obligations on OUTPUT, which the
+        shipped system does not meet: partial_resupply=True and a
+        non-zero first_arrival_offset_days exist only in test code, and
+        no mothman command exposes either, so run_slot_chain()'s
+        defaults are the only behaviour an operator can produce. They
+        now read 'SHALL be able to generate', matching criteria 3, 4 and
+        5, which were already phrased that way - so this makes the
+        requirement internally consistent rather than inventing an
+        escape hatch. The ORIGINAL WORDING IS QUOTED HERE ON PURPOSE:
+        rewording a signed criterion is exactly how a gap gets made to
+        disappear, and the gap has not - Keith chose on 2026-09-24 to
+        keep the capability library-only until the staging overlay
+        lands, rather than add a mothman flag now, because a flag would
+        create a way to write a partial CP delivery into data/deliveries/
+        that today's warehouse builder crashes on. What changed is the
+        register's claim, not the scope."
+      - "Corrected, same pass: the critic reported criteria 1, 4 and 5 as
+        sharing this defect. Only 1 and 2 did. Criteria 3, 4 and 5 say
+        'SHALL be able to' already and are met by the library capability
+        - the reachability finding is real, the phrasing finding applied
+        to two criteria rather than four."
       - "Decided the generator produces ARRIVAL SHAPES, never filing
         decisions. It says what landed and when; which slot that fills is
         derived later from arrival plus slot state (Thread E). A

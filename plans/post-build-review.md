@@ -570,8 +570,32 @@ post-build critic should see a requirement's own `evidence:`.
    **Cost:** small. One expression, plus a decision about what the
    legend should say when the three buckets do not sum to the total.
 
-   **Recommendation: fix.** Of everything in this file it is the
-   cheapest severe one.
+   **SIGNED OFF AND FIXED, 2026-09-25 - Keith chose option (b)**, giving
+   the quiet states their own counters rather than dropping them from
+   the totals. Every figure is now COUNTED (`agencyCount(status)`)
+   rather than derived by subtracting two of them from the total, and
+   `No data` / `Schedule ended` appear with their own swatch and count
+   whenever an agency is in that state - so the legend also stops
+   naming three statuses when `statusVocabulary()` has five (#56's exec
+   half).
+
+   They appear only when real: two permanent `(0)` counters would be
+   furniture on the ordinary page.
+
+   **Failing tests first**, `tests/test_dashboard_e2e.py::
+   TestTheExecutiveLegendCountsWhatIsActuallyThere`, in a real browser
+   against the real built page. Three of four failed before. The one
+   that matters most is not about any single number - it asserts **the
+   figures sum to the number of agencies**, at a normal as-of, at
+   `2028-01-01` and at `2022-01-01`. A subtraction cannot be checked
+   against anything; a count can, and that is the property that makes
+   this class of bug impossible rather than merely fixed.
+
+   **#6 is NOT covered by this and still needs its own sign-off** - the
+   view-sub sentence above the legend still says "worst-of, so nothing
+   silently hides behind a healthy average" while two statuses are
+   deliberately excluded from that rollup. It is less misleading now
+   that the quiet ones are visibly counted, and still not true.
 
 2. **[todo, 2026-09-24]** **[Dashboard UI, Pipeline & publishing]**
    **[F2] The low-runway warning is computed, tested, and never
@@ -973,10 +997,32 @@ just now, not by reading the critic's transcript.
     **Defensible on the letter** - at the gate, nothing IS failing the
     build, and the hard failure lands at filing in sprint 8.
 
-    **Keith's call**, and the critic's Q3 is the fork: change the words
-    now ("NOT LOW - EXHAUSTED", and drop "low on runway" for that case),
-    or leave it until the filing layer lands, on the grounds that
-    changing the gate's voice twice is worse than once.
+    **SIGNED OFF AND FIXED, 2026-09-25 - Keith chose option (a)**,
+    changing the words now rather than waiting for the filing layer.
+
+    The exhausted line now opens `EXHAUSTED (not failing the build,
+    yet):` instead of `WARNING (not failing the build):`, and
+    `summary()` no longer describes a calendar with no future dates at
+    all as "low on runway" - it says that calendar is `EXHAUSTED`, and
+    counts any merely-low ones after it, so the worse fact is never the
+    parenthetical. **The promise that nothing is failing the build
+    stays**, in both states: a non-fatal warning that starts failing
+    builds is one somebody turns off, and then it is not there for the
+    one that mattered.
+
+    **Failing tests first**, `tests/test_runway.py::
+    TestExhaustedDoesNotWearTheMildStatesWords`, including one that
+    pins the unchanged half - today's real config is low, not
+    exhausted, and must keep reading exactly as it did.
+
+    **It turned up a fixture that had been quietly wrong.**
+    `test_the_summary_counts_calendars_when_more_than_one_is_low` builds
+    a second calendar its own comment calls "also nearly out" and gave
+    it a single 2023 date - which is EXHAUSTED at that test's own as-of,
+    not nearly out. Nothing noticed while both states shared one
+    sentence. Extended to 2028 so the fixture matches its comment and
+    the assertion is about counting LOW calendars, which is what its
+    name says.
 
 22. **[todo, 2026-09-24]** **[Testing & dev tooling]** **[A7] The
     runway number and the last period in one sentence belong to
@@ -1192,11 +1238,36 @@ just now, not by reading the critic's transcript.
     **`mothman supply` will have to pick a side**, and whichever it
     picks, one group reads wrong.
 
-    **Keith's call**, and the critic's Q4 offers: (a) `supply` follows
-    `schedule`, older usage is legacy; (b) `supply` uses a different
-    flag name so the collision is not deepened; (c) decide the whole
-    CLI's noun now and plan one reconciliation - against Keith's own
-    recorded reasoning that "renames are how a CLI surface rots".
+    **SIGNED OFF AND DONE, 2026-09-25 - Keith chose option (c)**: one
+    corrective rename, now, while there are six command groups and one
+    user. His own "renames are how a CLI surface rots" is about
+    REPEATED renames; this is the one that stops them.
+
+    **Checked before renaming, and it settled the noun.** Both
+    shorthands map one-to-one onto a real collection -
+    `bdm` -> `civil-registration`, `cp` -> `child-protection` - verified
+    against `hierarchy.all_datasets()` rather than assumed. `bdm` is not
+    a dataset shorthand; its collection simply holds one dataset today.
+    So the OLDER sites had the wrong noun and `schedule`'s was right all
+    along.
+
+    `--collection bdm|cp|all` on `mothman pipeline run` and the five
+    `mothman debug run-*`/`build-warehouses` commands. `--dataset` stays
+    exactly where it already meant a dataset id: `schedule show` and
+    `debug changelog`. **No deprecated alias** - keeping both spellings
+    is the fork, not the fix, and `mothman` is this repo's only
+    programmatic access point, so every caller is in the tree and was
+    updated in the same change (README, `CLAUDE.md`, the CLI tests).
+    The short VALUES stay as they are; the noun was the question, and
+    each flag's help now names the collection it stands for.
+
+    **Failing tests first**, and deliberately not a list of known call
+    sites: `tests/test_cli_app.py::TestOneNounPerThing` walks the whole
+    Click tree and asserts no command takes a collection shorthand under
+    a flag named `--dataset`, that the shorthands live under exactly one
+    flag name, and that `--dataset` still exists where it really means a
+    dataset. A future command cannot reintroduce the fork somewhere
+    nobody thought to look.
 
 ### What both critics found genuinely working
 
@@ -1457,13 +1528,32 @@ here as its own question, not acted on.
     not a surprise - but "the capability ships" is true of the library
     and not of the product.
 
-    **Keith's call**, and the critic's Q2 frames it: give these a real
-    `mothman` flag now (small, makes the criteria satisfiable by a
-    person, and gives `REQ-GEN-044` a lever), or keep them library-only
-    until the staging overlay lands. Its own caution against the flag is
-    worth quoting: it would create a way to write a partial CP delivery
-    into `data/deliveries/` that today's warehouse builder will crash
-    on, which is what the off-by-default currently guards against.
+    **SIGNED OFF AND DONE, 2026-09-25 - Keith chose option (b)**: keep
+    the capability library-only until the staging overlay lands, and
+    fix the register rather than the code. A `mothman` flag would create
+    a way to write a partial CP delivery into `data/deliveries/` that
+    today's warehouse builder crashes on, which is exactly what the
+    off-by-default guards against.
+
+    **A correction to the critic, found while doing it.** It reported
+    criteria 1, 4 and 5 as sharing the defect. **Only 1 and 2 did.**
+    Criteria 3, 4 and 5 already say "SHALL be able to" and are met by
+    the library capability. The reachability finding is real for all of
+    them; the PHRASING finding applied to two criteria, not four - the
+    fifth such correction in this pass.
+
+    So criteria 1 and 2 were reworded from "SHALL generate" to "SHALL be
+    able to generate", **matching the shape criteria 3, 4 and 5 already
+    used** - which makes the requirement internally consistent rather
+    than inventing an escape hatch for it.
+
+    **The original wording is quoted verbatim in `REQ-GEN-040`'s own
+    `decisions:`, on purpose.** Rewording a signed criterion is exactly
+    how a gap gets made to disappear, and this one has not: the
+    capability is still unreachable by any operator, that is still
+    recorded, and Keith still chose to defer it. What changed is the
+    register's CLAIM, not the scope - and a reader who suspects
+    otherwise can see both versions without going to git.
 
 38. **[investigate, 2026-09-24]** **[Pipeline & publishing, Dashboard UI]** **[A7] The dashboard is two slots away from asserting a stop
     that does not happen.**
@@ -2035,3 +2125,42 @@ twice. It deliberately did not re-find the `TypeError`.
     - The duplicate check cards compound: four tools × one logical
       check is already three or four identical cards, and tool identity
       is the smallest, lowest-contrast text on each (#56).
+
+### Found by this session, not by a critic
+
+59. **[done, 2026-09-25]** **[Testing & dev tooling, Pipeline & publishing]** **A test computed "today" on the container's clock
+    while the page computed it on the asset's, and failed for eight
+    hours out of every twenty-four.**
+
+    Found by a real full-suite run at 06:12 Perth / 22:12 UTC on
+    2026-09-25 - the window where the two calendars disagree - while
+    gating the work above. **Not caused by any of it**: the same run
+    passed the evening before, at 22:5x Perth, when both clocks read
+    the same day.
+
+    `tests/test_dashboard_e2e.py::TestSupplyHistoryDrillDown` picked a
+    supply-history row whose date was not `date.today()`, clicked it,
+    and asserted the URL gained `asof=<that date>`. `date.today()` is
+    the CONTAINER's date; `DEFAULT_AS_OF` is the asset's
+    (`Australia/Perth`, REQ-PIPE-048). Between 16:00 and 24:00 UTC the
+    page's default is already tomorrow, so the test picked a row dated
+    on that default, `setAsOfInUrl()` correctly dropped the parameter -
+    "a plain shared link never implies someone deliberately chose a
+    date", its own comment - and the assertion failed against a
+    completely healthy page.
+
+    **Fixed by reading the page's own `DEFAULT_AS_OF`** rather than any
+    clock of the test's own. The authoritative value is the one the code
+    under test uses, so this cannot drift again; picking a better
+    hardcoded date, or the asset clock in Python, would both have left a
+    second implementation to keep in step.
+
+    **Worth keeping visible for two reasons.** It is exactly the class
+    of bug `REQ-PIPE-048` exists to prevent, living in the test suite
+    rather than the code - the third place this session found it, after
+    #3 (every date rendered on the viewer's clock) and #51 (the sliced
+    "UTC" label). And it is a real instance of `CLAUDE.md`'s own rule
+    about tests that assert against ambient state: it was green locally
+    and in CI for days, and would have gone red in CI on any push made
+    in that eight-hour window, looking exactly like a regression in
+    whatever that push happened to touch.

@@ -126,3 +126,65 @@ def test_main_menu_loop_routes_generate_choice_then_exits(monkeypatch):
     app._main_menu_loop()
 
     assert routed == ["generate"]
+
+
+class TestOneNounPerThing:
+    """post-build-review #31, Keith's option (c), 2026-09-24.
+
+    `--dataset` meant two different things across the CLI: a
+    `click.Choice` of the collection shorthands `bdm`/`cp` in
+    `pipeline run` and most of `debug`, and a real dataset id in
+    `schedule show` and `debug changelog`. One flag name, two
+    vocabularies, and `mothman supply` was about to have to pick a side.
+
+    Both shorthands map one-to-one onto a real collection -
+    `bdm` -> civil-registration, `cp` -> child-protection - so the
+    older sites had the wrong noun, not the newer ones. Keith chose to
+    reconcile it once, now, while there are six command groups and one
+    user, against his own earlier reasoning that renames are how a CLI
+    surface rots: that is about REPEATED renames, and this is one
+    corrective one before anything else depends on it.
+
+    A tree walk rather than a list of known call sites, so a future
+    command cannot reintroduce the fork somewhere nobody thought to
+    look.
+    """
+
+    SHORTHANDS = {"bdm", "cp"}
+
+    def _options(self):
+        from click import Choice, Group
+
+        from cli.app import cli
+
+        def walk(command, path):
+            if isinstance(command, Group):
+                for name, sub in command.commands.items():
+                    yield from walk(sub, f"{path} {name}".strip())
+                return
+            for param in command.params:
+                choices = set(param.type.choices) if isinstance(param.type, Choice) else set()
+                for opt in param.opts:
+                    yield path, opt, choices
+
+        yield from walk(cli, "")
+
+    def test_no_command_calls_a_collection_shorthand_a_dataset(self):
+        offenders = [f"mothman {path} {opt}" for path, opt, choices in self._options()
+                     if opt == "--dataset" and self.SHORTHANDS & choices]
+        assert not offenders, (
+            "these take a collection shorthand under a flag named --dataset, which means "
+            f"something else elsewhere in the same CLI: {offenders}")
+
+    def test_the_shorthands_live_under_one_flag_name(self):
+        names = {opt for _path, opt, choices in self._options()
+                 if self.SHORTHANDS & choices and opt.startswith("--")}
+        assert names <= {"--collection"}, (
+            f"the collection shorthands are spelled under more than one flag name: {sorted(names)}")
+
+    def test_dataset_still_exists_for_things_that_really_are_datasets(self):
+        """The reconciliation must not delete the correct usage along
+        with the incorrect one."""
+        dataset_flags = [path for path, opt, _c in self._options() if opt == "--dataset"]
+        assert "schedule show" in dataset_flags
+        assert "debug changelog" in dataset_flags

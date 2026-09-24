@@ -56,14 +56,14 @@ def pipeline_group() -> None:
 
 
 @pipeline_group.command("run")
-@click.option("--dataset", type=click.Choice(["bdm", "cp", "all"]), default="all",
-              help="Which dataset's full manifest to regenerate and run. Default: both.")
+@click.option("--collection", type=click.Choice(["bdm", "cp", "all"]), default="all",
+              help="Which collection's full manifest to regenerate and run - bdm = civil-registration, cp = child-protection. Default: both.")
 @click.option("--sequential", is_flag=True,
               help="Run the manifest's checks one at a time instead of in parallel - "
                    "easier to debug one specific run's stack trace.")
 @click.option("--snapshot", is_flag=True,
               help="Also archive a dashboard snapshot afterward (same as SNAPSHOT_DASHBOARD=1).")
-def run_command(dataset: str, sequential: bool, snapshot: bool) -> None:
+def run_command(collection: str, sequential: bool, snapshot: bool) -> None:
     """Replaces run_pipeline.sh: regenerate synthetic data, run the real tools against every
     run in the manifest (writing fresh qa_results/ history), then rebuild and embed the
     dashboard. Same real, permanent qa_results/ write as any other real pipeline run - not a
@@ -72,9 +72,9 @@ def run_command(dataset: str, sequential: bool, snapshot: bool) -> None:
 
     from . import dashboard as dashboard_cli
 
-    if dataset in ("bdm", "all"):
+    if collection in ("bdm", "all"):
         _run_bdm(sequential)
-    if dataset in ("cp", "all"):
+    if collection in ("cp", "all"):
         _run_cp(sequential)
 
     console.print("Reshaping into dashboard JSON...", style="dim")

@@ -109,6 +109,41 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-09-25"
+    summary: >
+      The overview no longer counts quiet agencies as healthy, and the
+      option that picks a collection is finally called one.
+    changes:
+      - category: Fixed
+        items:
+          - headline: The overview counts what is actually there
+            components: ["Dashboard UI"]
+            description: >
+              The green figure on the front page was worked out by
+              subtracting the red and amber ones from the total, so an
+              agency with no data, or whose schedule had ended, was
+              counted as healthy. Every figure is now counted in its own
+              right, and the two quiet states appear in the key with
+              their own totals whenever they are real.
+          - headline: An empty delivery calendar no longer calls itself "low"
+            components: ["Pipeline & publishing"]
+            description: >
+              A calendar with no future dates left was described in the
+              same words as one merely running short. It now says it is
+              exhausted, and says plainly that nothing is failing the
+              build yet.
+      - category: Improved
+        items:
+          - headline: "--collection, because that is what it takes"
+            components: ["Testing & dev tooling"]
+            description: >
+              `mothman pipeline run` and the `debug` runners took
+              `--dataset bdm` or `--dataset cp`, which name collections
+              rather than datasets - and `--dataset` means a real
+              dataset elsewhere in the same tool. They now take
+              `--collection`. Commands that genuinely take a dataset are
+              unchanged.
+
   - date: "2026-09-24"
     summary: >
       Child Protection investigations are now checked for dates that run

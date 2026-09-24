@@ -121,12 +121,20 @@ class TestItWarnsOncePerCalendarNotOncePerDataset:
         contract_dir = tmp_path / "contract"
         shutil.copytree("contract", contract_dir)
         doc = yaml.safe_load((contract_dir / "data-asset.yaml").read_text())
-        # A second authored calendar, also nearly out, with one dataset on it.
+        # A second authored calendar, also nearly out, with one dataset
+        # on it. NEARLY out rather than fully out, and the dates below
+        # were extended to 2028 on 2026-09-24 to make that true: it used
+        # to carry a single 2023 date, which is EXHAUSTED at this test's
+        # own as-of, not "nearly out" as this comment always said. That
+        # went unnoticed while both states shared one summary sentence;
+        # post-build-review #21 gave the exhausted state its own words,
+        # and this assertion is about counting LOW calendars.
         doc["calendars"].append({
             "name": "annual", "description": "Once a year.",
             "versions": [{"effective_from": "2023-01-01", "changelog": ["initial"],
                            "claim_window": "14d",
-                           "dates": [{"period": "2023", "date": "2023-03-01"}]}]})
+                           "dates": [{"period": str(y), "date": f"{y}-03-01"}
+                                      for y in range(2023, 2029)]}]})
         doc["hierarchy"]["agencies"][0]["collections"][0]["datasets"].append(
             {"id": "extra", "name": "Extra", "table": "extra", "calendar": "annual"})
         (contract_dir / "data-asset.yaml").write_text(yaml.safe_dump(doc))
@@ -237,3 +245,49 @@ class TestItTouchesNoData:
         runway.warning_lines(date(2026, 9, 23))
         runway.exhausted_datasets(date(2026, 9, 23))
         assert not [p for p in opened if "/data/" in p or p.endswith("duckdb")], opened
+
+
+class TestExhaustedDoesNotWearTheMildStatesWords:
+    """post-build-review #21, Keith's option (a), 2026-09-24.
+
+    This module's own docstring calls low runway and an exhausted
+    schedule "TWO STATES, DELIBERATELY DIFFERENT IN KIND". In the text
+    they were the same state: both lines opened `WARNING (not failing
+    the build)`, and the summary said a calendar with no runway at all
+    was "low on runway".
+
+    REQ-PIPE-053 criterion 14 asks a warning to be distinguished from a
+    failure "in text as well as colour". Keith's call was to change the
+    words now rather than wait for the filing layer, since nothing about
+    the gate's behaviour changes - at the gate, neither state fails the
+    build, and saying so stays.
+    """
+
+    # Past the real quarterly calendar's last authored period.
+    AFTER = date(2028, 6, 1)
+
+    def test_the_exhausted_line_does_not_open_with_the_word_warning(self):
+        lines = runway.warning_lines(self.AFTER)
+        assert lines, "precondition - the real config must be exhausted by this date"
+        assert not lines[0].startswith("WARNING"), (
+            f"the severest state opens with the mild state's word:\n  {lines[0]}")
+
+    def test_the_exhausted_line_still_says_it_is_not_failing_the_build(self):
+        """The label changes; the promise does not. A non-fatal warning
+        that starts failing builds is one somebody turns off."""
+        line = runway.warning_lines(self.AFTER)[0]
+        assert "not failing the build" in line
+
+    def test_the_summary_does_not_call_an_empty_calendar_low_on_runway(self):
+        note = runway.summary(self.AFTER)
+        assert note
+        assert "low on runway" not in note, (
+            f"a calendar with no future dates at all is not low on runway:\n  {note}")
+        assert "cannot be processed" in note
+
+    def test_a_merely_low_calendar_keeps_the_warning_wording(self):
+        """The change must not leak into the state it is distinguishing
+        from - today's real config is low, not exhausted."""
+        line = runway.warning_lines(date(2026, 9, 23))[0]
+        assert line.startswith("WARNING (not failing the build)")
+        assert runway.summary(date(2026, 9, 23)).endswith("low on runway.")

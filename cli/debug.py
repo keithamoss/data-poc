@@ -60,12 +60,13 @@ def debug_group() -> None:
 
 
 @debug_group.command("run-dbt")
-@click.option("--dataset", type=click.Choice(["bdm", "cp"]), required=True)
+@click.option("--collection", type=click.Choice(["bdm", "cp"]), required=True,
+              help="bdm = civil-registration, cp = child-protection.")
 @click.option("--run-id", required=True, help="An existing manifest run_id already on disk.")
-def run_dbt_command(dataset: str, run_id: str) -> None:
+def run_dbt_command(collection: str, run_id: str) -> None:
     """Run real dbt-core in isolation against one run already on disk."""
     run_timestamp = asset_time.now().isoformat()
-    if dataset == "bdm":
+    if collection == "bdm":
         from qa_tools.bdm.run_dbt_bdm import evaluate_dbt_bdm
         results = evaluate_dbt_bdm(run_id, run_timestamp)
     else:
@@ -75,12 +76,13 @@ def run_dbt_command(dataset: str, run_id: str) -> None:
 
 
 @debug_group.command("run-soda")
-@click.option("--dataset", type=click.Choice(["bdm", "cp"]), required=True)
+@click.option("--collection", type=click.Choice(["bdm", "cp"]), required=True,
+              help="bdm = civil-registration, cp = child-protection.")
 @click.option("--run-id", required=True, help="An existing manifest run_id already on disk.")
-def run_soda_command(dataset: str, run_id: str) -> None:
+def run_soda_command(collection: str, run_id: str) -> None:
     """Run real Soda Core in isolation against one run already on disk."""
     run_timestamp = asset_time.now().isoformat()
-    if dataset == "bdm":
+    if collection == "bdm":
         from qa_tools.bdm.run_soda_bdm import evaluate_soda_bdm
         results = evaluate_soda_bdm(run_id, run_timestamp)
     else:
@@ -90,12 +92,13 @@ def run_soda_command(dataset: str, run_id: str) -> None:
 
 
 @debug_group.command("run-datacontract")
-@click.option("--dataset", type=click.Choice(["bdm", "cp"]), required=True)
+@click.option("--collection", type=click.Choice(["bdm", "cp"]), required=True,
+              help="bdm = civil-registration, cp = child-protection.")
 @click.option("--run-id", required=True, help="An existing manifest run_id already on disk.")
-def run_datacontract_command(dataset: str, run_id: str) -> None:
+def run_datacontract_command(collection: str, run_id: str) -> None:
     """Run real datacontract-cli in isolation against one run already on disk."""
     run_timestamp = asset_time.now().isoformat()
-    if dataset == "bdm":
+    if collection == "bdm":
         from qa_tools.bdm.run_datacontract_bdm import evaluate_datacontract_bdm
         entry = _bdm_manifest_entry(run_id)
         results = evaluate_datacontract_bdm(run_id, entry["csv_path"], run_timestamp)
@@ -106,14 +109,15 @@ def run_datacontract_command(dataset: str, run_id: str) -> None:
 
 
 @debug_group.command("run-evidently")
-@click.option("--dataset", type=click.Choice(["bdm", "cp"]), required=True)
+@click.option("--collection", type=click.Choice(["bdm", "cp"]), required=True,
+              help="bdm = civil-registration, cp = child-protection.")
 @click.option("--run-id", required=True, help="An existing manifest run_id already on disk.")
 @click.option("--reference-run-id", default=None,
               help="Defaults to the manifest's own first (clean-by-construction) entry.")
-def run_evidently_command(dataset: str, run_id: str, reference_run_id: str | None) -> None:
+def run_evidently_command(collection: str, run_id: str, reference_run_id: str | None) -> None:
     """Run real Evidently AI in isolation against one run already on disk."""
     run_timestamp = asset_time.now().isoformat()
-    if dataset == "bdm":
+    if collection == "bdm":
         from qa_tools.bdm.run_evidently_bdm import evaluate_evidently_bdm
         entry = _bdm_manifest_entry(run_id)
         ref_entry = _bdm_manifest_entry(reference_run_id) if reference_run_id else _bdm_manifest_first_entry()
@@ -127,10 +131,11 @@ def run_evidently_command(dataset: str, run_id: str, reference_run_id: str | Non
 
 
 @debug_group.command("build-warehouses")
-@click.option("--dataset", type=click.Choice(["bdm", "cp"]), required=True)
-def build_warehouses_command(dataset: str) -> None:
+@click.option("--collection", type=click.Choice(["bdm", "cp"]), required=True,
+              help="bdm = civil-registration, cp = child-protection.")
+def build_warehouses_command(collection: str) -> None:
     """Build every per-run DuckDB warehouse for one dataset's real synthetic manifest."""
-    if dataset == "bdm":
+    if collection == "bdm":
         from qa_tools.bdm.build_per_run_warehouses import build_all
     else:
         from qa_tools.cp.build_cp_warehouses import build_all

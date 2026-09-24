@@ -326,11 +326,11 @@ Rough layout:
   Thread B) - every real pipeline run adds to it, nothing in it should
   ever be deleted or regenerated away the way `reports/*.json` is.
   Regenerate via `mothman pipeline run` (the whole pipeline end to end
-  for both datasets by default, ~45s+ - `--dataset bdm`/`--dataset cp`
+  for both datasets by default, ~45s+ - `--collection bdm`/`--collection cp`
   to scope to one; `--sequential` if debugging one specific run, since
   parallel workers interleave their print output and stack traces) or,
   for lower-level single-tool debugging against a run already on disk,
-  `mothman debug run-dbt --dataset bdm --run-id <id>` (and the `run-soda`/
+  `mothman debug run-dbt --collection bdm --run-id <id>` (and the `run-soda`/
   `run-datacontract`/`run-evidently` equivalents - see `cli/debug.py`'s
   own docstring for why these ALSO write real qa_results/ history, same
   as any other real tool invocation, not a side-effect-free dry run).
@@ -573,6 +573,16 @@ Rough layout:
   JS suite 183 tests in ~13s.
   -> **~148s/1217 tests (2026-09-23, REQ-QAC-047)**. Flat again, 32
   more tests. JS suite 218 tests in ~15s.
+  -> **~132s/1236 tests (2026-09-25, the post-build fix pass)**. Flat
+  against the previous entry, 19 more tests. JS suite 227 tests in
+  ~17s. One real, environment-dependent failure surfaced in the run
+  before this one and is fixed rather than waived - a test computing
+  "today" from `date.today()` while the page computes it on the asset
+  clock, so it went red only in the eight-hour window where UTC and
+  Perth are on different calendar days (plans/post-build-review.md
+  #59). Worth knowing for anyone reading a red e2e result late in a
+  UTC day: check whether the assertion depends on an ambient date
+  before reading it as a regression.
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.

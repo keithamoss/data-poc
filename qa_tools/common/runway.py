@@ -173,8 +173,16 @@ def warning_lines(as_of: date) -> list[str]:
                     if runway.dataset_count == 1
                     else f"{runway.dataset_count} datasets name it")
         if runway.is_exhausted:
+            # NOT "WARNING", and that is the whole point of this branch
+            # (plans/post-build-review.md #21, Keith's call 2026-09-24).
+            # This module's own docstring calls the two states
+            # "deliberately different in kind"; until this change they
+            # opened with the same word, so the severest one read as the
+            # mild one. The promise that nothing is failing the build
+            # stays - it is the label that was wrong, not the
+            # behaviour.
             lines.append(
-                f"WARNING (not failing the build): calendar {runway.calendar_name!r} has NO "
+                f"EXHAUSTED (not failing the build, yet): calendar {runway.calendar_name!r} has NO "
                 f"future dates left - its last is {runway.last_period} on {runway.last_date}, "
                 f"and {datasets}. Author the next year's dates in "
                 f"contract/data-asset.yaml; `mothman schedule candidate-dates` proposes them. "
@@ -199,9 +207,23 @@ def summary(as_of: date) -> str | None:
     if not low:
         return None
     exhausted = exhausted_datasets(as_of)
+
+    # A CALENDAR WITH NO FUTURE DATES AT ALL IS NOT "LOW ON RUNWAY"
+    # (#21). It used to be described that way here, which is how the
+    # severest state ended up reading as the mild one in the one line a
+    # reader is most likely to skim. When both kinds are present the
+    # exhausted ones lead and the rest are counted after, so the worse
+    # fact is never the parenthetical.
+    out_of_dates = [r for r in low if r.is_exhausted]
+    if out_of_dates:
+        part = (f"{len(out_of_dates)} calendar(s) EXHAUSTED"
+                if len(out_of_dates) > 1
+                else f"calendar {out_of_dates[0].calendar_name!r} is EXHAUSTED")
+        others = len(low) - len(out_of_dates)
+        also = f" ({others} more low on runway)" if others else ""
+        return (f"{part}{also}; {len(exhausted)} dataset(s) have no remaining slots and cannot be "
+                f"processed until dates are added.")
+
     part = (f"{len(low)} calendar(s) low on runway"
             if len(low) > 1 else f"calendar {low[0].calendar_name!r} is low on runway")
-    if exhausted:
-        return (f"{part}; {len(exhausted)} dataset(s) have no remaining slots and cannot be "
-                f"processed until dates are added.")
     return f"{part}."

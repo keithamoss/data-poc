@@ -68,7 +68,7 @@ def test_run_dataset_bdm_only_never_touches_cp(monkeypatch):
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
 
-    result = _runner.invoke(pipeline_cli.pipeline_group, ["run", "--dataset", "bdm"])
+    result = _runner.invoke(pipeline_cli.pipeline_group, ["run", "--collection", "bdm"])
 
     assert result.exit_code == 0, result.output
     assert calls == ["bdm-generate", "bdm-run", "build-data", "embed", "sync"]
@@ -89,7 +89,7 @@ def test_run_dataset_cp_only_never_touches_bdm(monkeypatch):
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
 
-    result = _runner.invoke(pipeline_cli.pipeline_group, ["run", "--dataset", "cp"])
+    result = _runner.invoke(pipeline_cli.pipeline_group, ["run", "--collection", "cp"])
 
     assert result.exit_code == 0, result.output
     assert calls == ["cp-generate", "cp-run", "build-data", "embed", "sync"]

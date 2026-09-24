@@ -170,10 +170,24 @@ class TestSupplyHistoryDrillDown:
 
         rows = clean_page.locator(".supply-history tbody tr")
         assert rows.count() > 0, "no real supply-history rows rendered - fixture/test drifted from real committed history"
-        today = date.today().isoformat()
+        # THE PAGE'S OWN DEFAULT, not `date.today()`. This read the
+        # CONTAINER's date until 2026-09-25, and the two are different
+        # calendar days for eight hours out of every twenty-four: the
+        # asset clock is Australia/Perth (REQ-PIPE-048), so between
+        # 16:00 and 24:00 UTC the page's default as-of is already
+        # tomorrow. The test then picked a row dated on the page's own
+        # default, setAsOfInUrl() correctly dropped the parameter, and
+        # the assertion below failed on an entirely healthy page.
+        #
+        # Found by a real full-suite run in that window, 2026-09-25.
+        # Exactly the class of bug the requirement this suite covers
+        # exists to prevent, living in the test rather than the code -
+        # and unfixable by choosing a better hardcoded date, since the
+        # authoritative value is the one the code under test uses.
+        today = clean_page.evaluate("() => DEFAULT_AS_OF")
         run_dates = rows.evaluate_all("els => els.map(el => el.dataset.runDate)")
         target_run_date = next((d for d in run_dates if d != today), None)
-        assert target_run_date, f"every real supply-history row is dated today ({today}) - can't exercise a real non-default as-of date"
+        assert target_run_date, f"every real supply-history row is dated on the page's own default as-of ({today}) - can't exercise a real non-default as-of date"
         target_index = run_dates.index(target_run_date)
 
         rows.nth(target_index).click()
@@ -1420,3 +1434,62 @@ class TestQuietStatesAreVisiblyBuilt:
         assert border_contrast >= text_contrast - 0.05, (
             f"{theme}: the nodata pill's border is {border_contrast:.2f}:1 against its own fill while "
             f"its label is {text_contrast:.2f}:1 - a border nobody can see is not a distinction")
+
+
+class TestTheExecutiveLegendCountsWhatIsActuallyThere:
+    """post-build-review #1, Keith's option (b), 2026-09-24.
+
+    The green figure was computed as `total - red - amber`, so an
+    agency whose status is `nodata` or `exhausted` landed in the green
+    bucket by arithmetic. The single most prominent number on the
+    landing page could state that both agencies were healthy directly
+    above a notice saying six datasets could not be processed.
+
+    Option (b) was to give the quiet states their own counters rather
+    than drop them from the totals, so the legend also stops naming
+    three statuses when the vocabulary has five.
+    """
+
+    ALL_QUIET = "2028-01-01"   # past the quarterly calendar's last period
+    NOTHING_YET = "2022-01-01"  # before any real history exists
+    NORMAL = None
+
+    def _legend(self, page):
+        return page.locator("#view .legend-key").first.inner_text()
+
+    def test_no_agency_is_counted_green_when_none_is_green(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, as_of=self.ALL_QUIET)
+        statuses = clean_page.evaluate("() => DATA.agencies.map(a => a.status)")
+        assert "green" not in statuses, "precondition - no agency should be green at this as-of"
+        assert re.search(r"Green[^(]*\(0\b", self._legend(clean_page)), (
+            f"legend claims green agencies that do not exist: {self._legend(clean_page)}")
+
+    def test_the_quiet_states_are_named_and_counted(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, as_of=self.ALL_QUIET)
+        legend = self._legend(clean_page)
+        statuses = clean_page.evaluate("() => DATA.agencies.map(a => a.status)")
+        for label, status in (("No data", "nodata"), ("Schedule ended", "exhausted")):
+            if status in statuses:
+                assert label in legend, f"{status!r} is on the page and absent from the legend"
+
+    def test_every_counter_sums_to_the_number_of_agencies(self, clean_page, built_dashboard_html):
+        """The arithmetic bug was a subtraction that could not be
+        checked. Whatever the legend shows must add up."""
+        for as_of in (self.NORMAL, self.ALL_QUIET, self.NOTHING_YET):
+            _goto(clean_page, built_dashboard_html, as_of=as_of)
+            total = clean_page.evaluate("() => DATA.agencies.length")
+            counted = sum(int(n) for n in re.findall(r"\((\d+)\)", self._legend(clean_page)))
+            assert counted == total, (
+                f"as_of={as_of}: legend counts {counted} of {total} agencies: "
+                f"{self._legend(clean_page)}")
+
+    def test_a_normal_as_of_still_reads_the_way_it_always_did(self, clean_page, built_dashboard_html):
+        """The quiet counters must not become permanent furniture on a
+        page where nothing is quiet."""
+        _goto(clean_page, built_dashboard_html, as_of=self.NORMAL)
+        legend = self._legend(clean_page)
+        statuses = clean_page.evaluate("() => DATA.agencies.map(a => a.status)")
+        if "nodata" not in statuses:
+            assert "No data" not in legend
+        if "exhausted" not in statuses:
+            assert "Schedule ended" not in legend
