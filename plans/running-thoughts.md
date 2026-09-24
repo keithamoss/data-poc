@@ -2242,3 +2242,69 @@ the tolerance is per-dataset like the grace allowance; and whether a
 deliberately-disordered row should be excluded (the deleted code
 filtered them out to protect the classification - a check arguably wants
 to SEE them, and there is already a separate ordering check that does).
+
+44. **[investigate, 2026-09-25]** **[Pipeline & publishing]** A MORE
+    ELEGANT MECHANISM FOR THE IMMUTABLE HISTORY OF CHECKS - Keith's own
+    ask, raised while approving the check-seal fix
+    (`plans/post-build-review.md` #44): "I'd like to think about a more
+    elegant mechanism for recording this immutable history of checks
+    and so forth, because the daily data asset is going to have like 20
+    datasets appearing daily, so that starts to get big and expensive."
+
+    **What happens today**, measured rather than estimated:
+    every real run commits four tool files plus `dataset_stats.json`
+    under `qa_results/<agency>/<collection>/<run_id>/`, and each tool
+    file carries `raw_output` (that tool's native JSON) beside
+    `verified` (the fully-resolved check records). One Birth
+    Registrations run is ~300KB; the whole committed tree is **26MB
+    across 60 runs**, averaging ~444KB per run. Of a 685-byte
+    `verified` record only ~254 bytes is CONFIGURATION - the rest is
+    the run's own result, plus the agency/collection/dataset triple
+    repeated on every record. `raw_output` is **77%** of the volume.
+
+    **Why it stops being academic at the real target.** Keith's own
+    figure, 2026-09-25: the daily asset will have roughly **20 datasets
+    arriving daily**. At today's measured rate that is:
+
+    | | |
+    |---|---|
+    | 1 year | 7,300 runs, **~3.1 GB** |
+    | 3 years | 21,900 runs, **~9.3 GB** |
+    | 5 years | 36,500 runs, **~15.4 GB** |
+
+    In a git repository that everyone clones. And ~2.4GB/year of it is
+    `raw_output` alone.
+
+    **What this is NOT.** It is not a consequence of the check-seal
+    change approved the same day - that only READS what is already
+    committed and adds nothing. And it is not an argument against
+    Thread B: a permanent, committed QA history is the point of this
+    design, and the 26MB bought something real. The question is whether
+    the SHAPE is right, not whether the history should exist.
+
+    **Threads worth pulling when this is picked up:**
+    - **Does anything read `raw_output` back?** It is 77% of the
+      volume and it exists so a tool's native output is never lost.
+      Nobody has checked what actually consumes it. If the answer is
+      "nothing, outside forensics", keeping it only for runs where
+      something failed is most of the saving for none of the loss.
+    - **Configuration is repeated, not versioned.** A check's
+      thresholds are written into every run although they change
+      perhaps twice a year. A separate, append-only record of "this
+      check had these thresholds from this date" would hold the same
+      immutable history in a few KB rather than a few GB - and it is
+      exactly what the seal gate wants to read anyway.
+    - **The per-record triple.** `agency_id`/`collection_id`/
+      `dataset_id` are on every one of 257 records per run and are
+      already in the file's own path.
+    - **Compression.** `dashboard/snapshots/*.html.gz` already
+      establishes that this repo will commit gzipped artefacts where
+      the content is archival rather than diffable. JSON of this shape
+      compresses hard, and nothing reads these files in a hot path.
+    - **Whether git is the right store at all** past a certain size,
+      and what that would cost in the "works from a plain clone"
+      property the whole project leans on.
+
+    **Not urgent at 2 datasets and 60 runs.** Worth designing before
+    the daily asset exists rather than after, because migrating a
+    committed history is far harder than choosing its shape.
