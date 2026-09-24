@@ -2170,3 +2170,35 @@ squared with.
 descriptions of concepts whose requirements are still being signed off
 would produce a page that is wrong before it is finished - and a wrong
 glossary is worse than none, because people quote it.
+
+42. **[todo, 2026-09-24]** **[QA checks & contract]** A CONTENT CHECK
+that asks "does this supply look like the period it is filed under" -
+the only thing that turns a wrong default filing into something a human
+sees.
+
+Surfaced 2026-09-24 at `REQ-PIPE-065`'s sign-off, where a decision says
+plainly: **"NO REQUIREMENT OWNS IT; it is a check and belongs with batch
+5's check work."** Logged here because a decision buried inside one
+requirement is a record, not a task list - nothing would have brought it
+back up when batch 5 was scoped.
+
+**Why it exists.** `REQ-PIPE-065` settles that an ambiguous assignment
+DEFAULTS BACKWARD - an arrival that cannot be told apart from a late one
+takes the oldest claimable unfilled slot, because late is commoner than
+early - and is marked as uncertain. That default is right on average and
+wrong sometimes, and nothing in the assignment rule can tell which.
+
+**What this check adds, and the line it must not cross.** It is a
+DETECTOR, never a decider. "This supply does not look like the period it
+is filed under" is a legitimate, non-circular QA finding - it reports,
+it does not make the filing call. That distinction is load-bearing:
+`REQ-PIPE-062` rejects DERIVING the period from the supply's own content
+as circular, because it would infer the filing decision from the very
+data whose correctness is about to be tested. Reporting on the mismatch
+is a different act from deciding with it, and only the second is
+forbidden.
+
+**Not scoped.** What "looks like the period" means is undefined and is
+the whole design problem - a date column's range, a row-count profile,
+a comparison against the previous supply, or something per-dataset and
+declared. Belongs with batch 5's check work.

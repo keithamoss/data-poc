@@ -7971,8 +7971,11 @@ requirements:
   - id: REQ-PIPE-065
     title: An uncertain assignment says it is uncertain, and an arrival into a filled slot is reported
     date_written: "2026-09-23"
+    signed_off:
+      by: Keith
+      date: "2026-09-24"
     story: "As an operator, I want to be shown the filings the rule was not sure about and the supplies that landed on top of something already accepted, so that the two cases the rule genuinely cannot resolve reach a person while they are still cheap to correct."
-    moscow: should
+    moscow: must
     status: not_started
     source: "Keith's own proposal, 2026-09-21, plans/supply-model.md Thread E - 'arrival into an already-filled slot: warn, and never auto-promote' - plus the ambiguous-assignment default in the same thread. Test scenario register TS-4, TS-1's tail, TS-3a and TS-3c. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
@@ -7984,6 +7987,7 @@ requirements:
       - "THE SYSTEM SHALL NOT report an arrival into a slot that was never filled, so that the ordinary repair path after a rejection stays silent."
       - "THE SYSTEM SHALL name, in that report, the three responses available - accepting the supply as a correction, re-filing it to another slot, and rejecting it as a duplicate."
       - "THE SYSTEM SHALL report these as warnings rather than failures, and SHALL NOT stop processing on either."
+      - "THE SYSTEM SHALL NOT automatically promote a supply that landed in a slot already filled by a promoted supply, whatever that supply's own status."
     non_functional_requirements:
       - "On a healthy feed an arrival into an accepted slot is rare, which is what keeps the report meaningful rather than becoming wallpaper at 30 datasets. If it turns out to be common, that is a signal about the claim windows, not a reason to suppress the report."
       - "The trigger is STRUCTURAL - the slot had been promoted into, and something arrived anyway - so there is nothing to tune. Keep it that way: the version this replaced needed a 'within X of the window opening' threshold, and any such X is arbitrary, with a case just outside it slipping through silently."
@@ -7995,6 +7999,28 @@ requirements:
       - "Decided WARNING, not error, because one legitimate case remains: a supplier realises the extract they sent was wrong - wrong period, wrong filter - even though it passed every check. Data can be clean and still be wrong, and that is the limit of any check suite."
       - "Decided the ambiguous case DEFAULTS BACKWARD but is marked. An arrival when a prior slot is unfilled cannot be told apart from a late one by any rule, so it takes the oldest claimable unfilled slot since late is commoner than early - marked as assigned under ambiguity and surfaced for review. Cheap to correct, because filing is mutable and the verdict recomputes."
       - "CARRIED HERE because sprint 11 owns the act and this requirement owns the detection, and the gap must not be lost between them: a supply landing in a filled slot NEVER AUTO-PROMOTES, whatever its status. Without that carve-out the amber-or-green auto-promotion rule would let a supplier's accidental duplicate send silently supersede data already accepted, with the only trace a superseded table nobody looked at. Filling an empty slot is routine; replacing accepted data is a decision."
+      - >
+        SETTLED 2026-09-24 (Keith): that carve-out is now CRITERION 9
+        here, rather than a decision pointing at sprint 11. Found during
+        sign-off: it is the rule standing between a supplier's
+        accidental duplicate send and the silent replacement of accepted
+        data, and it existed only as prose inside this requirement -
+        no criterion here, and no requirement anywhere owning it. Sprint
+        11 has none yet, and REQ-PIPE-062 criterion 6 says only that a
+        promotion FILLS a slot, which is a different statement.
+      - >
+        That is the same shape as the batch-3 failure this project
+        already recorded: an IOU written against work that does not
+        exist, appearing exactly once in the register, in the deferral
+        itself. Detection and the carve-out now travel together, and
+        sprint 11 can restate it when it is scoped - a duplicated rule
+        is cheap, an unowned one is not.
+      - >
+        ALSO SETTLED 2026-09-24 (Keith): MoSCoW raised from SHOULD to
+        MUST. Unbuilt, this requirement leaves ambiguous assignments
+        presented as CERTAIN, which is a false-confidence problem rather
+        than a missing nicety - and everything either side of it in this
+        batch is a must.
       - "Recorded so it is not re-proposed: the content check survives as a DETECTOR, not a decider. 'This supply does not look like the period it is filed under' is a legitimate, non-circular QA finding - it is not making the call - and it is the only thing that turns a wrong default filing into something a human sees rather than something that sits there quietly. NO REQUIREMENT OWNS IT; it is a check and belongs with batch 5's check work, and it is recorded here so it survives the deletion of Thread B."
 
   - id: REQ-PIPE-066
