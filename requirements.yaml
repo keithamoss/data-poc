@@ -8029,15 +8029,22 @@ requirements:
         path_for()'s current docstring already refuses to do. Found by
         delivery-architect, 2026-09-24.
       - >
-        docs/delivery-format.md IS NORMATIVE AND THIS REQUIREMENT
-        FALSIFIES IT. It currently states that a file's dataset comes
-        from the arrivalPattern block matched by
-        qa_tools/common/file_arrival.py - which criterion 4 explicitly
-        forbids reusing as the filename matcher. It must be updated in
-        the SAME change, not as a follow-up: leaving it stale makes the
-        spec and the code disagree with nothing saying which wins, and
-        this project has already been bitten once by a normative doc
-        outliving the design it described.
+        docs/delivery-format.md IS NORMATIVE AND THIS REQUIREMENT WILL
+        FALSIFY IT AGAIN, so it must be updated in the SAME change, not
+        as a follow-up - leaving it stale makes the spec and the code
+        disagree with nothing saying which wins.
+      - >
+        "AGAIN" because checking it on 2026-09-24 found it was ALREADY
+        WRONG, before this requirement changes anything. It said a
+        file's dataset comes from the arrivalPattern block "matched by
+        qa_tools/common/file_arrival.py" - but the function that
+        actually maps a filename to a dataset inside a delivery is
+        qa_tools/common/delivery.py's dataset_for_filename().
+        file_arrival.py matches whole S3 KEYS, the transport concern the
+        aws/ handlers use. The normative doc named the wrong half of
+        exactly the split criterion 4 exists to make explicit. Fixed
+        the same day, independently of this requirement, and the
+        correction is stated in the doc itself so a reader meets it.
       - >
         SCOPE, recorded because the NFR above is FALSE TODAY for one of
         the two datasets: Child Protection does not use pattern

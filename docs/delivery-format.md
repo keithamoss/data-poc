@@ -74,7 +74,15 @@ ordering from a delivery's name.
 A file's name is the one thing inside a delivery that carries meaning,
 and only through each dataset's **own configured pattern** — the
 `arrivalPattern` block in that dataset's ODCS contract, matched by
-`qa_tools/common/file_arrival.py`.
+`qa_tools/common/delivery.py`'s `dataset_for_filename()`.
+
+**Two matchers exist and they are not interchangeable**, which this
+paragraph got wrong until 2026-09-24. `delivery.py` matches a bare
+FILENAME inside a delivery, taking only a `keyPattern`'s last segment.
+`qa_tools/common/file_arrival.py` matches a whole S3 KEY with named
+groups, and is the real transport concern the `aws/` handlers use.
+Pointing this section at the S3 matcher named the wrong half of the
+split that `REQ-PIPE-058` exists to make explicit.
 
 A file matching no pattern is not an error in the format. It is a real
 thing suppliers do (a `readme.txt`, a spreadsheet of notes, a PDF), and
