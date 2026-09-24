@@ -2153,6 +2153,34 @@ here as its own question, not acted on.
     schedule guard alone. Recorded here because the discovery belongs
     with the finding that prompted it.
 
+    **AND THE SEAL FOR CHECKS ALREADY EXISTS** - found 2026-09-25 while
+    working out what option (c) would actually look like, and it
+    changes the shape of the answer.
+
+    Every committed `qa_results/*/verified[]` record already carries
+    `check_id`, `warn_threshold`, `fail_threshold`, `on_fail_action`,
+    `dimension` and `label` - what each check WAS at the moment it was
+    used to judge real data. Measured: **257 check_ids across 60
+    committed runs, and not one has ever had more than one threshold
+    pair.** So the baseline exists, is committed, is years-deep, and
+    agrees with today's configuration everywhere.
+
+    That means the checks half of option (c) is not a new artefact at
+    all - it is changing the baseline from `HEAD~1` to committed QA
+    history. It also asks a strictly better question: not "did this
+    change since the previous commit" but **"did this change since it
+    was last used to judge data"**, which is the thing that actually
+    must not move quietly.
+
+    **The calendars half has no such record, and building one now may
+    be throwaway.** Nothing committed carries a period's date, a due
+    instant or a claim window - `dataset_stats.json`'s arrival record
+    is `run_id`/`run_index`/`received_at`/`delivery` and nothing more,
+    deliberately (`REQ-GEN-043` criterion 7). Once sprint 8/9 files
+    supplies against slots, the filing record will carry the due
+    instant and claim window each was judged under, and the calendar
+    seal becomes the same shape as the check one for free.
+
     **Cost:** small to document, larger to close. **Recommendation:**
     decide which, and write down whichever is chosen - an
     under-documented guard is one a future session will trust further
