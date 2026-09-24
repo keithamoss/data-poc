@@ -728,6 +728,25 @@ post-build critic should see a requirement's own `evidence:`.
    bare Green pill - and, in the accessibility tree, a `button "Green"`
    with no name.
 
+   **IT IS WORSE THAN EITHER CRITIC FOUND, measured 2026-09-25 while
+   building the accessibility cluster.** `navigate()` calls `render()`
+   BEFORE `history.pushState`, so the throw aborts the navigation
+   itself: clicking a row for `cp-clients`, `cp-carers` or
+   `cp-case-workers` leaves **the URL completely unchanged**. Verified
+   in a real browser - clicked the row, `url changed: False`, the
+   address still reading `/agency/child-protection-family-support`
+   while the page shows a half-drawn dataset view.
+
+   So on three of seven datasets the address bar disagrees with the
+   screen, Back goes somewhere else than the reader expects, a copied
+   link returns to the agency, and a reload loses the drill-down. The
+   critics reported a missing Supply History panel; the navigation
+   being silently broken is the larger half, and neither saw it.
+
+   **Still awaiting sign-off.** It is named here rather than fixed
+   because it is not in the accessibility cluster Keith approved -
+   though it is now the strongest candidate for the next one.
+
    **The part that matters beyond the bug:**
    `dashboard/check_dashboard_renders.py` holds the built page to zero
    console errors and this is shipping, so that gate is evidently not
@@ -776,9 +795,19 @@ post-build critic should see a requirement's own `evidence:`.
    Tier 1 agency cards and Tier 3 column tiles ARE real `<button>`s, so
    keyboard navigation dead-ends at exactly one level above the data.
 
-   **Cost:** small per row, but it belongs with #9 and
-   `plans/dashboard.md` #15 as one accessibility pass rather than three
-   patches.
+   **SIGNED OFF AND FIXED, 2026-09-25**, as one pass with #9, #10 and
+   #55. Every `tr[data-nav]` now carries `tabindex="0"` and answers
+   Enter and Space.
+
+   **On the row rather than a control inside the first cell**,
+   deliberately: the whole row has been the target since it was
+   written, and moving the affordance into one cell would change what a
+   MOUSE user clicks in order to fix what a keyboard user cannot reach.
+
+   **Tests:** `TestTheKeyboardCanReachTheData` asserts every row is in
+   the tab order, and separately that a focused row actually navigates
+   on Enter - the attribute and the behaviour, because the attribute
+   alone is a tab stop that does nothing.
 
 9. **[todo, 2026-09-24]** **[Dashboard UI]** **[U2] Nine focusable
    controls live inside closed, `aria-hidden="true"` drawers.** After
@@ -786,9 +815,31 @@ post-build critic should see a requirement's own `evidence:`.
    with no focus indicator anywhere. A WCAG 4.1.2 violation, and
    practically it reads as "Tab stopped working".
 
-   **Not independently verified** beyond the critic's own captured
-   focus trace - it is a runtime observation and the visual critic is
-   currently driving the only browser. Recorded as reported.
+   **VERIFIED and SIGNED OFF AND FIXED, 2026-09-25.** Confirmed in a
+   real browser rather than taken from the critic's trace: focusing
+   each control inside a closed drawer and checking whether
+   `document.activeElement` actually became it.
+
+   Every drawer now carries `inert` as well as `aria-hidden`, set
+   through one helper (`setDrawerHidden`) rather than at each of the
+   eight call sites - **the two attributes drifting apart is exactly
+   the bug being fixed**, so one place sets both. `inert` is the
+   purpose-built answer: it removes the subtree from the tab order AND
+   the accessibility tree, where the previous `transform:translateX`
+   removed it only from the eye. Support confirmed in the pinned
+   Chromium before it was relied on.
+
+   **Tests:** one asserts nothing inside a closed drawer can take
+   focus; its sibling asserts an OPEN drawer's controls still can,
+   because the cheapest wrong fix here hides everything.
+
+   **A test bug worth recording, since it is this file's own subject.**
+   The open-drawer test first clicked `.snapshots-btn`, which is the
+   class on every masthead chip - `.first` is "Dark mode", which opens
+   no drawer at all. It passed without ever opening one. Now it opens
+   the panel by its label and asserts a drawer is open before testing
+   anything, which is the same "check the precondition actually held"
+   discipline the rest of this pass has needed.
 
 10. **[todo, 2026-09-24]** **[Dashboard UI]** **[U3] `plans/dashboard.md`
     #15 confirmed still present, both halves**, checked across four
@@ -798,6 +849,32 @@ post-build critic should see a requirement's own `evidence:`.
     Ctrl-click and "copy link address" do nothing on breadcrumbs,
     agency cards, dataset rows or column tiles. A confirmation of an
     existing entry rather than a new finding; belongs with #8/#9.
+
+    **THREE OF THE FOUR HALVES FIXED, 2026-09-25.**
+
+    - **`document.title`** now names the view: `Registry Services ·
+      Data Asset QA Register`. Read off the view's own `<h2>` rather
+      than switched on `STATE.tier` - the heading is already the
+      answer, a per-tier lookup would be a second thing to keep in
+      step, and a tier added later gets this for free. Status pills are
+      stripped, since "Real pipeline data — 42 computed runs" is a
+      badge, not the view's name.
+    - **A live region** (`#route-announcer`, `aria-live="polite"`)
+      announces the same string, so a route change is spoken rather
+      than silent.
+    - **Focus moves** to the new view's heading - but only on a real
+      `navigate()`, NOT on every `render()`. `render()` also runs when
+      the as-of date changes, and stealing focus out of the date picker
+      mid-adjustment would be its own bug.
+
+    **THE FOURTH HALF IS STILL OPEN AND NEEDS A DECISION: real
+    anchors.** Breadcrumbs, agency cards, dataset rows and column tiles
+    are `<button>`/`<tr>` with `data-nav`, so middle-click, Ctrl-click
+    and "copy link address" still do nothing. Fixing it means every
+    navigable thing becomes an `<a href>` carrying the hash route it
+    already knows how to build - real work across five render
+    functions, and a change to what a click does at every tier, rather
+    than a patch. Worth its own conversation.
 
 11. **[todo, 2026-09-24]** **[Dashboard UI]** **[U4] A stale column or
     check deep link fails silently** - lands on the dataset page with no
@@ -2075,7 +2152,26 @@ twice. It deliberately did not re-find the `TypeError`.
     `.crumb`, `.pill.tag.sm`, `.link-btn`, `.drawer-close` and `INPUT`.
 
     **The problem is coverage, not craft** - the four that exist are
-    properly designed. Belongs with #8/#9/#10 as one accessibility pass.
+    properly designed.
+
+    **SIGNED OFF AND FIXED, 2026-09-25.** One rule naming the
+    CATEGORY rather than a fifth, sixth and seventh naming elements:
+    `:where(a, button, input, select, textarea, summary,
+    [tabindex]):focus-visible`. `:where()` keeps its specificity at
+    zero so the four bespoke rules, which come after it, keep their own
+    deliberate offsets.
+
+    **A rule per element is how the gap happened**, and a rule that
+    names the category cannot miss the next element somebody adds.
+
+    **Tests:** four representative types (`.crumb`, `.col-tile`,
+    `.snapshots-btn`, `.drawer-close`) are focused in a real browser
+    and asserted to have a solid, non-zero outline rather than the
+    browser's default. One real gotcha is recorded in the test itself:
+    Chrome decides `:focus-visible` from how the LAST interaction
+    arrived, so a programmatic `.focus()` after a mouse click gets no
+    ring however the CSS is written - the test presses Tab first to put
+    the browser back in the mode the test is actually about.
 
 56. **[todo, 2026-09-24]** **[Dashboard UI, QA checks & contract]**
     **[V16/V18/V23] The page's own statement of its colour language is

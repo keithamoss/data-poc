@@ -134,6 +134,21 @@ releases:
               build yet.
       - category: Improved
         items:
+          - headline: You can reach the whole dashboard from the keyboard
+            components: ["Dashboard UI"]
+            description: >
+              The dataset list on an agency page could not be reached
+              without a mouse, so keyboard navigation stopped one level
+              above the data. Those rows now take focus and open on
+              Enter, every control has a visible focus outline, and
+              focus no longer disappears into panels that are closed.
+          - headline: The page says which view you are on
+            components: ["Dashboard UI"]
+            description: >
+              Every view used to share one browser-tab title, so history
+              and bookmarks could not tell them apart. The title now
+              names the view, and moving between views announces itself
+              and moves the cursor there.
           - headline: One calendar typo now reads as one calendar typo
             components: ["Pipeline & publishing"]
             description: >

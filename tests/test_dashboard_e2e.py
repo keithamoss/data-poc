@@ -1493,3 +1493,137 @@ class TestTheExecutiveLegendCountsWhatIsActuallyThere:
             assert "No data" not in legend
         if "exhausted" not in statuses:
             assert "Schedule ended" not in legend
+
+
+def _open_a_drawer(page):
+    """Open the Past snapshots panel, by its label."""
+    page.get_by_text("Past snapshots", exact=False).first.click()
+    page.wait_for_timeout(300)
+
+
+class TestTheKeyboardCanReachTheData:
+    """The accessibility cluster: post-build-review #8, #9, #10 and #55,
+    signed off together 2026-09-25.
+
+    Four findings that are really one job. A reader who does not use a
+    mouse could reach Tier 1 and Tier 3 but not Tier 2 - so keyboard
+    navigation dead-ended exactly one level above the data this
+    dashboard exists to show - while focus could disappear into
+    off-screen drawers, seven of eleven interactive element types had no
+    visible focus ring, and nothing announced a route change at all.
+    """
+
+    # Registry Services rather than Child Protection, deliberately:
+    # three of the six CP datasets still throw on drill-down
+    # (post-build-review #5, not yet signed off), and that throw aborts
+    # navigate() before history.pushState - so a row click there does
+    # not change the URL at all. These tests are about keyboard
+    # equivalence, not about that bug, and must not be green or red
+    # because of it.
+    AGENCY = {"tier": "agency", "agencyId": "registry-services"}
+
+    def test_every_dataset_row_is_in_the_tab_order(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, state=self.AGENCY)
+        tabindexes = clean_page.evaluate(
+            "() => [...document.querySelectorAll('tr[data-nav]')].map(t => t.tabIndex)")
+        assert tabindexes, "precondition - the agency page must render dataset rows"
+        assert all(t >= 0 for t in tabindexes), (
+            f"dataset rows are unreachable by keyboard: tabIndex values {tabindexes}")
+
+    def test_a_dataset_row_navigates_on_enter(self, clean_page, built_dashboard_html):
+        """The property that matters is operability, not the attribute."""
+        _goto(clean_page, built_dashboard_html, state=self.AGENCY)
+        clean_page.locator("tr[data-nav]").first.focus()
+        clean_page.keyboard.press("Enter")
+        clean_page.wait_for_timeout(300)
+        assert "/dataset/" in clean_page.url, (
+            f"Enter on a focused dataset row did not drill in: {clean_page.url}")
+
+    def test_nothing_inside_a_closed_drawer_can_take_focus(self, clean_page, built_dashboard_html):
+        """Focusable content inside `aria-hidden` is a WCAG 4.1.2
+        violation, and to a keyboard user it simply reads as "Tab
+        stopped working" - the focus ring vanishes off-screen."""
+        _goto(clean_page, built_dashboard_html)
+        stuck = clean_page.evaluate("""() => {
+            const out = [];
+            document.querySelectorAll('.drawer:not(.open)').forEach(drawer => {
+                drawer.querySelectorAll('a,button,input,select,textarea,[tabindex]')
+                      .forEach(el => {
+                          el.focus();
+                          if(document.activeElement === el) out.push(drawer.id);
+                      });
+            });
+            return [...new Set(out)];
+        }""")
+        assert not stuck, f"closed drawers still hold focusable controls: {stuck}"
+
+    def test_an_open_drawer_can_still_be_used(self, clean_page, built_dashboard_html):
+        """Whatever hides the closed ones must not hide the open one."""
+        _goto(clean_page, built_dashboard_html)
+        # By its text, not by `.snapshots-btn` - that class is on every
+        # masthead chip, and `.first` is "Dark mode", which opens no
+        # drawer at all. An earlier draft of this test did exactly that
+        # and passed without ever opening one.
+        _open_a_drawer(clean_page)
+        assert clean_page.locator(".drawer.open").count() == 1, "precondition - a drawer must be open"
+        reachable = clean_page.evaluate("""() => {
+            const open = document.querySelector('.drawer.open');
+            const el = open.querySelector('button, a, input');
+            el.focus();
+            return document.activeElement === el;
+        }""")
+        assert reachable, "an OPEN drawer's own controls cannot take focus"
+
+    @pytest.mark.parametrize("selector", [
+        ".crumb", ".col-tile", ".snapshots-btn", ".drawer-close",
+    ])
+    def test_interactive_things_have_a_designed_focus_ring(
+            self, clean_page, built_dashboard_html, selector):
+        """Seven of eleven element types fell back to Chrome's own
+        1px ring. The bar is that focus is styled deliberately, not that
+        it is styled identically - the four that already had rings carry
+        their own offsets on purpose."""
+        _goto(clean_page, built_dashboard_html, state={
+            "tier": "dataset", "agencyId": "registry-services",
+            "collectionId": "civil-registration", "datasetId": "birth-registrations"})
+        # A closed drawer is inert now, so its own close button cannot
+        # take focus until the drawer is open - which is the point of
+        # the change above, not a gap in this one.
+        if selector == ".drawer-close":
+            _open_a_drawer(clean_page)
+        # Chrome decides :focus-visible from how the LAST interaction
+        # arrived, so a programmatic .focus() after a mouse click gets
+        # no ring however the CSS is written. One Tab puts the browser
+        # back in keyboard mode, which is the mode this test is about.
+        clean_page.keyboard.press("Tab")
+        found = clean_page.evaluate("""(sel) => {
+            const el = document.querySelector(sel + ":not([inert] *)");
+            if(!el) return null;
+            el.focus();
+            const s = getComputedStyle(el);
+            return {style: s.outlineStyle, width: s.outlineWidth, color: s.outlineColor};
+        }""", selector)
+        assert found, f"no {selector} on the page to focus"
+        assert found["style"] == "solid" and found["width"] != "0px", (
+            f"{selector} falls back to the browser's default focus ring: {found}")
+
+    def test_the_page_title_says_which_view_you_are_on(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        exec_title = clean_page.title()
+        _goto(clean_page, built_dashboard_html, state=self.AGENCY)
+        agency_title = clean_page.title()
+        assert agency_title != exec_title, (
+            f"the title never changes - both views are titled {exec_title!r}")
+        assert "Registry Services" in agency_title
+
+    def test_a_route_change_is_announced_and_moves_focus(self, clean_page, built_dashboard_html):
+        """Without either, a screen-reader user who activates a row is
+        told nothing and left where they were."""
+        _goto(clean_page, built_dashboard_html, state=self.AGENCY)
+        clean_page.locator("tr[data-nav]").first.click()
+        clean_page.wait_for_timeout(400)
+        focused = clean_page.evaluate("() => document.activeElement.tagName")
+        assert focused != "BODY", "focus was not moved to the new view"
+        announced = clean_page.evaluate(
+            "() => (document.querySelector('[aria-live]') || {}).textContent || ''")
+        assert announced.strip(), "nothing was announced for the route change"

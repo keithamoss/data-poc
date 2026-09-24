@@ -103,6 +103,17 @@ button{font:inherit; color:inherit;}
   cursor:pointer; transition:background .15s;
 }
 .wordmark:hover{background:var(--surface-alt);}
+/* EVERY interactive thing gets a visible focus ring, from one rule
+   (plans/post-build-review.md #55). Seven of eleven element types used
+   to fall back to the browser's own 1px default - including the column
+   tiles, which are the dataset page's primary control, and the As-of
+   chip, which both quiet-state messages tell the reader to go and use.
+   A rule per element is how that happened; a rule that names the
+   CATEGORY cannot miss the next one. The four bespoke rules below keep
+   their own offsets by coming after this. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible{
+  outline:2px solid var(--accent); outline-offset:2px;
+}
 .wordmark:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 .seal{
   width:38px; height:38px; border-radius:50%; flex:none;
@@ -176,6 +187,14 @@ button{font:inherit; color:inherit;}
 .view-head{display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:6px;}
 .view-head h2{font-size:26px;}
 .view-sub{color:var(--ink-muted); font-size:14px; margin-top:4px; max-width:62ch;}
+/* Visually hidden, still announced. The route announcer (#10) has to
+   reach a screen reader without appearing on the page; display:none
+   and visibility:hidden would remove it from the accessibility tree
+   too, which is the one thing it exists for. */
+.sr-only{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
+}
 .legend-key{display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--ink-muted); margin-block:14px 20px;}
 .legend-key span{display:inline-flex; align-items:center; gap:6px;}
 .legend-key i{width:8px;height:8px;border-radius:50%;display:inline-block;}
@@ -573,6 +592,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
 
   <nav class="rail" id="rail" aria-label="Drill-down breadcrumb"></nav>
 
+  <div id="route-announcer" class="sr-only" aria-live="polite" role="status"></div>
   <main id="view"></main>
 
   <footer>
@@ -583,7 +603,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
 </div>
 
 <div class="backdrop" id="backdrop"></div>
-<aside class="drawer" id="drawer" aria-hidden="true">
+<aside class="drawer" id="drawer" aria-hidden="true" inert>
   <div class="drawer-head">
     <div>
       <div class="legend-key" style="margin:0 0 4px;" id="drawer-eyebrow"></div>
@@ -595,7 +615,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
 </aside>
 
 <div class="backdrop" id="check-backdrop"></div>
-<aside class="drawer check-panel" id="check-panel" aria-hidden="true">
+<aside class="drawer check-panel" id="check-panel" aria-hidden="true" inert>
   <div class="drawer-head">
     <div>
       <div class="legend-key" style="margin:0 0 4px;" id="check-panel-eyebrow"></div>
@@ -611,7 +631,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
 </aside>
 
 <div class="backdrop" id="snapshots-backdrop"></div>
-<aside class="drawer" id="snapshots-panel" aria-hidden="true">
+<aside class="drawer" id="snapshots-panel" aria-hidden="true" inert>
   <div class="drawer-head">
     <div>
       <div class="legend-key" style="margin:0 0 4px;">Time travel</div>
@@ -632,7 +652,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
      not an archive. One global control for the whole dashboard, not
      per-dataset (Keith: "that's like global, not per dataset"). -->
 <div class="backdrop" id="asof-backdrop"></div>
-<aside class="drawer" id="asof-panel" aria-hidden="true">
+<aside class="drawer" id="asof-panel" aria-hidden="true" inert>
   <div class="drawer-head">
     <div>
       <div class="legend-key" style="margin:0 0 4px;">Cadence-aware viewing</div>
@@ -667,7 +687,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
      (matches the original ask: "who's committed/pushed what dataset's
      QA recently" as a single cross-cutting view). -->
 <div class="backdrop" id="activity-backdrop"></div>
-<aside class="drawer" id="activity-panel" aria-hidden="true">
+<aside class="drawer" id="activity-panel" aria-hidden="true" inert>
   <div class="drawer-head">
     <div>
       <div class="legend-key" style="margin:0 0 4px;">Publish history</div>
@@ -687,7 +707,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
      item 63's mobile-header-crowding flag - a 6th button now, not yet
      addressed). -->
 <div class="backdrop" id="changelog-backdrop"></div>
-<aside class="drawer" id="changelog-panel" aria-hidden="true">
+<aside class="drawer" id="changelog-panel" aria-hidden="true" inert>
   <div class="drawer-head">
     <div>
       <div class="legend-key" style="margin:0 0 4px;">Tool development history</div>
@@ -703,7 +723,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
      linkage. Same interaction pattern as every other header-button
      panel, reused deliberately. -->
 <div class="backdrop" id="requirements-backdrop"></div>
-<aside class="drawer" id="requirements-panel" aria-hidden="true">
+<aside class="drawer" id="requirements-panel" aria-hidden="true" inert>
   <div class="drawer-head">
     <div>
       <div class="legend-key" style="margin:0 0 4px;">Live requirements register</div>
@@ -720,7 +740,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
      resolutions. Same interaction pattern as every other header-button
      panel. -->
 <div class="backdrop" id="leaderboard-backdrop"></div>
-<aside class="drawer" id="leaderboard-panel" aria-hidden="true">
+<aside class="drawer" id="leaderboard-panel" aria-hidden="true" inert>
   <div class="drawer-head">
     <div>
       <div class="legend-key" style="margin:0 0 4px;">Who's resolved the most QA tickets in a row without reopening</div>
@@ -2450,6 +2470,17 @@ function navigate(next){
   render();
   history.pushState(STATE, "", stateToHash(STATE));
   window.scrollTo({top:0, behavior:"smooth"});
+  // FOCUS FOLLOWS THE NAVIGATION (#10). Without this the document
+  // replaces itself under the reader and focus stays on body, so the
+  // next Tab starts from the top of the page and a screen reader is
+  // still sitting on whatever was activated. Only on a real navigation
+  // - render() also runs when the as-of date changes, and stealing
+  // focus from the date picker mid-adjustment would be its own bug.
+  const heading = document.querySelector("#view h2");
+  if(heading){
+    heading.setAttribute("tabindex", "-1");
+    heading.focus({preventScroll:true});
+  }
 }
 
 function resolveContext(state){
@@ -2485,13 +2516,41 @@ window.addEventListener("popstate", (e)=>{
   renderFromState();
 });
 
+// WHAT VIEW AM I ON - in the title, and out loud (post-build-review
+// #10, plans/dashboard.md #15). document.title never changed, so every
+// one of this SPA's routes was "Data Asset QA Register" in the tab
+// strip, in the history menu and in a bookmark; and nothing announced
+// a route change, so a screen-reader user who activated a row was told
+// nothing at all.
+//
+// Read off the view's own <h2> rather than switched on STATE.tier: the
+// heading is already the answer, a per-tier lookup would be a second
+// place to keep in step, and a tier added later gets this for free.
+// Pills are stripped - "Real pipeline data - 42 computed runs" is a
+// badge, not part of the view's name.
+const SITE_NAME = "Data Asset QA Register";
+function currentViewName(){
+  const h2 = document.querySelector("#view h2");
+  if(!h2) return "";
+  const copy = h2.cloneNode(true);
+  copy.querySelectorAll(".pill").forEach(el=> el.remove());
+  return copy.textContent.replace(/\s+/g, " ").trim();
+}
+function describeRoute(){
+  const name = currentViewName();
+  document.title = name ? `${name} \u00b7 ${SITE_NAME}` : SITE_NAME;
+  const announcer = document.getElementById("route-announcer");
+  if(announcer) announcer.textContent = name || SITE_NAME;
+}
+
 function render(){
   const view = document.getElementById("view");
-  if(STATE.tier==="exec") return renderExec(view);
-  if(STATE.tier==="plans"){ PLANS_FILTER = plansFilterFromUrl(); return renderPlans(view); }
-  if(STATE.tier==="demo") return renderDemo(view);
-  if(STATE.tier==="agency") return renderAgency(view, STATE.agencyId);
-  if(STATE.tier==="dataset") return renderDataset(view, STATE.agencyId, STATE.collectionId, STATE.datasetId);
+  const done = r => { describeRoute(); return r; };
+  if(STATE.tier==="exec") return done(renderExec(view));
+  if(STATE.tier==="plans"){ PLANS_FILTER = plansFilterFromUrl(); return done(renderPlans(view)); }
+  if(STATE.tier==="demo") return done(renderDemo(view));
+  if(STATE.tier==="agency") return done(renderAgency(view, STATE.agencyId));
+  if(STATE.tier==="dataset") return done(renderDataset(view, STATE.agencyId, STATE.collectionId, STATE.datasetId));
 }
 
 
@@ -2650,7 +2709,7 @@ function renderAgency(view, agencyId){
           // as a quiet row; only one of them is somebody's job, and
           // identical wording is what would hide that.
           if(ds.scheduleExhausted){
-            return `<tr data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
+            return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
               <td><div class="dataset-name">${ds.name}</div><div class="dataset-provider">${ds.provider}</div></td>
               <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
               <td colspan="4" style="color:var(--ink); font-size:12.5px;">Delivery schedule ended after
@@ -2658,7 +2717,7 @@ function renderAgency(view, agencyId){
             </tr>`;
           }
           if(ds.noDataAsOf){
-            return `<tr data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
+            return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
               <td><div class="dataset-name">${ds.name}</div><div class="dataset-provider">${ds.provider}</div></td>
               <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
               <td colspan="4" style="color:var(--ink-faint); font-size:12.5px;">No QA run within tolerance as of the selected date</td>
@@ -2670,7 +2729,7 @@ function renderAgency(view, agencyId){
           // aggregateSparkline()'s own comment - scoped here to just this
           // one dataset's own columns.
           const dsSpark = aggregateSparkline(ds.columns);
-          return `<tr data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
+          return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td><div class="dataset-name">${ds.name}</div><div class="dataset-provider">${ds.provider}</div></td>
             <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
             <td>${arrivalPillHtml} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${fmtArrival(ds.lastArrival)}</span></td>
@@ -2684,7 +2743,24 @@ function renderAgency(view, agencyId){
       </div>
     </div>
   `).join("");
-  wrap.querySelectorAll("tbody tr").forEach(tr=> tr.addEventListener("click", ()=> navigate(JSON.parse(tr.dataset.nav))));
+  // KEYBOARD-OPERABLE, not just clickable (post-build-review #8). The
+  // Tier 1 agency cards and Tier 3 column tiles are real <button>s; the
+  // middle tier was bare <tr data-nav>, so a reader who does not use a
+  // mouse could reach the executive view and a column but never the
+  // dataset listing between them - the navigation dead-ended exactly
+  // one level above the data this page exists to show.
+  //
+  // tabindex on the row rather than a control inside the first cell,
+  // because the whole row is the target and has been since it was
+  // written; moving the affordance into one cell would change what a
+  // mouse user clicks to fix what a keyboard user cannot reach.
+  wrap.querySelectorAll("tbody tr").forEach(tr=>{
+    const go = ()=> navigate(JSON.parse(tr.dataset.nav));
+    tr.addEventListener("click", go);
+    tr.addEventListener("keydown", e=>{
+      if(e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); }
+    });
+  });
 }
 
 // Phase 5j Stage 2 - one cycle group's own entries as a `.dataset-table`
@@ -2976,6 +3052,26 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   }
 }
 
+// aria-hidden AND inert, ALWAYS TOGETHER (post-build-review #9).
+// Every drawer is position:fixed and slid off-screen with a transform,
+// which hides it from the eye and from nobody else: nine focusable
+// controls sat inside closed, aria-hidden drawers, so tabbing past the
+// last on-screen control sent focus somewhere invisible. To a keyboard
+// user that reads as "Tab stopped working", and focusable content
+// inside aria-hidden is a WCAG 4.1.2 violation besides.
+//
+// `inert` is the purpose-built answer - it takes the subtree out of the
+// tab order AND the accessibility tree - and it is set here rather than
+// at each call site because the two attributes drifting apart is
+// exactly the bug this fixes. Verified supported in the pinned
+// Chromium before being relied on.
+function setDrawerHidden(id, hidden){
+  const el = typeof id === "string" ? document.getElementById(id) : id;
+  if(!el) return;
+  el.setAttribute("aria-hidden", hidden ? "true" : "false");
+  el.toggleAttribute("inert", hidden);
+}
+
 function wireCards(grid){ grid.querySelectorAll(".card").forEach(el=> el.addEventListener("click", ()=> navigate(JSON.parse(el.dataset.nav)))); }
 
 /* =========================================================================
@@ -3148,7 +3244,7 @@ function openColumnDrawer(ag, col, ds, column, opts){
   body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted); margin-bottom:18px;">${column.description||""}</div>` + statsBlock + summaryBlock + checksBlock;
   document.getElementById("backdrop").classList.add("open");
   document.getElementById("drawer").classList.add("open");
-  document.getElementById("drawer").setAttribute("aria-hidden","false");
+  setDrawerHidden("drawer", false);
   body.querySelectorAll(".check-card").forEach(el=>{
     const idx = Number(el.dataset.idx);
     const ck = column.checks[idx];
@@ -3177,7 +3273,7 @@ function openColumnDrawer(ag, col, ds, column, opts){
 function hideDrawer(){
   document.getElementById("backdrop").classList.remove("open");
   document.getElementById("drawer").classList.remove("open");
-  document.getElementById("drawer").setAttribute("aria-hidden","true");
+  setDrawerHidden("drawer", true);
 }
 // User-initiated close (X, backdrop, Escape): if the drawer was opened via
 // pushState (STATE.columnName set), go back to the history entry the
@@ -3548,7 +3644,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   fillAuthored(body);
   document.getElementById("check-backdrop").classList.add("open");
   document.getElementById("check-panel").classList.add("open");
-  document.getElementById("check-panel").setAttribute("aria-hidden","false");
+  setDrawerHidden("check-panel", false);
   body.querySelectorAll("[data-toggle-table]").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       const t = document.getElementById(btn.dataset.toggleTable+"-table");
@@ -3597,7 +3693,7 @@ function setCompareIdx(ag, col, ds, column, check, idx){
 function hideCheckPanel(){
   document.getElementById("check-backdrop").classList.remove("open");
   document.getElementById("check-panel").classList.remove("open");
-  document.getElementById("check-panel").setAttribute("aria-hidden","true");
+  setDrawerHidden("check-panel", true);
 }
 function closeCheckPanel(){
   if(STATE && STATE.checkKey) history.back();
@@ -3674,12 +3770,12 @@ const PANEL_RENDER = {activity:renderActivityPanel, changelog:renderChangelogPan
 function showPanelDom(name){
   document.getElementById(`${name}-backdrop`).classList.add("open");
   document.getElementById(`${name}-panel`).classList.add("open");
-  document.getElementById(`${name}-panel`).setAttribute("aria-hidden","false");
+  setDrawerHidden(`${name}-panel`, false);
 }
 function hidePanelDom(name){
   document.getElementById(`${name}-backdrop`).classList.remove("open");
   document.getElementById(`${name}-panel`).classList.remove("open");
-  document.getElementById(`${name}-panel`).setAttribute("aria-hidden","true");
+  setDrawerHidden(`${name}-panel`, true);
 }
 function hideAllPanelsDom(){ SIDE_PANELS.forEach(hidePanelDom); }
 function openPanel(name, opts){
@@ -4364,12 +4460,12 @@ function openAsOfPanel(){
   document.getElementById("asof-default-label").textContent = fmtDate(new Date(DEFAULT_AS_OF+"T00:00:00Z"));
   document.getElementById("asof-backdrop").classList.add("open");
   document.getElementById("asof-panel").classList.add("open");
-  document.getElementById("asof-panel").setAttribute("aria-hidden","false");
+  setDrawerHidden("asof-panel", false);
 }
 function closeAsOfPanel(){
   document.getElementById("asof-backdrop").classList.remove("open");
   document.getElementById("asof-panel").classList.remove("open");
-  document.getElementById("asof-panel").setAttribute("aria-hidden","true");
+  setDrawerHidden("asof-panel", true);
 }
 document.getElementById("asof-btn").addEventListener("click", openAsOfPanel);
 document.getElementById("asof-backdrop").addEventListener("click", closeAsOfPanel);
