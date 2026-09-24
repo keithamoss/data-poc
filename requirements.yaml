@@ -7333,7 +7333,12 @@ requirements:
         forever, so patterns could only ever grow alternations,
         accumulating every historical naming scheme across thirty
         datasets over years. It punishes exactly the change that should
-        be cheap. So there is ONE gate, the duplicate-attribution one.
+        be cheap. So there is no HISTORY gate: the only gate over
+        pattern CONTENT is the duplicate-attribution one, criterion 8.
+        Criterion 7's missing-pattern check is a separate completeness
+        gate and is untouched by this - the two are easy to read as
+        contradicting each other, which is why the distinction is
+        spelled out rather than left to the count.
   - id: REQ-PIPE-059
     title: Two files for one dataset in one delivery are held, never chosen between
     date_written: "2026-09-23"
