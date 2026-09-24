@@ -441,12 +441,68 @@ yet, and they should not be until the standard is signed off - the
 as-of-relative rule above is exactly the kind of thing that is cheap to
 build in and expensive to retrofit.
 
-**Q4 is NOT closed.** Keith asked directly. Settled: the format, the
-year, asset time, the relative pass, the 30-day fix. Still open:
-**punctuation** (his two examples differ on the comma), **whether
-config-echoing CLI output is covered**, and the two traps the pass
-turned up - **relative-to-the-as-of** and **the missing future tense**.
-Then it needs drafting as a real requirement before any of it is built.
+**Q4 IS NOW CLOSED AS A DECISION, 2026-09-24 evening.** Everything it
+asked is settled; none of it is built beyond the two defect fixes
+recorded above, and it still needs drafting as a real requirement
+before any more is.
+
+**Punctuation - Keith's call was that it is mine.** Settled as ONE date
+string with an optional time in front of it, rather than two formats:
+
+| | |
+|---|---|
+| A date | `Friday, 29 September 2026` |
+| A date and time | `2:15pm Friday, 29 September 2026` |
+
+Time is lowercase `am`/`pm`, no full stops, no leading zero on the
+hour, and minutes always shown even on the hour (`2:00pm`), so a column
+of them lines up.
+
+**Why this shape.** His two dictated examples disagreed on the comma,
+and the cheapest way to settle that is not to pick a winner but to stop
+having two strings: the date form is his own example exactly, and the
+date-and-time form is that same string with the time prefixed. One
+thing to build, one thing to read, and no rule about when the comma
+appears because it always does, in the same place.
+
+**The CLI matches** - his own call, closing the fifth open point. Worth
+recording the consequence once, since it was the reason for asking:
+`mothman schedule show`'s date columns will read `Monday, 1 November
+2027` rather than `2027-11-01`, so they no longer match the
+`data-asset.yaml` a reader may have open beside them. He has made the
+call and it is not re-litigated here - noted so that whoever hits it
+later knows it was a decision rather than an oversight.
+
+**Future tense is in** - his own call. The standard runs in both
+directions: `in 3 days`, `in 2 weeks`, `in 2 quarters` as well as `X
+ago`. Which means the trap the pass turned up is now a requirement of
+the standard rather than a gap in it.
+
+**THE RELATIVE HALF IS PARKED** - his own word, 2026-09-24 evening:
+"let's park the whole relative date thing."
+
+Read as parking the WORK, not the decisions. What stops: wiring
+relative time into the high-value sites the pass identified - the
+`Last QA run` column, the snapshots picker, latest arrival, release
+notes and plans dates. None of that was built and none of it starts.
+
+What stands:
+- **The 30-day fix stays shipped.** He asked for it specifically,
+  earlier in the same conversation, and it is in `d5158a1` and green.
+  `fmtRelativeTime()` keeps running to years.
+- **The decisions above stay recorded**, future tense included, so
+  unparking is a matter of drafting rather than re-deciding.
+- **The as-of-relative rule stays on the record** as the thing that
+  must be built in rather than retrofitted, since it is the reason
+  parking is cheap now and expensive later.
+
+**So the absolute half is live and the relative half is parked.** #3,
+#14, #51 and road-testing items 5 and 11 all resolve against the
+absolute standard, and none of them needs the relative work.
+
+**Next step, not taken:** draft this as a requirement. It has not been
+drafted, and per `CLAUDE.md` nothing is built until Keith has signed
+one off.
 
 ## Findings
 
