@@ -269,3 +269,45 @@ anything here that turns into real build work becomes a requirement in
    and whether times should carry a visible zone label once they are no
    longer saying "UTC" - a bare "14:32" that used to read "14:32 UTC"
    loses information unless it says what it now means.
+
+   **VERIFIED 2026-09-24, and it constrains this item and any other
+   "change over time" check, row counts included.** Keith asked whether
+   Soda's row-count check can express an expected increase and separate
+   amber/red thresholds for change over time. Answered by real
+   experiment against the installed `soda-core 3.5.6`, not from docs -
+   `docs.soda.io` is blocked from this environment, and a real run is a
+   better primary source regardless.
+
+   - **Absolute row-count bands with both tiers already work, and we
+     already use them.** `contract/bdm-birth-registrations-soda-checks.
+     yml`'s `row_count` check carries `warn: when < 500` and `fail: when
+     < 100 / when > 20000`. Re-ran it live against a three-row table: it
+     evaluated and FAILED as expected.
+   - **SodaCL does have change-over-time syntax, and it does accept
+     tiered thresholds.** `change for row_count`, `change percent for
+     row_count` and `change avg last 7 for row_count` all parse, and a
+     `warn:`/`fail:` pair on one parses cleanly - no syntax error.
+   - **But Soda Core cannot EXECUTE any of them.** `soda/scan.py`'s
+     `__get_historic_data_from_soda_cloud_metric_store()` logs "Soda
+     Core must be configured to connect to Soda Cloud to use
+     change-over-time checks" and returns `{}` - the measurement history
+     lives in Soda Cloud, and Soda Core has no local store for it. The
+     check then crashes evaluating (`'NoneType' object has no attribute
+     'get'`), is marked NOT EVALUATED, and the scan returns exit code 3.
+   - **The failure mode is the dangerous one: the check DISAPPEARS.** A
+     not-evaluated check is absent from `scan.get_scan_results()
+     ["checks"]` entirely - verified, the list came back empty. This
+     repo's runners read exactly that structure and ignore
+     `scan.execute()`'s return code, so adding such a check would
+     produce no red, no amber and no visible error - just a declared
+     `check_id` that never reports. That is a silently missing check,
+     which is the false-green direction.
+
+   **So any change-over-time check in this project has to be computed
+   by us**, against committed `qa_results/` history, rather than
+   declared in SodaCL - which is the same conclusion this item was
+   heading for anyway, and now applies equally to row-count change.
+   Note the history is already there and already committed, so the
+   comparison needs no live data access; per `CLAUDE.md`'s hard rule it
+   would still be computed at run time by whoever legitimately holds a
+   connection, never in the dashboard build.
