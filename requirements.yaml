@@ -1015,6 +1015,9 @@ requirements:
   - id: REQ-PIPE-069
     title: Every delivery is recorded as its own committed file, written once at recognition
     date_written: "2026-09-24"
+    signed_off:
+      by: Keith
+      date: "2026-09-24"
     story: >
       As whoever reads this history years from now, I want what arrived
       and what it was attributed to recorded beside the QA results and
@@ -1038,9 +1041,10 @@ requirements:
       - THE SYSTEM SHALL store those files outside the per-dataset QA
         results, in a location of their own, because a delivery spans
         datasets and is not a QA result.
-      - THE SYSTEM SHALL record, in a delivery's own file, every table
-        it carried and the dataset each was attributed to, and SHALL NOT
-        record in it any outcome that is not known at recognition time.
+      - THE SYSTEM SHALL record, in a delivery's own file, every file it
+        carried by the name it arrived under, and the dataset each was
+        attributed to where one was, and SHALL NOT record in it any
+        outcome that is not known at recognition time.
       - THE SYSTEM SHALL make the delivery record queryable as SQL
         directly from the committed files, and SHALL NOT maintain a
         second copy of it in the warehouse.
@@ -1116,12 +1120,56 @@ requirements:
         criterion 8 (record each table's LOAD OUTCOME as its own
         committed record) restates REQ-PIPE-060 criterion 13. Two signed
         requirements own the processing log between them.
-    open_questions:
       - >
-        Does criterion 3 record the FILENAME or the logical table name?
-        It says "every table it carried", and REQ-PIPE-058's gate needs
-        filenames - a file's name is precisely what attribution reads.
-        Cheap to make explicit now, expensive to discover at build time.
+        SETTLED 2026-09-24 (Keith): criterion 3 records EVERY FILE BY
+        THE NAME IT ARRIVED UNDER, not every table. As drafted it said
+        "every table it carried", which fails twice. REQ-PIPE-058's
+        collision gate checks filename-to-dataset pairs, and a logical
+        table name is not what attribution reads - a file's NAME is. And
+        a JUNK FILE - a Word document, a PDF, somebody's test PNG - is
+        not a table and has no dataset, so it would not have been
+        recorded at all.
+      - >
+        The junk-file half is the sharper one and Keith raised it
+        directly. REQ-PIPE-057 criterion 14 requires the system to
+        record every artefact it declined to act on "alongside the
+        delivery it came in, so that a supplier changing their extract
+        is visible rather than silent" - and THIS FILE is what
+        "alongside the delivery" means. Without the rewording the
+        WARNING fires once at recognition and the durable record loses
+        it, which defeats that criterion's stated purpose: a supplier
+        drifting over time is invisible if only the current run
+        remembers.
+      - >
+        CONFIRMED, rather than re-decided: the TABLE-vs-LOAD split Keith
+        questioned at sign-off is the one already settled earlier the
+        same day - the delivery file holds RECOGNITION facts, the
+        processing log holds LOAD facts. ATTRIBUTION (this file is
+        cp_clients) is a recognition fact, decided by pattern match
+        before any load is attempted; the PHYSICAL TABLE it became
+        (staging.cp_clients_...) is a load fact and belongs to
+        REQ-PIPE-060's processing log.
+      - >
+        Two reasons attribution stays here rather than moving to the
+        load record, beyond it being already settled. NOT EVERYTHING
+        ATTRIBUTED REACHES A LOAD - a file matching two datasets is held
+        and attributed to neither, an unloadable file gets no table at
+        all - so a supply recognised but never loaded would otherwise
+        have no record of what we thought it was. And REQ-PIPE-058's
+        gate wants PAIRS: keeping both here makes it one read, splitting
+        them across two logs makes it a join.
+      - >
+        PRIVACY, worth going in with eyes open rather than discovering
+        later: a junk filename is the sharpest case of this
+        requirement's own public-repo NFR. A systematic extract name
+        like birth_registrations_2026-08-28.csv is impersonal; a stray
+        notes_for_jenny_re_case_4471.docx is not, and it is exactly the
+        kind of file that lands in a delivery by accident. Contents are
+        still never read or recorded (REQ-PIPE-057), but the NAME is now
+        durably committed rather than fleeting. Keith accepted this
+        knowingly on 2026-09-24; redaction was raised as an alternative
+        and not taken.
+    open_questions:
       - >
         Whether REQ-PIPE-038's criterion 8 or REQ-PIPE-060's criterion
         13 owns the processing log, since both now state it.
