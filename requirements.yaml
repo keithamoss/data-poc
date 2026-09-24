@@ -1169,10 +1169,6 @@ requirements:
         durably committed rather than fleeting. Keith accepted this
         knowingly on 2026-09-24; redaction was raised as an alternative
         and not taken.
-    open_questions:
-      - >
-        Whether REQ-PIPE-038's criterion 8 or REQ-PIPE-060's criterion
-        13 owns the processing log, since both now state it.
 
   - id: REQ-GHUB-015
     title: GitHub Issues as the QA remediation ticketing system
@@ -3382,10 +3378,6 @@ requirements:
         regenerate, open or query any data.
       - THE SYSTEM SHALL expose regeneration as a mothman subcommand
         rather than a bare script.
-      - THE SYSTEM SHALL record each table's LOAD OUTCOME as its own
-        committed record, separate from the delivery's file, so that an
-        arrival with nothing loadable is still a recorded arrival
-        without the delivery's file ever being rewritten.
     non_functional_requirements:
       - Deleting today's committed qa_results/ is a one-off exception to
         CLAUDE.md's rule that nothing in it is ever regenerated away. It
@@ -3557,10 +3549,15 @@ requirements:
         holds LOAD facts - what loaded, into which physical table, or
         why it did not. Two files, two moments, both written once and
         neither ever rewritten.
-    open_questions:
       - >
-        Whether this requirement's criterion 8 or REQ-PIPE-060 criterion
-        13 owns the processing log, since both now state it.
+        CRITERION DROPPED 2026-09-24 (Keith): the former criterion 8 -
+        record each table's load outcome as its own committed record -
+        is gone. REQ-PIPE-060 owns the processing log outright, in its
+        criteria 13-20. Its second clause, protecting the delivery
+        file from ever being rewritten, is owned twice over by
+        REQ-PIPE-069. And after this day's split this requirement is
+        purely about re-keying committed QA history, so a load-outcome
+        criterion no longer belongs in it at all.
 
   - id: REQ-DASH-055
     title: The dashboard shows real datasets only
@@ -7807,6 +7804,7 @@ requirements:
       - "THE SYSTEM SHALL NOT automatically retry a load recorded as failed."
       - "WHERE a load is recorded as failed, THE SYSTEM SHALL surface it as needing human action, resolvable either by rejecting that supply or by reprocessing it after a fix."
       - "WHEN a failed load is reprocessed, THE SYSTEM SHALL write a new load record rather than editing the failed one, and SHALL take the latest record for that table as current."
+      - "THE SYSTEM SHALL store load records in committed history alongside the delivery log, outside the per-dataset QA results."
     non_functional_requirements:
       - "A crash between the staging load and QA currently has no defined behaviour, and the failure is silent in the worst direction: a truncated table in a global staging schema is indistinguishable from a real short supply and would be checked as real data. Loading must be all-or-nothing per table, and a partially-processed delivery must be recognisable as such."
       - "DuckDB permits one PROCESS per database file - verified: while one holds a read-write connection a second writer fails AND a read-only reader fails with 'IO Error: Could not set lock on file'. mothman pipeline run fans out over a ProcessPoolExecutor and is parallel by default, and the per-run databases that provide isolation for free today are removed by REQ-PIPE-035 - so from this sprint on, two workers of a SINGLE invocation would collide on the file lock. Staging therefore runs sequentially, which is sufficient here and costs a flag that already exists. The concurrency problem this NFR used to call a hard blocker lands at sprint 15, with dbt as a second writing process, and belongs there."
@@ -7971,6 +7969,34 @@ requirements:
         the cost of a flag the tool already has. The genuine concurrency
         problem is dbt as a second writing process, and it belongs to
         sprint 15.
+      - >
+        SETTLED 2026-09-24 (Keith): THIS REQUIREMENT OWNS THE PROCESSING
+        LOG OUTRIGHT, and REQ-PIPE-038's criterion 8 was dropped. That
+        criterion said "record each table's LOAD OUTCOME as its own
+        committed record, separate from the delivery's file, so that an
+        arrival with nothing loadable is still a recorded arrival
+        without the delivery's file ever being rewritten" - two
+        statements, both now redundant. The first restates criterion 13
+        here; the second protects the delivery file's immutability,
+        which REQ-PIPE-069 owns twice over (its criterion 1 forbids
+        rewriting, its criterion 3 forbids recording anything not known
+        at recognition time).
+      - >
+        There was a structural reason too, beyond the duplication: after
+        the 2026-09-24 split, REQ-PIPE-038 is purely about re-keying
+        committed QA history per dataset. A load-outcome criterion does
+        not belong in it at all any more - it was only ever there
+        because the delivery log was.
+      - >
+        CRITERION 20 ADDED in the same change, and it is the reason the
+        drop needed care. Nothing in any CRITERION said WHERE load
+        records live: criterion 13 says "its own committed record"
+        without a location, and the only statement that the log sits
+        beside the delivery log was a DECISION here, not a criterion.
+        REQ-PIPE-038's criterion 8 was accidentally the nearest thing to
+        it, so dropping it without noticing would have widened the gap
+        rather than closed it. The obligation is now checkable, in the
+        same shape as REQ-PIPE-069 criterion 2.
 
   - id: REQ-PIPE-061
     title: Arrivals are processed in receipt order, and an interrupted run loses nothing
