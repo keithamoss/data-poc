@@ -7493,6 +7493,44 @@ requirements:
         because it is plans/supply-model.md's own word for the whole
         model, and because REQ-PIPE-050's decision had already
         anticipated that exact name.
+      - >
+        SETTLED 2026-09-24 (Keith), and it is a standing division rather
+        than three separate rejections: THE CLI DOES THINGS, THE
+        DASHBOARD SEES THINGS, GITHUB ISSUES DECIDES THINGS. The
+        `supply` group holds OPERATIONS - run recognition, stage a
+        delivery, validate patterns, reprocess a failed load after a fix
+        - against the operator's own working copy, which is where
+        "local" is the right answer. Reading the state of the supply
+        model is the dashboard's job.
+      - >
+        His reason, and it is stronger than the convenience argument it
+        defeats: ANY COUNT OR QUEUE THE CLI SHOWED WOULD BE STALE BY
+        CONSTRUCTION. The records live in committed history, so a local
+        mothman reads the operator's CHECKOUT - a count as of whenever
+        they last pulled, presented as though it were live. The
+        alternatives are worse: silently wrong, or a CLI command that
+        fetches, which turns a local operation into a network one. The
+        dashboard has no such problem because CI builds it from the
+        actual committed state and publishes it, so it is current for
+        everyone by construction.
+      - >
+        Three specific proposals are therefore REJECTED, recorded by
+        name because each reads as an obvious convenience and will be
+        re-proposed: a bare-`mothman` MAIN MENU ENTRY for outstanding
+        supply decisions carrying a live count (delivery-cli-ux's §6,
+        which it called the batch's biggest workflow-fit gap); a
+        `mothman supply status` READ SURFACE listing the human-action
+        queue (its §5); and a CLI LOOKUP answering "why was this supply
+        filed here" over REQ-PIPE-062 criterion 9's recorded branch and
+        considered slots (its §7). All three are the dashboard's.
+      - >
+        CONSEQUENCE, named rather than discovered: the dashboard becomes
+        the ONLY way to see a hold, and it is rebuilt by CI on push - so
+        the latency between a hold appearing and a person being able to
+        see it is a deploy. That is already true of everything else this
+        dashboard shows, but it stops being incidental and becomes
+        load-bearing here, because a hold is work waiting on a human
+        rather than a status anyone is browsing.
 
       - >
         SETTLED 2026-09-24 (Keith): a delivery with no receipt is

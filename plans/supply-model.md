@@ -593,13 +593,38 @@ warning comes.
    public repo), or gate over a small committed fixture corpus (catches
    only collisions someone thought to add)?
 
-**Must be answered before the new commands are built:**
-3. Where do the new supply commands live - a new `mothman supply` group,
-   or folded into `pipeline`?
-4. Does the human-action queue get a bare-`mothman` main-menu entry in
-   this batch, or wait for sprint 12's write path?
-5. Is "why was this supply filed here" readable from the CLI in this
-   batch, or explicitly deferred?
+**Must be answered before the new commands are built - ALL SETTLED
+2026-09-24, recorded on `REQ-PIPE-057`:**
+3. ~~Where do the new supply commands live?~~ **A new `mothman supply`
+   group, Tier 1**, following `REQ-PIPE-050`'s precedent - which had
+   already rejected folding into `pipeline` AND the fold-in-now-rename-
+   later compromise, and had already named `supply` as the eventual
+   group. This is that batch.
+4. ~~Does the human-action queue get a main-menu entry?~~ **No**, and
+   Keith's reason generalises past the question: ANY count or queue the
+   CLI showed would be STALE BY CONSTRUCTION, because the records live
+   in committed history and a local `mothman` reads the operator's
+   CHECKOUT. A wrong count on the front door is worse than none, and a
+   command that fetched to fix it would stop being a local operation.
+5. ~~Is "why was this supply filed here" readable from the CLI?~~ **No -
+   that is the dashboard's.**
+
+   Together these settle a STANDING DIVISION rather than three separate
+   answers: **the CLI does things, the dashboard sees things, GitHub
+   Issues decides things.** The `supply` group holds operations against
+   the operator's own working copy; reading the state of the model
+   belongs to the dashboard, which CI builds from the actual committed
+   state and publishes, so it is current for everyone by construction.
+   Three of `delivery-cli-ux`'s own recommendations fall to this and are
+   recorded by name on `REQ-PIPE-057` so they are not re-proposed: the
+   main-menu entry, a `mothman supply status` read surface, and a CLI
+   why-was-this-filed lookup.
+
+   Consequence named rather than discovered: the dashboard becomes the
+   ONLY way to see a hold, and it is rebuilt by CI on push - so the
+   latency between a hold appearing and a person seeing it is a deploy.
+   Already true of everything else the dashboard shows; load-bearing
+   here, because a hold is work waiting on a human.
 
 **Must be answered before the presentation is built:**
 6. One affordance or two - a queue plus a feed, or everything in the
