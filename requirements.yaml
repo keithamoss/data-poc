@@ -7094,6 +7094,9 @@ requirements:
   - id: REQ-PIPE-057
     title: A delivery is recognised from the transport, and what it cannot place it reports
     date_written: "2026-09-23"
+    signed_off:
+      by: Keith
+      date: "2026-09-24"
     story: "As whoever maintains this pipeline, I want the pipeline to work out for itself what arrived together and to say plainly what it could not place, so that filing starts from an observed transport unit rather than from anything a supplier told us or the generator wrote down."
     moscow: must
     status: not_started
@@ -7105,13 +7108,13 @@ requirements:
       - "THE SYSTEM SHALL treat a delivery as received only where our own receipt record for it exists."
       - "IF a delivery is present with no receipt record, THEN THE SYSTEM SHALL leave it unprocessed, SHALL continue processing every other delivery, and SHALL report it on every run as an informational observation."
       - "THE SYSTEM SHALL NOT require a configured interval, a file modification time, or any record of how long a delivery has been present, in order to decide whether to report a missing receipt."
-      - "THE SYSTEM SHALL derive which collection a delivery is for from the datasets its own files were attributed to."
+      - "THE SYSTEM SHALL derive which collections a delivery is for from the datasets its own files were attributed to, WHERE one delivery may be for more than one collection."
       - "THE SYSTEM SHALL NOT derive the receipt instant, the period, the dataset, the collection or the processing order from a delivery's name."
       - "WHERE a delivery contains a file attributed to no dataset, THE SYSTEM SHALL record it as an unrecognised artefact, SHALL report it at WARNING level rather than informational, and SHALL NOT fail the delivery, check it or promote it."
       - "THE SYSTEM SHALL distinguish an unrecognised artefact, which matches no pattern, from an unexpected table, which matches a pattern for a dataset with no slot in that period, and SHALL report the latter as informational."
       - "IF a delivery contains a file asserting what that delivery is for, or a file resembling our own receipt record, THEN THE SYSTEM SHALL report it as an anomaly and SHALL NOT read any value out of it."
       - "IF no file in a delivery is attributed to any dataset, THEN THE SYSTEM SHALL report the delivery as unplaceable, and SHALL NOT fail the run."
-      - "IF a delivery holds files attributed to more than one collection, THEN THE SYSTEM SHALL hold it for a human, SHALL NOT split it across collections, and SHALL continue processing every other delivery."
+      - "WHERE a delivery holds files attributed to more than one collection, THE SYSTEM SHALL attribute each file on its own dataset's terms, and SHALL NOT hold, reject or fail the delivery for spanning collections."
       - "THE SYSTEM SHALL record every artefact it declined to act on alongside the delivery it came in, so that a supplier changing their extract is visible rather than silent."
       - "WHERE no deliveries are present at all, THE SYSTEM SHALL report no arrivals and SHALL NOT fail."
       - "THE SYSTEM SHALL expose delivery recognition through a mothman subcommand."
@@ -7132,26 +7135,59 @@ requirements:
       - "Decided an unrecognised artefact must not break a delivery or block readiness, because both are defined over EXPECTED tables (TS-15, broadened by Keith to cover a test.png, a garbage filename, any artefact mapping to no slot at all)."
       - "Decided a delivery's NAME means nothing and is required to follow no pattern, so that recognition cannot pass by parsing a name we wrote ourselves (docs/delivery-format.md, REQ-GEN-043 criterion 15). The real generated set already contains spaces, bare hex strings and four different naming conventions."
       - "Decided nothing in the pipeline may read data/generator_bookkeeping.json. It knows which slot each delivery was built to fill, and a pipeline reading it would be filing from a declaration rather than from arrival plus slot state - the rejected supplier manifest wearing our own badge. Tests may read it; nothing that files a supply may."
-      - "Decided a mixed-COLLECTION delivery is held rather than raising. Today qa_tools/common/arrivals.py raises DeliveryFormatError on one, which stops the whole run over one malformed drop - the same shape as failing 29 healthy datasets for one exhausted schedule, which REQ-PIPE-053 exists to prevent. Note this is different from the mixed-PERIOD delivery, which runs QA and never auto-promotes (TS-33a, sprint 11)."
-
       - >
-        SETTLED 2026-09-24 (Keith): a delivery whose files map to more
-        than one collection is HELD and reported, and everything else in
-        the run keeps processing. This CHANGES BUILT BEHAVIOUR -
-        qa_tools/common/arrivals.py raises today, and because
-        recognition walks the whole tree, one such delivery currently
-        takes the run down for every delivery in it.
+        SETTLED 2026-09-24 (Keith): a delivery MAY span collections, and
+        is not held, rejected or failed for doing so. Each file is
+        attributed to its own dataset and handled on that dataset's
+        terms. A supplier dropping two collections in one transport unit
+        is an ordinary thing to do, not a malformed arrival.
       - >
-        The argument for keeping the hard error was real and is recorded
-        rather than dismissed: a delivery spanning two collections means
-        the TRANSPORT BOUNDARY itself is wrong, not the data, so every
-        arrival fact derived from that boundary is suspect and a loud
-        stop is arguably the honest response. It lost on two counts. The
-        hold still reports it, so the boundary problem stays visible and
-        actionable - nothing is lost but the blast radius. And one
-        malformed drop stopping a run that contains 29 healthy datasets
-        is exactly the shape REQ-PIPE-053 already exists to prevent,
-        which is how a check gets disabled wholesale rather than fixed.
+        This CHANGES BUILT BEHAVIOUR twice over, and the second one is
+        the part that is easy to miss. qa_tools/common/arrivals.py's
+        classify() raises DeliveryFormatError on such a delivery, which
+        additionally takes the whole run down because recognition walks
+        the whole tree. But classify() also RETURNS A SINGLE
+        collection_id, which arrivals_for() then filters deliveries on -
+        so single-collection is structural in today's code, not just a
+        guard to delete.
+      - >
+        CONSEQUENCE, accepted deliberately: RUN IDENTITY stops being
+        one-to-one with a delivery. Run ids are assigned today from
+        receipt order WITHIN a collection, so one delivery means one
+        run. Once a delivery may span collections, one arrival
+        contributes to two collections' run sequences - one delivery,
+        two runs. That is the honest model rather than a compromise: the
+        DELIVERY is the transport unit and the RUN is the per-collection
+        QA unit, and they were only ever the same thing by coincidence
+        of the PoC's own generated data. See REQ-PIPE-061 for the
+        ordering scope this implies.
+      - >
+        REJECTED, having been the drafted position on 2026-09-23 and
+        settled the other way by Keith on 2026-09-24: holding a
+        mixed-collection delivery for a human. The argument was that a
+        delivery spanning two collections means the TRANSPORT BOUNDARY
+        itself is wrong rather than the data, so every arrival fact
+        derived from that boundary is suspect. It does not survive the
+        observation that spanning collections is legitimate, and a hold
+        would stop healthy supply on a boundary that is working. What
+        survives from that thread is only the blast-radius point, which
+        is kept above and applies to every odd delivery: whatever
+        recognition decides about one, it must not take the rest of the
+        run down - the same shape as failing 29 healthy datasets for one
+        exhausted schedule, which REQ-PIPE-053 exists to prevent.
+      - >
+        UNCHANGED by the above, and the distinction is the whole point:
+        a delivery whose files land in different PERIODS runs QA and
+        never auto-promotes - a human review gate, re-confirmed by Keith
+        2026-09-24. It is NOT a criterion here, because recognition
+        never knows a period: period comes from slot assignment
+        downstream, which is why the gate is scoped as a PROMOTION rule
+        in delivery sprint 11 (plans/supply-model.md item 11). Its
+        condition is different PERIODS, not different SLOTS - an
+        ordinary six-table Child Protection delivery already spans six
+        slots, so an implementation keyed on slots passes TS-33a while
+        failing TS-33b and blocks auto-promotion on every healthy
+        multi-table delivery.
 
       - >
         SETTLED 2026-09-24 (Keith): a delivery with no receipt is
@@ -7244,7 +7280,7 @@ requirements:
       - "THE SYSTEM SHALL evaluate patterns independently of the order they are declared in, so that no attribution depends on which pattern happened to be checked first."
       - "WHEN the configuration gate runs, THE SYSTEM SHALL fail if a dataset that has slots declares no arrival pattern."
       - "WHEN the configuration gate runs, THE SYSTEM SHALL fail if any filename can be attributed to more than one dataset."
-      - "THE SYSTEM SHALL report a file matching no pattern as unrecognised, and SHALL NOT attribute it by elimination, by proximity or by the collection the rest of the delivery belongs to."
+      - "THE SYSTEM SHALL report a file matching no pattern as unrecognised, and SHALL NOT attribute it by elimination, by proximity or by the collections the rest of the delivery belongs to."
       - "THE SYSTEM SHALL allow one dataset's pattern to match more than one file in a single delivery, and SHALL NOT silently take one of them."
       - "THE SYSTEM SHALL record, with each attributed file, which dataset's pattern attributed it."
       - "THE SYSTEM SHALL expose the pattern gate through mothman check."
@@ -7520,6 +7556,7 @@ requirements:
       - "THE SYSTEM SHALL process arrivals in ascending order of our own receipt instant."
       - "THE SYSTEM SHALL NOT process arrivals in the order they were discovered, listed or named."
       - "WHERE two arrivals share a receipt instant, THE SYSTEM SHALL order them by a defined, deterministic tiebreak."
+      - "THE SYSTEM SHALL order arrivals by receipt instant across every collection, and SHALL NOT order them within one collection at a time."
       - "THE SYSTEM SHALL produce identical filings for a given set of arrivals whatever order they were presented in."
       - "WHEN a run processes arrivals, THE SYSTEM SHALL process every arrival not yet processed since its recorded marker, rather than only the arrival that triggered the run."
       - "THE SYSTEM SHALL advance its marker only past arrivals it has fully processed."
@@ -7536,6 +7573,20 @@ requirements:
       - "Decided the receipt instant is the only ordering fact. A supplier-provided timestamp reflects their clock, their timezone and their bugs, and staging's whole justification is that it asserts only facts we can vouch for (TS-32). A delivery's name is arbitrary by design, so sorting by it would be inventing an order out of a supplier's naming habits."
       - "Decided each run DRAINS THE BACKLOG - reading everything unprocessed since a marker rather than only the triggering event. Settled for decision processing in Thread H's second pass, and it is the same discipline here rather than a second one. The reason it matters generally: GitHub holds only ONE pending run per concurrency group, so three rapid triggers silently lose the middle one, and the opt-in queueing mode was rejected by Keith as edition-gated. Draining works on any edition, at any volume, and survives a run failing for reasons that have nothing to do with concurrency."
       - "Decided the tiebreak must be deterministic and stated rather than left to sort stability, because a stable sort over a directory listing is still a directory listing."
+      - >
+        SETTLED 2026-09-24 (Keith): receipt order is GLOBAL, not
+        per-collection. It follows from REQ-PIPE-057 allowing one
+        delivery to span collections - a per-collection ordering would
+        have to visit such a delivery twice and could order it
+        differently each time, which is the non-determinism this
+        requirement exists to remove. Today's code orders within a
+        collection (qa_tools/common/arrivals.py's arrivals_for()), so
+        this is a change to built behaviour rather than a restatement.
+      - >
+        Note what stays per-collection: the RUN. One arrival spanning
+        two collections produces two runs, because a run is the
+        per-collection QA unit. Only the ORDER in which arrivals are
+        processed is global, and the marker with it.
 
   - id: REQ-PIPE-062
     title: A supply is assigned to a slot by rule, and the rule can never claim forward

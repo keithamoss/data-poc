@@ -764,6 +764,12 @@ by running the real matcher rather than reading it:
 
 ### Open questions waiting on Keith
 
+**ALL EIGHT SETTLED 2026-09-24** with Keith, and each answer now lives
+on the requirement it belongs to rather than here - the lists below are
+kept only as the record of what was asked and what the scoper itself
+picked. Where an answer went AGAINST the pick it is marked inline, since
+that is the case a later reader is most likely to get backwards.
+
 **Non-functional**, each with the scoper's own pick:
 1. **A crash between staging load and QA** - a truncated table in a
    global staging schema is indistinguishable from a real short supply.
@@ -803,6 +809,15 @@ by running the real matcher rather than reading it:
    `arrivals.py` raises, stopping the whole run including the other 29
    healthy datasets. Hold it and keep processing (*pick*); or keep the
    hard error because the transport boundary itself is wrong.
+   **SETTLED 2026-09-24, AGAINST THE PICK: neither.** A delivery MAY
+   span collections and is processed normally - spanning is legitimate,
+   not malformed, so a hold would stop healthy supply. The consequence
+   Keith accepted with it is that a run stops being one-to-one with a
+   delivery: one such arrival produces two runs, one per collection, and
+   receipt order becomes global rather than per-collection. See
+   `REQ-PIPE-057`, `REQ-PIPE-061`, TS-36/TS-36b. Unchanged by it: the
+   mixed-PERIOD delivery, which runs QA and never auto-promotes
+   (TS-33a, sprint 11).
 
 ### Also flagged, not this batch's to fix
 
@@ -1907,15 +1922,31 @@ dropped file is exactly the one a supplier will later say they sent.
 **TS-36 `[unit]` One delivery, two collections.**
 A drop containing Birth Registrations' file alongside two Child
 Protection tables - one folder, two collections.
-**Expect**: that delivery is HELD and reported; every OTHER delivery in
-the run is processed normally (Keith, 2026-09-24). This CHANGES BUILT
-BEHAVIOUR - `qa_tools/common/arrivals.py` raises today, and because
-recognition walks the whole tree one such drop currently takes the run
-down for all 60 deliveries, which was reproduced before deciding. The
-rejected alternative is recorded on `REQ-PIPE-057`: a delivery spanning
-two collections means the TRANSPORT BOUNDARY is wrong, which is a real
-argument, but the hold reports it just as visibly and loses only the
-blast radius.
+**Expect**: the delivery is processed NORMALLY. Each file is attributed
+to its own dataset and handled on that dataset's terms; nothing is held,
+rejected or failed for spanning collections (Keith, 2026-09-24). This
+CHANGES BUILT BEHAVIOUR twice - `qa_tools/common/arrivals.py`'s
+`classify()` raises today (and because recognition walks the whole tree,
+one such drop takes the run down for all 60 deliveries, reproduced
+before deciding), and it also returns a SINGLE `collection_id` that
+`arrivals_for()` filters on, so single-collection is structural rather
+than just a guard.
+
+**Assert the run consequence too, because it is the part that will be
+got wrong**: this delivery produces **two runs**, one per collection.
+Run ids come from receipt order, which is now global rather than
+per-collection (`REQ-PIPE-061`) - so the assertion is that both runs
+exist, that each carries only its own collection's files, and that
+neither collection's ordering was computed by walking the tree a second
+time.
+
+**TS-36b `[unit]` A mixed-collection delivery must not be held.**
+The negative case, and it exists for the same reason TS-33b does: the
+rejected design (hold it for a human) is the one already written down in
+git history, so an implementation that reinstates it looks defensible in
+review. Assert explicitly that no hold, no anomaly and no warning is
+raised for the spanning itself - an unrecognised artefact inside such a
+delivery still warns on its own terms, which is a different thing.
 
 **TS-37 `[unit]` A delivery directory with no receipt record.**
 Files present under `data/deliveries/<name>/`, nothing at
