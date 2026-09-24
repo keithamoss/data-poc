@@ -1602,30 +1602,49 @@ customProperties:
   - property: arrivalPattern
     value:
       - type: nested_folder
-        keyPattern: "cp/{delivery_id}/cp_clients.csv"
+        keyPattern: "cp/{slot_id}/cp_clients.csv"
         dataset_id: cp-clients
         extractTo: cp_clients
       - type: nested_folder
-        keyPattern: "cp/{delivery_id}/cp_notifications.csv"
+        keyPattern: "cp/{slot_id}/cp_notifications.csv"
         dataset_id: cp-notifications
         extractTo: cp_notifications
       - type: nested_folder
-        keyPattern: "cp/{delivery_id}/cp_investigations.csv"
+        keyPattern: "cp/{slot_id}/cp_investigations.csv"
         dataset_id: cp-investigations
         extractTo: cp_investigations
       - type: nested_folder
-        keyPattern: "cp/{delivery_id}/cp_placements.csv"
+        keyPattern: "cp/{slot_id}/cp_placements.csv"
         dataset_id: cp-placements
         extractTo: cp_placements
       - type: nested_folder
-        keyPattern: "cp/{delivery_id}/cp_carers.csv"
+        keyPattern: "cp/{slot_id}/cp_carers.csv"
         dataset_id: cp-carers
         extractTo: cp_carers
       - type: nested_folder
-        keyPattern: "cp/{delivery_id}/cp_case_workers.csv"
+        keyPattern: "cp/{slot_id}/cp_case_workers.csv"
         dataset_id: cp-case-workers
         extractTo: cp_case_workers
     # qa_tools/common/file_arrival.py's real, tested pattern-matching
     # shape - one nested_folder pattern per real table, since one CP
     # delivery is all 6 tables landing together under a shared
-    # {delivery_id}/ prefix, not a single flat key the way BDM's is.
+    # {slot_id}/ prefix, not a single flat key the way BDM's is.
+    #
+    # The placeholder was {delivery_id} until 2026-09-24 (Keith,
+    # pre-build Q12). It names the LOGICAL OBLIGATION - one slot, many
+    # deliveries - which is what REQ-GEN-042 already renamed in the
+    # generator, where generate_runs.py emits slot_id with its own note
+    # that "this is not called delivery_id any more". The contract was
+    # the last place carrying the old word, and it was the dangerous
+    # one: the supply model uses DELIVERY for the observed transport
+    # unit, so somebody building recognition off this config would have
+    # read "delivery" and got the wrong concept. Safe to rename alone -
+    # nothing reads this capture group by name (only run_id is, in the
+    # aws/ ingest handlers); the group name is documentation of what
+    # that path segment holds.
+    #
+    # NOT YET RENAMED: the VALUES in real paths still read
+    # "delivery_120", because changing them changes generator output and
+    # therefore committed history, which REQ-PIPE-038 regenerates
+    # wholesale under its own delete-and-regenerate rule. The config is
+    # now honest about what the segment means; the values follow there.

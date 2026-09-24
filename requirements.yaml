@@ -7909,6 +7909,42 @@ requirements:
         gate and is untouched by this - the two are easy to read as
         contradicting each other, which is why the distinction is
         spelled out rather than left to the count.
+      - >
+        SETTLED AND DONE 2026-09-24 (Keith), resolving pre-build Q12 -
+        the delivery_id collision the concept inventory called "actively
+        hazardous" and scheduled for batch 1, where it was missed. The
+        contract's arrivalPattern placeholders were renamed from
+        {delivery_id} to {slot_id} in the same session, because this
+        requirement rewrites that config block anyway and it was the
+        cheapest moment it will ever be.
+      - >
+        The collision was narrower than the inventory recorded, and
+        checking that is what made the fix small: REQ-GEN-042 had
+        already done the vocabulary work, and generator/generate_runs.py
+        emits slot_id carrying its own note that "One slot, many
+        deliveries - which is why this is not called delivery_id any
+        more". The CONTRACT was the last place still carrying the old
+        word, and it was the dangerous one - the supply model uses
+        DELIVERY for the observed transport unit, so anyone building
+        recognition from this config would have read "delivery" and got
+        the logical obligation instead.
+      - >
+        Verified safe to rename alone before doing it: the capture group
+        is never read by name. file_arrival.py returns groupdict() as an
+        opaque dict, and the only named lookup anywhere is run_id, in
+        the two aws/ ingest handlers. The placeholder name is
+        documentation of what that path segment holds, not an interface.
+        Confirmed by running the real arrival-pattern tests afterwards -
+        23 passed.
+      - >
+        NOT DONE, and deliberately: the VALUES in real paths still read
+        "delivery_120". Changing them changes generator output and
+        therefore committed history, which REQ-PIPE-038 regenerates
+        wholesale under its own delete-and-regenerate rule - so that is
+        where the values follow. The config is now honest about what the
+        segment MEANS; the segment's contents catch up there. Recorded
+        because a half-renamed concept is exactly the state a later
+        reader would otherwise find and mistake for an oversight.
 
       - >
         SETTLED 2026-09-24 (Keith): duplicate attribution is caught by a

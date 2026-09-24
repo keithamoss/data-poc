@@ -640,13 +640,30 @@ warning comes.
     requiring "any record of how long a delivery has been present", and
     a derived count may or may not cross that line.
 
-**Can wait, but not indefinitely:**
-11. What happens to `dataset_stats.json`'s `arrival` block - drop,
-    rename as a genuine extract-to-receipt lag measure, or revisit at
-    `REQ-PIPE-038`?
-12. The `delivery_id` collision, still unresolved from batch 1, and now
-    sitting inside the config `058` rewrites
-    (`keyPattern: "cp/{delivery_id}/cp_clients.csv"`).
+**Can wait, but not indefinitely - BOTH SETTLED 2026-09-24:**
+11. ~~What happens to `dataset_stats.json`'s `arrival` block?~~ **It
+    goes** - `REQ-PIPE-066` criterion 12 retires it. Keith: "that should
+    not be in the JSON, that should be like a check that we craft."
+    `earliest_extract` is a supplier-derived arrival time `REQ-PIPE-060`
+    forbids, carrying a filter whose only justification was protecting
+    the classification `066` deletes; `max_lag_hours` measures
+    within-supply staleness despite its position, and was verified to be
+    committed, carried through both build paths and **rendered
+    nowhere**. The real finding underneath - EXTRACT-TO-RECEIPT LAG - is
+    logged as a check, `plans/running-thoughts.md` #43.
+12. ~~The `delivery_id` collision.~~ **Renamed to `{slot_id}` in the
+    contract, done the same session**, since `REQ-PIPE-058` rewrites
+    that config block anyway. It was narrower than the concept inventory
+    recorded: `REQ-GEN-042` had already renamed it in the generator, and
+    the contract was the last place carrying the old word - and the
+    dangerous one, since anyone building recognition from that config
+    would have read "delivery" and got the logical obligation. Verified
+    safe first: the capture group is never read by name, only `run_id`
+    is. The VALUES still read `delivery_120` and follow at
+    `REQ-PIPE-038`'s regeneration, which is recorded on `REQ-PIPE-058`
+    so a later reader does not mistake the half-state for an oversight.
+
+**All twelve pre-build questions are now settled.**
 
 **Unowned and not a question**: the severity-bearing activity feed
 (nothing owns it), and the run-id renumbering of committed history
