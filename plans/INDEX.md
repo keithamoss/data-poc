@@ -486,7 +486,7 @@ one when this line suggests it matters.
   - *touches:* `qa_tools/common/changelog.py`
 - **#23** `todo` 2026-09-21 - Automatic snapshots, on every publish, deduplicated by content hash (Thread K).
 - **#24** `todo` 2026-09-22 - Time-granular "as at". The as-of control accepts an optional TIME alongside the date, so an intra-day sequence -...
-- **#25** `todo` 2026-09-24 - CARRY-FORWARD: a period whose supply never arrives, and a human accepts that it never will. Keith, 2026-09-24.
+- **#25** `todo` 2026-09-24 - CARRY-FORWARD: a period whose supply never arrives, and a human decides to point it at the previous period. Keith,...
 - **Batch 3's scoper sense-check** `todo` 2026-09-23 - findings, 2026-09-23
   - *touches:* `contract/child-protection-soda-checks.yml`, `pipeline/cadence.py`
   - Verified against the sprint list, not taken on trust. The six map to:

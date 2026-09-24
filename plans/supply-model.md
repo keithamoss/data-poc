@@ -1349,10 +1349,10 @@ comparisons against the expected-supply sequence.
     it.
 
 25. **[todo, 2026-09-24]** **[Pipeline & publishing]** **CARRY-FORWARD:
-    a period whose supply never arrives, and a human accepts that it
-    never will.** Keith, 2026-09-24. A genuinely new concept, adjacent
-    to promotion and rejection (sprint 11) rather than part of either,
-    and it has no requirement anywhere yet.
+    a period whose supply never arrives, and a human decides to point it
+    at the previous period.** Keith, 2026-09-24. A genuinely new
+    concept, adjacent to promotion and rejection (sprint 11) rather than
+    part of either, and it has no requirement anywhere yet.
 
     **The situation.** A dataset's slot for a period goes unfilled, the
     period passes, and a human concludes the supply is not coming. The
@@ -1361,25 +1361,46 @@ comparisons against the expected-supply sequence.
     anyone SAY that. The slot stays overdue forever and the period
     schema stays empty.
 
-    **The mechanism Keith described**, and it is the same machinery the
-    model already has rather than new architecture: create a VIEW in
-    the current period's schema that points back at the previous
-    period's table. Anything querying the period by its logical name
-    resolves to last period's data. That is exactly the
-    logical-name-to-physical-table indirection `REQ-PIPE-035` already
-    establishes, pointed one schema further back.
+    **The trigger is LATENESS, and it goes through GitHub Issues like
+    every other decision** (Keith, 2026-09-24, correcting an earlier
+    reading recorded here that had this deliberately bypassing the
+    Issues channel - see the correction note at the end). When a supply
+    ticks over to LATE, that opens a ticket. The ticket is the thing a
+    human acts on, and carry-forward is one of the actions available
+    from it. So there is no special write path: the same
+    read-only-dashboard principle and the same sprint-12 Issues
+    mechanism apply, and this is not an exception to either.
 
-    **It is a HUMAN DECISION, and the write path is the command line.**
-    Keith reasoned through and rejected GitHub Issues for this one, in
-    his own words: an issue needs something to open it, and a dataset
-    that never arrived produces no arrival, no QA run and therefore no
-    trigger. So there is nothing for the Issues path to hang off. This
-    is the first decision in the model whose write path is deliberately
-    NOT the Issues channel sprint 12 establishes - worth stating
-    explicitly, because "the dashboard is read-only, so decisions go
-    through Issues" would otherwise read as universal. The decision is
-    still recorded in the same append-only log, with the same who,
-    when, what, which and why.
+    **The action is a DATABASE action, not a QA one** - Keith's own
+    framing, "less about QA and more about database stuff". Create a
+    view in that period's schema, for that table, pointing at the
+    previous period's table. Anything querying the period by its
+    logical name resolves to last period's data. That is exactly the
+    logical-name-to-physical-table indirection `REQ-PIPE-035` already
+    establishes, aimed one schema further back.
+
+    **It DOES trigger a re-QA of that table** (Keith, 2026-09-24,
+    reasoning it through in the moment and worth recording with his
+    reason rather than just the outcome): the carried-forward table has
+    dependents, and cross-table checks that read it need to be
+    re-evaluated against what the period now actually resolves to. Not
+    re-QAing would leave every dependent check holding a verdict about
+    an empty period.
+
+    **A carried-forward slot COUNTS AS FILLED** (Keith, 2026-09-24,
+    settling this directly) - **but it must read as carried forward in
+    the dashboard, never as an ordinary green.** His own words: "no one
+    could look at it and go, oh, it's green and it's good. No, it's
+    green. And then next to it, it should say carry forward or
+    something." That is the **status-plus-qualifier chip** vocabulary
+    this model already uses elsewhere - the "no data" qualifier on an
+    overdue dataset, and a check that could not run. Same pattern, new
+    qualifier, rather than a new visual language.
+
+    **A late arrival AFTER a carry-forward is HELD for a human** (Keith,
+    2026-09-24). It does not silently replace the view, and it does not
+    get discarded - a human decides, which keeps the carry-forward a
+    real decision rather than a default that any later event can undo.
 
     **Naming is unsettled** - he offered "rollback" and "patch" as
     candidates and neither convinced him. Both are misleading: nothing
@@ -1387,37 +1408,35 @@ comparisons against the expected-supply sequence.
     used above as a working label only, chosen because it says what
     actually happens, and the real name is his to pick.
 
-    **Open questions, and the first two are the load-bearing ones:**
+    **Still open:**
 
-    - **Does a carried-forward slot count as FILLED?** `REQ-PIPE-062`
-      criterion 6 says a slot is filled only where a supply has been
-      PROMOTED into it, and here nothing was. Say filled, and a late
-      supply arriving afterwards hits a filled slot and is held for a
-      human, which may well be right. Say unfilled, and the slot stays
-      overdue forever despite a human having explicitly settled it. A
-      third state - decided, not filled - may be the honest answer, and
-      it is not free: every rollup, every overdue calculation and every
-      status count would need to know about it.
-    - **What happens when the supply turns up anyway?** The carry-
-      forward has to be reversible - repoint the view at the real data
-      once it is promoted - and that is a second decision, not an
-      automatic consequence, or an arrival could silently overwrite a
-      human's call.
-    - **What does QA say about a carried-forward period?** There is no
-      supply, so there are no check results. The period cannot be green
-      (nothing was checked), and red is wrong (nothing is broken).
-      Keith's own view is that the dashboard does not NEED to know about
-      this, and that it would not hurt if it did - but the dashboard
-      already renders a status per dataset per period, so it will show
-      that period as SOMETHING. Deciding what, rather than discovering
-      it, is the work.
+    - **How it appears in the dashboard, mechanically** - Keith's own
+      open question: does the carried-forward period appear as a table
+      in its own right that we re-QA (which it is, physically - a view
+      with real check results against it), or as a period that CALLS
+      OUT that it is pointing elsewhere? The qualifier chip settles the
+      LABELLING; this is about whether the period has its own row of
+      check results or borrows the previous period's.
     - **Does the carry-forward chain?** Two consecutive missed periods:
       does period 3 point at period 2's view, or straight through to
       period 1's real table? A chain of views is fragile and a resolved
       pointer is a second thing to keep correct.
     - **Which sprint.** It needs schema-per-period (sprint 13) to have a
-      period schema to create the view in, and the decision log (sprint
-      12) to record the decision, so it cannot land before either.
+      period schema to create the view in, the decision log (sprint 12)
+      to record the decision and carry the Issues write path, and
+      arrival classification (sprint 10) to know a supply is late in
+      the first place.
+
+    **Correction recorded rather than silently overwritten**, because
+    the wrong version was written into this file first and a later
+    reader may have seen it. The original entry said this was the first
+    decision in the model whose write path was deliberately NOT GitHub
+    Issues, reasoning that a dataset which never arrived produces no
+    arrival, no QA run and therefore no trigger. That reasoning looks
+    sound and is wrong: **lateness is itself the trigger**, and the
+    model already detects it. Worth keeping visible because the same
+    mistake - concluding that an absence cannot raise an event - would
+    be easy to make again.
 
 **Why the dashboard sprints come last**: they render everything above.
 Building them earlier means building against a data shape still moving -
