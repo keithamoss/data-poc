@@ -7285,7 +7285,7 @@ requirements:
       - "WHEN the configuration gate runs, THE SYSTEM SHALL fail if any filename in the committed delivery history matches more than one dataset's arrival pattern."
       - "IF a file matches more than one dataset's arrival pattern, THEN THE SYSTEM SHALL hold that file for a human, SHALL NOT attribute it to any dataset, SHALL report it at no lower than WARNING level, and SHALL NOT fail the delivery or the run."
       - "THE SYSTEM SHALL report a file matching no pattern as unrecognised, and SHALL NOT attribute it by elimination, by proximity or by the collections the rest of the delivery belongs to."
-      - "THE SYSTEM SHALL allow one dataset's pattern to match more than one file in a single delivery, and SHALL NOT silently take one of them."
+      - "THE SYSTEM SHALL allow one dataset's pattern to MATCH more than one file in a single delivery without erroring, and SHALL NOT silently take one of them, WHERE what then happens to those files is REQ-PIPE-059's hold rather than acceptance of both."
       - "THE SYSTEM SHALL record, with each attributed file, which dataset's pattern attributed it."
       - "THE SYSTEM SHALL expose the pattern gate through mothman check."
     non_functional_requirements:
@@ -7394,6 +7394,9 @@ requirements:
   - id: REQ-PIPE-059
     title: Two files for one dataset in one delivery are held, never chosen between
     date_written: "2026-09-23"
+    signed_off:
+      by: Keith
+      date: "2026-09-24"
     story: "As an operator, I want the pipeline to stop and ask when one delivery contains two files that could both be the same table, so that a supplier's second file is never dropped by whichever one the loop happened to see last."
     moscow: must
     status: not_started
@@ -7452,6 +7455,51 @@ requirements:
         a referential check against it. Holding one table reddens checks
         on others; the blast radius is not zero, it is scoped to what
         actually depends on the held thing.
+
+      - >
+        SETTLED 2026-09-24 (Keith): HOLD EVERY TIME, including the
+        legitimate split extract, and accept the recurring cost. A
+        supplier who routinely splits one table generates a hold per
+        period, per dataset, indefinitely - he chose this knowing that,
+        because a proper splitting mechanism is the real answer and a
+        hold is the honest placeholder until one exists.
+      - >
+        Two real supply shapes are therefore explicitly OUT OF SCOPE for
+        this PoC, both landing in this hold today and both logged as
+        future requirements - plans/running-thoughts.md #39 (a supplier
+        splits one table across several files, which we would stitch
+        back together on load) and #40 (DELTA supplies, a dataset
+        arriving as add/update/delete files rather than a full table).
+        Keith's own words on both: "develop a proper splitting mechanism
+        and deltas later".
+      - >
+        The delta shape is the larger of the two and is flagged here
+        rather than only in the thought, because it contradicts this
+        requirement's own foundation. A split extract is still one table
+        VERSION cut into pieces. A delta is not a table version at all -
+        it is a change set against a previous state - so "a supply is
+        one table version", which is what justifies holding rather than
+        merging, stops being true. Promotion, drift and the meaning of a
+        green verdict all change with it.
+      - >
+        Recorded because the repo now carries a real, deliberate tension
+        that will otherwise read as a defect: docs/delivery-format.md
+        lists two files matching one dataset's pattern as one of three
+        shapes a delivery may LEGITIMATELY contain. That stays true of
+        what we may RECEIVE. What this requirement settles is that we
+        will not PROCESS one unattended, which is a different claim -
+        and the format doc now says so inline.
+      - >
+        REJECTED, for now rather than on principle, letting a dataset
+        DECLARE that it arrives in parts: a config flag, parts
+        concatenated on load, a single file then being the anomaly. It
+        handles real split extracts cleanly but reintroduces exactly the
+        merging this requirement rejects as manufacturing a supply that
+        never arrived, so it needs a stated reason rather than being
+        slipped in as configuration. ALSO REJECTED for now: hold once,
+        remember the resolution, stop asking. Best ergonomics of the
+        three and the likeliest eventual answer, but it needs the
+        decision log from sprint 12 to exist first.
 
   - id: REQ-PIPE-060
     title: Staging asserts only arrival facts, and a table is there or it is not

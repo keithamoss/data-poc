@@ -90,6 +90,18 @@ generator can emit on purpose so recognition is tested against them:
 | A file matching no pattern | `readme.txt`, `notes.pdf` | Suppliers include covering notes |
 | A file unparseable as the format its name claims | a `.csv` holding HTML | Truncated uploads, error pages saved as data |
 
+**Legitimate to RECEIVE is not the same as processed unattended**, and
+the first row is where the two part company. A delivery carrying two
+files for one dataset is HELD for a human every time - `REQ-PIPE-059`,
+Keith's call 2026-09-24 - because nothing here can tell a split extract
+apart from a duplicate, a wrong file or two periods of the same table,
+and every rule for choosing between them drops a file the supplier will
+later say they sent.
+
+Assembling split extracts properly, and the related shape where a
+dataset arrives as add/update/delete DELTA files, are both deliberately
+out of scope for this PoC. See `plans/running-thoughts.md` #39 and #40.
+
 ## The receipt record is ours
 
 ```json

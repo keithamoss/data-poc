@@ -2052,3 +2052,63 @@ delivery with files and no receipt means the boundary has not closed
 yet, so it is the NORMAL state of every delivery until it does - which
 is why that requirement skips it as in-flight and reports it
 informationally rather than treating it as an anomaly.
+
+39. **[todo, 2026-09-24]** **[Pipeline & publishing]** A supplier splits
+one table across several files, and we stitch them back together on
+load.
+
+Keith's own ask, 2026-09-24, raised while signing off `REQ-PIPE-059`.
+His words: "the supplier splits it into three parts to assemble it and
+we need to stitch it back together as part of loading it into staging."
+
+**Explicitly OUT of scope for this PoC.** `REQ-PIPE-059` holds every
+such delivery for a human, every time, which Keith chose knowing the
+cost - a supplier who routinely splits an extract generates a hold per
+period, per dataset, indefinitely. A proper splitting mechanism is the
+answer; a hold is the honest placeholder until one exists.
+
+**The tension this leaves in the repo, worth knowing before it is read
+as a defect.** `docs/delivery-format.md` lists "two files matching one
+dataset's pattern - suppliers split large extracts" as one of three
+shapes a delivery may LEGITIMATELY contain. That stays true of what we
+may RECEIVE. What `REQ-PIPE-059` settles is that we will not process one
+unattended, which is a different claim.
+
+**What a real requirement here would have to answer**, none of which is
+settled: how a dataset DECLARES that it arrives in parts (a config flag,
+or a resolution a human records once); whether the parts are concatenated
+on load, which is the merging `REQ-PIPE-059` explicitly rejected as
+"manufacturing a supply that never arrived" and would need a stated
+reason to be acceptable here; whether a MISSING part is detectable at all
+(three of three versus two of three is invisible without the supplier
+saying so, which is the declared-manifest shape Thread B rejected); and
+what ORDER means when the parts carry no sequence beyond their filenames.
+
+40. **[todo, 2026-09-24]** **[Pipeline & publishing]** Delta supplies -
+a delivery carrying adds, updates and deletes rather than a full table.
+
+Keith's own ask, 2026-09-24, in the same breath as #39 and the same
+shape of problem: "files with add/update/delete or maybe add+update/
+delete." So one dataset may arrive as two or three files in one
+delivery, split by OPERATION rather than by size.
+
+**Explicitly OUT of scope for this PoC**, same as #39, and it falls into
+the same `REQ-PIPE-059` hold today - several files matching one
+dataset's pattern, held for a human.
+
+**Why it is a bigger change than #39 rather than a variant of it.** A
+split extract is still one table version cut into pieces, so stitching
+restores the thing that arrived. A delta is NOT a table version at all -
+it is a change SET against a previous state, which breaks the model's
+own central assertion that "a supply is one table VERSION". Everything
+downstream leans on that: promotion replaces a table, drift compares
+this period's table to last period's, and a QA verdict is about the
+table as supplied. None of those mean the same thing when what arrived
+is 400 deletes.
+
+**Questions a real requirement would have to answer:** whether a delta
+is applied to the promoted table before QA or QA'd as the delta itself;
+what a green verdict on a delta even asserts; what happens when a delta
+arrives for a period whose base was never promoted; and whether the
+apply is reversible, since demotion currently means swapping a table
+back rather than un-applying changes to one.
