@@ -7389,7 +7389,7 @@ requirements:
       - "WHERE a delivery holds files attributed to more than one collection, THE SYSTEM SHALL attribute each file on its own dataset's terms, and SHALL NOT hold, reject or fail the delivery for spanning collections."
       - "THE SYSTEM SHALL record every artefact it declined to act on alongside the delivery it came in, so that a supplier changing their extract is visible rather than silent."
       - "WHERE no deliveries are present at all, THE SYSTEM SHALL report no arrivals and SHALL NOT fail."
-      - "THE SYSTEM SHALL expose delivery recognition through a mothman subcommand."
+      - "THE SYSTEM SHALL expose delivery recognition as a subcommand of a mothman command group of its own, named supply, and SHALL NOT place it under a group documented as not human-facing."
     non_functional_requirements:
       - "Recognition runs on every pipeline run and reads every delivery present. At ~30 datasets with years of history this is thousands of deliveries, and today's shape re-reads the whole tree once per collection - it must scale by reading each delivery once per run, not once per collection."
       - "Recognition must work on a freshly-cloned machine where data/ does not exist at all. A test that asserts a gitignored tree is present passes locally and fails in CI - a real red on 2026-09-23 - so absence is a state to handle, not a precondition to assert."
@@ -7460,6 +7460,39 @@ requirements:
         slots, so an implementation keyed on slots passes TS-33a while
         failing TS-33b and blocks auto-promotion on every healthy
         multi-table delivery.
+      - >
+        SETTLED 2026-09-24 (Keith): the new supply commands live in a
+        MOTHMAN COMMAND GROUP OF THEIR OWN, named `supply`, Tier 1 -
+        not folded into `pipeline`, not bolted onto `schedule`. This
+        requirement's recognition command and REQ-PIPE-060's staging
+        load are its first two members; the human-action queue and
+        sprint 12's decision commands join it.
+      - >
+        The argument had already run once and is recorded on
+        REQ-PIPE-050, which this decision follows rather than re-derives:
+        delivery-architect argued for folding into `pipeline` on
+        taxonomy grounds and lost, because cli/pipeline.py's own
+        docstring calls that group "not human-facing - for integration
+        tests and for yourself", and someone draining a hold queue is
+        exactly a human. That decision ALSO rejected the obvious
+        compromise by name - "fold in now, move to a `mothman supply`
+        group when batches 3-6 justify one - because moving a command
+        later breaks whatever docs and muscle memory have formed, and
+        renames are how a CLI surface rots". This is that batch, and
+        that is the group it named.
+      - >
+        Rejected extending `mothman schedule` into a broader supply
+        group, which would reuse a Tier 1 group a person is already in:
+        its docstring states "Everything here is CONFIG ONLY. Nothing
+        opens data/", and recognition and staging both open data/, so it
+        would break that group's stated invariant.
+      - >
+        NAMING CAVEAT, accepted knowingly: a SUPPLY is the per-dataset
+        unit and a DELIVERY is the transport unit, so a group called
+        `supply` listing deliveries is a slight mismatch. Chosen anyway
+        because it is plans/supply-model.md's own word for the whole
+        model, and because REQ-PIPE-050's decision had already
+        anticipated that exact name.
 
       - >
         SETTLED 2026-09-24 (Keith): a delivery with no receipt is
@@ -7795,7 +7828,7 @@ requirements:
       - "THE SYSTEM SHALL NOT run two writing processes against one database file at the same time, and WHERE staging would otherwise fan out across parallel workers, THE SYSTEM SHALL stage sequentially."
       - "THE SYSTEM SHALL trigger checks from the arrival of a delivery, and SHALL NOT trigger them from a promotion."
       - "THE SYSTEM SHALL use only our own receipt instant as a supply's arrival time, and SHALL NOT use a timestamp inside the supplier's files, a column in their data or a file modification time."
-      - "THE SYSTEM SHALL expose the staging load through a mothman subcommand."
+      - "THE SYSTEM SHALL expose the staging load as a subcommand of the mothman supply group."
 
       - "THE SYSTEM SHALL record each table's load outcome as its own committed record, written only after that table's load is durable."
       - "THE SYSTEM SHALL NOT write a table's load record before its load is durable."
