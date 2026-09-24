@@ -858,11 +858,29 @@ just now, not by reading the critic's transcript.
     be processed.
 
     **Cost:** small - one conditional, or dropping the clause.
-    **Keith's call, two options,** and the critic's Q1 is the right
-    framing: make the headline conditional on runway, or keep the OK
-    line as a statement about config validity alone and drop the
-    "every one of them expecting something" clause, which is the part
-    that reads as a claim about the present.
+
+    **SIGNED OFF AND FIXED, 2026-09-24 - Keith chose option (b)**: keep
+    the headline as a statement about configuration validity and drop
+    the clause. It now reads `schedule validation OK - 2 calendar(s),
+    7 dataset(s), no configuration errors.`
+
+    **Rejected: making the headline runway-aware**, the other option on
+    the table. Config validity and remaining runway are deliberately
+    separate concerns in this gate - one fails the build and the other
+    must never do - and a headline speaking for both is exactly where
+    they would get confused.
+
+    **Failing test first**, `tests/test_validate_schedule.py::
+    TestTheSuccessLineDoesNotContradictTheWarningBelowIt`. It drives the
+    real gate against the REAL committed config with the asset clock
+    moved past the quarterly calendar's last authored period, so the
+    genuine exhausted warning fires, and asserts the headline makes no
+    claim the warning contradicts. Two sibling tests guard the
+    preconditions: that the gate still passes and the warning still
+    fires - without which there is nothing to contradict - and that
+    dropping the clause did not leave a bare "OK", since the counts are
+    what tell a reader the gate read the whole file rather than falling
+    out early.
 
 18. **[todo, 2026-09-24]** **[Testing & dev tooling]** **[A2] The
     header's dataset count is not the number of datasets affected.**

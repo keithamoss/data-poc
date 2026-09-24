@@ -737,8 +737,24 @@ def main(src: Source | None = None) -> int:
 
     n_calendars = len(schedule.calendars())
     n_datasets = len(list(_walk_datasets(yaml.safe_load(src.asset_path.read_text()))))
+    # A STATEMENT ABOUT THE CONFIGURATION, NOT ABOUT TODAY
+    # (plans/post-build-review.md #17, Keith's call 2026-09-24).
+    #
+    # This line used to end "every one of them expecting something",
+    # and that was a claim the gate had not checked.
+    # _expects_nothing_errors asks whether a dataset derives zero
+    # periods EVER; the clause generalised it into a claim about NOW,
+    # and the two part company the moment a calendar runs out - at
+    # which point the first line of this gate's output asserted the
+    # opposite of the warning printed three lines below it, which is
+    # the false-green shape runway.py's own docstring opens with.
+    #
+    # Rejected: making the headline runway-aware. Config validity and
+    # remaining runway are deliberately separate concerns here - one
+    # fails the build and the other must never do - and a headline that
+    # spoke for both would be the place they got confused.
     print(f"schedule validation OK - {n_calendars} calendar(s), {n_datasets} dataset(s), "
-          f"every one of them expecting something.")
+          f"no configuration errors.")
 
     # LOW RUNWAY IS A WARNING AND RETURNS 0, permanently (REQ-PIPE-053).
     # A non-fatal warning that fails a build gets disabled, and then it

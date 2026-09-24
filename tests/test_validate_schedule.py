@@ -508,3 +508,55 @@ class TestAPastDateCannotMoveQuietly:
         assert len(git_calls) == 1, git_calls
         assert git_calls[0][1] == "show"
         assert git_calls[0][2].startswith("HEAD~1:")
+
+
+class TestTheSuccessLineDoesNotContradictTheWarningBelowIt:
+    """post-build-review #17, Keith's option (b), 2026-09-24.
+
+    The gate's OK line used to end "every one of them expecting
+    something". `_expects_nothing_errors` asks whether a dataset derives
+    zero periods EVER; that clause generalises it into a claim about
+    NOW, and the two part company the moment a calendar runs out - at
+    which point the first line of the gate's output asserts the opposite
+    of the warning three lines below it.
+
+    Keith's call was to keep the headline as a statement about
+    configuration validity, which is what the gate actually checks, and
+    drop the clause - rather than make the headline runway-aware, which
+    would merge two concerns the code deliberately separates.
+    """
+
+    def _run_past_the_last_authored_date(self, monkeypatch, capsys):
+        from qa_tools.common import asset_time
+
+        # Past the quarterly calendar's last authored period, so the
+        # real exhausted warning fires against the REAL committed
+        # config - the state the contradiction actually appears in.
+        monkeypatch.setattr(
+            asset_time, "now",
+            lambda: asset_time.wall_clock(date(2028, 6, 1), "09:00"))
+        code = validate_schedule.main()
+        captured = capsys.readouterr()
+        return code, captured.out, captured.err
+
+    def test_the_gate_still_passes_and_the_warning_still_fires(self, monkeypatch, capsys):
+        """Precondition for the test below: without the warning there is
+        nothing for the headline to contradict."""
+        code, _out, err = self._run_past_the_last_authored_date(monkeypatch, capsys)
+        assert code == 0
+        assert "cannot be processed" in err
+
+    def test_the_headline_makes_no_claim_about_what_datasets_expect_now(
+            self, monkeypatch, capsys):
+        _code, out, err = self._run_past_the_last_authored_date(monkeypatch, capsys)
+        assert "cannot be processed" in err, "precondition - the exhausted warning must fire"
+        assert "expecting something" not in out, (
+            f"the gate's success line claims every dataset is expecting something while the "
+            f"warning below it says some cannot be processed at all:\n  {out.strip()}")
+
+    def test_the_headline_still_says_what_it_checked(self, monkeypatch, capsys):
+        """Dropping the clause must not leave a bare "OK" - the counts
+        are what tell a reader the gate looked at the whole file rather
+        than falling out early."""
+        _code, out, _err = self._run_past_the_last_authored_date(monkeypatch, capsys)
+        assert "calendar(s)" in out and "dataset(s)" in out

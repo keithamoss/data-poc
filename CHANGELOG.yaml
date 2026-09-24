@@ -130,6 +130,15 @@ releases:
               date instead. It now keeps counting in weeks, months and
               years, so you can tell at a glance how long ago something
               was QA'd without working it out.
+          - headline: The schedule check no longer contradicts its own warning
+            components: ["Pipeline & publishing"]
+            description: >
+              When a delivery calendar had run out of dates, the check
+              said every dataset was expecting a supply immediately above
+              a warning that six of them could not be processed. It now
+              reports what it actually checked - that the configuration
+              itself is sound - and leaves the warning to speak for
+              itself.
           - headline: One ended schedule is no longer announced twice
             components: ["Dashboard UI"]
             description: >
