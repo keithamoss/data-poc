@@ -491,3 +491,75 @@ anything here that turns into real build work becomes a requirement in
    question numerically for high-cardinality columns where a histogram
    would be unreadable. Worth designing the two together so they do not
    end up as two unrelated treatments of one concern.
+
+10. **[investigate, 2026-09-24]** **[Dashboard UI]** **[QA checks &
+    contract]** **An invalid-values check should say WHICH values were
+    invalid and how many of each - and mostly it already can, for six
+    columns out of everything.** Keith's own ask, 2026-09-24: a table, a
+    histogram, a bar chart, whatever - just be clear what was wrong and
+    how much of it there was.
+
+    **It already exists, which reframes this from "build it" to "why did
+    you not see it".** `aggregateValuesBlock()` in the template renders,
+    inside the check panel's Row-level detail section:
+
+    - **categorical** - "Invalid values seen, current run (N row(s))",
+      then one labelled bar per distinct invalid value with its count.
+      That is exactly what was asked for.
+    - **numeric/date** - earliest bad value, latest bad value, distinct
+      count, then a bucketed histogram of the failing values.
+    - **sensitive columns** - suppressed behind a lock with only the
+      count, which is the right default and worth not losing.
+
+    **The gap is COVERAGE, and it is a hand-maintained allowlist.**
+    `AGGREGATE_SPEC` in `qa_tools/bdm/dataset_stats.py` and
+    `qa_tools/cp/dataset_stats.py` names **six column entries in total**
+    - BDM's `sex`, `place_of_birth_suburb`, `date_of_birth`; CP's
+    `(cp_clients, postcode)`, `(cp_clients, date_of_birth)`,
+    `(cp_notifications, concern_type)`. Against that, the two SodaCL
+    files alone carry **19 `invalid_percent` checks** (8 BDM, 11 CP),
+    before counting the dbt and datacontract equivalents. Every check
+    outside the allowlist renders no value breakdown at all, silently -
+    there is no "not available for this check" line the way the
+    failing-row sample block has one.
+
+    **A second entry gate on top of the first**: each spec carries a
+    `check_names` set, so even a covered column shows nothing unless the
+    check's own name is in it - and the naming is already inconsistent
+    between the two files (`"invalid_percent[all]"` in BDM,
+    `"invalid_percent"` in CP). A check renamed, or a new tool reporting
+    the same column under a different name, drops out with no signal.
+
+    **And the validity rule is DUPLICATED, which is the part that will
+    bite.** Each spec carries its own hand-written `invalid_condition`
+    SQL restating what the check already declares - `_SUBURB_VALID`,
+    `_SEX_VALID`, `_POSTCODE_VALID`, `_CONCERN_TYPE_VALID` are literal
+    re-copies of lists that also live in the SodaCL checks and the ODCS
+    contract. **Checked 2026-09-24: they are in sync today** - suburb 51
+    values both sides, no difference either way; sex identical - so this
+    is a latent risk rather than a live bug. But nothing gates them
+    against each other, and the failure is quiet in a nasty way: the
+    panel would confidently draw a value breakdown computed from a stale
+    list while the check's own verdict used the current one, so the
+    numbers on screen would disagree with the status beside them. Same
+    family as `CLAUDE.md`'s "enumerate every consumer" bullet.
+
+    **So the real work is probably not a new chart.** It is deriving the
+    aggregate from the check's own declared validity rule instead of a
+    parallel hand-written one, so coverage follows the checks
+    automatically and there is one copy of the truth - with the
+    sensitive-column suppression preserved, since that is a deliberate
+    decision and not an omission. Worth checking against item 9 before
+    building either: that one wants a distribution of ALL values current
+    versus previous, this one wants a distribution of the INVALID ones,
+    and they are close enough that two unrelated implementations would
+    be a mistake.
+
+    Open: whether an uncovered check should say so rather than render
+    nothing (the failing-row sample block already sets that precedent);
+    whether every column can have one or whether some genuinely should
+    not (a free-text name column's invalid values are close to
+    row-level data, which is the line
+    `docs/remediation-workflow-design.md` draws); and whether the
+    breakdown should also show the compared run, which is item 9's
+    question arriving from the other direction.
