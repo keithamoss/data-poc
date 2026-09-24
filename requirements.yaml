@@ -7899,6 +7899,9 @@ requirements:
   - id: REQ-PIPE-064
     title: When nothing is confidently claimable, hold it for a human
     date_written: "2026-09-23"
+    signed_off:
+      by: Keith
+      date: "2026-09-24"
     story: "As an operator, I want the pipeline to say it does not know where a supply belongs rather than putting it somewhere plausible, so that the one thing it can never do is start a cascade by guessing forward."
     moscow: must
     status: not_started
@@ -7926,7 +7929,7 @@ requirements:
 
       - >
         SETTLED 2026-09-24 (Keith), answering the open question this
-        requirement carried, and REQ-PIPE-064's identical one, together.
+        requirement carried, and REQ-PIPE-059's identical one, together.
         A held supply IS LOADED into staging but is NOT QA'd
         automatically. Keith's reasoning, which is sharper than the
         options as drafted: the single-table checks could run without a
@@ -7945,18 +7948,25 @@ requirements:
         hold. The write path itself belongs with the decision log in
         sprint 12.
       - >
-        What the run actually does meanwhile, worked through on Keith's
-        own eight-file Child Protection example (cp_clients and
-        cp_placements each arriving twice): the two duplicated datasets
-        get no view, because REQ-PIPE-035 now forbids choosing between
-        candidates, so they are unqueryable for that run. The other four
-        datasets are processed, assigned and QA'd normally. Any
-        cross-table check reading a held table reads RED naming it -
-        which for cp_clients is real and not hypothetical, since
+        WHAT HOLDING COSTS, stated generally because it applies to every
+        hold in this model, not only to this requirement's trigger. A
+        held table gets NO VIEW, because REQ-PIPE-035 forbids choosing
+        between candidates, so it is unqueryable for that run. Every
+        other dataset in the delivery is processed, assigned and QA'd
+        normally. But any cross-table check READING a held table reads
+        RED naming it - so holding one table reddens checks on others.
+        The blast radius is not zero; it is scoped to what actually
+        depends on the held thing.
+      - >
+        The worked example behind that is Keith's eight-file Child
+        Protection case - cp_clients and cp_placements each arriving
+        twice - and it belongs to REQ-PIPE-059's duplicate-file hold,
+        NOT to this requirement's own trigger, which is a supply no slot
+        can claim. Noted because the two holds share consequences and a
+        reader could otherwise take the example as describing this rule.
+        Its cp_clients detail is real rather than hypothetical:
         cp_notifications, cp_investigations and cp_placements all carry
-        a referential check against it. Holding one table reddens checks
-        on others; the blast radius is not zero, it is scoped to what
-        actually depends on the held thing.
+        a referential check against it.
 
   - id: REQ-PIPE-065
     title: An uncertain assignment says it is uncertain, and an arrival into a filled slot is reported
