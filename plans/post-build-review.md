@@ -672,6 +672,10 @@ post-build critic should see a requirement's own `evidence:`.
    requirement, not a new feature - and see #21, which asks what the
    register should have recorded.
 
+   **SIGNED OFF 2026-09-25** - "we should rectify that, yep, definitely
+   actually build that." To build, as the missed criterion it is rather
+   than as a new feature.
+
 3. **[todo, 2026-09-24]** **[Dashboard UI]** **[F3] Every date on the
    page renders in the VIEWER's timezone, not the asset's.** For any
    viewer west of UTC the displayed date is a day early, silently.
@@ -740,6 +744,28 @@ post-build critic should see a requirement's own `evidence:`.
    **Recommendation:** worth a requirement of its own. At 30 datasets
    this is the most likely of anything in this file to become a real
    false-green incident.
+
+   **SIGNED OFF 2026-09-25, with a design direction from Keith**: "yes,
+   we should definitely flag clearly that the column has no checks. I
+   feel like maybe a grey, as in like a disabled kind of grey colour is
+   the one to go for there - kind of speaks to it's inactive."
+
+   So the answer is NOT amber or red. A column nobody checks is not
+   failing and not warning - it is **inactive**, and disabled-grey is a
+   vocabulary a reader already has for that. It also cannot be mistaken
+   for a verdict, which is exactly what green was being mistaken for.
+
+   **That makes it a sixth status rather than a colour swap**, and
+   `REQ-QAC-047` owns the status vocabulary - so it lands in
+   `statusVocabulary()`, `STATUS_LABEL`, the pill CSS, the legend
+   (which #56 already says names three of five) and the Python twin in
+   `dataset_status.py`, held to the same `status-cases.json` table.
+
+   **The question the build has to answer**, noted now rather than
+   discovered later: what a column whose only check is inactive ROLLS
+   UP to. It must not win a `worstOf()` against a real verdict, and it
+   must not silently vanish either - which is precisely the shape
+   already settled for `nodata`.
 
 5. **[done, 2026-09-24]** **[Dashboard UI]** **[F5] An uncaught
    `TypeError` on three of seven datasets, at the DEFAULT as-of, on an
@@ -939,6 +965,33 @@ post-build critic should see a requirement's own `evidence:`.
     already knows how to build - real work across five render
     functions, and a change to what a click does at every tier, rather
     than a patch. Worth its own conversation.
+
+    **SIGNED OFF 2026-09-25, and stated as a principle rather than a
+    fix.** Keith's own words: "yes, there should be links everywhere.
+    Everything should be an actual link. Nothing should be a magic
+    JavaScript link or magic JavaScript button."
+
+    That is wider than this finding, so it is recorded as the rule it
+    is: **anything that navigates is an `<a href>` carrying the route
+    it goes to.** Breadcrumbs, agency cards, dataset rows, column
+    tiles, check rows. A `<button>` stays a button only where it
+    performs an ACTION rather than a navigation - opening a panel,
+    toggling the theme, picking a date.
+
+    **What it buys beyond the middle-click:** the browser gets to do
+    its own job. Ctrl-click, open-in-new-tab, copy-link-address,
+    hover-to-see-the-target, and a real link for anything that scrapes
+    or archives the page. It also removes the keyboard question - a
+    link is focusable and Enter-able with no `tabindex` and no keydown
+    handler, so #8's row fix becomes a simpler thing rather than a
+    cleverer one.
+
+    **The thing to get right in the build:** a real `<a href>` is still
+    intercepted for the SPA route, and the interception must let the
+    browser win when the user asks it to - never `preventDefault` on a
+    middle click or a Ctrl/Cmd/Shift click. Intercepting
+    unconditionally is how a link becomes a magic JavaScript button
+    wearing an `<a>`, which is the thing this decision is against.
 
 11. **[todo, 2026-09-24]** **[Dashboard UI]** **[U4] A stale column or
     check deep link fails silently** - lands on the dataset page with no
@@ -1584,6 +1637,12 @@ things the critics tried to break and could not.
     is right - it is a call about how this project keeps its own
     records, and it belongs with Keith.
 
+    **Keith, 2026-09-25: "I'm open to that. Give me a proposal."** The
+    proposal is summarised here so it does not live only in a chat log:
+    add an optional `unmet_criteria:` list to a requirement - each
+    entry naming the criterion, why it is unmet and who owns it next -
+    rather than adding a third status. Awaiting his yes.
+
 ### From `delivery-critic` (functional, 2026-09-24)
 
 Four of its findings are the same defects the dashboard UX critic
@@ -1679,6 +1738,16 @@ here as its own question, not acted on.
     **Cost:** small for the first. The second is a judgement about how
     loudly a browser should fail, which is the same question #5 raises
     from the other side.
+
+    **SPLIT 2026-09-25, at Keith's direction.** The guard's
+    `date.today()` half moves to **#44**, which is the same guard and
+    the same conversation - "sure, happy for you to put it in 44 and
+    then address it there".
+
+    **What stays here is the dashboard half**: `assetTodayDateStr()`
+    falling back silently to UTC when `ASSET_TIMEZONE` is null or the
+    zone name does not resolve. Still open, still mine, and still the
+    smaller of the two.
 
 36. **[todo, 2026-09-24]** **[QA checks & contract, Pipeline & publishing]** **[A5] Hierarchy identifiers are still restated inline
     across many modules, and the requirement's own evidence says the
@@ -1850,6 +1919,9 @@ here as its own question, not acted on.
     **Cost:** small. **Recommendation: fix** - it is the same
     "no permissive fallback" stance `CLAUDE.md` takes elsewhere.
 
+    **SIGNED OFF 2026-09-25** - "yep, we should definitely raise on
+    unknown collection id." To build.
+
 42. **[todo, 2026-09-24]** **[Pipeline & publishing]** **[B6] The claim
     window is not effective-dated, so a new calendar version moves
     history.**
@@ -1870,6 +1942,47 @@ here as its own question, not acted on.
     **Cost:** moderate - it needs the same effect-window resolution the
     dates already have. **Recommendation: fix**, and it is a real
     correctness bug rather than a polish item, so a failing test first.
+
+    **ANSWERED 2026-09-25 - Keith asked whether `REQ-PIPE-051` fixes
+    this once built, or whether Thread E already has a solution.**
+
+    **051 is already built, and it does not fix this - deliberately.**
+    Its criterion 5 says the system "SHALL NOT attach a due instant, a
+    grace allowance or a CLAIM WINDOW to a period". Scoping the claim
+    window out of periods is correct: it belongs to the slot, not the
+    period. So this is not an oversight in 051, it is a boundary 051
+    drew on purpose.
+
+    **But 051 states the principle this needs, in its own criterion 9**
+    - "SHALL evaluate each period against the version of its own
+    calendar in force on that period's own date" - and BUILT the
+    mechanism, `_effect_windows()`. `periods_for_calendar()`'s own
+    docstring describes an identical bug it already fixed for dates:
+    reading `calendar.current` for the whole sequence, so adding a 2027
+    version did not move the earlier periods, it REPLACED them, and
+    four years of history ceased to exist.
+
+    **`claim_window()` is that same bug in the layer 051 handed to
+    052.** `REQ-PIPE-052` criterion 10 says a slot takes its claim
+    window "from its dataset's own contract where one is declared and
+    from its calendar's default otherwise" - and is silent on WHICH
+    VERSION. Today's code satisfies it by reading `.current`, so the
+    criterion is not broken, it is underspecified.
+
+    **Thread E does not solve it either - it RAISES THE STAKES.** Its
+    settled assignment rule is "assign to the oldest slot whose CLAIM
+    WINDOW is open and which is unfilled", so the claim window is not a
+    display detail, it is the input to slot assignment. A claim window
+    that moves retroactively means re-deriving a past assignment can
+    give a different answer than the one history was filed under - the
+    cascading misassignment Thread E exists to prevent, arriving
+    through configuration rather than through the rule.
+
+    **So: no existing requirement fixes it, the mechanism is already
+    built, and the fix is to apply `_effect_windows()` to the claim
+    window as well as to the dates** - plus tightening 052's criterion
+    10 to name the version, which touches `requirements.yaml`'s own
+    claims and so is Keith's.
 
 43. **[done, 2026-09-24]** **[Testing & dev tooling]** **[C1/C3/C4] Two
     gates claimed to catch "a throw reaching a viewer" do not, and the
@@ -1970,6 +2083,27 @@ here as its own question, not acted on.
     Both are reasonable simplifications for a "say what you did" gate.
     Neither is written down, and the requirement's decision prose reads
     as though the guard is complete.
+
+    **Keith, 2026-09-25: "that's a pretty weak guard there, we can't
+    really rely on that. What are the options?"** Three, in the reply
+    of the same date and summarised here:
+
+    - **(a) Widen the diff.** Check the whole push range rather than
+      `HEAD~1`, and stop letting any changelog edit clear the finding.
+      Cheapest; still depends on how CI happens to be checked out.
+    - **(b) Compare against the base branch** so the unit is the whole
+      change rather than one commit. Catches a date moved and
+      "un-moved" across commits.
+    - **(c) Seal elapsed versions.** Commit a fingerprint of each
+      calendar version's authored dates once its window has elapsed;
+      the gate compares the file against the seal and never reads git
+      history at all. Works at any fetch depth, in any push shape, on
+      any checkout.
+
+    **#35 IS FOLDED IN HERE**, at Keith's own direction the same day -
+    the guard's `date.today()` reads the RUNNER's clock, so for about a
+    third of each Perth day it classifies a date on the wrong side of
+    "today". Same guard, same conversation, one fix.
 
     **Cost:** small to document, larger to close. **Recommendation:**
     decide which, and write down whichever is chosen - an
@@ -2100,6 +2234,25 @@ twice. It deliberately did not re-find the `TypeError`.
     failing); or log it as a standing accessibility item across every
     muted token, since the footer (#54) and `--ink-faint` generally
     have the same problem and fixing one pill leaves the pattern.
+
+    **DECIDED 2026-09-25: NOT FIXING the text contrast.** Keith's own
+    words: "let's not fix that, I'm happy to take the hit to
+    accessibility." The border half was fixed on 2026-09-24 and stays
+    fixed, so what is declined is specifically raising `--ink-faint` -
+    the `nodata` label at 2.81:1 light / 3.55:1 dark, and the footer at
+    3.03:1 / 4.16:1 (#54), against a 4.5:1 bar.
+
+    **One factual point was put to him once and is recorded rather than
+    re-argued**, because it is a fact about the destination rather than
+    an opinion about the design: Australian government digital services
+    are generally held to WCAG 2.1 AA, so if this PoC becomes something
+    an agency publishes, this stops being a taste question and becomes
+    a compliance one. He has that and it is his call.
+
+    **Recorded as deliberate debt, not as an open finding**, so nobody
+    re-raises it as though it were new. What it does NOT touch: the
+    keyboard and focus work (#8/#9/#10/#55) was operability rather than
+    contrast, and is unaffected.
 
 50. **[todo, 2026-09-24]** **[Dashboard UI]** **[V4] `1.5px` borders
     render as `1px`, so the intended weight difference does not exist.**
