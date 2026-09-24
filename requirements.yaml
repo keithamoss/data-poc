@@ -1170,6 +1170,150 @@ requirements:
         knowingly on 2026-09-24; redaction was raised as an alternative
         and not taken.
 
+  - id: REQ-DASH-070
+    title: Supply anomalies and outstanding decisions have one presentation, aggregated and never a data verdict
+    date_written: "2026-09-24"
+    story: >
+      As a data engineer with thirty datasets to watch, I want everything
+      that needs a person presented in one place with a count, and
+      everything that merely happened presented as what happened, so that
+      an anomaly cannot hide behind a tier's status rollup and a warning
+      cannot read as a verdict on somebody's data.
+    moscow: must
+    status: not_started
+    source: >
+      Batch 3's pre-build review, 2026-09-24. delivery-dashboard-ux found
+      that the eleven requirements of delivery sprints 7-10 emit at least
+      fourteen dashboard-facing obligations and NOT ONE CRITERION NAMES
+      THE DASHBOARD - every sentence describing the UI lives in an NFR or
+      a decision, none of which is checkable. delivery-architect found the
+      same gap independently. Keith's call, option (a) of two: one
+      requirement owns the presentation, drafted now rather than at
+      delivery sprint 22. See plans/supply-model.md, "Batch 3's pre-build
+      review".
+    acceptance_criteria:
+      - "THE SYSTEM SHALL present everything requiring a human decision - a held supply, a failed load, an assignment made under ambiguity, and a slot closed but unfilled - in ONE element carrying a total count, and SHALL NOT render one element per item or one element per producing rule."
+      - "THE SYSTEM SHALL render that element whatever a tier's status rollup says, and SHALL carry a per-scope count on each affected agency and collection, so that a rollup cannot absorb it."
+      - "THE SYSTEM SHALL distinguish, within that element, items that BLOCK a supply from items that merely need review, so that a non-blocking item cannot read as blocking work."
+      - "THE SYSTEM SHALL keep an item in that element until it is resolved, and SHALL NOT clear it because a later run passed over it."
+      - "THE SYSTEM SHALL present event severity - informational, warning, needs-action - distinctly from data-quality status, and SHALL NOT render event severity using the status vocabulary a check's verdict uses."
+      - "THE SYSTEM SHALL distinguish every severity by label as well as by appearance, and SHALL NOT rely on colour alone."
+      - "THE SYSTEM SHALL render a slot closed by monotonic filling and left unfilled as an obligation awaiting a decision, and SHALL NOT render it as a red data verdict."
+      - "THE SYSTEM SHALL name, for an item needing a decision, the responses available to a person, and SHALL NOT present a response that cannot yet be taken as a control."
+      - "WHERE an assignment was made under ambiguity, THE SYSTEM SHALL render that qualifier everywhere the assignment itself is rendered, and SHALL NOT render it only in the feed."
+      - "THE SYSTEM SHALL NOT render an absent, unfiled or uncertain arrival classification as a punctuality verdict, and SHALL render a classification it does not recognise as unknown."
+      - "THE SYSTEM SHALL state, where a reader meets a recomputed arrival classification, that it follows the supply's current filing."
+      - "THE SYSTEM SHALL explain an event in terms of what happened and whose task it is, and SHALL NOT attribute fault to the reader."
+      - "WHERE nothing requires a person, THE SYSTEM SHALL say so rather than rendering an empty element."
+    non_functional_requirements:
+      - >
+        This exists because six producers - REQ-PIPE-057, 058, 059, 060,
+        064 and 065 - each carry their own "report it as needing action /
+        at WARNING / as informational" criterion, while the rule governing
+        how those COMBINE sat in two NFRs on two of the six. Built
+        independently, each honours its own criterion and the aggregate
+        obligation is met by nobody. That is the unowned-IOU shape
+        CLAUDE.md already records from the batch-3 failure.
+      - >
+        At ~30 datasets the aggregation is the whole requirement, not a
+        refinement of it. REQ-PIPE-059's and REQ-PIPE-064's own NFRs say
+        it: "a banner per dataset is how people learn to ignore the whole
+        class". There is no cross-dataset view of any of this today - the
+        exec and agency tiers roll up STATUS ONLY - so without this
+        requirement every fact those eleven produce is reachable only by
+        drilling into one dataset at a time, which at 30 means nobody
+        sees them.
+      - >
+        The resolution path does not exist until delivery sprint 12, so
+        for a period this element shows work nobody can clear. That is
+        accepted for build order and is exactly why criterion 8 forbids
+        rendering a response as a control before it can be taken -
+        REQ-PIPE-064's own NFR warns that "a hold nobody can clear is
+        indistinguishable from a bug", and repeated unhelpful states
+        teach people to stop reading the thing that teaches them.
+      - >
+        Reuse the existing idioms rather than inventing a second visual
+        language. REQ-PIPE-053's own trio is the closest precedent and is
+        already the right shape: a count-led notice with no dismiss
+        control ("a dismissible notice about a task nobody has done is a
+        notice about a task nobody will do"), a per-tier marker so a
+        rollup cannot absorb it, and a pill deliberately unlike the four
+        status pills - solid border, square marker - "because this is the
+        one state that is OUR task undone rather than a verdict on
+        anybody's data", never distinguished by colour alone.
+      - >
+        This is a dashboard-build concern and may never open data/. Every
+        fact it renders is already committed by the producing requirement.
+      - >
+        The dashboard is the ONLY way to see a hold (REQ-PIPE-057's own
+        decision), and it is rebuilt by CI on push - so the latency
+        between a hold appearing and a person seeing it is a deploy.
+    dependencies: [REQ-PIPE-057, REQ-PIPE-059, REQ-PIPE-060, REQ-PIPE-063, REQ-PIPE-064, REQ-PIPE-065, REQ-PIPE-066]
+    decisions:
+      - >
+        SETTLED 2026-09-24 (Keith), option (a) of two: ONE REQUIREMENT
+        OWNS THE PRESENTATION, drafted now rather than left to delivery
+        sprint 22. Rejected leaving it to sprint 22 with each pipeline
+        requirement carrying its own presentational criteria, because six
+        independent builds would land before anything reconciled them.
+        The eleven keep only the obligation to RECORD the fact and its
+        severity; how those combine on screen is here.
+      - >
+        Recorded because it is the finding that produced this
+        requirement: the eleven emit at least fourteen dashboard-facing
+        obligations and not one criterion names the dashboard. Every
+        sentence that actually describes the UI - "a banner per dataset is
+        how people learn to ignore the whole class", "say so where a
+        reader will meet it", "the dashboard will show a permanently red
+        slot nobody can close" - lives in an NFR or a decision. A critic
+        verifies against acceptance_criteria, so none of it was checkable.
+      - >
+        TWO SURFACES, NOT ONE, and the requirements themselves force it.
+        REQ-PIPE-064's NFR asks for both "re-presented on every run until
+        resolved" and "must not become thirty banners at 30 datasets",
+        which one time-ordered feed cannot do at once: a feed is scanned
+        and discarded, a queue is drained. Put a persistent state in a
+        feed and you get either wallpaper or a hold that scrolls away.
+        This requirement owns the QUEUE; the activity feed stays a feed
+        and remains sprint 22's.
+      - >
+        REJECTED rendering event severity with the status pill
+        vocabulary, which is criterion 5's reason for existing: an
+        unrecognised artefact at WARNING must not make a reader think the
+        dataset is amber, and REQ-PIPE-057 criterion 9 says explicitly it
+        does not fail the delivery. Event severity and data-quality
+        verdict are different claims about different things.
+      - >
+        A REAL COLLISION WITH BUILT CODE, which criterion 10 exists to
+        close: arrivalStatusLabel() in the template maps anything that is
+        not early or late to green "On time", so REQ-PIPE-066's new
+        unfiled value would render as a confident punctuality verdict on
+        the Tier 2 dataset table, the Latest arrival tile and the
+        supply-history Timing column. That is item 74's exact failure
+        mode at the last transform before the user, and REQ-PIPE-066's
+        own criteria 10 and 11 do not reach it - it is neither a
+        derivation nor a deletion, it is a permissive fallback.
+      - >
+        Criterion 9 uses the qualifier-chip idiom REQ-PIPE-063's sign-off
+        already established for the carried-forward case, deliberately
+        rather than inventing a second one. An assignment marked
+        uncertain in the feed but rendered as a confident verdict on the
+        dataset page is the false-confidence problem REQ-PIPE-065's
+        MoSCoW was raised to MUST over.
+    open_questions:
+      - >
+        Whether a non-blocking review item (REQ-PIPE-065's uncertain
+        assignment) belongs in the same element as the blocking states
+        with a visible distinction, or on a separate review surface.
+        Criterion 3 assumes the former.
+      - >
+        What "reported on every run" means for REQ-PIPE-057's in-flight
+        delivery on a surface that shows state rather than a run log -
+        one row carrying a run count, or a literal row per run per
+        delivery. A derived count may or may not cross REQ-PIPE-057
+        criterion 6's prohibition on "any record of how long a delivery
+        has been present".
+
   - id: REQ-GHUB-015
     title: GitHub Issues as the QA remediation ticketing system
     story: >
