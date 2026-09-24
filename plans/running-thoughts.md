@@ -2112,3 +2112,61 @@ what a green verdict on a delta even asserts; what happens when a delta
 arrives for a period whose base was never promoted; and whether the
 apply is reversible, since demotion currently means swapping a table
 back rather than un-applying changes to one.
+
+41. **[todo, 2026-09-24]** **[Docs & process]** **[Dashboard UI]** A
+CONCEPTS page - the supply vocabulary explained, with diagrams.
+
+Keith asked on 2026-09-24 whether we had made "that concepts page that
+kind of was going to have descriptions and then some diagrams, all the
+concepts we're coming up with around like deliveries and supplies and
+slots and periods". **We had not**, and a real search found no trace of
+it ever being scoped: no `docs/concepts.md`, no dashboard tab, no
+requirement, nothing in this file's other 40 items, and nothing added or
+deleted in git history. The word "diagram" appears twice in the whole
+planning corpus, neither time about this.
+
+**That it left no trace is the point of logging it now.** He remembered
+it as something we had agreed to do, which means it was raised at least
+once and evaporated - exactly the failure `CLAUDE.md`'s "log any aside
+immediately" convention exists to prevent.
+
+**Three things already exist that keep making this look done**, and each
+is a different job:
+- `plans/supply-model.md`'s **Concept inventory** (2026-09-22) is the
+  closest, and it answers what the model INTRODUCES, CHANGES and
+  RETIRES. It is written for a builder navigating vocabulary change
+  mid-flight, who already knows the concepts and needs to know which
+  words survive. Not an explanation, and no diagrams.
+- `docs/components.md` is the 7-part COMPONENT taxonomy - a different
+  axis entirely.
+- `docs/delivery-format.md` is normative on one concept, and only its
+  physical shape on disk.
+
+So the vocabulary built across the supply-model work - delivery, supply,
+slot, period, run, staging, promotion, rejection, and now carry-forward
+(sprint 25) - is defined across threads and `requirements.yaml`'s
+`decisions:` fields, and **nowhere that explains it to a person**. That
+matters more the moment anyone else uses this.
+
+**Where it lives is a real fork, not a detail:**
+- `docs/concepts.md`, versioned beside the code, read by contributors
+  and by the `delivery-*` agents. Cheapest, and it is where
+  `docs/components.md` already sits.
+- A dashboard **Concepts tab** - a real `/concepts` URL alongside Plans
+  and Demo - so someone reading the dashboard can look up "what is a
+  slot" without a repo checkout.
+- Both, with the tab rendering the doc. The Plans tab already parses
+  committed markdown at build time (`dashboard/plans_md.py`), so the
+  second is nearly free once the first exists.
+
+**Diagrams need their own small decision**: this repo has no diagramming
+toolchain at all today. Hand-authored inline SVG (consistent with how
+the dashboard draws everything else, and works from a `file://` open),
+or a text source rendered at build time, which adds a dependency the
+"no live external dependency at render time" rule would have to be
+squared with.
+
+**Do it AFTER the supply-model sprints, not during.** Writing definitive
+descriptions of concepts whose requirements are still being signed off
+would produce a page that is wrong before it is finished - and a wrong
+glossary is worse than none, because people quote it.
