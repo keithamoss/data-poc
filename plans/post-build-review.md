@@ -90,6 +90,26 @@ three-way rather than two-way, and #9's severity depends on a claim
 about `mothman check` that turned out to be true for a different reason
 than the one given.
 
+**Where to start, if you read one thing.** Four findings are false
+greens or broken renders in code that is live right now, and they are
+the four this session would put in front of you first:
+
+| # | What | Cost |
+|---|---|---|
+| **#5** | An uncaught `TypeError` on three of seven dataset pages, at the default as-of, dropping the Supply History panel - shipping past a gate whose whole job is to catch it | small fix, real gate work |
+| **#1** | The executive legend counts `exhausted` and `nodata` agencies as GREEN - "Green, 2 agencies" directly above "6 datasets cannot be processed" | one expression |
+| **#4** | Eleven "no automated quality rule defined" placeholders that read as passing checks everywhere above the fourth click | a design question |
+| **#34** | Month names case-insensitive in the runtime, case-SENSITIVE in the gate - valid config refused with an untrue message | one `.lower()` |
+
+Two more are missed criteria on requirements already marked `built`,
+which is a different kind of problem: **#2** (the low-runway warning
+never rendered in the dashboard, and it is due right now) and **#3**
+(every date rendered on the viewer's clock, not the asset's).
+
+**#33 and #47 are process questions, not code** - whether the register
+should be able to say "built except for these criteria", and whether a
+post-build critic should see a requirement's own `evidence:`.
+
 ### From `delivery-dashboard-ux-critic` (2026-09-24)
 
 1. **[todo, 2026-09-24]** **[Dashboard UI]** **[F1] The executive tier
@@ -1214,3 +1234,355 @@ here as its own question, not acted on.
     lives, and a critic that cannot see one will re-propose it.
 
     **Keith's call.** Recorded here rather than decided.
+
+### From `delivery-dashboard-visual-critic` (2026-09-24)
+
+**This critic's measurements reproduce exactly.** Every contrast ratio
+it reported was recomputed here from the real token values in the
+template, and all eight came back to the second decimal place - 2.81,
+1.51, 3.55, 1.51, 13.22, 5.35, 12.78, 6.54. Every CSS rule it cited is
+at the line it named. Nothing in its report needed correcting, which is
+not true of the other three.
+
+Its **V1** is #1 (the exec green counter, reached by a third
+independent route and measured in three separate as-of states) and its
+**V15**'s terminator half is #15; both are recorded above rather than
+twice. It deliberately did not re-find the `TypeError`.
+
+48. **[todo, 2026-09-24]** **[Dashboard UI]** **[V2] Hovering a dataset
+    row makes the "No data" pill's fill vanish into the row.**
+
+    **Verified - the two rules are the same token.**
+    `.dataset-table tbody tr:hover{background:var(--surface-alt);}`
+    (template:243) and `.pill.nodata{background:var(--surface-alt); …}`
+    (:152). The critic measured the hovered result: pill background and
+    row background both `rgb(238,234,221)`, a contrast of **1.00:1**.
+    Unhovered it is already only 1.20:1.
+
+    What is left under the cursor is the 1px dashed border, which is
+    itself invisible (#49). So at any past or future as-of - where
+    "No data" is the most common row state - the status token
+    disappears when a reader points at it. `.pill.exhausted` loses its
+    fill the same way but survives on its dark border and dark text.
+
+    **Only findable by hovering.** Neither rule is wrong on its own.
+
+    **Cost:** trivial. **Recommendation: fix.**
+
+49. **[todo, 2026-09-24]** **[Dashboard UI]** **[V3/V5] The `nodata`
+    pill fails WCAG AA in both themes, and its dashed border is not
+    visible at all.**
+
+    **Recomputed here from the real tokens:**
+
+    | | text on own fill | border on own fill |
+    |---|---|---|
+    | `nodata`, light | **2.81:1** | **1.51:1** |
+    | `nodata`, dark | **3.55:1** | **1.51:1** |
+    | `exhausted`, light | 13.22:1 | 5.35:1 |
+    | `exhausted`, dark | 12.78:1 | 6.54:1 |
+
+    At 12.5px/700 the WCAG bar is 4.5:1, not the large-text 3:1 - so
+    both `nodata` readings fail. A **4.7× gap** separates two states
+    that sit side by side.
+
+    **The border number is the more interesting one.** `REQ-PIPE-053`'s
+    own CSS comment says the exhausted pill is "deliberately unlike the
+    other four: a solid border and a square marker". In practice the
+    distinction is not dashed-versus-solid - it is *no visible border*
+    versus *a visible one*. It happens to work, but not for the reason
+    the code gives.
+
+    **And the marker does nothing.** `.pill.nodata .ico` is
+    `border-radius:2px`, `.pill.exhausted .ico` is `1px` (:153, :159).
+    At 9px those are both squares - the critic checked at device scale
+    and they are indistinguishable. So of the three devices meant to
+    separate the two quiet states, the background is identical, the
+    marker is imperceptible, and **all the work is done by text
+    contrast** - which is the token that fails AA.
+
+    **Keith's call, and the critic's Q3 frames the real tension:**
+    fixing the contrast means making the quiet state louder, which is
+    the opposite of what "quiet" was for. Its three options: raise both
+    tokens (clears AA, narrows the 4.7× gap doing the actual work); fix
+    only the border (makes dashed-vs-solid real, leaves the text
+    failing); or log it as a standing accessibility item across every
+    muted token, since the footer (#54) and `--ink-faint` generally
+    have the same problem and fixing one pill leaves the pattern.
+
+50. **[todo, 2026-09-24]** **[Dashboard UI]** **[V4] `1.5px` borders
+    render as `1px`, so the intended weight difference does not exist.**
+
+    **Verified in source** - `.pill.exhausted` (:158) and
+    `.notice-exhausted` (:160) both declare `border:1.5px solid`. The
+    critic measured computed `borderTopWidth` in a real browser at
+    DPR 1: **`1px`**, both. Chrome floors 1.5 device-independent px to
+    1 device px at 1×.
+
+    So the exhausted pill's border is the same weight as the nodata
+    pill's; only style and colour differ. It renders at 1.5px on a 2×
+    display and 1px on the 1× displays most government desktops use, so
+    it is also **inconsistent between machines**.
+
+    Exactly the case where reading the source gives the wrong answer -
+    worth keeping as an example, not just as a fix.
+
+51. **[todo, 2026-09-24]** **[Dashboard UI]** **[V8/V9] `REQ-PIPE-048`'s
+    stored offsets reach two render sites, and neither handles them.**
+
+    **Verified in the real built data and the real template, and this
+    resolves a puzzle the two dashboard critics each saw half of.** One
+    field, `arrivedAt`, formatted at one site and not the other:
+
+    - **The SLA tile** (template:1239) builds it as
+      `d.lastArrival.arrivedAt.slice(11,16)+" UTC (earliest extract,
+      latest run)"` - character-slicing the wall clock out of the string
+      and labelling it UTC unconditionally. Correct today only because
+      every stored value is `+00:00`, which is the thing `REQ-PIPE-048`
+      changed. (This is #14 from the other direction.)
+    - **The supply-history table** (:2690) renders `e.arrivedAt`
+      **raw**. Confirmed in `reports/birth_registrations_dashboard.json`:
+      **43 values, every one of the form
+      `2026-09-16T05:17:30.280161+00:00`** - ISO-8601 with microseconds
+      and an explicit offset, straight into a user-facing TIMING column.
+
+    The critic's screenshot shows the column going, in three consecutive
+    rows, from `1 day since previous` to `0 days since previous` to an
+    amber pill plus that raw string.
+
+    **A stale comment sits right above it.** Template:767-769 says
+    "`lastArrival.arrivedAt` on its own is only ever a time
+    (`05:07 local`, `14:32 UTC …`)". The data no longer has that shape;
+    :1239 manufactures it, and `fmtArrival()` interpolates whatever it
+    is given.
+
+    **The tile is also the timezone problem made concrete.** In one
+    four-across strip the SLA tile reads `Daily, by 14:00 AWST` and the
+    arrival tile reads `05:29 UTC`, and a reader must add eight in their
+    head, across two tiles, to judge the "Early" verdict sitting in the
+    same cell. The one place the asset clock is visible is in the wrong
+    clock - against a requirement whose story is "so that a supply that
+    arrived at 10pm in Perth is not read as having arrived the following
+    afternoon".
+
+    **Keith's call, the critic's Q4:** render every user-facing instant
+    in the asset timezone (matches the story, one formatter, changes
+    several existing views so it wants its own requirement); keep UTC
+    but format it properly; or split - format the supply-history
+    timestamps now as a plain rendering defect, and scope the
+    UTC-vs-AWST question separately. **This is the same subject as #3,
+    #14 and road-testing item 5**, arriving from a fourth direction.
+
+52. **[todo, 2026-09-24]** **[Dashboard UI]** **[V6/V7] The mobile
+    overflow's widest driver is the badge row, not the table - a
+    different fix from the one #16 implies.**
+
+    The dashboard UX critic measured `scrollWidth` 537 against 390 and
+    attributed it to `TABLE.dataset-table` at 539px. On the agency page
+    at `?asof=2027-09-01` the visual critic measures `scrollWidth`
+    **613**, and the widest overflowing element is the **badge row**
+    (`display:flex; flex-wrap:nowrap`) at **597px** - its
+    `Owned by Brian (qa), Reg (peer_review), Arthur (manager)` pill
+    alone is **336px**, `white-space:nowrap` inherited from `.pill`
+    (:138). The table's right edge is 561, second.
+
+    Different fix - `flex-wrap:wrap` on the badge row - so worth
+    separating from #16 rather than folding in.
+
+    **Separately, `REQ-PIPE-053`'s own collection-level count marker is
+    clipped at 390px.** `.collection-title` (:233) is a flex row with no
+    `flex-wrap`: container `clientWidth` 358 against `scrollWidth` 368,
+    and the `1 schedule ended` pill's right edge sits 10px past the
+    container's. The new marker is the thing cut off.
+
+53. **[todo, 2026-09-24]** **[Dashboard UI]** **[V11/V12/V13] The two
+    new quiet-state branches were written with a different markup shape
+    from the branch beside them.**
+
+    Three separate consequences, all measured:
+
+    - **Four column headers hang over nothing.** At `?asof=2027-09-01`
+      all six Tier-2 rows use a `colspan="4"` message cell, so
+      `LATEST ARRIVAL`, `ROWS`, `LAST QA RUN` and `TREND` have zero
+      content in every row - **579 of 1179px (49%) of the table** at
+      1440, and 37% at 390 where they are what pushes it past the
+      viewport. Worse, the message starts *under* `LATEST ARRIVAL`, so
+      "No QA run within tolerance as of the selected date" reads as a
+      value in that column.
+    - **The status pill moves 630px.** On a normal dataset page the
+      pill sits at x=922 in its own right-hand cluster; on the
+      exhausted and no-data branches it is **inline inside the `<h2>`**
+      at x≈295 and x≈360, sized and shaped like the "View on GitHub"
+      and "Owned by …" utility chips. A reader who has learned
+      "status is top-right" finds it top-left.
+    - **The same condition is a bordered box at Tier 1 and unstyled
+      body text at Tier 3.** The exec notice has a border, a fill, a
+      radius and `<code>` chips; the dataset-level message measures
+      `background: rgba(0,0,0,0)`, `border: 0px none` - bare text on
+      `--paper` on a page where everything else is a card. **Verified
+      in source:** `.notice-exhausted code` (:163) is scoped to the
+      notice, so the same two strings get a chip at Tier 1 and nothing
+      at Tier 3. Two smaller ones in the same pair: `max-width` is
+      `60ch` on one body and `56ch` on the other - two measures for two
+      sibling states written the same day - and both `<code>`s fall
+      back to the browser's `monospace` while every other code-ish
+      string on the page uses `.mono`/IBM Plex Mono with tabular
+      numerals.
+
+54. **[todo, 2026-09-24]** **[Dashboard UI]** **[V10/V14/V15] Layout
+    measure: the notice is 2.4× the page's own, the footer fails AA, and
+    the exec grid is half empty.**
+
+    - **The exec notice is 1180px wide over 583px of cards**, and its
+      body measures **146 characters per line** at 13px - against
+      `.view-sub`'s declared `max-width:62ch` sitting 20px above it.
+      Nothing else on the page is that wide except the footer.
+    - **The footer measures 162 characters per line, `max-width: none`,
+      at 12px, with contrast 3.03:1 light / 4.16:1 dark** - both under
+      4.5:1. `REQ-DASH-055` appended a sentence to it that reads as a
+      changelog entry become permanent page furniture, and pushed the
+      block to four lines. (#15 is the missing terminator in the same
+      sentence.)
+    - **`.grid` uses `auto-fill`** (:217, **verified in source**), so at
+      1180px it computes four 284.5px tracks and fills two: **exactly
+      half the executive tier is empty**, held open by phantom tracks
+      `auto-fit` would collapse. The direct visual consequence of
+      `REQ-DASH-055` removing three invented agencies from a grid tuned
+      for five. The two real cards also **do not align internally** -
+      `.card` is plain block flow with `.card-meta` unpinned, so a
+      1-line title and a 3-line title put the sparkline and the meta row
+      50px apart, leaving 69px of dead space under one card and 19px
+      under the other (155px at the 2027 as-of).
+
+    **The grid one is explicitly a judgment call, not a defect** - the
+    critic says so - because `auto-fit` would stretch two cards to 583px
+    each, which may read worse. **Keith's call, its Q1:** collapse the
+    tracks, cap the grid to its content, or leave it on the grounds that
+    it self-corrects as the asset grows.
+
+55. **[todo, 2026-09-24]** **[Dashboard UI]** **[V17] Seven of eleven
+    focusable element types fall back to Chrome's default focus ring.**
+
+    **Verified in source:** `grep` finds `:focus-visible` rules at
+    template lines 106, 224, 346, 347, 353, 354 **and nowhere else** -
+    four elements (`.wordmark`, `.card`, `.scope-check`, `.check-card`)
+    got a deliberate `2px solid var(--accent)` ring with
+    per-element offsets, and everything else did not.
+
+    What did not: **`.col-tile`** (the primary interactive surface of
+    the dataset page), all nine masthead chips including **the As-of
+    chip** - which is `REQ-PIPE-048`'s own control and the thing *both*
+    quiet-state messages instruct the reader to go and use - plus
+    `.crumb`, `.pill.tag.sm`, `.link-btn`, `.drawer-close` and `INPUT`.
+
+    **The problem is coverage, not craft** - the four that exist are
+    properly designed. Belongs with #8/#9/#10 as one accessibility pass.
+
+56. **[todo, 2026-09-24]** **[Dashboard UI, QA checks & contract]**
+    **[V16/V18/V23] The page's own statement of its colour language is
+    out of date, and the language is reused for something else.**
+
+    - **The legend names three statuses; the vocabulary has five.**
+      `.legend-key` hardcodes Green / Amber / Red at both the exec
+      (:2524) and dataset (:2838) tiers, while `REQ-QAC-047`'s
+      `statusVocabulary()` carries `nodata` and `exhausted` too with
+      `STATUS_LABEL` supplying their names. At `?asof=2027-09-01` the
+      page renders a legend naming three statuses directly above two
+      cards carrying the two it omits.
+    - **The MoSCoW pills reuse the status palette.** **Verified in
+      source:** `MOSCOW_CLASS = {must:"red", should:"amber",
+      could:"green", wont:"nodata"}` (:3818) and
+      `REQ_STATUS_CLASS = {built:"green", …}` (:3822) - so a
+      requirement renders `● Must` in exactly the pill a failing
+      dataset uses, and the critic captured one viewport with `● Red`
+      agency pills on the left and `● Must` requirement pills on the
+      right. Outside these four requirements' build scope, but squarely
+      inside the status vocabulary `REQ-QAC-047` owns.
+    - **Three visually identical check cards** in one column drawer,
+      same title, same description, same Red pill - distinguishable
+      only by 12px grey monospace (`dbt:multiple_birth_sibling` /
+      `soda:sibling_match` / `datacontract:sibling_match`). They read as
+      a rendering bug at a glance, and the threshold line carries
+      **two formats for the same fact** - `REQ-QAC-047`'s
+      no-threshold-fallback rule surfacing as the prose "no
+      single-sided threshold — status is this tool's own verdict",
+      which wraps mid-sentence and reads as debug output.
+
+57. **[investigate, 2026-09-24]** **[Dashboard UI]** **[V19/V20/V21/
+    V22/V24] Five smaller visual findings, recorded together.**
+
+    - **`exhaustedMarker()` produces duplicate-looking pill pairs at
+      today's scale** - three `.pill.exhausted` within 40px vertically
+      on the Tier-2 page, the last two adjacent and identically styled.
+      **This is the one finding that gets BETTER at 30 datasets** ("17
+      schedules ended" is genuinely useful), which is why it is a
+      judgment call. **Keith's call, its Q2:** keep as built, suppress
+      the marker at count 1, or merge the pair into one pill.
+    - **`box-decoration-break: slice` splits the command chip on
+      mobile** - `<code>mothman schedule candidate-dates</code>`
+      returns 2 client rects at 390px, rendering as two separate
+      rounded boxes and reading as two commands.
+    - **All nine masthead chips are 28px tall** at 390px, below both
+      the iOS (44) and Android (48) tap minimums - including the As-of
+      chip, which both quiet-state messages tell the reader to use.
+    - **"No data" is two visual states, and one contradicts itself.**
+      At `?asof=2022-01-01` (no history at all) the card has no
+      sparkline - honest. At `?asof=2027-09-01` (history exists, none
+      current) the card shows the **full 19-cycle sparkline ending in a
+      red endpoint dot** under a "No data" pill - the only red pixel in
+      that viewport, 130px under a pill saying there is no data.
+    - **`.crumb` breaks mid-token at 390px** - "TIER 2" wraps to
+      "TIER" / "2" on every mobile view. One `white-space:nowrap`.
+
+### What the visual critic found genuinely working
+
+- **`.pill.exhausted` survives dark mode properly** - 12.78:1 text,
+  6.54:1 border, unambiguously the most prominent thing in its card.
+  `REQ-PIPE-053`'s "never distinguished by colour alone" holds: the
+  label says "Schedule ended" in words and the state is legible with
+  colour removed. The other quiet state does not clear that bar (#49).
+- **The exec notice earns its place in the squint test** - blurred, the
+  page still resolves to "a bordered announcement at the top, two quiet
+  cards below".
+- **Tier-2 row messages are differentiated by weight, not just
+  wording** - the exhausted row's message renders in `--ink`, the
+  no-data rows' in muted. A real distinction doing real work.
+- **The exhausted dataset page at 390px is the best-laid-out view in
+  the whole pass** - pills wrap cleanly onto their own lines, measure
+  lands around 42 characters, hierarchy holds.
+- **No horizontal overflow at the exec tier at 390px** in either quiet
+  state.
+- **The drawer scrim is real** - checked because it looked absent.
+- **Card and check-card focus rings are properly designed** (#55 is
+  coverage, not craft).
+- **`REQ-DASH-055`'s removal is visually clean where it matters** - no
+  orphaned "illustrative mock data" chrome anywhere, in any state or
+  theme.
+
+### What the visual critic says breaks at ~30 datasets
+
+58. **[investigate, 2026-09-24]** **[Dashboard UI]** **Visual scale
+    findings, collected.** Each belongs to a finding above.
+
+    - The legend arithmetic gets wronger: at 30 datasets some dataset
+      is nearly always quiet, so the green number is nearly always
+      inflated (#1).
+    - The legend is nearly always incomplete - three named statuses out
+      of five is survivable while quiet states are rare (#56).
+    - Card misalignment goes from two ragged cards to eight ragged
+      rows, with the last row always partly empty (#54).
+    - The four dead columns multiply: 30 rows eating 49% of desktop
+      width and forcing a 545px table into a 390px viewport (#53).
+    - **The exec notice's scale risk is its calendar list, not its
+      dataset count.** The heading aggregates correctly ("N datasets");
+      the body inlines every unique calendar name in bold via
+      `${which}`. Six calendars in a 146-character line is already at
+      the limit - the heading scales, the body does not.
+    - **The drawer's run-history squares do not scale at all** - 31
+      runs already renders as 24 + 7, ragged, with no time axis and no
+      grouping. A year of daily runs is ~365 16px squares, roughly 15
+      ragged rows of full-saturation colour, sitting *above* the check
+      list it is meant to introduce.
+    - The duplicate check cards compound: four tools × one logical
+      check is already three or four identical cards, and tool identity
+      is the smallest, lowest-contrast text on each (#56).
