@@ -1417,6 +1417,48 @@ comparisons against the expected-supply sequence.
       OUT that it is pointing elsewhere? The qualifier chip settles the
       LABELLING; this is about whether the period has its own row of
       check results or borrows the previous period's.
+    - **WHAT DETECTS LATENESS, and what acts on it** (Keith,
+      2026-09-24, explicitly flagged as an open decision for when this
+      is scoped). Two candidates: lateness is checked as part of the
+      natural running of QA, so any run sweeps every dataset for
+      overdue slots; or it is a scheduled job of its own, a cron.
+
+      **Worth separating detection from action before choosing**, since
+      the two are not the same problem. Lateness is ALREADY derived,
+      client-side, as a pure function of schedule, as-of date and fill
+      state - that is what produces the red-with-"no data"-qualifier
+      reading in the freshness scenario above. So nothing needs to be
+      computed that is not computed today; what is missing is the ACTOR
+      that turns a derived state into a durable event, namely the
+      ticket.
+
+      **The case against QA-run-triggered is specific**: a dataset that
+      never arrives produces no QA run of its own, so detection would
+      ride on some OTHER dataset's run happening. At 30 datasets on a
+      quarterly asset there are quiet stretches where nothing arrives
+      at all - which is precisely the situation this whole concept
+      exists for. The mechanism would be weakest exactly when it
+      matters most.
+
+      **The case against a cron has a real, verified gotcha**: GitHub's
+      own documentation states that in a PUBLIC repository, scheduled
+      workflows are automatically disabled after 60 days with no
+      repository activity. This repo is public, and a quiet quarterly
+      asset is exactly a repo with little activity - so the scheduled
+      job would switch itself off during the stretch it is meant to
+      cover, silently. Checked against docs.github.com 2026-09-24
+      rather than recalled.
+
+      **Note lateness detection needs NO data access** - only the
+      schedule and promotion state - so unlike most computations in
+      this pipeline it is not excluded from CI by the never-touch-
+      `data/` rule. That widens the options rather than settling them.
+
+      **And whichever is chosen, it must be idempotent**: a daily sweep
+      must not open a new ticket every day for the same late supply.
+      That is the same marker-and-drain discipline sprint 12 already
+      establishes for decisions, not a new mechanism.
+
     - **Does the carry-forward chain?** Two consecutive missed periods:
       does period 3 point at period 2's view, or straight through to
       period 1's real table? A chain of views is fragile and a resolved
