@@ -134,6 +134,16 @@ releases:
               build yet.
       - category: Improved
         items:
+          - headline: One calendar typo now reads as one calendar typo
+            components: ["Pipeline & publishing"]
+            description: >
+              Mistyping a calendar's name used to produce an identical
+              error for every dataset on it, each suggesting you edit
+              that dataset - and offering the misspelling itself as a
+              valid choice. The check now says once, above the detail,
+              how many datasets name the missing calendar and which
+              defined calendar nobody is using, and it only suggests
+              calendars something already uses.
           - headline: A calendar mistake is caught before you push
             components: ["Testing & dev tooling"]
             description: >

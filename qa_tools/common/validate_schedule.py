@@ -99,6 +99,18 @@ class ConfigError:
     problem: str
     fix: str
 
+    # ONE MISTAKE, REPORTED N TIMES, IS STILL ONE MISTAKE
+    # (plans/post-build-review.md #19). `cause` groups errors that share
+    # a single root - a calendar renamed by one character produces one
+    # error per dataset on it - so _report() can say what the root is
+    # ABOVE the detail. It suppresses nothing: every offending item is
+    # still printed individually and the header count is unchanged,
+    # which is Keith's own rule from 2026-09-23. `cause_hint` carries
+    # the one extra sentence that names a likely fix, resolved where the
+    # configuration is in scope rather than at print time.
+    cause: str | None = None
+    cause_hint: str | None = None
+
     def __str__(self) -> str:
         return f"{self.problem} {self.fix}"
 
@@ -309,6 +321,30 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
     out: list[ConfigError] = []
     calendars = {(c or {}).get("name"): (c or {}) for c in (raw.get("calendars") or [])}
 
+    # ONLY SUGGEST A CALENDAR SOMETHING ALREADY USES (#19). The fix line
+    # used to list every defined calendar, which meant that after a
+    # one-character rename it offered the TYPO as a valid option:
+    # follow it literally, point six datasets at `quarterley`, and the
+    # gate goes green with the misspelling committed. A calendar no
+    # dataset references is either brand new or a typo, and neither is
+    # something to steer a broken dataset at.
+    #
+    # Falls back to listing everything when nothing is referenced at
+    # all - a first dataset being added to a fresh asset - because there
+    # is then no usage signal to prefer one by, and an empty list helps
+    # nobody.
+    in_use = {(d or {}).get("calendar") for d, _c in _walk_datasets(raw)
+              if (d or {}).get("calendar") in calendars}
+    options = ", ".join(sorted(n for n in (in_use or set(calendars)) if n))
+
+    # The one defined calendar nothing references, when there is exactly
+    # one, is the likely other half of a rename. More than one and there
+    # is nothing to point at, so nothing is claimed.
+    unreferenced = sorted(n for n in calendars if n and n not in in_use)
+    typo_hint = (f" The calendar {unreferenced[0]!r} is defined and no dataset names it - "
+                 f"if that is the typo, one edit there fixes them all."
+                 if len(unreferenced) == 1 else "")
+
     for dataset, _collection in _walk_datasets(raw):
         dataset = dataset or {}
         dataset_id = dataset.get("id")
@@ -319,15 +355,17 @@ def _dataset_errors(raw: dict, src: Source) -> list[ConfigError]:
             out.append(ConfigError(
                 src.name, scope,
                 "names no `calendar:`.",
-                f"Add one of: {', '.join(sorted(n for n in calendars if n))}. Without it "
+                f"Add one of: {options}. Without it "
                 f"there is nothing to judge this dataset's supplies against."))
             continue
         if named not in calendars:
             out.append(ConfigError(
                 src.name, scope,
                 f"names calendar {named!r}, which this asset does not define.",
-                f"Use one of: {', '.join(sorted(n for n in calendars if n))}, or add that "
-                f"calendar. A dataset on a calendar that does not exist expects nothing."))
+                f"Use one of: {options}, or add that "
+                f"calendar. A dataset on a calendar that does not exist expects nothing.",
+                cause=f"unknown-calendar:{named}",
+                cause_hint=typo_hint))
             continue
 
         months = dataset.get("delivery_months")
@@ -710,6 +748,30 @@ def _report(errors: list[ConfigError]) -> None:
     subject = f"{len(datasets)} dataset(s)" if datasets else "the asset's own configuration"
     print(f"schedule validation FAILED - {len(errors)} error(s) affecting {subject}:",
           file=sys.stderr)
+
+    # THE SHARED CAUSE, ONCE, ABOVE THE DETAIL (#19). One calendar
+    # renamed by a character produces one error per dataset on it, and
+    # the detail below correctly describes N broken datasets - while the
+    # repair is one edit in the calendar they all name. Printed here so
+    # a reader meets the root before the symptoms, and only when there
+    # is genuinely something to aggregate: a single error is not a
+    # shared cause, and a line restating it would be noise.
+    #
+    # NOTHING IS SUPPRESSED. Every offending item is still printed
+    # individually below and the count in the header is unchanged -
+    # Keith's own rule, 2026-09-23, against the reviewer's
+    # cause-suppression recommendation. This adds a line; it removes
+    # none.
+    by_cause: dict[str, list[ConfigError]] = defaultdict(list)
+    for error in errors:
+        if error.cause:
+            by_cause[error.cause].append(error)
+    for cause, shared in sorted(by_cause.items()):
+        if len(shared) < 2:
+            continue
+        _kind, _, value = cause.partition(":")
+        print(f"\n  {len(shared)} datasets name calendar {value!r}, which this asset does "
+              f"not define.{shared[0].cause_hint or ''}", file=sys.stderr)
 
     by_file: dict[str, dict[str | None, list[ConfigError]]] = defaultdict(lambda: defaultdict(list))
     for error in errors:

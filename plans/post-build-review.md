@@ -969,6 +969,48 @@ just now, not by reading the critic's transcript.
     documented in that file as NOT covering this item, so a later
     reader does not take it for more than it is.
 
+    **SIGNED OFF AND FIXED, 2026-09-25 - Keith chose option (c)**, both
+    halves. The real output now reads:
+
+    ```
+    schedule validation FAILED - 6 error(s) affecting 6 dataset(s):
+
+      6 datasets name calendar 'quarterly', which this asset does not
+      define. The calendar 'quarterley' is defined and no dataset names
+      it - if that is the typo, one edit there fixes them all.
+
+      data-asset.yaml
+        dataset 'cp-carers'
+          - names calendar 'quarterly', which this asset does not define.
+            Use one of: daily, or add that calendar. ...
+    ```
+
+    **The cause line** is emitted only when at least two errors share a
+    root - a single error is not a shared cause, and a line restating it
+    would be noise. `ConfigError` grew a `cause` key and a `cause_hint`,
+    so the grouping is structural rather than string-matched on the
+    message text.
+
+    **Nothing is suppressed, and Keith's 2026-09-23 rule is intact**:
+    all six datasets are still printed individually and the header count
+    is unchanged. This adds a line above the detail; it removes none.
+    There is a test asserting exactly that, because "add a cause line"
+    is one refactor away from becoming the cause suppression he
+    rejected.
+
+    **The suggestions now list only calendars a dataset already uses**,
+    which is what stops `quarterley` being offered. A calendar nothing
+    references is either brand new or a typo, and neither is safe to
+    steer a broken dataset at. It falls back to listing everything when
+    nothing is referenced at all - a first dataset on a fresh asset -
+    since there is then no usage signal and an empty list helps nobody.
+
+    **The typo guess is claimed only when it is safe to claim**: exactly
+    one defined calendar unreferenced. Two or more and there is nothing
+    to point at, so nothing is said - covered by its own test, which
+    points a dataset at a name nobody ever defined and asserts no guess
+    appears.
+
 20. **[todo, 2026-09-24]** **[Testing & dev tooling]** **[A4/A5] One
     mistake produces two errors in two idioms, and the generated half of
     the fix lines names nothing.**

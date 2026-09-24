@@ -560,3 +560,96 @@ class TestTheSuccessLineDoesNotContradictTheWarningBelowIt:
         than falling out early."""
         _code, out, _err = self._run_past_the_last_authored_date(monkeypatch, capsys)
         assert "calendar(s)" in out and "dataset(s)" in out
+
+
+class TestOneTypoReadsAsOneTypo:
+    """post-build-review #19, Keith's option (c), 2026-09-25.
+
+    Rename a calendar by one character and every dataset on it reports
+    "names calendar 'quarterly', which this asset does not define. Use
+    one of: daily, quarterley, or add that calendar."
+
+    Two things were wrong with that, and neither is the individual
+    reporting Keith settled on 2026-09-23 - nothing here hides an error
+    or changes the header count.
+
+    The true fix is one character in the calendar, and the output
+    described N broken datasets instead. And the options offered
+    included the typo itself, so a reader who followed the text
+    literally pointed every dataset at the misspelling and turned the
+    gate GREEN with it committed.
+    """
+
+    @pytest.fixture
+    def renamed_calendar(self, tmp_path):
+        """The real config with `quarterly` renamed by one character -
+        the exact mistake, not an approximation of it."""
+        import shutil
+
+        contract_dir = tmp_path / "contract"
+        shutil.copytree(REAL_CONTRACT_DIR, contract_dir)
+        path = contract_dir / "data-asset.yaml"
+        doc = yaml.safe_load(path.read_text())
+        for calendar in doc["calendars"]:
+            if calendar["name"] == "quarterly":
+                calendar["name"] = "quarterley"
+        path.write_text(yaml.safe_dump(doc))
+        return Source(path, contract_dir)
+
+    def _errors(self, src):
+        return validate(src)
+
+    def test_no_fix_line_offers_the_name_nothing_uses(self, renamed_calendar):
+        """`quarterley` is defined and no dataset names it. A calendar
+        nothing references is either brand new or a typo, and steering
+        a broken dataset at it is not a safe thing to suggest."""
+        unknown = [e for e in self._errors(renamed_calendar)
+                   if "does not define" in e.problem]
+        assert unknown, "precondition - the rename must produce unknown-calendar errors"
+        for error in unknown:
+            assert "quarterley" not in error.fix, (
+                f"the fix line offers the typo as a valid option:\n  {error.fix}")
+
+    def test_the_shared_cause_is_named_once_above_the_detail(self, renamed_calendar, capsys):
+        validate_schedule.main(renamed_calendar)
+        err = capsys.readouterr().err
+        assert "quarterly" in err
+        cause_lines = [ln for ln in err.splitlines() if "datasets name" in ln]
+        assert len(cause_lines) == 1, (
+            f"expected exactly one line naming the shared cause, got {cause_lines}")
+        assert "quarterley" in cause_lines[0], (
+            "the one calendar nothing references is the likely typo and should be named")
+
+    def test_every_offending_dataset_is_still_reported_individually(self, renamed_calendar, capsys):
+        """Keith's 2026-09-23 rule. The cause line is printed ABOVE the
+        detail; it suppresses nothing and changes no count."""
+        errors = self._errors(renamed_calendar)
+        unknown = [e for e in errors if "does not define" in e.problem]
+        assert len(unknown) == 6, f"expected all six CP datasets reported, got {len(unknown)}"
+        validate_schedule.main(renamed_calendar)
+        err = capsys.readouterr().err
+        assert f"{len(errors)} error(s)" in err
+
+    def test_a_calendar_that_was_simply_never_written_gets_no_typo_guess(self, tmp_path, capsys):
+        """The guess is only safe when exactly one defined calendar is
+        unreferenced. Point a dataset at a name nobody has ever defined,
+        leave every real calendar in use, and there is nothing to
+        suggest as the typo."""
+        import shutil
+
+        contract_dir = tmp_path / "contract"
+        shutil.copytree(REAL_CONTRACT_DIR, contract_dir)
+        path = contract_dir / "data-asset.yaml"
+        doc = yaml.safe_load(path.read_text())
+        for _dataset, _collection in validate_schedule._walk_datasets(doc):
+            if _dataset.get("id") == "cp-carers":
+                _dataset["calendar"] = "fortnightly"
+        path.write_text(yaml.safe_dump(doc))
+
+        validate_schedule.main(Source(path, contract_dir))
+        err = capsys.readouterr().err
+        assert "fortnightly" in err
+        assert "if that is the typo" not in err, (
+            f"guessed a typo with no unreferenced calendar to guess at:\n{err}")
+        assert "datasets name" not in err, (
+            "one dataset is not a shared cause - there is nothing to aggregate")
