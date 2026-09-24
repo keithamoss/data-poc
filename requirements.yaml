@@ -904,6 +904,230 @@ requirements:
       - dashboard/requirements_yaml.py::parse_requirements
       - qa_tools/common/validate_requirements.py::validate
 
+  - id: REQ-PIPE-068
+    title: One database, and every read of supply data goes through a per-run view schema
+    date_written: "2026-09-24"
+    story: >
+      As whoever maintains this pipeline, I want one durable database
+      and one place where a logical table name becomes a physical
+      table, so that staging has somewhere to stage into and a check
+      can never read a table that is half-loaded, ambiguous or simply
+      the wrong version.
+    moscow: must
+    status: not_started
+    source: >
+      SPLIT OUT OF REQ-PIPE-035 on 2026-09-24 (Keith), which covered
+      three separable things under one signed id - period schemas, the
+      per-run view schema, and one database. REQ-PIPE-060's build-order
+      decision moved "the single-database half" forward to delivery
+      sprint 8, but sprint 8 needs the VIEW SCHEMA too and neither half
+      of that split named it. See plans/supply-model.md, "Batch 3's
+      pre-build review".
+    acceptance_criteria:
+      - THE SYSTEM SHALL resolve each logical table name a check uses to
+        exactly one physical table, through a per-run schema containing
+        only views, and SHALL discard that schema once the run
+        completes.
+      - THE SYSTEM SHALL route every read of supply data through that
+        per-run schema, and SHALL NOT query a physical table directly
+        from any check, tool invocation or downstream reader.
+      - WHERE a logical name has more than one candidate physical table
+        and no basis on which to choose, THE SYSTEM SHALL NOT create a
+        view for it, and SHALL treat that name as absent for the run
+        rather than selecting one of the candidates.
+      - THE SYSTEM SHALL treat a table as present for the run only where
+        it resolves to exactly one version, and SHALL NOT treat the mere
+        existence of files claiming that name as presence.
+      - THE SYSTEM SHALL record, for every QA run, which physical
+        version of each table it read, in committed history that
+        outlives the discarded per-run schema.
+      - THE SYSTEM SHALL name a per-run schema so that one left behind
+        by an interrupted run is identifiable and removable without
+        reference to any other record.
+      - THE SYSTEM SHALL hold all period schemas, the staging schema and
+        the rejected schema in one database, and SHALL NOT create a
+        database per run.
+    non_functional_requirements:
+      - >
+        This is what delivery sprint 8 cannot start without. Staging has
+        nowhere to stage into without a durable database, and
+        REQ-PIPE-060 criterion 7's guarantee - a staged table is visible
+        to a check only once its load record exists - is delivered by
+        the view, not by the table. Without criteria 11-14 of the
+        original REQ-PIPE-035, the honest implementation of that
+        criterion is the whole-delivery transaction Keith rejected on
+        scale.
+      - >
+        CI and any read-committed-history path may never open or query
+        any database, including this one.
+      - >
+        Test isolation must be arranged deliberately rather than falling
+        out of a database per run, which this requirement removes. One
+        database per test worker is the shape REQ-PIPE-060's own
+        decisions assume.
+      - >
+        A per-run schema left behind by an interrupted run must be
+        identifiable and removable on its own terms, because at ~30
+        datasets with years of history an accumulating set of orphaned
+        schemas is a real operational cost rather than untidiness.
+    dependencies: []
+    decisions:
+      - >
+        SPLIT SETTLED 2026-09-24 (Keith), option (a) of four: split
+        REQ-PIPE-035 in two along the corrected line rather than three
+        ways, whole, or with an IOU. Three ways was rejected because two
+        of the three would be signed and built together anyway; building
+        035 whole now contradicts its own build-order decision that
+        period schemas here are "shelves years before anything decides
+        what goes on them"; and an IOU against a partially-built
+        requirement is the exact shape CLAUDE.md already records as a
+        failure.
+      - >
+        The line moved from where REQ-PIPE-060's decision first drew it.
+        That decision split sprint 13 into "the single-database half"
+        and "the schema-per-period half", which is two pieces where
+        there are three. The per-run VIEW SCHEMA is named by neither,
+        and sprint 8 needs it: REQ-PIPE-060 criterion 7 depends on it,
+        and REQ-PIPE-059's own decision states that two duplicated
+        datasets "get no view, because REQ-PIPE-035 now forbids choosing
+        between candidates" - which is criterion 13 of that requirement,
+        now criterion 3 here.
+      - >
+        WHY THE SPLIT IS SAFE, carried over from REQ-PIPE-060 rather
+        than restated loosely: moving the single-database half forward
+        leaves a window with one database and no per-run isolation,
+        survivable ONLY because nothing runs QA between sprint 8 and
+        sprint 15. The same reason disposes of the verified
+        one-process-per-database blocker: dbt is the concurrent writer
+        and does not run until QA does. If QA ever moves earlier than
+        sprint 15, this stops holding.
+      - >
+        DUPLICATION FLAGGED, not resolved, and it needs Keith: criterion
+        5 here (record which physical version each run read) and
+        REQ-PIPE-038's own surviving criterion 9 (store, with a QA run's
+        committed results, which physical table each logical name
+        resolved to) are the same obligation stated twice in two signed
+        requirements. One of them should go.
+    open_questions:
+      - >
+        Which of this requirement's criterion 5 and REQ-PIPE-038's
+        criterion 9 survives - they are the same obligation in two
+        places.
+
+  - id: REQ-PIPE-069
+    title: Every delivery is recorded as its own committed file, written once at recognition
+    date_written: "2026-09-24"
+    story: >
+      As whoever reads this history years from now, I want what arrived
+      and what it was attributed to recorded beside the QA results and
+      never rewritten, so that the record of an arrival outlives the
+      warehouse that held it and can be queried without one.
+    moscow: must
+    status: not_started
+    source: >
+      SPLIT OUT OF REQ-PIPE-038 on 2026-09-24 (Keith), which covered two
+      separable things under one signed id - re-keying committed QA
+      history per dataset, and the delivery log. The delivery log moves
+      forward to sit with recognition (delivery sprint 7), because
+      RECOGNITION IS WHAT WRITES IT, and because REQ-PIPE-058's
+      collision gate has no corpus without it. See
+      plans/supply-model.md, "Blocker 2 resolved - the delivery log is
+      the corpus".
+    acceptance_criteria:
+      - THE SYSTEM SHALL record every delivery as its own committed
+        file, written once when the delivery is recognised, and SHALL
+        NOT append to, edit or re-write a delivery's file afterwards.
+      - THE SYSTEM SHALL store those files outside the per-dataset QA
+        results, in a location of their own, because a delivery spans
+        datasets and is not a QA result.
+      - THE SYSTEM SHALL record, in a delivery's own file, every table
+        it carried and the dataset each was attributed to, and SHALL NOT
+        record in it any outcome that is not known at recognition time.
+      - THE SYSTEM SHALL make the delivery record queryable as SQL
+        directly from the committed files, and SHALL NOT maintain a
+        second copy of it in the warehouse.
+      - THE SYSTEM SHALL preserve the recorded offset of every instant
+        read back out of a delivery file, and SHALL NOT let it be
+        inferred as a naive or UTC-normalised value.
+      - THE SYSTEM SHALL regenerate the delivery log from scratch
+        alongside the QA results, under the same delete-and-regenerate
+        rule, and SHALL NOT leave delivery records describing a history
+        that no longer exists.
+    non_functional_requirements:
+      - >
+        This is REQ-PIPE-058 criterion 8's corpus. That criterion gates
+        "any filename in the committed delivery history", and no such
+        history exists today - data/deliveries/ is gitignored and no
+        committed dataset_stats.json contains a filename at all. Without
+        this requirement the gate reads data/ and passes vacuously in CI
+        and on every fresh clone, which is the failure REQ-PIPE-057's
+        own NFR names.
+      - >
+        The record is read on the read-committed-history path, which may
+        never open data/. That is what makes it usable by the gate in
+        deploy-pages.yml at all, and it is why the record must be
+        committed rather than held in the warehouse.
+      - >
+        This repo is public, so a recorded filename becomes a published
+        string, and REQ-PIPE-057's own NFR states that a filename can
+        itself identify a person in a Birth Registrations or Child
+        Protection context. Today's are synthetic; the real-deployment
+        judgement should be made on real-deployment terms rather than
+        inherited from this PoC.
+      - >
+        Written once at recognition and never rewritten. Anything known
+        only after loading belongs to REQ-PIPE-060's processing log, not
+        here.
+    dependencies: [REQ-PIPE-057]
+    decisions:
+      - >
+        SETTLED 2026-09-24 (Keith): THE DELIVERY LOG IS THE CORPUS for
+        REQ-PIPE-058's collision gate. He arrived at it by asking
+        whether the warehouse is committed - it is not, zero files under
+        data/ are tracked - and then what the delivery log would give us
+        if it were not gitignored. It already records exactly the
+        attribution pairs the gate needs.
+      - >
+        It beats the committed fixture corpus this session had
+        recommended, because it is the REAL history rather than examples
+        somebody thought to add - which was that option's whole
+        weakness. Also rejected: reading data/deliveries/ directly,
+        which would put a data/ read into the deploy path and break the
+        standing rule outright rather than merely being vacuous; and
+        running the gate in test.yml where generated data exists, which
+        leaves it outside mothman check, which REQ-PIPE-058 criterion 13
+        requires.
+      - >
+        Queryability was verified by real experiment rather than
+        assumed, and the finding is carried over from REQ-PIPE-038:
+        DuckDB reads the committed JSON files straight into a SQL view
+        via read_json_auto over a glob, joinable against the staging and
+        period schemas, with nothing synced and nothing duplicated. A
+        second copy of the log in the warehouse was rejected as two
+        records that can drift for no gain.
+      - >
+        The moment matters and was got wrong once already, in
+        REQ-PIPE-038 before this split: RECOGNITION HAPPENS BEFORE
+        LOADING, so a file written at recognition cannot carry load
+        outcomes. That contradiction was found on 2026-09-24 and
+        resolved by REQ-PIPE-060's processing log - the delivery file
+        holds RECOGNITION facts, the processing log holds LOAD facts,
+        two files, two moments, neither ever rewritten.
+      - >
+        DUPLICATION FLAGGED, not resolved: REQ-PIPE-038's surviving
+        criterion 8 (record each table's LOAD OUTCOME as its own
+        committed record) restates REQ-PIPE-060 criterion 13. Two signed
+        requirements own the processing log between them.
+    open_questions:
+      - >
+        Does criterion 3 record the FILENAME or the logical table name?
+        It says "every table it carried", and REQ-PIPE-058's gate needs
+        filenames - a file's name is precisely what attribution reads.
+        Cheap to make explicit now, expensive to discover at build time.
+      - >
+        Whether REQ-PIPE-038's criterion 8 or REQ-PIPE-060's criterion
+        13 owns the processing log, since both now state it.
+
   - id: REQ-GHUB-015
     title: GitHub Issues as the QA remediation ticketing system
     story: >
@@ -2556,32 +2780,9 @@ requirements:
       - THE SYSTEM SHALL load every table in a delivery into staging
         before running QA over that delivery, so that a check is never
         evaluated against a table still mid-load.
-      - THE SYSTEM SHALL resolve each logical table name a check uses to
-        exactly one physical table, through a per-run schema containing
-        only views, and SHALL discard that schema once the run
-        completes.
-      - THE SYSTEM SHALL route every read of supply data through that
-        per-run schema, and SHALL NOT query a physical table directly
-        from any check, tool invocation or downstream reader.
-      - WHERE a logical name has more than one candidate physical table
-        and no basis on which to choose, THE SYSTEM SHALL NOT create a
-        view for it, and SHALL treat that name as absent for the run
-        rather than selecting one of the candidates.
-      - THE SYSTEM SHALL treat a table as present for the run only where
-        it resolves to exactly one version, and SHALL NOT treat the mere
-        existence of files claiming that name as presence.
-      - THE SYSTEM SHALL record, for every QA run, which physical
-        version of each table it read, in committed history that
-        outlives the discarded per-run schema.
-      - THE SYSTEM SHALL name a per-run schema so that one left behind
-        by an interrupted run is identifiable and removable without
-        reference to any other record.
       - THE SYSTEM SHALL evaluate a check once, against the state
         current at that moment, and SHALL NOT recompute it for a
         historical arrival.
-      - THE SYSTEM SHALL hold all period schemas, the staging schema and
-        the rejected schema in one database, and SHALL NOT create a
-        database per run.
     non_functional_requirements:
       - CI must never open or query a warehouse. This is real-run-time
         work only, the same rule dataset_stats.py follows - anything a
@@ -2602,6 +2803,21 @@ requirements:
         say plainly what it would be otherwise.
     dependencies: [REQ-PIPE-034]
     decisions:
+      - >
+        SCOPE NARROWED 2026-09-24 (Keith), in a requirement already
+        signed on 2026-09-23. This covered three separable things: the
+        PERIOD SCHEMAS it keeps, the per-run VIEW SCHEMA, and ONE
+        DATABASE. The latter two moved to REQ-PIPE-068 because delivery
+        sprint 8 needs them and this requirement's own period-schema
+        half does not land until sprint 13 - and `status: built` is
+        CI-enforced across every criterion, so the register could not
+        otherwise record that the half sprint 8 needs is done.
+      - >
+        Criteria 11-16 and 18 as signed are now REQ-PIPE-068's criteria
+        1-7, unchanged in wording. Nothing was rewritten in the move;
+        only the id that owns them changed. What stays here is the
+        period-schema model, the temporal-reference rules, and the
+        once-only evaluation rule.
       - Decided AGAINST cross-period composition, and this requirement
         was rewritten on 2026-09-22 to remove it (plans/supply-model.md
         Thread J). Red-for-unrun is what killed it - a cross-table check
@@ -3120,32 +3336,13 @@ requirements:
         regenerate, open or query any data.
       - THE SYSTEM SHALL expose regeneration as a mothman subcommand
         rather than a bare script.
-      - THE SYSTEM SHALL record every delivery as its own committed
-        file, written once when the delivery is recognised, and SHALL
-        NOT append to, edit or re-write a delivery's file afterwards.
-      - THE SYSTEM SHALL store those files outside the per-dataset QA
-        results, in a location of their own, because a delivery spans
-        datasets and is not a QA result.
-      - THE SYSTEM SHALL record, in a delivery's own file, every table
-        it carried and the dataset each was attributed to, and SHALL NOT
-        record in it any outcome that is not known at recognition time.
       - THE SYSTEM SHALL record each table's LOAD OUTCOME as its own
         committed record, separate from the delivery's file, so that an
         arrival with nothing loadable is still a recorded arrival
         without the delivery's file ever being rewritten.
-      - THE SYSTEM SHALL make the delivery record queryable as SQL
-        directly from the committed files, and SHALL NOT maintain a
-        second copy of it in the warehouse.
-      - THE SYSTEM SHALL preserve the recorded offset of every instant
-        read back out of a delivery file, and SHALL NOT let it be
-        inferred as a naive or UTC-normalised value.
       - THE SYSTEM SHALL store, with a QA run's own committed results,
         which physical table each logical name resolved to for that
         run.
-      - THE SYSTEM SHALL regenerate the delivery log from scratch
-        alongside the QA results, under the same delete-and-regenerate
-        rule, and SHALL NOT leave delivery records describing a history
-        that no longer exists.
     non_functional_requirements:
       - Deleting today's committed qa_results/ is a one-off exception to
         CLAUDE.md's rule that nothing in it is ever regenerated away. It
@@ -3178,6 +3375,26 @@ requirements:
         same history and a diff stays a real correctness check.
     dependencies: [REQ-PIPE-034, REQ-PIPE-036, REQ-QAC-037]
     decisions:
+      - >
+        SCOPE NARROWED 2026-09-24 (Keith), in a requirement already
+        signed on 2026-09-23, and for the same reason as REQ-PIPE-035's
+        split the same day. This covered two separable things: RE-KEYING
+        committed QA history per dataset, which it keeps, and the
+        DELIVERY LOG, which moved to REQ-PIPE-069.
+      - >
+        The delivery log moved FORWARD, to sit with recognition at
+        delivery sprint 7 rather than staying at sprint 14, on two
+        grounds. Recognition is what WRITES it - criterion 8 as signed
+        said "written once when the delivery is recognised" - and
+        REQ-PIPE-058's collision gate has no corpus without it.
+      - >
+        Criteria 8, 9, 10, 12, 13 and 15 as signed are now
+        REQ-PIPE-069's criteria 1-6, unchanged in wording. Criteria 11
+        and 14 were deliberately NOT moved: 11 (record each table's load
+        outcome) restates REQ-PIPE-060 criterion 13, and 14 (which
+        physical table each logical name resolved to) restates what is
+        now REQ-PIPE-068 criterion 5. Both duplications are flagged as
+        open questions rather than silently resolved by the split.
       - Decided to DELETE and regenerate rather than migrate (Keith,
         2026-09-21, in as many words - "because the current data is all
         synthetic, I'm happy to delete it all and regenerate it. We
