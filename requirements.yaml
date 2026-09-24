@@ -1173,6 +1173,9 @@ requirements:
   - id: REQ-DASH-070
     title: Supply anomalies and outstanding decisions have one presentation, aggregated and never a data verdict
     date_written: "2026-09-24"
+    signed_off:
+      by: Keith
+      date: "2026-09-24"
     story: >
       As a data engineer with thirty datasets to watch, I want everything
       that needs a person presented in one place with a count, and
@@ -1300,19 +1303,28 @@ requirements:
         uncertain in the feed but rendered as a confident verdict on the
         dataset page is the false-confidence problem REQ-PIPE-065's
         MoSCoW was raised to MUST over.
-    open_questions:
       - >
-        Whether a non-blocking review item (REQ-PIPE-065's uncertain
-        assignment) belongs in the same element as the blocking states
-        with a visible distinction, or on a separate review surface.
-        Criterion 3 assumes the former.
+        SETTLED 2026-09-24 (Keith), resolving pre-build Q7: an uncertain
+        assignment SHARES the one element with the blocking states, with
+        criterion 3's visible distinction carrying the difference.
+        Rejected a separate review surface. The total is what a person
+        acts on - "six things waiting for me" is the number - and two
+        surfaces means nobody knows it. The distinction carries what
+        kind; the count carries the urgency.
       - >
-        What "reported on every run" means for REQ-PIPE-057's in-flight
-        delivery on a surface that shows state rather than a run log -
-        one row carrying a run count, or a literal row per run per
-        delivery. A derived count may or may not cross REQ-PIPE-057
-        criterion 6's prohibition on "any record of how long a delivery
-        has been present".
+        The risk that argues for a separate surface is real and is what
+        criterion 3 exists to manage: REQ-PIPE-065's uncertain
+        assignment is genuinely NON-BLOCKING - the supply was filed,
+        just uncertainly - and mixing a non-blocking item into a work
+        queue with a weak distinction is how people learn to ignore the
+        queue, which is the failure both aggregation NFRs already name.
+      - >
+        SETTLED 2026-09-24 (Keith), resolving pre-build Q10: the
+        in-flight delivery is rendered from a committed RUN-LEVEL
+        observation, framed as at the last regeneration. Neither drafted
+        option was buildable - see REQ-PIPE-057's own decisions for the
+        gap underneath the question and for why the record's subject had
+        to change from the delivery to the run.
 
   - id: REQ-GHUB-015
     title: GitHub Issues as the QA remediation ticketing system
@@ -7524,6 +7536,7 @@ requirements:
       - "THE SYSTEM SHALL treat a delivery as received only where our own receipt record for it exists."
       - "IF a delivery is present with no receipt record, THEN THE SYSTEM SHALL leave it unprocessed, SHALL continue processing every other delivery, and SHALL report it on every run as an informational observation."
       - "THE SYSTEM SHALL NOT require a configured interval, a file modification time, or any record of how long a delivery has been present, in order to decide whether to report a missing receipt."
+      - "WHERE a delivery is present with no receipt record, THE SYSTEM SHALL commit, as an observation of that run, the delivery's name and the names of the files then present in it, and SHALL NOT record it as a delivery received."
       - "THE SYSTEM SHALL derive which collections a delivery is for from the datasets its own files were attributed to, WHERE one delivery may be for more than one collection."
       - "THE SYSTEM SHALL NOT derive the receipt instant, the period, the dataset, the collection or the processing order from a delivery's name."
       - "WHERE a delivery contains a file attributed to no dataset, THE SYSTEM SHALL record it as an unrecognised artefact, SHALL report it at WARNING level rather than informational, and SHALL NOT fail the delivery, check it or promote it."
@@ -7675,6 +7688,72 @@ requirements:
         dashboard shows, but it stops being incidental and becomes
         load-bearing here, because a hold is work waiting on a human
         rather than a status anyone is browsing.
+      - >
+        SETTLED 2026-09-24 (Keith), resolving pre-build Q10 and a gap
+        underneath it: an in-flight delivery is committed AS AN
+        OBSERVATION OF THE RUN, naming the delivery and the files then
+        present in it. The dashboard renders it framed as at the last
+        regeneration - his own words, "as at the time that this
+        dashboard was last regenerated, there were X in-flight
+        deliveries".
+      - >
+        THE GAP THAT MADE Q10 UNANSWERABLE AS POSED, recorded because it
+        is not visible from any single criterion. Criterion 4 treats a
+        delivery as received only where our receipt exists, and
+        REQ-PIPE-069 writes the committed delivery file AT RECOGNITION -
+        so an in-flight delivery, having no receipt, is never recognised
+        and leaves NO COMMITTED TRACE AT ALL. Criterion 5 nonetheless
+        requires it reported on every run, and this requirement's own
+        CLI-does-things decision makes the dashboard the only reader of
+        committed history. The thing that had to be reported had nowhere
+        to land, so both drafted options - one row carrying a run count,
+        a literal row per run - presupposed a trail this design never
+        wrote.
+      - >
+        WHAT RESOLVED IT was changing the SUBJECT of the record rather
+        than relaxing any rule. Committing "delivery X is in flight" is
+        a permanent record about a delivery we have not accepted - the
+        wrong shape, and it would sit in history beside records of
+        things that actually happened. Committing "the run at 14:32
+        observed these deliveries in flight" is a record about THE RUN,
+        which genuinely happened and genuinely saw that. The as-at
+        framing is then honest labelling rather than a caveat, and it is
+        what the dashboard already is: CURRENT_AS_OF and the snapshot
+        archive rest on the same premise.
+      - >
+        FILENAMES, not just the delivery name, and not a count. A count
+        answers "is anything in flight"; the question worth asking is
+        "is anything STUCK", which needs to distinguish three deliveries
+        flowing through from the same three sitting there for a week.
+        Filenames go further: a stuck delivery's diagnosis is usually
+        WHICH files made it, so a file list going 2, 4, 6 across runs
+        reads as an upload progressing and one stuck at 2 reads as one
+        that died. Reading a directory listing records no contents,
+        which is the same line this requirement already draws for an
+        unrecognised artefact.
+      - >
+        REJECTED, having been this session's own recommendation: making
+        the in-flight report CLI-ONLY terminal output, on the grounds
+        that an in-flight delivery is transient by definition. It
+        satisfies criterion 5 and needs no committed record, but it
+        loses the one genuinely bad case - a delivery whose boundary
+        never closes because something upstream is broken would be
+        visible only to whoever ran the pipeline, never on the
+        dashboard. In-flight being the NORMAL state is exactly what
+        would have let a stuck one hide.
+      - >
+        CONSEQUENCE, named rather than discovered: these records CHURN
+        in a way no other committed record here does. An in-flight
+        delivery is mid-upload by definition, so its file list
+        legitimately differs run to run - which is the signal, and also
+        makes this the one committed record expected to change between
+        observations rather than being written once and left alone.
+      - >
+        Criterion 6 is untouched by this. It forbids requiring a record
+        of how long a delivery has been present IN ORDER TO DECIDE
+        WHETHER TO REPORT; reporting stays unconditional on every run,
+        and a reader deriving persistence from run history afterwards is
+        not the decision input.
 
       - >
         SETTLED 2026-09-24 (Keith): a delivery with no receipt is
