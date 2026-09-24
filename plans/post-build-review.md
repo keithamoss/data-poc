@@ -2105,6 +2105,54 @@ here as its own question, not acted on.
     third of each Perth day it classifies a date on the wrong side of
     "today". Same guard, same conversation, one fix.
 
+    **ANSWERED 2026-09-25, and the answer escalates this.** Keith asked
+    the right question - "don't we have a solid way for people to not
+    be able to retroactively change CHECKS? Why don't we just apply
+    that?" - and the honest answer is **no, we do not. It is the same
+    mechanism with the same hole.**
+
+    `qa_tools/common/validate_check_lifecycle.py` compares the working
+    tree against `collect_checks("HEAD~1")`. One job in
+    `deploy-pages.yml` runs both gates at `fetch-depth: 2`, and that
+    workflow's own comment says so: "Needs HEAD~1 for its past-date
+    guard - the same fetch-depth: 2 this job already sets for the
+    check-lifecycle diff below". So a push of two or more commits is
+    only ever checked on its last one, **for the 257 hand-authored
+    checks as much as for the calendars.** Change a check's threshold
+    in commit A, land commit B on top, and the gate protecting Thread
+    D never sees it.
+
+    **So this is not a schedule finding. It is a finding about the one
+    mechanism both gates share**, and it is worse where it was not
+    being looked at: the check gate is what stands between a quietly
+    edited threshold and a QA history that no longer means what it
+    said.
+
+    **The RULES should stay different, though, and that is worth being
+    precise about** - applying the check gate's contract wholesale to
+    calendars would be weaker than what calendars need:
+
+    - **A check's config changing is LEGITIMATE.** The rule is "say
+      what you did", so a changelog entry is the right escape hatch and
+      the gate is a documentation gate.
+    - **A past calendar date moving is NOT legitimate**, at any level
+      of documentation. It changes what already-filed history was
+      judged against - a supply that was late becomes on time. A
+      changelog entry does not make that acceptable, so the escape
+      hatch that clears the finding on ANY changelog difference is
+      wrong twice over: too loose, and conceptually the wrong shape.
+
+    **Which points at option (c) for both.** Sealing - a committed
+    fingerprint of what has already elapsed - fixes the shared hole
+    without depending on fetch depth, push shape or checkout, and it
+    lets each gate keep its own rule about what a seal MEANS: for
+    checks, "changed, and here is the changelog entry"; for past dates,
+    "cannot change".
+
+    **Still Keith's call**, since it is now a bigger change than the
+    schedule guard alone. Recorded here because the discovery belongs
+    with the finding that prompted it.
+
     **Cost:** small to document, larger to close. **Recommendation:**
     decide which, and write down whichever is chosen - an
     under-documented guard is one a future session will trust further
