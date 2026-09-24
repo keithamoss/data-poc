@@ -134,6 +134,12 @@ releases:
               build yet.
       - category: Improved
         items:
+          - headline: A calendar mistake is caught before you push
+            components: ["Testing & dev tooling"]
+            description: >
+              Editing the delivery calendars now runs the schedule check
+              as you commit, rather than waiting for the build. It takes
+              about a second and reads no data.
           - headline: "--collection, because that is what it takes"
             components: ["Testing & dev tooling"]
             description: >

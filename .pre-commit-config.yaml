@@ -48,3 +48,29 @@ repos:
         language: system
         files: ^\.claude/agents/.*\.md$
         pass_filenames: false
+  # The schedule/asset configuration gate, at commit time rather than
+  # only in CI. Keith's own call, 2026-09-25: a one-character mistake in
+  # a calendar name can leave six datasets expecting nothing, and
+  # finding that out after a push is a slow way to learn it. Config
+  # only - nothing here opens data/ or a warehouse - so it costs ~1.2s.
+  #
+  # WHAT IT DOES NOT DO, recorded so nobody later reads it as covering
+  # more than it does (plans/post-build-review.md #19): it does not fix
+  # the case where a typo'd calendar name produces N identical errors
+  # whose suggested fix steers you to the wrong edit. That path ends in
+  # a VALID configuration - point the datasets at the misspelling and
+  # the gate goes green - so running the same validator sooner, or more
+  # often, still goes green. Only naming the common cause fixes that,
+  # and it is a separate piece of work.
+  #
+  # `check --only schedule` rather than `schedule validate` directly,
+  # matching mothman check's own --only help text, which names a
+  # pre-commit hook as what that option is for.
+  - repo: local
+    hooks:
+      - id: mothman-check-schedule
+        name: schedule configuration is valid
+        entry: uv run mothman check --only schedule
+        language: system
+        files: ^contract/.*\.ya?ml$
+        pass_filenames: false

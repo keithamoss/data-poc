@@ -951,6 +951,24 @@ just now, not by reading the critic's transcript.
     **Keith's call**, and the critic's Q2 offers exactly that split:
     (a) add the cause line, (b) stop listing the typo, (c) both.
 
+    **STILL OPEN.** Keith asked on 2026-09-25 whether a pre-commit hook
+    would solve this instead. **It does not, and the reason is the
+    finding itself:** the harmful path ends in a VALID configuration.
+    Point the six datasets at `quarterley` as the text instructs and
+    the gate goes GREEN - so running the same validator sooner, or on
+    every commit, is still green. A hook changes WHEN you see the
+    message, not what it says, and arguably makes the bad instruction
+    more likely to be followed, since you are mid-commit and want to
+    move on.
+
+    **The hook was worth adding on its own merits and has been**, as a
+    separate thing (`mothman-check-schedule` in
+    `.pre-commit-config.yaml`, 2026-09-25): the gate is config-only and
+    runs in ~1.2s, and finding a calendar mistake at commit rather than
+    after a push is a real improvement to the loop. It is deliberately
+    documented in that file as NOT covering this item, so a later
+    reader does not take it for more than it is.
+
 20. **[todo, 2026-09-24]** **[Testing & dev tooling]** **[A4/A5] One
     mistake produces two errors in two idioms, and the generated half of
     the fix lines names nothing.**
