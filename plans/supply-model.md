@@ -541,7 +541,36 @@ hold, is untouched and remains the half that cannot be wrong. Nothing is
 misfiled under any of these options; what varied was only how early the
 warning comes.
 
-### Other findings worth carrying, not yet actioned
+### Other findings - ALL CARRIED INTO REQUIREMENTS, 2026-09-24
+
+**This section is now safe to delete with the rest of this write-up.**
+Every finding below lives in a requirement's `decisions:` as well, which
+is the permanent artefact - carried deliberately rather than left here,
+because this file is working material and `CLAUDE.md`'s own rule is that
+a decision existing only in deleted prose is a decision lost. Where each
+went:
+
+- Child Protection not using pattern attribution, the `path_for()`
+  anti-pattern, `docs/delivery-format.md` being normative and falsified,
+  the ReDoS length cap making anchoring structural, and which of the two
+  regex matchers is retired -> **`REQ-PIPE-058`**.
+- Recognition becoming a threaded pass rather than a function ten
+  callers invoke, `path_for()` being called unconditionally at six of
+  them, and the three security items (delivery-name validation at the
+  new CLI boundary, no field a content sample could occupy, `textContent`
+  not `innerHTML`) -> **`REQ-PIPE-057`**.
+- The fourth CSV-to-DuckDB loader, the staged table name never being
+  supplier-derived, and the global staging schema's sensitivity ->
+  **`REQ-PIPE-060`**.
+- "Stage sequentially is a control-flow change, not a flag" ->
+  **`REQ-PIPE-060`**, as a CORRECTION to a decision signed the same
+  evening that had claimed the cost was "a flag the tool already has".
+  Verified against the real code: `--sequential` is one flag on a single
+  fan-out covering everything a run does, so setting it makes the WHOLE
+  pipeline serial rather than just staging.
+
+The original text follows.
+
 
 - **Child Protection does not use pattern attribution at all.**
   `qa_tools/cp/build_cp_warehouses.py` loads by hardcoded filename in a

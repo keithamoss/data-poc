@@ -7866,6 +7866,41 @@ requirements:
         understood at all, and the dangerous reading is that it is a
         supply we failed to claim. Knowing what something is, is the
         difference.
+      - >
+        SCOPE, from delivery-architect 2026-09-24, carried here because
+        it is larger than this requirement's wording implies:
+        recognition must become A PASS WHOSE RESULT IS THREADED, not a
+        function callers invoke. arrivals_for() is called from TEN sites
+        today - cli/bdm.py, cli/cp.py, pipeline/load.py, both
+        build_*_warehouses modules, both orchestrate_* modules and four
+        run_* tool modules - and list_deliveries() re-reads every
+        directory and every receipt on each call, with only
+        _patterns_for cached. So the read-each-delivery-once-per-run NFR
+        above is a refactor across all ten, not an optimisation inside
+        one.
+      - >
+        Related, and the part most likely to be missed: Arrival.
+        path_for() is called UNCONDITIONALLY at six of those sites, and
+        REQ-PIPE-059 turns its DeliveryFormatError into an operational
+        state. If the hold is handled only inside new code, a held
+        dataset still takes mothman bdm qa's run listing down, because
+        cli/bdm.py's load_manifest() calls path_for() inside a
+        comprehension. The hold has to be handled where an Arrival is
+        CONSUMED, not only where it is produced.
+      - >
+        SECURITY, three items, all cheap and structural rather than
+        matters of care. (1) validate_delivery_name() exists but is
+        applied only by write_delivery() - read_delivery() and
+        read_receipt() do none, safe today only because the name comes
+        from iterdir(). The mothman subcommand this requirement adds
+        will take a delivery name as an ARGUMENT, which closes that
+        loop: validate at the CLI boundary and re-check containment
+        before opening. (2) An unrecognised artefact's NAME is recorded
+        and its CONTENTS never are - make that structural by giving the
+        anomaly record no field a content sample could go in, rather
+        than relying on nobody adding one while debugging. (3) This repo
+        is public and whatever is reported gets published, so the render
+        path must reach the DOM via textContent, never innerHTML.
   - id: REQ-PIPE-058
     title: A file's dataset comes from that dataset's own declared pattern, and the patterns are gated
     date_written: "2026-09-23"
@@ -8012,6 +8047,29 @@ requirements:
         configuration edit with no code change" holds for BDM and not
         for CP until that loop is rewritten, which is part of this
         requirement's work rather than a separate tidy-up.
+      - >
+        SECURITY, from delivery-architect 2026-09-24, and it makes
+        criterion 5's anchoring structural rather than a review item.
+        The ReDoS residual Keith accepted is bounded mechanically, not
+        by trusting the author: cap filename length before matching
+        (anything over 255 characters is already invalid on every
+        filesystem this runs on), compile every pattern ONCE at config
+        load and raise a NAMED CONFIG ERROR rather than a stack trace at
+        recognition time, and match with re.fullmatch rather than
+        relying on authors remembering to anchor. Rejecting
+        backreferences and nested quantifiers at the gate is optional;
+        the length cap is not.
+      - >
+        RETIREMENT, so the right thing is deleted: criterion 4 forbids
+        reusing the S3 keyPattern as the filename matcher, which retires
+        qa_tools/common/delivery.py's _filename_pattern_to_regex - the
+        one that takes only a key's LAST SEGMENT and expands
+        {placeholder} to a non-separator run. qa_tools/common/
+        file_arrival.py's _pattern_to_regex legitimately SURVIVES: it
+        matches whole S3 keys with named groups and is the real
+        transport concern aws/'s handlers use. Two matchers with
+        different semantics is exactly what criterion 4 is separating,
+        so say which one goes or somebody deletes the wrong one.
 
       - >
         SETTLED 2026-09-24 (Keith): duplicate attribution is caught by a
@@ -8383,6 +8441,46 @@ requirements:
         reading - "we already have --sequential, we are done" - is the
         one a builder reaches for first, and it silently costs the
         parallel default for the entire suite.
+      - >
+        SCOPE, from delivery-architect 2026-09-24: THIS WOULD BE THE
+        FOURTH CSV-TO-DUCKDB LOADER unless it replaces the others.
+        Three are live today - pipeline/load.py's load_all(),
+        qa_tools/bdm/build_per_run_warehouses.py and
+        qa_tools/cp/build_cp_warehouses.py - and all three do
+        CREATE OR REPLACE TABLE ... read_csv_auto over
+        qa_tools/common/csv_io. The concept inventory already lists the
+        two per-run builders as retired by REQ-PIPE-035, and this
+        requirement's own decisions already call out
+        build_cp_warehouses.py's CREATE OR REPLACE as the
+        cheapest-and-wrong implementation.
+      - >
+        Why that matters beyond tidiness: if the staging loader lands
+        BESIDE them rather than replacing them, the repo carries four
+        loaders, two live and two "to be deleted later" - which is the
+        precise condition that produced the generator/
+        synthetic_data_generator signature drift this project has
+        already been bitten by. The retirement belongs in this batch,
+        consistent with REQ-PIPE-068's single-database half having
+        already moved forward to sprint 8.
+      - >
+        SECURITY: criterion 4 needs a unique physical table name per
+        arrival, and it must be built from OUR OWN dataset id and
+        receipt instant - never from a supplier's filename or the
+        delivery name. The existing loaders f-string table names
+        straight into DDL, safe only because the name comes from a
+        hardcoded list, and DuckDB's parameter binding covers values,
+        not identifiers. If anything supplier-derived ever reaches an
+        identifier it must be validated against a strict pattern and
+        quoted.
+      - >
+        The GLOBAL STAGING SCHEMA is the most sensitive artefact this
+        design creates after the period schemas - it spans agencies,
+        holds every supply ever received including the wrong ones, and
+        is never emptied. Retention being out of PoC scope is a
+        deliberate decision recorded above, not an oversight, and that
+        should be said in the module's own docstring so a later session
+        neither reads it as a gap nor quietly adds a cleanup that
+        destroys history.
       - >
         SETTLED 2026-09-24 (Keith): THIS REQUIREMENT OWNS THE PROCESSING
         LOG OUTRIGHT, and REQ-PIPE-038's criterion 8 was dropped. That
