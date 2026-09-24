@@ -8092,6 +8092,9 @@ requirements:
   - id: REQ-PIPE-067
     title: An arrival verdict follows its filing, and is never a frozen fact
     date_written: "2026-09-23"
+    signed_off:
+      by: Keith
+      date: "2026-09-24"
     story: "As an agency data owner, I want a supply that was reported late only because it was filed wrongly to stop reading late once it is filed correctly, so that the record never keeps a verdict everybody knows to be untrue."
     moscow: must
     status: not_started
@@ -8114,3 +8117,21 @@ requirements:
       - "Decided re-filing does NOT go through un-decide, and this was rejected explicitly rather than never considered. It looks natural - demote to staging, promote into the other period, no third operation - and it was the shape originally proposed. Un-decide and re-file are different acts for different reasons: un-decide says 'this needs another look', re-file says 'this belongs in a different period'. Sharing a mechanism would cost the log its legibility for no saving worth having."
       - "Recorded as a boundary: re-filing itself, its warning when the target slot is already filled, and the rule that a re-file into an occupied slot SUPERSEDES what is there, are sprint 11 and 12 work. This requirement owns only what happens to the VERDICT when a filing moves, which is why it can be built and tested before the write path exists - by moving a filing in a test rather than through the real operator path."
       - "Decided the dashboard's JS never recomputes classification, which is what makes a mutable verdict safe rather than a source of two answers. The verdict travels with the supply; the page renders it."
+      - >
+        SETTLED 2026-09-24 (Keith): CRITERION 5 IS BUILDABLE NOW AND ITS
+        TRACE IS NOT NAVIGABLE UNTIL SPRINT 12. It requires a recomputed
+        classification to be traceable to the re-filing that caused it,
+        and re-filing is recorded in the DECISION LOG, which is sprint
+        12 work. The boundary decision above says this requirement can
+        be built and tested before the write path exists, by moving a
+        filing in a test - and a test that moves a filing produces no
+        log entry to point at.
+      - >
+        So the criterion is met by RECORDING THE REFERENCE - the
+        recomputation carries an identifier for the re-filing that
+        caused it - and that reference dangles until the decision log
+        exists to resolve it. Stated here rather than left for whoever
+        builds it to discover, because the alternative failure is
+        specific: five of six criteria built, the sixth quietly skipped
+        as un-buildable, and the requirement reported done.
+
