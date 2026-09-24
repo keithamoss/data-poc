@@ -311,3 +311,105 @@ anything here that turns into real build work becomes a requirement in
    comparison needs no live data access; per `CLAUDE.md`'s hard rule it
    would still be computed at run time by whoever legitimately holds a
    connection, never in the dashboard build.
+
+6. **[todo, 2026-09-24]** **[QA checks & contract]** **Known
+   date-of-birth outliers, declared explicitly, with a tiered
+   percentage tolerance.** Keith's own ask, 2026-09-24. Some bad dates
+   are KNOWN - a legacy placeholder, a specific bad batch - and they
+   come as individual dates or as a date RANGE. He wants those named,
+   and then a tolerance on how many rows may carry one, in bands:
+   roughly 1% acceptable, 2% amber, above 3% red.
+
+   **The semantics to hold on to, because the wording cuts both ways.**
+   These are values known to be BAD, and we TOLERATE them up to a
+   threshold. That is a different check from the plausible-range one
+   already in `contract/bdm-birth-registrations-soda-checks.yml`
+   (`date_of_birth < DATE '1900-01-01' OR date_of_birth >
+   CURRENT_DATE`), which catches UNKNOWN bad dates and tolerates none
+   of them - it is a `failed rows` check, so a single row fails it
+   outright, with no warn tier and no percentage at all. Two checks,
+   deliberately: a named, tolerated defect and an unrecognised one are
+   not the same event, and collapsing them means either the known
+   placeholder reds the dataset forever or the unknown date gets a
+   tolerance it should never have.
+
+   **VERIFIED 2026-09-24 against the installed `soda-core 3.5.6`** by
+   running real scans over a ten-row DuckDB table, not from docs.
+   Two routes work and two plausible-looking ones fail silently:
+
+   - **WORKS - individual dates.** `invalid_percent(date_of_birth)` with
+     `invalid values: ['1900-01-01', '1800-01-01']` and `warn: when >
+     1%` / `fail: when > 3%`. Evaluated correctly: outcome `fail`,
+     value `20.0` for two sentinel rows in ten. The two thresholds give
+     exactly the three bands Keith described - clean below warn, amber
+     between, red above fail - which is the same pattern
+     `invalid_percent(sex)` already uses in this file.
+   - **WORKS - dates AND ranges.** A user-defined metric carrying a SQL
+     expression, with the same tiers:
+     `known_outlier_percent expression:` computing
+     `100.0 * COUNT(CASE WHEN date_of_birth IN (...) OR date_of_birth
+     BETWEEN ... THEN 1 END) / COUNT(*)`, `warn: when > 1`, `fail: when
+     > 3`. Evaluated correctly: outcome `fail`, value `30.0` for three
+     rows in ten. This is the route that handles a range, and it
+     handles individual dates too, so it can carry the whole feature.
+   - **DOES NOT WORK - `valid min` / `valid max` with dates.** Soda
+     parses these as floats: `valid min must be an number (float), but
+     was '1900-01-02'`, quoted or not. There is no date-range form of
+     the built-in validity config.
+   - **DOES NOT WORK - `valid sql`.** Unsupported in this version:
+     "Skipping unsupported check configuration: valid sql".
+
+   **Both failures are SILENT FALSE GREENS, which is the part that
+   matters more than the feature.** In each case the misconfiguration
+   was logged as an error and the check still evaluated to **pass, with
+   value 0.0** - because with no validity criterion, nothing is invalid.
+   A person writing `valid min: '1900-01-01'` gets a green check that
+   looks like it is guarding the column and is guarding nothing. See
+   item 7, which is the general fix.
+
+   Still to decide: WHERE the outlier list lives (inline in the SodaCL
+   check, or in the ODCS contract beside the column it describes, which
+   is where a reader would look for it); whether the same mechanism is
+   wanted on other date columns or is specific to `date_of_birth`; and
+   the three prose fields `docs/check-authoring-rules.md` requires,
+   where `failure_indicates` has real work to do - "more rows than
+   agreed carry a known-bad date" is a different message from "a date we
+   do not recognise appeared".
+
+7. **[todo, 2026-09-24]** **[QA checks & contract]** **A misconfigured
+   Soda check passes silently, because the runners ignore Soda's own
+   error log.** Found 2026-09-24 while verifying item 6, and it is a
+   real defect rather than a design gap - three separate instances have
+   now turned up in one morning.
+
+   `qa_tools/bdm/run_soda_bdm.py` and `qa_tools/cp/run_soda_cp.py` both
+   call `scan.execute()` and go straight to `scan.get_scan_results()`.
+   Neither inspects the return value, and neither calls
+   `scan.has_error_logs()`. Soda reports a bad check configuration by
+   logging an ERROR and carrying on, so the three cases found today all
+   reach the dashboard as ordinary results:
+
+   - `valid sql` - unsupported, silently skipped, check then **passes**
+     at 0.0% invalid because nothing is being validated.
+   - `valid min` / `valid max` given a date - rejected as not-a-float,
+     check then **passes** at 0.0% for the same reason.
+   - a change-over-time check with no Soda Cloud - crashes in
+     evaluation, and the check vanishes from
+     `get_scan_results()["checks"]` entirely, so it reports nothing at
+     all (see item 4).
+
+   In every case `scan.has_error_logs()` was `True`, so the signal
+   exists and is simply not read. Two of the three produce a GREEN check
+   that guards nothing, and the third produces a `check_id` that is
+   declared, lifecycle-validated, and never reports - all three are the
+   false-green direction.
+
+   Not yet decided, and worth a moment because the obvious fix is too
+   blunt: whether an error should fail the whole scan (simple, and one
+   bad check then stops a dataset's entire QA run - the blast-radius
+   shape `REQ-PIPE-053` exists to avoid), or mark just the affected
+   checks as errored and surface them as needing attention, or be
+   caught at config time by a gate over the checks file so a broken
+   check never runs at all. The third is the most in keeping with how
+   this project already gates check lifecycle, and would not have
+   caught the change-over-time case, which only fails at run time.
