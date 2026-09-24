@@ -7767,6 +7767,9 @@ requirements:
   - id: REQ-PIPE-062
     title: A supply is assigned to a slot by rule, and the rule can never claim forward
     date_written: "2026-09-23"
+    signed_off:
+      by: Keith
+      date: "2026-09-24"
     story: "As an agency data owner, I want each supply attributed to the period it is actually for, so that a punctual supplier is never recorded as sending a very late resupply while the slot they actually filled goes overdue as a phantom missing delivery."
     moscow: must
     status: not_started
@@ -7810,6 +7813,33 @@ requirements:
       - "Rejected, again and for the record, DERIVING THE PERIOD FROM THE SUPPLY'S OWN CONTENT (circular - it infers the filing decision from the very data whose correctness is about to be tested, and a resupply exists precisely because the first attempt was wrong, possibly wrong in its dates) and the SUPPLIER-DECLARED PERIOD (unenforceable across a wide and varied supplier base, and the suppliers who would get it wrong are exactly the ones whose data most needs QA)."
       - "Decided this also DELETES the daily cutoff rule and the separate 'arrives a week early' case. Both are the same mechanism now: if a feed's supply genuinely lands the evening before, its due instant IS the evening before and the window opens accordingly - the schedule expresses it directly instead of a rule reinterpreting arrivals afterwards. TS-10 is the worked example: the same 22:00 arrival fills Tuesday on time or Monday late depending only on slot state."
       - "Decided nothing measures HOW EARLY a supply is in order to assign it (TS-9). Earliness is a reported consequence of the assignment, which is why classification can be a pure function of the assigned slot."
+      - >
+        SETTLED 2026-09-24 (Keith): a dataset whose supplies are FOR THE
+        FOLLOWING PERIOD needs no exception to criterion 5, and
+        criterion 5 stays absolute. He raised this as a per-dataset
+        property - "does it appear in a slot in this period, or does it
+        need to go into a slot in the next period?" - and it reads at
+        first like a head-on collision with the never-claim-forward
+        rule, which is why the answer is recorded here rather than left
+        to be re-derived.
+      - >
+        It is the SAME MECHANISM as the deleted daily-cutoff and
+        arrives-a-week-early cases directly above: the SCHEDULE
+        expresses it, not the rule. If a dataset's supplies are for the
+        following period, that period's slot carries a due instant and
+        claim window that are already open when the supply arrives - so
+        the window is open, nothing claims forward, and the assignment
+        rule is untouched. Slots are already per-dataset, so this needs
+        no new configuration axis either.
+      - >
+        Why it matters that this is NOT an exception: criterion 5 says
+        "under any rule or any circumstance", and an absolute rule with
+        one exception is how forward-claiming comes back. The general
+        principle worth carrying is the one the cutoff decision already
+        states - when an arrival seems to belong to a different period,
+        the answer is almost always that the CALENDAR is wrong, never
+        that the rule needs a special case. Originally raised as
+        plans/road-testing.md item 3, which this closes.
 
   - id: REQ-PIPE-063
     title: A slot stops being claimable once a later one is filled

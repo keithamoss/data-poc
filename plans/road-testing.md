@@ -115,9 +115,19 @@ anything here that turns into real build work becomes a requirement in
    without fixing the first risks two unexplained figures instead of
    one.
 
-3. **[investigate, 2026-09-24]** **[Pipeline & publishing]** **A
+3. **[done, 2026-09-24]** **[Pipeline & publishing]** **A
    delivery that belongs to the NEXT period rather than the current
-   one, decided per dataset.** Keith's own ask, 2026-09-24. Some
+   one, decided per dataset.**
+
+   **RESOLVED 2026-09-24 at `REQ-PIPE-062`'s sign-off, and the answer
+   is recorded there.** It is NOT an exception to criterion 5, which
+   stays absolute: the SCHEDULE expresses it, not the rule. That
+   dataset's slot for the following period carries a due instant and
+   claim window already open when the supply arrives, so nothing claims
+   forward. Slots are already per-dataset, so no new configuration axis
+   is needed. Same mechanism as the daily-cutoff and arrives-a-week-
+   early cases that requirement already deleted. The rest of this entry
+   is kept as the record of how it was raised. Keith's own ask, 2026-09-24. Some
    datasets' supplies are for the period they arrive in; others' are
    for the following one. His own framing: "does it appear in a slot in
    this period, or does it need to go into a slot in the next period?"
