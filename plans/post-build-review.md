@@ -543,7 +543,7 @@ post-build critic should see a requirement's own `evidence:`.
 
 ### From `delivery-dashboard-ux-critic` (2026-09-24)
 
-1. **[todo, 2026-09-24]** **[Dashboard UI]** **[F1] The executive tier
+1. **[done, 2026-09-24]** **[Dashboard UI]** **[F1] The executive tier
    counts every non-red, non-amber agency as GREEN - including
    `exhausted` and `nodata`.** The single most prominent sentence on the
    landing page can state that both agencies are healthy directly above
@@ -700,7 +700,7 @@ post-build critic should see a requirement's own `evidence:`.
    this is the most likely of anything in this file to become a real
    false-green incident.
 
-5. **[todo, 2026-09-24]** **[Dashboard UI]** **[F5] An uncaught
+5. **[done, 2026-09-24]** **[Dashboard UI]** **[F5] An uncaught
    `TypeError` on three of seven datasets, at the DEFAULT as-of, on an
    ordinary drill-down - and it ships past the zero-console-errors
    gate.**
@@ -805,7 +805,7 @@ post-build critic should see a requirement's own `evidence:`.
    **Recommendation:** resolve as part of sprint 8 rather than now, but
    see #20 - at 30 datasets the missing names are a hunt.
 
-8. **[todo, 2026-09-24]** **[Dashboard UI]** **[U1] You cannot reach a
+8. **[done, 2026-09-24]** **[Dashboard UI]** **[U1] You cannot reach a
    dataset from an agency page by keyboard at all.**
 
    **Verified.** The Tier-2 dataset rows - the primary drill-down, the
@@ -832,7 +832,7 @@ post-build critic should see a requirement's own `evidence:`.
    on Enter - the attribute and the behaviour, because the attribute
    alone is a tab stop that does nothing.
 
-9. **[todo, 2026-09-24]** **[Dashboard UI]** **[U2] Nine focusable
+9. **[done, 2026-09-24]** **[Dashboard UI]** **[U2] Nine focusable
    controls live inside closed, `aria-hidden="true"` drawers.** After
    the last on-screen control, focus disappears into invisible widgets
    with no focus indicator anywhere. A WCAG 4.1.2 violation, and
@@ -864,7 +864,7 @@ post-build critic should see a requirement's own `evidence:`.
    anything, which is the same "check the precondition actually held"
    discipline the rest of this pass has needed.
 
-10. **[todo, 2026-09-24]** **[Dashboard UI]** **[U3] `plans/dashboard.md`
+10. **[in-progress, 2026-09-24]** **[Dashboard UI]** **[U3] `plans/dashboard.md`
     #15 confirmed still present, both halves**, checked across four
     distinct views: `document.title` never updates, focus never moves on
     route change, no ARIA live region announces one, and there are **2
@@ -908,7 +908,7 @@ post-build critic should see a requirement's own `evidence:`.
     column or check. At 30 datasets with evolving schemas, stale column
     bookmarks are the common case, not the edge.
 
-12. **[todo, 2026-09-24]** **[Dashboard UI]** **[U5] The placeholder
+12. **[done, 2026-09-24]** **[Dashboard UI]** **[U5] The placeholder
     check is not deep-linkable and Back cannot close its panel.** A real
     keyed check behaves perfectly (URL gains `/check/<key>`, Back closes
     the panel and restores the drawer, Escape does the same and syncs
@@ -975,7 +975,7 @@ post-build critic should see a requirement's own `evidence:`.
 All of these were verified by this session running the real commands
 just now, not by reading the critic's transcript.
 
-17. **[todo, 2026-09-24]** **[Testing & dev tooling, Pipeline & publishing]** **[A1] The gate's success line asserts the exact
+17. **[done, 2026-09-24]** **[Testing & dev tooling, Pipeline & publishing]** **[A1] The gate's success line asserts the exact
     opposite of the warning three lines below it.**
 
     **Verified** at `qa_tools/common/validate_schedule.py:740` - the OK
@@ -1030,7 +1030,7 @@ just now, not by reading the critic's transcript.
     **Cost:** small, but it needs a decision about what "affected"
     means, since it now has to fan a calendar error out to its datasets.
 
-19. **[todo, 2026-09-24]** **[Testing & dev tooling]** **[A3] Every
+19. **[done, 2026-09-24]** **[Testing & dev tooling]** **[A3] Every
     error names a correction; the one it names is the wrong one, and
     the options offered include the typo.**
 
@@ -1145,7 +1145,7 @@ just now, not by reading the critic's transcript.
     **Cost:** small for the wording. Moderate for the double-fire, which
     is a real seam between two validators.
 
-21. **[todo, 2026-09-24]** **[Testing & dev tooling, Pipeline & publishing]** **[A6] The exhausted schedule wears the warning's
+21. **[done, 2026-09-24]** **[Testing & dev tooling, Pipeline & publishing]** **[A6] The exhausted schedule wears the warning's
     label, in the one place a maintainer would act.**
 
     **Verified** in `qa_tools/common/runway.py`. `warning_lines()`
@@ -1383,7 +1383,7 @@ just now, not by reading the critic's transcript.
     reader would actually wonder about - why `cp-case-workers` shows 10
     rows against 20 calendar dates - is answered only by inference.
 
-31. **[investigate, 2026-09-24]** **[Testing & dev tooling]** **[B13]
+31. **[done, 2026-09-24]** **[Testing & dev tooling]** **[B13]
     `--dataset` means two different things - and it is actually three.**
 
     **Verified, and the critic understated it.** `grep` across `cli/`:
@@ -1673,7 +1673,7 @@ here as its own question, not acted on.
     future session trusts instead of re-checking, which is the same
     failure `CLAUDE.md` records about a fabricated test count.
 
-37. **[investigate, 2026-09-24]** **[Data generation]** **[A6/B3] Three
+37. **[done, 2026-09-24]** **[Data generation]** **[A6/B3] Three
     `REQ-GEN-040` criteria describe capabilities no operator can reach.**
 
     **Verified by grep.** `partial_resupply=True` appears in the whole
@@ -1830,7 +1830,7 @@ here as its own question, not acted on.
     dates already have. **Recommendation: fix**, and it is a real
     correctness bug rather than a polish item, so a failing test first.
 
-43. **[todo, 2026-09-24]** **[Testing & dev tooling]** **[C1/C3/C4] Two
+43. **[done, 2026-09-24]** **[Testing & dev tooling]** **[C1/C3/C4] Two
     gates claimed to catch "a throw reaching a viewer" do not, and the
     gate's own three reporting criteria have no test at all.**
 
@@ -2019,7 +2019,7 @@ twice. It deliberately did not re-find the `TypeError`.
 
     **Cost:** trivial. **Recommendation: fix.**
 
-49. **[todo, 2026-09-24]** **[Dashboard UI]** **[V3/V5] The `nodata`
+49. **[in-progress, 2026-09-24]** **[Dashboard UI]** **[V3/V5] The `nodata`
     pill fails WCAG AA in both themes, and its dashed border is not
     visible at all.**
 
@@ -2179,7 +2179,7 @@ twice. It deliberately did not re-find the `TypeError`.
       string on the page uses `.mono`/IBM Plex Mono with tabular
       numerals.
 
-54. **[todo, 2026-09-24]** **[Dashboard UI]** **[V10/V14/V15] Layout
+54. **[in-progress, 2026-09-24]** **[Dashboard UI]** **[V10/V14/V15] Layout
     measure: the notice is 2.4× the page's own, the footer fails AA, and
     the exec grid is half empty.**
 
@@ -2210,7 +2210,7 @@ twice. It deliberately did not re-find the `TypeError`.
     tracks, cap the grid to its content, or leave it on the grounds that
     it self-corrects as the asset grows.
 
-55. **[todo, 2026-09-24]** **[Dashboard UI]** **[V17] Seven of eleven
+55. **[done, 2026-09-24]** **[Dashboard UI]** **[V17] Seven of eleven
     focusable element types fall back to Chrome's default focus ring.**
 
     **Verified in source:** `grep` finds `:focus-visible` rules at
