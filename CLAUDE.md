@@ -106,12 +106,19 @@ already scoped.
   was decided about each finding. Created 2026-09-24 at Keith's own
   ask, deliberately separate from the files above because those hold
   work not yet done and this holds judgements about code already
-  running. **It carries a standing rule stricter than the pre-build
-  one: Keith signs off EVERY finding before anything in shipped code
-  changes** - not a "trivially safe" fix, not a one-liner - and a
-  critic's report is a claim to be verified against the real code
-  before it is written up, not a verdict. Read it before acting on any
-  post-build critic output.
+  running. **It carries a standing rule about sign-off, AMENDED by
+  Keith on 2026-09-25 and narrower than it first was**: he signs off
+  significant defects, product decisions, changes to agreed behaviour
+  or design, and anything touching `requirements.yaml`'s own claims -
+  but minor bugs, wording, coverage and polish are no longer his to
+  approve ("I'm happy for you to fix minor bugs or do bits and pieces
+  of polish"). What did NOT relax: every finding is still written up
+  there whether or not it needed him, every defect fix still gets a
+  failing test first, and anything genuinely unclear gets flagged
+  rather than assumed minor. A critic's report is still a claim to be
+  verified against the real code before it is written up, not a
+  verdict. Read that file's own standing-rule section before acting on
+  any post-build critic output.
 
 **Finding what's currently PRIORITY, without reading all nine files.**
 Some items carry an explicit priority line Keith has set (`Priority:

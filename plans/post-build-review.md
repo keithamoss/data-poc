@@ -31,6 +31,47 @@ So the sequence is fixed, and it is not the same as the pre-build one:
    defect (`CLAUDE.md`'s standing rule), or a recorded decision to
    leave it alone.
 
+### AMENDED 2026-09-25 - the gate now applies to what is significant, not to everything
+
+Keith's own words, after the first thirteen findings had been walked
+through one at a time: "I don't actually care about reviewing all of
+them. I just want to know the ones that are significant or really
+require my decision as a product owner. I'm happy for you to fix minor
+bugs or do bits and pieces of polish."
+
+So step 4 above is narrowed, and steps 1-3 and 5 are unchanged.
+
+**Still needs his sign-off:**
+- A **significant defect** - one whose consequence is a wrong answer,
+  lost work, silently broken behaviour, or a false green. Flagged
+  before it is fixed, even when the fix itself is obvious, because he
+  is entitled to know the system did that.
+- Anything that is a **product decision**: what the dashboard should
+  say, what a state should mean, what is worth building.
+- Anything that **changes agreed behaviour or design**, including a
+  palette or layout change visible across the page, and anything that
+  reopens a decision already recorded.
+- Anything touching `requirements.yaml`'s own claims, since the
+  register is the permanent artefact.
+
+**Does not need it any more:** minor defects with one obvious right
+answer, wording, spacing, test coverage, and polish.
+
+**Two things that do NOT relax**, because they are what makes the
+narrower gate safe:
+1. **Everything still gets written up here**, fixed or not, with its
+   evidence. Delegating the decision is not delegating the record - he
+   must be able to find out afterwards what was changed and why.
+2. **A defect fix still gets a failing test first.** That is
+   `CLAUDE.md`'s rule and it never depended on who signed the finding
+   off.
+
+**And the judgement call is deliberately mine to make wrong in one
+direction only.** Where it is unclear whether something is minor, it
+gets flagged. Over-reporting costs him a sentence; under-reporting
+means shipped code changed on a judgement he never saw, which is the
+thing the original rule existed to prevent.
+
 **Why the gate is stricter here than for a new requirement.** A
 pre-build finding costs a conversation to act on. A post-build finding
 costs a change to something people are already relying on, and the
