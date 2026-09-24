@@ -7504,6 +7504,9 @@ requirements:
   - id: REQ-PIPE-060
     title: Staging asserts only arrival facts, and a table is there or it is not
     date_written: "2026-09-23"
+    signed_off:
+      by: Keith
+      date: "2026-09-24"
     story: "As whoever maintains this pipeline, I want every arriving file loaded into staging on the strength of arrival alone, so that a supply is checkable before anybody has decided where it belongs, and so that staging can never be wrong about anything."
     moscow: must
     status: not_started
@@ -7515,9 +7518,9 @@ requirements:
       - "THE SYSTEM SHALL name each staged table uniquely per arrival, carrying that arrival's instant, and SHALL NOT overwrite a table staged from an earlier arrival of the same dataset."
       - "IF a file cannot be loaded at all, THEN THE SYSTEM SHALL create no table for it, SHALL record the arrival and the reason it could not be loaded, and SHALL report that dataset's supply as red."
       - "WHERE one file in a delivery cannot be loaded, THE SYSTEM SHALL still stage every other file in that delivery."
-      - "THE SYSTEM SHALL make a staged table readable only once it has been loaded completely, so that an interrupted load leaves no partially-loaded table for a check to read."
+      - "THE SYSTEM SHALL make a staged table visible to a check only once that table's load record exists, so that an interrupted load leaves nothing a check can read."
       - "IF a load is interrupted, THEN THE SYSTEM SHALL leave that delivery in a state the next run can process from the beginning, and SHALL NOT treat a partially-staged delivery as staged."
-      - "THE SYSTEM SHALL serialise every write to the shared database, so that a parallel run can never attempt two writing processes against one database file."
+      - "THE SYSTEM SHALL NOT run two writing processes against one database file at the same time, and WHERE staging would otherwise fan out across parallel workers, THE SYSTEM SHALL stage sequentially."
       - "THE SYSTEM SHALL trigger checks from the arrival of a delivery, and SHALL NOT trigger them from a promotion."
       - "THE SYSTEM SHALL use only our own receipt instant as a supply's arrival time, and SHALL NOT use a timestamp inside the supplier's files, a column in their data or a file modification time."
       - "THE SYSTEM SHALL expose the staging load through a mothman subcommand."
@@ -7531,7 +7534,7 @@ requirements:
       - "WHEN a failed load is reprocessed, THE SYSTEM SHALL write a new load record rather than editing the failed one, and SHALL take the latest record for that table as current."
     non_functional_requirements:
       - "A crash between the staging load and QA currently has no defined behaviour, and the failure is silent in the worst direction: a truncated table in a global staging schema is indistinguishable from a real short supply and would be checked as real data. Loading must be all-or-nothing per table, and a partially-processed delivery must be recognisable as such."
-      - "DuckDB permits one PROCESS per database file - verified: while one holds a read-write connection a second writer fails AND a read-only reader fails with 'IO Error: Could not set lock on file'. mothman pipeline run is parallel by default and dbt runs as its own writing process, and the per-run databases that provide isolation for free today are removed by REQ-PIPE-035. This is a hard blocker, not a tuning concern."
+      - "DuckDB permits one PROCESS per database file - verified: while one holds a read-write connection a second writer fails AND a read-only reader fails with 'IO Error: Could not set lock on file'. mothman pipeline run fans out over a ProcessPoolExecutor and is parallel by default, and the per-run databases that provide isolation for free today are removed by REQ-PIPE-035 - so from this sprint on, two workers of a SINGLE invocation would collide on the file lock. Staging therefore runs sequentially, which is sufficient here and costs a flag that already exists. The concurrency problem this NFR used to call a hard blocker lands at sprint 15, with dbt as a second writing process, and belongs there."
       - "The global staging schema is new, spans every agency, holds every supply ever received including ones that were wrong, and is never emptied. In a real deployment it is the most sensitive artefact this design creates after the period schemas: an extract containing columns nobody should have sent sits there permanently. Retention is deliberately out of PoC scope, and that deferral belongs in the register rather than only in prose due for deletion."
       - "Staging only grows. At ~30 datasets on a quarterly asset plus a daily one, with years of history and a new table per arrival rather than an overwrite, the table count is the thing that grows fastest in this design - so nothing may require enumerating every staged table to answer an ordinary question."
       - "CI and any read-committed-history path may never open or query the warehouse, including staging. Anything a later read needs must be computed here, at load time, by whoever legitimately has a connection, and committed alongside."
@@ -7649,6 +7652,50 @@ requirements:
         requires. Growth is one small file per table per delivery -
         roughly 11k a year at thirty datasets daily, the same order as
         qa_results/ already.
+      - >
+        SETTLED 2026-09-24 (Keith): criterion 7 reworded. It used to say
+        a staged table must be READABLE only once loaded completely,
+        which cannot be built alongside the rejection of a
+        whole-delivery transaction above. Without a transaction a
+        truncated table is physically present and physically readable -
+        that is exactly why deriving completeness from the catalogue was
+        rejected - so the criterion was true at one layer and false at
+        another.
+      - >
+        What actually delivers the guarantee is the LOAD RECORD plus
+        REQ-PIPE-035's ephemeral view: a check reads through a view, and
+        the view resolves only tables that have a record. PHYSICAL
+        PRESENCE IS NOT READABILITY, and that distinction is the whole
+        mechanism. Recorded because the old wording's honest
+        implementation was the transaction Keith turned down on scale,
+        so someone building from the criterion alone would have
+        reintroduced the rejected design believing they were following
+        the spec.
+      - >
+        SETTLED 2026-09-24 (Keith): criterion 9 softened, and the DuckDB
+        NFR with it. It used to require serialising every write to the
+        shared database, and the NFR called the one-process limit a hard
+        blocker - while the build-order decision above disposed of it by
+        noting dbt does not run until sprint 15. Both sat in this
+        requirement saying different things about the same risk.
+      - >
+        The part the sprint-15 reasoning did not cover, and it is real:
+        mothman pipeline run fans out over a ProcessPoolExecutor
+        (qa_tools/common/parallel_orchestrate.py) and is parallel by
+        default. The collision is therefore not between two people - it
+        is two worker processes of a SINGLE invocation, by one person,
+        on one machine, with dbt nowhere in sight. It is harmless today
+        only because each run gets its own per-run database, which
+        REQ-PIPE-035 removes.
+      - >
+        Keith's call, and it survives that correction rather than
+        resting on the version first put to him: this is a PoC, one
+        person runs it, and --sequential already exists. Staging runs
+        SEQUENTIALLY until sprint 15 makes real concurrency worth
+        solving - a deliberate, stated constraint rather than a gap, at
+        the cost of a flag the tool already has. The genuine concurrency
+        problem is dbt as a second writing process, and it belongs to
+        sprint 15.
 
   - id: REQ-PIPE-061
     title: Arrivals are processed in receipt order, and an interrupted run loses nothing
