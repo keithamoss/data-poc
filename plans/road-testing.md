@@ -606,3 +606,62 @@ anything here that turns into real build work becomes a requirement in
     `tests-js/supply-history.test.js` already covers this section's
     grouping logic and is the obvious home for anything asserting the
     rendered output.
+
+12. **[todo, 2026-09-24]** **[QA checks & contract]** **A completeness
+    check for a TALL dataset: every event must have exactly one row per
+    expected category.** Keith's own ask, 2026-09-24, with his own
+    worked example - a geocoding dataset holding one row per geocoding
+    event per ABS census year, so one geocoding event generates six
+    rows for six census years. Anything that violates that, we want to
+    know about.
+
+    **The generalisable rule underneath it**, which is what makes this
+    worth building rather than one bespoke query: *for every key, there
+    must be exactly one row for each member of a declared set.* Stated
+    that way it has three distinct violations, and they mean different
+    things operationally - worth separating rather than reporting one
+    count:
+    - a **missing** member (five years present, one absent) - an
+      incomplete event;
+    - a **duplicate** member (two rows for the same event and year) - a
+      double-load or a bad join, and the one most likely to skew any
+      downstream aggregate silently;
+    - an **unexpected** member (a year not in the declared set) - the
+      source has started emitting something nobody agreed to, which is
+      the same event class as an unrecognised arrival artefact.
+
+    **This is the PoC's first TALL dataset, and that is the part likely
+    to bite.** Every dataset here today is wide - one row per entity -
+    and several existing patterns quietly assume it:
+    - the **primary key is composite** (event plus census year). The
+      contract expresses uniqueness as `unique: true` on a single
+      column, and the check panel's failing-row sample renders
+      "primary key only" as a single value per row. Neither is wrong,
+      but neither has ever had to carry a two-part key.
+    - **`row_count` bands become a multiple.** A supply of N events is
+      6N rows, so the absolute band that works for a wide table needs
+      to be stated against events, or against rows with the multiplier
+      made explicit - otherwise a supply missing a whole census year
+      still lands comfortably inside a row-count band.
+    - a bare **`unique`** check on the event column would fail by
+      design, since every event legitimately appears six times.
+
+    **Open:** where the expected set of census years is DECLARED - a
+    literal list in the contract beside the column, which is how
+    `valid values` already works, or derived from the data, which would
+    make a wholly-missing year invisible because nothing would expect
+    it; whether six is fixed or grows, since a new census adds a
+    seventh and every historical event then looks incomplete unless the
+    expected set is scoped to when the event was geocoded; whether the
+    check reports per event or as a percentage of events, which is
+    `REQ-QAC`-style tiering and pairs with item 6's tolerance bands;
+    and which tool runs it - this is a `GROUP BY ... HAVING` shape,
+    so Soda's `failed rows` with a `fail query` or a dbt test, not any
+    built-in metric.
+
+    **Also unresolved, and prior to the check itself**: whether this
+    PoC gains a real geocoding dataset to demonstrate against, or
+    whether the pattern is shown on one of the existing collections.
+    There is no geocoding or census data in the repo today - checked -
+    so something has to be generated either way, and `plans/
+    data-generation.md` is where that lands rather than here.
