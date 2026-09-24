@@ -1198,6 +1198,13 @@ comparisons against the expected-supply sequence.
     is different PERIODS, not different SLOTS - per-table slots mean an
     ordinary six-table delivery already spans six slots.
 
+    **A third disposition exists and is NOT here**: sprint 25's
+    carry-forward, where no supply arrives at all and a human accepts
+    it never will. Promotion and rejection both act on a supply that
+    exists; that one acts on the absence of one. Noted here because
+    "promotion and rejection" reads like a complete set of outcomes and
+    is not.
+
 12. **[todo, 2026-09-21]** **[Pipeline & publishing]** **The decision
     log, and the GitHub Issues write path.** Append-only; who, when,
     what, which, why; automated decisions recorded the same way with the
@@ -1340,6 +1347,77 @@ comparisons against the expected-supply sequence.
     **Last, and deliberately**: it depends on both the decision log
     (sprint 12) and the as-of work (sprint 19), and nothing depends on
     it.
+
+25. **[todo, 2026-09-24]** **[Pipeline & publishing]** **CARRY-FORWARD:
+    a period whose supply never arrives, and a human accepts that it
+    never will.** Keith, 2026-09-24. A genuinely new concept, adjacent
+    to promotion and rejection (sprint 11) rather than part of either,
+    and it has no requirement anywhere yet.
+
+    **The situation.** A dataset's slot for a period goes unfilled, the
+    period passes, and a human concludes the supply is not coming. The
+    period's data is not missing in a business sense - last period's
+    data is still the best available answer - but today nothing lets
+    anyone SAY that. The slot stays overdue forever and the period
+    schema stays empty.
+
+    **The mechanism Keith described**, and it is the same machinery the
+    model already has rather than new architecture: create a VIEW in
+    the current period's schema that points back at the previous
+    period's table. Anything querying the period by its logical name
+    resolves to last period's data. That is exactly the
+    logical-name-to-physical-table indirection `REQ-PIPE-035` already
+    establishes, pointed one schema further back.
+
+    **It is a HUMAN DECISION, and the write path is the command line.**
+    Keith reasoned through and rejected GitHub Issues for this one, in
+    his own words: an issue needs something to open it, and a dataset
+    that never arrived produces no arrival, no QA run and therefore no
+    trigger. So there is nothing for the Issues path to hang off. This
+    is the first decision in the model whose write path is deliberately
+    NOT the Issues channel sprint 12 establishes - worth stating
+    explicitly, because "the dashboard is read-only, so decisions go
+    through Issues" would otherwise read as universal. The decision is
+    still recorded in the same append-only log, with the same who,
+    when, what, which and why.
+
+    **Naming is unsettled** - he offered "rollback" and "patch" as
+    candidates and neither convinced him. Both are misleading: nothing
+    is being reverted and nothing is being repaired. "Carry-forward" is
+    used above as a working label only, chosen because it says what
+    actually happens, and the real name is his to pick.
+
+    **Open questions, and the first two are the load-bearing ones:**
+
+    - **Does a carried-forward slot count as FILLED?** `REQ-PIPE-062`
+      criterion 6 says a slot is filled only where a supply has been
+      PROMOTED into it, and here nothing was. Say filled, and a late
+      supply arriving afterwards hits a filled slot and is held for a
+      human, which may well be right. Say unfilled, and the slot stays
+      overdue forever despite a human having explicitly settled it. A
+      third state - decided, not filled - may be the honest answer, and
+      it is not free: every rollup, every overdue calculation and every
+      status count would need to know about it.
+    - **What happens when the supply turns up anyway?** The carry-
+      forward has to be reversible - repoint the view at the real data
+      once it is promoted - and that is a second decision, not an
+      automatic consequence, or an arrival could silently overwrite a
+      human's call.
+    - **What does QA say about a carried-forward period?** There is no
+      supply, so there are no check results. The period cannot be green
+      (nothing was checked), and red is wrong (nothing is broken).
+      Keith's own view is that the dashboard does not NEED to know about
+      this, and that it would not hurt if it did - but the dashboard
+      already renders a status per dataset per period, so it will show
+      that period as SOMETHING. Deciding what, rather than discovering
+      it, is the work.
+    - **Does the carry-forward chain?** Two consecutive missed periods:
+      does period 3 point at period 2's view, or straight through to
+      period 1's real table? A chain of views is fragile and a resolved
+      pointer is a second thing to keep correct.
+    - **Which sprint.** It needs schema-per-period (sprint 13) to have a
+      period schema to create the view in, and the decision log (sprint
+      12) to record the decision, so it cannot land before either.
 
 **Why the dashboard sprints come last**: they render everything above.
 Building them earlier means building against a data shape still moving -
