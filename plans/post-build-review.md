@@ -73,6 +73,140 @@ check results across 60 runs, both datasets.
 
 ---
 
+## Queued for Keith - the visual critic's four questions
+
+**First thing when you are back, 2026-09-24 evening, your own ask.**
+These are the four from `delivery-dashboard-visual-critic`. They are
+here rather than in its own section below so you can answer them
+without reading 58 findings first - each is self-contained, and the
+finding number beside it has the measurements if you want them.
+
+They are the four where a critic could see the defect but not the right
+answer, and each would change what gets built. Every one of them is
+about something already shipped, so nothing moves until you say.
+
+Six more questions are behind these - four from the CLI critic (#17,
+#19, #21, #31) and two from the functional one (#1, #37). Say the word
+and they go in the same queue.
+
+### Q1. The executive tier is half empty, and that is a design call
+
+**What is there.** `.grid` uses `auto-fill`, so at 1180px it lays out
+four 284.5px tracks and fills two. The two real agency cards span 583px
+of a 1180px grid - **exactly half the front page is empty** - and the
+phantom tracks are held open rather than collapsed. This is the direct
+visual consequence of `REQ-DASH-055` removing three invented agencies
+from a grid that had been tuned for five. (#54)
+
+**Three ways, and the critic was explicit that this is a judgment call
+rather than a defect:**
+- **Collapse the tracks** (`auto-fit`) - the two cards stretch to
+  ~583px each and fill the row. No dead space, but two very wide cards
+  for a small amount of content, and it looks different again the day a
+  third agency appears.
+- **Cap the grid to its content** - a narrower container so two cards
+  sit in a deliberate-looking block rather than a half-empty four-track
+  row. Keeps the card proportions; adds a width rule tuned to today's
+  count.
+- **Leave it** - only visible at two agencies, and it self-corrects as
+  the asset grows toward thirty datasets.
+
+**My lean: cap it.** It is the only option that looks deliberate today
+without committing to a shape that is wrong at thirty, and the width
+rule is one line to delete when the third agency lands. "Leave it" is
+defensible, but this is the page people get shown the PoC on.
+
+### Q2. The exhausted count markers duplicate the pill beside them
+
+**What is there.** `exhaustedMarker()` adds a count pill at each tier.
+At today's scale that count is 1, so it restates the pill next to it -
+the critic measured **three identical `.pill.exhausted` within 40px
+vertically** on the Tier-2 page, the last two literally adjacent. (#57)
+
+**This is the one finding in the whole pass that gets BETTER at scale.**
+"17 schedules ended" at an agency is genuinely useful; "1 schedule
+ended" beside a pill already saying "Schedule ended" is not.
+
+- **Keep as built** - redundant now, correct, and becomes the useful
+  form at thirty datasets with no second change.
+- **Suppress the marker when the count is 1** - removes the duplicate
+  today, shows the marker only when it is actually aggregating.
+- **Merge them** - one pill per tier reading "Schedule ended" at count
+  1 and "N schedules ended" above. Fewest pills, but it turns the
+  marker into a status pill and blurs two roles.
+
+**My lean: suppress at 1.** A small conditional, no behaviour change at
+scale, and it keeps the marker's role clean - it aggregates, and when
+there is nothing to aggregate it says nothing.
+
+### Q3. Fixing the "No data" pill means making the quiet state louder
+
+**What is there,** recomputed here from the real tokens rather than
+taken from the report: the pill's text measures **2.81:1 in light and
+3.55:1 in dark** against 4.5:1 for 12.5px bold, so it fails WCAG AA in
+both themes. Its dashed border measures **1.51:1** - not visible at
+all, either theme. The exhausted pill beside it measures 13.22:1 and
+12.78:1, a **4.7x gap**. (#49)
+
+**Two things make this more than a contrast fix.** The code comment
+says the exhausted pill is distinguished by "a solid border and a
+square marker" - but the border difference is really *invisible versus
+visible*, and both 9px markers are squares (1px versus 2px radius is
+imperceptible). So all the work separating the two quiet states is
+being done by the text contrast, on the token that fails.
+
+- **Raise both tokens** - clears AA, but narrows the 4.7x gap that is
+  currently doing the actual distinguishing.
+- **Fix only the border** - makes dashed-versus-solid a real
+  distinction instead of a notional one; leaves the text failing.
+- **Out of scope for now, logged as a standing accessibility item**
+  across every muted token - the footer (#54) and `--ink-faint`
+  generally have the same problem, so fixing one pill leaves the
+  pattern.
+
+**My lean is a blend of the last two:** fix the border now, because it
+is cheap and it makes the design the code already claims real - then
+fold the text contrast into one accessibility pass with #8 (keyboard
+cannot reach a dataset), #9 (focusable controls inside `aria-hidden`
+drawers), #10 and #55 (seven of eleven focusable types have no designed
+focus ring). Those four are already one job waiting to happen, and the
+muted-token audit belongs with them rather than ahead of them.
+
+### Q4. Two render sites disagree about the clock, and one shows raw ISO strings
+
+**What is there.** `REQ-PIPE-048` made every stored instant carry its
+own offset. Two render sites never caught up. The SLA tile builds its
+value by character-slicing the wall clock out of the string and
+appending `" UTC"` unconditionally - right today only because every
+stored value happens to be `+00:00`, which is the thing that
+requirement changed. And the supply-history table renders the field
+raw: **43 values of the form `2026-09-16T05:17:30.280161+00:00`**,
+confirmed in the built data, landing in a user-facing TIMING column.
+(#51)
+
+**The tile is the more pointed one.** In one four-across strip the SLA
+tile reads `Daily, by 14:00 AWST` and the arrival tile reads
+`05:29 UTC`, and a reader adds eight in their head, across two tiles,
+to judge the "Early" verdict in the same cell. Against a requirement
+whose story is "so that a supply that arrived at 10pm in Perth is not
+read as having arrived the following afternoon."
+
+- **Render every user-facing instant in the asset timezone** - matches
+  the story exactly, one formatter; changes what several existing views
+  display, so it wants its own requirement rather than a tidy-up.
+- **Keep UTC but format it** - drop the microseconds, use tabular
+  numerals, label the zone consistently. Cheaper, leaves the reader
+  doing +8 between two adjacent tiles.
+- **Split it** - format the supply-history timestamps now as a plain
+  rendering defect, and scope the UTC-versus-AWST question separately.
+
+**My lean: split.** The raw timestamps are not a decision, they are
+something nobody formatted. The timezone question is a real one and it
+is now the same subject arriving from four directions - #3 (every date
+rendered on the viewer's clock), #14 (the hardcoded "AWST"/"UTC"
+strings), #51, and your own road-testing item 5. That deserves one
+decision recorded once, not four patches.
+
 ## Findings
 
 Numbered continuously across critics. Each carries the critic's own
