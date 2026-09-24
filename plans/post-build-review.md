@@ -111,10 +111,35 @@ rather than a defect:**
 - **Leave it** - only visible at two agencies, and it self-corrects as
   the asset grows toward thirty datasets.
 
-**My lean: cap it.** It is the only option that looks deliberate today
-without committing to a shape that is wrong at thirty, and the width
-rule is one line to delete when the third agency lands. "Leave it" is
-defensible, but this is the page people get shown the PoC on.
+**ANSWERED 2026-09-24 evening - Keith asked whether capping hardcodes
+the agency count, "bearing in mind we'll have probably eight or so
+agencies in reality." That fact changes the answer, so the lean above
+is withdrawn rather than defended.**
+
+**At eight agencies the problem does not exist.** The grid lays out
+four 284.5px tracks at 1180px, so eight cards fill two complete rows
+with no dead tracks at all. Five, six or seven give one partial row,
+which is what every card grid on the internet looks like. The half-empty
+row is purely an artefact of being at two.
+
+**And yes, capping means pinning something.** The no-hardcode version
+would be `width: fit-content` with `margin-inline: auto` on the
+container - but `auto-fill` needs a definite width to compute its track
+count, and under intrinsic sizing that resolution is exactly the thing
+that goes strange. In practice you end up pinning a width, which is
+tuning for a state the asset is about to leave.
+
+**So: leave the grid alone.** Revised lean, on Keith's own fact.
+
+**What IS worth fixing regardless of agency count is the other half of
+#54**, and it gets worse at eight rather than better: `.card` is plain
+block flow with `.card-meta` unpinned, so a one-line title and a
+three-line title put the sparkline and the meta row 50px apart. At two
+agencies that is two ragged cards; at eight it is two ragged ROWS, and
+at thirty datasets' worth of collections below it, more. The fix is
+`.card{display:flex; flex-direction:column}` plus
+`.card-meta{margin-top:auto}` - no count anywhere, and it is correct at
+any number of agencies.
 
 ### Q2. The exhausted count markers duplicate the pill beside them
 
@@ -200,12 +225,65 @@ read as having arrived the following afternoon."
 - **Split it** - format the supply-history timestamps now as a plain
   rendering defect, and scope the UTC-versus-AWST question separately.
 
-**My lean: split.** The raw timestamps are not a decision, they are
-something nobody formatted. The timezone question is a real one and it
-is now the same subject arriving from four directions - #3 (every date
-rendered on the viewer's clock), #14 (the hardcoded "AWST"/"UTC"
-strings), #51, and your own road-testing item 5. That deserves one
-decision recorded once, not four patches.
+**DECIDED 2026-09-24 evening, and wider than the question asked.**
+Keith's own call, in his words: "let's make a call... that will
+standardise the display of all timestamps and dates across the entire
+code base."
+
+**The standard he set:**
+
+| Kind | Form | His example |
+|---|---|---|
+| Date and time | time, then weekday, then day and month | `2:15pm Friday 29 September` |
+| Date alone | weekday, then day and month | `Friday, 29 September` |
+| Relative | "X <unit> ago", scaling by unit | `X minutes ago`, `X hours ago`, `X days ago`, `X weeks ago`, `X months ago`, `X years ago` |
+
+**And one prohibition, stated flatly: no raw ISO timestamps anywhere a
+person can see.** That kills #51's supply-history column and #14's
+`.slice(11,16)+" UTC"` tile outright, rather than choosing between the
+three options that were on the table.
+
+**This is a DISPLAY standard, not a storage change** - recorded
+explicitly because the distinction is load-bearing and nothing in the
+dictated version says it. Every stored instant keeps its ISO form with
+its offset: `qa_results/` is a permanent history read by machines,
+`REQ-PIPE-048` exists precisely to make those offsets explicit, and
+changing what is written would break the lot. The standard governs what
+reaches a human eye - the dashboard, the CLI, anything printed.
+
+**It needs a requirement before anything is built** (`CLAUDE.md`'s
+sign-off gate), and it is genuinely cross-cutting rather than a tidy-up:
+it lands on the dashboard's `fmtDate`/`fmtDateShort`/`fmtArrival`/
+`updateAsOfButtonLabel`, the supply-history table, the SLA tile, the
+`mothman schedule` output (`2027-11-01`, `09:00 +0800`), and every
+other print site. Four existing findings collapse into it - #3, #14,
+#51 and road-testing item 5 - plus road-testing item 11's "make the
+dates readable, not bloody raw timestamps".
+
+**Five things the dictated standard does not settle, and each would
+change what gets built - for Keith, before drafting:**
+1. **The year.** Neither example carries one, and this dashboard shows
+   multi-year history: supply runs from 2026, as-of dates out to 2028,
+   a Plans tab full of dated entries. Always show it, or only when it
+   is not the current year?
+2. **The timezone.** The format carries no zone label - which, given
+   the question this answers, most naturally means *everything is the
+   asset's clock and therefore needs no label*. That is the whole
+   substance of Q4 and it should be said out loud rather than inferred
+   from a format string.
+3. **Where relative, where absolute.** "Live · updated 39s ago" already
+   exists; supply history, last-QA-run and arrival times are absolute
+   today. One rule, or absolute with a relative tooltip, or relative
+   under some threshold and absolute beyond it?
+4. **Punctuation.** The two dictated examples differ - `2:15pm Friday
+   29 September` has no comma, `Friday, 29 September` has one. Worth
+   pinning, since this will be applied mechanically across a lot of
+   sites.
+5. **The CLI's machine-ish output.** `mothman schedule show` prints
+   dates into a table somebody may well be eyeballing against
+   `data-asset.yaml`, where `2027-11-01` matches the file and
+   `Monday, 1 November` does not. Does the standard cover config-echoing
+   output, or only prose?
 
 ## Findings
 
