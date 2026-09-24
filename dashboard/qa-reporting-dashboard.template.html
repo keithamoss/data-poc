@@ -2237,8 +2237,21 @@ function wireChart(id, history, warn, fail, unit, xs, ys, W, padL, padR, onPoint
 // sixth stopped being processed entirely. Rendered wherever a tier's
 // card is, in words as well as by the border the .pill.exhausted class
 // carries.
-function exhaustedMarker(count){
+// `status` IS THE GROUP'S OWN PILL, and the only thing it is used for
+// is deciding whether this marker would be saying the same thing twice
+// (plans/post-build-review.md, the visual critic's Q2, signed off
+// 2026-09-24). At one exhausted dataset inside a group already pilled
+// "Schedule ended", it read "Schedule ended  1 schedule ended".
+//
+// NARROWER THAN "SUPPRESS AT ONE", deliberately, and the difference is
+// the whole point: one exhausted dataset inside a RED agency has no
+// other signal on that card, so suppressing the marker by count alone
+// would hide it completely - which is precisely the absorption
+// REQ-PIPE-053 exists to prevent. Redundancy is the test, not the
+// count.
+function exhaustedMarker(count, status){
   if(!count) return "";
+  if(count===1 && status==="exhausted") return "";
   return `<div style="margin-top:6px; font-size:12px; color:var(--ink); display:flex;
     align-items:center; gap:5px;"><span class="pill exhausted sm"><span class="ico"></span>${count}
     schedule${count===1?"":"s"} ended</span></div>`;
@@ -2558,7 +2571,7 @@ function renderExec(view){
       <div style="color:var(--ink-muted); font-size:12.5px;">${ag.blurb}</div>
       ${spark}
       <div class="card-meta"><span><b>${ag.collections.length}</b> ${pluralize(ag.collections.length,"collection")}</span><span><b>${nDatasets}</b> ${pluralize(nDatasets,"dataset")}</span></div>
-      ${exhaustedMarker(ag.exhaustedCount)}
+      ${exhaustedMarker(ag.exhaustedCount, ag.status)}
     </button>`;
   }).join("");
   wireCards(grid);
@@ -2605,7 +2618,7 @@ function renderAgency(view, agencyId){
   const wrap = document.getElementById("collections");
   wrap.innerHTML = ag.collections.map(col=>`
     <div class="collection-block">
-      <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount)}</div>
+      <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}</div>
       <div class="overflow-x">
       <table class="dataset-table">
         <thead><tr><th>Dataset</th><th>Status</th><th>Latest arrival</th><th>Rows, latest run</th><th>Last QA run</th><th>Trend</th></tr></thead>
@@ -3676,6 +3689,17 @@ document.getElementById("snapshots-panel-close").addEventListener("click", close
 // (dashboard/embed_dashboard_data.py's own _build_changelog_feed()) -
 // this just renders it, same "dumb template, data prep happens
 // server-side" split every other embedded const on this page follows.
+// GOES ALL THE WAY TO YEARS, and never falls back to an absolute date
+// (Keith's display standard, 2026-09-24). It used to stop at 30 days
+// and return fmtDate(then), so "weeks", "months" and "years" did not
+// exist - and the one caller renders the absolute date alongside this
+// anyway, which made the fallback a duplicate as well as a gap.
+//
+// The handover points are in DAYS rather than in each unit's own
+// arithmetic, so there is one number to read per boundary: a week at 7,
+// a month at 30, and a year decided by the month count rather than by a
+// day threshold - which is what stops "12 months ago" ever being
+// printed for something a reader would call a year.
 function fmtRelativeTime(isoString){
   const then = new Date(isoString), now = new Date();
   const mins = Math.round((now-then)/60000);
@@ -3684,8 +3708,12 @@ function fmtRelativeTime(isoString){
   const hours = Math.round(mins/60);
   if(hours<24) return `${hours} ${pluralize(hours,"hour")} ago`;
   const days = Math.round(hours/24);
-  if(days<30) return `${days} ${pluralize(days,"day")} ago`;
-  return fmtDate(then);
+  if(days<7) return `${days} ${pluralize(days,"day")} ago`;
+  if(days<30){ const weeks = Math.round(days/7); return `${weeks} ${pluralize(weeks,"week")} ago`; }
+  const months = Math.round(days/30.44);
+  if(months<12) return `${months} ${pluralize(months,"month")} ago`;
+  const years = Math.round(days/365.25);
+  return `${years} ${pluralize(years,"year")} ago`;
 }
 function renderActivityPanel(){
   const body = document.getElementById("activity-panel-body");

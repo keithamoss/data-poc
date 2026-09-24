@@ -183,6 +183,31 @@ ended" beside a pill already saying "Schedule ended" is not.
 scale, and it keeps the marker's role clean - it aggregates, and when
 there is nothing to aggregate it says nothing.
 
+**SIGNED OFF AND FIXED, 2026-09-24 evening** - and **the approved
+proposal had to be narrowed while building it**, which is worth
+recording because the naive version was actively wrong.
+
+**Suppressing by COUNT ALONE would have hidden real information.** The
+marker exists because `REQ-PIPE-053` says an exhausted schedule must
+never be absorbed by the rollup - "one exhausted among five red still
+reads Red plus a count marker". A RED agency containing one exhausted
+dataset has no other signal on its card: its own pill says Red. Drop
+the marker at count 1 and that dataset disappears from the tier
+entirely - the exact absorption the requirement forbids, reintroduced
+by a fix meant to tidy it up. Same shape as `plans/qa-pipeline.md` item
+74, where a fix written to prevent a false green introduced one.
+
+**So the test is REDUNDANCY, not count.** `exhaustedMarker(count,
+status)` now returns nothing only when `count === 1` **and** the
+group's own pill already says `Schedule ended`. Both call sites pass
+their own status. A single exhausted dataset under a red, amber, green
+or no-data pill still gets its marker.
+
+**Failing tests first**, in `tests-js/relative-time-and-markers.test.js`
+- including one that pins the narrowing itself
+(`STILL shows a count of one when the group's own pill says something
+else`), so a later tidy-up cannot quietly restore the wrong version.
+
 ### Q3. Fixing the "No data" pill means making the quiet state louder
 
 **What is there,** recomputed here from the real tokens rather than
@@ -401,6 +426,27 @@ relative format in both directions, the as-of-relative rule, and a
 single helper that both the dashboard and the CLI resolve through - not
 two more implementations. It supersedes #3, #14, #51 and road-testing
 items 5 and 11.
+
+**The 30-day fallback is FIXED, 2026-09-24 evening** (Keith: "also fix
+the bug where it stops at 30 days"). `fmtRelativeTime()` now runs
+minutes, hours, days, weeks, months, years and never returns an
+absolute date. Handover points are expressed in days so there is one
+number per boundary - a week at 7, a month at 30 - with the year
+decided by the computed month count rather than a day threshold, which
+is what stops "12 months ago" ever being printed.
+
+**Everything else in this pass still needs the requirement.** Keith
+agreed the analysis of the high-value sites; none of them are wired up
+yet, and they should not be until the standard is signed off - the
+as-of-relative rule above is exactly the kind of thing that is cheap to
+build in and expensive to retrofit.
+
+**Q4 is NOT closed.** Keith asked directly. Settled: the format, the
+year, asset time, the relative pass, the 30-day fix. Still open:
+**punctuation** (his two examples differ on the comma), **whether
+config-echoing CLI output is covered**, and the two traps the pass
+turned up - **relative-to-the-as-of** and **the missing future tense**.
+Then it needs drafting as a real requirement before any of it is built.
 
 ## Findings
 

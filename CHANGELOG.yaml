@@ -123,6 +123,22 @@ releases:
               the same height on every card, whatever the length of the
               agency's name. A card with a short name used to leave a gap
               below its figures that read as though something was missing.
+          - headline: Older activity now says how long ago, not just when
+            components: ["Dashboard UI"]
+            description: >
+              Recent activity gave up after a month and showed a bare
+              date instead. It now keeps counting in weeks, months and
+              years, so you can tell at a glance how long ago something
+              was QA'd without working it out.
+          - headline: One ended schedule is no longer announced twice
+            components: ["Dashboard UI"]
+            description: >
+              An agency or collection with a single ended schedule used
+              to show "Schedule ended" and "1 schedule ended" side by
+              side. The count now appears only when it is adding
+              something - and it still appears for a single one whenever
+              the status beside it says anything else, so nothing gets
+              hidden.
           - headline: The "No data" tag has an outline you can actually see
             components: ["Dashboard UI"]
             description: >
