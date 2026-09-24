@@ -3024,7 +3024,25 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   // REQ-DASH-026 established for the check card and its panel.
   scopeWrap.querySelectorAll(".scope-check").forEach(btn=>{
     const column = ds.columns.find(c=> columnKey(c)===btn.dataset.col);
-    const check = (column.checks||[]).find(ck=> ck.key===btn.dataset.check);
+    const check = column && (column.checks||[]).find(ck=> ck.key===btn.dataset.check);
+    // LOUD, BUT NOT FATAL (#5). A check whose key does not resolve is a
+    // real data bug and must not pass quietly - console.error fails
+    // dashboard/check_dashboard_renders.py, which is exactly the gate
+    // that should catch it. But throwing here aborted the forEach, and
+    // with it everything renderDataset() draws afterwards: the reader
+    // got a half-page with a blank row on it, and the click that got
+    // them there never updated the URL.
+    //
+    // So: report it where a gate can see it, skip the row, and let the
+    // rest of the page render. "Fail loudly" on a server means a
+    // stack trace somebody reads; in a browser it means a silently
+    // half-drawn page, which is the opposite.
+    if(!check){
+      console.error(`check ${btn.dataset.check} on column ${btn.dataset.col} `
+                     + `does not resolve in ${ds.id} - the row is skipped`);
+      btn.remove();
+      return;
+    }
     btn.querySelector(".nm").textContent = check.name;
     // Without this a section reads as three identical rows: the same
     // real-world check asked by three tools shares one name by design

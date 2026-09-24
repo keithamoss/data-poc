@@ -1339,13 +1339,19 @@ class TestAnExhaustedScheduleIsLoud:
         assert heading.locator(".pill.exhausted").count() == 1
         assert heading.locator(".pill.red").count() == 0
 
-    def test_the_page_still_has_zero_console_errors(self, page, built_dashboard_html):
-        errors = []
-        page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+    def test_the_page_still_has_zero_console_errors(self, clean_page, built_dashboard_html):
+        """`clean_page`, NOT `page` (plans/post-build-review.md #43).
+
+        This used to take the plain `page` fixture and register only a
+        `console` handler of its own - so an UNCAUGHT EXCEPTION slipped
+        straight past it. It passed while the very dataset page it
+        navigates to was throwing a TypeError (#5). The suite's own
+        `clean_page` fixture has registered both `console` and
+        `pageerror` all along, and asserts them empty in teardown.
+        """
         for as_of in (self.NONE_EXHAUSTED, self.ONE_EXHAUSTED, self.ALL_EXHAUSTED):
-            _goto(page, built_dashboard_html, as_of=as_of)
-            _goto(page, built_dashboard_html, state=self.DS, as_of=as_of)
-        assert errors == []
+            _goto(clean_page, built_dashboard_html, as_of=as_of)
+            _goto(clean_page, built_dashboard_html, state=self.DS, as_of=as_of)
 
 
 def _contrast(a: tuple[float, float, float], b: tuple[float, float, float]) -> float:
@@ -1627,3 +1633,71 @@ class TestTheKeyboardCanReachTheData:
         announced = clean_page.evaluate(
             "() => (document.querySelector('[aria-live]') || {}).textContent || ''")
         assert announced.strip(), "nothing was announced for the route change"
+
+
+class TestEveryDatasetPageSurvivesItsOwnDrillDown:
+    """post-build-review #5, signed off 2026-09-25.
+
+    A column with no real rule gets a synthesised placeholder check, and
+    that placeholder had no `key`. The scope-section renderer writes
+    `data-check="${ck.key}"`, so the attribute became the literal string
+    "undefined"; the re-lookup compared `undefined === "undefined"`,
+    matched nothing, and dereferenced it.
+
+    Three of seven datasets throw - precisely the three carrying a
+    TABLE-scope placeholder, which is the only scope that loop runs
+    over. The consequence is worse than a missing panel: navigate()
+    calls render() BEFORE history.pushState, so the throw aborts the
+    navigation itself and the URL never changes.
+    """
+
+    DATASETS = ["cp-clients", "cp-carers", "cp-case-workers",
+                "cp-notifications", "cp-investigations", "cp-placements"]
+
+    def _state(self, dataset_id):
+        return {"tier": "dataset", "agencyId": "child-protection-family-support",
+                "collectionId": "child-protection", "datasetId": dataset_id}
+
+    @pytest.mark.parametrize("dataset_id", DATASETS)
+    def test_it_renders_without_throwing(self, clean_page, built_dashboard_html, dataset_id):
+        """clean_page's teardown asserts no console error and no
+        uncaught exception, which is the whole assertion here."""
+        _goto(clean_page, built_dashboard_html, state=self._state(dataset_id))
+        assert clean_page.locator("#view h2").count() == 1
+
+    @pytest.mark.parametrize("dataset_id", ["cp-clients", "cp-carers", "cp-case-workers"])
+    def test_everything_after_the_scope_sections_still_renders(
+            self, clean_page, built_dashboard_html, dataset_id):
+        """The throw aborted renderDataset() partway, and Supply History
+        is what lived after it."""
+        _goto(clean_page, built_dashboard_html, state=self._state(dataset_id))
+        assert clean_page.locator("#supply-history-toggle, .supply-history").count() > 0, (
+            "the supply-history section is missing - renderDataset() stopped early")
+
+    @pytest.mark.parametrize("dataset_id", ["cp-clients", "cp-carers", "cp-case-workers"])
+    def test_clicking_the_row_actually_changes_the_url(
+            self, clean_page, built_dashboard_html, dataset_id):
+        """The half nobody reported: a throw inside render() means
+        history.pushState never runs, so the address bar keeps saying
+        the agency while the screen shows a dataset."""
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "agency", "agencyId": "child-protection-family-support"})
+        row = clean_page.locator(f'tr[data-nav*="{dataset_id}"]').first
+        row.click()
+        clean_page.wait_for_timeout(400)
+        assert f"/dataset/{dataset_id}" in clean_page.url, (
+            f"navigating to {dataset_id} left the URL at {clean_page.url}")
+
+    def test_the_placeholder_check_is_deep_linkable(self, clean_page, built_dashboard_html):
+        """#12, the same root cause: with no key the check panel opened
+        with no URL change, so it was neither shareable nor closable
+        with Back."""
+        _goto(clean_page, built_dashboard_html, state=self._state("cp-clients"))
+        missing = clean_page.evaluate("""() => {
+            const out = [];
+            (DATA && DATA.agencies || []).forEach(ag => ag.collections.forEach(col =>
+                col.datasets.forEach(ds => (ds.columns || []).forEach(c =>
+                    (c.checks || []).forEach(ck => { if(!ck.key) out.push(`${ds.id}.${c.name}`); })))));
+            return out;
+        }""")
+        assert not missing, f"checks with no key, so no deep link and no Back: {missing}"

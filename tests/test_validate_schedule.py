@@ -653,3 +653,37 @@ class TestOneTypoReadsAsOneTypo:
             f"guessed a typo with no unreferenced calendar to guess at:\n{err}")
         assert "datasets name" not in err, (
             "one dataset is not a shared cause - there is nothing to aggregate")
+
+
+class TestTheGateActuallyFailsTheBuild:
+    """REQ-PIPE-050 criterion 1 - "SHALL exit non-zero on any error".
+
+    Added 2026-09-25 as part of post-build-review #43. Not a defect:
+    `main()` has always returned 1 on errors. It had simply never been
+    asserted - every other test in this module checks that `validate()`
+    returns a non-empty list, which is a different claim from the gate
+    actually failing, and the one gate-level assertion in the suite was
+    the happy path (`main() == 0`).
+
+    A validator whose exit code nobody checks is a validator CI can stop
+    honouring without any test noticing.
+    """
+
+    def test_a_broken_configuration_exits_non_zero(self, tmp_path):
+        import shutil
+
+        contract_dir = tmp_path / "contract"
+        shutil.copytree(REAL_CONTRACT_DIR, contract_dir)
+        path = contract_dir / "data-asset.yaml"
+        doc = yaml.safe_load(path.read_text())
+        for calendar in doc["calendars"]:
+            if calendar["name"] == "quarterly":
+                calendar["name"] = "quarterley"
+        path.write_text(yaml.safe_dump(doc))
+
+        assert validate_schedule.main(Source(path, contract_dir)) == 1
+
+    def test_the_real_committed_configuration_exits_zero(self):
+        """The other half: a gate that always failed would also satisfy
+        the assertion above."""
+        assert validate_schedule.main() == 0

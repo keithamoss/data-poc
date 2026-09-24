@@ -756,9 +756,32 @@ post-build critic should see a requirement's own `evidence:`.
 
    **Cost:** the crash itself is small. The gate gap is the real work.
 
-   **Recommendation: fix, with a failing test first** per `CLAUDE.md` -
-   and the test belongs at the render layer, not the data layer, for
-   exactly the reason item 74 records.
+   **SIGNED OFF AND FIXED, 2026-09-25, in two places.**
+
+   **The data.** The synthesised placeholder gets a real
+   `key: "no_rule_defined"` in both build modules - unique within its
+   column, which is the scope `/check/<key>` resolves in, and this
+   placeholder is by definition the only check on its column.
+
+   **The render.** The scope-check loop no longer dereferences whatever
+   `find()` returned. A key that does not resolve is a real data bug
+   and must not pass quietly, so it logs `console.error` - which fails
+   `check_dashboard_renders.py`, exactly the gate that should catch it
+   - removes the row, and lets the rest of the page render.
+
+   **"Fail loudly" needs a different shape in a browser**, and that is
+   the reasoning worth keeping. On a server it means a stack trace
+   somebody reads. Here it meant a silently half-drawn page and a lost
+   navigation, which is the opposite of loud. Loud to the GATE, not
+   fatal to the READER.
+
+   **Tests, at the render layer:** every one of the six CP datasets is
+   loaded in a real browser under the fixture that asserts no console
+   error and no uncaught exception; the three that threw are
+   additionally asserted to still render everything after the scope
+   sections; and a third test clicks the row and asserts **the URL
+   actually changes**, which is the half neither critic found. Seven
+   failed before the fix.
 
 6. **[todo, 2026-09-24]** **[Dashboard UI]** **[F6] The executive
    tier's own explanatory sentence is now false.** It reads "worst-of,
@@ -893,6 +916,13 @@ post-build critic should see a requirement's own `evidence:`.
     from #4/#5 opens a panel with no URL change: not shareable, and Back
     skips past it. **Same root cause as #5** - fix the key and this goes
     with it.
+
+    **FIXED as a consequence, 2026-09-25**, exactly as predicted. The
+    placeholder now carries a key, so its panel deep-links and Back
+    closes it like any other check. A test asserts no check anywhere in
+    the embedded data is missing a key, rather than asserting this one
+    placeholder has one - the property is "every check is addressable",
+    not "we remembered this case".
 
 13. **[investigate, 2026-09-24]** **[Dashboard UI]** **[U6] The
     exhausted dataset page is a dead end that hides real history.** It
@@ -1835,6 +1865,50 @@ here as its own question, not acted on.
     page to zero console errors and so is what would catch a throw
     reaching a viewer". #5 is a throw reaching a viewer on three of
     seven dataset pages, and the gate is green.
+
+    **SIGNED OFF AND FIXED, 2026-09-25, all three halves.**
+
+    **The e2e fixture.** `TestAnExhaustedScheduleIsLoud::
+    test_the_page_still_has_zero_console_errors` now takes `clean_page`
+    instead of `page`. One word, and it is the one that would have
+    caught #5 months earlier.
+
+    **The render gate.** `check_dashboard_renders.py` now visits every
+    agency and dataset route, enumerated from the page's own `DATA` and
+    built with the page's own `stateToHash()` - so a dataset added
+    later is covered without anybody remembering, and the gate can
+    never visit a route the app would not build.
+
+    **PROVEN BLIND FIRST, AND PROVEN SIGHTED AFTER.** The bug was
+    reintroduced into a built copy (11 keys stripped) and the old gate
+    still reported "zero console errors"; with the extension it names
+    the three affected datasets and fails. Both directions checked,
+    because a gate that passes everything and a gate that works look
+    identical from one run.
+
+    **Two no-ops were found doing it, and they are the point.** The
+    first version assigned `window.location.hash` - the app listens for
+    `popstate`, which a programmatic hash assignment does not fire, so
+    it "visited" nine routes without re-rendering once. The second
+    tested `window.DATA` - a top-level `const` creates a global
+    BINDING but not a window property, so it enumerated zero routes.
+    **Both reported success.** Neither would have been caught by
+    anything except re-proving against the reintroduced bug, which is
+    the same a-check-that-never-runs-looks-like-success shape the gate
+    was being extended to close, hit twice in twenty minutes while
+    closing it.
+
+    **Criterion 1's own test.** `TestTheGateActuallyFailsTheBuild`
+    asserts `main()` returns 1 on a broken configuration and 0 on the
+    real one. Not a defect - it always did - but every other test in
+    that module asserts `validate()` returns a non-empty list, which is
+    a different claim from the gate failing. A validator whose exit
+    code nobody checks is one CI can stop honouring with no test
+    noticing.
+
+    **`_report()` itself is now covered** by #19's own tests, which
+    drive `main()` and read its real stderr - criteria 19, 21 and 22
+    went from untested to asserted as a side effect of that work.
 
     **Recommendation: fix all three**, and take the cheap one first -
     switching that one e2e test to `clean_page` is a one-word change

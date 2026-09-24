@@ -299,6 +299,20 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
 
         if not checks_out:
             checks_out = [{
+                # A REAL KEY, because everything downstream assumes one
+                # (plans/post-build-review.md #5 and #12). Without it the
+                # scope-section renderer wrote data-check="undefined",
+                # the re-lookup matched nothing, and dereferencing the
+                # result threw - taking out the rest of renderDataset()
+                # AND, because navigate() renders before it pushes
+                # history, the navigation itself. The check panel was
+                # also un-deep-linkable and un-closable with Back, for
+                # the same missing field.
+                #
+                # Unique within its column, which is the scope the
+                # /check/<key> route resolves in - and this placeholder
+                # is by definition the only check on its column.
+                "key": "no_rule_defined",
                 "name": "No automated quality rule defined",
                 # This check is synthesized HERE, not produced by any real
                 # tool - so it has to state its own status explicitly

@@ -116,6 +116,14 @@ releases:
     changes:
       - category: Fixed
         items:
+          - headline: Three Child Protection datasets open properly again
+            components: ["Dashboard UI"]
+            description: >
+              Opening Client Register, Carer Register or Case Workers
+              left out the supply history and did not update the address
+              bar, so the link you copied went back to the agency. Both
+              are fixed, and the checks that caused it can now be linked
+              to like any other.
           - headline: The overview counts what is actually there
             components: ["Dashboard UI"]
             description: >
