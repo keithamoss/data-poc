@@ -6246,7 +6246,7 @@ requirements:
       broken supply reads as a demonstration rather than as a defect
       somebody forgot about.
     moscow: must
-    status: not_started
+    status: built
     source: >
       Keith, 2026-09-22, on the test scenario register - "if I click on a
       test, it takes me to the relevant as-of date and then the relevant
@@ -6293,6 +6293,81 @@ requirements:
       - Same pattern plans/INDEX.md already uses - a generated, committed
         index rather than a live query. No new machinery.
     dependencies: [REQ-GEN-044]
+    linked_tests:
+      - tests/test_scenario_map.py
+    implemented_by:
+      - qa_tools/common/scenarios.py::parse_register
+      - qa_tools/common/scenario_map.py::build_map
+      - qa_tools/common/scenario_map.py::read_placements
+      - qa_tools/common/scenario_map.py::write_map
+      - cli/scenarios.py::map_command
+      - cli/scenarios.py::list_command
+    evidence:
+      - >
+        2026-09-25: the register stays PROSE in plans/supply-model.md
+        and this parses it rather than replacing it. It was written
+        while the model was being shaped, every entry carries the
+        narrative behind it, and Keith reviewed it as prose - which is
+        what makes it authoritative. Moving it into YAML would make it
+        machine-readable and unreadable at once, which is the wrong
+        trade for the thing everything else cites.
+      - >
+        2026-09-25: the parse is asserted COMPLETE rather than
+        plausible - the test counts the raw `TS-n [mode]` mentions in
+        the register's own section and asserts the parse returns
+        exactly as many. All 51 scenarios parse; a register of fifty
+        that quietly returns forty-nine is worse than one that cannot
+        be read at all.
+      - >
+        2026-09-25: a REAL PARSING BUG was found by making the parser
+        strict rather than by review. An entry whose title never closes
+        was being silently repaired by appending the missing `**`;
+        refusing it instead immediately surfaced TS-23, whose body
+        begins on the SAME LINE as its closing `**` and which the
+        line-based match had been reading as a malformed header. The
+        header is now matched as a prefix of the whole block.
+      - >
+        2026-09-25: criterion 5 is asserted as the ABSENCE of a link -
+        no http, no `#/`, no markdown link syntax anywhere in the
+        document. The generator knows where a scenario landed and does
+        not know how the dashboard addresses its pages, so a URL
+        written here would break silently the next time a route
+        changed.
+      - >
+        2026-09-25: criterion 3 is asserted by PARSING both
+        generate_synthetic_data functions and checking write_map is
+        among the calls. A map regenerated separately disagrees with
+        the history the first time somebody regenerates one and not the
+        other, and it disagrees silently because both files look fine
+        on their own.
+      - >
+        2026-09-25: criterion 6 distinguishes two states that a lazier
+        reading would merge. A `[unit]` scenario reads "no generated
+        data, nothing to navigate to" - it never will have any - while
+        an `[INJECT]` scenario reads "not injected - nothing to look at
+        yet". Saying the same thing about both would make the real
+        backlog invisible.
+      - >
+        2026-09-25: the committed map has a staleness gate of the same
+        shape plans/INDEX.md already has, because a generated file that
+        can drift from its source is one that will.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
+    unmet_criteria:
+      - criterion: >
+          Criteria 1 and 2 pass VACUOUSLY on the real repo today: there
+          are zero injected scenarios, so the map names no dataset, no
+          supply, no period and no as-of date for anything. Both are
+          built and are exercised against a real placement record in
+          the tests.
+        why: >
+          REQ-GEN-044 is the requirement that places scenarios into the
+          generated history and writes the record this reads. It is not
+          built - it needs schedule-configuration decisions that are
+          Keith's, because three of its daily scenarios require three
+          different due times for Birth Registrations. Recorded here
+          rather than claimed, because a vacuous pass reads identically
+          to a real one in a register.
+        owner: REQ-GEN-044
     decisions:
       - Decided the map carries COORDINATES and the dashboard constructs
         the LINK (Keith's own framing, 2026-09-22). The generator knows

@@ -68,6 +68,13 @@ def generate_synthetic_data() -> None:
     unmodified."""
     from pipeline import orchestrate
     orchestrate.prepare_warehouse(regenerate=True)
+    # THE MAP IS REBUILT IN THE SAME ACT (REQ-GEN-045 criterion 3).
+    # A map regenerated separately is a map that disagrees with the
+    # history the first time somebody regenerates one and not the
+    # other - and it disagrees silently, because both files look
+    # fine on their own.
+    from qa_tools.common import scenario_map
+    scenario_map.write_map()
 
 
 def load_manifest() -> list[dict]:

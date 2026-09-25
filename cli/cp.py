@@ -67,6 +67,13 @@ def generate_synthetic_data() -> None:
     for the whole manifest here."""
     from generator import generate_cp_runs
     generate_cp_runs.main()
+    # THE MAP IS REBUILT IN THE SAME ACT (REQ-GEN-045 criterion 3).
+    # A map regenerated separately is a map that disagrees with the
+    # history the first time somebody regenerates one and not the
+    # other - and it disagrees silently, because both files look
+    # fine on their own.
+    from qa_tools.common import scenario_map
+    scenario_map.write_map()
 
 
 def load_manifest() -> list[dict]:
