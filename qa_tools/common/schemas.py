@@ -389,6 +389,12 @@ class CollectionConfig(_Strict):
     id: NonEmptyStr
     name: NonEmptyStr
     contract: NonEmptyStr
+    #: What one delivery IS, for this source (REQ-PIPE-057 criteria 2
+    #: and 3). Optional HERE and a hard failure at recognition time -
+    #: the two are not in tension: a collection can coherently exist
+    #: while its transport is being described, and nothing may READ a
+    #: delivery from a source that has not said what one is.
+    delivery_boundary: NonEmptyStr | None = None
     datasets: list[DatasetConfig] = Field(min_length=1)
 
 

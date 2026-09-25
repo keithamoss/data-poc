@@ -85,6 +85,11 @@ class Dataset:
     #: dataset attributing nothing is a coherent state to be in while
     #: its pattern is being added.
     arrival_pattern: str = ""
+    #: What ONE DELIVERY is, for the source this dataset's collection
+    #: belongs to (REQ-PIPE-057). Collection-level rather than
+    #: per-dataset: the boundary is a property of the transport a
+    #: supplier delivers over, not of any one table inside it.
+    delivery_boundary: str = ""
 
     @property
     def qa_results_scope(self) -> tuple[str, str]:
@@ -142,6 +147,7 @@ def _load() -> tuple[str, dict[str, Dataset]]:
                     contract=_require(collection, "contract",
                                        f"collection {collection.get('id')!r}"),
                     arrival_pattern=(dataset.get("arrival_pattern") or "").strip(),
+                    delivery_boundary=(collection.get("delivery_boundary") or "").strip(),
                 )
                 # A duplicate id would make every lookup for it
                 # ambiguous and silently resolve to whichever came

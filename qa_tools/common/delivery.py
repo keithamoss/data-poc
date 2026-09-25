@@ -37,7 +37,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from qa_tools.common import arrival_patterns, asset_time
+from qa_tools.common import arrival_patterns, asset_time, delivery_boundary
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 DELIVERIES_DIR = ROOT / "data" / "deliveries"
@@ -331,6 +331,13 @@ def survey(deliveries_dir: Path | None = None,
     two days would need one of those, and the mtime is the exact signal
     this module refuses to trust.
     """
+    # WHAT ONE DELIVERY IS, BEFORE READING ANY (criteria 2 and 3). A
+    # source that has not said fails here, naming itself, rather than
+    # having a grouping inferred from filenames or arrival proximity -
+    # and it fails before anything is read, so the error is about the
+    # configuration rather than about whatever happened to be on disk.
+    delivery_boundary.check_all()
+
     deliveries_dir = Path(deliveries_dir or DELIVERIES_DIR)
     # A freshly-cloned machine has no data/ at all. Absence is a state
     # to handle, not a precondition to assert - a test that asserted

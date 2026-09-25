@@ -35,7 +35,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-from qa_tools.common import delivery, hierarchy
+from qa_tools.common import delivery, hierarchy, slots
 
 
 @dataclass(frozen=True)
@@ -115,6 +115,10 @@ class Recognition:
     by_dataset: dict[str, tuple[str, ...]]
     unmatched: tuple[str, ...]
     contested: dict[str, tuple[str, ...]]
+    #: Datasets whose files DID match, for a dataset nothing is owed
+    #: from. An UNEXPECTED TABLE, which is a different event from an
+    #: unrecognised artefact and gets a different level (criterion 11).
+    unexpected: tuple[str, ...] = ()
 
     @property
     def collections(self) -> tuple[str, ...]:
@@ -163,8 +167,28 @@ def recognise(d: delivery.Delivery) -> Recognition:
             f"arrival pattern and were not processed - {', '.join(sorted(found.unmatched))}. "
             f"A covering note is ordinary; a renamed extract is a supply on the floor.",
             stacklevel=2)
+    # AN UNEXPECTED TABLE IS INFORMATIONAL, and an unrecognised
+    # artefact is a warning. The two sit adjacent and are easy to
+    # collapse into one another, so the distinction is worth keeping:
+    # a file matching NO pattern may be a renamed extract, which is a
+    # real supply on the floor; a file matching a pattern for a dataset
+    # nothing is owed from is a supplier sending something extra, which
+    # is odd rather than lossy. Nothing is dropped either way - the
+    # table is still attributed and still staged.
+    #
+    # NARROWER THAN THE CRITERION, deliberately. It says "no slot in
+    # that period", and which period a supply fills is REQ-PIPE-062's
+    # answer, which does not exist yet. What is checkable now is a
+    # dataset with no slots AT ALL, which is the same event at a
+    # coarser grain.
+    unexpected = tuple(sorted(
+        ds for ds in found.by_dataset if not slots.is_owed_supplies(ds)))
+    if unexpected:
+        print(f"note: delivery {d.name!r} carries {', '.join(unexpected)}, which "
+               f"nothing is currently owed from - processed as usual.")
     return Recognition(
         delivery_name=d.name,
+        unexpected=unexpected,
         by_dataset={ds: tuple(names) for ds, names in found.by_dataset.items()},
         unmatched=tuple(found.unmatched),
         contested={k: tuple(v) for k, v in found.contested.items()})

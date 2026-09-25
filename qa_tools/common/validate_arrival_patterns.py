@@ -40,7 +40,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from qa_tools.common import arrival_patterns, hierarchy, schedule
+from qa_tools.common import arrival_patterns, hierarchy, slots
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -87,7 +87,7 @@ def missing_patterns() -> list[str]:
     for entry in hierarchy.all_datasets():
         if entry.arrival_pattern:
             continue
-        if schedule.slots_for_dataset(entry.dataset_id):
+        if slots.is_owed_supplies(entry.dataset_id):
             out.append(entry.dataset_id)
     return sorted(out)
 

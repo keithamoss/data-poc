@@ -197,3 +197,30 @@ def next_unfilled_claimable(slots: list[Slot], at: datetime,
         if is_claimable(slot, at):
             return slot
     return None
+
+
+def is_owed_supplies(dataset_id: str) -> bool:
+    """Whether anything is ever owed from this dataset.
+
+    NOT `slots_for_dataset(...) != []`, which is the obvious spelling
+    and raises: a cadence-rule calendar generates for ever, so asking
+    it for slots without a horizon is a question with no answer, and it
+    says so rather than picking one. A cadence rule therefore always
+    owes something; an authored calendar owes something if it has any
+    periods at all.
+
+    Used to tell an UNEXPECTED TABLE - a supplier sending something
+    nothing is owed from - apart from an unrecognised artefact, which
+    matched no pattern at all (REQ-PIPE-057 criterion 11), and to fail
+    a dataset that is owed supplies and declares no arrival pattern
+    (REQ-PIPE-058 criterion 7).
+    """
+    from qa_tools.common import schedule
+
+    try:
+        calendar = schedule.calendar_for_dataset(dataset_id)
+    except (schedule.ScheduleConfigError, KeyError):
+        return False
+    if calendar.current.is_cadence_rule:
+        return True
+    return bool(schedule.periods_for_dataset(dataset_id))

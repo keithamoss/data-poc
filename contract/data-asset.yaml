@@ -224,6 +224,15 @@ hierarchy:
           # belong to" resolves through one lookup rather than a map
           # somebody maintains (REQ-GEN-043).
           contract: bdm-birth-registrations-contract.yaml
+          # REQ-PIPE-057. What ONE DELIVERY is, for this source. The
+          # boundary comes from the TRANSPORT - one folder drop, one S3
+          # prefix, one SFTP session - and is stated rather than
+          # assumed, because a source that states nothing must FAIL
+          # rather than have a grouping inferred from filenames,
+          # timestamps or arrival proximity. Those are guesses that
+          # look like facts, and every arrival fact downstream is
+          # derived from the boundary.
+          delivery_boundary: directory
           datasets:
             - id: birth-registrations
               name: Birth Registrations
@@ -262,6 +271,7 @@ hierarchy:
         - id: child-protection
           name: Child Protection
           contract: child-protection-contract.yaml
+          delivery_boundary: directory   # REQ-PIPE-057 - see above.
           datasets:
             - id: cp-clients
               name: Client Register

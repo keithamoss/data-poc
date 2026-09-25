@@ -168,6 +168,23 @@ class TestABadPatternIsANamedConfigError:
 class TestTheConfigurationGate:
     """Criteria 7 and 8."""
 
+    def test_missing_patterns_really_runs_against_the_real_tree(self):
+        """Written after monkeypatching it out hid a real bug for an
+        hour: this function called a `slots_for_dataset` that does not
+        exist, and nothing noticed, because every real dataset declares
+        a pattern so the line never executed."""
+        assert validate_arrival_patterns.missing_patterns() == []
+
+    def test_a_dataset_owed_supplies_with_no_pattern_is_found(self, monkeypatch):
+        """The real function, against a dataset that declares none."""
+        entries = [hierarchy.Dataset(
+            data_asset_id="a", agency_id="ag", agency_name="Ag",
+            collection_id="child-protection", collection_name="CP",
+            dataset_id="cp-carers", dataset_name="Carers", table="cp_carers",
+            contract="c.yaml", arrival_pattern="", delivery_boundary="directory")]
+        monkeypatch.setattr(hierarchy, "all_datasets", lambda: entries)
+        assert validate_arrival_patterns.missing_patterns() == ["cp-carers"]
+
     def test_a_dataset_owed_supplies_with_no_pattern_fails(self, monkeypatch):
         monkeypatch.setattr(validate_arrival_patterns, "missing_patterns",
                              lambda: ["cp-carers"])
