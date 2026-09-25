@@ -1032,7 +1032,7 @@ post-build critic should see a requirement's own `evidence:`.
    anything, which is the same "check the precondition actually held"
    discipline the rest of this pass has needed.
 
-10. **[in-progress, 2026-09-24]** **[Dashboard UI]** **[U3] `plans/dashboard.md`
+10. **[done, 2026-09-25]** **[Dashboard UI]** **[U3] `plans/dashboard.md`
     #15 confirmed still present, both halves**, checked across four
     distinct views: `document.title` never updates, focus never moves on
     route change, no ARIA live region announces one, and there are **2
@@ -1094,6 +1094,32 @@ post-build critic should see a requirement's own `evidence:`.
     unconditionally is how a link becomes a magic JavaScript button
     wearing an `<a>`, which is the thing this decision is against.
 
+    **DONE 2026-09-25, the fourth half.** Breadcrumbs and agency cards
+    are `<a href>` carrying the route they go to; dataset rows carry a
+    real link on the dataset NAME. One shared `wireNavLinks()` does the
+    interception and bails on any modifier, and on any button but the
+    primary - so Ctrl-click, middle-click, Cmd-click and Shift-click
+    all reach the browser untouched, which is asserted four ways rather
+    than assumed.
+
+    **A `<tr>` cannot be an `<a>`**, which is the one place the
+    principle needed a judgement rather than a substitution. The link
+    sits on the dataset name - what a reader aims at anyway, and what
+    "copy link address" should be offered on - and the row stays
+    clickable as a convenience. The row handler now bails when the
+    click came from inside an anchor, without which a Ctrl-click on the
+    name would open a new tab AND navigate this one, which is worse
+    than the magic button it replaced.
+
+    **Buttons that ACT are still buttons**, asserted explicitly in both
+    suites: the theme toggle, the as-of picker and the panel controls
+    are not navigations and did not become links.
+
+    Verified in a real browser as well as jsdom, because the jsdom half
+    cannot show that an ordinary click still routes instead of
+    reloading the page - which is the way this change could have
+    silently cost the SPA.
+
 11. **[done, 2026-09-25]** **[Dashboard UI]** **[U4] A stale column or
     check deep link fails silently** - lands on the dataset page with no
     message, `STATE.columnName` still set to the bad value, and the
@@ -1141,7 +1167,7 @@ post-build critic should see a requirement's own `evidence:`.
     placeholder has one - the property is "every check is addressable",
     not "we remembered this case".
 
-13. **[investigate, 2026-09-24]** **[Dashboard UI]** **[U6] The
+13. **[done, 2026-09-25]** **[Dashboard UI]** **[U6] The
     exhausted dataset page is a dead end that hides real history.** It
     replaces the ENTIRE dataset page - columns, checks, arrival history,
     trends - with the exhausted message. `cp-case-workers` has 18 real
@@ -1162,6 +1188,20 @@ post-build critic should see a requirement's own `evidence:`.
     the last known state currently gets nothing and no way to ask for
     it. The message stays first and stays loud - this is not a demotion
     of it, it is putting history back underneath it.
+
+    **DONE 2026-09-25.** The early `return` is gone: the message is
+    built as a banner and the ORDINARY renderer runs, so the page
+    carries its columns, checks, arrival history and trends underneath
+    it. The heading keeps the `exhausted` pill, so the page does not
+    read as ordinary at a glance, and the banner ends by saying in
+    words that what follows is the last known state rather than a
+    current reading.
+
+    **A side benefit worth naming:** this path now exercises the same
+    renderer as every other dataset instead of being a second, quietly
+    diverging one. It had never run `renderDataset()`'s real body at
+    all, which is its own latent risk - the first test written here
+    asserts it renders with no console error for exactly that reason.
 
 14. **[todo, 2026-09-24]** **[Dashboard UI]** **[U7] The asset's own
     timezone is configured, and the page still shows two zones side by

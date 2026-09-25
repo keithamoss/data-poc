@@ -133,6 +133,24 @@ releases:
               counted as healthy. Every figure is now counted in its own
               right, and the two quiet states appear in the key with
               their own totals whenever they are real.
+          - headline: Everything you can navigate to is a real link
+            components: ["Dashboard UI"]
+            description: >
+              Breadcrumbs, agency cards and dataset names were buttons
+              pretending to be links, so middle-click, Ctrl-click,
+              open-in-new-tab and copy-link-address all did nothing on
+              them. They are real links now, and the page gets out of
+              the way when you ask the browser to handle one. Buttons
+              that perform an action rather than going somewhere — the
+              date picker, dark mode, the side panels — stay buttons.
+          - headline: A dataset whose schedule has ended still shows its history
+            components: ["Dashboard UI"]
+            description: >
+              Opening one replaced the whole page with a notice saying no
+              more supplies are expected, hiding eighteen runs of real
+              results behind it. The notice stays at the top, and
+              everything you came for is underneath it, labelled as the
+              last known state rather than a current reading.
           - headline: A column with no quality rule now says so instead of showing green
             components: ["Dashboard UI", "QA checks & contract"]
             description: >

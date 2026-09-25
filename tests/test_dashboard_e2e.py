@@ -1899,3 +1899,119 @@ class TestAnUncheckedColumnSaysSoAtEveryLevel:
                                                               built_dashboard_html):
         _goto(clean_page, built_dashboard_html, state=self.STATE)
         assert clean_page.evaluate("() => STATUS_LABEL.inactive") == "No rule defined"
+
+
+class TestNavigationUsesRealLinks:
+    """post-build-review #10, Keith's own principle: "there should be
+    links everywhere. Everything should be an actual link. Nothing
+    should be a magic JavaScript link or magic JavaScript button."
+
+    There were 2 real anchors in the whole rendered page. The jsdom
+    suite covers the markup and the modifier guards; this covers what
+    only a real browser can show - that the href genuinely resolves, and
+    that an ordinary click still routes rather than reloading the page.
+    """
+
+    def test_the_landing_view_is_full_of_real_links_now(self, clean_page,
+                                                         built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        anchors = clean_page.locator("#agency-grid a.card")
+        assert anchors.count() > 0
+        href = anchors.first.get_attribute("href")
+        assert href.startswith("#/agency/"), href
+
+    def test_an_ordinary_click_routes_without_reloading(self, clean_page,
+                                                         built_dashboard_html):
+        """The interception still has to work - a real href that always
+        navigated the hard way would lose the SPA."""
+        _goto(clean_page, built_dashboard_html)
+        clean_page.evaluate("window.__stillHere = true")
+        clean_page.locator("#agency-grid a.card").first.click()
+        clean_page.wait_for_timeout(400)
+        assert clean_page.evaluate("window.__stillHere") is True, (
+            "the page reloaded - the click was not intercepted")
+        assert "/agency/" in clean_page.url
+
+    def test_a_dataset_name_is_a_link_that_resolves(self, clean_page,
+                                                     built_dashboard_html):
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "agency", "agencyId": "child-protection-family-support"})
+        link = clean_page.locator("tbody tr a.dataset-link").first
+        href = link.get_attribute("href")
+        assert "/dataset/" in href, href
+        link.click()
+        clean_page.wait_for_timeout(400)
+        assert "/dataset/" in clean_page.url
+
+    def test_the_breadcrumbs_are_links(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "agency", "agencyId": "registry-services"})
+        crumbs = clean_page.locator("#rail a.crumb")
+        assert crumbs.count() > 1
+        assert crumbs.first.get_attribute("href") == "#/"
+
+    def test_a_control_that_acts_rather_than_navigates_is_still_a_button(
+            self, clean_page, built_dashboard_html):
+        """The other half of the rule - a panel toggle is an action."""
+        _goto(clean_page, built_dashboard_html)
+        for control_id in ["theme-btn", "activity-btn", "asof-btn"]:
+            tag = clean_page.evaluate(
+                f"() => (document.getElementById({control_id!r})||{{}}).tagName")
+            assert tag in (None, "BUTTON"), f"{control_id} is a {tag}"
+
+
+class TestAnExhaustedDatasetStillShowsItsHistory:
+    """post-build-review #13, decided 2026-09-25: "keep the message
+    prominent, and show the last known results below it".
+
+    The exhausted branch replaced the ENTIRE dataset page - columns,
+    checks, arrival history, trends - with its message and returned.
+    cp-case-workers has 18 real committed runs and 7 columns behind
+    that message, with no affordance to reach any of it.
+
+    The reasoning to build against: "nothing is expected" and "nothing
+    ever happened" are different statements, and replacing the whole
+    page conflates them. This is not a demotion of the message - it
+    stays first and stays loud - it is putting the history back
+    underneath it.
+    """
+
+    # An as-of date past the quarterly calendar's last authored period,
+    # so the dataset is genuinely exhausted rather than merely quiet.
+    AS_OF = "2028-06-01"
+    STATE = {"tier": "dataset", "agencyId": "child-protection-family-support",
+             "collectionId": "child-protection", "datasetId": "cp-case-workers"}
+
+    def _open(self, page, html):
+        _goto(page, html, state=self.STATE, as_of=self.AS_OF)
+        page.wait_for_timeout(400)
+
+    def test_the_message_is_still_there_and_still_first(self, clean_page,
+                                                         built_dashboard_html):
+        self._open(clean_page, built_dashboard_html)
+        text = clean_page.locator("#view").inner_text()
+        assert "delivery schedule has ended" in text.lower()
+
+    def test_the_columns_are_reachable_rather_than_replaced(self, clean_page,
+                                                             built_dashboard_html):
+        self._open(clean_page, built_dashboard_html)
+        assert clean_page.locator(".column-tile, .col-tile").count() > 0, (
+            "the whole page is still the message - 7 columns of real history are hidden")
+
+    def test_the_supply_history_is_reachable_too(self, clean_page,
+                                                  built_dashboard_html):
+        self._open(clean_page, built_dashboard_html)
+        assert clean_page.locator("#supply-history-toggle, .supply-history").count() > 0
+
+    def test_the_heading_still_says_the_schedule_ended(self, clean_page,
+                                                        built_dashboard_html):
+        """Showing history under the message must not make the page look
+        ordinary at a glance."""
+        self._open(clean_page, built_dashboard_html)
+        assert clean_page.locator("#view h2 .pill.exhausted").count() == 1
+
+    def test_it_renders_without_throwing(self, clean_page, built_dashboard_html):
+        """clean_page's teardown asserts no console error - the whole
+        point, since this path never ran the normal renderer before."""
+        self._open(clean_page, built_dashboard_html)
+        assert clean_page.locator("#view h2").count() == 1

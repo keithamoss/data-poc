@@ -140,6 +140,14 @@ button{font:inherit; color:inherit;}
   background:none; cursor:pointer; color:var(--ink-muted); font-weight:600;
 }
 .crumb:hover{background:var(--surface-alt);}
+/* The crumbs and cards are real <a>s now (post-build-review #10), so
+   they need what a <button> gave them for free: no underline, the
+   page's own ink rather than the UA link colour, and - for the card -
+   the block layout its children assume. */
+.crumb, .card{text-decoration:none;}
+.crumb{color:var(--ink-muted);}
+.dataset-link{color:inherit; text-decoration:none;}
+.dataset-link:hover{text-decoration:underline;}
 .crumb.current{background:var(--accent-soft); color:var(--accent-ink); border-color:var(--accent-soft-line);}
 .crumb .tier{font-size:10px; letter-spacing:.08em; text-transform:uppercase; opacity:.7; font-weight:700;}
 .sep{color:var(--line-strong);}
@@ -2414,15 +2422,63 @@ function assignmentBadge(kind, id){
   return `<span class="pill tag sm" title="Real people assigned via contract/people.yaml"><span class="ico"></span>Owned by ${names}</span>`;
 }
 
+// EVERYTHING THAT NAVIGATES IS A REAL LINK (post-build-review #10,
+// Keith's own principle: "there should be links everywhere. Everything
+// should be an actual link. Nothing should be a magic JavaScript link
+// or magic JavaScript button").
+//
+// There were 2 real anchors in the whole rendered page, so middle-click,
+// Ctrl-click, open-in-new-tab, copy-link-address and hover-to-see-the-
+// target did nothing on breadcrumbs, agency cards, dataset rows or
+// column tiles.
+//
+// What it buys beyond the middle click: the browser gets to do its own
+// job, and the keyboard question disappears - an anchor is focusable
+// and Enter-able with no tabindex and no keydown handler.
+//
+// A <button> stays a button where it performs an ACTION rather than a
+// navigation: opening a panel, toggling the theme, picking a date.
+function navHref(nav){ return stateToHash(nav); }
+
+// THE INTERCEPTION MUST LET THE BROWSER WIN WHEN THE READER ASKS IT TO.
+// Intercepting unconditionally is how a link becomes a magic JavaScript
+// button wearing an <a>, which is the thing this decision is against.
+// So: any modifier, or anything but the primary button, and we do
+// nothing at all - the href is real and the browser handles it.
+function wireNavLinks(root){
+  (root || document).querySelectorAll("a[data-nav]").forEach(el=>{
+    if(el.dataset.navWired) return;
+    el.dataset.navWired = "1";
+    el.addEventListener("click", e=>{
+      if(e.defaultPrevented) return;
+      if(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if(typeof e.button === "number" && e.button !== 0) return;
+      e.preventDefault();
+      navigate(JSON.parse(el.dataset.nav));
+    });
+  });
+}
+
+// A <tr> CANNOT BE AN <a>, so the link lives on the dataset's name -
+// which is what a reader aims at anyway, and what "copy link address"
+// should be offered on. The row stays clickable as a convenience, but
+// the LINK is the navigation: it is what carries the href, what
+// middle-click and Ctrl-click act on, and what the keyboard reaches
+// with no tabindex of its own (post-build-review #10, and it simplifies
+// #8's row fix rather than adding to it).
+function datasetLink(ag, col, ds){
+  const nav = {tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id};
+  return `<a class="dataset-name dataset-link" href="${navHref(nav)}"
+    data-nav='${JSON.stringify(nav)}'>${ds.name}</a>`;
+}
+
 function setRail(items){
   const rail = document.getElementById("rail");
   rail.innerHTML = items.map((it,i)=>{
     const isLast = i===items.length-1;
-    return `<button class="crumb ${isLast?'current':''}" data-nav='${JSON.stringify(it.nav)}'><span class="tier">${it.tier}</span>${it.label}</button>` + (isLast?"":'<span class="sep">/</span>');
+    return `<a class="crumb ${isLast?'current':''}" href="${navHref(it.nav)}" data-nav='${JSON.stringify(it.nav)}'><span class="tier">${it.tier}</span>${it.label}</a>` + (isLast?"":'<span class="sep">/</span>');
   }).join("");
-  rail.querySelectorAll(".crumb").forEach(btn=>{
-    btn.addEventListener("click", ()=> navigate(JSON.parse(btn.dataset.nav)));
-  });
+  wireNavLinks(rail);
 }
 
 // Browser back/forward support: STATE is a plain, JSON-serializable object
@@ -2813,13 +2869,13 @@ function renderExec(view){
     const nDatasets = ag.collections.reduce((s,c)=>s+c.datasets.length,0);
     const allCols = ag.collections.flatMap(c=>c.datasets.flatMap(d=>d.columns));
     const spark = aggregateSparkline(allCols);
-    return `<button class="card" data-nav='${JSON.stringify({tier:"agency", agencyId:ag.id})}'>
+    return `<a class="card" href="${navHref({tier:"agency", agencyId:ag.id})}" data-nav='${JSON.stringify({tier:"agency", agencyId:ag.id})}'>
       <div class="card-top"><h3>${ag.name}</h3>${pill(ag.status)}</div>
       <div style="color:var(--ink-muted); font-size:12.5px;">${ag.blurb}</div>
       ${spark}
       <div class="card-meta"><span><b>${ag.collections.length}</b> ${pluralize(ag.collections.length,"collection")}</span><span><b>${nDatasets}</b> ${pluralize(nDatasets,"dataset")}</span></div>
       ${exhaustedMarker(ag.exhaustedCount, ag.status)}
-    </button>`;
+    </a>`;
   }).join("");
   wireCards(grid);
 }
@@ -2894,7 +2950,7 @@ function renderAgency(view, agencyId){
           // identical wording is what would hide that.
           if(ds.scheduleExhausted){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
-              <td><div class="dataset-name">${ds.name}</div><div class="dataset-provider">${ds.provider}</div></td>
+              <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
               <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
               <td colspan="4" style="color:var(--ink); font-size:12.5px;">Delivery schedule ended after
                 ${ds.scheduleExhausted.lastPeriod} — no supply expected, and QA cannot run until dates are added</td>
@@ -2902,7 +2958,7 @@ function renderAgency(view, agencyId){
           }
           if(ds.noDataAsOf){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
-              <td><div class="dataset-name">${ds.name}</div><div class="dataset-provider">${ds.provider}</div></td>
+              <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
               <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
               <td colspan="4" style="color:var(--ink-faint); font-size:12.5px;">No QA run within tolerance as of the selected date</td>
             </tr>`;
@@ -2914,7 +2970,7 @@ function renderAgency(view, agencyId){
           // one dataset's own columns.
           const dsSpark = aggregateSparkline(ds.columns);
           return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
-            <td><div class="dataset-name">${ds.name}</div><div class="dataset-provider">${ds.provider}</div></td>
+            <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
             <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
             <td>${arrivalPillHtml} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${fmtArrival(ds.lastArrival)}</span></td>
             <td class="mono">${fmtInt(ds.rowCount)}</td>
@@ -2938,9 +2994,17 @@ function renderAgency(view, agencyId){
   // because the whole row is the target and has been since it was
   // written; moving the affordance into one cell would change what a
   // mouse user clicks to fix what a keyboard user cannot reach.
+  wireNavLinks(wrap);
   wrap.querySelectorAll("tbody tr").forEach(tr=>{
     const go = ()=> navigate(JSON.parse(tr.dataset.nav));
-    tr.addEventListener("click", go);
+    tr.addEventListener("click", e=>{
+      // The anchor in the name cell handles its own click - including
+      // deciding to let the browser have it. Without this guard a
+      // Ctrl-click on the name would open a new tab AND navigate this
+      // one, which is worse than the magic button it replaced.
+      if(e.target.closest("a")) return;
+      go();
+    });
     tr.addEventListener("keydown", e=>{
       if(e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); }
     });
@@ -3088,29 +3152,39 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   // supplied yet" is a fact about a supplier; "the schedule has ended"
   // is a task on OUR side, and rendering them the same way is what
   // makes a configuration task invisible.
+  // THE MESSAGE STAYS FIRST AND STAYS LOUD; THE HISTORY COMES BACK
+  // UNDERNEATH IT (post-build-review #13, Keith's own call). This used
+  // to `return` here, replacing the entire page - columns, checks,
+  // arrival history, trends - with the message. cp-case-workers has 18
+  // real committed runs and 7 columns behind it, and no affordance to
+  // reach any of them.
+  //
+  // "Nothing is expected" and "nothing ever happened" are different
+  // statements, and replacing the whole page conflates them. So the
+  // banner is built here and PREPENDED after the ordinary render, which
+  // also means this path exercises the same renderer as every other
+  // dataset rather than being a second, quietly diverging one.
+  let exhaustedBanner = "";
   if(ds.scheduleExhausted){
     const ended = ds.scheduleExhausted;
     const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || "contract/data-asset.yaml";
-    view.innerHTML = `
-      <div class="view-head">
-        <div>
-          <h2>${ds.name} ${pill("exhausted")} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</h2>
-          <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}</div>
+    exhaustedBanner = `
+      <div class="notice-exhausted" role="status">
+        <b>This dataset's delivery schedule has ended.</b>
+        <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
+          Its calendar <b style="display:inline">${ended.calendar}</b> has no dates after
+          <b style="display:inline">${ended.lastPeriod}</b>
+          (${fmtDate(new Date(ended.lastDate+"T00:00:00Z"))}), so as of
+          <b style="display:inline">${fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"))}</b> no supply
+          is expected, none can be filed, and QA cannot run for it.<br><br>
+          Nothing is wrong with the data. Add the next delivery dates to
+          <code>${file}</code> — <code>mothman schedule candidate-dates</code> proposes them for
+          review. Supplies that arrive meanwhile are still accepted and will be filed correctly
+          once the dates exist.<br><br>
+          <b style="display:inline; color:var(--ink);">What follows is this dataset's last known
+          state</b>, as at its final supply — history, not a current reading.
         </div>
-      </div>
-      <div style="padding:40px 0; color:var(--ink-muted); font-size:14px; max-width:60ch;">
-        <b style="color:var(--ink);">This dataset's delivery schedule has ended.</b><br><br>
-        Its calendar <b>${ended.calendar}</b> has no dates after
-        <b>${ended.lastPeriod}</b> (${fmtDate(new Date(ended.lastDate+"T00:00:00Z"))}), so as of
-        <b>${fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"))}</b> no supply is expected, none can be
-        filed, and QA cannot run for it.<br><br>
-        Nothing is wrong with the data. Add the next delivery dates to
-        <code>${file}</code> — <code>mothman schedule candidate-dates</code> proposes them for
-        review. Supplies that arrive meanwhile are still accepted and will be filed correctly
-        once the dates exist.
-      </div>
-    `;
-    return;
+      </div>`;
   }
   if(ds.noDataAsOf && !ds.columns.length){
     view.innerHTML = `
@@ -3132,11 +3206,12 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   view.innerHTML = `
     <div class="view-head">
       <div>
-        <h2>${ds.name}${ds.realRunCount?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:""}</h2>
+        <h2>${ds.name}${ds.scheduleExhausted?` ${pill("exhausted")}`:""}${ds.realRunCount?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:""}</h2>
         <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${ds.realRunCount?" · figures below are computed by real dbt/Soda/datacontract-cli/Evidently tools against real generated runs — not fabricated in the browser.":""}</div>
       </div>
       <div style="display:flex; align-items:center; gap:8px;">${pill(ds.status)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
     </div>
+    ${exhaustedBanner}
     ${ds.noDataAsOf ? `
     <div style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:64ch;">
       As of <b>${fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"))}</b>, nothing has landed yet in this dataset's
@@ -3274,7 +3349,7 @@ function setDrawerHidden(id, hidden){
   el.toggleAttribute("inert", hidden);
 }
 
-function wireCards(grid){ grid.querySelectorAll(".card").forEach(el=> el.addEventListener("click", ()=> navigate(JSON.parse(el.dataset.nav)))); }
+function wireCards(grid){ wireNavLinks(grid); }
 
 /* =========================================================================
    6. Column drawer

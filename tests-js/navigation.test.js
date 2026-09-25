@@ -276,3 +276,96 @@ describe("a URL pointing at a column or check that no longer exists", () => {
   // opens its drawer - which needs real check data.
   // tests/test_dashboard_e2e.py's TestAStaleDeepLinkSaysSo has it.
 });
+
+// EVERYTHING THAT NAVIGATES IS A REAL LINK (post-build-review #10,
+// Keith's own principle, 2026-09-25: "there should be links everywhere.
+// Everything should be an actual link. Nothing should be a magic
+// JavaScript link or magic JavaScript button").
+//
+// There were 2 real anchors in the entire rendered page, so middle-click,
+// Ctrl-click, open-in-new-tab, copy-link-address and hover-to-see-target
+// did nothing on breadcrumbs, agency cards or dataset rows.
+//
+// A <button> stays a button where it performs an ACTION rather than a
+// navigation - opening a panel, toggling the theme, picking a date.
+describe("everything that navigates is an anchor carrying its own route", () => {
+  it("breadcrumbs are links to the tier they go to", () => {
+    const w = load();
+    w.navigate({ tier: "dataset", agencyId: "registry-services",
+                 collectionId: "civil-registration", datasetId: "birth-registrations" });
+    const crumbs = [...dashboard.document.querySelectorAll("#rail .crumb")];
+    expect(crumbs.length).toBeGreaterThan(1);
+    for (const c of crumbs) {
+      expect(c.tagName).toBe("A");
+      expect(c.getAttribute("href")).toMatch(/^#\//);
+    }
+  });
+
+  it("an agency card is a link to that agency", () => {
+    const w = load();
+    const card = dashboard.document.querySelector("#agency-grid .card");
+    expect(card.tagName).toBe("A");
+    expect(card.getAttribute("href")).toBe(
+      w.stateToHash({ tier: "agency", agencyId: JSON.parse(card.dataset.nav).agencyId }));
+  });
+
+  it("a dataset row carries a real link to its dataset", () => {
+    // A <tr> cannot be an <a>, so the link lives on the dataset name -
+    // which is the thing a reader would aim at anyway. The row stays
+    // clickable as a convenience; the LINK is the navigation.
+    const w = load();
+    w.navigate({ tier: "agency", agencyId: "registry-services" });
+    const link = dashboard.document.querySelector("tbody tr a.dataset-link");
+    expect(link).not.toBeNull();
+    expect(link.getAttribute("href")).toContain("/dataset/");
+  });
+
+  it("a plain click is still intercepted for the SPA route", () => {
+    const w = load();
+    const card = dashboard.document.querySelector("#agency-grid .card");
+    const before = w.history.length;
+    card.dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true }));
+    expect(w.hashToState().tier).toBe("agency");
+    expect(w.history.length).toBe(before + 1);
+  });
+
+  it("a ctrl-click is left to the browser rather than hijacked", () => {
+    // "Intercepting unconditionally is how a link becomes a magic
+    // JavaScript button wearing an <a>, which is the thing this
+    // decision is against."
+    const w = load();
+    const card = dashboard.document.querySelector("#agency-grid .card");
+    const ev = new w.MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true });
+    card.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it("a middle click is left to the browser too", () => {
+    const w = load();
+    const card = dashboard.document.querySelector("#agency-grid .card");
+    const ev = new w.MouseEvent("click", { bubbles: true, cancelable: true, button: 1 });
+    card.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it("a meta- or shift-click is left alone as well", () => {
+    const w = load();
+    const card = dashboard.document.querySelector("#agency-grid .card");
+    for (const mods of [{ metaKey: true }, { shiftKey: true }]) {
+      const ev = new w.MouseEvent("click", { bubbles: true, cancelable: true, ...mods });
+      card.dispatchEvent(ev);
+      expect(ev.defaultPrevented).toBe(false);
+    }
+  });
+
+  it("a control that performs an action is still a button", () => {
+    // The other half of the rule. Opening a panel or toggling the theme
+    // is not a navigation and must not become a link.
+    const w = load();
+    const d = dashboard.document;
+    for (const id of ["theme-toggle", "wordmark-btn"]) {
+      const el = d.getElementById(id);
+      if (el) expect(el.tagName).toBe("BUTTON");
+    }
+  });
+});
