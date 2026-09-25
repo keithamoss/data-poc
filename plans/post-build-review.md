@@ -2261,6 +2261,51 @@ here as its own question, not acted on.
     was last used to judge data"**, which is the thing that actually
     must not move quietly.
 
+    **CORRECTION, 2026-09-25, found while building it: the seal in
+    committed history is NOT the thing this gate compares.**
+
+    `find_undocumented_changes()` compares `config_hash` - a SHA-256 of
+    a check's WHOLE config dict from its definition file. The committed
+    `verified` records carry the RESOLVED thresholds and nothing else;
+    `config_hash` appears nowhere in `qa_results/` (grepped, zero
+    hits).
+
+    **The gap is not cosmetic, and one example settles it.** Changing a
+    dbt `accepted_values` list from `[M, F, X]` to `[M, F, X, U]`
+    changes the config hash and changes NO threshold. Comparing on the
+    projection history carries would miss exactly the class of change
+    that matters most - what a check actually tests - while catching
+    only the thresholds. So "compare on what history already has" is
+    not a weaker version of the gate, it is a different and worse one.
+
+    **What I told Keith was right about thresholds and wrong about the
+    comparison**, and the difference is load-bearing, so it is recorded
+    here rather than quietly worked around.
+
+    **The obvious repair is the wrong shape, and its own numbers say
+    so.** Writing `config_hash` into each verified record costs ~35
+    bytes x 257 checks = **8.8 KB per run**, 2.9% of a measured 300 KB
+    run - which is **63 MB a year, 313 MB over five**, at the 20
+    datasets-daily figure Keith gave the same day. That is a lot of
+    repetition for a value that changes perhaps once a year per check,
+    and it walks directly INTO the problem
+    `plans/running-thoughts.md` #44 was opened to walk out of.
+
+    **An append-only record of check-config changes is the same
+    artefact as the seal, and costs ~30 KB a YEAR in total.** It is
+    what the gate wants to read, it is what makes the history
+    immutable, and it is what #44 already names as a thread to pull.
+    Building a per-run hash now would be building the throwaway version
+    of it.
+
+    **So the recommendation changed while building**, and it is Keith's
+    to take or leave:
+    - **Now:** the cheap hardening only - widen `HEAD~1` to the whole
+      push range, drop the changelog escape hatch, fix the runner clock
+      (#35). Closes the multi-commit hole in both gates, adds no bytes.
+    - **Then:** the real seal arrives as part of #44's redesign, where
+      it is a few KB rather than a few hundred MB.
+
     **The calendars half has no such record, and building one now may
     be throwaway.** Nothing committed carries a period's date, a due
     instant or a claim window - `dataset_stats.json`'s arrival record
