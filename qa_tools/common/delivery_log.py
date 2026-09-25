@@ -54,6 +54,8 @@ import json
 import re
 from pathlib import Path
 
+from qa_tools.common import holds
+
 ROOT = Path(__file__).resolve().parent.parent.parent
 
 #: Its own tree, beside the QA results rather than inside them: a
@@ -121,6 +123,14 @@ def record(delivery, recognition, log_dir: Path | None = None) -> Path | None:
              "contested_by": contested.get(name)}
             for name in sorted(delivery.files)
         ],
+        # HELD SUPPLIES (REQ-PIPE-059 criterion 4). Derivable from
+        # `files` - two entries carrying one dataset_id - and stated
+        # anyway, because the question a person opens this with is
+        # "what was held and what could it not choose between", and
+        # making them compute it from a file list is how a queue stops
+        # being drained.
+        "held": [{"dataset_id": h.dataset_id, "files": list(h.files)}
+                  for h in holds.holds_in(recognition)],
         # Recorded, never read. A receipt lookalike or a supplier's own
         # manifest is excluded from `files` on purpose, so this is the
         # only place their presence survives.

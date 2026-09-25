@@ -123,6 +123,22 @@ generator can emit on purpose so recognition is tested against them:
 | A file matching no pattern | `readme.txt`, `notes.pdf` | Suppliers include covering notes |
 | A file unparseable as the format its name claims | a `.csv` holding HTML | Truncated uploads, error pages saved as data |
 
+**A DELIVERY MAY LEGITIMATELY CONTAIN THE SECOND SHAPE, AND WE WILL NOT
+PROCESS IT UNATTENDED.** Those are different claims and the repo carries
+both on purpose, so that the tension reads as deliberate rather than as
+a defect. Two files matching one dataset's pattern is a real thing a
+supplier sends and this format accepts it — `REQ-PIPE-059` then HOLDS
+that dataset's supply for a person rather than choosing between them.
+Both files are staged, so the material to resolve it with is there;
+neither resolves to the logical table name, so nothing can read it
+until somebody assigns or rejects. Every other dataset in the same
+delivery is processed as usual.
+
+It holds **every time**, including a supplier who routinely splits one
+table — Keith's call, 2026-09-24, knowing the recurring cost, because a
+proper splitting mechanism is the real answer and a hold is the honest
+placeholder until one exists.
+
 **Legitimate to RECEIVE is not the same as processed unattended**, and
 the first row is where the two part company. A delivery carrying two
 files for one dataset is HELD for a human every time - `REQ-PIPE-059`,

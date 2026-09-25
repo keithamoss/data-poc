@@ -35,7 +35,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-from qa_tools.common import delivery, hierarchy, slots
+from qa_tools.common import delivery, hierarchy, holds, slots
 
 
 @dataclass(frozen=True)
@@ -72,6 +72,19 @@ class Arrival:
         return {"run_id": self.run_id, "run_index": self.run_index,
                 "received_at": self.received_at.isoformat(),
                 "delivery": self.delivery_name, "path": str(self.path)}
+
+    @property
+    def held(self) -> frozenset[str]:
+        """Datasets in this arrival whose supply cannot be chosen -
+        more than one file matched (REQ-PIPE-059).
+
+        A CALLER MUST CHECK THIS BEFORE path_for(), which still refuses
+        rather than guessing. The refusal is right and was always
+        right; what was wrong is that it arrived as an exception and
+        took every other dataset in the delivery with it.
+        """
+        return frozenset(ds for ds, names in self.files_by_dataset.items()
+                          if len(names) > 1)
 
     def path_for(self, dataset_id: str) -> Path:
         """The single file for one dataset, or an error naming why not.
@@ -186,6 +199,17 @@ def recognise(d: delivery.Delivery) -> Recognition:
     if unexpected:
         print(f"note: delivery {d.name!r} carries {', '.join(unexpected)}, which "
                f"nothing is currently owed from - processed as usual.")
+    # A SUPPLY NOBODY MAY CHOOSE FOR YOU (REQ-PIPE-059). Reported as
+    # needing action rather than informationally: an unexpected table
+    # is a supplier sending something extra, and this is a supply that
+    # will not be checked until somebody resolves it.
+    found_holds = holds.holds_in(Recognition(
+        delivery_name=d.name,
+        by_dataset={ds: tuple(names) for ds, names in found.by_dataset.items()},
+        unmatched=(), contested={}))
+    for hold in found_holds:
+        warnings.warn(hold.describe(), stacklevel=2)
+
     return Recognition(
         delivery_name=d.name,
         unexpected=unexpected,

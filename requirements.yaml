@@ -8609,7 +8609,7 @@ requirements:
       date: "2026-09-24"
     story: "As an operator, I want the pipeline to stop and ask when one delivery contains two files that could both be the same table, so that a supplier's second file is never dropped by whichever one the loop happened to see last."
     moscow: must
-    status: not_started
+    status: built
     source: "Keith, 2026-09-22, plans/supply-model.md Thread H second chaos pass #3 - 'hold for a human', tied by him to the not-yet-designed filename-to-dataset mapping. Delivery sprint 7. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
       - "IF more than one file in a delivery is attributed to the same dataset, THEN THE SYSTEM SHALL hold that dataset's supply for a human, and SHALL NOT choose between the files."
@@ -8711,6 +8711,80 @@ requirements:
         three and the likeliest eventual answer, but it needs the
         decision log from sprint 12 to exist first.
 
+      - >
+        Decided BOTH FILES STAGE UNDER DISTINCT PHYSICAL NAMES, which
+        is not a detail: one name for both means the second overwrites
+        the first, so the hold would have nothing left to resolve WITH.
+        That is the exact failure the hold exists to prevent,
+        reintroduced one layer down and invisible from anywhere the
+        hold is reported.
+      - >
+        Decided "staged but not checked" is enforced by the MECHANISM
+        rather than by remembering. REQ-PIPE-068 creates no view where
+        a logical name has several candidates, so a held dataset is
+        simply unreadable for that run - there is no code path that has
+        to know a dataset is held in order to skip QA on it.
+      - >
+        Criterion 6 and half of criterion 3 are currently satisfied BY
+        ABSENCE, which is worth stating rather than claiming as
+        enforcement: nothing assigns slots (REQ-PIPE-062) or classifies
+        arrivals (REQ-PIPE-066) yet, so a held supply cannot fill a
+        slot or be classified because nothing fills or classifies
+        anything. They need re-checking when those land, and the tests
+        here assert what IS enforced today rather than implying more.
+      - >
+        The refusal itself was already built and already right -
+        Arrival.path_for() has always raised rather than taking the
+        first file, with its own docstring saying why. What was wrong
+        is that it arrived as an EXCEPTION, from six unconditional call
+        sites, so one ill-formed delivery took every other arrival down
+        with it. This requirement turned a correct refusal into a
+        handled state.
+    linked_tests:
+      - tests/test_holds.py
+      - tests/test_delivery_log.py
+      - tests/test_arrivals.py
+    implemented_by:
+      - qa_tools/common/holds.py::holds_in
+      - qa_tools/common/holds.py::held_datasets
+      - qa_tools/common/arrivals.py::Arrival
+      - qa_tools/common/supply_db.py::staged_table
+      - qa_tools/common/delivery_log.py::record
+    evidence:
+      - >-
+        2026-09-25: the loader rewrite this needed - staging every file
+        a dataset matched rather than the one path_for() returned - was
+        proved behaviour-preserving against real data. A full pipeline
+        run over both collections diffed 6563 recorded check verdicts
+        against the committed history it replaced, with no differences
+        at all.
+      - >-
+        2026-09-25: the overwrite hazard is asserted rather than
+        reasoned about. A test stages two files for one dataset and
+        confirms two physical tables exist - because one name for both
+        loses a file silently, and the hold would then be reporting on
+        material that is no longer there.
+      - >-
+        2026-09-25: "not QA'd" is asserted the way it is enforced - a
+        test stages both halves, builds the run's views, and confirms
+        the logical name resolves to nothing and that querying it
+        raises. Nothing in the QA path knows what a hold is.
+      - >-
+        2026-09-25: criterion 2 is tested with a held delivery sitting
+        beside a healthy one, because the failure it replaces was an
+        exception from six unconditional path_for() call sites that
+        took the whole run down.
+      - >-
+        2026-09-25: the shape is currently UNREACHABLE for Child
+        Protection and reachable for Birth Registrations, and the tests
+        say so rather than working around it - CP's patterns match
+        exactly one filename each, so a second file is an unrecognised
+        artefact rather than a hold, while BDM's carries a placeholder.
+        Recorded because a future session widening a CP pattern needs
+        to know that is what makes the hold reachable there.
+      - >-
+        2026-09-25: all ten gates green, 1533 Python tests and 294 JS
+        tests.
   - id: REQ-PIPE-060
     title: Staging asserts only arrival facts, and a table is there or it is not
     date_written: "2026-09-23"

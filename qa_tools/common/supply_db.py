@@ -142,7 +142,7 @@ def run_id_of(schema: str) -> str | None:
     return schema[len(RUN_SCHEMA_PREFIX):]
 
 
-def staged_table(table: str, run_id: str) -> str:
+def staged_table(table: str, run_id: str, discriminator: str = "") -> str:
     """The physical name a staged table takes.
 
     One name per (logical table, arrival), never an overwrite - a
@@ -157,7 +157,16 @@ def staged_table(table: str, run_id: str) -> str:
     physical table per arrival, resolved to a logical name by a view -
     is what matters here and does not change.
     """
-    return f"{_ident(table, 'table name')}__{_ident(run_id, 'run id')}"
+    name = f"{_ident(table, 'table name')}__{_ident(run_id, 'run id')}"
+    if not discriminator:
+        return name
+    # A HELD SUPPLY STAGES EVERY FILE THAT MATCHED (REQ-PIPE-059), so
+    # two files claiming one dataset in one delivery need two physical
+    # names. Without this the second overwrites the first and the hold
+    # has nothing left to resolve WITH - which is the exact failure the
+    # hold exists to prevent, reintroduced one layer down.
+    safe = re.sub(r"[^0-9A-Za-z]+", "_", discriminator).strip("_") or "x"
+    return f"{name}__{safe}"
 
 
 def ensure_schemas(conn) -> None:

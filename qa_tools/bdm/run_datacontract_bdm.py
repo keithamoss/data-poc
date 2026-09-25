@@ -168,7 +168,8 @@ if __name__ == "__main__":
 
     from qa_tools.common import arrivals
     manifest = [a.as_entry() | {"csv_path": str(a.path_for("birth-registrations"))}
-                for a in arrivals.arrivals_for("civil-registration", "run_")]
+                for a in arrivals.arrivals_for("civil-registration", "run_")
+                if "birth-registrations" not in a.held]
     for entry in manifest:
         res = evaluate_datacontract_bdm(entry["run_id"], entry["csv_path"], datetime.now(timezone.utc).isoformat())
         print(f"--- {entry['run_id']} ({entry['delivery']}) ---")

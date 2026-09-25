@@ -39,7 +39,7 @@ TABLE = "birth_registrations"
 
 
 def build_one(run_id: str, csv_path: str, run_date: str, db_path: str | None = None,
-              contract_path: str = CONTRACT_PATH) -> str:
+              contract_path: str = CONTRACT_PATH, discriminator: str = "") -> str:
     """Stage one already-on-disk CSV as this run's supply, and give the
     run a view of it. Returns the physical staged table's name.
 
@@ -67,14 +67,14 @@ def build_one(run_id: str, csv_path: str, run_date: str, db_path: str | None = N
     df["run_id"] = run_id
     df["run_date"] = run_date
 
-    physical = supply_db.staged_table(TABLE, run_id)
+    physical = supply_db.staged_table(TABLE, run_id, discriminator)
     conn = supply_db.connect(path=db_path)
     try:
         supply_db.ensure_schemas(conn)
         # Handed to DuckDB as a real staging CSV rather than through the
         # dataframe, so the explicit-null handling csv_io owns stays the
         # one place that decides what an empty cell means.
-        staging_csv = os.path.join(os.path.dirname(csv_path), f"_staged_{run_id}.csv")
+        staging_csv = os.path.join(os.path.dirname(csv_path), f"_staged_{physical}.csv")
         df.to_csv(staging_csv, index=False)
         try:
             conn.execute(
@@ -110,10 +110,17 @@ def build_all(raw_dir: str = RAW_DIR, db_path: str | None = None,
     staged = []
     for arrival in arrivals.arrivals_for("civil-registration", "run_",
                                           deliveries_dir, receipts_dir):
-        staged.append(build_one(
-            arrival.run_id, str(arrival.path_for("birth-registrations")),
-            asset_time.local_date(arrival.received_at).isoformat(),
-            db_path=db_path))
+        run_date = asset_time.local_date(arrival.received_at).isoformat()
+        names = arrival.files_by_dataset.get("birth-registrations") or ()
+        # EVERY FILE THAT MATCHED IS STAGED, both halves of a held
+        # supply included (REQ-PIPE-059) - the material to resolve the
+        # hold with has to be there. They get distinct physical names
+        # and no view resolves the logical one, so nothing can read it.
+        for filename in names:
+            staged.append(build_one(
+                arrival.run_id, str(arrival.path / filename), run_date,
+                db_path=db_path,
+                discriminator=filename if len(names) > 1 else ""))
     return staged
 
 

@@ -33,7 +33,8 @@ TABLES = [d.table for d in hierarchy.datasets_in_collection("child-protection")]
 
 
 def add_table_to_run(run_id: str, table: str, csv_path: str, db_path: str | None = None,
-                      raw_dir: str = CP_RAW_DIR, contract_path: str = CONTRACT_PATH) -> str:
+                      raw_dir: str = CP_RAW_DIR, contract_path: str = CONTRACT_PATH,
+                      discriminator: str = "") -> str:
     """Loads exactly one CP table's CSV into that run's DuckDB file - the
     single-arrival counterpart to build_all()'s per-manifest-entry loop
     body, called once per arriving CP table file so a delivery's warehouse
@@ -67,7 +68,8 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, db_path: str | None
 
     run_raw_dir = os.path.join(raw_dir, run_id)
     os.makedirs(run_raw_dir, exist_ok=True)
-    dest_csv = os.path.join(run_raw_dir, f"{table}.csv")
+    dest_csv = os.path.join(run_raw_dir, os.path.basename(csv_path) if discriminator
+                             else f"{table}.csv")
     if os.path.abspath(csv_path) != os.path.abspath(dest_csv):
         with open(csv_path, "rb") as src, open(dest_csv, "wb") as dst:
             dst.write(src.read())
@@ -76,7 +78,7 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, db_path: str | None
     staging_csv = os.path.join(run_raw_dir, f"_staged_{table}.csv")
     df.to_csv(staging_csv, index=False)
 
-    physical = supply_db.staged_table(table, run_id)
+    physical = supply_db.staged_table(table, run_id, discriminator)
     conn = supply_db.connect(path=db_path)
     try:
         supply_db.ensure_schemas(conn)
@@ -121,8 +123,18 @@ def build_all(raw_dir: str = CP_RAW_DIR, db_path: str | None = None,
         for dataset_id, filenames in sorted(arrival.files_by_dataset.items()):
             table = hierarchy.dataset(dataset_id).table
             for filename in filenames:
+                # EVERY FILE THAT MATCHED IS STAGED, including both
+                # halves of a held supply (REQ-PIPE-059): the material
+                # to resolve the hold with has to be there. They get
+                # distinct physical names, and no view resolves the
+                # logical one - REQ-PIPE-068 refuses to choose between
+                # candidates - so nothing can read it, which is how
+                # "staged but not checked" is enforced by the mechanism
+                # rather than by remembering.
+                discriminator = filename if len(filenames) > 1 else ""
                 add_table_to_run(run_id, table, os.path.join(str(arrival.path), filename),
-                                  db_path=db_path, raw_dir=raw_dir)
+                                  db_path=db_path, raw_dir=raw_dir,
+                                  discriminator=discriminator)
                 staged += 1
         run_ids.append(run_id)
         print(f"{run_id}: staged {staged} table(s)")

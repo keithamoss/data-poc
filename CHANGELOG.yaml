@@ -342,6 +342,13 @@ releases:
               build yet.
       - category: Improved
         items:
+          - headline: Nobody picks between two files for you
+            components: ["Pipeline & publishing"]
+            description: >
+              If one delivery carries two files that are both the same
+              table, that table is held for you rather than the pipeline
+              picking one. Both are kept, everything else in the
+              delivery carries on, and you decide.
           - headline: A permanent record of what arrived
             components: ["Pipeline & publishing"]
             description: >

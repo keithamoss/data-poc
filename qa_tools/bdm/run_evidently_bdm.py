@@ -135,7 +135,8 @@ def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
 
     from qa_tools.common import arrivals
     manifest = [a.as_entry() | {"csv_path": str(a.path_for("birth-registrations"))}
-                for a in arrivals.arrivals_for("civil-registration", "run_")]
+                for a in arrivals.arrivals_for("civil-registration", "run_")
+                if "birth-registrations" not in a.held]
     previous_file = _previous_run_file(manifest, run_id)
     if previous_file is not None:
         current_count, row_count_snapshot = _row_count(csv_filename)
@@ -180,7 +181,8 @@ if __name__ == "__main__":
 
     from qa_tools.common import arrivals
     manifest = [a.as_entry() | {"csv_path": str(a.path_for("birth-registrations"))}
-                for a in arrivals.arrivals_for("civil-registration", "run_")]
+                for a in arrivals.arrivals_for("civil-registration", "run_")
+                if "birth-registrations" not in a.held]
     ref = manifest[0]  # not the module-level REFERENCE_RUN_ID default - see orchestrate_bdm.py
     for entry in manifest:
         res = evaluate_evidently_bdm(entry["run_id"], entry["csv_path"], datetime.now(timezone.utc).isoformat(),

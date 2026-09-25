@@ -79,9 +79,12 @@ def load_manifest() -> list[dict]:
     supplies from a declaration rather than from what arrived.
     """
     from qa_tools.common import arrivals
+    # A HELD supply is not pickable: nothing may choose between its
+    # files, so there is no one csv_path to offer (REQ-PIPE-059).
     return [a.as_entry()
                 | {"csv_path": str(a.path_for("birth-registrations"))}
-            for a in arrivals.arrivals_for("civil-registration", "run_")]
+            for a in arrivals.arrivals_for("civil-registration", "run_")
+            if "birth-registrations" not in a.held]
 
 
 def manifest_exists() -> bool:
