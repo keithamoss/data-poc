@@ -35,7 +35,7 @@ from datetime import date
 
 
 from . import bdm_common
-from qa_tools.common import arrivals, supply_db
+from qa_tools.common import arrivals, run_id_guard, supply_db
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
@@ -227,8 +227,9 @@ def run_pipeline(sequential: bool = False) -> dict:
     # (REQ-GEN-043). The generator's manifest.json is bookkeeping, and
     # a pipeline reading it would be filing supplies from what it was
     # told rather than from what arrived.
+    found_arrivals = arrivals.arrivals_for("civil-registration", "run_")
     manifest = [a.as_entry() | {"csv_path": str(a.path_for("birth-registrations"))}
-                for a in arrivals.arrivals_for("civil-registration", "run_")]
+                for a in found_arrivals]
 
     # The first manifest entry (run_01, always clean by RUN_PLAN
     # construction) - NOT run_evidently_bdm.REFERENCE_RUN_ID, a hardcoded
@@ -239,6 +240,11 @@ def run_pipeline(sequential: bool = False) -> dict:
     # regenerations, evidently silently compared against a stale leftover
     # file from a previous anchor date instead of failing loudly - see
     # plans/qa-pipeline.md for the regression test this got.
+    # BEFORE ANY REAL TOOL RUNS (REQ-PIPE-057 criterion 19). Run ids
+    # are positional, so a change in what recognition returns renames
+    # committed history - a failure that would otherwise be found when
+    # CI went red on paths nothing in this file mentions.
+    run_id_guard.check(AGENCY_ID, COLLECTION_ID, found_arrivals)
     reference_entry = manifest[0]
     run_timestamp = asset_time.now().isoformat()
     # Fails loudly here, before any real tool runs, if git identity isn't

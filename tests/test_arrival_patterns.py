@@ -264,6 +264,7 @@ class TestAContestedFileIsHeldRatherThanFiled:
         d = delivery.Delivery(name="drop", path=tmp_path, files=("shared.csv",),
                               received_at=None, anomalies=())
         with pytest.warns(UserWarning, match=re.escape("shared.csv")):
-            found, by_dataset, unmatched = arrivals.recognise(d)
-        assert by_dataset == {} and unmatched == ()
-        assert found is None
+            found = arrivals.recognise(d)
+        assert found.by_dataset == {} and found.unmatched == ()
+        assert found.contested == {"shared.csv": ("alpha", "beta")}
+        assert found.is_unplaceable

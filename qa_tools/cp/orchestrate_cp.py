@@ -27,7 +27,7 @@ import os
 import sys
 
 
-from qa_tools.common import arrivals, supply_db
+from qa_tools.common import arrivals, run_id_guard, supply_db
 from qa_tools.common import hierarchy
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common.git_identity import get_run_by
@@ -140,13 +140,19 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
 
     # RECOGNISED FROM DISK, never read from a declaration
     # (REQ-GEN-043) - see orchestrate_bdm.py's identical comment.
-    manifest = [a.as_entry() for a in arrivals.arrivals_for("child-protection", "cp_run_")]
+    found_arrivals = arrivals.arrivals_for("child-protection", "cp_run_")
+    manifest = [a.as_entry() for a in found_arrivals]
 
     # The first manifest entry (cp_run_01, always clean by RUN_PLAN
     # construction) - NOT run_evidently_cp.REFERENCE_RUN_ID, a hardcoded
     # literal that goes stale every time the anchor date rolls forward
     # (generator/anchor_date.py) - see orchestrate_bdm.py's identical fix
     # and plans/qa-pipeline.md for the bug this was found as.
+    # BEFORE ANY REAL TOOL RUNS (REQ-PIPE-057 criterion 19). Run ids
+    # are positional, so a change in what recognition returns renames
+    # committed history - a failure that would otherwise be found when
+    # CI went red on paths nothing in this file mentions.
+    run_id_guard.check(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, found_arrivals)
     reference_run_id = manifest[0]["run_id"]
     run_timestamp = asset_time.now().isoformat()
     # Fails loudly here, before any real tool runs - see orchestrate_bdm.py's

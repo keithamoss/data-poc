@@ -105,13 +105,43 @@ class TestADeliveryIsRecognisedNotLabelled:
         _write(dirs, "mystery-drop", {"covering_note.pdf": "%PDF-1.4\n"})
         d, r = dirs
         assert [x.name for x in arrivals.unplaceable(d, r)] == ["mystery-drop"]
-        assert _for(dirs) == []
-        assert _for(dirs, "child-protection", "cp_run_") == []
+        # Reported, and the run does not fail (criterion 13).
+        with pytest.warns(UserWarning, match="covering_note.pdf"):
+            assert _for(dirs) == []
+        with pytest.warns(UserWarning):
+            assert _for(dirs, "child-protection", "cp_run_") == []
 
-    def test_a_delivery_spanning_two_collections_needs_a_human(self, dirs):
+    def test_a_delivery_spanning_two_collections_is_attributed_not_held(self, dirs):
+        """REVERSED 2026-09-24 (Keith), and this test's old name said
+        the opposite: a spanning delivery used to RAISE, which took the
+        whole run down for one odd drop. The argument for holding was
+        that spanning means the transport BOUNDARY is wrong rather than
+        the data - and it does not survive the observation that
+        spanning is legitimate, because a hold stops healthy supply on
+        a boundary that is working.
+
+        One delivery, two runs: the DELIVERY is the transport unit and
+        the RUN is the per-collection QA unit, and they were only ever
+        the same thing by coincidence of this PoC's generated data."""
         _write(dirs, "mixed", {_BDM_FILE: "registration_number\n1\n", "cp_clients.csv": "a\n1\n"})
-        with pytest.raises(delivery.DeliveryFormatError, match="more than one collection"):
-            _for(dirs)
+
+        bdm = _for(dirs)
+        cp = _for(dirs, "child-protection", "cp_run_")
+
+        assert [a.delivery_name for a in bdm] == ["mixed"]
+        assert [a.delivery_name for a in cp] == ["mixed"]
+        assert bdm[0].run_id == "run_001" and cp[0].run_id == "cp_run_001"
+        # Each side sees only its OWN files - attribution is per file,
+        # on its own dataset's terms.
+        assert bdm[0].files_by_dataset == {"birth-registrations": (_BDM_FILE,)}
+        assert cp[0].files_by_dataset == {"cp-clients": ("cp_clients.csv",)}
+
+    def test_a_spanning_delivery_names_both_collections(self, dirs):
+        _write(dirs, "mixed", {_BDM_FILE: "registration_number\n1\n", "cp_clients.csv": "a\n1\n"})
+        d, r = dirs
+        [one] = delivery.list_deliveries(d, r)
+        assert arrivals.recognise(one).collections == (
+            "child-protection", "civil-registration")
 
 
 class TestRunIdsComeFromReceiptOrder:

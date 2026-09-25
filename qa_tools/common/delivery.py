@@ -274,20 +274,93 @@ def read_delivery(name: str, deliveries_dir: Path | None = None,
                      files=tuple(files), anomalies=tuple(anomalies))
 
 
+@dataclass(frozen=True)
+class InFlight:
+    """A delivery that is present and that we have no receipt for.
+
+    THE NORMAL CASE, not an edge one (Keith, 2026-09-24). Under a real
+    transport a delivery has no receipt until our own boundary rule
+    says the drop is complete, so every delivery is in flight for a
+    while - the receipt is what makes a mid-upload drop
+    distinguishable from a short one, which is the whole reason it is
+    required before anything is processed.
+
+    It carries the FILE NAMES, not a count. A count answers "is
+    anything in flight"; the question worth asking is "is anything
+    STUCK", and three deliveries flowing through look identical to the
+    same three sitting there for a week. A file list going 2, 4, 6
+    across runs reads as an upload progressing; one stuck at 2 reads as
+    one that died. Reading a directory listing records no contents,
+    which is the same line drawn everywhere else here.
+    """
+
+    name: str
+    files: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Survey:
+    """Everything present under the deliveries tree, read ONCE.
+
+    One pass, not one per collection: at ~30 datasets with years of
+    history this tree is thousands of deliveries, and re-reading it per
+    collection is the shape that stops scaling first (REQ-PIPE-057's
+    own non-functional constraint).
+    """
+
+    received: list[Delivery]
+    in_flight: list[InFlight]
+
+
+def survey(deliveries_dir: Path | None = None,
+            receipts_dir: Path | None = None) -> Survey:
+    """Read the whole deliveries tree once: what has been received, and
+    what is present without a receipt.
+
+    A RECEIPT-LESS DELIVERY IS SKIPPED, NOT FATAL (criteria 4 and 5).
+    It used to take every other delivery down with it, because
+    read_receipt() raises and this read them in a list comprehension -
+    one incomplete upload stopped the entire pipeline. What has not
+    changed is the rule underneath: we still never invent a receipt
+    instant from a file's modification time. Skipping and reporting
+    keeps that rule and drops the collateral damage.
+
+    Nothing here needs to know how LONG a delivery has been present
+    (criterion 6). Reporting it on every run needs no interval, no
+    mtime and no new persistent state; knowing it had been stuck for
+    two days would need one of those, and the mtime is the exact signal
+    this module refuses to trust.
+    """
+    deliveries_dir = Path(deliveries_dir or DELIVERIES_DIR)
+    # A freshly-cloned machine has no data/ at all. Absence is a state
+    # to handle, not a precondition to assert - a test that asserted
+    # this tree exists passed locally and went red in CI on 2026-09-23.
+    if not deliveries_dir.is_dir():
+        return Survey(received=[], in_flight=[])
+
+    received, in_flight = [], []
+    for entry in sorted(deliveries_dir.iterdir()):
+        if not entry.is_dir():
+            continue
+        try:
+            received.append(read_delivery(entry.name, deliveries_dir, receipts_dir))
+        except DeliveryFormatError:
+            in_flight.append(InFlight(
+                name=entry.name,
+                files=tuple(sorted(p.name for p in entry.iterdir() if p.is_file()))))
+    return Survey(received=sorted(received, key=lambda d: d.received_at),
+                   in_flight=sorted(in_flight, key=lambda d: d.name))
+
+
 def list_deliveries(deliveries_dir: Path | None = None,
                      receipts_dir: Path | None = None) -> list[Delivery]:
-    """Every delivery on disk, OLDEST RECEIPT FIRST.
+    """Every RECEIVED delivery on disk, OLDEST RECEIPT FIRST.
 
     Ordered by our own receipt instant, never by directory name -
     a delivery name is arbitrary and means nothing, so sorting by it
     would be inventing an order out of a supplier's naming habits.
     """
-    deliveries_dir = Path(deliveries_dir or DELIVERIES_DIR)
-    if not deliveries_dir.is_dir():
-        return []
-    out = [read_delivery(p.name, deliveries_dir, receipts_dir)
-           for p in sorted(deliveries_dir.iterdir()) if p.is_dir()]
-    return sorted(out, key=lambda d: d.received_at)
+    return survey(deliveries_dir, receipts_dir).received
 
 
 # ---- Which dataset does a file belong to? (criterion 3) --------------
