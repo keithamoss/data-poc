@@ -9601,7 +9601,50 @@ requirements:
       date: "2026-09-24"
     story: "As an agency data owner, I want a delivery that never arrived to stay recorded as not arrived, so that a later resupply of a different day cannot be quietly filed against it and turn a service failure into a met obligation."
     moscow: must
-    status: not_started
+    status: built
+    linked_tests:
+      - tests/test_monotonic_filling.py
+      - tests/test_assignment.py
+    implemented_by:
+      - qa_tools/common/assignment.py::closed_by_monotonic_filling
+      - qa_tools/common/assignment.py::oldest_claimable_unfilled
+      - qa_tools/common/assignment.py::assign
+    evidence:
+      - >
+        2026-09-25: the scenario is traced end to end as a real sequence, and
+        the requirement's own warning is answered directly. It says a test
+        asserting a slot stayed UNFILLED is easy to write as a no-op that
+        passes against any implementation, so each negative assertion here
+        carries a CONTROL that drives the same arrival with monotonic filling
+        switched off and shows the bad answer appearing - the Wednesday
+        resupply taking the missed Tuesday. Without that control the test
+        proves nothing.
+      - >
+        2026-09-25: genuine lateness is asserted to survive, which is the way
+        this rule could have bought safety at too high a price. A supply
+        landing 03:00 the next morning still fills its own slot while nothing
+        later is filled, and four consecutive one-day-late supplies each fill
+        their own slot in turn, so a feed running behind reads as running
+        behind rather than as a run of missing slots.
+      - >
+        2026-09-25: claimability is computed, never stored - asserted by
+        showing the same slot is open with only an earlier slot filled and
+        closed once a later one is, and by a source check that the function
+        writes nothing. A stored flag would be wrong from the moment the next
+        promotion lands.
+      - >
+        2026-09-25: criterion 6's trigger needed interpretation and the
+        reading is recorded rather than assumed. Thread H says "when nothing
+        is confidently claimable, hold it for a human", while decision 1
+        traces the Wednesday 23:00 arrival as a CONFIDENT Wednesday resupply -
+        so the resupply branch keeps that case and the hold takes the rest.
+        In practice that makes the hold unreachable on a contiguous daily
+        calendar where the filled slot is always the one being arrived into;
+        it fires where the filled slot is NOT the current one, which is a
+        supply promoted out of order or a calendar with gaps. Worth Keith's
+        eye, because a branch that cannot fire is indistinguishable from one
+        that is wrong.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     source: "Keith, delivery sprint 9, plans/supply-model.md Thread H first chaos pass #3 - monotonic filling - with its own named limit. Test scenario register TS-5, TS-6c. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
       - "THE SYSTEM SHALL treat a slot as no longer claimable once any later slot for the same dataset has been filled."

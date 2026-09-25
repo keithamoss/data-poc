@@ -83,6 +83,7 @@ from qa_tools.common import asset_time, slots as slots_mod
 ON_TIME = "on-time-current-slot"
 OLDEST_CLAIMABLE = "oldest-claimable-unfilled"
 RESUPPLY = "resupply-of-most-recently-filled"
+HELD = "held-nothing-confidently-claimable"
 UNASSIGNABLE = "no-slot-and-nothing-filled"
 
 
@@ -130,17 +131,49 @@ def current_slot(slots: Sequence[slots_mod.Slot], at: datetime) -> slots_mod.Slo
     return slots[index] if index >= 0 else None
 
 
-def oldest_claimable_unfilled(slots: Sequence[slots_mod.Slot], at: datetime,
-                               filled: frozenset[str]) -> slots_mod.Slot | None:
-    """The oldest slot whose window is open and which is unfilled.
+def closed_by_monotonic_filling(slots: Sequence[slots_mod.Slot],
+                                 filled: frozenset[str]) -> frozenset[str]:
+    """Slots that may no longer be claimed because a LATER one is
+    filled (REQ-PIPE-063).
 
-    Stops at the first hit. Once REQ-PIPE-063's monotonic filling
-    lands, the filled slots are a prefix and this is the slot just
-    after it; until then it is bounded by the run of filled slots at
-    the front, which is the same bound in practice.
+    THE FAILURE THIS PREVENTS IS WORSE THAN A CASCADE, because it
+    manufactures a delivery that never happened. Tuesday is missed
+    entirely; Wednesday 22:00 arrives, is promoted, and fills
+    Wednesday; Wednesday 23:00 a RESUPPLY of Wednesday arrives.
+    Without this rule the oldest claimable unfilled slot is TUESDAY, so
+    a Wednesday resupply files as Tuesday one day late - and a service
+    failure is erased using another day's data. The resupply branch
+    never fires to stop it, because an outstanding missed slot means a
+    claimable unfilled one exists.
+
+    ASKED, NEVER RECORDED. The answer changes as later slots fill, so a
+    stored flag would be wrong from the moment the next promotion
+    lands - the same reasoning REQ-PIPE-052 applied to overdue.
+
+    GENUINE LATENESS SURVIVES: Monday's supply landing Tuesday 03:00
+    finds Tuesday unfilled with nothing later filled, so Tuesday is
+    still open. And consecutive slots filled late in sequence each
+    fill, so a feed running behind reads as running behind rather than
+    as a run of missing slots.
+    """
+    if not filled:
+        return frozenset()
+    last_filled = max((i for i, s in enumerate(slots) if s.name in filled), default=-1)
+    return frozenset(s.name for s in slots[:last_filled] if s.name not in filled)
+
+
+def oldest_claimable_unfilled(slots: Sequence[slots_mod.Slot], at: datetime,
+                               filled: frozenset[str],
+                               closed: frozenset[str] = frozenset()) -> slots_mod.Slot | None:
+    """The oldest slot whose window is open, which is unfilled, and
+    which monotonic filling has not closed.
+
+    Stops at the first hit. With monotonic filling the filled slots and
+    the closed ones together form a prefix, so this is the slot just
+    after it.
     """
     for slot in slots:
-        if slot.name in filled:
+        if slot.name in filled or slot.name in closed:
             continue
         if slots_mod.is_claimable(slot, at):
             return slot
@@ -185,8 +218,10 @@ def assign(dataset_id: str, supply_id: str, at: datetime,
                                slot=current.name, branch=ON_TIME,
                                considered=tuple(considered))
 
-    # 2. OLDEST CLAIMABLE UNFILLED. Lateness still works.
-    oldest = oldest_claimable_unfilled(slots, at, filled)
+    # 2. OLDEST CLAIMABLE UNFILLED, minus anything monotonic filling
+    #    has closed (REQ-PIPE-063). Lateness still works.
+    closed = closed_by_monotonic_filling(slots, filled)
+    oldest = oldest_claimable_unfilled(slots, at, filled, closed)
     if oldest is not None:
         if oldest.name not in considered:
             considered.append(oldest.name)
@@ -194,10 +229,36 @@ def assign(dataset_id: str, supply_id: str, at: datetime,
                            slot=oldest.name, branch=OLDEST_CLAIMABLE,
                            considered=tuple(considered))
 
-    # 3. A RESUPPLY of the most recently filled slot. This is where a
-    #    second file for an already-filled slot lands, and it is what
-    #    stops "oldest unfilled" pushing it into the future.
+    # 3. A RESUPPLY of the most recently filled slot - but only where
+    #    that slot is the one the arrival is actually IN. This is the
+    #    Wednesday 23:00 case the monotonic-filling decision traces:
+    #    Wednesday is filled and current, so a second Wednesday file is
+    #    confidently a Wednesday resupply.
     latest = most_recently_filled(slots, filled)
+    if latest is not None and current is not None and latest.name == current.name:
+        if latest.name not in considered:
+            considered.append(latest.name)
+        return Assignment(dataset_id=dataset_id, supply_id=supply_id,
+                           slot=latest.name, branch=RESUPPLY,
+                           considered=tuple(considered), resupply_of=latest.name)
+
+    # 4. HELD FOR A HUMAN (criterion 6). The arrival could only go in a
+    #    slot monotonic filling has closed, and Thread H names the
+    #    answer: "when nothing is confidently claimable, hold it for a
+    #    human and let them decide where it is filed."
+    #
+    #    THIS IS THE NAMED LIMIT OF THE RULE, not a gap in it. Once a
+    #    delivery is skipped AND a later one has landed, a genuine
+    #    backfill of the older slot cannot be placed by ANY rule - it is
+    #    not claimable, and defaulting it into a future slot is the
+    #    forward cascade again. Keith: "I think we can't design around
+    #    that." Guessing here is what turns a service failure into a met
+    #    obligation, which this requirement rates worse than a cascade
+    #    because it manufactures a delivery that never happened.
+    if closed:
+        return Assignment(dataset_id=dataset_id, supply_id=supply_id, slot=None,
+                           branch=HELD, considered=tuple(considered) or tuple(sorted(closed)))
+
     if latest is not None:
         if latest.name not in considered:
             considered.append(latest.name)

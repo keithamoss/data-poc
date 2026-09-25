@@ -503,6 +503,13 @@ releases:
               to. Without that, a supplier whose system went down for
               two days had every later delivery recorded two days late,
               for good.
+          - headline: A delivery that never came stays missing
+            components: ["Pipeline & publishing"]
+            description: >
+              A period nobody delivered for can no longer be quietly
+              filled by a later day's resupply. It stays on the record
+              as an obligation that was not met, so a service failure
+              cannot turn into a met one.
 
   - date: "2026-09-24"
     summary: >
