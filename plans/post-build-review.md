@@ -411,8 +411,24 @@ change what gets built - for Keith, before drafting:**
 3. **Relative versus absolute:** he asked for a pass now rather than an
    item later. It follows.
 
-Still open: **punctuation** (the two dictated examples differ on the
-comma) and **whether config-echoing CLI output is covered**.
+**BOTH OF THESE WERE SETTLED LATER THE SAME EVENING** - see the
+"Punctuation" and "The CLI matches" paragraphs at the end of the
+relative-time pass below. Punctuation became one date string with an
+optional time in front of it; config-echoing CLI output IS covered,
+Keith's own call, with the consequence recorded there.
+
+**This line said "Still open" until 2026-09-25 and cost something.**
+A session preparing the six open items read it, did not read the
+resolution two sections further down, and put the CLI question to
+Keith as though it were undecided - with a lean OPPOSITE to the
+decision he had already made. He agreed with the lean, so the record
+briefly held two contradictory answers.
+
+Left here rather than deleted, because it is the third time this
+project has watched a decision get missed by a reader who stopped one
+level above it (`plans/tooling.md` #17 is the other). A stale "still
+open" is worse than no note at all: it does not merely fail to inform,
+it actively asserts the wrong thing.
 
 ### The relative-time pass (Keith's ask, 2026-09-24 evening)
 
@@ -506,13 +522,31 @@ date-and-time form is that same string with the time prefixed. One
 thing to build, one thing to read, and no rule about when the comma
 appears because it always does, in the same place.
 
-**The CLI matches** - his own call, closing the fifth open point. Worth
-recording the consequence once, since it was the reason for asking:
-`mothman schedule show`'s date columns will read `Monday, 1 November
-2027` rather than `2027-11-01`, so they no longer match the
-`data-asset.yaml` a reader may have open beside them. He has made the
-call and it is not re-litigated here - noted so that whoever hits it
-later knows it was a decision rather than an oversight.
+**The CLI matches** - his own call, 2026-09-24, closing the fifth open
+point. Worth recording the consequence once, since it was the reason
+for asking: `mothman schedule show`'s date columns will read
+`Monday, 1 November 2027` rather than `2027-11-01`, so they no longer
+match the `data-asset.yaml` a reader may have open beside them.
+
+**SUPERSEDED 2026-09-25. Config-echoing output is EXEMPT.** Keith's
+own call, put to him a second time and answered the other way: prose
+and anything read AS A TIME follows the standard; a column that echoes
+a configured value keeps its ISO form, so a reader can diff the table
+against the file by eye.
+
+**The second asking was an accident and is recorded as one**, because
+the accident is the interesting part. A stale "Still open" line two
+sections above this one (now corrected, see it for the full note) sent
+a session to Keith with the question presented as undecided and a lean
+OPPOSITE to the decision he had already made. He agreed with the lean.
+The contradiction was caught by reading this paragraph while drafting
+the requirement, and put back to him rather than resolved by picking
+the newer answer or the better-informed one.
+
+**Which is current: the 2026-09-25 exemption.** The 2026-09-24
+paragraph above is left standing rather than rewritten, so the earlier
+reasoning survives - it is a real argument for one rule with no
+exemptions, and whoever revisits this should see it.
 
 **Future tense is in** - his own call. The standard runs in both
 directions: `in 3 days`, `in 2 weeks`, `in 2 quarters` as well as `X
@@ -3420,6 +3454,57 @@ twice. It deliberately did not re-find the `TypeError`.
       is the smallest, lowest-contrast text on each (#56).
 
 ### Found by this session, not by a critic
+
+60. **[todo, 2026-09-25]** **[Dashboard UI]** **The masthead's
+    "Live" clock measures nothing at all, and says the data was updated
+    when it was not.**
+
+    **Found by Keith, 2026-09-25**, reading the requirement draft's
+    first open question: "I'm not sure that masthead is working... it
+    should kind of be baked in when the dashboard gets rebuilt, right?
+    Because otherwise it doesn't have any updated information in it."
+
+    **Verified, and the code says so itself.** The section header is
+    literally `Boot + fake "live" clock`:
+
+    ```js
+    let secondsAgo = 4;
+    setInterval(()=>{ secondsAgo += 7; ... }, 7000);
+    ```
+
+    It is a counter starting at 4 that adds 7 every 7 seconds. It reads
+    no build time, no page-load time and no data timestamp. It counts
+    up from whenever the tab was opened, for as long as the tab stays
+    open, beside a pulsing green "live" dot - on a page that is a
+    STATIC FILE built by CI, possibly days earlier. Leave it open an
+    hour and it reads "Live - updated 51m ago", which is a statement
+    about the reader's browser session presented as a statement about
+    data freshness.
+
+    **This is the same family as the false greens, not a cosmetic
+    one.** On a dashboard whose whole job is saying whether data is
+    stale, a freshness indicator that asserts currency it cannot know
+    is the dangerous direction - and it is the ONE element on the page
+    a reader would trust for that question without drilling in.
+
+    **The honest fact exists and is not embedded.** Nothing carries a
+    build time today (grepped: no `generated_at`, `BUILT_AT` or
+    `build_time` in the template or `embed_dashboard_data.py`), but
+    `reports/results_bdm.json`/`results_cp.json` each carry a real
+    `generated_at`, and CI rebuilds the whole dashboard from committed
+    history on every relevant push - so "when this page was built" is a
+    real, knowable fact.
+
+    **Keith's own direction**, same message: bake it in at rebuild
+    time. That also removes the `setInterval` entirely, which is the
+    second-implementation problem `REQ-DASH-071` forbids - the masthead
+    does its own inline arithmetic rather than calling
+    `fmtRelativeTime()`.
+
+    **Scoped into `REQ-DASH-071` rather than fixed loose**, since it is
+    the same subject as that requirement and the requirement is not
+    signed off yet. Recorded here because the finding is about shipped
+    code and stands whatever happens to the requirement.
 
 59. **[done, 2026-09-25]** **[Testing & dev tooling, Pipeline & publishing]** **A test computed "today" on the container's clock
     while the page computed it on the asset's, and failed for eight

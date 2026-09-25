@@ -9123,4 +9123,172 @@ requirements:
         builds it to discover, because the alternative failure is
         specific: five of six criteria built, the sixth quietly skipped
         as un-buildable, and the requirement reported done.
-
+  - id: REQ-DASH-071
+    title: One way to write a date, everywhere a person reads one
+    story: >-
+      As someone reading the dashboard or the mothman CLI, I want every
+      date and time shown to me in one consistent, readable form on the
+      asset's own clock, so that I never have to convert between zones,
+      decode a raw timestamp, or work out which of two adjacent tiles I
+      should believe.
+    moscow: must
+    status: not_started
+    source: >-
+      Keith, voice-dictated, 2026-09-24 evening, settling the visual
+      critic's Q4 and widening it himself - "let's make a call... that
+      will standardise the display of all timestamps and dates across the
+      entire code base". Scoped further 2026-09-24/25 through
+      plans/post-build-review.md's Q4 and relative-time pass. HAND-DRAFTED
+      2026-09-25, NOT through delivery-scoper - flagged per Keith's own
+      standing rule of 2026-09-23 that a batch's provenance is stated
+      before it is presented, not after being asked.
+    acceptance_criteria:
+      - >-
+        THE SYSTEM SHALL render a date, wherever a person reads one, as
+        the weekday, the day, the month and the year - for example
+        "Friday, 29 September 2026".
+      - >-
+        WHERE a time is shown with a date, THE SYSTEM SHALL prefix it to
+        that same date string - for example "2:15pm Friday, 29 September
+        2026" - and SHALL NOT use a second date format for the pair.
+      - >-
+        THE SYSTEM SHALL write the time in lowercase am or pm with no full
+        stops, no leading zero on the hour, and the minutes always shown
+        even on the hour, so that a column of times aligns.
+      - >-
+        THE SYSTEM SHALL always show the year, and SHALL NOT omit it for
+        the current year.
+      - >-
+        THE SYSTEM SHALL render every user-facing instant on the data
+        asset's own configured clock.
+      - >-
+        THE SYSTEM SHALL NOT label the timezone on a user-facing instant,
+        because there is only one - and SHALL NOT show two zones for the
+        same fact.
+      - >-
+        THE SYSTEM SHALL NOT render a raw ISO-8601 timestamp anywhere a
+        person can see one.
+      - >-
+        WHERE output echoes a value that is written in a configuration
+        file, THE SYSTEM SHALL keep that value's own written form, so that
+        a reader can compare the output against the file by eye.
+      - >-
+        THE SYSTEM SHALL resolve every user-facing date and time through
+        one shared implementation per runtime, and SHALL NOT grow a second
+        implementation of the same format.
+      - >-
+        THE SYSTEM SHALL NOT change how any instant is STORED - every
+        stored instant keeps its ISO-8601 form and its own offset.
+      - >-
+        WHERE a relative time is shown, THE SYSTEM SHALL express it as "X
+        unit ago" for the past and "in X unit" for the future, scaling by
+        minutes, hours, days, weeks, months and years, and SHALL NOT fall
+        back to an absolute date at any threshold.
+      - >-
+        WHERE a relative time is shown on a page that is being read as of
+        a selected date, THE SYSTEM SHALL compute it relative to that
+        selected date rather than to the reader's own clock.
+      - >-
+        THE SYSTEM SHALL state when the page a reader is looking at was
+        BUILT, taken from the build itself, and SHALL NOT present any
+        elapsed time that is measured from when the reader opened it.
+      - >-
+        IF the data asset's timezone is absent or cannot be resolved,
+        THEN THE SYSTEM SHALL fail loudly rather than rendering any
+        instant, and SHALL NOT fall back to the reader's own clock or
+        to UTC.
+    non_functional_requirements:
+      - >-
+        Mechanical breadth. This lands on the dashboard's own date
+        helpers, the supply-history table, the SLA tile, the as-of
+        control, and the mothman schedule output - so the change is wide
+        and shallow, and the risk is a site missed rather than a site
+        wrong. Enumerate the call sites before changing any of them.
+      - >-
+        The asset clock already exists and is already correct in the
+        engine. This requirement must consume it, not reimplement it -
+        REQ-PIPE-048 exists precisely so no second offset is carried
+        anywhere.
+    dependencies:
+      - REQ-PIPE-048
+      - REQ-QAC-047
+    decisions:
+      - >-
+        Decided ONE date string with an optional time in front of it,
+        rather than two formats. Keith's two dictated examples disagreed
+        on the comma, and the cheapest way to settle that is not to pick a
+        winner but to stop having two strings - so there is no rule about
+        when the comma appears, because it always does, in the same place.
+      - >-
+        Decided the year is ALWAYS shown, not only when it is not the
+        current year. Keith's own call. The narrower reading needs a rule
+        and can surprise a reader; this one needs neither, and this
+        dashboard shows several years of history at once.
+      - >-
+        Decided the absence of a timezone label MEANS everything is on the
+        asset's clock - Keith's own words, and the substantive answer to
+        the visual critic's Q4. Rejected keeping UTC and formatting it
+        better, which leaves a reader adding eight hours in their head
+        between two adjacent tiles, against a requirement whose own story
+        is that a supply arriving at 10pm in Perth is not read as arriving
+        the following afternoon.
+      - >-
+        Decided this is a DISPLAY standard and changes nothing about
+        storage. Recorded explicitly because the distinction is
+        load-bearing and nothing in the dictated version says it -
+        qa_results/ is a permanent machine-read history, REQ-PIPE-048
+        exists to make its offsets explicit, and changing what is written
+        would break the lot.
+      - >-
+        Decided config-echoing output is EXEMPT - Keith, 2026-09-25.
+        A column that echoes a configured value keeps its written form so
+        a reader can diff the table against the file by eye. This
+        SUPERSEDES his own 2026-09-24 call that the CLI matches the
+        standard with no exemption. Both are on the record in
+        plans/post-build-review.md, along with why the question was asked
+        twice - a stale "still open" line sent a session to him with a
+        lean opposite to the decision he had already made.
+      - >-
+        Decided the RELATIVE half is parked - Keith's own word, "let's
+        park the whole relative date thing". Its FORMAT is specified here
+        anyway, both directions included, so unparking is a matter of
+        wiring rather than re-deciding. What is parked is the wiring into
+        the sites a pass identified as high value - the last-QA-run
+        column, the snapshots picker, latest arrival, release notes and
+        plans dates.
+      - >-
+        Decided relative time must be computed against the SELECTED as-of
+        date rather than the reader's own clock, and decided it here
+        rather than at build time. Viewing as of a date in 2027, a
+        "2 days ago" measured against the real clock is not unhelpful, it
+        is false. It is cheap to build in and expensive to retrofit, which
+        is the whole reason parking the rest is safe.
+      - >-
+        Decided the masthead's "Live - updated Ns ago" clock states when
+        the page was BUILT - Keith, 2026-09-25, answering the draft's
+        own open question by questioning the element instead.
+        Investigating it found the code's own section header reads
+        'Boot + fake "live" clock', and the implementation is a counter
+        starting at 4 that adds 7 every 7 seconds - measuring nothing,
+        counting up from whenever the tab was opened, beside a pulsing
+        green "live" dot on a static file CI built days earlier
+        (post-build-review #60). His framing - "it should be baked in
+        when the dashboard gets rebuilt... otherwise it doesn't have any
+        updated information in it" - is the only honest reading, and it
+        removes the setInterval that was this requirement's own
+        second-implementation problem.
+      - >-
+        Decided an unresolvable asset timezone FAILS LOUDLY - Keith,
+        2026-09-25, "no need for a graceful fallback".
+        assetTodayDateStr() falls back silently to UTC today, which is
+        the fixed bug returning with no signal (post-build-review #35's
+        second residue, and the same question #5 raises from the other
+        side). A dashboard that quietly re-interprets every date on the
+        page is worse than one that refuses to draw, because only the
+        second is noticed.
+      - >-
+        Rejected splitting this into a dashboard requirement and a CLI
+        one. The failure it fixes is two surfaces disagreeing about the
+        same instant, so one requirement covering both is the point; a
+        split would let them drift again while both read as built.
+    open_questions: []
