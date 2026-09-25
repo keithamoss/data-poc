@@ -33,7 +33,8 @@ See requirements.yaml's own top-of-file comment for the full schema.
 from __future__ import annotations
 from pathlib import Path
 
-import yaml
+
+from qa_tools.common import yaml_io
 
 from qa_tools.common.schemas import Requirement
 
@@ -47,6 +48,6 @@ def parse_requirements(path: str | Path) -> list[dict]:
     schema - see this module's own docstring for why that is preferred
     to rendering something half-formed."""
     with open(path) as f:
-        doc = yaml.safe_load(f) or {}
+        doc = yaml_io.load(f) or {}
     return [Requirement(**(r or {})).model_dump()
             for r in (doc.get("requirements") or [])]

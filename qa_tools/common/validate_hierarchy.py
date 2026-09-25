@@ -53,7 +53,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import yaml
+
+from qa_tools.common import yaml_io
 
 from qa_tools.common import hierarchy
 
@@ -152,7 +153,7 @@ def validate() -> list[str]:
             continue
 
         with open(path) as f:
-            doc = yaml.safe_load(f) or {}
+            doc = yaml_io.load(f) or {}
 
         try:
             expected_id, expected_name, expected_domain = _describes(describes)

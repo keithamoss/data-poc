@@ -41,7 +41,8 @@ Two things this module does, deliberately kept separate:
 from __future__ import annotations
 from datetime import date, datetime, timedelta
 
-import yaml
+
+from qa_tools.common import yaml_io
 
 from qa_tools.common import asset_time
 
@@ -87,7 +88,7 @@ def parse_cadence_from_contract(contract_path: str, element: str | None = None) 
     override the contract-wide defaults; omitting it reads the defaults
     alone, which is every single-dataset contract's case."""
     with open(contract_path) as f:
-        doc = yaml.safe_load(f)
+        doc = yaml_io.load(f)
     props = _sla_properties_to_dict(doc.get("slaProperties"), element)
 
     cadence_type = props["cadenceType"]["value"]
@@ -185,6 +186,6 @@ def parse_claim_window_from_contract(contract_path: str, element: str | None = N
     (REQ-PIPE-049).
     """
     with open(contract_path) as f:
-        doc = yaml.safe_load(f) or {}
+        doc = yaml_io.load(f) or {}
     entry = _sla_properties_to_dict(doc.get("slaProperties"), element).get("claimWindow")
     return None if entry is None else str(entry["value"])

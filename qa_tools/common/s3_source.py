@@ -16,7 +16,8 @@ invented fresh."""
 from __future__ import annotations
 import os
 
-import yaml
+
+from qa_tools.common import yaml_io
 
 
 def dataset_s3_config(contract_path: str) -> dict:
@@ -32,7 +33,7 @@ def dataset_s3_config(contract_path: str) -> dict:
     error - a contract that genuinely has no S3 source configured yet is
     a real, valid state, not a config bug."""
     with open(contract_path) as f:
-        doc = yaml.safe_load(f)
+        doc = yaml_io.load(f)
     props = {cp["property"]: cp["value"] for cp in doc.get("customProperties") or [] if "property" in cp}
     return {
         "prefix": props.get("s3Source"),
