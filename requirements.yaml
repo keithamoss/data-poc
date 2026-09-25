@@ -1367,7 +1367,7 @@ requirements:
       an anomaly cannot hide behind a tier's status rollup and a warning
       cannot read as a verdict on somebody's data.
     moscow: must
-    status: not_started
+    status: built
     source: >
       Batch 3's pre-build review, 2026-09-24. delivery-dashboard-ux found
       that the eleven requirements of delivery sprints 7-10 emit at least
@@ -1436,6 +1436,98 @@ requirements:
         decision), and it is rebuilt by CI on push - so the latency
         between a hold appearing and a person seeing it is a deploy.
     dependencies: [REQ-PIPE-057, REQ-PIPE-059, REQ-PIPE-060, REQ-PIPE-063, REQ-PIPE-064, REQ-PIPE-065, REQ-PIPE-066]
+    linked_tests:
+      - tests/test_outstanding.py
+      - tests-js/outstanding.test.js
+      - tests/test_dashboard_e2e.py
+    implemented_by:
+      - qa_tools/common/outstanding.py::survey
+      - qa_tools/common/outstanding.py::Outstanding
+      - qa_tools/common/outstanding.py::Item
+      - dashboard/embed_dashboard_data.py::embed
+    evidence:
+      - >
+        2026-09-25: the aggregation is asserted as ONE element, not as a
+        count of items. Four items from four different producers - a
+        held supply, a failed load, a contested file and an unrecognised
+        one - render exactly one .notice-queue carrying three queue-item
+        rows, because the failure this requirement exists to prevent is
+        six correct banners and no total.
+      - >
+        2026-09-25: criterion 10 was a REAL DEFECT in built code, not a
+        gap. arrivalStatusLabel()/arrivalPill() mapped anything that was
+        not "early" or "late" to a green "On time" pill, so
+        REQ-PIPE-066's "unfiled" - which means there is no slot to be
+        punctual against at all - would have rendered as a confident
+        punctuality verdict in three places: the Tier 2 dataset table,
+        the Latest arrival tile and the supply-history Timing column.
+        Three regression tests were written first and CONFIRMED FAILING
+        against the pre-fix template (checked out from HEAD and run):
+        "expected 'On time' not to be 'On time'", "expected '<span
+        class=\"pill green \">...' not to contain 'pill green'", and
+        "expected 'On time' to be 'Unknown'". Both maps are exhaustive
+        now and an unrecognised value renders as unknown.
+      - >
+        2026-09-25: severity is asserted to share NO vocabulary with a
+        data verdict - every severity pill is checked for the absence of
+        green/amber/red, and each is checked to carry its own label in
+        words, because colour alone was never the distinction this could
+        rely on. An unrecognised severity renders at the LOUDEST weight
+        rather than the quietest, so a new producer's needs-action item
+        cannot arrive looking like a footnote.
+      - >
+        2026-09-25: criterion 8 is asserted as the ABSENCE of a control.
+        The rendered queue contains no <button> and no <a>, and says in
+        words that the responses are recorded rather than offered -
+        because REQ-PIPE-064's own NFR warns that a hold nobody can
+        clear is indistinguishable from a bug, and a dead button teaches
+        a reader that the whole panel is dead.
+      - >
+        2026-09-25: the empty state is asserted in a REAL browser at two
+        tiers, not in a unit test, because it is the state a reader
+        actually meets today - the real committed history has nothing
+        outstanding, and "nothing is waiting" must not look like "this
+        panel is broken".
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
+    unmet_criteria:
+      - criterion: >
+          Criterion 1, in part - a supply HELD BY THE ASSIGNMENT RULE
+          (REQ-PIPE-064) does not reach the queue. REQ-PIPE-059's
+          delivery-level hold does, from delivery_log/, and so do failed
+          loads, contested files and unrecognised artefacts.
+        why: >
+          supply_holds.holds_in() takes a run's decisions in memory and
+          deliberately writes nothing, because the resolution path that
+          would read a store does not exist and a store invented now
+          would have to be unpicked. So there is no committed record for
+          this to read, and this requirement may never open data/ or
+          re-run the rule. Re-check when filings are recorded.
+        owner: the promotion sprint (batch 4)
+      - criterion: >
+          Criterion 1, in part - a slot closed by monotonic filling and
+          left unfilled produces no item. The derivation is built and
+          criterion 7's framing is written, but it is structurally empty.
+        why: >
+          Only a PROMOTION fills a slot, and nothing closes until a later
+          one is filled. filing.filled_slots() returns an empty set on
+          purpose until promotion exists, so no slot can be closed and
+          none can therefore be closed-and-unfilled. Built against the
+          real rule rather than stubbed, so it lights up on its own.
+        owner: the promotion sprint (batch 4)
+      - criterion: >
+          Criterion 9, in part - the uncertain-filing qualifier is
+          rendered at all three sites an assignment appears (the Tier 2
+          arrival cell, the Latest arrival tile and the supply-history
+          Timing column) and is covered by tests, but no real supply
+          carries it today.
+        why: >
+          REQ-PIPE-062's filings are deliberately not recorded until
+          promotion exists (Keith, 2026-09-25), so filings/ is empty and
+          the reader finds nothing. The reader is built now rather than
+          later for the reason REQ-PIPE-065's rule was: a reader written
+          when the writer turns on is written by somebody who has
+          forgotten why the shape is what it is.
+        owner: the promotion sprint (batch 4)
     decisions:
       - >
         SETTLED 2026-09-24 (Keith), option (a) of two: ONE REQUIREMENT

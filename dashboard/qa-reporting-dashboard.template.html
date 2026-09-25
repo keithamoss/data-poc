@@ -211,6 +211,61 @@ button{font:inherit; color:inherit;}
   position:relative;}
 .pill.inactive .ico::after{content:""; position:absolute; left:-1px; right:-1px; top:50%;
   height:1.5px; background:var(--ink-muted); transform:rotate(-45deg);}
+
+/* ============ Event severity (REQ-DASH-070) =============================
+   A SEPARATE VOCABULARY FROM STATUS, which is criterion 5 rather than
+   a style choice. The five pills above are verdicts on somebody's
+   DATA; these three are claims about an EVENT in our own processing.
+   An unrecognised artefact at WARNING must not make a reader think the
+   dataset is amber - REQ-PIPE-057 criterion 9 says explicitly that it
+   does not fail the delivery.
+
+   So: no green, no amber, no red, and no round marker. One ink ramp
+   and three marker SHAPES, which reads as a scale of loudness rather
+   than as a judgement - the same reasoning that gave a requirement's
+   MoSCoW priority its own neutral ramp (post-build-review #56).
+   Never distinguished by colour alone: each carries its own label in
+   words, and the three markers differ in shape as well as in weight,
+   so the ramp survives greyscale and every kind of colour vision. */
+.pill.ev{background:var(--surface-alt); border-radius:6px;}
+.pill.ev .ico{border-radius:0;}
+/* SOLID: somebody has to do something. */
+.pill.ev-action{color:var(--ink); border:2px solid var(--ink);}
+.pill.ev-action .ico{background:var(--ink);}
+/* HALF-FILLED, and dashed like .pill.nodata: worth a look, not a job. */
+.pill.ev-warn{color:var(--ink); border:2px dashed var(--ink-muted);}
+.pill.ev-warn .ico{background:linear-gradient(135deg, var(--ink-muted) 50%, transparent 50%);
+  outline:1.5px solid var(--ink-muted); outline-offset:-1.5px;}
+/* HOLLOW: nothing is asked of anybody. */
+.pill.ev-info{color:var(--ink-muted); border:1px solid var(--ink-faint);}
+.pill.ev-info .ico{background:transparent; outline:1.5px solid var(--ink-faint);
+  outline-offset:-1.5px;}
+/* BLOCKING IS A SECOND AXIS, not a fourth severity (criterion 3).
+   REQ-PIPE-065's uncertain assignment is genuinely non-blocking - the
+   supply was filed, just uncertainly - and mixing a non-blocking item
+   into a work queue with a weak distinction is how people learn to
+   ignore the queue. A filled left bar is a different channel from the
+   pill entirely, so the two distinctions cannot be confused for one. */
+.queue-item.blocking{border-left:3px solid var(--ink); padding-left:9px;}
+.queue-item.review{border-left:3px solid var(--line-strong); padding-left:9px;}
+
+/* THE QUEUE ITSELF. Unlike .notice-exhausted and .notice-runway this
+   is ALWAYS rendered - it says "nothing is waiting" on the
+   overwhelming majority of days (criterion 13), and a panel that
+   shouts on a quiet day is one people stop reading. Hence two
+   weights: the quiet one for an empty queue, the heavy one only when
+   something is actually waiting. NO DISMISS CONTROL, for the reason
+   REQ-PIPE-053's own notice gives - a dismissible notice about a task
+   nobody has done is a notice about a task nobody will do. */
+.notice-queue{max-width:80ch; border:2px solid var(--ink-muted); background:var(--surface-alt);
+  border-radius:10px; padding:12px 14px; margin-bottom:14px;}
+.notice-queue.quiet{border:1px solid var(--line-strong);}
+.notice-queue > b{display:block; margin-bottom:4px;}
+.queue-item{border-top:1px solid var(--line); margin-top:9px; padding-top:9px;}
+.queue-item:first-of-type{border-top:0; margin-top:6px; padding-top:0;}
+.queue-head{display:flex; align-items:baseline; gap:7px; flex-wrap:wrap;}
+.queue-detail, .queue-responses{color:var(--ink-muted); font-size:12.5px; margin-top:3px;}
+.queue-responses b{font-weight:600; color:var(--ink);}
 /* Running LOW, not run out - a different state from .notice-exhausted
    and deliberately quieter than it, since nothing has failed and
    nothing is unprocessable yet (post-build-review #2). */
@@ -229,8 +284,8 @@ button{font:inherit; color:inherit;}
    Tier 3. They also fell back to that default rather than the page's
    own IBM Plex Mono with tabular numerals, which every other code-ish
    string on the page uses. */
-.notice-exhausted code, .notice-runway code, .stale-link-notice code,
-.view-sub code{
+.notice-exhausted code, .notice-runway code, .notice-queue code,
+.stale-link-notice code, .view-sub code{
   background:var(--surface); padding:1px 5px; border-radius:4px;
   /* Without this a wrapped chip renders as TWO rounded boxes, so
      `mothman schedule candidate-dates` reads as two commands at 390px
@@ -1132,10 +1187,66 @@ function cadenceLabel(cadence){
   }
   return "";
 }
-function arrivalStatusLabel(status){ return status==="early" ? "Early" : status==="late" ? "Late" : "On time"; }
+// A PERMISSIVE FALLBACK FAILS IN THE DANGEROUS DIRECTION, and this one
+// did (REQ-DASH-070 criterion 10). Both of these used to map anything
+// that was not "early" or "late" to a GREEN "On time" pill - so
+// REQ-PIPE-066's "unfiled", which means there is no slot to be
+// punctual against at all, would have rendered as a confident
+// punctuality verdict in three places at once: the Tier 2 dataset
+// table, the Latest arrival tile and the supply-history Timing column.
+// That is plans/qa-pipeline.md item 74's exact failure mode, at the
+// last transform before the user, arriving by the same route: a value
+// gained a new state and the render layer's `else` swallowed it.
+//
+// So both are EXHAUSTIVE MAPS now, and an unrecognised value renders
+// as unknown rather than as the commonest verdict. It is also why the
+// map carries BOTH spellings of on-time: the dashboard build writes
+// "onTime" (pipeline/cadence.py's classify_arrival) and
+// qa_tools/common/arrival_classification.py writes "on_time", and a
+// reader should not be told a supply's punctuality is unknown because
+// two modules disagree about a capital letter.
+const ARRIVAL_STATUS_LABEL = {
+  early:"Early", late:"Late", onTime:"On time", on_time:"On time", "on-time":"On time",
+  // NOT a fourth kind of punctuality: there is nothing to be punctual
+  // against (REQ-PIPE-066 criterion 8).
+  unfiled:"Not filed to a slot",
+  unknown:"Unknown"};
+const ARRIVAL_STATUS_CLASS = {
+  early:"amber", late:"red", onTime:"green", on_time:"green", "on-time":"green",
+  unfiled:"nodata", unknown:"nodata"};
+function arrivalStatusLabel(status){ return ARRIVAL_STATUS_LABEL[status] || "Unknown"; }
 function arrivalPill(status, size){
-  const cls = status==="late" ? "red" : status==="early" ? "amber" : "green";
+  const cls = ARRIVAL_STATUS_CLASS[status] || "nodata";
   return `<span class="pill ${cls} ${size||""}"><span class="ico"></span>${arrivalStatusLabel(status)}</span>`;
+}
+// CRITERION 11. A punctuality verdict is measured against the slot the
+// supply is CURRENTLY filed to, and a re-filing changes it - so the
+// figure a reader is looking at is not a fixed historical fact, and
+// saying so is the difference between a reader who notices it moved
+// and one who concludes the page is wrong.
+const ARRIVAL_FOLLOWS_FILING =
+  "Measured against the slot this supply is currently filed to. Re-filing it to another slot recomputes this.";
+// CRITERION 9: EVERYWHERE THE ASSIGNMENT IS RENDERED, not only in the
+// feed. REQ-PIPE-065's rule files a supply to the oldest claimable
+// unfilled slot while an EARLIER slot was also unfilled, and marks
+// that assignment uncertain - and an assignment marked uncertain in
+// one place and rendered as a confident verdict everywhere else is
+// exactly the false confidence that requirement's MoSCoW was raised
+// to MUST over. So the qualifier travels with the punctuality verdict
+// rather than living beside it.
+//
+// It reuses REQ-PIPE-063's own qualifier-chip idiom deliberately,
+// rather than inventing a second one for the same kind of claim.
+// Sourced from the outstanding queue because that is where the
+// uncertain filings already are - one reader, not two.
+function ambiguityChip(datasetId, supplyId, source){
+  const items = outstandingItems("dataset", datasetId, source)
+    .filter(i=> i.kind==="uncertain-assignment");
+  if(!items.length) return "";
+  const match = supplyId ? items.find(i=> (i.headline||"").indexOf(supplyId) !== -1) : items[0];
+  if(!match) return "";
+  const why = match.ambiguity || match.detail || "";
+  return `<span class="pill ev ev-warn sm" title="${escHtml(why)}"><span class="ico"></span>Uncertain filing</span>`;
 }
 // item 54 (plans/qa-pipeline.md) - Keith's report: "1 collections"/"1
 // datasets" on the Executive tier's agency cards, plus 4 other
@@ -1489,6 +1600,20 @@ const SNAPSHOT_MANIFEST = [];
 // periods for ever and cannot run out, so warning about one would be
 // warning about something that cannot happen.
 const SCHEDULE_RUNWAY = null;
+// OUTSTANDING — REQ-DASH-070: everything that needs a person, in one
+// place with one count. Built by qa_tools/common/outstanding.py from
+// committed history alone (delivery_log/, processing_log/,
+// observations/in_flight/, filings/) and embedded here, so the page
+// answers "what is waiting for me" with no data access at all.
+//
+// ONE ELEMENT, NOT ONE PER PRODUCING RULE, and at ~30 datasets that is
+// the whole point rather than a refinement of it: six requirements
+// each emit their own "report this as needing action" obligation, and
+// six banners per dataset is how people learn to ignore a whole class
+// of warning. The empty shape below is the raw template's own state
+// and is itself a real one - criterion 13 asks the page to SAY nothing
+// is waiting rather than render an empty box.
+const OUTSTANDING = {items:[], total:0, blockingCount:0, byAgency:{}, byCollection:{}, byDataset:{}, summary:"Nothing is waiting for a person."};
 const CHANGELOG_FEED = [];
 const RELEASE_NOTES = {intro:[], entries:[]};
 const REQUIREMENTS = [];
@@ -3096,6 +3221,161 @@ function lowRunwayNotice(runway){
   </div>`;
 }
 
+/* ---- Outstanding decisions (REQ-DASH-070) ---------------------------
+   ONE ELEMENT FOR EVERYTHING THAT NEEDS A PERSON. Six requirements -
+   REQ-PIPE-057, 059, 060, 063, 064 and 065 - each carry their own
+   "report it as needing action / at WARNING / as informational"
+   criterion, and the rule governing how those COMBINE sat in two NFRs
+   on two of the six. Built independently, each honours its own
+   criterion and the aggregate obligation is met by nobody. So the
+   aggregate lives here, and nothing else gets to render a banner.
+
+   A QUEUE, NOT A FEED, and the requirements force the split:
+   REQ-PIPE-064's NFR asks for both "re-presented on every run until
+   resolved" and "must not become thirty banners at 30 datasets",
+   which one time-ordered feed cannot do at once. A feed is scanned and
+   discarded; a queue is drained. The activity feed stays a feed.
+
+   `source` IS A PARAMETER for the reason scheduleRunwayAsOf()'s is:
+   it is how this gets tested against real, varied data without a
+   build, and the embedded const is only the default. */
+const EVENT_SEVERITY_LABEL = {"needs-action":"Needs action", warning:"Warning",
+                               informational:"For information"};
+const EVENT_SEVERITY_CLASS = {"needs-action":"ev ev-action", warning:"ev ev-warn",
+                               informational:"ev ev-info"};
+// AN UNRECOGNISED SEVERITY IS NOT SILENTLY DOWNGRADED. A value this
+// page does not know about is rendered as itself, at the loudest
+// weight, because the alternative - falling through to the quietest -
+// is how a new producer's needs-action item would arrive looking like
+// a footnote. Same reasoning as arrivalStatusLabel()'s own fix below:
+// a permissive fallback fails in the dangerous direction.
+function eventSeverityLabel(severity){
+  return EVENT_SEVERITY_LABEL[severity] || severity;
+}
+function eventSeverityPill(severity, size){
+  const cls = EVENT_SEVERITY_CLASS[severity] || "ev ev-action";
+  return `<span class="pill ${cls} ${size||""}"><span class="ico"></span>${escHtml(eventSeverityLabel(severity))}</span>`;
+}
+// WHAT KIND, in a word, beside the severity. The severity says how
+// loudly; the kind is what a person actually recognises.
+const OUTSTANDING_KIND_LABEL = {
+  "held-supply":"Held supply", "failed-load":"Failed load",
+  "contested-file":"Contested file", "unrecognised-file":"Unrecognised file",
+  "in-flight-delivery":"Still arriving", "uncertain-assignment":"Uncertain filing",
+  "closed-unfilled-slot":"Missing supply"};
+function outstandingKindLabel(kind){ return OUTSTANDING_KIND_LABEL[kind] || kind; }
+
+function outstandingSource(source){
+  return source === undefined ? (typeof OUTSTANDING !== "undefined" ? OUTSTANDING : null) : source;
+}
+// The items in one scope. `scope` is "agency", "collection",
+// "dataset", or anything falsy for the whole asset.
+function outstandingItems(scope, id, source){
+  const src = outstandingSource(source);
+  const items = (src && src.items) || [];
+  if(!scope || !id) return items;
+  const key = scope==="agency" ? "agencyId" : scope==="collection" ? "collectionId" : "datasetId";
+  return items.filter(i=> i[key] === id);
+}
+
+// CRITERION 2: a per-scope count on each affected agency and
+// collection, so a rollup cannot absorb it. Deliberately rendered
+// WHATEVER that tier's status says - a collection reading red because
+// five datasets are red still has to say a sixth has a supply nobody
+// can place, and a collection reading GREEN has to say it loudest of
+// all, because green is exactly where a reader stops looking.
+//
+// Unlike exhaustedMarker() there is no redundancy case to suppress:
+// this marker never says the same thing the status pill beside it
+// already said, because a status pill can never say any of this.
+function outstandingMarker(scope, id, source){
+  const items = outstandingItems(scope, id, source);
+  if(!items.length) return "";
+  const blocking = items.filter(i=>i.blocking).length;
+  const severity = blocking ? "needs-action"
+    : items.some(i=>i.severity==="warning") ? "warning" : "informational";
+  const words = `${items.length} ${pluralize(items.length,"thing")} waiting for a person`;
+  return `<div style="margin-top:6px; font-size:12px; color:var(--ink); display:flex;
+    align-items:center; gap:5px;">${eventSeverityPill(severity,"sm")}<span>${words}${blocking? ` (${blocking} blocking)` : ""}</span></div>`;
+}
+
+// CRITERION 8: NAME the responses, never offer them as controls. The
+// resolution path does not exist until delivery sprint 12, and
+// REQ-PIPE-064's own NFR warns that "a hold nobody can clear is
+// indistinguishable from a bug" - so the item says which it is.
+// A button that did nothing would teach a reader that this panel does
+// nothing, which costs the next thing too.
+function outstandingResponses(item){
+  const responses = item.responses || [];
+  if(!responses.length) return "";
+  const list = responses.map(r=>escHtml(r)).join("; ");
+  const lead = item.actionable ? "You can" : "What resolves it";
+  const caveat = item.actionable ? ""
+    : ` <span style="color:var(--ink-faint);">— not yet possible from this page; these are
+        recorded so the work is known, not offered as buttons that would do nothing.</span>`;
+  return `<div class="queue-responses"><b>${lead}:</b> ${list}.${caveat}</div>`;
+}
+
+function outstandingItemHtml(item){
+  // CRITERION 3, on its own channel: the left bar says blocking or
+  // not, the pill says how loudly, and neither is doing the other's
+  // job. CRITERION 12: what happened and whose task it is, never
+  // fault attributed to the reader - the headline names the artefact
+  // or the supply, not a person.
+  const klass = item.blocking ? "blocking" : "review";
+  const ambiguity = item.ambiguity
+    ? `<div class="queue-detail"><i>${escHtml(item.ambiguity)}</i></div>` : "";
+  const when = item.observedAt
+    ? `<span style="color:var(--ink-faint); font-size:11.5px;">${escHtml(String(item.observedAt))}</span>` : "";
+  return `<div class="queue-item ${klass}">
+    <div class="queue-head">
+      ${eventSeverityPill(item.severity,"sm")}
+      <b style="font-weight:650;">${escHtml(outstandingKindLabel(item.kind))}</b>
+      <span>${escHtml(item.headline||"")}</span>
+      <span class="pill ${item.blocking?"ev ev-action":"ev ev-info"} sm"><span class="ico"></span>${item.blocking?"Blocks a supply":"Needs review"}</span>
+      ${when}
+    </div>
+    <div class="queue-detail">${escHtml(item.detail||"")}</div>
+    ${ambiguity}
+    ${outstandingResponses(item)}
+  </div>`;
+}
+
+// CRITERION 13: where nothing requires a person, SAY SO. An empty
+// queue is a real state worth reporting, and rendering nothing leaves
+// a reader unable to tell "nothing outstanding" from "this panel is
+// broken" - which is the same thing as far as trust in the panel goes.
+//
+// CRITERION 4: an item stays until it is RESOLVED. Nothing here marks
+// one as seen, and a later passing run does not clear it: every item
+// is derived from committed history each build, so it persists exactly
+// as long as the fact does.
+function outstandingQueue(scope, id, source){
+  const items = outstandingItems(scope, id, source);
+  const where = scope && id ? " here" : "";
+  if(!items.length){
+    return `<div class="notice-queue quiet" role="status">
+      <b>Nothing is waiting for a person${where}</b>
+      <div style="color:var(--ink-muted); font-size:13px;">No supply is held, no load has
+        failed, no artefact is unattributed and no filing is uncertain. This panel is always
+        shown, so an empty one means checked and clear rather than not looked at.</div>
+    </div>`;
+  }
+  const blocking = items.filter(i=>i.blocking).length;
+  const review = items.length - blocking;
+  const parts = [];
+  if(blocking) parts.push(`<b style="display:inline">${blocking}</b> blocking a supply`);
+  if(review) parts.push(`<b style="display:inline">${review}</b> needing review`);
+  return `<div class="notice-queue" role="status">
+    <b>${items.length} ${pluralize(items.length,"thing")} waiting for a person${where} — ${parts.join(", ")}</b>
+    <div style="color:var(--ink-muted); font-size:13px; margin-bottom:2px;">
+      These are events in our own processing of a supply, not verdicts on anybody's data —
+      none of them changes a dataset's red/amber/green status.
+    </div>
+    ${items.map(outstandingItemHtml).join("")}
+  </div>`;
+}
+
 function renderExec(view){
   // "Agencies", renamed from "Executive" on 2026-09-25 (Keith's call).
   // Tier 2 already IS one agency - its own breadcrumb label is that
@@ -3176,6 +3456,7 @@ function renderExec(view){
     </div>
     ${exhaustedNotice()}
     ${lowRunwayNotice()}
+    ${outstandingQueue()}
     <div class="grid" id="agency-grid"></div>
   `;
   const grid = document.getElementById("agency-grid");
@@ -3189,6 +3470,7 @@ function renderExec(view){
       ${spark}
       <div class="card-meta"><span><b>${ag.collections.length}</b> ${pluralize(ag.collections.length,"collection")}</span><span><b>${nDatasets}</b> ${pluralize(nDatasets,"dataset")}</span></div>
       ${exhaustedMarker(ag.exhaustedCount, ag.status)}
+      ${outstandingMarker("agency", ag.id)}
     </a>`;
   }).join("");
   wireCards(grid);
@@ -3248,12 +3530,14 @@ function renderAgency(view, agencyId){
       </div>
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ag.status)}${githubFolderLink("agencies", ag.id)}${assignmentBadge("agencies", ag.id)}</div>
     </div>
+    ${outstandingQueue("agency", ag.id)}
     <div id="collections"></div>
   `;
   const wrap = document.getElementById("collections");
   wrap.innerHTML = ag.collections.map(col=>`
     <div class="collection-block">
       <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}</div>
+      ${outstandingMarker("collection", col.id)}
       <div class="overflow-x">
       <table class="dataset-table">
         <thead><tr><th>Dataset</th><th>Status</th><th>Latest arrival</th><th>Rows, latest run</th><th>Last QA run</th><th>Trend</th></tr></thead>
@@ -3286,7 +3570,7 @@ function renderAgency(view, agencyId){
           return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
             <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
-            <td>${arrivalPillHtml} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;" title="Earliest extract in the latest run">${fmtArrival(ds.lastArrival)}</span></td>
+            <td><span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPillHtml}</span> ${ambiguityChip(ds.id)} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;" title="Earliest extract in the latest run">${fmtArrival(ds.lastArrival)}</span></td>
             <td class="mono">${fmtInt(ds.rowCount)}</td>
             <td class="mono" style="color:var(--ink-muted);">${fmtDate(ds.lastArrival.date)}</td>
             <td style="min-width:100px;">${dsSpark}</td>
@@ -3382,7 +3666,7 @@ function renderSupplyCycleRows(entries, datasetId){
       // e.arrivedAt used to be emitted RAW here - offset, microseconds
       // and all ("2026-09-16T05:17:30.280161+00:00"), 43 of them down
       // one column. REQ-DASH-071.
-      : `${e.arrivalStatus ? arrivalPill(e.arrivalStatus,"sm") : ""} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt ? fmtInstant(e.arrivedAt) : ""}</span>`;
+      : `${e.arrivalStatus ? `<span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPill(e.arrivalStatus,"sm")}</span>` : ""} ${ambiguityChip(datasetId, e.run_id)} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt ? fmtInstant(e.arrivedAt) : ""}</span>`;
     // data-run-id alongside data-run-date: run_date is NOT unique (a
     // resupply shares its base run's date - plans/conceptual-design.md
     // Thread A found 352 real BDM runs across only 123 distinct dates),
@@ -3551,9 +3835,10 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       current expected cycle (started <b>${fmtDay(cycleStartDate(ds.sla.cadence, CURRENT_AS_OF))}</b>) -
       so the figures below show its full real history, but no column reads red/amber/green as CURRENT status.
     </div>` : ""}
+    ${outstandingQueue("dataset", ds.id)}
     <div class="sla-strip">
       <div class="sla-tile"><div class="k">SLA</div><div class="v" style="font-size:14px;">${cadenceLabel(ds.sla.cadence)}</div></div>
-      <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono" title="Earliest extract in the latest run">${fmtArrival(ds.lastArrival)} ${ds.lastArrival.arrivalStatus!=="onTime" ? "("+arrivalStatusLabel(ds.lastArrival.arrivalStatus)+")" : ""}</div></div>
+      <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono" title="Earliest extract in the latest run">${fmtArrival(ds.lastArrival)} <span title="${ARRIVAL_FOLLOWS_FILING}">${ds.lastArrival.arrivalStatus!=="onTime" ? "("+arrivalStatusLabel(ds.lastArrival.arrivalStatus)+")" : ""}</span> ${ambiguityChip(ds.id)}</div></div>
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>
       <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">${fmtInt(ds.rowCount)} <span style="font-size:11.5px; color:${rowDelta>=0?'var(--good)':'var(--bad)'};">(${rowDelta>=0?'+':''}${fmtInt(rowDelta)})</span></div></div>
     </div>

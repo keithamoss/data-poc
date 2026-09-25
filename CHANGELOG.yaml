@@ -112,8 +112,8 @@ releases:
   - date: "2026-09-25"
     summary: >
       Every date and time now reads the same way, supplies are kept in
-      one warehouse rather than thrown away, and the overview stops
-      counting quiet agencies as healthy.
+      one warehouse rather than thrown away, and everything waiting for a
+      person is gathered into one list with a count.
     changes:
       - category: Fixed
         items:
@@ -517,6 +517,20 @@ releases:
               supply is for, it now says so and waits for you, naming
               every period it considered and why each was ruled out -
               rather than putting the file somewhere plausible.
+          - headline: Everything waiting, in one list
+            components: ["Dashboard UI"]
+            description: >
+              Held supplies, failed loads, files nothing could place and
+              uncertain filings now appear together with one count, on
+              the overview and on every agency and dataset they affect.
+              On a quiet day it says nothing is waiting.
+          - headline: Warnings are not verdicts
+            components: ["Dashboard UI"]
+            description: >
+              Anything waiting for a person is marked as needing action,
+              a warning or information, in its own wording and never in
+              the red, amber and green a failing check uses - so an odd
+              filename cannot read as a dataset in trouble.
 
   - date: "2026-09-24"
     summary: >

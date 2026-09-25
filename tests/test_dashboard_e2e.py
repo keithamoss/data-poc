@@ -2265,3 +2265,73 @@ class TestTheDisplayStandardHoldsInARealBrowser:
                       "2026-09-29T14:15:00+08:00"):
             in_browser = clean_page.evaluate(f"fmtInstant({value!r})")
             assert in_browser == display_time.format_instant(value), value
+
+
+class TestOutstandingDecisions:
+    """REQ-DASH-070, asserted where a person actually looks.
+
+    The standing lesson this follows is CLAUDE.md's own: a green data
+    layer says nothing about a render layer with its own transform.
+    Everything below drives the REAL built page in a REAL browser and
+    reads what the page decided, not what the build wrote.
+    """
+
+    def test_every_tier_says_nothing_is_waiting_rather_than_showing_nothing(
+            self, clean_page, built_dashboard_html):
+        """Criterion 13, at all three tiers.
+
+        An empty element and a missing one look identical to a reader,
+        and both look identical to a panel that crashed. The real
+        committed history currently has nothing outstanding, so this is
+        the state a reader meets today - which makes it the one worth
+        holding to a browser-level assertion rather than a unit one.
+        """
+        _goto(clean_page, built_dashboard_html)
+        assert clean_page.locator(".notice-queue").count() == 1
+        assert "Nothing is waiting for a person" in clean_page.locator(
+            ".notice-queue").inner_text()
+
+        agency = clean_page.locator("#agency-grid .card").first
+        agency.click()
+        clean_page.wait_for_timeout(400)
+        assert "Nothing is waiting for a person" in clean_page.locator(
+            ".notice-queue").first.inner_text()
+
+    def test_the_quiet_state_is_not_dressed_as_a_data_verdict(
+            self, clean_page, built_dashboard_html):
+        """Criterion 5, and the reason this element exists at all: an
+        event in our own processing is not a claim about anybody's
+        data, so it may not borrow the status vocabulary to say so."""
+        _goto(clean_page, built_dashboard_html)
+        classes = clean_page.locator(".notice-queue").get_attribute("class")
+        for verdict in ("green", "amber", "red"):
+            assert verdict not in classes
+
+    def test_no_arrival_anywhere_on_the_page_renders_an_unknown_state_as_on_time(
+            self, clean_page, built_dashboard_html):
+        """Criterion 10, at the last transform before the user.
+
+        arrivalPill() used to map anything that was not early or late
+        to a green 'On time', so REQ-PIPE-066's 'unfiled' - which means
+        there is no slot to be punctual against - would have rendered
+        as a confident verdict. This asks the PAGE's own function,
+        because the page is where that decision is actually made.
+        """
+        _goto(clean_page, built_dashboard_html)
+        for status in ("unfiled", "something-nobody-taught-it", ""):
+            label = clean_page.evaluate(f"arrivalStatusLabel({status!r})")
+            pill = clean_page.evaluate(f"arrivalPill({status!r})")
+            assert label != "On time", status
+            assert "pill green" not in pill, status
+
+    def test_an_arrival_verdict_says_it_follows_the_supplys_current_filing(
+            self, clean_page, built_dashboard_html):
+        """Criterion 11. A punctuality verdict is measured against the
+        slot a supply is currently filed to, so it is not a fixed
+        historical fact - and a reader who does not know that reads a
+        changed figure as the page being wrong."""
+        _goto(clean_page, built_dashboard_html)
+        clean_page.locator("#agency-grid .card").first.click()
+        clean_page.wait_for_timeout(400)
+        titles = clean_page.locator("td span[title*='currently filed to']")
+        assert titles.count() > 0, "no arrival verdict on Tier 2 carries the qualifier"

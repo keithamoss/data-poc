@@ -408,11 +408,6 @@ subagent's finding is a claim until it is.
   criterion 13's "expose the pattern gate through `mothman check`" would
   be built literally and wrongly, as another bare-module entry
   unreachable from the group a person editing patterns is already in.
-- **CONFIRMED.** `arrivalStatusLabel()` in the dashboard template maps
-  anything that is not `early` or `late` to green "On time". `066`
-  criterion 8 introduces `unfiled`, which would therefore render as a
-  confident punctuality verdict - item 74's exact shape, at the last
-  transform before the user.
 - **CITATION CORRECTED.** `delivery-cli-ux` attributed the
   group-placement precedent to `REQ-PIPE-049`. It is `REQ-PIPE-050`,
   whose decision explicitly rejected "fold in now, move to a
@@ -421,45 +416,6 @@ subagent's finding is a claim until it is.
   renames are how a CLI surface rots". The substance is exactly as
   reported, and THIS IS BATCH 3, so the question that decision deferred
   has arrived.
-
-### The one finding all three converged on, independently
-
-**This batch produces records and events that no requirement owns the
-READING of.** Each agent met it from its own side:
-
-- `delivery-dashboard-ux`: the eleven emit at least fourteen
-  dashboard-facing obligations and **not one criterion names the
-  dashboard**. Every dashboard sentence that exists lives in an NFR or a
-  decision, none of which is checkable. The surface they all land on -
-  the `CHANGELOG_FEED` to activity-feed conversion - is sprint 22 and
-  has no requirement at all.
-- `delivery-cli-ux`: three requirements add `mothman` surface and none
-  says which group; the human-action queue has no command at all.
-- `delivery-architect`: the same feed gap, plus the run-id renumbering
-  above.
-
-Six producers (`057`, `058`, `059`, `060`, `064`, `065`) each carry a
-"report it as needing action / at WARNING / as informational" criterion,
-and the rule governing how those COMBINE sits in two NFRs on two of the
-six. Build them independently and each honours its own criterion while
-the aggregate obligation is met by nobody. That is the same unowned-IOU
-shape `CLAUDE.md` records from the batch-3 failure, and the same one
-`REQ-PIPE-065`'s sign-off fixed by pulling the never-auto-promote
-carve-out in as criterion 9.
-
-### Where the two UX agents disagree, usefully
-
-`delivery-cli-ux` says ONE queue serves all the human-action states.
-`delivery-dashboard-ux` says TWO - a persistent queue plus a
-time-ordered feed - on the grounds that `REQ-PIPE-064`'s NFRs demand
-both "re-presented on every run until resolved" and "must not become
-thirty banners at 30 datasets", which one time-ordered feed cannot do at
-once: a feed is scanned and discarded, a queue is drained.
-
-Both agree the four (or six) producers should share ONE affordance
-rather than one each. They differ on whether non-blocking review items
-(`065`'s uncertain assignments) belong in the same place as blocking
-ones.
 
 ### Blocks the START of sprint 8
 
@@ -655,19 +611,12 @@ The original text follows.
    Already true of everything else the dashboard shows; load-bearing
    here, because a hold is work waiting on a human.
 
-**Must be answered before the presentation is built:**
-6. One affordance or two - a queue plus a feed, or everything in the
-   feed with severity filtering?
-7. Do `065`'s uncertain assignments share the queue with the blocking
-   states, or get their own review surface?
-8. Who owns the presentation - one new dashboard requirement drafted
-   now, or left to sprint 22?
-9. `063`'s closed-unfilled slot - render as "obligation awaiting a
-   decision" now, or leave as ordinary red until sprint 12?
-10. The in-flight delivery reported every run - one row carrying a run
-    count, or a literal row per run per delivery? Note `057` c6 forbids
-    requiring "any record of how long a delivery has been present", and
-    a derived count may or may not cross that line.
+**Presentation - questions 6 to 10, ALL SETTLED 2026-09-24 and now
+owned by `REQ-DASH-070`**, whose criteria and `decisions:` carry them:
+one affordance or two, whether an uncertain assignment shares the queue
+with the blocking states, who owns the presentation at all, how a
+closed-unfilled slot renders, and how a repeatedly-reported in-flight
+delivery is shown. Built 2026-09-25.
 
 **Can wait, but not indefinitely - BOTH SETTLED 2026-09-24:**
 11. ~~What happens to `dataset_stats.json`'s `arrival` block?~~ **It

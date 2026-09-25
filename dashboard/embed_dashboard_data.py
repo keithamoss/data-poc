@@ -157,6 +157,14 @@ RELEASE_NOTES/REQUIREMENTS above, and the same CI-safe, no-live-data
 status as everything else this script embeds (plans/*.md are real,
 committed markdown files, no `gh`/DuckDB access needed).
 
+And `const OUTSTANDING` (REQ-DASH-070, 2026-09-25) - everything that
+needs a person, from qa_tools/common/outstanding.py's survey() over
+committed history alone (delivery_log/, processing_log/,
+observations/in_flight/, filings/). Asset-level rather than per
+collection, deliberately: computing it inside either
+build_*_dashboard_data.py is how one queue would have become two,
+which is the thing that requirement exists to prevent.
+
 And `const DEMO_CAST` (plans/tooling.md #1 Phase 6, "Demo" tab,
 2026-09-19) - the raw asciinema v2 `.cast` file content (plain text,
 JSON-lines) from the real, committed dashboard/demos/qa_wizard.cast -
@@ -182,6 +190,7 @@ from dashboard.plans_md import parse_plans
 from dashboard.requirements_yaml import parse_requirements
 from qa_tools.common import asset_time
 from qa_tools.common import hierarchy
+from qa_tools.common import outstanding
 from qa_tools.common import runway
 from qa_tools.common import schedule
 from qa_tools.common.acceptance_sync import build_decisions
@@ -354,6 +363,20 @@ def embed() -> None:
         })
     html = _replace_const(html, "SCHEDULE_RUNWAY",
                            json.dumps(schedule_runway, separators=(",", ":")))
+
+    # OUTSTANDING - REQ-DASH-070. Everything that needs a person, from
+    # committed history alone, as ONE thing carrying ONE total.
+    #
+    # Read here rather than in either build_*_dashboard_data.py on
+    # purpose: this is asset-level and spans both collections, and
+    # computing it per-collection is how it would have become two
+    # queues - which is the thing the requirement exists to prevent.
+    outstanding_now = outstanding.survey().as_record()
+    html = _replace_const(html, "OUTSTANDING",
+                           json.dumps(outstanding_now, separators=(",", ":")))
+    print(f"Re-embedded OUTSTANDING = {outstanding_now['total']} item(s) "
+          f"({outstanding_now['blockingCount']} blocking) across "
+          f"{len(outstanding_now['byAgency'])} agenc(ies)")
     print(f"Re-embedded SCHEDULE_RUNWAY = {len(schedule_runway['calendars'])} authored "
           f"calendar(s), "
           f"{sum(len(c['datasets']) for c in schedule_runway['calendars'])} dataset(s)")

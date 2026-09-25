@@ -606,6 +606,11 @@ Rough layout:
   directories in an old checkout is dead weight rather than state
   anything reads.
 
+
+  -> **~180s/1734 tests (2026-09-25, REQ-DASH-070)**. Up ~9s on 296
+  more tests since the entry above, and that is where the growth went -
+  no new hot spot. JS suite 315 tests in ~18s.
+
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.
