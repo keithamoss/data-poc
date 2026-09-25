@@ -2335,3 +2335,145 @@ class TestOutstandingDecisions:
         clean_page.wait_for_timeout(400)
         titles = clean_page.locator("td span[title*='currently filed to']")
         assert titles.count() > 0, "no arrival verdict on Tier 2 carries the qualifier"
+
+
+@pytest.fixture
+def dashboard_html_with_divergent_arrivals(built_dashboard_html, tmp_path, monkeypatch) -> Path:
+    """A second built HTML whose Child Protection datasets arrive on
+    their OWN schedules (REQ-DASH-041).
+
+    The real committed history cannot exercise this requirement at all:
+    all six CP datasets arrive together, eighteen runs each on the same
+    dates, because the generator emits one six-table delivery per
+    period. So the divergence is constructed here - two datasets cut
+    short by a quarter, one cut to a single late arrival - rather than
+    waited for.
+
+    The CUT IS ON `runs` AND EVERYTHING KEYED BY RUN, not on `runs`
+    alone: leaving a check's history pointing at a run the dataset no
+    longer has is a shape the real data can never produce, and a test
+    built on one proves nothing about the real page.
+    """
+    from dashboard import embed_dashboard_data as edd
+
+    (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
+    (tmp_path / "vendor").symlink_to((Path(edd.ROOT) / "dashboard" / "vendor").resolve())
+
+    source = Path(edd.ROOT) / "reports" / "child_protection_dashboard.json"
+    data = json.loads(source.read_text())
+
+    # How many of each dataset's own runs to keep. One is left whole,
+    # so the collection genuinely does not line up.
+    KEEP = {"cp-carers": 9, "cp-case-workers": 1, "cp-investigations": 14}
+    for dataset in data["datasets"]:
+        keep = KEEP.get(dataset["id"])
+        if keep is None:
+            continue
+        dataset["runs"] = dataset["runs"][:keep]
+        kept = {r["run_id"] for r in dataset["runs"]}
+        dataset["arrivalHistory"] = [a for a in dataset.get("arrivalHistory") or []
+                                      if a["run_id"] in kept]
+        dataset["arrivalByRun"] = {k: v for k, v in (dataset.get("arrivalByRun") or {}).items()
+                                    if k in kept}
+        dataset["lastArrival"] = {
+            **(dataset.get("lastArrival") or {}),
+            "run_date": dataset["runs"][-1]["run_date"]}
+        for column in dataset.get("columns") or []:
+            for check in column.get("checks") or []:
+                check["history"] = [h for h in check.get("history") or []
+                                     if h["run_id"] in kept]
+            stats = column.get("stats") or {}
+            stats["byRun"] = {k: v for k, v in (stats.get("byRun") or {}).items() if k in kept}
+
+    doctored = tmp_path / "child_protection_dashboard.json"
+    doctored.write_text(json.dumps(data))
+
+    out_html = tmp_path / "dashboard_divergent.html"
+    monkeypatch.setattr(edd, "TARGETS", [
+        ("REAL_BIRTH_REG_DATA", str(Path(edd.ROOT) / "reports" / "birth_registrations_dashboard.json")),
+        ("REAL_CP_DATA", str(doctored)),
+    ])
+    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
+    edd.embed()
+    return out_html
+
+
+class TestPerDatasetArrivals:
+    """REQ-DASH-041, at the render layer in a real browser.
+
+    The requirement exists BECAUSE the data layer was already checked:
+    buildSupplyHistory was driven against a doctored dataset and held
+    up, and a correct builder says nothing about a template with its
+    own transform. So every assertion here is on the rendered page.
+    """
+
+    def _open_cp(self, page, html):
+        _goto(page, html)
+        page.locator("#agency-grid .card").nth(1).click()
+        page.wait_for_timeout(500)
+
+    def test_a_collection_arriving_on_six_schedules_renders_without_console_errors(
+            self, clean_page, dashboard_html_with_divergent_arrivals):
+        """Criterion 5, and the NFR's "should not look like a bug"."""
+        self._open_cp(clean_page, dashboard_html_with_divergent_arrivals)
+        rows = clean_page.locator(".dataset-table tbody tr")
+        assert rows.count() >= 6, "the Child Protection table lost datasets"
+
+    def test_each_dataset_resolves_on_its_OWN_history_not_the_collections(
+            self, clean_page, dashboard_html_with_divergent_arrivals):
+        """Criterion 1, and the assertion is about DIVERGENCE rather
+        than about dates.
+
+        Three datasets are cut short, and at the default as-of date
+        their newest arrival falls outside their own current cycle - so
+        the page correctly renders them in the quiet state while the
+        three whole ones render a real arrival. A collection-wide
+        as-of would put all six in the same state, whichever it chose,
+        which is exactly what this is here to rule out.
+        """
+        self._open_cp(clean_page, dashboard_html_with_divergent_arrivals)
+        rows = clean_page.locator(".dataset-table tbody tr")
+        quiet = [i for i in range(rows.count())
+                  if "no qa run within tolerance" in rows.nth(i).inner_text().lower()]
+        assert len(quiet) == 3, (
+            f"expected the three cut-short datasets to resolve quietly, got {quiet}")
+        assert rows.count() - len(quiet) == 3, "the untouched datasets stopped rendering"
+
+    def test_a_dataset_with_no_arrival_by_the_as_of_date_shows_the_existing_quiet_state(
+            self, clean_page, dashboard_html_with_divergent_arrivals):
+        """Criterion 4. cp-case-workers is cut to its single earliest
+        arrival, so an as-of date before that has nothing to show - and
+        the page must say so in the state it already has rather than
+        rendering an empty panel."""
+        _goto(clean_page, dashboard_html_with_divergent_arrivals, as_of="2023-01-01")
+        clean_page.locator("#agency-grid .card").nth(1).click()
+        clean_page.wait_for_timeout(500)
+        text = clean_page.locator("#view").inner_text().lower()
+        assert "no qa run within tolerance" in text or "no data" in text, text[:400]
+
+    def test_the_as_of_picker_moves_each_dataset_on_its_own_history(
+            self, clean_page, dashboard_html_with_divergent_arrivals):
+        """Criteria 2 and 3. Stepping the as-of date back must change
+        what SOME datasets show without emptying the page - the case a
+        collection-wide as-of would get wrong."""
+        self._open_cp(clean_page, dashboard_html_with_divergent_arrivals)
+        before = clean_page.locator(".dataset-table tbody tr td:nth-child(5)").all_inner_texts()
+
+        _goto(clean_page, dashboard_html_with_divergent_arrivals, as_of="2024-06-01")
+        clean_page.locator("#agency-grid .card").nth(1).click()
+        clean_page.wait_for_timeout(500)
+        after = clean_page.locator(".dataset-table tbody tr td:nth-child(5)").all_inner_texts()
+
+        assert before != after, "the as-of date changed nothing on any dataset"
+        assert clean_page.locator(".dataset-table tbody tr").count() >= 6, (
+            "moving the as-of date emptied the collection")
+
+    def test_a_short_datasets_own_supply_history_still_renders_at_tier_3(
+            self, clean_page, dashboard_html_with_divergent_arrivals):
+        """Criterion 1 at the dataset page - the surface the original
+        data-layer check never reached."""
+        _goto(clean_page, dashboard_html_with_divergent_arrivals,
+              state={"tier": "dataset", "agencyId": "child-protection-family-support",
+                      "collectionId": "child-protection", "datasetId": "cp-carers"})
+        text = clean_page.locator("#view").inner_text()
+        assert text.strip(), "the cut-short dataset's own page rendered nothing"

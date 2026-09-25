@@ -4975,7 +4975,7 @@ requirements:
       schedule, so that the feature that survived a chain-building test
       in the lab also survives on the page.
     moscow: must
-    status: not_started
+    status: built
     source: >
       The stated limit of item 6's own verification, 2026-09-20 -
       buildSupplyHistory was driven in a real browser against a doctored
@@ -5017,6 +5017,62 @@ requirements:
       - A collection whose tables arrive on six different schedules
         should not look like a bug.
     dependencies: [REQ-PIPE-034, REQ-PIPE-038]
+    linked_tests:
+      - tests-js/per-dataset-arrivals.test.js
+      - tests/test_dashboard_e2e.py
+    implemented_by:
+      - dashboard/qa-reporting-dashboard.template.html::clipDatasetToAsOf
+      - dashboard/qa-reporting-dashboard.template.html::buildSupplyHistory
+      - dashboard/qa-reporting-dashboard.template.html::noDataDataset
+    evidence:
+      - >
+        2026-09-25: THE REAL HISTORY CANNOT EXERCISE THIS REQUIREMENT AT
+        ALL, which is the first thing that had to be established rather
+        than assumed. All six Child Protection datasets arrive together,
+        eighteen runs each on the same dates, because the generator
+        emits one six-table delivery per period. So the divergence is
+        constructed - two datasets cut short by a quarter, one cut to a
+        single early arrival - rather than waited for.
+      - >
+        2026-09-25: asserted AT THE RENDER LAYER in a real browser, which
+        is this requirement's own NFR and its reason for existing
+        separately. A whole second dashboard is built from a doctored
+        Child Protection feed and driven in Chromium; the console-error
+        collector every test in that suite runs under covers criterion
+        5 for all five of them.
+      - >
+        2026-09-25: the cut is made on `runs` AND on everything keyed by
+        run - arrivalHistory, arrivalByRun, each check's history, each
+        column's byRun stats. Leaving a check pointing at a run its
+        dataset no longer has is a shape the real data can never
+        produce, and a test built on one proves nothing about the real
+        page.
+      - >
+        2026-09-25: the divergence assertion is about STATE, not about
+        dates, and that came out of a first version that asserted the
+        wrong thing. At the default as-of date the three cut-short
+        datasets correctly fall outside their own current cycle and
+        render the existing quiet row, while the three whole ones
+        render a real arrival - three and three, asserted both ways. A
+        collection-wide as-of would put all six in the same state
+        whichever it chose, which is exactly what this rules out.
+      - >
+        2026-09-25: criterion 4's "no FURTHER quiet state" is held as a
+        property of the clip having exactly TWO outcomes - a clipped
+        dataset, or null meaning "use the state the page already had".
+        A third sentinel is how a second quiet state would arrive, and
+        it would arrive from there.
+      - >
+        2026-09-25: criterion 3's recorded contradiction was checked
+        rather than stepped around. Thread H reads as-at T as
+        promotion-filtered and the 2026-09-23 decision reads the
+        dashboard's as-of as arrival-filtered; the newer one wins, and
+        nothing promotes yet, so the two cannot diverge in the data
+        today. What the test holds is the structural fact underneath:
+        clipDatasetToAsOf reads `runs`, which are arrivals, and has no
+        promotion input to read instead. TS-28 still needs rewording,
+        which is Keith's.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     decisions:
       - >
         Decided the as-of view shows the most recent ARRIVAL, never the
