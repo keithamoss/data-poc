@@ -531,6 +531,20 @@ releases:
               a warning or information, in its own wording and never in
               the red, amber and green a failing check uses - so an odd
               filename cannot read as a dataset in trouble.
+          - headline: One period at a time
+            components: ["Pipeline & publishing"]
+            description: >
+              Checks will read a single period's data with the delivery
+              under test laid over it, so a comparison between two tables
+              is always within one period. A delivery covering two periods
+              is checked once for each.
+          - headline: Checks that cannot run
+            components: ["Pipeline & publishing"]
+            description: >
+              Where a table a check needs never arrived, the check now
+              reads red and names it, instead of quietly reading nothing.
+              A brand-new dataset with no earlier period to compare
+              against still reads as having no data, not as a failure.
 
   - date: "2026-09-24"
     summary: >

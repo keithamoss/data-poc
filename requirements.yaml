@@ -3289,7 +3289,7 @@ requirements:
       arrived says so instead of quietly reading a different period's
       data.
     moscow: must
-    status: not_started
+    status: built
     source: >
       Keith, plans/publishing-and-history.md item 6, 2026-09-20,
       REWRITTEN 2026-09-22 against plans/supply-model.md Threads B and
@@ -3358,6 +3358,104 @@ requirements:
         together. Today the data is synthetic; the requirement should
         say plainly what it would be otherwise.
     dependencies: [REQ-PIPE-034]
+    linked_tests:
+      - tests/test_period_schema.py
+    implemented_by:
+      - qa_tools/common/period_schema.py::create_overlay_views
+      - qa_tools/common/period_schema.py::check_readiness
+      - qa_tools/common/period_schema.py::fan_out
+      - qa_tools/common/period_schema.py::newest
+      - qa_tools/common/period_schema.py::reference_view
+      - qa_tools/common/period_schema.py::period_schema
+    evidence:
+      - >
+        2026-09-25: the dangerous fallback is the one asserted hardest.
+        Where a staged name has two candidates the overlay does NOT
+        fall through to the promoted version - it would QA the delivery
+        against data it did not contain, which reads green and means
+        nothing. The test proves the promoted table is really there,
+        then proves the view is not, then proves querying the name
+        raises.
+      - >
+        2026-09-25: a period name is AUTHORED, not an identifier, so the
+        encoding is asserted lossless in both directions over "2026-Q3",
+        "2026_Q3", "2026-08-24", "Nov-Jan window" and "FY26/27" - and
+        the two a naive substitution would collapse are asserted
+        DISTINCT. That collision is not an error, it is a silent merge
+        of two periods' promoted data with nothing downstream able to
+        notice.
+      - >
+        2026-09-25: criterion 4 is tested against a real two-version
+        period schema rather than on the sort key alone, so "read the
+        newest" is asserted as the rows a check actually sees. An
+        ordinal breaks a tie within one arrival, and a physical name
+        this project did not mint can never win - being wrong about
+        WHICH version was read is the one outcome worth avoiding.
+      - >
+        2026-09-25: criterion 5 is asserted as a real cross-agency JOIN.
+        A Birth Registrations table and a Child Protection table are
+        promoted into one period schema and joined through the run's
+        own views in a single query, with no assembly step, which is
+        the whole argument for not fencing the schema per collection.
+      - >
+        2026-09-25: the fan-out is asserted against its own trap first.
+        An ordinary three-table Child Protection delivery in ONE period
+        produces ONE run, because per-table slots mean a healthy
+        delivery already spans several SLOTS in one period and anything
+        keyed on slots splits every one of them (Thread H's TS-33b, one
+        layer up). A dataset with no period is in no run at all, and a
+        run's identity comes from its period rather than its position.
+      - >
+        2026-09-25: criteria 10 and 11 were VERIFIED AGAINST THE
+        EXISTING CODE rather than built, and are asserted structurally
+        so they cannot regress silently. Criterion 10 - both
+        orchestrators call the whole staging pass before
+        run_manifest(), asserted by parsing the function bodies and
+        comparing line numbers, because a test that merely ran the
+        pipeline would pass whatever the order was. Criterion 11 - both
+        replay paths are asserted to import no duckdb, open no supply
+        database and call no evaluate_* tool, so a historical verdict
+        is replayed rather than re-derived.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
+    unmet_criteria:
+      - criterion: >
+          Criteria 1, 2 and 3 are BUILT BUT NOT WIRED. The period
+          schema, the overlay, the newest-within-period rule and the
+          per-period fan-out all exist and are tested against the real
+          rule; no orchestrator calls them, so today's QA runs still
+          read staging alone through REQ-PIPE-068's view schema.
+        why: >
+          A run cannot be scoped to a period until a supply HAS one, and
+          REQ-PIPE-062's filings are deliberately not recorded until
+          promotion exists (Keith, 2026-09-25). With nothing filed,
+          fan_out() correctly produces zero runs and wiring it in would
+          stop the pipeline. The alternative - inventing a placeholder
+          period so something runs - is the plausible-looking default
+          this project keeps deleting, and it would put a fabricated
+          period into committed QA history. Turning it on is one call
+          at the top of each orchestrator once filings are recorded.
+        owner: the promotion sprint (batch 4)
+      - criterion: >
+          Criteria 6, 7 and 8 - red-for-unrun - are built as a decision
+          function with its own tests, but no check's verdict is
+          currently produced through it.
+        why: >
+          The same dependency: red-for-unrun is asked of a run scoped to
+          a period, and no run is. Built now rather than later because
+          the nodata carve-out for a brand-new dataset is the part most
+          likely to be re-derived wrongly - without it every new dataset
+          starts life red on all its drift checks, which is how people
+          learn to ignore a signal.
+        owner: the promotion sprint (batch 4)
+      - criterion: >
+          Criterion 9's temporal reference resolves a PERIOD schema, and
+          today's drift check still compares against a fixed reference
+          RUN (run_01) rather than a reference period.
+        why: >
+          Reference periods need promotion for the same reason as above.
+          reference_view() is built, tested as a real cross-schema VIEW
+          rather than a copy, and is what the drift check moves onto.
+        owner: the promotion sprint (batch 4)
     decisions:
       - >
         SCOPE NARROWED 2026-09-24 (Keith), in a requirement already

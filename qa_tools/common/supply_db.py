@@ -170,9 +170,18 @@ def staged_table(table: str, received_at, ordinal: int = 0) -> str:
 
 
 def ensure_schemas(conn) -> None:
-    """The durable schemas. Period schemas are delivery sprint 13 and
-    are deliberately not created here - shelves years before anything
-    decides what goes on them."""
+    """The durable schemas that exist whether or not anything has been
+    promoted.
+
+    PERIOD SCHEMAS ARE STILL NOT CREATED HERE, and the reason changed
+    with REQ-PIPE-035 rather than going away. They are no longer future
+    work - qa_tools/common/period_schema.py builds them - but one is
+    created when a period is first promoted into, by
+    ensure_period_schema(), not swept into existence ahead of time.
+    Creating every period a calendar declares would put years of empty
+    schemas in the database, and an empty period schema and a period
+    nobody has promoted into are the same fact stated twice.
+    """
     for schema in (STAGING_SCHEMA, REJECTED_SCHEMA):
         conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
 

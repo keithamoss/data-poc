@@ -417,16 +417,17 @@ subagent's finding is a claim until it is.
   reported, and THIS IS BATCH 3, so the question that decision deferred
   has arrived.
 
-### Blocks the START of sprint 8
+### Blocks the START of sprint 8 - BOTH RESOLVED
 
-- **`REQ-PIPE-035` is one signed requirement covering three things** -
-  single database, schema-per-period, and the per-run view schema - and
-  `REQ-PIPE-060`'s own build-order decision moved only the FIRST into
-  sprint 8. `status: built` is CI-enforced across every criterion, so
-  the register cannot record half a requirement as built. Either 035 is
-  split, or staging is built against a database that does not exist, or
-  an explicit IOU is written - and the third is the shape already
-  recorded as a failure.
+- **`REQ-PIPE-035` covering three things.** **RESOLVED 2026-09-24
+  (Keith), option (a) of four: SPLIT IN TWO.** The single database and
+  the per-run view schema became `REQ-PIPE-068`, criteria unchanged in
+  wording; the period-schema model, the temporal-reference rules and
+  the once-only evaluation rule stayed on `035`. Both are now built -
+  `068` on 2026-09-25, `035` the same night. The reasoning, the three
+  rejected options and the verified one-process-per-database blocker
+  that the split also disposed of are on `REQ-PIPE-068`'s own
+  `decisions:`.
 - **`REQ-PIPE-058` criterion 8 has no corpus**, above. **RESOLVED
   2026-09-24 (Keith) - the corpus is the DELIVERY LOG**, see below.
 
