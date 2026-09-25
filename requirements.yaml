@@ -9694,7 +9694,62 @@ requirements:
       date: "2026-09-24"
     story: "As an operator, I want the pipeline to say it does not know where a supply belongs rather than putting it somewhere plausible, so that the one thing it can never do is start a cascade by guessing forward."
     moscow: must
-    status: not_started
+    status: built
+    linked_tests:
+      - tests/test_supply_holds.py
+      - tests/test_monotonic_filling.py
+      - tests/test_assignment.py
+    implemented_by:
+      - qa_tools/common/supply_holds.py::holds_in
+      - qa_tools/common/supply_holds.py::Holds
+      - qa_tools/common/supply_holds.py::HeldSupply
+      - qa_tools/common/assignment.py::_why_unavailable
+      - qa_tools/common/assignment.py::Assignment
+      - cli/supply.py::holds_command
+    unmet_criteria:
+      - criterion: >-
+          Criterion 3, in part - a held supply is kept staged and is not
+          promoted or arrival-classified. The rule refuses to place it and
+          nothing promotes or classifies it, but that is by absence rather
+          than by a mechanism, because neither promotion nor arrival
+          classification is wired to filings yet.
+        why: >-
+          REQ-PIPE-062's filings are deliberately not recorded until
+          promotion exists, so there is no stored hold for a promotion step
+          to skip. Satisfied today by there being nothing to do it wrong,
+          which is not the same as satisfied. Re-check when promotion lands.
+        owner: the promotion sprint (batch 4)
+    evidence:
+      - >
+        2026-09-25: the refusal is tested against a CONTROL that must not be
+        held, because a rule that always refused would pass a careless test of
+        a refusal. The reachable case decision 4 names - a slot skipped, a
+        later one filled, monotonic filling closing the skipped one, and the
+        genuine backfill turning up - is driven end to end through the real
+        rule.
+      - >
+        2026-09-25: criterion 4 is tested as something a person could act on
+        rather than as a field being present. The reasons distinguish "already
+        filled", "closed because a later slot is filled" and "its claim window
+        has not opened", and the list is capped so a daily feed's hundreds of
+        slots cannot bury the three that matter.
+      - >
+        2026-09-25: criterion 2 is asserted against the scenario's own future
+        slots - the test first proves a future slot is actually present in the
+        reasons, so it cannot pass vacuously, then asserts the supply went to
+        none of them.
+      - >
+        2026-09-25: holds aggregate, asserted as ONE line for three holds
+        rather than three lines. At ~30 datasets a banner per held supply is
+        thirty banners, which is how people learn to ignore a whole class.
+      - >
+        2026-09-25: the dead end is stated rather than hidden, which this
+        requirement asks for explicitly because a hold nobody can clear is
+        indistinguishable from a bug. `mothman supply holds` says assignment
+        is built but not yet recorded, tests assert the module offers no
+        resolve() or assign_to_slot(), and the write path stays with the
+        decision log in sprint 12.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     source: "Keith, delivery sprint 9, plans/supply-model.md Thread H first chaos pass #3 and Thread E's standing principle - where a rule genuinely cannot know, SAY SO rather than commit silently. Test scenario register TS-7 and TS-6c's tail. Honours REQ-PIPE-052's deferral, in which 'hold for a human' appears exactly once in the whole register and nowhere else. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
       - "IF no slot can be assigned by the rule and the supply cannot be recorded as a resupply of a filled slot, THEN THE SYSTEM SHALL hold it for a human."

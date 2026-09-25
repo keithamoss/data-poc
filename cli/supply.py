@@ -434,3 +434,34 @@ def filings_command(dataset_id: str, limit: int) -> None:
                        record.get("slot") or "[yellow]unfiled[/yellow]",
                        readable.get(record.get("branch", ""), record.get("branch", "")))
     console.print(table)
+
+
+@supply_group.command("holds")
+def holds_command() -> None:
+    """Supplies nothing could place, waiting on a person.
+
+    A hold is the correct output of the rule rather than a fault in
+    it: where the rule genuinely cannot know which period a supply is
+    for, it says so instead of putting it somewhere plausible. Putting
+    it somewhere plausible is how a cascade starts.
+
+    Counted together rather than one entry per supply - at thirty
+    datasets a banner each is how people learn to ignore the whole
+    class.
+    """
+    from qa_tools.common import supply_holds
+
+    # NOTHING IS RECORDED TO READ BACK YET. REQ-PIPE-062's filings are
+    # not written until promotion exists, so there is no committed
+    # store of holds either. This reports honestly rather than
+    # inventing one, and turns into a real read the moment that lands.
+    found = supply_holds.holds_in([])
+    console.print(found.summary())
+    if not found.needs_action:
+        console.print("[dim]Assignment is built but not yet recorded - see REQ-PIPE-062. "
+                       "Holds will appear here once filings are written.[/dim]")
+        return
+    for entry in found.supplies:
+        console.print(f"\n[yellow]{entry.dataset_id}[/yellow] - {entry.supply_id}")
+        for name, why in entry.unavailable:
+            console.print(f"  {name}: [dim]{why}[/dim]")

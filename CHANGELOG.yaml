@@ -510,6 +510,13 @@ releases:
               filled by a later day's resupply. It stays on the record
               as an obligation that was not met, so a service failure
               cannot turn into a met one.
+          - headline: Saying it does not know
+            components: ["Pipeline & publishing"]
+            description: >
+              Where the pipeline genuinely cannot tell which period a
+              supply is for, it now says so and waits for you, naming
+              every period it considered and why each was ruled out -
+              rather than putting the file somewhere plausible.
 
   - date: "2026-09-24"
     summary: >

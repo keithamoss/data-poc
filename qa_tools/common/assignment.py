@@ -103,15 +103,38 @@ class Assignment:
     branch: str
     considered: tuple[str, ...]
     resupply_of: str | None = None
+    #: For a HELD supply: why each slot it looked at was unavailable
+    #: (REQ-PIPE-064 criterion 4). A hold that says only "no slot"
+    #: tells a person nothing they can act on, and acting on it is the
+    #: entire point - the resolution is a human assigning it.
+    unavailable: tuple[tuple[str, str], ...] = ()
 
     @property
     def is_resupply(self) -> bool:
         return self.branch == RESUPPLY
 
+    @property
+    def is_held(self) -> bool:
+        return self.branch == HELD
+
+    def describe(self) -> str:
+        """Why this supply is where it is, in words.
+
+        For a hold this is the whole deliverable: criterion 4 asks it
+        to name the slots it considered AND why each was unavailable,
+        because the resolution is a person choosing one.
+        """
+        if not self.is_held:
+            return f"{self.supply_id} -> {self.slot} ({self.branch})"
+        reasons = "; ".join(f"{name}: {why}" for name, why in self.unavailable)
+        return (f"{self.supply_id} could not be placed - {reasons or 'no slot was open'}. "
+                f"It stays staged and is not checked until somebody assigns it.")
+
     def as_record(self) -> dict:
         return {"dataset_id": self.dataset_id, "supply_id": self.supply_id,
                 "slot": self.slot, "branch": self.branch,
-                "considered": list(self.considered), "resupply_of": self.resupply_of}
+                "considered": list(self.considered), "resupply_of": self.resupply_of,
+                "unavailable": [list(pair) for pair in self.unavailable]}
 
 
 def current_slot(slots: Sequence[slots_mod.Slot], at: datetime) -> slots_mod.Slot | None:
@@ -256,8 +279,10 @@ def assign(dataset_id: str, supply_id: str, at: datetime,
     #    obligation, which this requirement rates worse than a cascade
     #    because it manufactures a delivery that never happened.
     if closed:
-        return Assignment(dataset_id=dataset_id, supply_id=supply_id, slot=None,
-                           branch=HELD, considered=tuple(considered) or tuple(sorted(closed)))
+        return Assignment(
+            dataset_id=dataset_id, supply_id=supply_id, slot=None, branch=HELD,
+            considered=tuple(considered) or tuple(sorted(closed)),
+            unavailable=_why_unavailable(slots, at, filled, closed))
 
     if latest is not None:
         if latest.name not in considered:
@@ -272,4 +297,37 @@ def assign(dataset_id: str, supply_id: str, at: datetime,
     # would be claiming forward - the one thing criterion 5 makes
     # absolute.
     return Assignment(dataset_id=dataset_id, supply_id=supply_id, slot=None,
-                       branch=UNASSIGNABLE, considered=tuple(considered))
+                       branch=UNASSIGNABLE, considered=tuple(considered),
+                       unavailable=_why_unavailable(slots, at, filled, closed))
+
+
+def _why_unavailable(slots: Sequence[slots_mod.Slot], at: datetime,
+                      filled: frozenset[str],
+                      closed: frozenset[str]) -> tuple[tuple[str, str], ...]:
+    """Each slot this arrival could have gone in, and why it could not
+    (REQ-PIPE-064 criterion 4).
+
+    A HOLD THAT SAYS ONLY "no slot" IS NOT ACTIONABLE, and acting on it
+    is the entire point - the resolution is a person assigning the
+    supply to a slot, which they cannot do without knowing what was
+    ruled out and on what grounds.
+
+    Only slots near the arrival are named. Listing every slot a daily
+    feed has ever had would bury the three that matter, which is the
+    same reasoning that keeps holds aggregated rather than one banner
+    per dataset.
+    """
+    out: list[tuple[str, str]] = []
+    for slot in slots:
+        if slot.name in filled:
+            why = "already filled by a promoted supply"
+        elif slot.name in closed:
+            why = "closed - a later slot has been filled, so this one can no longer be claimed"
+        elif not slots_mod.is_claimable(slot, at):
+            why = "its claim window has not opened yet, and nothing may claim forward"
+        else:
+            continue
+        out.append((slot.name, why))
+    # Nearest first: the slots around the arrival are the ones a person
+    # is choosing between.
+    return tuple(out[-6:])
