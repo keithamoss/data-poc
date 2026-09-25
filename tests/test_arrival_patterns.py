@@ -206,10 +206,18 @@ class TestTheConfigurationGate:
         assert "alpha" in message and "beta" in message
 
     def test_it_says_when_it_has_no_corpus_rather_than_reporting_success(self, tmp_path):
-        """A check with no corpus is not a check that passed, and the
-        delivery log it needs is REQ-PIPE-069."""
+        """A check with no corpus is not a check that passed. It has
+        one now - REQ-PIPE-069's delivery log, which fills as the
+        pipeline runs - but an empty one still has to say so, because
+        a fresh clone has no deliveries yet."""
         line = validate_arrival_patterns.validate(log_dir=tmp_path / "nothing-here")
-        assert "no committed delivery log yet" in line
+        assert "no delivery has been logged yet" in line
+
+    def test_the_real_corpus_is_the_committed_delivery_log(self):
+        """The gate reads what REQ-PIPE-069 wrote, not data/ - which is
+        what lets it run in CI at all."""
+        line = validate_arrival_patterns.validate()
+        assert "recorded filename(s)" in line, line
 
     def test_a_real_corpus_is_counted(self, tmp_path):
         (tmp_path / "d1.json").write_text(json.dumps(

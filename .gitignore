@@ -3,6 +3,16 @@ __pycache__/
 .venv/
 .pytest_cache/
 .ruff_cache/
+# NOTHING UNDER data/ IS EVER COMMITTED. Listed wholesale rather than
+# path by path after a real incident, 2026-09-25: REQ-PIPE-068 created
+# data/supply.duckdb and data/dbt_scratch/, a `git add -A` staged them
+# in the window BEFORE their ignore lines existed, and a gitignore
+# never applies to an already-tracked file - so 404MB of scratch
+# databases went into a public repo and the later ignore lines did
+# nothing. A catch-all closes the window for the next artefact too.
+data/
+# The specific paths below are kept for readability - they say what is
+# actually in there - and are redundant under the line above.
 data/raw/
 data/cp_raw/
 # REQ-GEN-043's delivery format. In a real deployment these hold real

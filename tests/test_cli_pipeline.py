@@ -153,3 +153,78 @@ def test_run_without_snapshot_flag_only_syncs_local_copies(monkeypatch):
     assert result.exit_code == 0, result.output
     assert calls[-1] == "sync"
     assert "snapshot" not in calls
+
+
+def test_running_the_pipeline_does_not_destroy_the_committed_delivery_log(
+        monkeypatch, tmp_path):
+    """A real incident, 2026-09-25, and the reason criterion 6 is built
+    as a prune rather than a wipe.
+
+    `mothman pipeline run` used to clear the whole delivery log at the
+    top, on the reasoning that the run would rewrite it. The tests
+    above invoke exactly that command with the real work STUBBED OUT -
+    so the next gate run deleted sixty committed records and nothing
+    rewrote them, because the thing that would have was the part being
+    stubbed.
+
+    The general shape is worth more than the fix: a command that
+    destroys committed state before recreating it is only correct when
+    the recreation actually happens, and a test suite is precisely the
+    place where it does not.
+    """
+    import cli.pipeline as pipeline_cli
+    from qa_tools.common import delivery, delivery_log
+
+    log_dir = tmp_path / "delivery_log"
+    log_dir.mkdir()
+    (log_dir / "monday.json").write_text('{"delivery": "monday", "files": []}')
+    monkeypatch.setattr(delivery_log, "DELIVERY_LOG_DIR", log_dir)
+    # Nothing on disk, so a delivery still recorded is one the prune
+    # has every reason to think is gone - the worst case for the log.
+    monkeypatch.setattr(delivery, "DELIVERIES_DIR", tmp_path / "no-deliveries")
+
+    calls = []
+    monkeypatch.setattr(pipeline_cli, "_run_bdm", lambda sequential: calls.append("bdm"))
+    monkeypatch.setattr(pipeline_cli, "_run_cp", lambda sequential: calls.append("cp"))
+    _patch_dashboard_build_embed(monkeypatch, calls)
+    _patch_snapshot(monkeypatch, calls)
+
+    result = _runner.invoke(pipeline_cli.pipeline_group, ["run"])
+    assert result.exit_code == 0, result.output
+
+    # The prune DOES remove it, because that delivery genuinely is not
+    # there - what must never happen is the whole log going on a run
+    # that rewrote nothing. Proven by pointing the deliveries at a real
+    # tree instead:
+    assert not (log_dir / "monday.json").exists()
+
+
+def test_a_delivery_still_present_keeps_its_record_across_a_run(monkeypatch, tmp_path):
+    """The other half, and the one that actually guards the incident."""
+    import cli.pipeline as pipeline_cli
+    from qa_tools.common import delivery, delivery_log
+
+    log_dir = tmp_path / "delivery_log"
+    log_dir.mkdir()
+    (log_dir / "monday.json").write_text('{"delivery": "monday", "files": []}')
+    monkeypatch.setattr(delivery_log, "DELIVERY_LOG_DIR", log_dir)
+
+    deliveries = tmp_path / "deliveries"
+    (deliveries / "monday").mkdir(parents=True)
+    (deliveries / "monday" / "cp_clients.csv").write_text("a\n1\n")
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+    (receipts / "monday.json").write_text('{"received_at": "2026-09-25T09:00:00+08:00"}')
+    monkeypatch.setattr(delivery, "DELIVERIES_DIR", deliveries)
+    monkeypatch.setattr(delivery, "RECEIPTS_DIR", receipts)
+
+    calls = []
+    monkeypatch.setattr(pipeline_cli, "_run_bdm", lambda sequential: calls.append("bdm"))
+    monkeypatch.setattr(pipeline_cli, "_run_cp", lambda sequential: calls.append("cp"))
+    _patch_dashboard_build_embed(monkeypatch, calls)
+    _patch_snapshot(monkeypatch, calls)
+
+    result = _runner.invoke(pipeline_cli.pipeline_group, ["run"])
+    assert result.exit_code == 0, result.output
+    assert (log_dir / "monday.json").exists(), \
+        "a run that rewrote nothing must not take the record with it"

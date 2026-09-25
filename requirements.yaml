@@ -1137,7 +1137,7 @@ requirements:
       never rewritten, so that the record of an arrival outlives the
       warehouse that held it and can be queried without one.
     moscow: must
-    status: not_started
+    status: built
     source: >
       SPLIT OUT OF REQ-PIPE-038 on 2026-09-24 (Keith), which covered two
       separable things under one signed id - re-keying committed QA
@@ -1283,6 +1283,77 @@ requirements:
         knowingly on 2026-09-24; redaction was raised as an alternative
         and not taken.
 
+      - >
+        CRITERION 6 IS BUILT AS A PRUNE RATHER THAN A WIPE, and the
+        narrowing is a real incident rather than a preference. The
+        first version cleared the whole log at the top of `mothman
+        pipeline run`, on the reasoning that the run would rewrite it.
+        The test suite invokes exactly that command with the real work
+        STUBBED OUT - so the next gate run deleted sixty committed
+        records and nothing rewrote them, because the thing that would
+        have was the part being stubbed.
+      - >
+        Why pruning is not a weaker version of the same thing: records
+        are write-once by criterion 1, so a record for a delivery still
+        present IS what a regeneration would write again. The only
+        records a wipe removes and a rebuild does not restore are the
+        ones for deliveries that are gone, which is exactly what the
+        prune removes. Same end state for every case that can arise,
+        with no window in which committed history does not exist.
+      - >
+        The general shape is worth more than the fix, and it is now a
+        test: a command that destroys committed state before recreating
+        it is only correct when the recreation actually happens, and a
+        test suite is precisely the place where it does not.
+      - >
+        Decided the log records EVERY delivery, not only those for the
+        collection being run. A delivery is a transport unit and is not
+        owned by a collection - one may span two - so filing the log by
+        collection would mean choosing one for a delivery precisely
+        where it has more than one. Write-once makes this idempotent:
+        whichever orchestrator reaches a delivery first records it, and
+        the rest no-op.
+    linked_tests:
+      - tests/test_delivery_log.py
+      - tests/test_cli_pipeline.py
+      - tests/test_arrival_patterns.py
+    implemented_by:
+      - qa_tools/common/delivery_log.py::record
+      - qa_tools/common/delivery_log.py::prune
+      - qa_tools/common/delivery_log.py::records
+      - qa_tools/common/delivery_log.py::sql
+      - qa_tools/common/validate_arrival_patterns.py::committed_filenames
+    evidence:
+      - >-
+        2026-09-25: REQ-PIPE-058's collision gate now has a REAL
+        CORPUS. It reported "no delivery has been logged yet, so
+        nothing to check" before this landed and reports "38 recorded
+        filename(s)" after, read from committed files rather than from
+        data/ - which is what lets it run in CI at all.
+      - >-
+        2026-09-25: criterion 4 was verified by real experiment rather
+        than asserted. DuckDB reads the committed JSON straight off
+        disk via read_json_auto over a glob, and the filename-to-dataset
+        pairs the gate wants come out of an UNNEST over the same view -
+        nothing synced, nothing duplicated, no second copy in the
+        warehouse. Run against the real 60-record log as well as in a
+        test.
+      - >-
+        2026-09-25: a full pipeline run wrote 60 delivery records,
+        covering 42 Birth Registrations deliveries and 18 Child
+        Protection ones, and a second run rewrote none of them - which
+        is criterion 1 holding in practice rather than in principle.
+      - >-
+        2026-09-25: the destructive first version of criterion 6 was
+        caught by the gate run that followed it, which found the log
+        empty. Both halves are now covered by tests that fail against
+        that version - one asserting a record for a delivery still
+        present survives a run that rewrote nothing.
+      - >-
+        2026-09-25: all ten gates green, with 1521 Python tests and 294
+        JS tests, and the 60 committed records intact after the full
+        suite - which is the assertion that matters, since the suite
+        is what destroyed them the first time.
   - id: REQ-DASH-070
     title: Supply anomalies and outstanding decisions have one presentation, aggregated and never a data verdict
     date_written: "2026-09-24"

@@ -35,7 +35,8 @@ from datetime import date
 
 
 from . import bdm_common
-from qa_tools.common import arrivals, delivery, in_flight_log, run_id_guard, supply_db
+from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
+                              run_id_guard, supply_db)
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
@@ -228,6 +229,14 @@ def run_pipeline(sequential: bool = False) -> dict:
     # a pipeline reading it would be filing supplies from what it was
     # told rather than from what arrived.
     found_arrivals = arrivals.arrivals_for("civil-registration", "run_")
+
+    # ONE COMMITTED FILE PER DELIVERY, WRITTEN ONCE (REQ-PIPE-069).
+    # Recognition facts only - what arrived and what we thought it was.
+    # A delivery spanning collections is recognised by both
+    # orchestrators, so the second write being a no-op is the ordinary
+    # case rather than a guard against a bug.
+    for d in delivery.list_deliveries():
+        delivery_log.record(d, arrivals.recognise(d))
 
     # WHAT THIS RUN SAW IN FLIGHT (REQ-PIPE-057 criteria 5 and 7).
     # Reported on EVERY run, with no interval and no threshold -

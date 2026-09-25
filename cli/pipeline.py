@@ -70,7 +70,26 @@ def run_command(collection: str, sequential: bool, snapshot: bool) -> None:
     dry run."""
     import os
 
+    from qa_tools.common import delivery_log
+
     from . import dashboard as dashboard_cli
+
+    # THE LOG MUST NOT DESCRIBE A HISTORY THAT NO LONGER EXISTS
+    # (REQ-PIPE-069 criterion 6). Pruned against what is actually on
+    # disk rather than wiped and rebuilt - see delivery_log.prune() for
+    # why, and for the sixty records the wipe version deleted.
+    #
+    # HERE rather than inside either orchestrator, because only this
+    # level knows about both collections: one orchestrator pruning
+    # against what IT recognised would delete the other's records every
+    # time.
+    from qa_tools.common import delivery as delivery_mod
+
+    present = {d.name for d in delivery_mod.survey().received}
+    gone = delivery_log.prune(present)
+    if gone:
+        console.print(f"Removed {len(gone)} delivery record(s) for deliveries that "
+                       f"are no longer present.", style="dim")
 
     if collection in ("bdm", "all"):
         _run_bdm(sequential)

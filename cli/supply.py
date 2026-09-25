@@ -194,3 +194,49 @@ def datasets_command() -> None:
         table.add_row(entry.dataset_id, entry.collection_id,
                        entry.arrival_pattern or "[red]none declared[/red]")
     console.print(table)
+
+
+@supply_group.command("log")
+@click.option("--sql", "as_sql", is_flag=True,
+               help="Print the SQL that reads the log, instead of the log itself.")
+def log_command(as_sql: bool) -> None:
+    """The committed record of what arrived (REQ-PIPE-069).
+
+    One file per delivery, written once at recognition and never
+    rewritten. It holds RECOGNITION facts - what arrived and what we
+    thought it was - and never load outcomes, which happen later and
+    live in their own record.
+    """
+    from qa_tools.common import delivery_log
+
+    if as_sql:
+        # QUERYABLE DIRECTLY FROM THE COMMITTED FILES (criterion 4):
+        # DuckDB reads them off disk and joins them against the staging
+        # and period schemas with nothing synced and nothing
+        # duplicated. Printed rather than run, because running it means
+        # opening a database and the committed-history path may not.
+        console.print(delivery_log.sql())
+        return
+
+    found = delivery_log.records()
+    if not found:
+        console.print("No delivery has been logged yet. The log fills as the pipeline runs.")
+        return
+
+    from qa_tools.common import asset_time, display_time
+
+    table = Table("Delivery", "Received", "Files", "Attributed", "Other",
+                   box=None, pad_edge=False)
+    for record in found:
+        files = record.get("files") or []
+        attributed = sum(1 for f in files if f.get("dataset_id"))
+        other = len(files) - attributed
+        table.add_row(
+            record.get("delivery", ""),
+            display_time.format_instant(
+                asset_time.parse_instant(record["received_at"], "delivery log")),
+            str(len(files)), str(attributed),
+            f"[yellow]{other}[/yellow]" if other else "0")
+    console.print(table)
+    console.print(f"\n[dim]{len(found)} delivery record(s). "
+                   f"`--sql` prints how to query them.[/dim]")

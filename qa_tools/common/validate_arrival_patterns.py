@@ -37,18 +37,12 @@ careless edit when it is cheapest to fix.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-from qa_tools.common import arrival_patterns, hierarchy, slots
+from qa_tools.common import arrival_patterns, delivery_log, hierarchy, slots
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
-#: Where REQ-PIPE-069 will commit one file per delivery. Read here
-#: rather than data/deliveries/, which is gitignored - putting a data/
-#: read into a gate that CI runs would break this project's standing
-#: rule outright rather than merely being vacuous.
-DELIVERY_LOG_DIR = ROOT / "delivery_log"
 
 
 class ArrivalPatternConfigError(ValueError):
@@ -61,22 +55,23 @@ class ArrivalPatternConfigError(ValueError):
 def committed_filenames(log_dir: Path | None = None) -> list[str]:
     """Every filename the committed delivery log has ever recorded.
 
-    Empty until REQ-PIPE-069 lands, which is stated by the gate rather
-    than passed over: a check with no corpus is not a check that
-    passed.
+    THE CORPUS, and REQ-PIPE-069 is what fills it. Read through that
+    module rather than re-implemented here: two readers of one format
+    is how a gate ends up checking something slightly different from
+    what was written.
+
+    Empty before any delivery has been logged, which the gate states
+    rather than passes over - a check with no corpus is not a check
+    that passed.
     """
-    directory = Path(log_dir) if log_dir is not None else DELIVERY_LOG_DIR
-    if not directory.is_dir():
-        return []
+    try:
+        found = delivery_log.records(log_dir)
+    except delivery_log.DeliveryLogError as exc:
+        raise ArrivalPatternConfigError(str(exc)) from exc
     names: set[str] = set()
-    for path in sorted(directory.rglob("*.json")):
-        try:
-            record = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError) as exc:
-            raise ArrivalPatternConfigError(
-                f"{path} is in the delivery log and cannot be read ({exc})") from exc
-        for name in record.get("files") or []:
-            names.add(name if isinstance(name, str) else name.get("filename", ""))
+    for record in found:
+        for entry in record.get("files") or []:
+            names.add(entry if isinstance(entry, str) else (entry.get("filename") or ""))
     return sorted(n for n in names if n)
 
 
@@ -135,8 +130,8 @@ def validate(log_dir: Path | None = None) -> str:
         raise ArrivalPatternConfigError("\n".join(problems))
 
     corpus = (f"{len(filenames)} recorded filename(s)" if filenames
-              else "no committed delivery log yet (REQ-PIPE-069), so nothing to "
-                   "check for duplicate attribution")
+              else "no delivery has been logged yet, so nothing to check for "
+                   "duplicate attribution - the log fills as the pipeline runs")
     return (f"arrival pattern validation OK - {len(compiled)} dataset pattern(s), "
             f"{corpus}.")
 

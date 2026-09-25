@@ -27,7 +27,8 @@ import os
 import sys
 
 
-from qa_tools.common import arrivals, delivery, in_flight_log, run_id_guard, supply_db
+from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
+                              run_id_guard, supply_db)
 from qa_tools.common import hierarchy
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common.git_identity import get_run_by
@@ -141,6 +142,14 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     # RECOGNISED FROM DISK, never read from a declaration
     # (REQ-GEN-043) - see orchestrate_bdm.py's identical comment.
     found_arrivals = arrivals.arrivals_for("child-protection", "cp_run_")
+
+    # ONE COMMITTED FILE PER DELIVERY, WRITTEN ONCE (REQ-PIPE-069).
+    # Recognition facts only - what arrived and what we thought it was.
+    # A delivery spanning collections is recognised by both
+    # orchestrators, so the second write being a no-op is the ordinary
+    # case rather than a guard against a bug.
+    for d in delivery.list_deliveries():
+        delivery_log.record(d, arrivals.recognise(d))
 
     # WHAT THIS RUN SAW IN FLIGHT (REQ-PIPE-057 criteria 5 and 7).
     # Reported on EVERY run, with no interval and no threshold -
