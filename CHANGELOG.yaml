@@ -539,6 +539,13 @@ releases:
               period a supply was actually filed to. A quarterly file
               arriving a week ahead used to read as about twelve weeks
               late for a quarter that closed months earlier.
+          - headline: Fix the filing, fix the verdict
+            components: ["Pipeline & publishing"]
+            description: >
+              A supply that only looked late because it was filed to
+              the wrong period stops looking late once somebody moves
+              it to the right one. When it arrived does not change -
+              only which period it counts towards.
           - headline: Agency cards line up again
             components: ["Dashboard UI"]
             description: >

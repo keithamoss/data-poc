@@ -10140,7 +10140,64 @@ requirements:
       date: "2026-09-24"
     story: "As an agency data owner, I want a supply that was reported late only because it was filed wrongly to stop reading late once it is filed correctly, so that the record never keeps a verdict everybody knows to be untrue."
     moscow: must
-    status: not_started
+    status: built
+    linked_tests:
+      - tests/test_refiling.py
+      - tests/test_arrival_classification.py
+    implemented_by:
+      - qa_tools/common/filing.py::refile
+      - qa_tools/common/filing.py::classification_of
+      - qa_tools/common/arrival_classification.py::classify
+    unmet_criteria:
+      - criterion: >-
+          Criterion 4, in part - presenting the classification current for a
+          supply's present filing. The verdict is computed from the current
+          filing on every read and is never cached; nothing presents it to a
+          reader yet.
+        why: >-
+          It travels with the supply, and REQ-PIPE-062's filings are not
+          recorded until promotion exists - so there is nothing to present.
+          The dashboard side is REQ-DASH-070's. Recorded rather than counted
+          as done, because "computed correctly" and "shown correctly" are
+          different claims and this requirement makes both.
+        owner: the promotion sprint (batch 4), with REQ-DASH-070 for the UI
+    evidence:
+      - >
+        2026-09-25: the fixture deliberately STARTS FROM THE WRONG ANSWER and
+        a test asserts it - a supply filed to 2026-Q2 reads LATE - so the test
+        that it reads EARLY once re-filed to 2026-Q3 cannot pass vacuously.
+        That is the whole requirement in two assertions: a supply reported
+        late purely because it was misfiled was never actually late.
+      - >
+        2026-09-25: criterion 2 is asserted STRUCTURALLY as well as
+        behaviourally - the filing record carries no classification field at
+        all, so there is nothing that could go stale. The verdict is derived
+        on every read rather than stored and refreshed.
+      - >
+        2026-09-25: criterion 5 is BUILT NOW even though its trace cannot be
+        followed until sprint 12, because the failure named at sign-off is
+        specific - five of six criteria built and the sixth quietly skipped as
+        un-buildable. The recomputation carries a reference to the re-filing
+        that caused it, the reference is a REQUIRED argument rather than an
+        optional one, and it dangles until the decision log exists to resolve
+        it.
+      - >
+        2026-09-25: a re-file is one atomic record carrying both the from-slot
+        and the to-slot, asserted directly. Under the composed
+        demote-then-promote version it appears in the decision log as two
+        entries and a reader a year later has to infer they were one act.
+      - >
+        2026-09-25: the cost constraint is asserted by PARSING THE FUNCTION
+        BODY rather than grepping it - no call into a dataset's history and no
+        loop at all. A first version of that test grepped the whole source and
+        failed on the word "for" inside the docstring, which is a reminder
+        that a structural assertion needs to look at code rather than text.
+      - >
+        2026-09-25: pipeline/cadence.py's docstring said the opposite - that
+        the verdict is "embedded as a fixed historical fact". Corrected in the
+        same change rather than left as a second account: the arrival TIME
+        still never changes, the VERDICT is a function of the current filing.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     source: "Keith, delivery sprint 10, plans/supply-model.md Thread D's second correction, settled conditionally 2026-09-21 and unconditionally once re-filing was confirmed in scope 2026-09-22. Test scenario register TS-11. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
       - "WHEN a supply is re-filed to a different slot, THE SYSTEM SHALL recompute its arrival classification against the slot it is now filed to."

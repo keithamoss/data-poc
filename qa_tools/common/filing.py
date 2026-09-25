@@ -181,3 +181,83 @@ def _supply_id_for(arrival, dataset_id: str) -> str:
     names = arrival.files_by_dataset.get(dataset_id) or ()
     base = f"{dataset_id}@{asset_time.arrival_key(arrival.received_at)}"
     return base if len(names) <= 1 else f"{base}#1"
+
+
+#: A recomputation carries a reference to the re-filing that caused it
+#: (REQ-PIPE-067 criterion 5). THE REFERENCE DANGLES until the decision
+#: log exists in sprint 12 to resolve it, and that is stated rather
+#: than left for a reader to discover - the alternative failure is
+#: specific and was named at sign-off: five of six criteria built, the
+#: sixth quietly skipped as un-buildable, and the requirement reported
+#: done.
+REFILING_REFERENCE = "refiled_by"
+
+
+def refile(dataset_id: str, supply_id: str, to_slot: str, refiling_id: str,
+            reason: str = "", filings_dir: Path | None = None) -> dict | None:
+    """Move one supply to a different slot, and let its verdict follow.
+
+    THE VERDICT FOLLOWS THE FILING (REQ-PIPE-067). A supply reported
+    late purely because it was misfiled was never actually late, and
+    leaving a known-wrong verdict in place for the sake of immutability
+    is the one place this design would knowingly say something untrue.
+
+    THE ARRIVAL INSTANT DOES NOT MOVE (criterion 3). When we received
+    something is a fact; which period it was for is a decision, and
+    only the second one is being changed here.
+
+    ATOMIC, never a demote followed by a promote (criterion 5's
+    reasoning). One entry with a from-slot, a to-slot and one reason -
+    because under the composed version a re-file appears in the
+    decision log as two entries, and a reader a year later has to infer
+    they were one act. "Why is this supply in Q3?" should have a single
+    answer rather than being a correlation exercise.
+
+    `refiling_id` identifies the re-filing in the decision log. Nothing
+    resolves it yet - the log is sprint 12 - so it is recorded and
+    dangles, which is deliberate and is why this parameter is required
+    rather than optional.
+
+    Returns the updated record, or None where the supply was not filed
+    or is already in that slot (criterion 6 - an unchanged filing is
+    not recomputed).
+    """
+    current = filing_for(dataset_id, supply_id, filings_dir)
+    if current is None or current.get("slot") == to_slot:
+        return None
+
+    updated = dict(current)
+    updated["slot"] = to_slot
+    updated["refiled_from"] = current.get("slot")
+    updated[REFILING_REFERENCE] = refiling_id
+    if reason:
+        updated["refiling_reason"] = reason
+    # The branch that ORIGINALLY filed it is kept as history and no
+    # longer describes where it sits: a person put it here.
+    updated["branch"] = "refiled-by-a-person"
+
+    path = path_for(dataset_id, supply_id, filings_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(updated, indent=2) + "\n")
+    return updated
+
+
+def classification_of(dataset_id: str, supply_id: str, arrived_at,
+                       slot_by_name, filings_dir: Path | None = None) -> str:
+    """This supply's arrival verdict, for the slot it is filed to NOW.
+
+    ALWAYS READ, NEVER CACHED FROM AN EARLIER FILING (criteria 2 and
+    4). The verdict is not a frozen historical fact - it is a function
+    of the current filing, so presenting one computed against a filing
+    that has since changed is presenting something known to be untrue.
+
+    LOCAL TO THE SUPPLY THAT MOVED (the non-functional constraint). A
+    re-file changes one supply's verdict; nothing here replays a
+    history, because a design that needed to would stop being usable
+    once a daily feed has years behind it.
+    """
+    from qa_tools.common import arrival_classification
+
+    record = filing_for(dataset_id, supply_id, filings_dir)
+    slot = slot_by_name(record["slot"]) if record and record.get("slot") else None
+    return arrival_classification.classify(arrived_at, slot)

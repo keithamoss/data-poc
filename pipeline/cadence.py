@@ -31,12 +31,28 @@ Two things this module does, deliberately kept separate:
    THIS SPECIFIC, ALREADY-HAPPENED delivery early, on time, or late?"
    A real timestamp comparison (this run's own real earliest_extract,
    already committed to qa_results/, against the expected UTC moment +
-   latency_minutes grace) - computed ONCE per real run, here, at
-   dashboard-build time (a pure function of committed data, no live
-   DuckDB access - see CLAUDE.md's CI-never-touches-data rule), and
-   embedded as a fixed historical fact. Never needs porting to JS: a
-   past run's own real arrival time never changes no matter what as-of
-   date someone later picks.
+   latency_minutes grace) - computed here, at dashboard-build time (a
+   pure function of committed data, no live DuckDB access - see
+   CLAUDE.md's CI-never-touches-data rule).
+
+   CORRECTED 2026-09-25 (REQ-PIPE-067). This used to say the verdict
+   was "embedded as a fixed historical fact" and that a past run's
+   arrival never changes. The ARRIVAL TIME still never changes - that
+   half was and remains true. The VERDICT does: it is a function of
+   the slot a supply is currently FILED to, and re-filing a supply
+   moves it. A supply reported late purely because it was misfiled was
+   never actually late, and keeping a known-wrong verdict for the sake
+   of immutability is the one place this design would knowingly say
+   something untrue.
+
+   It still never needs porting to JS, but for a different reason than
+   the one given here before: the verdict TRAVELS WITH THE SUPPLY and
+   the page renders it. That is what makes a mutable verdict safe
+   rather than a second source of answers.
+
+   This function is itself the derivation REQ-PIPE-066 replaces - see
+   qa_tools/common/arrival_classification.py - and is retired once
+   filings are recorded.
 """
 from __future__ import annotations
 from datetime import date, datetime, timedelta
