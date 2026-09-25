@@ -200,13 +200,39 @@ class Resolution:
                 "absent": sorted(self.absent)}
 
 
-def candidates_in(conn, schema: str, logical_names: Sequence[str]) -> dict[str, list[str]]:
+def split_staged(physical: str) -> tuple[str, str, str] | None:
+    """`(logical table, run id, discriminator)` for a staged table name,
+    or None for a name that is not one.
+
+    `__` is the separator because no table or run id in this project
+    contains one - `cp_case_workers` and `cp_run_003` are all single
+    underscores - so the segments come apart unambiguously.
+    """
+    parts = physical.split("__")
+    if len(parts) < 2 or not all(parts[:2]):
+        return None
+    return parts[0], parts[1], "__".join(parts[2:])
+
+
+def candidates_in(conn, schema: str, logical_names: Sequence[str],
+                   run_id: str | None = None) -> dict[str, list[str]]:
     """Every physical table in `schema` that claims one of these logical
     names, keyed by the name it claims.
 
-    Matched on the `<table>__<suffix>` convention `staged_table()`
-    writes, and NOT by a prefix test: `cp_case_workers__x` must never be
-    a candidate for `cp_case`, and a prefix test says it is.
+    `run_id` SCOPES IT TO ONE ARRIVAL, and leaving it out is almost
+    never what a caller wants. The bug that put it here: a QA run built
+    its views from every version ever staged, so on the forty-second
+    run the logical name had forty-two candidates, the ambiguity rule
+    correctly refused to choose between them, and dbt failed to find a
+    table that was sitting right there. The rule was right; the
+    question it was asked was wrong. Candidates for a run are the
+    tables that run staged - several only where several files claimed
+    one dataset in one delivery, which is REQ-PIPE-059's case and the
+    ambiguity this is really for.
+
+    Matched on the `<table>__<run id>` convention `staged_table()`
+    writes, and NOT by a prefix test: `cp_case_workers__x` must never
+    be a candidate for `cp_case`, and a prefix test says it is.
     """
     rows = conn.execute(
         "SELECT table_name FROM information_schema.tables WHERE table_schema = ?",
@@ -214,9 +240,15 @@ def candidates_in(conn, schema: str, logical_names: Sequence[str]) -> dict[str, 
     wanted = set(logical_names)
     found: dict[str, list[str]] = {name: [] for name in wanted}
     for (physical,) in rows:
-        logical, sep, _suffix = physical.partition("__")
-        if sep and logical in wanted:
-            found[logical].append(physical)
+        parts = split_staged(physical)
+        if parts is None:
+            continue
+        logical, staged_run, _discriminator = parts
+        if logical not in wanted:
+            continue
+        if run_id is not None and staged_run != run_id:
+            continue
+        found[logical].append(physical)
     return found
 
 
@@ -323,3 +355,82 @@ def dbt_target_path(run_id: str) -> Path:
     theorised (plans/running-thoughts.md #12).
     """
     return scratch_dir() / "dbt_target" / _ident(run_id, "run id")
+
+
+def connect_dbt_scratch(run_id: str, read_only: bool = True):
+    """Open dbt's scratch database for a run, with the supply database
+    ATTACHed read-only exactly as dbt's own profile attaches it.
+
+    WITHOUT THE ATTACH THIS RAISES `Catalog "supply" does not exist`,
+    which is how it was found: dbt's staging models are VIEWS, and a
+    view carries its source reference rather than its source's rows -
+    `stg_birth_registrations` is defined over
+    `supply.<run schema>.birth_registrations`. Reading it from a
+    connection that has never heard of `supply` fails at bind time. The
+    rows are fine; the name is not resolvable.
+
+    Both sides open read-only, so this adds no lock contention - many
+    readers on one DuckDB file is exactly the case that is safe.
+    """
+    conn = duckdb.connect(str(dbt_scratch_db(run_id)), read_only=read_only)
+    conn.execute(f"ATTACH IF NOT EXISTS '{supply_db_path()}' AS supply (READ_ONLY)")
+    return conn
+
+
+# ---------------------------------------------------------------------------
+# What a run actually read (criterion 5)
+#
+# The view schema is discarded when the run ends, and "which version of
+# this table did that run read" is a question asked years afterwards -
+# of an audit, of a disagreement between two runs, of a check that
+# started failing. So the answer is recorded rather than reconstructed.
+#
+# RECORDED AT STAGING TIME, which is the only moment it is an OBSERVED
+# FACT rather than a re-derivation: the resolution is what create_run_views
+# decided, and deciding it again later against a staging schema that has
+# moved on would answer a different question and look like the same one.
+# This table is the carrier; qa_results/ is the durable record the
+# criterion asks for, written by the orchestrator once the run has a
+# timestamp to file it under.
+# ---------------------------------------------------------------------------
+
+_RESOLUTIONS = "_resolutions"
+
+
+def record_resolution(conn, res: Resolution) -> None:
+    """Persist one run's resolution, replacing any earlier one for that
+    run - re-staging an arrival re-decides it, and the latest decision
+    is the one that holds."""
+    conn.execute(
+        f'CREATE TABLE IF NOT EXISTS "{STAGING_SCHEMA}"."{_RESOLUTIONS}" '
+        "(run_id VARCHAR, logical VARCHAR, physical VARCHAR, state VARCHAR)")
+    conn.execute(
+        f'DELETE FROM "{STAGING_SCHEMA}"."{_RESOLUTIONS}" WHERE run_id = ?', [res.run_id])
+    rows = ([(res.run_id, k, v, "resolved") for k, v in res.resolved.items()]
+            + [(res.run_id, k, p, "ambiguous") for k, ps in res.ambiguous.items() for p in ps]
+            + [(res.run_id, k, None, "absent") for k in res.absent])
+    for row in rows:
+        conn.execute(
+            f'INSERT INTO "{STAGING_SCHEMA}"."{_RESOLUTIONS}" VALUES (?, ?, ?, ?)', list(row))
+
+
+def resolution_for(conn, run_id: str) -> Resolution:
+    """Read back what was decided for one run. An unrecorded run comes
+    back empty rather than raising: a caller asking is reporting, and a
+    report that says "nothing recorded" is more useful than a
+    traceback."""
+    res = Resolution(run_id=run_id, schema=run_schema(run_id))
+    try:
+        rows = conn.execute(
+            f'SELECT logical, physical, state FROM "{STAGING_SCHEMA}"."{_RESOLUTIONS}" '
+            "WHERE run_id = ? ORDER BY logical, physical", [run_id]).fetchall()
+    except duckdb.CatalogException:
+        return res
+    for logical, physical, state in rows:
+        if state == "resolved":
+            res.resolved[logical] = physical
+        elif state == "ambiguous":
+            res.ambiguous.setdefault(logical, []).append(physical)
+        else:
+            res.absent.append(logical)
+    return res

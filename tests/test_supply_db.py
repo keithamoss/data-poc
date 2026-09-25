@@ -107,6 +107,61 @@ class TestAmbiguityIsAbsenceRatherThanAChoice:
         assert res.absent == ["cp_placements"]
 
 
+class TestCandidatesAreScopedToTheRun:
+    """A real bug, found by running the pipeline against 42 real runs
+    (2026-09-25).
+
+    `create_run_views()` was being asked for candidates across the whole
+    staging schema rather than for the run being built, so by the
+    forty-second run the logical name had forty-two candidates, the
+    ambiguity rule correctly refused to choose, and dbt failed to find a
+    table that was sitting right there. The ambiguity rule was right;
+    the question it was asked was wrong - and the symptom was a missing
+    table, which reads nothing like a scoping mistake.
+    """
+
+    def test_a_run_sees_its_own_arrival_and_not_every_other_one(self, db):
+        for run_id in ("run_001", "run_002", "run_042"):
+            _stage(db, "birth_registrations", run_id)
+        res = supply_db.create_run_views(db, "run_042", supply_db.candidates_in(
+            db, supply_db.STAGING_SCHEMA, ["birth_registrations"], run_id="run_042"))
+        assert res.resolved == {"birth_registrations": "birth_registrations__run_042"}
+        assert res.ambiguous == {}
+
+    def test_unscoped_is_what_went_wrong(self, db):
+        """The old call, kept as a test so the failure mode stays
+        visible rather than becoming a thing nobody remembers."""
+        for run_id in ("run_001", "run_002"):
+            _stage(db, "birth_registrations", run_id)
+        unscoped = supply_db.candidates_in(
+            db, supply_db.STAGING_SCHEMA, ["birth_registrations"])
+        assert len(unscoped["birth_registrations"]) == 2
+        res = supply_db.create_run_views(db, "run_001", unscoped)
+        assert res.resolved == {}, "this is the bug: every run after the first resolves nothing"
+
+    def test_a_run_id_is_matched_whole_not_by_prefix(self, db):
+        """`run_001` and `run_0011` are different runs, and a prefix
+        test says the second belongs to the first."""
+        _stage(db, "birth_registrations", "run_001")
+        _stage(db, "birth_registrations", "run_0011")
+        found = supply_db.candidates_in(
+            db, supply_db.STAGING_SCHEMA, ["birth_registrations"], run_id="run_001")
+        assert found["birth_registrations"] == ["birth_registrations__run_001"]
+
+    def test_two_files_for_one_dataset_in_one_run_are_still_ambiguous(self, db):
+        """The ambiguity this is actually for (REQ-PIPE-059) survives
+        the scoping - it is within one run, not across runs."""
+        _stage(db, "cp_clients", "run_007")
+        db.execute(
+            f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."cp_clients__run_007__b" AS '
+            "SELECT 1 AS id")
+        found = supply_db.candidates_in(
+            db, supply_db.STAGING_SCHEMA, ["cp_clients"], run_id="run_007")
+        assert len(found["cp_clients"]) == 2
+        res = supply_db.create_run_views(db, "run_007", found)
+        assert res.resolved == {} and list(res.ambiguous) == ["cp_clients"]
+
+
 class TestACandidateMustActuallyClaimTheName:
     def test_a_longer_name_is_not_a_candidate_for_a_shorter_one(self, db):
         """`cp_case_workers__x` is not a version of `cp_case`. A prefix
@@ -250,3 +305,61 @@ class TestTheConcurrencyTheDesignRestsOn:
         for p in procs:
             p.join(30)
         assert [out.get() for _ in procs] == ["ok", "ok", "ok"]
+
+
+class TestWhatARunReadIsRecorded:
+    """Criterion 5. The view schema is discarded when the run ends, so
+    "which version of this table did that run read" has to be answered
+    from somewhere else - and years later, of an audit or of a check
+    that started failing.
+    """
+
+    def test_a_resolution_survives_the_schema_it_describes(self, db):
+        _stage(db, "birth_registrations", "run_001")
+        res = supply_db.create_run_views(db, "run_001", supply_db.candidates_in(
+            db, supply_db.STAGING_SCHEMA, ["birth_registrations"], run_id="run_001"))
+        supply_db.record_resolution(db, res)
+        supply_db.drop_run_schema(db, "run_001")
+
+        back = supply_db.resolution_for(db, "run_001")
+        assert back.resolved == {"birth_registrations": "birth_registrations__run_001"}
+
+    def test_it_records_why_a_name_was_not_readable(self, db):
+        """Ambiguous and absent are different answers to "why is this
+        table missing", and both are worth keeping."""
+        db.execute(
+            f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."cp_carers__r__a" AS SELECT 1 AS id')
+        db.execute(
+            f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."cp_carers__r__b" AS SELECT 1 AS id')
+        res = supply_db.create_run_views(db, "r", supply_db.candidates_in(
+            db, supply_db.STAGING_SCHEMA, ["cp_carers", "cp_placements"], run_id="r"))
+        supply_db.record_resolution(db, res)
+
+        back = supply_db.resolution_for(db, "r")
+        assert back.ambiguous == {"cp_carers": ["cp_carers__r__a", "cp_carers__r__b"]}
+        assert back.absent == ["cp_placements"]
+
+    def test_restaging_replaces_the_record_rather_than_adding_to_it(self, db):
+        _stage(db, "birth_registrations", "run_001")
+        args = (db, "run_001", supply_db.candidates_in(
+            db, supply_db.STAGING_SCHEMA, ["birth_registrations"], run_id="run_001"))
+        supply_db.record_resolution(db, supply_db.create_run_views(*args))
+        supply_db.record_resolution(db, supply_db.create_run_views(*args))
+
+        back = supply_db.resolution_for(db, "run_001")
+        assert back.resolved == {"birth_registrations": "birth_registrations__run_001"}
+        assert back.ambiguous == {} and back.absent == []
+
+    def test_a_run_nobody_recorded_reads_as_empty_rather_than_raising(self, db):
+        """The caller asking is reporting, and a report saying "nothing
+        recorded" is more use than a traceback."""
+        assert supply_db.resolution_for(db, "run_never").resolved == {}
+
+    def test_the_record_names_the_run_and_the_schema_it_describes(self, db):
+        _stage(db, "birth_registrations", "run_009")
+        res = supply_db.create_run_views(db, "run_009", supply_db.candidates_in(
+            db, supply_db.STAGING_SCHEMA, ["birth_registrations"], run_id="run_009"))
+        record = res.as_record()
+        assert record["run_id"] == "run_009"
+        assert record["schema"] == supply_db.run_schema("run_009")
+        assert record["resolved"] == {"birth_registrations": "birth_registrations__run_009"}

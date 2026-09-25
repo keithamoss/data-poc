@@ -11,6 +11,7 @@ reason to stub any of them out here."""
 from __future__ import annotations
 import os
 
+import qa_tools.common.supply_db as supply_db
 import qa_tools.bdm.build_per_run_warehouses as build_per_run_warehouses
 import qa_tools.bdm.orchestrate_bdm as orchestrate_bdm
 import qa_tools.bdm.run_datacontract_bdm as run_datacontract_bdm
@@ -36,11 +37,12 @@ def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
     # run_evidently_bdm.py already default to, so all three must point at
     # the SAME tmp dir here for the same reason.
     monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", raw_dir)
-    monkeypatch.setattr(build_per_run_warehouses, "OUT_DIR", duckdb_dir)
     monkeypatch.setattr(run_datacontract_bdm, "RAW_DIR", raw_dir)
     monkeypatch.setattr(run_evidently_bdm, "RAW_DIR", raw_dir)
-    monkeypatch.setattr(run_dbt_bdm, "DUCKDB_RUNS_DIR", duckdb_dir)
-    monkeypatch.setattr(run_soda_bdm, "DUCKDB_RUNS_DIR", duckdb_dir)
+    # One supply database, named by the environment - the three
+    # module attributes this replaces pointed at a directory of
+    # per-run DuckDB files (REQ-PIPE-068).
+    monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(duckdb_dir))
     monkeypatch.setattr(run_datacontract_bdm, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(run_dbt_bdm, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(run_soda_bdm, "write_qa_result", lambda *a, **k: None)
@@ -73,8 +75,10 @@ def test_run_single_bdm_produces_real_results_without_touching_the_manifest(monk
     with open(os.path.join(bdm_raw_dir, _REF_CSV), "rb") as src:
         with open(os.path.join(raw_dir, f"{_REF_RUN_ID}.csv"), "wb") as dst:
             dst.write(src.read())
-    build_per_run_warehouses.build_one(_REF_RUN_ID, os.path.join(raw_dir, f"{_REF_RUN_ID}.csv"), "2026-01-01",
-                                        out_dir=duckdb_dir)
+    # No out_dir: there is one supply database and it is named by the
+    # environment, which _patch_bdm_dirs() above has already set.
+    build_per_run_warehouses.build_one(
+        _REF_RUN_ID, os.path.join(raw_dir, f"{_REF_RUN_ID}.csv"), "2026-01-01")
 
     # No injected severity is passed - run_single() has nowhere to put
     # one any more (REQ-GEN-043), which is the point: a real arriving
@@ -105,14 +109,15 @@ def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_prese
     import qa_tools.cp.run_evidently_cp as run_evidently_cp
     import qa_tools.cp.run_soda_cp as run_soda_cp
 
-    monkeypatch.setattr(run_dbt_cp, "CP_DUCKDB_RUNS_DIR", cp_duckdb_dir)
-    monkeypatch.setattr(run_soda_cp, "CP_DUCKDB_RUNS_DIR", cp_duckdb_dir)
+    # One supply database, named by the environment - the three
+    # module attributes this replaces pointed at a directory of
+    # per-run DuckDB files (REQ-PIPE-068).
+    monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(cp_duckdb_dir))
     monkeypatch.setattr(run_datacontract_cp, "CP_RAW_DIR", cp_raw_dir)
     monkeypatch.setattr(run_evidently_cp, "CP_RAW_DIR", cp_raw_dir)
     for mod in (run_dbt_cp, run_soda_cp, run_datacontract_cp, run_evidently_cp):
         monkeypatch.setattr(mod, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(orchestrate_cp, "write_qa_result", lambda *a, **k: None)
-    monkeypatch.setattr(orchestrate_cp, "CP_DUCKDB_RUNS_DIR", cp_duckdb_dir)
 
     # An ARRIVAL RECORD, not a manifest entry: what we observed, and
     # nothing the generator knew (REQ-GEN-043).

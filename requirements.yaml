@@ -917,7 +917,7 @@ requirements:
       can never read a table that is half-loaded, ambiguous or simply
       the wrong version.
     moscow: must
-    status: not_started
+    status: built
     source: >
       SPLIT OUT OF REQ-PIPE-035 on 2026-09-24 (Keith), which covered
       three separable things under one signed id - period schemas, the
@@ -1011,6 +1011,119 @@ requirements:
         two signed requirements. It belongs with the mechanism that does
         the resolving, which is this requirement; 038 owns re-keying
         committed history and merely restated it.
+      - >
+        Decided dbt gets a SCRATCH DATABASE PER RUN and ATTACHes this
+        one read-only - Keith, 2026-09-25, over two alternatives he was
+        shown. Serialising the whole QA fan-out is the literal reading
+        and costs the parallel default he chose on 2026-09-19 (measured
+        ~83s to ~220s on the suite); leaving today's QA on per-run
+        databases until sprint 15 ships the requirement with criterion 2
+        unmet across the whole pipeline. The distinction that makes this
+        legitimate rather than a dodge: criterion 7 forbids a database
+        per run for SUPPLY DATA, which now lives in one database and
+        nowhere else, and dbt's scratch holds only its own materialised
+        views and test results - a tool artefact sprint 15 removes.
+      - >
+        The writer problem is real and was VERIFIED BY EXPERIMENT before
+        anything was designed around it: many processes may open one
+        DuckDB file read-only at once, and a single writer excludes
+        everyone, readers included. duckdb.org was blocked at the time;
+        Keith allow-listed it the same day and its own documentation
+        says the same thing in as many words. Recorded because the
+        cheap reading - "we already have --sequential, we are done" -
+        silently costs the parallel default for the whole suite.
+      - >
+        Decided the per-run VIEWS ARE BUILT IN THE LOAD PHASE and
+        discarded after the fan-out, rather than by the tools that read
+        them. Both are writes. A tool that built its own view, or tidied
+        up after itself, would take the exclusive lock and stall every
+        other worker - a failure that surfaces as somebody else's crash.
+      - >
+        Decided candidates are SCOPED TO THE RUN. Found by running the
+        real pipeline: asking for candidates across the whole staging
+        schema meant the forty-second run saw forty-two versions of one
+        logical name, the ambiguity rule correctly refused to choose,
+        and dbt failed to find a table sitting right there. The rule was
+        right and the question was wrong - and the symptom reads like a
+        missing table, not a scoping mistake. Ambiguity within ONE run,
+        which is REQ-PIPE-059's two-files-for-one-dataset case, is what
+        it is really for.
+      - >
+        Decided the resolution is RECORDED AT STAGING TIME rather than
+        reconstructed later. Staging is the only moment it is an
+        observed fact; re-deriving it afterwards against a staging
+        schema that has moved on answers a different question and looks
+        like the same one.
+    open_questions: []
+    unmet_criteria:
+      - criterion: >-
+          Criterion 2, in part - datacontract-cli and Evidently read
+          supply CSVs straight off disk rather than through the per-run
+          view schema, so two of the four tools are outside "every read
+          of supply data".
+        why: >-
+          Neither tool touches DuckDB at all today: datacontract-cli is
+          pointed at a CSV path and Evidently is handed a dataframe read
+          from one. Moving them is a real piece of work rather than a
+          repoint, and delivery sprint 15 rebuilds how QA is invoked
+          anyway. Flagged rather than quietly counted as done.
+        owner: Keith, to place at sprint 15 or sooner
+    linked_tests:
+      - tests/test_supply_db.py
+      - tests/test_build_warehouses_rebuild.py
+      - tests/test_run_dbt_bdm.py
+      - tests/test_run_soda_bdm.py
+      - tests/test_orchestrate_single_run.py
+    implemented_by:
+      - qa_tools/common/supply_db.py::create_run_views
+      - qa_tools/common/supply_db.py::candidates_in
+      - qa_tools/common/supply_db.py::record_resolution
+      - qa_tools/common/supply_db.py::drop_orphan_run_schemas
+      - qa_tools/common/supply_db.py::connect_dbt_scratch
+      - qa_tools/bdm/build_per_run_warehouses.py::build_one
+      - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
+    evidence:
+      - >-
+        2026-09-25: the migration was proved BEHAVIOUR-PRESERVING
+        against real data rather than argued. A full pipeline run over
+        both collections - 42 Birth Registrations runs and 18 Child
+        Protection ones, parallel by default - was diffed against the
+        committed history it replaced: 6545 recorded check verdicts,
+        every one identical, and no run with a different set of checks
+        except one whose Soda check was added to the contract the day
+        after that history was last regenerated.
+      - >-
+        2026-09-25: it also found a real latent bug it did not cause.
+        Twelve value aggregates came back in a different ORDER, because
+        the query ordered by count with no tie-break, so the same data
+        stored differently aggregated differently - and with a LIMIT
+        under it that does not merely reorder a list, it decides which
+        value a reader sees. This repo is seeded so that regenerating
+        and diffing is a real correctness check, which that quietly took
+        away. Reproduced deterministically, fixed with a secondary sort,
+        and covered by a test that fails against the old query.
+      - >-
+        2026-09-25: the concurrency the whole design rests on is
+        asserted, not assumed - a test starts three real processes
+        against one database and confirms they may all read it at once.
+        The failing half was found the same way: dbt's staging models
+        are VIEWS over the attached database, so reading them from a
+        connection that has not attached it raises `Catalog "supply"
+        does not exist` at bind time.
+      - >-
+        2026-09-25: criteria 1 and 6 are visible in a real run's own
+        output - "discarded 42 per-run view schema(s)" and "discarded 18
+        per-run view schema(s)" - and the database has none left
+        afterwards. Criterion 5 is a committed `tables_read.json` beside
+        each run's results, naming the physical table each logical name
+        resolved to.
+      - >-
+        2026-09-25: all nine mothman gates green, 1438 Python tests and
+        294 JS tests. The test suite moved off a directory of per-run
+        databases onto one database per test WORKER, which is the
+        isolation this requirement's own NFR asks for in as many words -
+        isolation used to fall out of a database per run, and this
+        removes that.
 
   - id: REQ-PIPE-069
     title: Every delivery is recorded as its own committed file, written once at recognition

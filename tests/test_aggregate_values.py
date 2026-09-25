@@ -129,3 +129,47 @@ def test_bin_dates_spreads_rows_across_bins_by_real_date_distance():
 
     assert sum(b["count"] for b in out) == 4
     assert len(out) <= 3
+
+
+class TestATieIsBrokenTheSameWayEveryTime:
+    """A real bug, found 2026-09-25 by REQ-PIPE-068's own regeneration
+    diff: three suburbs all invalid 10 times came back in a different
+    order after the same run was re-staged, because
+    `categorical_aggregate` ordered by count alone and left ties to
+    whatever order the engine happened to produce.
+
+    WHY IT MATTERS MORE THAN ORDERING. There is a `LIMIT 5` under that
+    ORDER BY, so a tie at the boundary does not merely reorder the
+    list - it decides which value a reader sees at all. And this whole
+    repo is seeded precisely so that regenerating and diffing is a real
+    correctness check; a query that answers differently for the same
+    data quietly takes that check away.
+    """
+
+    VALUES = [("TBC", 10), ("Freemantle", 7), ("Unknown", 7),
+              ("Not stated", 7), ("Perth Metro", 4), ("Elsewhere", 4)]
+
+    def _table(self, conn, name, rows):
+        conn.execute(f"CREATE TABLE {name}(v VARCHAR)")
+        for label, n in rows:
+            conn.execute(f"INSERT INTO {name} SELECT '{label}' FROM range({n})")
+
+    def _values(self, conn, name):
+        return [d["value"] for d in
+                categorical_aggregate(conn, name, "v", "1=1", None)["values"]]
+
+    def test_physical_order_does_not_change_the_answer(self):
+        conn = duckdb.connect()
+        self._table(conn, "a", self.VALUES)
+        self._table(conn, "b", list(reversed(self.VALUES)))
+        assert self._values(conn, "a") == self._values(conn, "b"), \
+            "the same data, stored in a different order, aggregated differently"
+
+    def test_tied_values_are_ordered_by_value(self):
+        """Not just stable - stated, so the order is something a reader
+        can predict rather than an artefact."""
+        conn = duckdb.connect()
+        self._table(conn, "t", self.VALUES)
+        got = self._values(conn, "t")
+        assert got[0] == "TBC"
+        assert got[1:4] == ["Freemantle", "Not stated", "Unknown"], got

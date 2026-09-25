@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 
+import qa_tools.common.supply_db as supply_db
 import qa_tools.cp.run_dbt_cp as run_dbt_cp
 
 # The run_ids cp_duckdb_dir's fixture deliveries are RECOGNISED as - see
@@ -19,11 +20,12 @@ from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_
 
 @pytest.fixture
 def _dbt_cp(monkeypatch, cp_duckdb_dir):
-    # dbt's own target_path now lives under CP_DUCKDB_RUNS_DIR itself (see
+    # dbt's scratch database and its target_path hang off the supply
+    # database's own directory (see
     # evaluate_dbt_cp()'s own comment) - a per-worker pytest tmp dir, so
     # no manual cleanup is needed here any more, same as
     # tests/test_run_dbt_bdm.py's own equivalent fixture.
-    monkeypatch.setattr(run_dbt_cp, "CP_DUCKDB_RUNS_DIR", cp_duckdb_dir)
+    monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(cp_duckdb_dir))
     monkeypatch.setattr(run_dbt_cp, "write_qa_result", lambda *a, **k: None)
 
 

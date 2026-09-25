@@ -123,21 +123,31 @@ def test_bdm_earliest_extract_falls_back_to_min_if_every_row_disordered():
 
 
 def test_cp_compute_dataset_stats_shape():
+    """The tables live in a RUN'S OWN VIEW SCHEMA, reached by search
+    path, which is how the real caller reaches them since REQ-PIPE-068 -
+    orchestrate_cp opens the supply database and sets the search path to
+    this run's schema. They used to live in a schema literally named
+    `raw`, which was the per-run database's own convention, and the
+    module's SQL said `raw.<table>` to match."""
+    from qa_tools.common import supply_db
+
     conn = duckdb.connect(":memory:")
-    conn.execute("CREATE SCHEMA raw")
+    schema = supply_db.run_schema("cp_run_01")
+    conn.execute(f'CREATE SCHEMA "{schema}"')
+    conn.execute(f"SET search_path = '{schema}'")
     for table in cp_stats.TABLES:
         conn.execute(f"""
-            CREATE TABLE raw.{table} (
+            CREATE TABLE "{schema}".{table} (
                 postcode VARCHAR, date_of_birth DATE, concern_type VARCHAR, extract_timestamp TIMESTAMP
             )
         """)
-    conn.execute("""
-        INSERT INTO raw.cp_clients VALUES
+    conn.execute(f"""
+        INSERT INTO "{schema}".cp_clients VALUES
         ('6007', '2020-01-01', NULL, '2020-01-05 10:00:00'),
         ('9999', '2020-01-01', NULL, '2020-01-05 11:00:00')
     """)
-    conn.execute("""
-        INSERT INTO raw.cp_notifications VALUES
+    conn.execute(f"""
+        INSERT INTO "{schema}".cp_notifications VALUES
         (NULL, NULL, 'Neglect', '2020-01-05 09:00:00'),
         (NULL, NULL, 'Not a real category', '2020-01-05 09:30:00')
     """)

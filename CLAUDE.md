@@ -598,6 +598,14 @@ Rough layout:
   seconds to prove the masthead does NOT tick. JS suite 294 tests in
   ~19s.
 
+  -> **~171s/1438 tests (2026-09-25, REQ-PIPE-068)**. Flat against the
+  entry above on 31 more tests. Worth knowing for the next fresh
+  sandbox: the per-run DuckDB files under `data/duckdb_runs/` and
+  `data/cp_duckdb_runs/` are gone, replaced by one `data/supply.duckdb`
+  and one database per TEST WORKER - so a stale pair of those
+  directories in an old checkout is dead weight rather than state
+  anything reads.
+
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.
@@ -1118,15 +1126,16 @@ Rough layout:
   `<title>` rather than just the status code.
 
   **Still genuinely blocked** (re-confirmed 2026-09-19, all `403`):
-  - **`docs.getdbt.com`**, **`docs.soda.io`**, **`duckdb.org`** - the
-    three tools this pipeline actually runs on. Hit 2026-09-23 when
-    Keith asked for confirmation that dbt and Soda really cannot read
-    across schemas (they can - see below). All three a real `curl: (56)
-    CONNECT tunnel failed, response 403`. Worth allow-listing: these
-    are the primary documentation for the project's own core
-    dependencies, not background research, and this is the first time
-    a factual question about them could not be checked against their
-    own docs. Answered instead by REAL EXPERIMENT against the installed
+  - **`docs.getdbt.com`**, **`docs.soda.io`** - two of the three tools
+    this pipeline actually runs on. (`duckdb.org`, the third, was
+    allow-listed 2026-09-25 and has moved to the reachable list below.)
+    Hit 2026-09-23 when Keith asked for confirmation that dbt and Soda
+    really cannot read across schemas (they can - see below). Both a
+    real `curl: (56) CONNECT tunnel failed, response 403`. Worth
+    allow-listing: these are the primary documentation for the
+    project's own core dependencies, not background research, and this
+    is the first time a factual question about them could not be
+    checked against their own docs. Answered instead by REAL EXPERIMENT against the installed
     packages, which is a better primary source than documentation
     anyway and needed no network at all - a real `soda.scan.Scan` over
     a two-schema DuckDB, and a real `dbt run` whose compiled SQL joined
@@ -1160,6 +1169,19 @@ Rough layout:
   **Now reachable** (allow-listed by Keith; kept here rather than
   deleted so a future session reading an old `plans/*.md` reference to
   "the blocked X" can see it has since been resolved):
+  - **`duckdb.org`** - the warehouse this whole pipeline runs on.
+    Allow-listed by Keith 2026-09-25 and re-verified with a real `curl`
+    (200). It paid for itself the same hour: `REQ-PIPE-068`'s design
+    turns on DuckDB's cross-process locking, which had been established
+    here by real experiment, and the primary source now confirms it in
+    as many words - "Read-write mode: one process can both read and
+    write to the database. Read-only mode: multiple processes can read
+    from the database, but no processes can write." Note the URL shape:
+    `/docs/stable/...` 302s to `/docs/current/....html`, so a bare
+    fetch of the first returns a redirect stub rather than the page.
+    **`docs.duckdb.org` is NOT a host** - it has no DNS record at all,
+    so it was never blocked and there is nothing to allow-list;
+    DuckDB's documentation lives under `duckdb.org/docs/`.
   - **`docs.github.com`** - GitHub's own documentation. Blocked when
     hit 2026-09-22 fact-checking GitHub Actions concurrency/queueing
     semantics for the decision-log design (`plans/supply-model.md`

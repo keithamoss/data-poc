@@ -111,8 +111,9 @@ intro: >
 releases:
   - date: "2026-09-25"
     summary: >
-      Every date and time now reads the same way, on the asset's own
-      clock, and the overview stops counting quiet agencies as healthy.
+      Every date and time now reads the same way, supplies are kept in
+      one warehouse rather than thrown away, and the overview stops
+      counting quiet agencies as healthy.
     changes:
       - category: Fixed
         items:
@@ -341,6 +342,20 @@ releases:
               build yet.
       - category: Improved
         items:
+          - headline: One warehouse instead of hundreds
+            components: ["Pipeline & publishing"]
+            description: >
+              Every supply used to be loaded into its own database file,
+              thrown away once the checks had run. They now go into one
+              warehouse that keeps them, and each run records which
+              version of each table it read.
+          - headline: A tied count no longer shuffles
+            components: ["Dashboard UI"]
+            description: >
+              Where several values were invalid the same number of
+              times, the list could come back in a different order each
+              rebuild, and one could drop off the bottom. Now it is
+              always the same list.
           - headline: Dates read like dates
             components: ["Dashboard UI", "Testing & dev tooling"]
             description: >

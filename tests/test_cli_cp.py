@@ -14,12 +14,11 @@ from click.testing import CliRunner
 
 import cli.common as common
 import cli.cp as cp
+import qa_tools.common.supply_db as supply_db
 import qa_tools.cp.build_cp_warehouses as build_cp_warehouses
 import qa_tools.cp.orchestrate_cp as orchestrate_cp
 import qa_tools.cp.run_datacontract_cp as run_datacontract_cp
-import qa_tools.cp.run_dbt_cp as run_dbt_cp
 import qa_tools.cp.run_evidently_cp as run_evidently_cp
-import qa_tools.cp.run_soda_cp as run_soda_cp
 
 from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_RUN_ID
 
@@ -43,12 +42,11 @@ def _patch_cp_dirs(monkeypatch, raw_dir, duckdb_dir, delivery_dirs=None):
     if delivery_dirs is not None:
         _patch_delivery_dirs(monkeypatch, delivery_dirs)
     monkeypatch.setattr(build_cp_warehouses, "CP_RAW_DIR", raw_dir)
-    monkeypatch.setattr(build_cp_warehouses, "OUT_DIR", duckdb_dir)
     monkeypatch.setattr(run_datacontract_cp, "CP_RAW_DIR", raw_dir)
     monkeypatch.setattr(run_evidently_cp, "CP_RAW_DIR", raw_dir)
-    monkeypatch.setattr(run_dbt_cp, "CP_DUCKDB_RUNS_DIR", duckdb_dir)
-    monkeypatch.setattr(run_soda_cp, "CP_DUCKDB_RUNS_DIR", duckdb_dir)
-    monkeypatch.setattr(orchestrate_cp, "CP_DUCKDB_RUNS_DIR", duckdb_dir)
+    # One database, named by the environment - see the BDM
+    # counterpart's own comment (REQ-PIPE-068).
+    monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(duckdb_dir))
 
 
 def test_raw_dir_reads_build_cp_warehouses_live_not_a_frozen_import_time_copy(monkeypatch):
@@ -437,7 +435,7 @@ def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(
 
     add_table_calls = []
 
-    def _fake_add_table_to_run(run_id, table, csv_path, out_dir=None, raw_dir=None):
+    def _fake_add_table_to_run(run_id, table, csv_path, db_path=None, raw_dir=None):
         add_table_calls.append((run_id, table, csv_path))
 
     monkeypatch.setattr(build_cp_warehouses, "add_table_to_run", _fake_add_table_to_run)

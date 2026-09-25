@@ -203,7 +203,7 @@ pipeline/                    a real package (pipeline/__init__.py) - invoked via
                                run`/`mothman dashboard build-data` (`cli/`, never bare `python3 -m pipeline.<module>`)
   load.py                       loads every generated run into one combined DuckDB table (still needed -
                                build_dashboard_data.py's own direct queries, e.g. the sex value-count
-                               chart, run against it; qa_tools/ builds its own separate per-run warehouses)
+                               chart, run against it; qa_tools/ stages supplies into data/supply.duckdb)
   orchestrate.py                generate -> load the combined warehouse (qa_tools/bdm/orchestrate_bdm.py
                                is the next step, run separately - see `mothman pipeline run`)
   build_dashboard_data.py       reshapes results_bdm.json into the dashboard's data shape
@@ -216,8 +216,9 @@ dashboard/
                                collection wired to real data
   embed_dashboard_data.py       builds qa-reporting-dashboard.html from the template above, embedding
                                both real datasets (REAL_BIRTH_REG_DATA, REAL_CP_DATA)
-data/                          generated - raw run CSVs, manifest.json, warehouse.duckdb, duckdb_runs/,
-                               cp_raw/, cp_duckdb_runs/ (not checked in)
+data/                          generated - raw run CSVs, manifest.json, cp_raw/, and supply.duckdb:
+                               ONE database holding every staged supply, which each QA run reads
+                               through a schema of views of its own (REQ-PIPE-068). Not checked in.
 reports/                       generated - results_bdm.json, results_cp.json,
                                birth_registrations_dashboard.json, child_protection_dashboard.json
                                (not checked in)

@@ -67,8 +67,17 @@ def categorical_aggregate(conn: duckdb.DuckDBPyConnection, table: str, column: s
     values: list[dict] = []
     if not suppressed and total:
         rows = conn.execute(
+            # ORDER BY n DESC, v - the `, v` is the fix for a real bug
+            # (2026-09-25). Ordering by count alone left ties to
+            # whatever order the engine produced, so the same data
+            # stored differently aggregated differently. With a LIMIT
+            # under it that does not merely reorder the list, it decides
+            # which value a reader sees at all - and this repo is seeded
+            # so that regenerating and diffing is a real correctness
+            # check, which a query answering differently for the same
+            # data quietly takes away.
             f"SELECT CAST({column} AS VARCHAR) AS v, COUNT(*) AS n FROM {table} WHERE {invalid_condition} "
-            f"GROUP BY v ORDER BY n DESC LIMIT {AGGREGATE_VALUE_CAP}",
+            f"GROUP BY v ORDER BY n DESC, v LIMIT {AGGREGATE_VALUE_CAP}",
             params,
         ).fetchall()
         values = [{"value": v if v is not None else "(null)", "count": n} for v, n in rows]

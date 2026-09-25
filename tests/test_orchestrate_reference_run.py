@@ -37,6 +37,20 @@ import qa_tools.cp.orchestrate_cp as orchestrate_cp
 
 
 class _FakeConn:
+    """Enough of a connection for the orchestrators' dataset_stats step,
+    which is stubbed out in these tests - they are about which reference
+    run gets forwarded, not about anything the database says.
+
+    `execute` earns its place: since REQ-PIPE-068 the orchestrators set
+    the run's view schema on the connection before handing it over, so a
+    fake with only close() stopped being a connection."""
+
+    def execute(self, *args, **kwargs):
+        return self
+
+    def fetchall(self):
+        return []
+
     def close(self):
         pass
 
@@ -55,7 +69,10 @@ def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypat
     monkeypatch.setattr(orchestrate_bdm.run_evidently_bdm, "evaluate_evidently_bdm", fake_evaluate_evidently_bdm)
     monkeypatch.setattr(orchestrate_bdm.dataset_stats, "compute_dataset_stats", lambda *a, **k: {})
     monkeypatch.setattr(orchestrate_bdm, "write_qa_result", lambda *a, **k: tmp_path / "unused.json")
-    monkeypatch.setattr(orchestrate_bdm.duckdb, "connect", lambda *a, **k: _FakeConn())
+    # The orchestrators no longer import duckdb directly - they open
+    # the supply database through supply_db.connect() and set the
+    # run's view schema on it (REQ-PIPE-068).
+    monkeypatch.setattr(orchestrate_bdm.supply_db, "connect", lambda *a, **k: _FakeConn())
 
     # An arrival record's own shape (REQ-GEN-043) - `csv_path` is the
     # real file inside the delivery, not a name built from the run_id.
@@ -85,7 +102,10 @@ def test_cp_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatc
     monkeypatch.setattr(orchestrate_cp.run_evidently_cp, "evaluate_evidently_cp", fake_evaluate_evidently_cp)
     monkeypatch.setattr(orchestrate_cp.dataset_stats, "compute_dataset_stats", lambda *a, **k: {})
     monkeypatch.setattr(orchestrate_cp, "write_qa_result", lambda *a, **k: tmp_path / "unused.json")
-    monkeypatch.setattr(orchestrate_cp.duckdb, "connect", lambda *a, **k: _FakeConn())
+    # The orchestrators no longer import duckdb directly - they open
+    # the supply database through supply_db.connect() and set the
+    # run's view schema on it (REQ-PIPE-068).
+    monkeypatch.setattr(orchestrate_cp.supply_db, "connect", lambda *a, **k: _FakeConn())
 
     entry = {"run_id": "cp_run_05_2099-02-02"}
     orchestrate_cp._run_one(entry, "2099-02-02T00:00:00Z", "test@example.com", "cp_run_01_2099-01-01")

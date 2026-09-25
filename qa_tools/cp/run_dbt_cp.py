@@ -50,7 +50,6 @@ from __future__ import annotations
 import json
 import os
 
-import duckdb
 
 from qa_tools.common import supply_db
 from qa_tools.common import hierarchy
@@ -243,7 +242,9 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
     # the tool actually ran).
     nodes = test_nodes(manifest)
 
-    conn = duckdb.connect(db_path, read_only=True)
+    # The supply database comes along READ-ONLY, because dbt's
+    # staging models are views over it - see connect_dbt_scratch().
+    conn = supply_db.connect_dbt_scratch(run_id)
     n_total_by_table = {t: conn.execute(f"SELECT COUNT(*) FROM stg_{t}").fetchone()[0] for t in cp_common.TABLES}
 
     results = []

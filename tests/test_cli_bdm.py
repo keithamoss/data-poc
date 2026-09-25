@@ -13,11 +13,10 @@ from click.testing import CliRunner
 
 import cli.bdm as bdm
 import cli.common as common
+import qa_tools.common.supply_db as supply_db
 import qa_tools.bdm.build_per_run_warehouses as build_per_run_warehouses
 import qa_tools.bdm.run_datacontract_bdm as run_datacontract_bdm
-import qa_tools.bdm.run_dbt_bdm as run_dbt_bdm
 import qa_tools.bdm.run_evidently_bdm as run_evidently_bdm
-import qa_tools.bdm.run_soda_bdm as run_soda_bdm
 
 _REF_RUN_ID = "pytest_bdm_ref"
 _DIRTY_RUN_ID = "pytest_bdm_dirty"
@@ -43,14 +42,19 @@ def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
     from pathlib import Path
 
     from qa_tools.common import delivery
+    from qa_tools.common import supply_db
     monkeypatch.setattr(delivery, "DELIVERIES_DIR", Path(raw_dir) / "deliveries")
     monkeypatch.setattr(delivery, "RECEIPTS_DIR", Path(raw_dir) / "receipts")
     monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", raw_dir)
-    monkeypatch.setattr(build_per_run_warehouses, "OUT_DIR", duckdb_dir)
     monkeypatch.setattr(run_datacontract_bdm, "RAW_DIR", raw_dir)
     monkeypatch.setattr(run_evidently_bdm, "RAW_DIR", raw_dir)
-    monkeypatch.setattr(run_dbt_bdm, "DUCKDB_RUNS_DIR", duckdb_dir)
-    monkeypatch.setattr(run_soda_bdm, "DUCKDB_RUNS_DIR", duckdb_dir)
+    # The warehouse used to be three module attributes pointing at a
+    # directory of per-run DuckDB files. It is now one database, named
+    # by MOTHMAN_SUPPLY_DB, which the supply_db_path fixture sets for
+    # this worker - so `duckdb_dir` is that database's path and every
+    # module resolves it the same way the real pipeline does, through
+    # the environment (REQ-PIPE-068).
+    monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(duckdb_dir))
 
 
 def _patch_delivery_dirs(monkeypatch, root):
@@ -175,11 +179,12 @@ def test_run_check_leaves_the_arrival_record_on_disk_exactly_as_it_found_it(
     monkeypatch.setattr(delivery, "DELIVERIES_DIR", raw_copy / "deliveries")
     monkeypatch.setattr(delivery, "RECEIPTS_DIR", raw_copy / "receipts")
     monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(raw_copy))
-    monkeypatch.setattr(build_per_run_warehouses, "OUT_DIR", bdm_duckdb_dir)
     monkeypatch.setattr(run_datacontract_bdm, "RAW_DIR", str(raw_copy))
     monkeypatch.setattr(run_evidently_bdm, "RAW_DIR", str(raw_copy))
-    monkeypatch.setattr(run_dbt_bdm, "DUCKDB_RUNS_DIR", bdm_duckdb_dir)
-    monkeypatch.setattr(run_soda_bdm, "DUCKDB_RUNS_DIR", bdm_duckdb_dir)
+    # One supply database, named by the environment - the three
+    # module attributes this replaces pointed at a directory of
+    # per-run DuckDB files (REQ-PIPE-068).
+    monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(bdm_duckdb_dir))
 
     def _fingerprint() -> list[tuple[str, str]]:
         out = []

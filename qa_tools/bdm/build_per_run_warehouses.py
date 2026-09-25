@@ -87,8 +87,11 @@ def build_one(run_id: str, csv_path: str, run_date: str, db_path: str | None = N
         # overwrite this design forbids: the name carries the arrival,
         # so replacing it re-loads the same arrival rather than losing a
         # previous one. That is what makes a re-run idempotent.
-        supply_db.create_run_views(conn, run_id, supply_db.candidates_in(
-            conn, supply_db.STAGING_SCHEMA, [TABLE]))
+        res = supply_db.create_run_views(conn, run_id, supply_db.candidates_in(
+            conn, supply_db.STAGING_SCHEMA, [TABLE], run_id=run_id))
+        # Recorded at staging time, which is the only moment this is an
+        # observed fact rather than a re-derivation (criterion 5).
+        supply_db.record_resolution(conn, res)
     finally:
         conn.close()
 

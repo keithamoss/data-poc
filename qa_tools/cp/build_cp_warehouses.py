@@ -87,8 +87,11 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, db_path: str | None
                 [staging_csv, DUCKDB_NULLSTR])
         finally:
             os.remove(staging_csv)
-        supply_db.create_run_views(conn, run_id, supply_db.candidates_in(
-            conn, supply_db.STAGING_SCHEMA, TABLES))
+        res = supply_db.create_run_views(conn, run_id, supply_db.candidates_in(
+            conn, supply_db.STAGING_SCHEMA, TABLES, run_id=run_id))
+        # Recorded at staging time, which is the only moment this is an
+        # observed fact rather than a re-derivation (criterion 5).
+        supply_db.record_resolution(conn, res)
     finally:
         conn.close()
     print(f"{run_id}: {table} -> {supply_db.STAGING_SCHEMA}.{physical}")

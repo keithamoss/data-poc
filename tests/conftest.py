@@ -104,20 +104,54 @@ def bdm_delivery_dirs(bdm_raw_dir):
 
 
 @pytest.fixture(scope="session")
-def bdm_duckdb_dir(tmp_path_factory, bdm_raw_dir):
-    """Per-run DuckDB warehouses for bdm_raw_dir's same two runs, built
-    via the real qa_tools.bdm.build_per_run_warehouses.build_all() -
-    the exact loading code path the real pipeline uses, not a
-    hand-rolled copy of it."""
-    from qa_tools.bdm.build_per_run_warehouses import build_all
+def supply_db_path(tmp_path_factory):
+    """ONE SUPPLY DATABASE PER TEST WORKER, which is the isolation
+    REQ-PIPE-068's own NFR asks for in as many words.
 
+    Isolation used to fall out of a database per run; that requirement
+    removes the database per run, so something has to replace it
+    deliberately. Criterion 7 forbids one database per RUN and says
+    nothing about workers, and `tmp_path_factory` is already per-worker
+    under xdist - so this inherits the separation the retired
+    data/duckdb_runs/ layout used to give for free.
+
+    Set through the environment rather than by monkeypatching a module
+    attribute, because that is how the real thing is configured and
+    because a session-scoped fixture cannot use `monkeypatch` anyway.
+    """
+    import os
+
+    from qa_tools.common import supply_db
+
+    path = tmp_path_factory.mktemp("supply") / "supply.duckdb"
+    before = os.environ.get(supply_db.SUPPLY_DB_ENV)
+    os.environ[supply_db.SUPPLY_DB_ENV] = str(path)
+    yield str(path)
+    if before is None:
+        os.environ.pop(supply_db.SUPPLY_DB_ENV, None)
+    else:
+        os.environ[supply_db.SUPPLY_DB_ENV] = before
+
+
+@pytest.fixture(scope="session")
+def bdm_duckdb_dir(supply_db_path, bdm_raw_dir):
+    """bdm_raw_dir's same two runs, staged into this worker's supply
+    database via the real build_all() - the exact loading code path the
+    real pipeline uses, not a hand-rolled copy of it.
+
+    Named for the directory it used to return, and returning the
+    database path instead. The name is left alone on purpose: every
+    test that depends on it depends on the DATA being staged, not on
+    the path, and renaming it across a dozen files would be churn that
+    hid the one real change in the diff.
+    """
     from pathlib import Path
 
-    out_dir = tmp_path_factory.mktemp("bdm_duckdb_runs")
-    build_all(out_dir=str(out_dir),
-               deliveries_dir=Path(bdm_raw_dir) / "deliveries",
+    from qa_tools.bdm.build_per_run_warehouses import build_all
+
+    build_all(deliveries_dir=Path(bdm_raw_dir) / "deliveries",
                receipts_dir=Path(bdm_raw_dir) / "receipts")
-    return str(out_dir)
+    return supply_db_path
 
 
 # The run_ids recognition will assign these two deliveries - see
@@ -203,21 +237,25 @@ def cp_delivery_dirs(cp_raw_dir):
 
 
 @pytest.fixture(scope="session")
-def cp_duckdb_dir(tmp_path_factory, cp_raw_dir):
-    """Per-run DuckDB warehouses for cp_raw_dir's same two runs, built
-    via the real qa_tools.cp.build_cp_warehouses.build_all() - the
-    exact loading code path the real pipeline uses."""
-    from qa_tools.cp.build_cp_warehouses import build_all
+def cp_duckdb_dir(supply_db_path, cp_raw_dir):
+    """cp_raw_dir's same two runs, staged into this worker's supply
+    database via the real build_all(). Shares one database with the BDM
+    fixture above, which is the point rather than a compromise - the
+    whole asset has one, and the two collections' tables have always
+    been distinct.
 
+    See the BDM fixture for why the name still says `dir`.
+    """
     from pathlib import Path
 
-    out_dir = tmp_path_factory.mktemp("cp_duckdb_runs")
+    from qa_tools.cp.build_cp_warehouses import build_all
+
     # deliveries_dir/receipts_dir passed EXPLICITLY. Without them
     # build_all() recognises arrivals from the real data/deliveries/
     # tree (REQ-GEN-043) - a real leak this fixture hit for exactly one
     # run, building 18 real CP warehouses into a pytest tmp dir while
     # the fixture's own two sat unread.
-    build_all(raw_dir=cp_raw_dir, out_dir=str(out_dir),
+    build_all(raw_dir=cp_raw_dir,
                deliveries_dir=Path(cp_raw_dir) / "deliveries",
                receipts_dir=Path(cp_raw_dir) / "receipts")
-    return str(out_dir)
+    return supply_db_path

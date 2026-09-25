@@ -90,12 +90,21 @@ def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str
     conn = supply_db.connect(read_only=True)
     conn.execute(f"SET search_path = '{supply_db.run_schema(run_id)}'")
     stats = dataset_stats.compute_dataset_stats(conn, entry)
+    tables_read = supply_db.resolution_for(conn, run_id).as_record()
     conn.close()
     # run_by stamped only on this write - see orchestrate_bdm.py's
     # identical comment.
     write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, "dataset_stats", stats,
                      run_by=run_by)
 
+    # WHICH PHYSICAL TABLE THIS RUN READ (REQ-PIPE-068 criterion 5).
+    # The view schema is thrown away when the run ends, and the
+    # question is asked years later - of an audit, or of a check that
+    # started failing - so the answer goes into committed history
+    # beside the run's results rather than being reconstructed from a
+    # staging schema that has since moved on.
+    write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp,
+                     "tables_read", tables_read)
     return results
 
 
@@ -145,6 +154,22 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     run_by = get_run_by()
     all_results = parallel_orchestrate.run_manifest(
         manifest, _run_one, run_timestamp, run_by, reference_run_id, sequential=sequential)
+
+    # DISCARD THE RUN SCHEMAS (REQ-PIPE-068 criteria 1 and 6). Here, after
+    # the fan-out, rather than at the end of each run: dropping a schema
+    # is a WRITE, DuckDB gives a writer an exclusive lock over the whole
+    # database, and a worker that tidied up after itself would lock out
+    # every other worker still reading. Sweeping everything is also what
+    # clears a schema left behind by an interrupted run - it is
+    # identifiable on its own terms, from its name alone, which is the
+    # whole reason the name carries the run id.
+    conn = supply_db.connect()
+    try:
+        dropped = supply_db.drop_orphan_run_schemas(conn)
+    finally:
+        conn.close()
+    if dropped:
+        print(f"discarded {len(dropped)} per-run view schema(s)")
 
     # Same rationale as orchestrate_bdm.py's identical block.
     dataset_stats_by_run = {}

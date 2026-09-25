@@ -63,7 +63,6 @@ from __future__ import annotations
 import json
 import os
 
-import duckdb
 
 from . import bdm_common
 from qa_tools.common import supply_db
@@ -285,7 +284,9 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
         run_results = json.load(f)
 
     nodes = test_nodes(manifest)
-    conn = duckdb.connect(db_path, read_only=True)
+    # The supply database comes along READ-ONLY, because dbt's
+    # staging models are views over it - see connect_dbt_scratch().
+    conn = supply_db.connect_dbt_scratch(run_id)
     n_total = conn.execute("SELECT COUNT(*) FROM stg_birth_registrations").fetchone()[0]
 
     results = []

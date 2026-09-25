@@ -6,13 +6,14 @@ against the real contract/bdm-birth-registrations-soda-checks.yml and
 a small, real, session-scoped BDM fixture."""
 from __future__ import annotations
 
+import qa_tools.common.supply_db as supply_db
 import qa_tools.bdm.run_soda_bdm as run_soda_bdm
 
 from fixture_ids import BDM_DIRTY_RUN_ID as _DIRTY_RUN_ID, BDM_REF_RUN_ID as _REF_RUN_ID
 
 
 def _run(monkeypatch, bdm_duckdb_dir, run_id, run_timestamp):
-    monkeypatch.setattr(run_soda_bdm, "DUCKDB_RUNS_DIR", bdm_duckdb_dir)
+    monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(bdm_duckdb_dir))
     monkeypatch.setattr(run_soda_bdm, "write_qa_result", lambda *a, **k: None)
     return run_soda_bdm.evaluate_soda_bdm(run_id, run_timestamp)
 

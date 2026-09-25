@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import pytest
 
+import qa_tools.common.supply_db as supply_db
 import qa_tools.bdm.run_dbt_bdm as run_dbt_bdm
 
 # The run_ids bdm_duckdb_dir's fixture deliveries are RECOGNISED as, not
@@ -26,12 +27,13 @@ from fixture_ids import BDM_DIRTY_RUN_ID as _DIRTY_RUN_ID, BDM_REF_RUN_ID as _RE
 
 @pytest.fixture
 def _dbt_bdm(monkeypatch, bdm_duckdb_dir):
-    # dbt's own target_path now lives under DUCKDB_RUNS_DIR itself (see
-    # evaluate_dbt_bdm()'s own comment) - a per-worker pytest tmp dir, not
-    # a real repo-relative location, so no manual cleanup is needed here
-    # any more (pytest's own tmp dir retention handles it, same as every
-    # other tmp_path_factory-based fixture in this suite).
-    monkeypatch.setattr(run_dbt_bdm, "DUCKDB_RUNS_DIR", bdm_duckdb_dir)
+    # dbt's scratch database and its target_path both hang off the
+    # supply database's own directory (see evaluate_dbt_bdm() and
+    # supply_db.dbt_target_path()) - a per-worker pytest tmp dir, not a
+    # real repo-relative location, so no manual cleanup is needed here
+    # (pytest's own tmp dir retention handles it, same as every other
+    # tmp_path_factory-based fixture in this suite).
+    monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(bdm_duckdb_dir))
     captured = {}
     monkeypatch.setattr(run_dbt_bdm, "write_qa_result",
                          lambda *a, **k: captured.setdefault("write_qa_result_called", True))

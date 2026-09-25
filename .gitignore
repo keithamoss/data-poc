@@ -17,6 +17,11 @@ data/warehouse.duckdb
 data/warehouse.db
 data/duckdb_runs/
 data/cp_duckdb_runs/
+# REQ-PIPE-068 replaced the two directories above with one supply
+# database plus dbt's own per-run scratch. They are left listed so a
+# checkout that still has them stays clean.
+data/supply.duckdb
+data/dbt_scratch/
 reports/results_bdm.json
 reports/results_cp.json
 reports/birth_registrations_dashboard.json
