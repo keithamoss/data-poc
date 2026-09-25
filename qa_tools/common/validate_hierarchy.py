@@ -59,15 +59,39 @@ from qa_tools.common import hierarchy
 
 CONTRACT_DIR = Path(__file__).resolve().parent.parent.parent / "contract"
 
-# The dataset contracts, and what each one describes. A contract scoped
-# to a COLLECTION names that collection; one scoped to a DATASET names
-# that dataset. Listed rather than inferred from the filename, because
-# a filename is not a declaration and this gate exists precisely to
-# stop things being assumed.
-CONTRACTS: tuple[tuple[str, str], ...] = (
-    ("bdm-birth-registrations-contract.yaml", "birth-registrations"),
-    ("child-protection-contract.yaml", "child-protection"),
-)
+def contracts() -> tuple[tuple[str, str], ...]:
+    """(filename, what it describes) for every contract the hierarchy
+    names. A contract scoped to a COLLECTION describes that collection;
+    one scoped to a DATASET describes that dataset.
+
+    DERIVED, not maintained (post-build-review #36). This was a
+    hand-written tuple restating a relation the hierarchy already
+    holds - every dataset declares its own `contract:` - so a third
+    collection meant editing two places, and forgetting the second one
+    failed SILENTLY: the new contract simply never got checked, by the
+    gate whose whole job is noticing that a contract and the tree
+    disagree.
+
+    The comment this replaces said the list was written out rather than
+    "inferred from the filename, because a filename is not a
+    declaration". That reasoning holds and is not what changed: nothing
+    here reads a filename to decide anything. It reads the hierarchy's
+    own declarations, which is the opposite of assuming.
+
+    Which one a contract describes falls out of how many datasets name
+    it: shared by several means it describes what they have in common,
+    which is their collection; named by exactly one means it describes
+    that dataset.
+    """
+    by_file: dict[str, list] = {}
+    for entry in hierarchy.all_datasets():
+        by_file.setdefault(entry.contract, []).append(entry)
+    out = []
+    for filename, entries in sorted(by_file.items()):
+        describes = (entries[0].dataset_id if len(entries) == 1
+                     else entries[0].collection_id)
+        out.append((filename, describes))
+    return tuple(out)
 
 
 def _describes(name: str) -> tuple[str, str, str]:
@@ -109,7 +133,19 @@ def _arrival_pattern_errors(filename: str, doc: dict) -> list[str]:
 
 def validate() -> list[str]:
     errors: list[str] = []
-    for filename, describes in CONTRACTS:
+    named = contracts()
+    # A CONTRACT NOTHING NAMES is the one thing deriving the list could
+    # have lost - and it was never checked before either, because
+    # nobody had added it to the hand-written tuple. So this is
+    # coverage that list did not have (post-build-review #36).
+    if CONTRACT_DIR.exists():
+        known = {filename for filename, _ in named}
+        for path in sorted(CONTRACT_DIR.glob("*-contract.yaml")):
+            if path.name not in known:
+                errors.append(
+                    f"{path.name}: no dataset in contract/data-asset.yaml names this "
+                    f"contract, so nothing checks it. Point a dataset at it, or remove it.")
+    for filename, describes in named:
         path = CONTRACT_DIR / filename
         if not path.exists():
             errors.append(f"{filename}: no such contract")
@@ -151,7 +187,7 @@ def main() -> int:
     agencies = {d.agency_id for d in datasets}
     print(
         f"hierarchy validation OK - {len(agencies)} agenc(ies), {len(collections)} collection(s), "
-        f"{len(datasets)} dataset(s), {len(CONTRACTS)} contract(s) in agreement."
+        f"{len(datasets)} dataset(s), {len(contracts())} contract(s) in agreement."
     )
     return 0
 

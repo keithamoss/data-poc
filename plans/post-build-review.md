@@ -2235,7 +2235,7 @@ here as its own question, not acted on.
     zone name does not resolve. Still open, still mine, and still the
     smaller of the two.
 
-36. **[todo, 2026-09-24]** **[QA checks & contract, Pipeline & publishing]** **[A5] Hierarchy identifiers are still restated inline
+36. **[in-progress, 2026-09-25]** **[QA checks & contract, Pipeline & publishing]** **[A5] Hierarchy identifiers are still restated inline
     across many modules, and the requirement's own evidence says the
     count is zero.**
 
@@ -2268,6 +2268,38 @@ here as its own question, not acted on.
     whether the literals do - an overstated `evidence:` is the thing a
     future session trusts instead of re-checking, which is the same
     failure `CLAUDE.md` records about a fabricated test count.
+
+    **ONE OF THE TWO STRUCTURAL NEIGHBOURS IS DONE, 2026-09-25.**
+    `validate_hierarchy.py`'s hand-maintained `CONTRACTS` tuple is now a
+    derived `contracts()`: every dataset already declares its own
+    `contract:`, and which one a file describes falls out of how many
+    datasets name it - shared by several means their collection, named
+    by exactly one means that dataset.
+
+    **The failure mode it removes was silent**, which is what made it
+    worth doing rather than tidy: a third collection meant editing two
+    places, and forgetting the second one meant the new contract simply
+    never got checked - by the gate whose whole job is noticing that a
+    contract and the tree disagree.
+
+    **The comment it replaces is not overruled.** That said the list was
+    written out rather than "inferred from the filename, because a
+    filename is not a declaration". True, and unchanged: nothing reads a
+    filename to decide anything. It reads the hierarchy's own
+    declarations, which is the opposite of assuming.
+
+    **It also gained coverage the hand-written list never had**: a
+    contract file no dataset names is now reported. Deriving could have
+    lost that case - except it was never checked before either, because
+    nobody had added such a file to the tuple.
+
+    **STILL OPEN, and both for Keith:** the `evidence:` line itself,
+    which says the count is zero when the critic counted 17 inline
+    literals across 10 modules - that is a claim in `requirements.yaml`
+    and so his under the standing rule. And
+    `qa_tools/bdm/evidently_check_lifecycle.py`'s literal check_id
+    string, left alone because the 17 literals are the substance of the
+    criterion and moving one of them is not the fix.
 
 37. **[done, 2026-09-24]** **[Data generation]** **[A6/B3] Three
     `REQ-GEN-040` criteria describe capabilities no operator can reach.**

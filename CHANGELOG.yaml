@@ -133,6 +133,16 @@ releases:
               counted as healthy. Every figure is now counted in its own
               right, and the two quiet states appear in the key with
               their own totals whenever they are real.
+          - headline: Adding a collection no longer means remembering a second file
+            components: ["QA checks & contract"]
+            description: >
+              The check that keeps data contracts and the agency tree in
+              step worked from a hand-written list of contract files, so
+              adding a collection meant editing two places — and
+              forgetting the second one meant the new contract was never
+              checked at all, silently. The list is now worked out from
+              the tree itself, and a contract file nothing points at is
+              reported rather than ignored.
           - headline: A finished requirement can now admit what it did not finish
             components: ["Docs & process"]
             description: >

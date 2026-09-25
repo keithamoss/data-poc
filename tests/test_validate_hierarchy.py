@@ -22,9 +22,18 @@ def _clear_cache():
 
 
 def _contract(tmp_path, monkeypatch, filename, doc, describes):
+    """One contract, in a directory of its own, as the only thing the
+    gate looks at.
+
+    Patches `contracts()` rather than a `CONTRACTS` constant since
+    2026-09-25: the list is derived from the hierarchy now rather than
+    hand-maintained (post-build-review #36). Pinning it here is still
+    right - these tests are about what the gate REJECTS in a contract
+    file, not about which files it finds."""
     (tmp_path / filename).write_text(yaml.safe_dump(doc))
     monkeypatch.setattr(validate_hierarchy, "CONTRACT_DIR", tmp_path)
-    monkeypatch.setattr(validate_hierarchy, "CONTRACTS", ((filename, describes),))
+    monkeypatch.setattr(validate_hierarchy, "contracts",
+                         lambda: ((filename, describes),))
 
 
 class TestTheRealRepo:
@@ -92,7 +101,8 @@ class TestItFailsUsefully:
 
     def test_a_missing_contract_file_is_an_error_not_a_skip(self, tmp_path, monkeypatch):
         monkeypatch.setattr(validate_hierarchy, "CONTRACT_DIR", tmp_path)
-        monkeypatch.setattr(validate_hierarchy, "CONTRACTS", (("gone.yaml", "birth-registrations"),))
+        monkeypatch.setattr(validate_hierarchy, "contracts",
+                             lambda: (("gone.yaml", "birth-registrations"),))
         assert validate_hierarchy.validate() == ["gone.yaml: no such contract"]
 
     def test_a_contract_describing_something_the_hierarchy_lacks_is_named(self, tmp_path, monkeypatch):
@@ -165,4 +175,47 @@ class TestArrivalPatternsNameRealDatasets:
         _contract(tmp_path, monkeypatch, "c.yaml",
                    {"id": "birth-registrations", "name": "Birth Registrations",
                     "domain": "registry-services"}, "birth-registrations")
+        assert validate_hierarchy.validate() == []
+
+
+class TestTheContractListIsDerivedNotMaintained:
+    """post-build-review #36's structural half.
+
+    `CONTRACTS` was a hand-maintained tuple of (filename, what it
+    describes) - restating a relation the hierarchy already holds, since
+    every dataset declares its own `contract:`. Two places to edit when
+    a third collection arrives, and the failure mode of forgetting one
+    is SILENT: the new contract simply never gets checked, by the gate
+    whose whole job is noticing that a contract and the tree disagree.
+    """
+
+    def test_it_covers_every_contract_the_hierarchy_names(self):
+        named = {d.contract for d in hierarchy.all_datasets()}
+        covered = {filename for filename, _ in validate_hierarchy.contracts()}
+        assert named == covered, (
+            f"the gate checks {covered} but the hierarchy names {named}")
+
+    def test_a_collection_scoped_contract_resolves_to_its_collection(self):
+        """Shared by several datasets, so it describes what they have in
+        common - which is the collection, not any one of them."""
+        by_file = dict(validate_hierarchy.contracts())
+        assert by_file["child-protection-contract.yaml"] == "child-protection"
+
+    def test_a_dataset_scoped_contract_resolves_to_that_dataset(self):
+        by_file = dict(validate_hierarchy.contracts())
+        assert by_file["bdm-birth-registrations-contract.yaml"] == "birth-registrations"
+
+    def test_a_contract_file_nothing_names_is_reported(self, tmp_path, monkeypatch):
+        """The one thing deriving could have LOST. An orphan contract was
+        never checked before either - nobody had added it to the tuple -
+        so this is coverage the hand-maintained list did not have."""
+        (tmp_path / "orphan-contract.yaml").write_text("id: nobody\n")
+        for name in {d.contract for d in hierarchy.all_datasets()}:
+            (tmp_path / name).write_text(
+                (validate_hierarchy.CONTRACT_DIR / name).read_text())
+        monkeypatch.setattr(validate_hierarchy, "CONTRACT_DIR", tmp_path)
+        errors = validate_hierarchy.validate()
+        assert any("orphan-contract.yaml" in e for e in errors), errors
+
+    def test_the_real_repo_still_passes(self):
         assert validate_hierarchy.validate() == []
