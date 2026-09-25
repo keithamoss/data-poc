@@ -37,7 +37,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from qa_tools.common import asset_time
+from qa_tools.common import arrival_patterns, asset_time
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 DELIVERIES_DIR = ROOT / "data" / "deliveries"
@@ -292,52 +292,65 @@ def list_deliveries(deliveries_dir: Path | None = None,
 
 # ---- Which dataset does a file belong to? (criterion 3) --------------
 
-def _filename_pattern_to_regex(key_pattern: str) -> re.Pattern:
-    """One arrivalPattern keyPattern as a FILENAME matcher.
-
-    The configured patterns are S3-key shaped (`bdm/birth_registrations_
-    {date}.csv`), because that is the transport they were written for.
-    Criterion 3 asks for the dataset to be derivable from the FILENAME
-    alone, so only the last segment is used - a delivery's own directory
-    name is arbitrary and carries no meaning, which means it cannot be
-    part of a match.
-
-    `{placeholder}` matches any run of characters that is not a path
-    separator or a dot, the same shape file_arrival.py already uses.
-    """
-    basename = key_pattern.rsplit("/", 1)[-1]
-    out, last = [], 0
-    for m in re.finditer(r"\{(\w+)\}", basename):
-        out.append(re.escape(basename[last:m.start()]))
-        out.append(r"[^/.]+")
-        last = m.end()
-    out.append(re.escape(basename[last:]))
-    return re.compile("^" + "".join(out) + "$")
-
-
-def dataset_for_filename(filename: str, patterns: list[dict]) -> str | None:
-    """The dataset a file belongs to, or None if no pattern matches.
+def dataset_for_filename(filename: str) -> str | None:
+    """The dataset a file belongs to, or None.
 
     None is a REAL ANSWER, not a failure: a covering note, a
-    spreadsheet of notes or a PDF is something suppliers genuinely
-    send, and the pipeline has to have somewhere to put it. It is
-    reported, never swallowed (criterion 9).
+    spreadsheet or a PDF is something suppliers genuinely send, and the
+    pipeline has to have somewhere to put it. It is reported, never
+    swallowed (criterion 10).
+
+    WHAT WAS RETIRED HERE, 2026-09-25: this used to take the ODCS
+    contract's arrivalPattern keyPatterns and match a file against each
+    one's LAST SEGMENT, with `{placeholder}` expanded to a
+    non-separator run. That made one configured value mean two
+    different things to two consumers - whole S3 keys to
+    file_arrival.py, bare filenames here - which is exactly the split
+    REQ-PIPE-058 criterion 4 exists to end. The pattern now lives in
+    the dataset's own configuration as a regular expression, and
+    qa_tools/common/arrival_patterns.py owns the matching.
+    file_arrival.py's own matcher legitimately survives: it matches
+    whole S3 keys, which is the transport concern aws/'s handlers use.
     """
-    for pattern in patterns or []:
-        if _filename_pattern_to_regex(pattern.get("keyPattern", "")).match(filename):
-            return pattern.get("dataset_id")
-    return None
+    return arrival_patterns.dataset_for_filename(filename)
 
 
-def files_by_dataset(delivery: "Delivery", patterns: list[dict]) -> dict[str, list[str]]:
-    """{dataset_id: [filename, ...]} for one delivery, plus the
-    unmatched files under the key None.
+@dataclass(frozen=True)
+class Attribution:
+    """Every file in one delivery, sorted into what can be done with it.
+
+    THREE BUCKETS, not two, and `contested` is the one worth
+    explaining. A file matching SEVERAL datasets' patterns is always a
+    configuration error - never a supplier's doing - so it is
+    attributed to nobody and held for a person (criterion 9). It is
+    deliberately NOT the same thing as one dataset's pattern matching
+    several files, which is the legitimate split-extract shape and
+    lives in `by_dataset` as a list. The two are adjacent in this code
+    and have opposite correct behaviour.
+    """
+
+    by_dataset: dict[str, list[str]]
+    unmatched: list[str]
+    contested: dict[str, list[str]]
+
+
+def files_by_dataset(delivery: "Delivery") -> Attribution:
+    """Sort one delivery's files by the dataset whose pattern claims
+    each of them.
 
     A LIST per dataset, not one filename, because a supplier splitting
-    a large extract across two files is ordinary (criterion 8) and a
+    a large extract across two files is ordinary (criterion 11) and a
     shape that could only hold one would lose the second silently.
     """
-    out: dict[str, list[str]] = {}
+    by_dataset: dict[str, list[str]] = {}
+    unmatched: list[str] = []
+    contested: dict[str, list[str]] = {}
     for name in delivery.files:
-        out.setdefault(dataset_for_filename(name, patterns), []).append(name)
-    return out
+        found = arrival_patterns.attribute(name)
+        if found.is_attributed:
+            by_dataset.setdefault(found.dataset_id, []).append(name)
+        elif found.is_contested:
+            contested[name] = list(found.dataset_ids)
+        else:
+            unmatched.append(name)
+    return Attribution(by_dataset=by_dataset, unmatched=unmatched, contested=contested)

@@ -79,6 +79,12 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
     # runway, which must be visible without failing the build.
     ("schedule", ["uv", "run", "mothman", "schedule", "validate"],
      "a config typo can never leave a dataset expecting nothing", True),
+    # REQ-PIPE-058 criterion 13. Half of a PAIR: this catches a careless
+    # pattern edit at the moment it is cheapest to fix, and the runtime
+    # hold in qa_tools/common/arrivals.py catches every collision that
+    # actually occurs. Neither alone is enough at thirty datasets.
+    ("patterns", ["uv", "run", "python3", "-m", "qa_tools.common.validate_arrival_patterns"],
+     "one filename can only ever belong to one dataset", False),
     ("requirements", ["uv", "run", "mothman", "dashboard", "validate-requirements"],
      "every linked test and implemented_by symbol still exists", False),
     ("changelog", ["uv", "run", "mothman", "dashboard", "validate-changelog"],

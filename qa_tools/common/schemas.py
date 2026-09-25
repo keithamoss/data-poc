@@ -374,6 +374,12 @@ class DatasetConfig(_Strict):
     name: NonEmptyStr
     table: NonEmptyStr
     calendar: NonEmptyStr
+    #: How this dataset's files are named, as a regular expression
+    #: (REQ-PIPE-058). Optional HERE because a dataset can coherently
+    #: exist while its pattern is being added; whether a dataset that is
+    #: owed supplies may go without one is the arrival-pattern gate's
+    #: question, and it fails on exactly that.
+    arrival_pattern: NonEmptyStr | None = None
     delivery_months: list[NonEmptyStr] | None = None
     dates: list[CalendarDate] | None = None
     not_expected: list[NotExpectedPeriod] | None = None

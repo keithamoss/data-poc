@@ -29,12 +29,11 @@ deriving them from arrival rather than from anything a supplier said.
 """
 from __future__ import annotations
 
-import functools
+import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-import yaml
 
 from qa_tools.common import delivery, hierarchy
 
@@ -92,21 +91,6 @@ class Arrival:
         return self.path / names[0]
 
 
-@functools.lru_cache(maxsize=8)
-def _patterns_for(collection_id: str) -> tuple[dict, ...]:
-    """One collection's arrivalPattern, from its own contract."""
-    with open(hierarchy.contract_path(collection_id)) as f:
-        doc = yaml.safe_load(f) or {}
-    entry = next((p for p in (doc.get("customProperties") or [])
-                  if p.get("property") == "arrivalPattern"), None)
-    return tuple(entry.get("value") or []) if entry else ()
-
-
-def _all_patterns() -> list[dict]:
-    seen = {d.collection_id for d in hierarchy.all_datasets()}
-    return [p for c in sorted(seen) for p in _patterns_for(c)]
-
-
 def recognise(d: delivery.Delivery) -> tuple[str | None, dict[str, tuple[str, ...]], tuple[str, ...]]:
     """(collection_id, {dataset: files}, unmatched) for one delivery.
 
@@ -114,9 +98,28 @@ def recognise(d: delivery.Delivery) -> tuple[str | None, dict[str, tuple[str, ..
     dataset's pattern - a drop we cannot place. Reported by the caller
     rather than raised here, because an unplaceable delivery is a real
     operational event, not a programming error.
+
+    THE PATTERNS NO LONGER COME FROM THE CONTRACT (REQ-PIPE-058). This
+    used to read each collection's ODCS `arrivalPattern` block and reuse
+    the S3 keyPattern's last segment as a filename matcher; each dataset
+    now declares its own regular expression in contract/data-asset.yaml
+    and qa_tools/common/arrival_patterns.py owns the match.
     """
-    grouped = delivery.files_by_dataset(d, _all_patterns())
-    unmatched = tuple(grouped.pop(None, ()))
+    found = delivery.files_by_dataset(d)
+    grouped = found.by_dataset
+    unmatched = tuple(found.unmatched)
+    # A FILE TWO DATASETS BOTH CLAIM is a configuration error, and it is
+    # reported at warning level and attributed to nobody rather than
+    # failing the delivery (criterion 9). Failing would mean one bad
+    # pattern stopping every other supply in the same drop, which is a
+    # worse outcome than a held file somebody has to look at.
+    for name, claimants in sorted(found.contested.items()):
+        warnings.warn(
+            f"delivery {d.name!r}: {name!r} matches the arrival pattern of more than "
+            f"one dataset ({', '.join(claimants)}), so it has been attributed to none "
+            f"of them and is held for a human. Two datasets claiming one filename is a "
+            f"configuration error - see contract/data-asset.yaml.",
+            stacklevel=2)
     collections = {hierarchy.dataset(ds).collection_id for ds in grouped}
     if len(collections) > 1:
         raise delivery.DeliveryFormatError(

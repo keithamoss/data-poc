@@ -342,6 +342,13 @@ releases:
               build yet.
       - category: Improved
         items:
+          - headline: Adding a dataset stops being a code change
+            components: ["Pipeline & publishing"]
+            description: >
+              Each dataset now says for itself how its files are named,
+              in one line of configuration. If two datasets ever claim
+              the same file, it is held for you rather than filed
+              against a guess.
           - headline: One warehouse instead of hundreds
             components: ["Pipeline & publishing"]
             description: >

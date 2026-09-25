@@ -78,6 +78,13 @@ class Dataset:
     dataset_name: str
     table: str
     contract: str          # the ODCS contract file covering this collection
+    #: How this dataset's files are named, as a regular expression
+    #: matched against a delivered file's own name and nothing else
+    #: (REQ-PIPE-058). Empty where a dataset declares none, which the
+    #: configuration gate decides about rather than this module - a
+    #: dataset attributing nothing is a coherent state to be in while
+    #: its pattern is being added.
+    arrival_pattern: str = ""
 
     @property
     def qa_results_scope(self) -> tuple[str, str]:
@@ -134,6 +141,7 @@ def _load() -> tuple[str, dict[str, Dataset]]:
                     table=dataset["table"],
                     contract=_require(collection, "contract",
                                        f"collection {collection.get('id')!r}"),
+                    arrival_pattern=(dataset.get("arrival_pattern") or "").strip(),
                 )
                 # A duplicate id would make every lookup for it
                 # ambiguous and silently resolve to whichever came

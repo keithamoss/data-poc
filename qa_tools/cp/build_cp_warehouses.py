@@ -109,12 +109,23 @@ def build_all(raw_dir: str = CP_RAW_DIR, db_path: str | None = None,
     for arrival in arrivals.arrivals_for("child-protection", "cp_run_",
                                           deliveries_dir, receipts_dir):
         run_id = arrival.run_id
-        run_dir = str(arrival.path)
-        for table in TABLES:
-            add_table_to_run(run_id, table, os.path.join(run_dir, f"{table}.csv"),
-                              db_path=db_path, raw_dir=raw_dir)
+        # WHAT IS IN THIS DELIVERY, not what we assumed would be
+        # (REQ-PIPE-058). This used to loop over the six table names and
+        # build `<table>.csv` for each, so Child Protection did not use
+        # pattern attribution at all - a supplier renaming an extract
+        # was a CODE change here while being a configuration change for
+        # Birth Registrations. It also meant a delivery missing a file
+        # failed on a path that did not exist rather than simply not
+        # staging that dataset.
+        staged = 0
+        for dataset_id, filenames in sorted(arrival.files_by_dataset.items()):
+            table = hierarchy.dataset(dataset_id).table
+            for filename in filenames:
+                add_table_to_run(run_id, table, os.path.join(str(arrival.path), filename),
+                                  db_path=db_path, raw_dir=raw_dir)
+                staged += 1
         run_ids.append(run_id)
-        print(f"{run_id}: staged {len(TABLES)} table(s)")
+        print(f"{run_id}: staged {staged} table(s)")
 
     return run_ids
 

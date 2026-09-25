@@ -238,6 +238,23 @@ hierarchy:
               # silently is how a dataset ends up expecting something
               # other than what its author wrote.
               calendar: daily
+              # REQ-PIPE-058. How this dataset's files are named, as a
+              # regular expression matched with re.fullmatch against a
+              # delivered file's own name - never the delivery's name,
+              # its path, or the file's position in it. Deliberately NOT
+              # the ODCS contract's arrivalPattern keyPattern, which is
+              # an S3 key and a transport concern, and stays there.
+              #
+              # SINGLE-QUOTED, because YAML reads `\.` in a
+              # double-quoted scalar as an unknown escape and refuses
+              # the file. Found the hard way while writing this.
+              #
+              # These were written to match exactly what the retired
+              # matcher matched, so this requirement moved WHERE the
+              # pattern lives without changing WHAT it claims. Narrowing
+              # one is the dangerous direction and nothing at config
+              # time catches it, so narrow deliberately, not in passing.
+              arrival_pattern: 'birth_registrations_[^/]+\.csv'
 
     - id: child-protection-family-support
       name: Department for Child Protection and Family Support
@@ -250,22 +267,32 @@ hierarchy:
               name: Client Register
               table: cp_clients
               calendar: quarterly
+              # REQ-PIPE-058 - see birth-registrations above.
+              arrival_pattern: 'cp_clients\.csv'
             - id: cp-notifications
               name: Notifications
               table: cp_notifications
               calendar: quarterly
+              # REQ-PIPE-058 - see birth-registrations above.
+              arrival_pattern: 'cp_notifications\.csv'
             - id: cp-investigations
               name: Investigations
               table: cp_investigations
               calendar: quarterly
+              # REQ-PIPE-058 - see birth-registrations above.
+              arrival_pattern: 'cp_investigations\.csv'
             - id: cp-placements
               name: Placements
               table: cp_placements
               calendar: quarterly
+              # REQ-PIPE-058 - see birth-registrations above.
+              arrival_pattern: 'cp_placements\.csv'
             - id: cp-carers
               name: Carer Register
               table: cp_carers
               calendar: quarterly
+              # REQ-PIPE-058 - see birth-registrations above.
+              arrival_pattern: 'cp_carers\.csv'
             - id: cp-case-workers
               name: Case Workers
               table: cp_case_workers
@@ -284,3 +311,5 @@ hierarchy:
               # window, so the short form invites exactly the wrong
               # reading.
               delivery_months: [February, August]
+              # REQ-PIPE-058 - see birth-registrations above.
+              arrival_pattern: 'cp_case_workers\.csv'

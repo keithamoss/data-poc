@@ -8126,7 +8126,7 @@ requirements:
       date: "2026-09-24"
     story: "As whoever plumbs in a new dataset, I want to declare how that dataset's files are named and have the pipeline attribute them on that alone, so that adding a dataset is a configuration change rather than a code change, and so that two datasets can never quietly claim the same file."
     moscow: must
-    status: not_started
+    status: built
     source: "Keith, delivery sprint 7 - the per-dataset filename pattern that maps a file to a table - plus Thread H second chaos pass #3, where his own instinct was a regular expression per dataset. docs/delivery-format.md is normative on the consuming side. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
       - "THE SYSTEM SHALL attribute each file in a delivery to at most one dataset, using that dataset's own declared arrival pattern."
@@ -8342,6 +8342,90 @@ requirements:
         split-extract shape. This is TWO datasets matching ONE file,
         which is always a configuration error. They are adjacent in the
         same code path and produce opposite correct behaviour.
+      - >
+        Decided the seven shipped patterns are BEHAVIOUR-EQUIVALENT to
+        what the retired matcher matched, so this requirement moved
+        WHERE a pattern lives without changing WHAT it claims. Narrowing
+        one - `birth_registrations_\\d{4}-\\d{2}-\\d{2}\\.csv` rather
+        than the equivalent `birth_registrations_[^/]+\\.csv` - reads
+        like an improvement and is the dangerous direction: nothing at
+        config time catches a pattern that is too narrow, and the
+        consequence is a real supply silently unrecognised. Narrow
+        deliberately, in its own change, not while moving house.
+      - >
+        Decided against widening Child Protection's patterns to accept
+        the split-extract shape - `cp_clients_part2.csv` matches nothing
+        today and stays that way. It would be a one-character change and
+        it is a product decision, not a refactor: a file that is
+        currently reported as unrecognised would start being filed as a
+        supply.
+      - >
+        YAML TRAP, recorded because it cost real time and will recur:
+        the patterns are SINGLE-quoted in contract/data-asset.yaml,
+        because YAML reads `\\.` inside a DOUBLE-quoted scalar as an
+        unknown escape and refuses to parse the file at all. The same
+        family as the check-yaml hook's own founding incident.
+      - >
+        The schedule gate caught the new key before any test did, and
+        that is the strict-allowlist design working exactly as written -
+        "an unknown key is accepted nowhere here precisely because a
+        dropped one is invisible". Adding `arrival_pattern` to
+        DatasetConfig is what makes it configuration rather than a typo;
+        it is optional THERE because a dataset can coherently exist
+        while its pattern is being added, and whether one that is owed
+        supplies may go without is this requirement's own gate.
+    linked_tests:
+      - tests/test_arrival_patterns.py
+      - tests/test_arrivals.py
+      - tests/test_delivery.py
+    implemented_by:
+      - qa_tools/common/arrival_patterns.py::attribute
+      - qa_tools/common/arrival_patterns.py::compiled_patterns
+      - qa_tools/common/validate_arrival_patterns.py::validate
+      - qa_tools/common/delivery.py::files_by_dataset
+      - qa_tools/common/arrivals.py::recognise
+    evidence:
+      - >-
+        2026-09-25: Child Protection moved OFF a hardcoded filename loop
+        and onto pattern attribution, which is what makes this
+        requirement's own non-functional claim - changing a pattern is a
+        configuration edit, not a code change - true for both datasets
+        rather than one. Verified against real data: a full CP pipeline
+        run staged all six tables for all 18 runs by attribution, and
+        3204 recorded check verdicts came back identical to the
+        committed history the loop produced.
+      - >-
+        2026-09-25: criterion 8's GATE EXISTS AND HAS NO CORPUS YET, and
+        it says so in its own output rather than reporting a clean pass
+        - "no committed delivery log yet (REQ-PIPE-069), so nothing to
+        check for duplicate attribution". The corpus is the delivery
+        log, which is three requirements away in the build order, so
+        today the configuration half catches a pattern that will not
+        compile and a dataset owed supplies with none. The half with
+        teeth today is the RUNTIME HOLD, which is the half that cannot
+        be wrong: it does not care whether the gate has a corpus, or
+        whether anyone remembered to run it.
+      - >-
+        2026-09-25: the runtime hold is asserted end to end - two
+        datasets configured to claim one filename produce a warning
+        naming the file, attribute it to neither, and do NOT fail the
+        delivery. Failing would mean one bad pattern stopping every
+        other supply in the same drop, which is worse than a held file
+        somebody has to look at.
+      - >-
+        2026-09-25: criterion 6 is tested by REVERSING the declaration
+        order and asserting the same answer, and criterion 5 by feeding
+        a pattern an unanchored author would have written - `re.fullmatch`
+        makes the anchoring structural rather than a review item.
+      - >-
+        2026-09-25: criterion 4's retirement is a real check rather than
+        a note - a test asserts the keyPattern-as-filename matcher is
+        gone from delivery.py AND that file_arrival.py's S3 key matcher
+        survives. Saying which one goes is what stops somebody deleting
+        the wrong one.
+      - >-
+        2026-09-25: all ten mothman gates green - the new `patterns`
+        gate among them - with 1465 Python tests and 294 JS tests.
   - id: REQ-PIPE-059
     title: Two files for one dataset in one delivery are held, never chosen between
     date_written: "2026-09-23"

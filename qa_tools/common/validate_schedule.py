@@ -189,6 +189,9 @@ _SHAPES: dict[str, str] = {
     "delivery_months": "a list of full month names, like [February, August]",
     "versions": "a list of versions, each with its own effective_from and changelog",
     "calendar": "the name of a calendar defined in this file",
+    "arrival_pattern": ("a regular expression matching this dataset's own "
+                         "delivered filenames, like 'cp_clients\\.csv' - single-quoted, "
+                         "because YAML rejects a backslash escape in double quotes"),
     "table": "the physical table this dataset lands in",
     "contract": "the ODCS contract file covering this collection",
     "id": "a stable identifier, lowercase with hyphens",

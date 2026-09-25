@@ -72,22 +72,47 @@ ordering from a delivery's name.
 ## Files are named so their dataset is derivable
 
 A file's name is the one thing inside a delivery that carries meaning,
-and only through each dataset's **own configured pattern** — the
-`arrivalPattern` block in that dataset's ODCS contract, matched by
-`qa_tools/common/delivery.py`'s `dataset_for_filename()`.
+and only through each dataset's **own configured pattern** — an
+`arrival_pattern:` on that dataset in `contract/data-asset.yaml`, as a
+**regular expression**, matched by
+`qa_tools/common/arrival_patterns.py`'s `attribute()`.
+
+It is matched with `re.fullmatch` against the file's **bare name**:
+never the delivery's name, never its path, never the file's position in
+it. Anchoring is therefore structural rather than something an author
+has to remember, and a name longer than 255 characters is refused
+before it is matched at all.
 
 **Two matchers exist and they are not interchangeable**, which this
-paragraph got wrong until 2026-09-24. `delivery.py` matches a bare
-FILENAME inside a delivery, taking only a `keyPattern`'s last segment.
-`qa_tools/common/file_arrival.py` matches a whole S3 KEY with named
-groups, and is the real transport concern the `aws/` handlers use.
-Pointing this section at the S3 matcher named the wrong half of the
-split that `REQ-PIPE-058` exists to make explicit.
+section got wrong twice. Until 2026-09-24 it named the S3 matcher, which
+was simply the wrong half. Until `REQ-PIPE-058` landed on 2026-09-25 it
+named a real matcher that reused the ODCS contract's `arrivalPattern`
+keyPattern — the same configured value read with two different meanings
+by two consumers, which is the split criterion 4 exists to end. That one
+is retired. `qa_tools/common/file_arrival.py` survives and matches a
+whole S3 KEY with named groups: the transport concern the `aws/`
+handlers use, and a different question from "which dataset is this
+file".
 
-A file matching no pattern is not an error in the format. It is a real
-thing suppliers do (a `readme.txt`, a spreadsheet of notes, a PDF), and
-the pipeline has to have somewhere to put it. It is reported, not
-swallowed.
+Three outcomes, and they are kept apart because they need different
+things done about them.
+
+**One dataset claims it** — it is that dataset's file, and the grouping
+itself is the record of which pattern claimed it.
+
+**Nobody claims it.** Not an error in the format: a `readme.txt`, a
+spreadsheet of notes or a PDF is a real thing suppliers send, and the
+pipeline has to have somewhere to put it. It is reported, never
+swallowed, and never attributed by elimination — "the only other file
+in a Birth Registrations delivery must be Birth Registrations" reads
+perfectly reasonable and is how a garbage file quietly becomes a supply.
+
+**Several datasets claim it.** Always a configuration error, never a
+supplier's doing. The file is attributed to none of them and held for a
+person, reported at warning level, and it does **not** fail the
+delivery — one bad pattern must not stop every other supply in the same
+drop. Note this is the opposite case to one dataset's pattern matching
+several files, which is the legitimate split-extract shape below.
 
 Three shapes a delivery may legitimately contain, all of which the
 generator can emit on purpose so recognition is tested against them:
