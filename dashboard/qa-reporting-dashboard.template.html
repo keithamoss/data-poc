@@ -140,6 +140,9 @@ button{font:inherit; color:inherit;}
   background:none; cursor:pointer; color:var(--ink-muted); font-weight:600;
 }
 .crumb:hover{background:var(--surface-alt);}
+/* "TIER 2" wrapped to "TIER" / "2" on every mobile view
+   (post-build-review #57). */
+.crumb .tier{white-space:nowrap;}
 /* The crumbs and cards are real <a>s now (post-build-review #10), so
    they need what a <button> gave them for free: no underline, the
    page's own ink rather than the UA link colour, and - for the card -
@@ -184,7 +187,12 @@ button{font:inherit; color:inherit;}
    a square marker, because this is the one state that is OUR task
    undone rather than a verdict on anybody's data. Never distinguished
    by colour alone - the label says "Schedule ended" in words. */
-.pill.exhausted{background:var(--surface-alt); color:var(--ink); border:1.5px solid var(--ink-muted);}
+/* 2px, NOT 1.5px: Chrome floors 1.5 device-independent px to 1 device px
+   at DPR 1, which is most government desktops - so the 'deliberately
+   unlike the other four' heavier border was the same weight as the quiet
+   pill's, and rendered differently between machines
+   (post-build-review #50). */
+.pill.exhausted{background:var(--surface-alt); color:var(--ink); border:2px solid var(--ink-muted);}
 .pill.exhausted .ico{background:var(--ink-muted); border-radius:1px;}
 /* NO RULE DEFINED - post-build-review #4, Keith's own direction: "a
    grey, as in a disabled kind of grey colour - kind of speaks to it's
@@ -205,10 +213,29 @@ button{font:inherit; color:inherit;}
    nothing is unprocessable yet (post-build-review #2). */
 .notice-runway{border:1px dashed var(--ink-faint); background:var(--surface-alt);
   border-radius:10px; padding:12px 14px; margin-bottom:16px; max-width:80ch;}
-.notice-exhausted{border:1.5px solid var(--ink-muted); background:var(--surface-alt);
+/* max-width for the same reason as the footer: this measured 146
+   characters per line at 1180px wide, over 583px of cards
+   (post-build-review #54). */
+.notice-exhausted{max-width:80ch; border:2px solid var(--ink-muted); background:var(--surface-alt);
   border-radius:10px; padding:12px 14px; margin-bottom:14px;}
 .notice-exhausted b{display:block; margin-bottom:4px;}
-.notice-exhausted code{background:var(--surface); padding:1px 5px; border-radius:4px;}
+/* CODE CHIPS ARE NOT SCOPED TO ONE NOTICE any more
+   (post-build-review #53). This rule used to sit on .notice-exhausted
+   alone, so the SAME two strings - a config path and a mothman command
+   - got a chip at Tier 1 and the browser's default `monospace` at
+   Tier 3. They also fell back to that default rather than the page's
+   own IBM Plex Mono with tabular numerals, which every other code-ish
+   string on the page uses. */
+.notice-exhausted code, .notice-runway code, .stale-link-notice code,
+.view-sub code{
+  background:var(--surface); padding:1px 5px; border-radius:4px;
+  /* Without this a wrapped chip renders as TWO rounded boxes, so
+     `mothman schedule candidate-dates` reads as two commands at 390px
+     (post-build-review #57). */
+  -webkit-box-decoration-break:clone; box-decoration-break:clone;
+  font-family:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size:.92em; font-variant-numeric:tabular-nums;
+}
 
 /* ============ Section headers ============ */
 .view-head{display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:6px;}
@@ -240,6 +267,16 @@ button{font:inherit; color:inherit;}
    three colours plus two footnotes. */
 .legend-key i.nodata{background:var(--ink-faint); border-radius:2px;}
 .legend-key i.exhausted{background:var(--ink-muted); border-radius:2px;}
+/* MoSCoW priority - one hue at four weights, deliberately NOT the
+   status palette (post-build-review #56). A scale, not a verdict. */
+.pill.prio-1{background:var(--accent-soft); color:var(--accent-ink); border:1px solid var(--accent);}
+.pill.prio-1 .ico{background:var(--accent);}
+.pill.prio-2{background:var(--accent-soft); color:var(--accent-ink); border:1px solid var(--accent-soft-line);}
+.pill.prio-2 .ico{background:var(--accent); opacity:.65;}
+.pill.prio-3{background:var(--surface-alt); color:var(--ink-muted); border:1px solid var(--accent-soft-line);}
+.pill.prio-3 .ico{background:var(--accent); opacity:.4;}
+.pill.prio-4{background:var(--surface-alt); color:var(--ink-faint); border:1px dashed var(--ink-faint);}
+.pill.prio-4 .ico{background:var(--ink-faint);}
 /* Hollow, not filled - the swatch for "switched off" should not look
    like a colour in the same family as the verdicts (#4). */
 .legend-key i.inactive{background:transparent; border:1.5px solid var(--ink-muted);
@@ -324,6 +361,24 @@ button{font:inherit; color:inherit;}
 .dataset-table tr:last-child td{border-bottom:none;}
 .dataset-table tbody tr{cursor:pointer;}
 .dataset-table tbody tr:hover{background:var(--surface-alt);}
+/* A HOVERED ROW MUST NOT SWALLOW THE PILL INSIDE IT
+   (post-build-review #48). The row hover and the three quiet pills all
+   resolved to --surface-alt, so pointing at a row made its own status
+   token disappear - measured at 1.00:1, with only an invisible 1px
+   dashed border left under the cursor. At any past or future as-of,
+   where "No data" is the most common row state, that is the state most
+   likely to vanish.
+
+   SCOPED TO HOVER, and to --surface rather than a new darker token:
+   this restores the pill to exactly the contrast it has unhovered
+   (1.20:1) rather than making the quiet state louder, which is what
+   Keith declined in #49. It also RAISES the label's own contrast
+   (2.81 -> 3.39 light, 4.62 -> 5.05 dark) without touching
+   --ink-faint, which is the token he declined to change. A darker fill
+   was tried first and rejected for lowering it to 2.76. */
+.dataset-table tbody tr:hover .pill.nodata,
+.dataset-table tbody tr:hover .pill.inactive,
+.dataset-table tbody tr:hover .pill.exhausted{background:var(--surface);}
 .dataset-name{font-weight:600;}
 .dataset-provider{color:var(--ink-muted); font-size:12px; margin-top:2px;}
 .overflow-x{overflow-x:auto;}
@@ -563,7 +618,12 @@ button{font:inherit; color:inherit;}
 .trend-table td.num{font-family:"IBM Plex Mono",monospace; text-align:right;}
 .trend-scroll{max-height:220px; overflow-y:auto; border:1px solid var(--line); border-radius:var(--radius-sm);}
 
-footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-top:1px solid var(--line); margin-top:20px;}
+/* max-width, because the footer measured 162 characters per line
+   against .view-sub's declared 62ch twenty pixels above it
+   (post-build-review #54). MEASURE ONLY - the footer's contrast
+   (3.03:1 light / 4.16:1 dark) is the --ink-faint question Keith
+   declined in #49, and this does not touch it. */
+footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-top:1px solid var(--line); margin-top:20px; max-width:90ch;}
 
 @media (max-width:480px){
   .compare-grid{grid-template-columns:1fr;}
@@ -573,8 +633,18 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
      the as-of date, "Recent activity"/"Release notes"/"Requirements"/
      "Past snapshots") stays intact, just tighter, rather than
      truncating or icon-only collapsing any of it away. */
-  .snapshots-btn{padding:6px 11px; font-size:11.5px;}
+  .snapshots-btn{padding:6px 11px; font-size:11.5px;
+    /* 28px tall was under both the iOS (44) and Android (48) tap
+       minimums - including the As-of chip, which both quiet-state
+       messages tell the reader to press (post-build-review #57).
+       Keith's call on mobile generally: shave the rough edges, accept
+       a substandard experience, everyone is on a desktop or laptop -
+       so this is the minimum that makes the controls usable, not a
+       responsive redesign. */
+    min-height:44px;}
   .live{font-size:11.5px; padding:5px 10px 5px 8px;}
+  /* The same, for the one other thing a thumb has to hit. */
+  .crumb{min-height:44px;}
 }
 </style>
 
@@ -3186,18 +3256,34 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         </div>
       </div>`;
   }
+  // THE SAME SHAPE AS ITS SIBLING QUIET STATE (post-build-review #53).
+  // This branch and the exhausted one were written the same day with
+  // different markup: the status pill inline in the <h2> rather than in
+  // the right-hand cluster every other dataset page puts it in - a
+  // reader who has learned "status is top-right" found it top-left,
+  // 630px away - and the body as bare text on --paper, with no border,
+  // no fill and a `max-width` of 56ch against its sibling's 60ch, on a
+  // page where everything else is a card.
+  //
+  // This one legitimately DOES replace the page, unlike the exhausted
+  // branch (#13): there are no columns to show underneath it. What it
+  // should not do is look like a different kind of thing.
   if(ds.noDataAsOf && !ds.columns.length){
     view.innerHTML = `
       <div class="view-head">
         <div>
-          <h2>${ds.name} ${pill("nodata")} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</h2>
+          <h2>${ds.name}</h2>
           <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}</div>
         </div>
+        <div style="display:flex; align-items:center; gap:8px;">${pill("nodata")} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
       </div>
-      <div style="padding:40px 0; color:var(--ink-muted); font-size:14px; max-width:56ch;">
-        No QA run within the accepted freshness window as of <b>${fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"))}</b> —
-        this dataset hadn't been supplied yet by that date. Pick a later
-        date, or reset to the default, using the 📅 As of control above.
+      <div class="notice-exhausted" role="status">
+        <b>Nothing had been supplied by this date.</b>
+        <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
+          There is no QA run within the accepted freshness window as of
+          <b style="display:inline">${fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"))}</b>. Pick a
+          later date, or reset to the default, using the 📅 As of control above.
+        </div>
       </div>
     `;
     return;
@@ -3206,7 +3292,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   view.innerHTML = `
     <div class="view-head">
       <div>
-        <h2>${ds.name}${ds.scheduleExhausted?` ${pill("exhausted")}`:""}${ds.realRunCount?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:""}</h2>
+        <h2>${ds.name}${ds.realRunCount?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:""}</h2>
         <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${ds.realRunCount?" · figures below are computed by real dbt/Soda/datacontract-cli/Evidently tools against real generated runs — not fabricated in the browser.":""}</div>
       </div>
       <div style="display:flex; align-items:center; gap:8px;">${pill(ds.status)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
@@ -4257,7 +4343,14 @@ document.getElementById("changelog-panel-close").addEventListener("click", close
 // keeping the "what does this value mean" logic separate from the
 // markup that displays it.
 const MOSCOW_LABEL = {must:"Must", should:"Should", could:"Could", wont:"Won't"};
-const MOSCOW_CLASS = {must:"red", should:"amber", could:"green", wont:"nodata"};
+// A REQUIREMENT'S PRIORITY IS NOT A DATA VERDICT (post-build-review
+// #56). These used to be the status classes - `must` rendered in
+// exactly the pill a FAILING dataset uses - so one viewport carried
+// red "Red" agency pills on the left and red "Must" requirement pills
+// on the right. Same palette, two unrelated meanings, and the status
+// vocabulary is REQ-QAC-047's to own. Their own neutral ramp now: one
+// hue, four weights, which reads as a scale rather than as a verdict.
+const MOSCOW_CLASS = {must:"prio-1", should:"prio-2", could:"prio-3", wont:"prio-4"};
 function moscowLabel(m){ return MOSCOW_LABEL[m] || m; }
 function moscowPill(m){ return `<span class="pill ${MOSCOW_CLASS[m]||"nodata"} sm"><span class="ico"></span>${moscowLabel(m)}</span>`; }
 const REQ_STATUS_LABEL = {built:"Built", in_progress:"In progress", not_started:"Not started"};

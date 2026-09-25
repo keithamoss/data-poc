@@ -2836,7 +2836,7 @@ independent route and measured in three separate as-of states) and its
 **V15**'s terminator half is #15; both are recorded above rather than
 twice. It deliberately did not re-find the `TypeError`.
 
-48. **[todo, 2026-09-24]** **[Dashboard UI]** **[V2] Hovering a dataset
+48. **[done, 2026-09-25]** **[Dashboard UI]** **[V2] Hovering a dataset
     row makes the "No data" pill's fill vanish into the row.**
 
     **Verified - the two rules are the same token.**
@@ -2855,6 +2855,27 @@ twice. It deliberately did not re-find the `TypeError`.
     **Only findable by hovering.** Neither rule is wrong on its own.
 
     **Cost:** trivial. **Recommendation: fix.**
+
+    **DONE 2026-09-25**, scoped to hover and to `--surface` rather than
+    a new darker token. That restores the pill to exactly the contrast
+    it has UNHOVERED (1.20:1) rather than making the quiet state
+    louder, which is what Keith declined in #49 - and it RAISES the
+    label's own contrast as a side effect (2.81 -> 3.39 light, 4.62 ->
+    5.05 dark) without touching `--ink-faint`, the token he declined to
+    change.
+
+    **A darker fill was tried first and backed out**, because measuring
+    it showed it dropped the label to 2.76 - making worse the very
+    number he agreed to take a hit on, which is not the same as taking
+    the hit.
+
+    **The first test passed for the wrong reason** and is worth
+    recording: it hovered a real row and compared the row's background
+    with its own pill's, and at the as-of it chose that pill was GREEN.
+    It measured a state that was never in question. It now hovers a row
+    for the real hovered colour and compares it against what
+    `.pill.nodata` and `.pill.inactive` actually paint, so it measures
+    the RULES rather than whichever pill a row happens to show.
 
 49. **[in-progress, 2026-09-24]** **[Dashboard UI]** **[V3/V5] The `nodata`
     pill fails WCAG AA in both themes, and its dashed border is not
@@ -2916,7 +2937,7 @@ twice. It deliberately did not re-find the `TypeError`.
     keyboard and focus work (#8/#9/#10/#55) was operability rather than
     contrast, and is unaffected.
 
-50. **[todo, 2026-09-24]** **[Dashboard UI]** **[V4] `1.5px` borders
+50. **[done, 2026-09-25]** **[Dashboard UI]** **[V4] `1.5px` borders
     render as `1px`, so the intended weight difference does not exist.**
 
     **Verified in source** - `.pill.exhausted` (:158) and
@@ -2932,6 +2953,11 @@ twice. It deliberately did not re-find the `TypeError`.
 
     Exactly the case where reading the source gives the wrong answer -
     worth keeping as an example, not just as a fix.
+
+    **DONE 2026-09-25** - 2px, which is a width every display actually
+    has. The test measures computed `borderTopWidth` on probe elements
+    rather than reading the declaration, for the reason this finding
+    exists.
 
 51. **[todo, 2026-09-24]** **[Dashboard UI]** **[V8/V9] `REQ-PIPE-048`'s
     stored offsets reach two render sites, and neither handles them.**
@@ -3001,7 +3027,7 @@ twice. It deliberately did not re-find the `TypeError`.
     and the `1 schedule ended` pill's right edge sits 10px past the
     container's. The new marker is the thing cut off.
 
-53. **[todo, 2026-09-24]** **[Dashboard UI]** **[V11/V12/V13] The two
+53. **[in-progress, 2026-09-25]** **[Dashboard UI]** **[V11/V12/V13] The two
     new quiet-state branches were written with a different markup shape
     from the branch beside them.**
 
@@ -3035,6 +3061,30 @@ twice. It deliberately did not re-find the `TypeError`.
       string on the page uses `.mono`/IBM Plex Mono with tabular
       numerals.
 
+    **MOSTLY DONE 2026-09-25**, and two of the three fell out of #13's
+    fix rather than needing their own:
+
+    - **The status pill is back where readers expect it.** The
+      exhausted branch now runs the ordinary renderer (#13), which puts
+      the pill in the right-hand cluster every other dataset page uses.
+      The first draft of that fix ADDED a second pill inline in the
+      `<h2>` - exactly the shape this finding complains about - caught
+      by counting pills on the real page. The no-data branch got the
+      same treatment by hand.
+    - **Both quiet states are bordered notices now**, sharing one
+      shape, one measure and one set of `<code>` chips. That chip rule
+      was scoped to `.notice-exhausted` alone, so the SAME two strings
+      got a chip at Tier 1 and the browser's default `monospace` at
+      Tier 3. It now covers every notice and uses the page's own IBM
+      Plex Mono with tabular numerals.
+
+    **STILL OPEN: the `colspan="4"` headers.** At a quiet as-of, four
+    Tier-2 column headers hang over nothing - 49% of the table at 1440
+    - and the message starts under `LATEST ARRIVAL`, so it reads as a
+    value in that column. Collapsing the header set when every row in a
+    collection is quiet is a real conditional-table change rather than
+    a CSS fix, and it deserves its own pass.
+
 54. **[in-progress, 2026-09-24]** **[Dashboard UI]** **[V10/V14/V15] Layout
     measure: the notice is 2.4× the page's own, the footer fails AA, and
     the exec grid is half empty.**
@@ -3059,6 +3109,12 @@ twice. It deliberately did not re-find the `TypeError`.
       1-line title and a 3-line title put the sparkline and the meta row
       50px apart, leaving 69px of dead space under one card and 19px
       under the other (155px at the 2027 as-of).
+
+    **THE TWO MEASURES ARE DONE 2026-09-25** - the exec notice is capped
+    at 80ch and the footer at 90ch, against the 146 and 162 characters
+    per line the critic measured. MEASURE ONLY: the footer's contrast
+    is the `--ink-faint` question Keith declined in #49, and neither
+    change touches it.
 
     **The grid one is explicitly a judgment call, not a defect** - the
     critic says so - because `auto-fit` would stretch two cards to 583px
@@ -3103,7 +3159,7 @@ twice. It deliberately did not re-find the `TypeError`.
     ring however the CSS is written - the test presses Tab first to put
     the browser back in the mode the test is actually about.
 
-56. **[todo, 2026-09-24]** **[Dashboard UI, QA checks & contract]**
+56. **[in-progress, 2026-09-25]** **[Dashboard UI, QA checks & contract]**
     **[V16/V18/V23] The page's own statement of its colour language is
     out of date, and the language is reused for something else.**
 
@@ -3123,6 +3179,12 @@ twice. It deliberately did not re-find the `TypeError`.
       agency pills on the left and `● Must` requirement pills on the
       right. Outside these four requirements' build scope, but squarely
       inside the status vocabulary `REQ-QAC-047` owns.
+
+      **DONE 2026-09-25.** MoSCoW has its own ramp - one hue at four
+      weights, reading as a scale rather than a verdict - so nothing
+      borrows the status palette any more. The legend half is done too:
+      it names every quiet state actually present, `inactive` included
+      (#4), rather than three of five.
     - **Three visually identical check cards** in one column drawer,
       same title, same description, same Red pill - distinguishable
       only by 12px grey monospace (`dbt:multiple_birth_sibling` /
@@ -3133,7 +3195,7 @@ twice. It deliberately did not re-find the `TypeError`.
       single-sided threshold — status is this tool's own verdict",
       which wraps mid-sentence and reads as debug output.
 
-57. **[investigate, 2026-09-24]** **[Dashboard UI]** **[V19/V20/V21/
+57. **[in-progress, 2026-09-25]** **[Dashboard UI]** **[V19/V20/V21/
     V22/V24] Five smaller visual findings, recorded together.**
 
     - **`exhaustedMarker()` produces duplicate-looking pill pairs at
@@ -3158,6 +3220,22 @@ twice. It deliberately did not re-find the `TypeError`.
       that viewport, 130px under a pill saying there is no data.
     - **`.crumb` breaks mid-token at 390px** - "TIER 2" wraps to
       "TIER" / "2" on every mobile view. One `white-space:nowrap`.
+
+    **FOUR OF THE FIVE DONE 2026-09-25**, the first having been settled
+    as Q2 the day before: the command chip gets `box-decoration-break:
+    clone`; the masthead chips and breadcrumbs get `min-height:44px`
+    below 480px - the minimum that makes them pressable, not a
+    responsive redesign, per Keith's own call on mobile ("shave off
+    some of the rough edges... everyone will be using it on desktop
+    screens"); and `.crumb .tier` gets `white-space:nowrap`.
+
+    **STILL OPEN: the red sparkline endpoint under a "No data" pill.**
+    Where history exists but none is current, the card paints the full
+    19-cycle sparkline ending in a red dot - the only red pixel in that
+    viewport, under a pill saying there is no data. A real
+    contradiction rather than polish, and the fix is in what the
+    sparkline paints for a quiet state rather than in CSS, so it is
+    left rather than rushed.
 
 ### What the visual critic found genuinely working
 

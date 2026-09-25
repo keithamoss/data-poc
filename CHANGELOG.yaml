@@ -133,6 +133,29 @@ releases:
               counted as healthy. Every figure is now counted in its own
               right, and the two quiet states appear in the key with
               their own totals whenever they are real.
+          - headline: Quiet status pills no longer disappear under the cursor
+            components: ["Dashboard UI"]
+            description: >
+              Pointing at a dataset row made its own "No data" or
+              "Schedule ended" pill vanish — the row highlight and the
+              pill were painted in exactly the same colour. The pill now
+              keeps its shape under the cursor, and reads slightly more
+              clearly there than it does at rest.
+          - headline: Priority and status stopped sharing a colour
+            components: ["Dashboard UI"]
+            description: >
+              A requirement marked "Must" was drawn in the same red as a
+              failing dataset, so one screen could show red verdicts on
+              one side and red priorities on the other. Priorities now
+              have their own scale.
+          - headline: Small fixes for narrow screens and long lines
+            components: ["Dashboard UI"]
+            description: >
+              Header buttons and breadcrumbs are now big enough to press
+              on a phone, a command shown in a notice no longer splits
+              into what looks like two commands, "Tier 2" stops wrapping
+              onto two lines, and the footer and the front-page notice
+              no longer run the full width of a wide monitor.
           - headline: Everything you can navigate to is a real link
             components: ["Dashboard UI"]
             description: >

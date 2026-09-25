@@ -158,7 +158,10 @@ class TestAsOfDatePicking:
             as_of=before_all_history,
         )
 
-        assert "No data" in clean_page.locator("#view h2").inner_text()
+        # `.view-head` rather than `#view h2` - see
+        # TestAnExhaustedScheduleIsLoud.test_it_is_not_rendered_as_red
+        # for why the pill moved (post-build-review #53).
+        assert "No data" in clean_page.locator(".view-head").first.inner_text()
 
 
 class TestSupplyHistoryDrillDown:
@@ -1346,9 +1349,16 @@ class TestAnExhaustedScheduleIsLoud:
         type next year's dates is an attribution error, and the fastest
         way to teach people that red does not mean what it says."""
         _goto(page, built_dashboard_html, state=self.DS, as_of=self.ONE_EXHAUSTED)
-        heading = page.locator("#view h2").first
-        assert heading.locator(".pill.exhausted").count() == 1
-        assert heading.locator(".pill.red").count() == 0
+        # `.view-head` rather than `#view h2` since 2026-09-25: the
+        # status pill moved OUT of the heading and into the right-hand
+        # cluster every other dataset page puts it in
+        # (post-build-review #53 - a reader who has learned "status is
+        # top-right" was finding it top-left, 630px away). What this
+        # test is about is which status shows, not which element holds
+        # it.
+        head = page.locator(".view-head").first
+        assert head.locator(".pill.exhausted").count() == 1
+        assert head.locator(".pill.red").count() == 0
 
     def test_the_page_still_has_zero_console_errors(self, clean_page, built_dashboard_html):
         """`clean_page`, NOT `page` (plans/post-build-review.md #43).
@@ -2003,15 +2013,94 @@ class TestAnExhaustedDatasetStillShowsItsHistory:
         self._open(clean_page, built_dashboard_html)
         assert clean_page.locator("#supply-history-toggle, .supply-history").count() > 0
 
-    def test_the_heading_still_says_the_schedule_ended(self, clean_page,
-                                                        built_dashboard_html):
+    def test_the_head_still_says_the_schedule_ended(self, clean_page,
+                                                     built_dashboard_html):
         """Showing history under the message must not make the page look
-        ordinary at a glance."""
+        ordinary at a glance - but the pill belongs where every other
+        dataset's status pill is, which is the right-hand cluster.
+        Putting a second one in the <h2> was the shape #53 complains
+        about (a reader who has learned "status is top-right" finding it
+        top-left), and the first draft of #13 did exactly that."""
         self._open(clean_page, built_dashboard_html)
-        assert clean_page.locator("#view h2 .pill.exhausted").count() == 1
+        assert clean_page.locator("#view h2 .pill.exhausted").count() == 0
+        assert clean_page.locator(".view-head .pill.exhausted").count() == 1
 
     def test_it_renders_without_throwing(self, clean_page, built_dashboard_html):
         """clean_page's teardown asserts no console error - the whole
         point, since this path never ran the normal renderer before."""
         self._open(clean_page, built_dashboard_html)
         assert clean_page.locator("#view h2").count() == 1
+
+
+class TestTheQuietPillsSurviveBeingLookedAt:
+    """post-build-review #48 and #50 - two visual defects that only a
+    real browser can show, which is why both sat unnoticed.
+
+    #48: `.dataset-table tbody tr:hover` and `.pill.nodata` resolve to
+    the SAME token, so hovering a row made the pill's fill vanish into
+    it - measured at 1.00:1. What was left under the cursor was a 1px
+    dashed border. At any past or future as-of, where "No data" is the
+    most common row state, the status token disappeared exactly when a
+    reader pointed at it.
+
+    #50: `border:1.5px` floors to 1px at DPR 1, which is most government
+    desktops - so the exhausted pill's "deliberately unlike the others"
+    heavier border was the same weight as the quiet one's, and rendered
+    differently between machines. Exactly the case where reading the
+    source gives the wrong answer.
+    """
+
+    def test_a_hovered_row_does_not_swallow_a_quiet_status_pill(
+            self, clean_page, built_dashboard_html):
+        """MEASURED AGAINST THE RULES, not against whichever pill a row
+        happens to be showing.
+
+        The first draft of this hovered a real row and compared its
+        background with its own pill's - and passed, because at the
+        as-of it chose that pill was GREEN. It was measuring a state
+        that was never in question. The defect is that two CSS rules
+        resolve to the same token, so that is what this measures: hover
+        a row to get the real hovered colour, then compare it with what
+        `.pill.nodata` and `.pill.inactive` actually paint.
+        """
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "agency", "agencyId": "child-protection-family-support"})
+        clean_page.locator("tbody tr").first.hover()
+        clean_page.wait_for_timeout(200)
+        result = clean_page.evaluate("""() => {
+            const tr = document.querySelector("tbody tr");
+            const rowBg = getComputedStyle(tr).backgroundColor;
+            const probe = (cls) => {
+                const el = document.createElement("span");
+                el.className = "pill " + cls;
+                tr.querySelector("td").appendChild(el);
+                const bg = getComputedStyle(el).backgroundColor;
+                el.remove();
+                return bg;
+            };
+            return {rowBg, nodata: probe("nodata"), inactive: probe("inactive")};
+        }""")
+        assert result["rowBg"] != result["nodata"], (
+            f"a hovered row and the No data pill are both {result['rowBg']} - the "
+            "status token vanishes under the cursor")
+        assert result["rowBg"] != result["inactive"], (
+            f"a hovered row and the No rule defined pill are both {result['rowBg']}")
+
+    def test_the_heavier_border_is_actually_heavier(self, clean_page,
+                                                     built_dashboard_html):
+        """Measured, not read: 1.5px is not a width a 1x display has."""
+        _goto(clean_page, built_dashboard_html)
+        widths = clean_page.evaluate("""() => {
+            const probe = (cls) => {
+                const el = document.createElement("span");
+                el.className = "pill " + cls;
+                document.body.appendChild(el);
+                const w = getComputedStyle(el).borderTopWidth;
+                el.remove();
+                return w;
+            };
+            return {nodata: probe("nodata"), exhausted: probe("exhausted")};
+        }""")
+        assert widths["exhausted"] != widths["nodata"], (
+            f"both borders render at {widths['exhausted']} - the intended weight "
+            "difference does not exist on this display")
