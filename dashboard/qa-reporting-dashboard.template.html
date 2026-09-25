@@ -2642,7 +2642,17 @@ function renderExec(view){
     <div class="view-head">
       <div>
         <h2>Agencies</h2>
-        <div class="view-sub">Rolled-up status across every agency in the multi-agency data asset. A red anywhere below makes the parent red; an amber with no red makes it amber — worst-of, so nothing silently hides behind a healthy average.</div>
+        <!-- THIS SENTENCE DESCRIBES THE ROLLUP, so it has to stay true
+             of it (plans/post-build-review.md #6). It used to end
+             "worst-of, so nothing silently hides behind a healthy
+             average" - which was written before REQ-PIPE-053 and
+             REQ-QAC-047 deliberately took two states OUT of the
+             worst-of ordering. They do not lose to a healthy average;
+             they are not in the comparison at all, and are counted
+             separately in the legend below. The old wording was the
+             page telling a reader the opposite of what its own code
+             does, directly above the counters that prove it. -->
+        <div class="view-sub">Rolled-up status across every agency in the multi-agency data asset. A red anywhere below makes the parent red; an amber with no red makes it amber — worst-of, so a failure cannot hide behind a healthy average. A dataset with no data, or whose schedule has ended, sits outside that comparison rather than losing to it, and is counted separately below.</div>
       </div>
     </div>
     <div class="legend-key">

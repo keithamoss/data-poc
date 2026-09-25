@@ -860,6 +860,30 @@ post-build critic should see a requirement's own `evidence:`.
    **Verified** by reading the line. **Cost:** one sentence.
    **Recommendation: fix alongside #1** - they are the same paragraph.
 
+   **SIGNED OFF AND FIXED, 2026-09-25**, one commit after the Tier 1
+   rename rather than alongside #1 - Keith declined to fold it into the
+   rename and then approved it on its own, which is the right order for
+   a claim about behaviour rather than a label.
+
+   It now reads: "...worst-of, so a failure cannot hide behind a
+   healthy average. A dataset with no data, or whose schedule has
+   ended, sits outside that comparison rather than losing to it, and is
+   counted separately below."
+
+   **The distinction the new wording carries** is the one the old
+   sentence blurred: those two states are not losing to a healthy
+   average, they are **not in the comparison at all** - and now that #1
+   gives them their own counters, "counted separately below" points at
+   something the reader can actually see three lines down.
+
+   **No new test**, deliberately, and the reasoning is recorded rather
+   than assumed: the behaviour this sentence describes is already
+   pinned - `rollup()`/`rollupStatuses()` by `status-cases.json` on
+   both sides, and the legend's own arithmetic by #1's
+   figures-sum-to-the-agency-count test. A test asserting particular
+   prose would pin the wording rather than the property, and would fail
+   the next time somebody improved the sentence.
+
 7. **[investigate, 2026-09-24]** **[Dashboard UI]** **[F7] The
    exhausted notice says how many datasets cannot be processed and
    never says which, or what is waiting.** `REQ-PIPE-053` asks a
