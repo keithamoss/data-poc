@@ -3862,6 +3862,19 @@ requirements:
       carrying a different half of the truth.
     moscow: must
     status: built
+    unmet_criteria:
+      - criterion: >-
+          THE SYSTEM SHALL define each dataset's place in the hierarchy in
+          exactly one place, and SHALL resolve every consumer's need for
+          those identifiers through it.
+        why: >-
+          The tree IS stated once and hierarchy.py IS the one resolver, but
+          17 inline hierarchy literals across 10 modules still restate ids
+          rather than resolving them - counted by a post-build critic,
+          2026-09-24, none of them the two named constants. The
+          hand-maintained contract-filename map that was the same shape has
+          gone (post-build-review #36, 2026-09-25); the literals have not.
+        owner: "post-build-review #36"
     source: >
       Keith's own question, 2026-09-20 - "what is it that actually
       groups Child Protection data together as a collection?" - and the
@@ -3948,10 +3961,24 @@ requirements:
       - >
         2026-09-23: the tree is stated once in contract/data-asset.yaml
         and resolved through one module. Twelve Python files carried
-        hierarchy literals before this; the count is now zero, and the
-        two that remain (cp_common.COLLECTION_ID,
-        bdm_common.DATASET_ID) each name WHICH part of the tree their
-        scripts are for, which is a reference rather than a restatement.
+        hierarchy literals before this, and the two named constants
+        that remain (cp_common.COLLECTION_ID, bdm_common.DATASET_ID)
+        each name WHICH part of the tree their scripts are for, which
+        is a reference rather than a restatement.
+      - >
+        CORRECTED 2026-09-25 (Keith). The line above used to say "the
+        count is now zero", and that was not true of the code. A
+        post-build critic counted 17 inline hierarchy literals across
+        10 modules, none of them the two named constants; a broader
+        grep the same day found 26 occurrences across 15 files, a
+        looser count that also catches the constants' own definitions
+        and some comments, so 17 is the more careful figure and it was
+        not re-derived line by line here. Criterion 1 is therefore
+        NOT fully met - see unmet_criteria below. Recorded rather than
+        quietly amended because an overstated evidence line is exactly
+        what a future session trusts instead of re-checking, which is
+        the same failure CLAUDE.md records about a fabricated test
+        count.
       - >
         2026-09-23: all six contract fields that had drifted were
         corrected, and validate_hierarchy.py was verified against the
@@ -4202,9 +4229,16 @@ requirements:
       - THE SYSTEM SHALL be able to generate a supply whose receipt
         instant falls after its slot's due instant by an arbitrary
         interval, including intervals spanning later slots.
-      - THE SYSTEM SHALL NOT decide, record or emit which slot a
-        generated supply fills - it SHALL only decide when that supply
-        was received.
+      - >-
+          THE SYSTEM SHALL NOT emit which slot a generated supply fills
+          inside any delivery, and SHALL NOT let the pipeline read that
+          from the generator's own bookkeeping - it SHALL only decide
+          when that supply was received. Narrowed 2026-09-25 (Keith)
+          from "SHALL NOT decide, record or emit", which contradicted
+          REQ-GEN-043 criterion 6 - the generator legitimately RECORDS
+          which slot a delivery was built to fill, in an artefact
+          outside every delivery. The firewall is about what the
+          pipeline may READ, not about what the generator may know.
       - THE SYSTEM SHALL keep generation seeded and reproducible - the
         same seed produces the same supplies, with the same receipt
         instants, in the same order.
@@ -6922,8 +6956,9 @@ requirements:
       - THE SYSTEM SHALL track each dataset's slot sequence
         independently of every other dataset's.
       - THE SYSTEM SHALL give each slot its own claim window, taken from
-        its dataset's own contract where one is declared and from its
-        calendar's default otherwise.
+        its dataset's own contract where one is declared and from the
+        version of its calendar in force on that period's own date
+        otherwise.
     non_functional_requirements:
       - Slot count multiplies - ~30 datasets on the quarterly asset,
         several of them multi-table collections, times four periods a

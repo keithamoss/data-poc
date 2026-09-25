@@ -2062,7 +2062,27 @@ function statusForValue(v,warn,fail){
   if(warn!=null && v>warn) return "amber";
   return "green";
 }
-function statusColorVar(s){ return s==="red"?"var(--bad)": s==="amber"?"var(--warn-fill)":"var(--good)"; }
+// A COLOUR FUNCTION WHOSE DEFAULT IS "HEALTHY" is the false-green shape
+// this project keeps finding (post-build-review #57). This was a
+// two-branch ternary falling through to var(--good), so every status it
+// did not recognise - nodata, exhausted, inactive, and anything added
+// later - painted green. Named explicitly now, with the quiet states
+// sharing the pill marker's own token so a strip or a dot reads as
+// "nothing to say" rather than as a verdict.
+const _QUIET_COLOUR = "var(--ink-faint)";
+// The statuses that are not verdicts. Derived from the vocabulary
+// rather than listed again, so a sixth one added later is quiet here
+// by default instead of silently painting green.
+function quietOf(status){
+  return UNORDERED_STATUSES.indexOf(status) !== -1 || status === "nodata"
+    ? status : undefined;
+}
+function statusColorVar(s){
+  if(s==="red") return "var(--bad)";
+  if(s==="amber") return "var(--warn-fill)";
+  if(s==="green") return "var(--good)";
+  return _QUIET_COLOUR;
+}
 
 // Phase 5e (plans/qa-pipeline.md #60), replacing the earlier
 // pickRepresentativeCheck()/sparkline() pair (one representative check's
@@ -2104,7 +2124,19 @@ function aggregateFailureSeries(cols){
     .map(e=>({date:e.date, rate:e.failing/e.total, status:e.worst}));
 }
 
-function aggregateSparkline(cols){
+// `quietStatus` is the DATASET's own state where it has one that is not
+// a verdict - nodata, exhausted, inactive. Where history exists but none
+// of it is current, the card used to paint the full series ending in a
+// red endpoint dot, under a pill saying there is no data: the only red
+// pixel in that viewport, asserting "and this is where it stands now",
+// which is the one thing a quiet state means nobody can say
+// (post-build-review #57).
+//
+// The LINE is untouched and deliberately so - Keith, on the quiet states
+// generally: "no red amber and greens... but I should still be able to
+// see the historical graphs and comparison stuff." Only the endpoint
+// makes a claim about the present, so only the endpoint goes quiet.
+function aggregateSparkline(cols, quietStatus){
   const points = aggregateFailureSeries(cols);
   if(points.length<2) return "";
   const w=180,h=28,pad=2;
@@ -2119,7 +2151,7 @@ function aggregateSparkline(cols){
   const last = points[points.length-1];
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="aggregate failing-check trend sparkline">
     <path d="${d}" fill="none" stroke="var(--ink-faint)" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
-    <circle cx="${x(n-1).toFixed(1)}" cy="${y(last.rate).toFixed(1)}" r="2.6" fill="${statusColorVar(last.status)}"/>
+    <circle cx="${x(n-1).toFixed(1)}" cy="${y(last.rate).toFixed(1)}" r="2.6" fill="${statusColorVar(quietStatus || last.status)}"/>
   </svg>`;
 }
 
@@ -2938,7 +2970,7 @@ function renderExec(view){
   grid.innerHTML = DATA.agencies.map(ag=>{
     const nDatasets = ag.collections.reduce((s,c)=>s+c.datasets.length,0);
     const allCols = ag.collections.flatMap(c=>c.datasets.flatMap(d=>d.columns));
-    const spark = aggregateSparkline(allCols);
+    const spark = aggregateSparkline(allCols, quietOf(ag.status));
     return `<a class="card" href="${navHref({tier:"agency", agencyId:ag.id})}" data-nav='${JSON.stringify({tier:"agency", agencyId:ag.id})}'>
       <div class="card-top"><h3>${ag.name}</h3>${pill(ag.status)}</div>
       <div style="color:var(--ink-muted); font-size:12.5px;">${ag.blurb}</div>
@@ -3038,7 +3070,7 @@ function renderAgency(view, agencyId){
           // Phase 5e (#60) redesigned what it shows - see
           // aggregateSparkline()'s own comment - scoped here to just this
           // one dataset's own columns.
-          const dsSpark = aggregateSparkline(ds.columns);
+          const dsSpark = aggregateSparkline(ds.columns, quietOf(ds.status));
           return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
             <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
@@ -3323,7 +3355,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   // Phase 5e (#60) redesigned what it shows (see aggregateSparkline()'s
   // own comment), scoped here to just this one column's own checks.
   grid.innerHTML = realColumns(ds).map(c=> {
-    const colSpark = aggregateSparkline([c]);
+    const colSpark = aggregateSparkline([c], quietOf(c.status));
     return `
     <button class="col-tile" data-status="${c.status}" data-col="${c.name}">
       <div class="name">${c.name}</div>

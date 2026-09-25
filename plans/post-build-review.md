@@ -826,12 +826,24 @@ post-build critic should see a requirement's own `evidence:`.
    that an unorderable status returns a value. The cases are split
    correctly now.
 
-   **A reporting gap found alongside**, not fixed: when a test in
-   `tests-js/status-parity.test.js` fails, Vitest's own stack-trace
-   reader hits an `EISDIR` and the remaining tests in that file never
-   report. It surfaced as "35 passed (42)" with one failure and seven
-   tests unaccounted for. Not silent - the failure was reported - but
-   a run that says 42 and measures 35 is worth knowing about.
+   **A reporting gap found alongside**, not fixed: Vitest's own
+   stack-trace reader hits an `EISDIR` and the remaining tests in that
+   file never report. It surfaced as "35 passed (42)" with one failure
+   and seven tests unaccounted for.
+
+   **CORRECTED 2026-09-25, having hit it again on #57 and diagnosed it
+   properly.** This said the trigger was a test FAILING. It is not:
+   the trigger is an EXCEPTION THROWN INSIDE THE JSDOM PAGE SCRIPT.
+   Vitest tries to source-map a stack frame whose "file" is the
+   directory the template was loaded from, gets `EISDIR`, and abandons
+   the rest of that file - with or without any test failing. On #57 it
+   hid five PASSING tests behind a fixture of mine that threw inside
+   `aggregateFailureSeries()`.
+
+   That makes it a useful diagnostic rather than only a nuisance: **a
+   jsdom test file that stops partway means something in the page
+   threw**, and the fastest way to find it is to re-run that file with
+   `--reporter=verbose` and look at the last test that reported.
 
    **Verified against the real built page**, not a fixture: all eleven
    placeholders now read `inactive`, both table-scope sections roll up
@@ -2293,12 +2305,20 @@ here as its own question, not acted on.
     lost that case - except it was never checked before either, because
     nobody had added such a file to the tuple.
 
-    **STILL OPEN, and both for Keith:** the `evidence:` line itself,
-    which says the count is zero when the critic counted 17 inline
-    literals across 10 modules - that is a claim in `requirements.yaml`
-    and so his under the standing rule. And
+    **THE EVIDENCE LINE IS CORRECTED, 2026-09-25, Keith's own yes.** It
+    claimed "the count is now zero"; the assertion is gone, and a
+    second entry records WHY it was wrong rather than quietly amending
+    it - an overstated evidence line is exactly what a future session
+    trusts instead of re-checking, which is the same failure
+    `CLAUDE.md` records about a fabricated test count.
+
+    **`REQ-QAC-039` now carries criterion 1 in `unmet_criteria:`** (the
+    field built for this, #33), owned by this finding. The register no
+    longer says the criterion is met.
+
+    **STILL OPEN:** the 17 literals themselves, and
     `qa_tools/bdm/evidently_check_lifecycle.py`'s literal check_id
-    string, left alone because the 17 literals are the substance of the
+    string - left alone because the literals are the substance of the
     criterion and moving one of them is not the fix.
 
 37. **[done, 2026-09-24]** **[Data generation]** **[A6/B3] Three
@@ -2394,7 +2414,7 @@ here as its own question, not acted on.
     `evidence:` prose reads, to anyone who does not open the code, as
     though these are live. Same subject as #33.
 
-40. **[todo, 2026-09-24]** **[Data generation, Pipeline & publishing]**
+40. **[done, 2026-09-25]** **[Data generation, Pipeline & publishing]**
     **[B4] Two signed criteria in this batch contradict each other.**
 
     `REQ-GEN-040` criterion 6: "SHALL NOT decide, record or emit which
@@ -2413,6 +2433,21 @@ here as its own question, not acted on.
     **Cost:** a wording change. **Recommendation:** reconcile the two
     rather than leave two signed criteria disagreeing - a future session
     reading 040 alone would conclude the bookkeeping file is a defect.
+
+    **RECONCILED 2026-09-25, Keith's own yes**, by narrowing 040 rather
+    than loosening 043. Criterion 6 was "SHALL NOT decide, record or
+    emit which slot a generated supply fills"; it now forbids EMITTING
+    one inside any delivery, and forbids the pipeline reading one from
+    the generator's bookkeeping, while leaving the generator free to
+    record what it knows.
+
+    **That is the rule the firewall actually enforces**, and stating it
+    that way is what makes `tests/test_arrivals.py`'s static check the
+    guard for a written criterion rather than for an unwritten
+    convention: the concern was never that the generator knows which
+    slot it built for - it must, to build a realistic supply - but that
+    a filing decision could be made from a declaration rather than
+    from arrival plus slot state.
 
 41. **[done, 2026-09-25]** **[Pipeline & publishing]** **[D2]
     `arrivals_for()` answers an unknown collection with silence.**
@@ -2510,6 +2545,13 @@ here as its own question, not acted on.
     window as well as to the dates** - plus tightening 052's criterion
     10 to name the version, which touches `requirements.yaml`'s own
     claims and so is Keith's.
+
+    **CRITERION 10 AMENDED 2026-09-25, Keith's own yes.** It read
+    "from its calendar's default otherwise" and now reads "from the
+    version of its calendar in force on that period's own date
+    otherwise". The code already did this; the criterion was
+    underspecified rather than wrong, which is the worse shape - it
+    was satisfied by the buggy reading and by the correct one alike.
 
     **DONE 2026-09-25** (the code half; the criterion-10 wording is
     still Keith's and is listed with the other register items).
@@ -3143,12 +3185,15 @@ twice. It deliberately did not re-find the `TypeError`.
       Tier 3. It now covers every notice and uses the page's own IBM
       Plex Mono with tabular numerals.
 
-    **STILL OPEN: the `colspan="4"` headers.** At a quiet as-of, four
+    **PARKED 2026-09-25, Keith's own call ("park it").** The
+    `colspan="4"` headers stay as they are: at a quiet as-of, four
     Tier-2 column headers hang over nothing - 49% of the table at 1440
     - and the message starts under `LATEST ARRIVAL`, so it reads as a
     value in that column. Collapsing the header set when every row in a
     collection is quiet is a real conditional-table change rather than
-    a CSS fix, and it deserves its own pass.
+    a CSS fix, and it was not worth the work today. Recorded as
+    deliberate debt rather than left as an open finding, so nobody
+    re-raises it as though it were new.
 
 54. **[in-progress, 2026-09-24]** **[Dashboard UI]** **[V10/V14/V15] Layout
     measure: the notice is 2.4× the page's own, the footer fails AA, and
@@ -3294,13 +3339,32 @@ twice. It deliberately did not re-find the `TypeError`.
     some of the rough edges... everyone will be using it on desktop
     screens"); and `.crumb .tier` gets `white-space:nowrap`.
 
-    **STILL OPEN: the red sparkline endpoint under a "No data" pill.**
-    Where history exists but none is current, the card paints the full
-    19-cycle sparkline ending in a red dot - the only red pixel in that
-    viewport, under a pill saying there is no data. A real
-    contradiction rather than polish, and the fix is in what the
-    sparkline paints for a quiet state rather than in CSS, so it is
-    left rather than rushed.
+    **THE RED ENDPOINT IS FIXED, 2026-09-25** (Keith: "yep, fix it").
+    Where history exists but none is current, the card painted the full
+    series ending in a red dot - the only red pixel in that viewport,
+    under a pill saying there is no data.
+
+    **The LINE is untouched and deliberately so.** Keith's own words on
+    the quiet states generally: "no red amber and greens... but I
+    should still be able to see the historical graphs and comparison
+    stuff." Only the ENDPOINT asserts "and this is where it stands
+    now", which is the one thing a quiet state means nobody can say -
+    so only the endpoint goes quiet. A test asserts the two paths are
+    identical with and without a quiet status.
+
+    **A SECOND BUG IN THE SAME FUNCTION, found writing the tests, and
+    the more dangerous one.** `statusColorVar()` was a two-branch
+    ternary falling through to `var(--good)`, so EVERY status it did
+    not recognise - `nodata`, `exhausted`, `inactive`, and anything
+    added later - painted green. A colour function whose default is
+    "healthy" is the same false-green shape this project keeps finding.
+    It names the three verdicts explicitly now and everything else is
+    quiet, and `quietOf()` derives the quiet set from the vocabulary
+    rather than listing it again, so a sixth status added later is
+    quiet by default instead of silently green.
+
+    Verified on the real built page at `?asof=2027-09-01`: both exec
+    cards read `var(--ink-faint)` where one had been red.
 
 ### What the visual critic found genuinely working
 

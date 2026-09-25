@@ -133,6 +133,17 @@ releases:
               counted as healthy. Every figure is now counted in its own
               right, and the two quiet states appear in the key with
               their own totals whenever they are real.
+          - headline: A trend line no longer ends in red when there is no current reading
+            components: ["Dashboard UI"]
+            description: >
+              Looking at a date where a dataset has history but nothing
+              recent, the card drew its full trend ending in a red dot —
+              often the only red on screen — directly under a pill
+              saying there is no data. The history still shows; the dot
+              marking "where it stands now" goes grey, because at that
+              date nobody can say. A related fix means a status the
+              dashboard does not recognise is drawn grey rather than
+              green.
           - headline: Adding a collection no longer means remembering a second file
             components: ["QA checks & contract"]
             description: >
