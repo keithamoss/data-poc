@@ -495,6 +495,14 @@ releases:
               that arrived for that table, so a supplier sending
               something broken shows up rather than leaving yesterday
               on screen as though nothing happened.
+          - headline: A punctual supplier stops reading as a late one
+            components: ["Pipeline & publishing"]
+            description: >
+              Working out which period a supply is for now treats
+              arriving on time as evidence of which period it belongs
+              to. Without that, a supplier whose system went down for
+              two days had every later delivery recorded two days late,
+              for good.
 
   - date: "2026-09-24"
     summary: >

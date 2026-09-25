@@ -245,12 +245,13 @@ def test_the_committed_history_trees_are_never_the_real_ones_in_a_test():
     evidence the tree survived, which is why this asserts the
     redirection itself.
     """
-    from qa_tools.common import delivery_log, in_flight_log, load_log
+    from qa_tools.common import delivery_log, filing, in_flight_log, load_log
 
     root = delivery_log.ROOT
     for module, name in ((load_log, "PROCESSING_LOG_DIR"),
                           (delivery_log, "DELIVERY_LOG_DIR"),
-                          (in_flight_log, "OBSERVATIONS_DIR")):
+                          (in_flight_log, "OBSERVATIONS_DIR"),
+                          (filing, "FILINGS_DIR")):
         current = getattr(module, name)
         assert root not in current.parents and current != root, (
             f"{module.__name__}.{name} points into the real repo at {current} - a test "

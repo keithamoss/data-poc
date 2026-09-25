@@ -178,6 +178,19 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     # are positional, so a change in what recognition returns renames
     # committed history - a failure that would otherwise be found when
     # CI went red on paths nothing in this file mentions.
+    # WHERE EACH SUPPLY BELONGS IS NOT RECORDED YET, DELIBERATELY
+    # (REQ-PIPE-062, Keith 2026-09-25). The assignment rule is built
+    # and tested - qa_tools/common/assignment.py - and calling
+    # filing.file_arrivals() here is all that is needed to turn it on.
+    # It is off because ONLY A PROMOTION FILLS A SLOT and promotion
+    # does not exist until batch 4, so today every supply that is not
+    # on time for its own current slot files against the oldest slot
+    # in the calendar: measured on a real run, 102 of 108 supplies
+    # landed on 2023-Q1. A filing is WRITE-ONCE by criterion 10, so
+    # recording those would bake a known artefact of a missing
+    # dependency into permanent history, where it later reads as data.
+    # Turn this on in the sprint that lands promotion, not before.
+
     run_id_guard.check(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, found_arrivals)
     reference_run_id = manifest[0]["run_id"]
     run_timestamp = asset_time.now().isoformat()

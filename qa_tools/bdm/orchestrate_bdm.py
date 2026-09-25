@@ -272,6 +272,19 @@ def run_pipeline(sequential: bool = False) -> dict:
     # regenerations, evidently silently compared against a stale leftover
     # file from a previous anchor date instead of failing loudly - see
     # plans/qa-pipeline.md for the regression test this got.
+    # WHERE EACH SUPPLY BELONGS IS NOT RECORDED YET, DELIBERATELY
+    # (REQ-PIPE-062, Keith 2026-09-25). The assignment rule is built
+    # and tested - qa_tools/common/assignment.py - and calling
+    # filing.file_arrivals() here is all that is needed to turn it on.
+    # It is off because ONLY A PROMOTION FILLS A SLOT and promotion
+    # does not exist until batch 4, so today every supply that is not
+    # on time for its own current slot files against the oldest slot
+    # in the calendar: measured on a real run, 102 of 108 supplies
+    # landed on 2023-Q1. A filing is WRITE-ONCE by criterion 10, so
+    # recording those would bake a known artefact of a missing
+    # dependency into permanent history, where it later reads as data.
+    # Turn this on in the sprint that lands promotion, not before.
+
     # BEFORE ANY REAL TOOL RUNS (REQ-PIPE-057 criterion 19). Run ids
     # are positional, so a change in what recognition returns renames
     # committed history - a failure that would otherwise be found when

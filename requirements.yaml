@@ -9449,7 +9449,77 @@ requirements:
       date: "2026-09-24"
     story: "As an agency data owner, I want each supply attributed to the period it is actually for, so that a punctual supplier is never recorded as sending a very late resupply while the slot they actually filled goes overdue as a phantom missing delivery."
     moscow: must
-    status: not_started
+    status: built
+    linked_tests:
+      - tests/test_assignment.py
+      - tests/test_filing.py
+      - tests/test_cli_supply.py
+    implemented_by:
+      - qa_tools/common/assignment.py::assign
+      - qa_tools/common/assignment.py::current_slot
+      - qa_tools/common/assignment.py::oldest_claimable_unfilled
+      - qa_tools/common/assignment.py::most_recently_filled
+      - qa_tools/common/assignment.py::Assignment
+      - qa_tools/common/filing.py::record
+      - qa_tools/common/filing.py::filing_for
+      - qa_tools/common/filing.py::filled_slots
+      - qa_tools/common/filing.py::file_arrivals
+      - cli/supply.py::filings_command
+    unmet_criteria:
+      - criterion: >-
+          Criterion 1, in part - assignment happens for every arrival BEFORE
+          any check runs over it. The rule runs and is tested; it is not
+          wired into the pipeline run, so no filing is recorded today.
+        why: >-
+          Keith's call, 2026-09-25, on measured evidence rather than in
+          principle. Only a PROMOTION fills a slot (decision 10) and
+          promotion does not exist until batch 4, so filled_slots() is
+          permanently empty and "the oldest claimable unfilled slot" is
+          always the first slot in the calendar. A real run filed 102 of
+          108 supplies against 2023-Q1. Criterion 10 makes a filing
+          WRITE-ONCE, so recording that would bake a known artefact of a
+          missing dependency into permanent history where it later reads
+          as data. filing.file_arrivals() is the single call that turns it
+          on, and both orchestrators carry a comment saying so.
+        owner: the promotion sprint (batch 4)
+    evidence:
+      - >
+        2026-09-25: both cascades are tested as REAL SEQUENCES rather than
+        single calls, which this requirement's own non-functional constraint
+        demands - each is invisible day to day, every day locally plausible
+        and never self-correcting, so a test of one call's return value would
+        pass against a rule that destroys the next year of filings. The
+        forward cascade test runs the rejected-then-promoted-then-resupplied
+        Monday; the backward one runs a four-day outage and asserts the whole
+        run afterwards stays on its own day.
+      - >
+        2026-09-25: the TS-3 boundary tests are LABELLED in the test file
+        itself, not in a plans file due for deletion, and say in their own
+        assertion messages that they assert a known imperfection stays
+        CONTAINED rather than that the system gets the right answer.
+      - >
+        2026-09-25: a test of mine had the imperfection backwards and the run
+        caught it. It expected an arrival inside the current slot's window to
+        file to the PREVIOUS slot; criterion 2 says the opposite, and the real
+        boundary misfile is a supply arriving BEFORE its own slot's window
+        opens, which reads as a late resupply of the previous slot while the
+        slot it actually filled goes overdue. The rule was right; the test was
+        wrong.
+      - >
+        2026-09-25: never-claim-forward is asserted three ways - a slot whose
+        window has not opened is not even considered, it is still not claimed
+        when every open slot is filled, and an arrival before the first window
+        is recorded unassignable rather than forced into a slot.
+      - >
+        2026-09-25: the cost constraint holds - the current slot is found by
+        bisection rather than a scan, and assignment over 4028 slots is within
+        a small constant of assignment over 28.
+      - >
+        2026-09-25: exercised end to end against the real pipeline before
+        recording was turned off - 108 supplies filed, 6 by the on-time branch
+        and 102 by oldest-claimable, and a second pass wrote nothing, which is
+        criterion 10 holding on real data.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     source: "Keith, delivery sprint 9 - the highest-risk sprint in the plan. plans/supply-model.md Thread E in full, including both cascades found by his own stress tests, plus Thread D's split of assignment from promotion. Test scenario register TS-1, TS-2, TS-3a-d, TS-6a, TS-6b, TS-9, TS-10. Honours the deferral REQ-PIPE-052 wrote: 'the rules that USE it - oldest claimable unfilled slot, on-time-wins-for-the-current-slot, monotonic filling, hold for a human - are slot ASSIGNMENT and belong to batch 3'. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
       - "WHEN a supply arrives and is attributed to a dataset, THE SYSTEM SHALL assign it to exactly one of that dataset's own slots, record it as a resupply of a filled slot, or hold it - and SHALL do so before any check runs over it."

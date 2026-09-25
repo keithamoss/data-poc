@@ -397,3 +397,40 @@ def history_command(dataset_id: str, limit: int) -> None:
             entry.delivery,
             f"{len(others)} other dataset(s)" if others else "[dim]on its own[/dim]")
     console.print(table)
+
+
+@supply_group.command("filings")
+@click.option("--dataset", "dataset_id", required=True,
+               help="The dataset whose filings to show.")
+@click.option("--limit", default=15, show_default=True,
+               help="How many of the most recent filings to list.")
+def filings_command(dataset_id: str, limit: int) -> None:
+    """Which slot each of this dataset's supplies was filed against.
+
+    Says WHY, not just where: the rule branch is recorded when the
+    filing is made, because recomputing it later gives a different
+    answer - the slot state it was decided against has moved on.
+
+    Reads committed records only. No database is opened.
+    """
+    from qa_tools.common import assignment, filing, hierarchy
+
+    hierarchy.dataset(dataset_id)
+    found = filing.filings_of(dataset_id)
+    if not found:
+        console.print(f"No supply of {dataset_id} has been filed yet.")
+        return
+
+    readable = {
+        assignment.ON_TIME: "on time for this slot",
+        assignment.OLDEST_CLAIMABLE: "oldest slot still owed",
+        assignment.RESUPPLY: "resupply - that slot was already filled",
+        assignment.UNASSIGNABLE: "[yellow]no slot was open for it[/yellow]",
+    }
+    console.print(f"[bold]{dataset_id}[/bold] - {len(found)} supply/supplies filed\n")
+    table = Table("Supply", "Filed against", "Why", box=None, pad_edge=False)
+    for record in found[-limit:]:
+        table.add_row(record.get("supply_id", ""),
+                       record.get("slot") or "[yellow]unfiled[/yellow]",
+                       readable.get(record.get("branch", ""), record.get("branch", "")))
+    console.print(table)

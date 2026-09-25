@@ -165,12 +165,13 @@ def _committed_history_is_off_limits(tmp_path_factory):
     that redirects one of these itself still overrides this and still
     restores to a temporary directory rather than to the real tree.
     """
-    from qa_tools.common import delivery_log, in_flight_log, load_log
+    from qa_tools.common import delivery_log, filing, in_flight_log, load_log
 
     root = tmp_path_factory.mktemp("committed_history")
     guarded = [(load_log, "PROCESSING_LOG_DIR", "processing_log"),
                 (delivery_log, "DELIVERY_LOG_DIR", "delivery_log"),
-                (in_flight_log, "OBSERVATIONS_DIR", "observations")]
+                (in_flight_log, "OBSERVATIONS_DIR", "observations"),
+                (filing, "FILINGS_DIR", "filings")]
     before = [(module, name, getattr(module, name)) for module, name, _ in guarded]
     for module, name, folder in guarded:
         setattr(module, name, root / folder)
@@ -193,15 +194,17 @@ def real_committed_history(_committed_history_is_off_limits):
     the real tree has to say so, which is the difference between an
     exception and a hole.
     """
-    from qa_tools.common import delivery_log, in_flight_log, load_log
+    from qa_tools.common import delivery_log, filing, in_flight_log, load_log
 
     root = delivery_log.ROOT
     restore = [(load_log, "PROCESSING_LOG_DIR", load_log.PROCESSING_LOG_DIR),
                 (delivery_log, "DELIVERY_LOG_DIR", delivery_log.DELIVERY_LOG_DIR),
-                (in_flight_log, "OBSERVATIONS_DIR", in_flight_log.OBSERVATIONS_DIR)]
+                (in_flight_log, "OBSERVATIONS_DIR", in_flight_log.OBSERVATIONS_DIR),
+                (filing, "FILINGS_DIR", filing.FILINGS_DIR)]
     load_log.PROCESSING_LOG_DIR = root / "processing_log"
     delivery_log.DELIVERY_LOG_DIR = root / "delivery_log"
     in_flight_log.OBSERVATIONS_DIR = root / "observations" / "in_flight"
+    filing.FILINGS_DIR = root / "filings"
     yield root
     for module, name, value in restore:
         setattr(module, name, value)
