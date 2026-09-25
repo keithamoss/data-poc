@@ -29,6 +29,7 @@ import sys
 
 from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
                               run_id_guard, supply_db)
+from qa_tools.common import backlog
 from qa_tools.common import hierarchy
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common.git_identity import get_run_by
@@ -201,6 +202,12 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
         conn.close()
     if dropped:
         print(f"discarded {len(dropped)} per-run view schema(s)")
+
+    # HOW FAR PROCESSING GOT (REQ-PIPE-061 criteria 6-8). The same
+    # global marker orchestrate_bdm.py advances, for the same reason:
+    # one arrival may span collections, so a per-collection marker
+    # could place such an arrival differently each time.
+    backlog.advance_past_staged()
 
     # Same rationale as orchestrate_bdm.py's identical block.
     dataset_stats_by_run = {}

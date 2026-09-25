@@ -4689,3 +4689,91 @@ Warning only:
 All config-only, no `data/` access, so it is safe in CI under the
 standing rule.
 
+
+
+## Thread L - Incremental processing, and the two things it waits on
+**Status:** todo (2026-09-25) · **Category:** Pipeline & publishing
+
+Keith's ask, 2026-09-25, after `REQ-PIPE-061` landed the backlog
+marker: log making `mothman pipeline run` incremental, with a
+`--rebuild` flag, and sequence it AFTER stable run identity exists.
+"Slot that into the plan, or slot that into what we're doing in the
+build at that point."
+
+**Where this came from.** `REQ-PIPE-061` built a marker recording how
+far processing has got, and deliberately did NOT make the run
+incremental - a full rebuild processes a superset of what criterion 6
+asks for, so the criterion holds, and regenerate-and-diff survives.
+Keith then asked what making it incremental would actually cost, which
+is how both blockers below were found. The marker is write-only today:
+nothing reads it for control flow.
+
+**What it would buy.** Cost bounded by the arrivals not yet processed
+rather than by total history. That is worth nothing at 60 deliveries
+and everything at the scale this is a PoC for - roughly 30 datasets on
+the quarterly asset, over years. It also matches what a real deployment
+does: `REQ-PIPE-060` criterion 10 already says checks are triggered by
+arrival, and a full rebuild on every run is a PoC artefact rather than
+the model. And it makes the marker load-bearing instead of a committed
+record nothing consults.
+
+**What it would cost, and why the flag is mandatory rather than
+optional.** Regenerate-and-diff stops being available as a correctness
+check - the technique that proved 6563 check verdicts unchanged across
+three separate refactors in one day. So `--rebuild` is not a
+convenience: it is the only way that verification survives, which means
+two processing paths to keep correct instead of one.
+
+**BLOCKER 1: stable run identity.** Run ids are positional -
+`run_id = f"{prefix}{index:03d}"` over the ordered arrival list - so a
+LATE arrival, one whose receipt instant sorts before existing ones,
+shifts every subsequent run id and renames committed `qa_results/`
+history. `run_id_guard` catches it and fails loudly, which is the right
+behaviour and not a fix. This is `REQ-PIPE-057` criterion 18, already
+recorded as unmet with `REQ-PIPE-069` as its owner.
+
+Incremental sharpens it rather than merely inheriting it: a full
+rebuild at least re-derives every id consistently, whereas an
+incremental run writes new runs BESIDE committed history that assumed a
+different numbering. So this is a prerequisite, not a parallel task.
+
+**BLOCKER 2: one processing pass, not two.** Fixed in part on
+2026-09-25 and worth recording because the residue is real. The marker
+is global (`REQ-PIPE-061` decision 9), and the first implementation
+advanced it over ONE collection's arrivals - which skips straight past
+any delivery belonging only to the other collection and sitting between
+them. Measured on the real data: Birth Registrations' newest arrival is
+seven weeks past Child Protection's, so whichever orchestrator ran
+first pushed the shared marker past all eighteen Child Protection
+arrivals.
+
+That specific bug is fixed - `advance_past_staged()` now walks the
+global delivery list and treats a delivery as processed only when every
+file it attributed to any dataset has a load record, so a delivery
+spanning collections waits for both halves. What is NOT fixed is the
+shape underneath it: two orchestrators still each make their own pass,
+and incremental processing wants one pass over the global order that
+dispatches per collection. That is a restructure of orchestration
+rather than a flag.
+
+**NOT a blocker, although it looks like one.** `reports/results_*.json`
+is a whole-dataset document carrying every run, so an incremental run
+cannot write it from what it just processed. It does not need to:
+`build_results_from_history.py` already rebuilds that document purely
+from committed `qa_results/`. Incremental composes as "run the tools on
+the new arrivals, then rebuild the document from history".
+
+**One more thing to resolve when this is scoped.** Evidently's drift
+reference is `manifest[0]` and its CSV is read from gitignored
+`data/raw/`. A full rebuild always has it to hand because generation
+precedes the run; an incremental run in a real deployment would need a
+durable home for the reference supply. Small, and easy to miss until it
+fails.
+
+**Sequencing, which is the actual ask here:** `REQ-PIPE-069` (stable
+run identity) first, then the single global pass, and incremental with
+`--rebuild` falls out of those rather than fighting them. It should
+become its own requirement at that point, scoped through
+`delivery-scoper` like the rest of the batch, rather than being folded
+into 069 - the prerequisite and the feature are different work with
+different acceptance criteria.

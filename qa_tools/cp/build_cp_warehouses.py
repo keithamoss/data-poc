@@ -103,7 +103,10 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, db_path: str | None
 
             df = read_csv_explicit_nulls(dest_csv,
                                           load_null_values_by_column(contract_path).get(table, {}))
-            staging_csv = os.path.join(run_raw_dir, f"_staged_{physical}.csv")
+            # Our own scratch, for the reason supply_db.staging_csv()
+            # gives: a temp file in a tree anything else reads back is
+            # a stray artefact waiting to be reported as one.
+            staging_csv = str(supply_db.staging_csv(physical))
             df.to_csv(staging_csv, index=False)
             try:
                 conn.execute(

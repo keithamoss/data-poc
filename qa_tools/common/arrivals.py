@@ -56,6 +56,12 @@ class Arrival:
     delivery_name: str
     path: Path
     received_at: datetime
+    #: The receipt's own sequence, carried through from the Delivery
+    #: (REQ-PIPE-061 criterion 3). Without it an Arrival cannot be
+    #: placed in the processing order at all - and the first version of
+    #: this left it off, which nothing noticed because the reader
+    #: defaulted a missing one to zero.
+    sequence: int
     files_by_dataset: dict[str, tuple[str, ...]]
     unmatched: tuple[str, ...]
     anomalies: tuple[str, ...]
@@ -259,7 +265,7 @@ def arrivals_for(collection_id: str, run_id_prefix: str,
         out.append(Arrival(
             run_id=f"{run_id_prefix}{index:03d}", run_index=index,
             collection_id=collection_id, delivery_name=d.name, path=d.path,
-            received_at=d.received_at, files_by_dataset=by_dataset,
+            received_at=d.received_at, sequence=d.sequence, files_by_dataset=by_dataset,
             unmatched=found.unmatched, anomalies=d.anomalies))
     return out
 

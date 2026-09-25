@@ -36,8 +36,14 @@ def _drop(dirs, name, files, when=WHEN):
     folder.mkdir()
     for filename, body in files.items():
         (folder / filename).write_text(body)
-    (receipts / f"{name}.json").write_text(
-        json.dumps({"received_at": when.isoformat()}))
+    # A REAL RECEIPT, sequence and all (REQ-PIPE-061). Written by hand
+    # rather than through write_delivery() because these tests build
+    # deliveries it would refuse - but the record still has to be one
+    # the pipeline can ORDER, or every test here fails on a receipt it
+    # invented rather than on the hold it is testing.
+    (receipts / f"{name}.json").write_text(json.dumps(
+        {"delivery": name, "received_at": when.isoformat(),
+         "sequence": delivery.next_sequence(receipts)}))
     return folder
 
 

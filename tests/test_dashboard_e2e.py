@@ -2117,7 +2117,8 @@ class TestABuiltRequirementShowsItsOwnHoles:
     proposal" then "ship it".
 
     REQ-PIPE-053 was marked `built` while six of its criteria were not
-    built at all, and the only record of that was a `decisions:` note -
+    built at all (five, since REQ-PIPE-061 closed one), and the only
+    record of that was a `decisions:` note -
     accurate, and in a field nobody has to read. The register's binary
     built/not_started model had no way to say "built except for these",
     so `built` overclaimed and nothing in CI could tell.
@@ -2130,12 +2131,35 @@ class TestABuiltRequirementShowsItsOwnHoles:
 
     def test_the_panel_names_them_rather_than_burying_them_in_decisions(
             self, clean_page, built_dashboard_html):
+        """Compared against what requirements.yaml actually says, not
+        against a literal.
+
+        This asserted `== 6` and went red the day one of the six was
+        closed - a test that fails when the work SUCCEEDS, and whose
+        only remedy is to edit the number, which is how a number stops
+        meaning anything. The claim worth testing is that the panel
+        renders what the register holds; how many holes are left is the
+        register's business and changes as the batch lands.
+        """
+        import yaml
+
+        register = yaml.safe_load(Path("requirements.yaml").read_text())
+        expected = {r["id"]: len(r.get("unmet_criteria") or [])
+                    for r in register["requirements"] if r.get("unmet_criteria")}
+        assert expected, "no requirement declares an unmet criterion - this test is vacuous"
+
         _goto(clean_page, built_dashboard_html)
-        found = clean_page.evaluate("""() => {
-            const r = (REQUIREMENTS||[]).find(x => x.id === "REQ-PIPE-053");
-            return r ? (r.unmet_criteria||[]).length : -1;
+        rendered = clean_page.evaluate("""() => {
+            const out = {};
+            (REQUIREMENTS||[]).forEach(r => {
+                const n = (r.unmet_criteria||[]).length;
+                if(n) out[r.id] = n;
+            });
+            return out;
         }""")
-        assert found == 6, f"REQ-PIPE-053 carries {found} unmet criteria"
+        assert rendered == expected, (
+            f"the page and the register disagree about which requirements have holes: "
+            f"page {rendered}, register {expected}")
 
     def test_every_unmet_criterion_says_which_why_and_who_next(
             self, clean_page, built_dashboard_html):

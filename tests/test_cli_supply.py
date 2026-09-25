@@ -7,6 +7,8 @@ would pass with the group unregistered.
 """
 from __future__ import annotations
 
+import json
+
 from datetime import datetime, timezone
 
 import pytest
@@ -35,9 +37,15 @@ def _drop(dirs, name, files, when=WHEN, receipt=True):
     for filename, body in files.items():
         (folder / filename).write_text(body)
     if receipt:
-        delivery.write_receipt(name, when, receipts) if hasattr(delivery, "write_receipt") \
-            else (receipts / f"{name}.json").write_text(
-                '{"received_at": "%s"}' % when.isoformat())
+        # A REAL RECEIPT, sequence and all (REQ-PIPE-061). Written by
+        # hand rather than through write_delivery() because these tests
+        # deliberately build odd deliveries that write_delivery()
+        # refuses - but the record still has to be one the pipeline can
+        # ORDER, or every test here fails on a receipt it invented
+        # rather than on the thing it is testing.
+        (receipts / f"{name}.json").write_text(json.dumps(
+            {"delivery": name, "received_at": when.isoformat(),
+             "sequence": delivery.next_sequence(receipts)}))
     return folder
 
 

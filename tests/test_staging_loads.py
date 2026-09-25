@@ -234,3 +234,38 @@ class TestStagingIsSequential:
             assert banned not in source, (
                 f"mothman pipeline run drives both collections via {banned} - they stage "
                 f"into ONE database file, which takes one writer")
+
+
+class TestNothingIsWrittenIntoTheDelivery:
+    """A delivery is a supplier-owned tree this pipeline treats as
+    immutable, and the loader used to write its staging CSV beside the
+    source file - which IS that tree.
+
+    Found live rather than by review: one leaked through a crash and
+    turned up on the next run as an 'unrecognised artefact' warning
+    naming our own temporary file.
+    """
+
+    def test_the_delivery_directory_is_untouched_by_a_load(self, staging):
+        drop = staging / "delivery"
+        source = _csv(drop / "birth_registrations_2026-09-25.csv", 3)
+        before = sorted(p.name for p in drop.iterdir())
+
+        physical = bdm.build_one("run_001", source, "2026-09-25",
+                                  received_at=_RECEIPT,
+                                  log_dir=staging / "processing_log")
+        assert physical is not None
+        after = sorted(p.name for p in drop.iterdir())
+        assert after == before, (
+            f"the load left {sorted(set(after) - set(before))} in the delivery - a supplier's "
+            f"directory is read, never written, and a stray file there is reported as an "
+            f"unrecognised artefact on every later run")
+
+    def test_a_failed_load_leaves_nothing_behind_either(self, staging):
+        drop = staging / "delivery"
+        drop.mkdir(parents=True, exist_ok=True)
+        before = sorted(p.name for p in drop.iterdir())
+        assert bdm.build_one("run_001", str(drop / "missing.csv"), "2026-09-25",
+                              received_at=_RECEIPT,
+                              log_dir=staging / "processing_log") is None
+        assert sorted(p.name for p in drop.iterdir()) == before

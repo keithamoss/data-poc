@@ -7304,29 +7304,29 @@ requirements:
       # `decisions:` note - accurate, and in a field nobody has to read.
       # A criterion this requirement does not meet now has somewhere
       # structured to sit, and the gate can see it.
+      #
+      # ONE CAME OFF on 2026-09-25: "continue to accept that dataset's
+      # supplies while its schedule is exhausted" is now met and
+      # covered by tests/test_backlog.py. REQ-PIPE-061 built the
+      # staging that accepting a supply into a backlog needed, and its
+      # own criterion 9 is the same SHALL - the duplication was
+      # deliberate, because this requirement made the claim and that
+      # one is the mechanism.
       - criterion: >-
           IF a dataset has no slot covering the date being processed, THEN THE
           SYSTEM SHALL fail for that dataset.
         why: >-
           Describes a filing layer that does not exist yet. Nothing files a
           supply against a slot, so there is nothing to fail at.
-        owner: batch 3, sprint 8 (staging and filing)
+        owner: REQ-PIPE-062 (slot assignment), batch 3
       - criterion: THE SYSTEM SHALL fail at filing, before QA runs for that dataset.
         why: Same filing layer - there is no filing step to fail before.
-        owner: batch 3, sprint 8 (staging and filing)
+        owner: REQ-PIPE-062 (slot assignment), batch 3
       - criterion: >-
           THE SYSTEM SHALL scope that failure to the affected dataset, and SHALL
           NOT stop processing any other dataset.
         why: Scopes a failure that cannot occur yet.
-        owner: batch 3, sprint 8 (staging and filing)
-      - criterion: >-
-          WHILE a dataset's schedule is exhausted, THE SYSTEM SHALL continue to
-          accept that dataset's supplies, so that the backlog can be filed
-          correctly once dates exist.
-        why: >-
-          The dashboard says this in words and nothing implements it - accepting
-          a supply into a backlog needs staging.
-        owner: batch 3, sprint 8 (staging and filing)
+        owner: REQ-PIPE-062 (slot assignment), batch 3
       - criterion: >-
           THE SYSTEM SHALL state, in that message, how many supplies are waiting
           and since when, and SHALL NOT state how many days have elapsed.
@@ -7334,13 +7334,13 @@ requirements:
           The exhausted notice says how many datasets cannot be processed and
           never what is piling up, because nothing tracks a backlog yet. Raised
           independently as post-build-review #7.
-        owner: batch 3, sprint 8 (staging and filing)
+        owner: REQ-PIPE-062 (slot assignment), batch 3
       - criterion: >-
           WHEN a run skips a dataset because its schedule is exhausted, THE
           SYSTEM SHALL state in that run's own summary how many datasets were
           processed and how many were skipped.
         why: No run currently skips a dataset for this reason, so no summary says so.
-        owner: batch 3, sprint 8 (staging and filing)
+        owner: REQ-PIPE-062 (slot assignment), batch 3
     source: >
       Keith, 2026-09-21, plans/supply-model.md Thread C - "exhausted
       schedule - hard failure, scoped per dataset", stronger than the
@@ -7547,6 +7547,7 @@ requirements:
         five datasets are red still has to say that a sixth stopped
         being processed entirely."
     linked_tests:
+      - tests/test_backlog.py
       - tests/test_runway.py
       - tests/test_dashboard_e2e.py
       - tests-js/schedule-runway.test.js
@@ -9199,8 +9200,48 @@ requirements:
       date: "2026-09-24"
     story: "As an agency data owner, I want two files that landed in the same batch to be filed the same way whatever order the pipeline happened to pick them up in, so that where a supply ends up is a fact about when it arrived rather than about a directory listing."
     moscow: must
-    status: not_started
+    status: built
     source: "Keith, delivery sprint 8 - replay in arrival-timestamp order - plans/supply-model.md Thread H first chaos pass #2, and the dependency REQ-PIPE-053 already names: 'replaying the backlog in arrival-timestamp order, which is batch 3's rule'. Test scenario register TS-8 and TS-32. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
+    linked_tests:
+      - tests/test_backlog.py
+      - tests/test_holds.py
+      - tests/test_cli_supply.py
+      - tests/test_cli_pipeline.py
+    implemented_by:
+      - qa_tools/common/delivery.py::next_sequence
+      - qa_tools/common/delivery.py::read_receipt_record
+      - qa_tools/common/delivery.py::survey
+      - qa_tools/common/backlog.py::Position
+      - qa_tools/common/backlog.py::pending
+      - qa_tools/common/backlog.py::advance
+      - qa_tools/common/backlog.py::advance_through
+      - qa_tools/common/backlog.py::advance_past_staged
+      - qa_tools/common/arrivals.py::Arrival
+    evidence:
+      - >
+        2026-09-25: criterion 3 was a LIVE bug, not a precaution, and the test was
+        confirmed to catch it before the fix went in. survey() sorted on the receipt
+        instant alone - a stable sort over a name-sorted iterdir() - so a tie fell to
+        the delivery's NAME, which REQ-PIPE-057 criterion 8 separately forbids.
+        Reverting the sort key made the new test fail on 'alpha' before 'zulu';
+        restoring it made it pass.
+      - >
+        2026-09-25: all 60 regenerated receipts carry a distinct sequence, 1 through
+        60, and a seeded regeneration reproduced every run id - run_id_guard.check()
+        reports no change against committed history for either collection.
+      - >
+        2026-09-25: criterion 3 is LATENT in real data and the test says so. All 60
+        committed receipts carry distinct instants, so no tie exists to exercise and a
+        test over real data would have passed without touching the rule at all. The
+        tie is constructed.
+      - >
+        2026-09-25: a second bug, found by Keith asking what incremental processing
+        would cost rather than by any test. Position.of() defaulted a missing
+        `sequence` to zero and Arrival carried none, so EVERY arrival's position had
+        sequence 0 and the tiebreak was absent at the one layer that uses it. Measured
+        directly - both collections' last arrivals reported sequence 0. Arrival now
+        carries it (40 and 60 respectively) and a missing one raises.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     acceptance_criteria:
       - "THE SYSTEM SHALL process arrivals in ascending order of our own receipt instant."
       - "THE SYSTEM SHALL NOT process arrivals in the order they were discovered, listed or named."
@@ -9287,6 +9328,54 @@ requirements:
         unlike the duplications resolved elsewhere today, because
         dropping either copy would cost one of the two requirements its
         readability.
+      - >
+        BUILT 2026-09-25 (Keith, choosing between exactly two options): the
+        write-order fact is a SEQUENCE on the receipt, assigned monotonically
+        when it is written. The alternative was a second timestamp, `recorded_at`
+        - simpler, no read-modify-write, and it can still tie, at which point the
+        order falls back to whatever the sort does. A sequence is total.
+      - >
+        A RECEIPT WITH NO SEQUENCE IS A HARD ERROR, never a default of zero.
+        Defaulting would put every pre-sequence receipt in one place, so a tie
+        between two of them falls to a directory listing - the exact
+        non-determinism this requirement removes, reintroduced by the fallback
+        written to tolerate it. Receipts live under gitignored data/, so the
+        remedy is to regenerate rather than migrate.
+      - >
+        That refusal is deliberately NOT a DeliveryFormatError, and the
+        distinction is load-bearing rather than taxonomic: survey() catches that
+        one and reclassifies the delivery as still in flight. A receipt missing
+        its sequence is a COMPLETE arrival we cannot order, and reporting it as
+        an incomplete upload would hide it behind an ordinary operational state.
+      - >
+        BUILT 2026-09-25: the marker does NOT make `mothman pipeline run`
+        incremental, and that was decided rather than overlooked. A full rebuild
+        processes a SUPERSET of what criterion 6 requires, so the criterion holds,
+        and regenerate-and-diff survives - the technique that proved 6563 verdicts
+        unchanged the same day. Making the run incremental is a separate change
+        with real prerequisites, recorded below.
+      - >
+        TWO PREREQUISITES FOR INCREMENTAL PROCESSING, both measured on 2026-09-25
+        when Keith asked what it would cost. FIRST, one global marker cannot be
+        advanced by two per-collection orchestrators: BDM's newest arrival is seven
+        weeks past CP's, so whichever runs first pushes the shared marker past the
+        other's outstanding work - measured, BDM first leaves CP 0 of 18 pending.
+        A global marker implies ONE processing pass over the global order, which
+        is a restructure of orchestration rather than a flag. It is latent today
+        only because nothing reads the marker for control flow.
+      - >
+        SECOND, run ids are positional, so a late arrival renames committed
+        history. That is REQ-PIPE-057 criterion 18, already recorded as unmet with
+        REQ-PIPE-069 as owner. Incremental sharpens it: a full rebuild at least
+        re-derives consistently, while an incremental run writes new runs beside
+        history that assumed a different numbering. Stable run identity is a
+        prerequisite, not a nice-to-have.
+      - >
+        Recorded as NOT a blocker although it looks like one: reports/results_*.json
+        is a whole-dataset document carrying every run, but
+        build_results_from_history.py already rebuilds it from committed
+        qa_results/, so incremental composes - run the tools on new arrivals, then
+        rebuild the document from history.
 
   - id: REQ-PIPE-062
     title: A supply is assigned to a slot by rule, and the rule can never claim forward

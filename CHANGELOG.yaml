@@ -466,6 +466,20 @@ releases:
               delivery. `mothman supply failures` lists what failed and
               why, and waits for you - reject the supply, or fix the
               cause and load it again.
+          - headline: Arrival order, not whatever the folder said
+            components: ["Pipeline & publishing"]
+            description: >
+              Two files that landed in the same batch are now processed
+              in the order they actually arrived. Where two share an
+              arrival time, the order they were received in settles it -
+              previously the supplier's own file naming did, which meant
+              the same two files could be filed differently.
+          - headline: An interrupted run picks up where it stopped
+            components: ["Pipeline & publishing"]
+            description: >
+              A run that stops partway now leaves everything it did not
+              finish for the next one, in the same order, rather than
+              only looking at whatever arrived most recently.
 
   - date: "2026-09-24"
     summary: >

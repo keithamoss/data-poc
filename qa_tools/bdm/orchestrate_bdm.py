@@ -37,6 +37,7 @@ from datetime import date
 from . import bdm_common
 from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
                               run_id_guard, supply_db)
+from qa_tools.common import backlog
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
@@ -221,6 +222,7 @@ def run_single(run_id: str, csv_path: str, run_date: str, reference_run_id: str,
     return _run_one(entry, run_timestamp, run_by, reference_run_id, reference_csv, on_step=on_step)
 
 
+
 def run_pipeline(sequential: bool = False) -> dict:
     build_per_run_warehouses.build_all()
 
@@ -301,6 +303,14 @@ def run_pipeline(sequential: bool = False) -> dict:
         conn.close()
     if dropped:
         print(f"discarded {len(dropped)} per-run view schema(s)")
+
+    # HOW FAR PROCESSING GOT (REQ-PIPE-061 criteria 6-8). Advanced
+    # AFTER the fan-out and only over arrivals that are genuinely
+    # staged, so an interrupted run leaves the rest to the next one in
+    # the same order. The marker is global - one arrival may span
+    # collections - so both orchestrators advance the same one, and
+    # advance() never moves it backwards.
+    backlog.advance_past_staged()
 
     # Read back rather than threaded through _run_one's own return value -
     # parallel_orchestrate.run_manifest's contract is a flat list of check

@@ -385,6 +385,21 @@ def scratch_dir() -> Path:
     return supply_db_path().parent / "dbt_scratch"
 
 
+def staging_csv(physical: str) -> Path:
+    """Where a loader writes the CSV it hands to DuckDB.
+
+    NEVER INSIDE THE DELIVERY. The first version put it beside the
+    source file, which IS the delivery directory - a supplier-owned
+    tree this pipeline treats as immutable, and the one place a stray
+    file becomes an "unrecognised artefact" warning on every later run.
+    That is not hypothetical: one leaked through a crash and turned up
+    in recognition as a file no dataset claimed.
+    """
+    directory = scratch_dir() / "staging"
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory / f"{_ident(physical, 'staged table')}.csv"
+
+
 def dbt_scratch_db(run_id: str) -> Path:
     d = scratch_dir()
     d.mkdir(parents=True, exist_ok=True)

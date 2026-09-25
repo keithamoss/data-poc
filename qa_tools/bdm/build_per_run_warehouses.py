@@ -97,7 +97,9 @@ def build_one(run_id: str, csv_path: str, run_date: str, db_path: str | None = N
             # Handed to DuckDB as a real staging CSV rather than through
             # the dataframe, so the explicit-null handling csv_io owns
             # stays the one place that decides what an empty cell means.
-            staging_csv = os.path.join(os.path.dirname(csv_path), f"_staged_{physical}.csv")
+            # IN OUR OWN SCRATCH, never beside the source file - that
+            # directory is the supplier's delivery.
+            staging_csv = str(supply_db.staging_csv(physical))
             df.to_csv(staging_csv, index=False)
             try:
                 conn.execute(

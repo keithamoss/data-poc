@@ -214,7 +214,11 @@ def test_a_delivery_still_present_keeps_its_record_across_a_run(monkeypatch, tmp
     (deliveries / "monday" / "cp_clients.csv").write_text("a\n1\n")
     receipts = tmp_path / "receipts"
     receipts.mkdir()
-    (receipts / "monday.json").write_text('{"received_at": "2026-09-25T09:00:00+08:00"}')
+    # The `sequence` is not decoration: without it the arrival cannot
+    # be placed in the processing order and read_delivery() refuses
+    # (REQ-PIPE-061).
+    (receipts / "monday.json").write_text(
+        '{"delivery": "monday", "received_at": "2026-09-25T09:00:00+08:00", "sequence": 1}')
     monkeypatch.setattr(delivery, "DELIVERIES_DIR", deliveries)
     monkeypatch.setattr(delivery, "RECEIPTS_DIR", receipts)
 

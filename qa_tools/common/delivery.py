@@ -71,6 +71,19 @@ class DeliveryFormatError(ValueError):
     it. Always names the delivery and what is wrong with it."""
 
 
+class ReceiptOrderError(RuntimeError):
+    """A receipt that can be read but cannot be ORDERED.
+
+    DELIBERATELY NOT A DeliveryFormatError, and the distinction is
+    load-bearing rather than taxonomic: survey() catches that one and
+    reclassifies the delivery as still in flight. A receipt missing its
+    sequence is not an incomplete upload - it is a complete arrival we
+    cannot place in the processing order - and reporting it as in
+    flight would hide the one thing worth seeing behind an ordinary
+    operational state.
+    """
+
+
 @dataclass(frozen=True)
 class Delivery:
     """One arrival, as read back off disk.
@@ -85,6 +98,10 @@ class Delivery:
     received_at: datetime
     files: tuple[str, ...]          # file names, sorted, relative to the delivery
     anomalies: tuple[str, ...]
+    #: Where this receipt fell in the order receipts were WRITTEN - the
+    #: tiebreak for two arrivals sharing a receipt instant
+    #: (REQ-PIPE-061 criterion 3). Never a supplier's fact.
+    sequence: int = 0
 
     @property
     def file_paths(self) -> tuple[Path, ...]:
@@ -211,9 +228,51 @@ def write_delivery(name: str, files: dict[str, str | bytes], received_at: dateti
     with open(receipts_dir / f"{name}.json", "w") as f:
         json.dump({"delivery": name,
                    "received_at": asset_time.isoformat(
-                       asset_time.parse_instant(received_at, f"received_at for delivery {name!r}"))},
+                       asset_time.parse_instant(received_at, f"received_at for delivery {name!r}")),
+                   # THE ORDER THIS RECORD WAS WRITTEN (REQ-PIPE-061
+                   # criterion 3), and the only fact available for
+                   # breaking a tie between two arrivals sharing a
+                   # receipt instant. Ours, like the instant beside it.
+                   "sequence": next_sequence(receipts_dir)},
                    f, indent=2)
     return path
+
+
+def next_sequence(receipts_dir: Path | None = None) -> int:
+    """The sequence the next receipt written here should carry.
+
+    ONE MORE THAN THE HIGHEST ALREADY WRITTEN, read from the receipts
+    themselves rather than from a counter file. A counter is a second
+    piece of state that can disagree with the records it describes, and
+    the records are the thing that has to be right.
+
+    WHY A SEQUENCE AND NOT A WRITE TIMESTAMP (Keith, 2026-09-25, choosing
+    between exactly those two). A write instant is simpler and needs no
+    read-modify-write, and it can still tie - at which point the order
+    falls back to whatever the sort does, which is the non-determinism
+    criterion 3 exists to remove. A sequence is total: two receipts can
+    never share one.
+
+    THE READ-MODIFY-WRITE IS REAL and is not defended here. Two writers
+    racing would both read the same maximum and both claim it. In this
+    PoC the receiving side is a single serial writer, and in a real
+    deployment the ordering fact would come from the transport rather
+    than be derived by reading a directory. Stated rather than hidden,
+    because a future deployment inherits this function's behaviour and
+    not this paragraph.
+    """
+    receipts_dir = Path(receipts_dir or RECEIPTS_DIR)
+    if not receipts_dir.is_dir():
+        return 1
+    highest = 0
+    for path in receipts_dir.glob("*.json"):
+        try:
+            value = json.loads(path.read_text()).get("sequence")
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(value, int):
+            highest = max(highest, value)
+    return highest + 1
 
 
 def read_receipt(name: str, receipts_dir: Path | None = None) -> datetime:
@@ -222,6 +281,21 @@ def read_receipt(name: str, receipts_dir: Path | None = None) -> datetime:
     A missing receipt is a hard error, not a fallback to a file's mtime:
     an arrival we have no record of receiving is a gap to notice, and
     inventing a time for it would hide exactly the thing worth seeing.
+    """
+    return read_receipt_record(name, receipts_dir)[0]
+
+
+def read_receipt_record(name: str, receipts_dir: Path | None = None) -> tuple[datetime, int]:
+    """Our receipt for one delivery: when it arrived, and where it fell
+    in the order receipts were written.
+
+    A MISSING SEQUENCE IS A HARD ERROR, not a default of zero
+    (REQ-PIPE-061). Defaulting would put every pre-sequence receipt at
+    the same position, so a tie between two of them would fall to sort
+    stability over a directory listing - exactly the non-determinism
+    criterion 3 removes, reintroduced by the fallback written to
+    tolerate it. Receipts live under gitignored `data/`, so the fix is
+    to regenerate rather than to migrate, and the error says so.
     """
     receipts_dir = Path(receipts_dir or RECEIPTS_DIR)
     path = receipts_dir / f"{name}.json"
@@ -232,7 +306,22 @@ def read_receipt(name: str, receipts_dir: Path | None = None) -> datetime:
             f"fall back to a file modification time.")
     with open(path) as f:
         record = json.load(f)
-    return asset_time.parse_instant(record["received_at"], f"received_at in {path}")
+    received_at = asset_time.parse_instant(record["received_at"], f"received_at in {path}")
+    sequence = record.get("sequence")
+    if not isinstance(sequence, int):
+        raise ReceiptOrderError(
+            f"the receipt at {path} has no `sequence`, so this arrival cannot be placed in the "
+            f"processing order. Receipts written before REQ-PIPE-061 carry none.\n\n"
+            f"Fix: remove data/deliveries/ and data/receipts/, then regenerate BOTH collections "
+            f"(`mothman bdm generate-synthetic-data` and `mothman cp generate-synthetic-data`). "
+            f"Regenerating one on its own is not enough - each generator reads every arrival "
+            f"back afterwards, so one collection's stale receipts stop the other's run too, and "
+            f"that is what makes this a clear-and-rebuild rather than a migration.\n\n"
+            f"Not defaulted to zero on purpose: that would put every pre-sequence receipt in one "
+            f"place, so a tie between two of them would fall to a directory listing - the "
+            f"non-determinism this sequence exists to remove, reintroduced by the fallback "
+            f"written to tolerate it.")
+    return received_at, sequence
 
 
 def read_delivery(name: str, deliveries_dir: Path | None = None,
@@ -269,8 +358,8 @@ def read_delivery(name: str, deliveries_dir: Path | None = None,
             continue
         files.append(entry.name)
 
-    return Delivery(name=name, path=path,
-                     received_at=read_receipt(name, receipts_dir),
+    received_at, sequence = read_receipt_record(name, receipts_dir)
+    return Delivery(name=name, path=path, received_at=received_at, sequence=sequence,
                      files=tuple(files), anomalies=tuple(anomalies))
 
 
@@ -355,7 +444,19 @@ def survey(deliveries_dir: Path | None = None,
             in_flight.append(InFlight(
                 name=entry.name,
                 files=tuple(sorted(p.name for p in entry.iterdir() if p.is_file()))))
-    return Survey(received=sorted(received, key=lambda d: d.received_at),
+    # RECEIPT INSTANT, THEN THE ORDER THE RECEIPTS WERE WRITTEN
+    # (REQ-PIPE-061 criteria 1 and 3). The second key is the whole
+    # point: this used to sort on the instant alone, which is a STABLE
+    # sort over the name-sorted iterdir() above - so two arrivals
+    # sharing an instant were ordered by the supplier's own naming
+    # habits, which REQ-PIPE-057 criterion 8 separately forbids. The
+    # tiebreak has to be stated, because a stable sort over a directory
+    # listing is still a directory listing.
+    #
+    # GLOBAL, ACROSS COLLECTIONS (criterion 4). One delivery may span
+    # collections, so a per-collection ordering would visit it twice
+    # and could place it differently each time.
+    return Survey(received=sorted(received, key=lambda d: (d.received_at, d.sequence)),
                    in_flight=sorted(in_flight, key=lambda d: d.name))
 
 
