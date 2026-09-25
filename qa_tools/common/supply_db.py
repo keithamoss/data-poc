@@ -62,6 +62,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping, Sequence
 
+from qa_tools.common.asset_time import arrival_key
+
 import duckdb
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -140,19 +142,6 @@ def run_id_of(schema: str) -> str | None:
     if not schema.startswith(RUN_SCHEMA_PREFIX):
         return None
     return schema[len(RUN_SCHEMA_PREFIX):]
-
-
-def arrival_key(received_at) -> str:
-    """One arrival's instant, as a table-name segment.
-
-    OUR OWN RECEIPT INSTANT, never a supplier's filename and never the
-    delivery's name (REQ-PIPE-060's security decision): these become
-    SQL identifiers, and DuckDB's parameter binding covers values, not
-    identifiers. Everything that reaches a name here is either ours or
-    a validated dataset id.
-    """
-    text = received_at if isinstance(received_at, str) else received_at.isoformat()
-    return re.sub(r"[^0-9]", "", text)[:20] or "0"
 
 
 def staged_table(table: str, received_at, ordinal: int = 0) -> str:

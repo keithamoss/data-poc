@@ -204,3 +204,32 @@ class TestWhatWasActuallyLoaded:
         load_log.record("monday", "cp-clients", "cp_clients__2026", load_log.FAILED,
                          WHEN.isoformat(), reason="bad csv", log_dir=_log)
         assert _run(["failures"]).exit_code == 0
+
+
+class TestOneDatasetsOwnTimeline:
+    """REQ-PIPE-034's own entry point - every new one gets a mothman
+    subcommand in the same change."""
+
+    def test_history_is_a_subcommand_of_the_supply_group(self):
+        assert "history" in supply_group.commands
+        assert "history" in CliRunner().invoke(cli, ["supply", "--help"]).output
+
+    def test_an_unknown_dataset_fails_before_anything_is_read(self):
+        result = _run(["history", "--dataset", "not-a-dataset"])
+        assert result.exit_code != 0
+
+    def test_it_says_promoted_is_not_tracked_rather_than_leaving_it_blank(
+            self, real_committed_history):
+        """Silence would read as "same as the latest arrival", which is
+        the conflation this requirement exists to split."""
+        result = _run(["history", "--dataset", "birth-registrations", "--limit", "2"])
+        assert result.exit_code == 0, result.output
+        assert "not tracked yet" in result.output
+        assert "42 arrival(s)" in result.output
+
+    def test_it_names_the_datasets_that_shared_a_delivery(self, real_committed_history):
+        result = _run(["history", "--dataset", "cp-clients", "--limit", "3"])
+        assert result.exit_code == 0, result.output
+        assert "5 other dataset(s)" in result.output, (
+            "a whole-collection delivery has to stay distinguishable from several "
+            "coincidental arrivals")

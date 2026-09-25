@@ -54,6 +54,7 @@ import json
 import re
 from pathlib import Path
 
+from qa_tools.common import asset_time
 from qa_tools.common import holds
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -75,10 +76,27 @@ class DeliveryLogError(RuntimeError):
     to write it."""
 
 
-def path_for(delivery_name: str, log_dir: Path | None = None) -> Path:
+def path_for(delivery, log_dir: Path | None = None) -> Path:
+    """This delivery's committed record.
+
+    THE NAME CARRIES THE RECEIPT ORDER, and that is a performance
+    contract rather than decoration (REQ-PIPE-034's own non-functional
+    constraint). Answering "when did this dataset last arrive" must not
+    cost a walk of every arrival ever received - and with names that
+    sort arbitrarily, the only way to find the newest delivery holding
+    one dataset is to open all of them. Sorting by name here IS sorting
+    by receipt, so that walk runs newest-first and stops at the first
+    hit, bounded by deliveries since that dataset last supplied.
+
+    Takes a Delivery rather than a name, because a name alone cannot
+    produce this filename.
+    """
     directory = Path(log_dir or DELIVERY_LOG_DIR)
-    safe = _UNSAFE.sub("_", delivery_name).strip("._") or "unnamed"
-    return directory / f"{safe}.json"
+    safe = _UNSAFE.sub("_", delivery.name).strip("._") or "unnamed"
+    # Zero-padded so the sequence sorts as a number rather than as text,
+    # which is the whole point of putting it here.
+    return directory / (f"{asset_time.arrival_key(delivery.received_at)}"
+                         f"--{int(delivery.sequence):09d}--{safe}.json")
 
 
 def record(delivery, recognition, log_dir: Path | None = None) -> Path | None:
@@ -94,7 +112,7 @@ def record(delivery, recognition, log_dir: Path | None = None) -> Path | None:
 
     Returns the path written, or None where one already existed.
     """
-    path = path_for(delivery.name, log_dir)
+    path = path_for(delivery, log_dir)
     if path.exists():
         return None
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -480,6 +480,21 @@ releases:
               A run that stops partway now leaves everything it did not
               finish for the next one, in the same order, rather than
               only looking at whatever arrived most recently.
+          - headline: Every table gets its own timeline
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman supply history --dataset <name>` shows when that
+              one table arrived, on its own. A file resent for it no
+              longer disappears into a delivery of five other tables
+              that did not change, and those five gain nothing from
+              sharing the drop.
+          - headline: A file that would not load still counts as arriving
+            components: ["Pipeline & publishing"]
+            description: >
+              A supply that could not be read is still the latest thing
+              that arrived for that table, so a supplier sending
+              something broken shows up rather than leaving yesterday
+              on screen as though nothing happened.
 
   - date: "2026-09-24"
     summary: >

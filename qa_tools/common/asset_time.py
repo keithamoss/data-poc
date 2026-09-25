@@ -38,6 +38,8 @@ five requirements' comparisons on.
 """
 from __future__ import annotations
 
+import re
+
 import functools
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
@@ -243,3 +245,23 @@ def record_source_instant(value, where: str) -> str | None:
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         parsed = parsed.replace(tzinfo=SOURCE_TIMESTAMP_OFFSET)
     return parsed.isoformat()
+
+
+def arrival_key(received_at) -> str:
+    """One arrival's instant, as a table-name segment.
+
+    OUR OWN RECEIPT INSTANT, never a supplier's filename and never the
+    delivery's name (REQ-PIPE-060's security decision): these become
+    SQL identifiers, and DuckDB's parameter binding covers values, not
+    identifiers. Everything that reaches a name here is either ours or
+    a validated dataset id.
+    """
+    text = received_at if isinstance(received_at, str) else received_at.isoformat()
+    return re.sub(r"[^0-9]", "", text)[:20] or "0"
+
+
+# Kept HERE rather than in supply_db, where it started, because the
+# committed-history readers need it and may never import duckdb - the
+# standing rule that CI and any read-committed-history path never
+# depends on live data access. It is a pure function of an instant, so
+# this is also simply where it belongs.

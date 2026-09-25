@@ -347,3 +347,53 @@ def failures_command() -> None:
                 asset_time.parse_instant(record.recorded_at, "processing log")),
             record.reason or "unrecorded")
     console.print(table)
+
+
+@supply_group.command("history")
+@click.option("--dataset", "dataset_id", required=True,
+               help="The dataset whose own arrival timeline to show.")
+@click.option("--limit", default=15, show_default=True,
+               help="How many of the most recent arrivals to list.")
+def history_command(dataset_id: str, limit: int) -> None:
+    """One dataset's own arrival timeline.
+
+    A file resent for this table appears here on its own, not folded
+    into a delivery of other tables that did not change - and the
+    tables that shared that delivery gain nothing from it.
+
+    Reads committed records only. No database is opened.
+    """
+    from qa_tools.common import arrival_history, asset_time, display_time, hierarchy
+
+    # Fails on an unknown id before anything is read, so the error is
+    # about what was typed rather than about an empty result.
+    hierarchy.dataset(dataset_id)
+
+    found = arrival_history.arrivals_of(dataset_id)
+    if not found:
+        console.print(f"No arrival of {dataset_id} has been recorded yet.")
+        return
+
+    latest = found[-1]
+    console.print(f"[bold]{dataset_id}[/bold] - {len(found)} arrival(s) recorded")
+    console.print(f"Most recent arrival: [bold]{latest.supply_id}[/bold] "
+                   f"[dim]({display_time.format_instant(asset_time.parse_instant(latest.received_at, 'arrival history'))})[/dim]")
+    # SAID IN WORDS, not left as a blank column. The promoted version is
+    # a different question from the arrived one and they diverge exactly
+    # when it matters - a broken file arriving while the warehouse still
+    # holds the good one - so silence here would read as "same thing".
+    console.print("[dim]Most recent PROMOTED supply: not tracked yet - promotion is a later "
+                   "sprint, and reporting the latest arrival as promoted is the conflation "
+                   "this deliberately avoids.[/dim]\n")
+
+    table = Table("Arrival", "Received", "Delivery", "Arrived with", box=None, pad_edge=False)
+    for entry in reversed(found[-limit:]):
+        others = [d for d in arrival_history.delivery_companions(entry.delivery)
+                   if d != dataset_id]
+        table.add_row(
+            entry.supply_id,
+            display_time.format_instant(
+                asset_time.parse_instant(entry.received_at, "arrival history")),
+            entry.delivery,
+            f"{len(others)} other dataset(s)" if others else "[dim]on its own[/dim]")
+    console.print(table)

@@ -2968,7 +2968,71 @@ requirements:
       resent on Tuesday appears on its own timeline rather than folded
       into a delivery of five other tables that did not change.
     moscow: must
-    status: not_started
+    status: built
+    linked_tests:
+      - tests/test_arrival_history.py
+      - tests/test_cli_supply.py
+      - tests/test_delivery_log.py
+    implemented_by:
+      - qa_tools/common/arrival_history.py::arrivals_of
+      - qa_tools/common/arrival_history.py::last_arrived
+      - qa_tools/common/arrival_history.py::last_promoted
+      - qa_tools/common/arrival_history.py::delivery_companions
+      - qa_tools/common/arrival_history.py::load_outcome
+      - qa_tools/common/delivery_log.py::path_for
+      - qa_tools/common/asset_time.py::arrival_key
+      - cli/supply.py::history_command
+    unmet_criteria:
+      - criterion: >-
+          Criterion 3 - hold, for every dataset, the identity of its most
+          recently PROMOTED supply.
+        why: >-
+          This requirement's own decision 8 found the defect after sign-off:
+          the derivation signed off with it reads the WAREHOUSE CATALOGUE,
+          which decision 4 forbids for the arrived side, and the identical
+          argument applies here and was not applied. The real source is
+          Thread G's committed append-only decision log, which does not
+          exist until batch 4. Answering it from the latest ARRIVAL instead
+          would be the exact conflation this requirement splits apart, so
+          last_promoted() returns None and says so in words rather than
+          approximating. REQ-DASH-056 cannot be computed until this lands.
+        owner: batch 4 (Thread G's decision log)
+    evidence:
+      - >
+        2026-09-25: built against the real committed history rather than a
+        fixture. Birth Registrations has its own unbroken timeline of 42
+        arrivals with unique per-dataset supply ids; each of the six Child
+        Protection datasets has its own 18, with distinct ids for the same
+        delivery. Birth Registrations is the control the non-functional
+        constraint names, and it comes out behaviourally unchanged.
+      - >
+        2026-09-25: the cost constraint is MEASURED, and the first
+        implementation failed it. Answering "when did this dataset last
+        arrive" opened 60 of 60 committed records, because the newest-first
+        walk was built as a list and so paid the whole cost before returning
+        anything. Made lazy it opens 1 of 60 for Birth Registrations and 43
+        of 60 for cp-clients - the second is correct rather than a
+        regression, since Child Protection genuinely has not supplied in the
+        42 deliveries since. Bounded by deliveries since that dataset last
+        supplied, never by total history. Two tests assert it by counting
+        real file reads.
+      - >
+        2026-09-25: the committed delivery-log filenames now carry the
+        receipt instant and sequence, so a directory listing IS receipt order
+        and the walk can stop at the first hit. All 60 existing records were
+        migrated with `git mv`, content untouched.
+      - >
+        2026-09-25: criterion 5 tested with a real FAILED load record - the
+        supply is still the dataset's latest arrival, and no table exists for
+        it. This is the case that makes a catalogue-derived timeline wrong
+        rather than merely slower: a supplier sending garbage would be
+        invisible and the timeline would show the day before.
+      - >
+        2026-09-25: arrival_key moved from supply_db to asset_time so the
+        committed-history readers can name a receipt without importing
+        duckdb. Verified by loading delivery_log in a fresh interpreter and
+        confirming duckdb is absent from sys.modules.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     source: >
       Keith, plans/publishing-and-history.md item 6 - "per dataset runs
       against a shared warehouse composed of the current good version of
@@ -8805,7 +8869,7 @@ requirements:
       - qa_tools/common/load_log.py::record_load
       - qa_tools/common/load_log.py::loaded_tables
       - qa_tools/common/load_log.py::delivery_is_processed
-      - qa_tools/common/supply_db.py::arrival_key
+      - qa_tools/common/asset_time.py::arrival_key
       - qa_tools/common/supply_db.py::staged_table
       - qa_tools/common/supply_db.py::candidates_in
       - qa_tools/common/supply_db.py::expected_tables

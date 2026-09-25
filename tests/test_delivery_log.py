@@ -25,6 +25,10 @@ class _Delivery:
     files: tuple
     received_at: datetime
     anomalies: tuple = ()
+    #: REQ-PIPE-061's receipt write order, which the committed
+    #: record's own FILENAME now carries so a dataset's last arrival
+    #: can be found without opening every record.
+    sequence: int = 1
 
 
 @dataclass
