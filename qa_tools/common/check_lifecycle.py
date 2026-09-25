@@ -175,6 +175,23 @@ class CheckMetadata:
     failure_indicates: str | None = None
     technical_note: str | None = None
 
+    # EVERY TABLE THIS CHECK READS BESIDES THE ONE IT IS FILED AGAINST
+    # (REQ-PIPE-036 criterion 10), as LOGICAL names. Declared rather
+    # than derived, because deriving it means four tool-specific
+    # parsers - a dbt `to: ref()`, a SodaCL "must exist in" sentence, a
+    # contract SQL query, an Evidently dict - and a parser that quietly
+    # returns nothing for a shape it did not expect produces a check
+    # result that looks complete and names none of what it read. A
+    # missed DECLARATION is caught by a gate that scans the check's own
+    # config for other known table names; a missed derivation is caught
+    # by nobody.
+    #
+    # Empty for the great majority of checks, which read only their own
+    # table, and criterion 10 asks for nothing from those. Outside the
+    # config hash for the same reason every field above it is: naming
+    # what a check already read is not a change to what it does.
+    reads_tables: list[str] = field(default_factory=list)
+
 
 def _config_hash(config: dict) -> str:
     """A stable fingerprint of "what the check actually does" - sorted
@@ -221,6 +238,23 @@ def _authored(meta: dict, key: str) -> str | None:
     return value.strip() if isinstance(value, str) else value
 
 
+def _table_list(meta: dict, key: str) -> list[str]:
+    """A declared list of logical table names, normalised and sorted.
+
+    A BARE STRING IS ACCEPTED AND WRAPPED, because the single-table case
+    is the common one and `reads_tables: cp_clients` is what somebody
+    will write. Refusing it would be correct and would also mean a
+    silently undeclared cross-table check the first time an author took
+    the obvious shortcut.
+    """
+    value = meta.get(key)
+    if value is None:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    return sorted({str(name).strip() for name in value if str(name).strip()})
+
+
 def _lifecycle_fields(meta: dict) -> dict:
     return {
         "introduced_date": meta.get("introduced_date"),
@@ -231,6 +265,7 @@ def _lifecycle_fields(meta: dict) -> dict:
         "name": _authored(meta, "name"),
         "failure_indicates": _authored(meta, "failure_indicates"),
         "technical_note": _authored(meta, "technical_note"),
+        "reads_tables": _table_list(meta, "reads_tables"),
     }
 
 

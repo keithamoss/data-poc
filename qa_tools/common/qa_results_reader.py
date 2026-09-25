@@ -51,6 +51,45 @@ def _natural_sort_key(name: str) -> tuple:
 # check, not noise from an incidental reordering.
 TOOL_ORDER = ["dbt", "soda", "datacontract", "evidently"]
 
+#: Every file a COMPLETE run writes - the four real tools plus the two
+#: pseudo-tools (REQ-PIPE-036 criterion 12). A run missing any of these
+#: failed partway through, and the point of deriving completeness this
+#: way rather than writing a marker file is that there is no third
+#: state to get wrong: a run is complete because everything it owes is
+#: there, not because something said so.
+EXPECTED_TOOLS = tuple(TOOL_ORDER) + ("dataset_stats", "tables_read")
+
+
+class PartialRunError(RuntimeError):
+    """A run whose results are on disk but incomplete."""
+
+
+def missing_tools(agency: str, dataset: str, run_id: str,
+                   qa_results_dir: Path | str = QA_RESULTS_DIR) -> list[str]:
+    """What this run still owes, or [] where it owes nothing."""
+    run_dir = Path(qa_results_dir) / agency / dataset / run_id
+    return [tool for tool in EXPECTED_TOOLS if not (run_dir / f"{tool}.json").exists()]
+
+
+def run_is_complete(agency: str, dataset: str, run_id: str,
+                     qa_results_dir: Path | str = QA_RESULTS_DIR) -> bool:
+    return not missing_tools(agency, dataset, run_id, qa_results_dir)
+
+
+def incomplete_runs(agency: str, dataset: str,
+                     qa_results_dir: Path | str = QA_RESULTS_DIR) -> dict[str, list[str]]:
+    """Every run under this dataset segment that failed partway, and
+    what each is missing."""
+    dataset_dir = Path(qa_results_dir) / agency / dataset
+    if not dataset_dir.is_dir():
+        return {}
+    out = {}
+    for run_dir in sorted(p for p in dataset_dir.iterdir() if p.is_dir()):
+        missing = missing_tools(agency, dataset, run_dir.name, qa_results_dir)
+        if missing:
+            out[run_dir.name] = missing
+    return out
+
 
 def read_one(agency: str, dataset: str, run_id: str, tool: str,
              qa_results_dir: Path | str = QA_RESULTS_DIR) -> list[dict]:

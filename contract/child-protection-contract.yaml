@@ -470,6 +470,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.escalation_completeness_datacontract
+              - property: reads_tables
+                value: ["cp_investigations"]
               - property: name
                 value: Escalation completeness
               - property: introduced_date
@@ -511,6 +513,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.cp_client_id.relationships_datacontract
+              - property: reads_tables
+                value: ["cp_clients"]
               - property: name
                 value: Client reference
               - property: introduced_date
@@ -650,6 +654,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.assigned_worker_id.relationships_datacontract
+              - property: reads_tables
+                value: ["cp_case_workers"]
               - property: name
                 value: Assigned worker reference
               - property: introduced_date
@@ -765,6 +771,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.closed_case_hygiene_datacontract
+              - property: reads_tables
+                value: ["cp_clients"]
               - property: name
                 value: Closed-case hygiene
               - property: introduced_date
@@ -806,6 +814,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.notification_id.relationships_datacontract
+              - property: reads_tables
+                value: ["cp_notifications"]
               - property: name
                 value: Notification reference
               - property: introduced_date
@@ -847,6 +857,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.cp_client_id.relationships_datacontract
+              - property: reads_tables
+                value: ["cp_clients"]
               - property: name
                 value: Client reference
               - property: introduced_date
@@ -939,6 +951,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.lead_worker_id.relationships_datacontract
+              - property: reads_tables
+                value: ["cp_case_workers"]
               - property: name
                 value: Lead worker reference
               - property: introduced_date
@@ -1049,6 +1063,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-placements.cp_client_id.relationships_datacontract
+              - property: reads_tables
+                value: ["cp_clients"]
               - property: name
                 value: Client reference
               - property: introduced_date
@@ -1114,6 +1130,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.relationships_datacontract
+              - property: reads_tables
+                value: ["cp_carers"]
               - property: name
                 value: Carer reference
               - property: introduced_date
@@ -1136,6 +1154,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.approval_compliance_datacontract
+              - property: reads_tables
+                value: ["cp_carers"]
               - property: name
                 value: Carer approval compliance
               - property: introduced_date

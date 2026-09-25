@@ -816,6 +816,7 @@ models:
               field: cp_client_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.cp_client_id.relationships_dbt
+                reads_tables: [cp_clients]
                 name: Client reference
                 category: consistency
                 introduced_date: "2023-01-15"
@@ -910,6 +911,7 @@ models:
               field: worker_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.assigned_worker_id.relationships_dbt
+                reads_tables: [cp_case_workers]
                 name: Assigned worker reference
                 category: consistency
                 introduced_date: "2023-01-15"
@@ -978,6 +980,7 @@ models:
               field: notification_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.notification_id.relationships_dbt
+                reads_tables: [cp_notifications]
                 name: Notification reference
                 category: consistency
                 introduced_date: "2023-01-15"
@@ -1003,6 +1006,7 @@ models:
               field: cp_client_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.cp_client_id.relationships_dbt
+                reads_tables: [cp_clients]
                 name: Client reference
                 category: consistency
                 introduced_date: "2023-01-15"
@@ -1057,6 +1061,7 @@ models:
               field: worker_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.lead_worker_id.relationships_dbt
+                reads_tables: [cp_case_workers]
                 name: Lead worker reference
                 category: consistency
                 introduced_date: "2023-01-15"
@@ -1108,6 +1113,7 @@ models:
               field: cp_client_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.cp_client_id.relationships_dbt
+                reads_tables: [cp_clients]
                 name: Client reference
                 category: consistency
                 introduced_date: "2023-01-15"
@@ -1150,6 +1156,7 @@ models:
               field: carer_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.relationships_dbt
+                reads_tables: [cp_carers]
                 name: Carer reference
                 category: consistency
                 introduced_date: "2023-01-15"

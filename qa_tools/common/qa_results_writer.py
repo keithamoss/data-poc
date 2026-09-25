@@ -77,11 +77,67 @@ inside each written file instead, for the actual wall-clock provenance.
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 QA_RESULTS_DIR = ROOT / "qa_results"
+
+
+def _with_tables_read(verified: list[dict], run_id: str) -> list[dict]:
+    """Record, on each cross-table check's own result, the physical
+    table name of every OTHER table it read (REQ-PIPE-036 criterion 10).
+
+    HERE RATHER THAN IN EACH TOOL, because this is the one place all
+    eight run_*.py callers already funnel through - and doing it in
+    four tool modules twice over is four chances for one of them to be
+    missed, which produces a result that looks complete and names none
+    of what it read.
+
+    THE RESOLUTION IS READ ONLY WHERE SOMETHING DECLARES A DEPENDENCY.
+    Birth Registrations has no cross-table check at all, so its four
+    writes never open a connection; Child Protection's do. A run with
+    no recorded resolution - a fixture, an ad hoc call - gets no
+    tables_read rather than an error, and that is safe to be quiet
+    about for one specific reason: the run-level tables_read.json
+    (REQ-PIPE-068 criterion 5) records the same resolution for the
+    whole run, so an absence here is visible against a file that is
+    always written.
+    """
+    from qa_tools.common import tables_read as tables_read_mod
+
+    declared = _declared_reads_tables()
+    if not any(record.get("check_id") in declared for record in verified):
+        return verified
+    try:
+        from qa_tools.common import supply_db
+
+        conn = supply_db.connect(read_only=True)
+        try:
+            resolved = supply_db.resolution_for(conn, run_id).resolved
+        finally:
+            conn.close()
+    except Exception:  # noqa: BLE001 - see the docstring on why this is quiet
+        return verified
+    return tables_read_mod.attach(verified, resolved, declared)
+
+
+@lru_cache(maxsize=1)
+def _declared_reads_tables() -> dict[str, list[str]]:
+    """`check_id` -> the tables that check declares it reads.
+
+    Cached because it parses every check source and the answer cannot
+    change within one process - a check definition is a file on disk,
+    and a run that edited one mid-flight would have bigger problems.
+    """
+    from qa_tools.common import tables_read as tables_read_mod
+    from qa_tools.common.validate_check_lifecycle import collect_checks
+
+    try:
+        return tables_read_mod.declared_by_check_id(collect_checks(None))
+    except Exception:  # noqa: BLE001 - a malformed source is the lifecycle gate's to report
+        return {}
 
 
 def write_qa_result(agency: str, dataset: str, run_id: str, run_timestamp: str,
@@ -119,7 +175,8 @@ def write_qa_result(agency: str, dataset: str, run_id: str, run_timestamp: str,
     run_dir.mkdir(parents=True, exist_ok=True)
     out_path = run_dir / f"{tool}.json"
     payload = {"run_timestamp": run_timestamp, "run_by": run_by,
-               "raw_output": raw_output, "verified": verified or []}
+               "raw_output": raw_output,
+               "verified": _with_tables_read(verified or [], run_id)}
     with open(out_path, "w") as f:
         json.dump(payload, f, indent=2, default=str)
     return out_path

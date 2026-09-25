@@ -3679,7 +3679,7 @@ requirements:
       all - and so that a normal delivery does not flash red while its
       own tables are still landing.
     moscow: must
-    status: not_started
+    status: built
     source: >
       Keith, plans/publishing-and-history.md item 6, 2026-09-20 - "per
       dataset QA runs, each triggered by its own table's arrival".
@@ -3749,6 +3749,97 @@ requirements:
         size before and after rather than assuming.
       - Invoked through mothman only.
     dependencies: [REQ-PIPE-034, REQ-PIPE-035, REQ-GEN-040]
+    linked_tests:
+      - tests/test_tables_read.py
+      - tests/test_period_schema.py
+    implemented_by:
+      - qa_tools/common/tables_read.py::attach
+      - qa_tools/common/tables_read.py::undeclared_cross_table
+      - qa_tools/common/tables_read.py::declared_by_check_id
+      - qa_tools/common/qa_results_writer.py::_with_tables_read
+      - qa_tools/common/qa_results_reader.py::run_is_complete
+      - qa_tools/common/qa_results_reader.py::incomplete_runs
+      - qa_tools/bdm/orchestrate_bdm.py::_run_step
+      - qa_tools/cp/orchestrate_cp.py::_run_step
+      - qa_tools/common/check_lifecycle.py::_table_list
+    evidence:
+      - >
+        2026-09-25: criterion 10 is DECLARED rather than derived, and
+        the gate is what makes that safe. Deriving it means four
+        tool-specific parsers, and a parser that quietly returns
+        nothing for a shape it did not expect produces a check result
+        that looks complete and names none of what it read.
+        undeclared_cross_table() re-reads all three tool sources and
+        found exactly 24 cross-table checks - 7 dbt relationships
+        tests, 7 SodaCL "must exist in" checks and 10 ODCS SQL rules -
+        every one of which now declares what it reads.
+      - >
+        2026-09-25: the gate is asserted NOT TO PASS VACUOUSLY. A test
+        strips the seven real declarations out of a copy of the dbt
+        schema and asserts the gate catches all seven, because a gate
+        over a corpus that cannot fail proves nothing.
+      - >
+        2026-09-25: declaring reads_tables on 24 checks changed ZERO of
+        259 config hashes, measured before and after rather than
+        assumed. Naming what a check already read is not a change to
+        what it does, and the field is excluded from the hash BY
+        CONSTRUCTION - _NON_CONFIG_FIELDS is derived from
+        _lifecycle_fields, which the new field is part of - so the test
+        asserts the derivation rather than a snapshot.
+      - >
+        2026-09-25: a real bug was found by a test rather than in
+        review. attach() dropped the check's own table by comparing the
+        result's dataset_id against the declared TABLE names -
+        "cp-placements" against "cp_placements" - which never matched,
+        so a check declaring its own table recorded itself as something
+        it read. The comparison now resolves the dataset id to its
+        table through the hierarchy.
+      - >
+        2026-09-25: criterion 11 is asserted on the SIGNATURE as well as
+        on the output. attach() takes results, the run's resolution and
+        the declarations, and nothing else - the rule is that another
+        table's status is not REACHABLE here, because a function that
+        could look it up would eventually be asked to.
+      - >
+        2026-09-25: criterion 12's "not recorded as complete" is DERIVED
+        from every expected file being present rather than from a
+        marker, so there is no third state to get wrong. All 60
+        committed runs carry the same six files and are asserted
+        complete; a run missing a tool is asserted incomplete and to
+        say which. The loud failure names the collection, the tool and
+        the run id, and chains the original exception rather than
+        replacing it.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
+    unmet_criteria:
+      - criterion: >
+          Criterion 1, in part - QA runs once per DELIVERY, which is
+          what it does today, but not yet "per period that delivery's
+          tables claim slots in". Criteria 8 and 9, the period-scoped
+          re-evaluation rules, are unmet for the same reason.
+        why: >
+          REQ-PIPE-035 built the per-period fan-out and it is not wired,
+          because a supply has no period until filings are recorded and
+          REQ-PIPE-062 defers that until promotion exists. An ordinary
+          delivery claims one period, so today's one-run-per-delivery
+          is the correct behaviour for every delivery that currently
+          exists - what is missing is the mixed-period case, which
+          cannot arise until something files.
+        owner: the promotion sprint (batch 4)
+      - criterion: >
+          Criterion 4 - each tool invocation is still scoped to a
+          COLLECTION rather than to one dataset, so Child Protection's
+          dbt, Soda and datacontract-cli runs each produce one raw
+          output covering six datasets.
+        why: >
+          The payoff criterion 4 names - raw output that needs neither
+          duplicating nor filtering to be stored per dataset - is only
+          collectable once qa_results/ is keyed per dataset, which is
+          REQ-PIPE-038's own criterion. Splitting the invocations first
+          would multiply tool runs sixfold against the NFR's ~45s
+          budget and store the same bytes in six places, which is the
+          opposite of what the criterion asks for. Measured today:
+          25.88 MB committed, 15.68 MB of it raw output (61%).
+        owner: REQ-PIPE-038
     decisions:
       - Decided the trigger is the DELIVERY, not the table (Keith,
         2026-09-22), which is why this requirement was revised rather

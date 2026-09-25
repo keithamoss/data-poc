@@ -74,6 +74,35 @@ DATASET_ID = bdm_common.DATASET_ID
 RUN_STEPS = ("dbt-core", "Soda Core", "datacontract-cli", "Evidently", "Dataset statistics")
 
 
+class QaRunFailure(RuntimeError):
+    """A tool failed partway through a run (REQ-PIPE-036 criterion 12).
+
+    NAMES THE DATASET AND THE TOOL, because the bare exception a tool
+    raises names neither - and at ~30 datasets across two collections,
+    "datacontract-cli exited 1" sends somebody to the logs to work out
+    WHOSE run it was. The original cause is chained rather than
+    replaced, so nothing about the diagnosis is lost.
+    """
+
+
+def _run_step(collection: str, tool: str, run_id: str, call):
+    """Run one tool's evaluation, or fail loudly saying whose it was.
+
+    The partial run's files STAY ON DISK. Deleting them would destroy
+    the evidence of what did run, and they cannot be mistaken for a
+    complete run anyway: completeness is derived from every expected
+    file being present (qa_results_reader.EXPECTED_TOOLS), so a run
+    that stopped after two tools is visibly missing four.
+    """
+    try:
+        return call()
+    except Exception as exc:  # noqa: BLE001 - re-raised, named, and chained
+        raise QaRunFailure(
+            f"{collection} run {run_id}: {tool} failed - {type(exc).__name__}: {exc}. "
+            f"This run is INCOMPLETE and is not recorded as a finished one; "
+            f"its partial results stay on disk.") from exc
+
+
 def _announce(on_step, label: str) -> None:
     """Report the step ABOUT to start. Optional by design: every existing
     caller (the full-manifest batch loop, the AWS Lambda handlers, the
@@ -92,14 +121,17 @@ def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str
 
     results: list[dict] = []
     _announce(on_step, RUN_STEPS[0])
-    results.extend(run_dbt_bdm.evaluate_dbt_bdm(run_id, run_timestamp))
+    results.extend(_run_step(COLLECTION_ID, "dbt-core", run_id,
+        lambda: run_dbt_bdm.evaluate_dbt_bdm(run_id, run_timestamp)))
     _announce(on_step, RUN_STEPS[1])
-    results.extend(run_soda_bdm.evaluate_soda_bdm(run_id, run_timestamp))
+    results.extend(_run_step(COLLECTION_ID, "Soda Core", run_id,
+        lambda: run_soda_bdm.evaluate_soda_bdm(run_id, run_timestamp)))
     _announce(on_step, RUN_STEPS[2])
-    results.extend(run_datacontract_bdm.evaluate_datacontract_bdm(run_id, csv_filename, run_timestamp))
+    results.extend(_run_step(COLLECTION_ID, "datacontract-cli", run_id,
+        lambda: run_datacontract_bdm.evaluate_datacontract_bdm(run_id, csv_filename, run_timestamp)))
     _announce(on_step, RUN_STEPS[3])
-    results.extend(run_evidently_bdm.evaluate_evidently_bdm(
-        run_id, csv_filename, run_timestamp, reference_run_id=reference_run_id, reference_csv=reference_csv))
+    results.extend(_run_step(COLLECTION_ID, "Evidently", run_id,
+        lambda: run_evidently_bdm.evaluate_evidently_bdm( run_id, csv_filename, run_timestamp, reference_run_id=reference_run_id, reference_csv=reference_csv)))
 
     # Computed and committed here, not by the dashboard-building layer -
     # this is the one point in the whole pipeline with a legitimate,

@@ -545,6 +545,20 @@ releases:
               reads red and names it, instead of quietly reading nothing.
               A brand-new dataset with no earlier period to compare
               against still reads as having no data, not as a failure.
+          - headline: Checks name what they read
+            components: ["QA checks & contract"]
+            description: >
+              A check that compares two tables now records which version
+              of the other table it read, so a failing referential check
+              tells you what it was failing against rather than leaving
+              you to work it out.
+          - headline: No half-finished runs
+            components: ["Pipeline & publishing"]
+            description: >
+              If a tool fails partway through a run, the error now names
+              the collection, the tool and the run, and the run is no
+              longer counted as a completed one just because some of its
+              results were written.
 
   - date: "2026-09-24"
     summary: >
