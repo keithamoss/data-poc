@@ -704,6 +704,15 @@ Rough layout:
   condition locally - move the gitignored tree aside, run the test -
   which is the cheapest way to check this class before pushing.
 
+  **GIT DEPTH is the same trap wearing different clothes**, hit
+  2026-09-25 and caught before pushing rather than by a red run. A test
+  asserted on `HEAD~2`, which every local clone resolves and
+  `actions/checkout@v4` does not - its default fetch-depth is 1, so
+  nothing older than HEAD exists on the runner. Anything a test says
+  about git history is subject to this, not just file trees. Same
+  cheapest check: `git clone --depth 1 file:///<repo>` somewhere
+  temporary and run the test there.
+
   Two things worth knowing so this doesn't get mis-diagnosed next time:
   **CI is not affected** - `.github/workflows/test.yml` runs all three
   as real steps, so a red local suite with a green CI almost certainly

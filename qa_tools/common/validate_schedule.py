@@ -49,6 +49,7 @@ from pathlib import Path
 import yaml
 
 from qa_tools.common import asset_time, schedule
+from qa_tools.common.diff_base import diff_base
 from qa_tools.common.schemas import DataAsset
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -632,7 +633,7 @@ def _changelog_at(doc: dict, calendar_name: str, effective: str) -> list[str]:
 
 
 def _retrospective_edit_errors(raw: dict, src: Source, today: date | None = None,
-                                ref: str = "HEAD~1") -> list[ConfigError]:
+                                ref: str | None = None) -> list[ConfigError]:
     """A date in the PAST that changed, without its version saying so.
 
     Thread E's rule is that config must never be edited to make red
@@ -650,14 +651,31 @@ def _retrospective_edit_errors(raw: dict, src: Source, today: date | None = None
       - Only within one version. Authoring a NEW effective-dated
         version is the sanctioned way to change a schedule, so a date
         that differs between versions is the mechanism working.
-      - A changelog entry on that version clears it. This is a "say
-        what you did" gate, not a freeze - Thread E allows a correction,
-        it just will not have one happen quietly.
+      - A NEW changelog entry on that version clears it. This is a
+        "say what you did" gate, not a freeze - Thread E allows a
+        correction, it just will not have one happen quietly. It has to
+        be an ADDED line, not merely a different one: the guard used to
+        accept any change to the list, so rewording an existing entry -
+        or deleting one - licensed moving a past date, which is the
+        opposite of what it is for. Same rule as the sibling gate's
+        `find_undocumented_changes()`, which has always required the
+        changelog to have grown (plans/post-build-review.md #44).
       - Silent when there is no previous commit to compare against,
         rather than failing. A shallow checkout or a first commit is
         not a finding.
+
+    WHICH COMMIT "PREVIOUS" MEANS is `diff_base()`'s call, not this
+    module's - see that module for the multi-commit hole both gates
+    shared.
     """
-    today = today or date.today()
+    # The ASSET's clock, never the runner's. They are different
+    # calendar dates for ~8 hours of every day (Perth is UTC+8), and
+    # this function's whole job is deciding whether a date is in the
+    # past - so a UTC runner would let through an edit to yesterday's
+    # date for a third of the day, and only for pushes landing in that
+    # window. Same class as plans/post-build-review.md #59.
+    today = today or asset_time.local_date(asset_time.now())
+    ref = ref or diff_base()
     previous = _content_at(str(src.asset_path.relative_to(ROOT)), ref) \
         if src.asset_path.is_relative_to(ROOT) else None
     if previous is None:
@@ -686,7 +704,8 @@ def _retrospective_edit_errors(raw: dict, src: Source, today: date | None = None
             continue  # a future date is meant to be editable
 
         old_changelog = _changelog_at(old_doc, calendar_name, effective)
-        if _changelog_at(raw, calendar_name, effective) != old_changelog:
+        new_changelog = _changelog_at(raw, calendar_name, effective)
+        if len(new_changelog) > len(old_changelog):
             continue  # the version says what changed, which is all this asks
 
         what = f"is now {new_value}" if new_value else "has been removed"

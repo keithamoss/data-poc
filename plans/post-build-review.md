@@ -1796,7 +1796,7 @@ here as its own question, not acted on.
     two functions should be held to each other, not each to its own
     expectation.
 
-35. **[todo, 2026-09-24]** **[Pipeline & publishing]** **[A4] Two
+35. **[in-progress, 2026-09-25]** **[Pipeline & publishing]** **[A4] Two
     wall-clock computations are not on the asset clock.**
     `REQ-PIPE-048` criterion 2 - "SHALL derive every wall-clock
     computation from that value, and SHALL NOT carry a hardcoded offset
@@ -1827,6 +1827,16 @@ here as its own question, not acted on.
     **Cost:** small for the first. The second is a judgement about how
     loudly a browser should fail, which is the same question #5 raises
     from the other side.
+
+    **First residue FIXED 2026-09-25**, as part of #44's cheap
+    hardening - Keith folded the two together ("happy for you to put it
+    in item 44 and then address it there"), same guard, one fix. The
+    boundary now reads `asset_time.local_date(asset_time.now())`, with
+    a regression test that can only pass on the asset's clock. The
+    SECOND residue - `assetTodayDateStr()`'s silent UTC fallback in the
+    browser - is still open and still Keith's, for the reason recorded
+    above: it is the "how loudly should a browser fail" question, not a
+    one-line fix.
 
     **SPLIT 2026-09-25, at Keith's direction.** The guard's
     `date.today()` half moves to **#44**, which is the same guard and
@@ -2157,7 +2167,7 @@ here as its own question, not acted on.
     switching that one e2e test to `clean_page` is a one-word change
     that would have caught #5.
 
-44. **[todo, 2026-09-24]** **[Pipeline & publishing]** **[D3] The
+44. **[done, 2026-09-25]** **[Pipeline & publishing]** **[D3] The
     retrospective-edit guard is narrower than its prose reads.**
 
     **Verified.** `validate_schedule.py:597` defaults to
@@ -2319,6 +2329,58 @@ here as its own question, not acted on.
     decide which, and write down whichever is chosen - an
     under-documented guard is one a future session will trust further
     than it goes.
+
+    **DONE 2026-09-25 - the cheap hardening, on Keith's own call ("yep,
+    do the cheap hardening now and leave the seal for 44").** Three
+    changes, no new bytes in `qa_results/`:
+
+    - **`qa_tools/common/diff_base.py`**, new: one function answering
+      "which commit do the immutability gates compare against". CI sets
+      `MOTHMAN_DIFF_BASE` to `github.event.before` - the commit the
+      PUSH started from - and `deploy-pages.yml` now checks out at
+      `fetch-depth: 0` rather than 2. Every commit in a push is read,
+      for the calendars and for every hand-authored check alike. It
+      falls back to `HEAD~1` when the ref is unset or unreachable,
+      because a branch's first push reports an all-zeros before-SHA and
+      a shallow checkout cannot reach past its depth - neither is a
+      finding, and neither should take a gate down. Its own module
+      because BOTH gates need it and neither should own it; they had
+      already drifted into two spellings of one decision.
+    - **The changelog escape now needs a LONGER changelog**, not a
+      different one. Rewording an existing entry - or deleting one -
+      used to license moving a past date. Same rule the sibling check
+      gate's `find_undocumented_changes()` has always had.
+    - **The past/future boundary reads the ASSET's clock** (#35's first
+      residue, folded in here as agreed). It was `date.today()`, the
+      runner's, and the two are different calendar dates for about a
+      third of every day - on a function whose whole job is deciding
+      whether a date is in the past.
+
+    **Tests, all confirmed failing against the real pre-fix code
+    first** - `TestTheGuardIsNotAsNarrowAsItLooked` (the changelog
+    escape, the asset clock, plus the must-not-change half: a
+    genuinely new entry still clears the finding) and `TestTheDiffBase`
+    (the fallbacks, plus two that assert the WIRING - the defect was
+    that each gate named its own ref, so a test of `diff_base()` alone
+    would not have caught it). The clock test is built so it can only
+    pass on an asset-clock reading: it moves a date that is past in
+    Perth and future anywhere UTC-ish.
+
+    **One of those tests would itself have gone red in CI**, caught
+    before pushing and recorded because it is the same shape CLAUDE.md
+    already names: it set the configured ref to `HEAD~2`, which
+    resolves in a full local clone and not under `actions/checkout@v4`,
+    whose default fetch-depth is 1. Reproduced with a real `git clone
+    --depth 1` rather than reasoned about, fixed by asserting on `HEAD`
+    - which resolves at any depth and proves the same thing - and the
+    whole file re-run inside that shallow clone to confirm it.
+
+    **What is deliberately NOT closed:** the seal itself. Sealing what
+    has elapsed needs no git history at all and is the right answer,
+    but the obvious build of it costs ~63 MB a year in repeated hashes
+    and the elegant build is the same artefact `plans/running-thoughts.md`
+    #44 exists to design. This closes the multi-commit hole today; that
+    item owns the rest.
 
 45. **[investigate, 2026-09-24]** **[QA checks & contract]** **[B5] One
     pinned false green, flagged only so the pin stays visible.**

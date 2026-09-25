@@ -31,6 +31,7 @@ from pathlib import Path
 
 from qa_tools.common import check_id as cid
 from qa_tools.common import check_lifecycle as cl
+from qa_tools.common.diff_base import diff_base
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -206,7 +207,11 @@ def _explanation_errors(checks: list[cl.CheckMetadata]) -> list[str]:
 
 
 def main(require_explanations: bool = False) -> int:
-    old_checks = collect_checks("HEAD~1")
+    # Not a literal "HEAD~1" - a push of several commits would then
+    # only ever be checked on its last one, and every retroactive edit
+    # underneath it would pass unread. See qa_tools/common/diff_base.py
+    # (plans/post-build-review.md #44).
+    old_checks = collect_checks(diff_base())
     new_checks = collect_checks(None)
     errors = cl.validate(old_checks, new_checks) + _check_id_errors(new_checks)
 

@@ -133,6 +133,19 @@ releases:
               counted as healthy. Every figure is now counted in its own
               right, and the two quiet states appear in the key with
               their own totals whenever they are real.
+          - headline: Every commit in a push is now checked for quiet edits
+            components: ["Pipeline & publishing"]
+            description: >
+              Two guards exist to stop a past delivery date, or a
+              check's definition, being changed after the fact - and
+              both only ever looked at the last commit of a push. A
+              change made one commit earlier went unseen. They now read
+              the whole push. Two related holes closed with it: editing
+              an existing calendar note no longer licenses moving a
+              past date (only a new note does), and "in the past" is
+              now decided on the asset's own clock rather than the
+              build machine's, which sits on a different calendar day
+              for about a third of every day.
           - headline: An empty delivery calendar no longer calls itself "low"
             components: ["Pipeline & publishing"]
             description: >

@@ -223,11 +223,24 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    env:
+      # The two history-comparing gates below ask "did something that
+      # should be immutable change?" by reading a file at an earlier
+      # commit. Comparing against HEAD~1 only ever checks a push's LAST
+      # commit, so anything edited in the one underneath it went
+      # unread - true for the calendars and for every hand-authored
+      # check alike (plans/post-build-review.md #44). This is the
+      # commit the push STARTED from, so every commit in it is covered.
+      # Empty on workflow_dispatch/issue_comment, where
+      # qa_tools/common/diff_base.py falls back to HEAD~1.
+      MOTHMAN_DIFF_BASE: ${{ github.event.before }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2 # need HEAD~1 for the check-lifecycle and schedule diffs
+          # Full history, not 2: the gates now compare against the
+          # push's base, which can be any number of commits back.
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
@@ -267,10 +280,10 @@ jobs:
       - name: Gate - hierarchy validation (REQ-QAC-039)
         run: uv run mothman dashboard validate-hierarchy
 
-      # Needs HEAD~1 for its past-date guard - the same fetch-depth: 2
-      # this job already sets for the check-lifecycle diff below, which
-      # is exactly why that guard was affordable enough to build
-      # (REQ-PIPE-050).
+      # Needs history for its past-date guard - the same MOTHMAN_DIFF_BASE
+      # and full checkout this job already sets for the check-lifecycle
+      # diff below, which is exactly why that guard was affordable
+      # enough to build (REQ-PIPE-050).
       - name: Gate - schedule and asset config validation (REQ-PIPE-050)
         run: uv run mothman schedule validate
 

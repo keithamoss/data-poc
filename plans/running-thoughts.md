@@ -2308,3 +2308,34 @@ to SEE them, and there is already a separate ordering check that does).
     **Not urgent at 2 datasets and 60 runs.** Worth designing before
     the daily asset exists rather than after, because migrating a
     committed history is far harder than choosing its shape.
+
+    **THIS ITEM NOW OWNS THE SEAL ITSELF**, decided 2026-09-25 ("yep,
+    do the cheap hardening now and leave the seal for 44"). The cheap
+    half shipped the same day - both immutability gates now read the
+    whole push rather than its last commit, the changelog escape needs
+    a NEW entry rather than any edit, and the past/future boundary is
+    on the asset's clock (`plans/post-build-review.md` #44, which
+    records what was and was not closed). The part deliberately left
+    here is the SEAL: a committed record of what a check was when it
+    was last used to judge data, so the gate needs no git history at
+    all.
+
+    It is left here rather than built because the two are the same
+    artefact. The obvious build - writing each check's `config_hash`
+    into every verified record - costs ~8.8KB a run, **~63MB a year**
+    at the 20-datasets-daily figure above, and lands squarely in the
+    problem this item exists to solve. The second thread above
+    ("configuration is repeated, not versioned") IS the seal, at ~30KB
+    a year in total. Building the per-run hash first would be building
+    the throwaway version of the thing this item is meant to design.
+
+    One correction worth carrying, because it was got wrong out loud
+    before it was got right: the committed history does NOT already
+    contain what the check gate compares. `find_undocumented_changes()`
+    compares `config_hash`, a SHA-256 of a check's whole config dict;
+    the `verified` records carry the RESOLVED thresholds and nothing
+    else, and `config_hash` appears nowhere in `qa_results/`. Changing
+    a dbt `accepted_values` list from `[M, F, X]` to `[M, F, X, U]`
+    changes the hash and changes no threshold - so comparing on what
+    history already holds would miss exactly the class of change that
+    matters most.

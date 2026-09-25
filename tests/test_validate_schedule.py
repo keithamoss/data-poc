@@ -687,3 +687,181 @@ class TestTheGateActuallyFailsTheBuild:
         """The other half: a gate that always failed would also satisfy
         the assertion above."""
         assert validate_schedule.main() == 0
+
+
+class TestTheGuardIsNotAsNarrowAsItLooked:
+    """post-build-review #44, the cheap hardening, 2026-09-25.
+
+    Two of the three weaknesses live in this function. The third - only
+    ever comparing against HEAD~1, so a push of several commits is
+    checked on its last one alone - is about which ref the gate is
+    handed, and is covered by TestTheDiffBase below.
+    """
+
+    CAL = "quarterly"
+
+    def _docs(self, mutate, old_mutate=None):
+        old = yaml.safe_load((REAL_CONTRACT_DIR / "data-asset.yaml").read_text())
+        if old_mutate:
+            old_mutate(old)
+        new = copy.deepcopy(old)
+        mutate(new)
+        return old, new
+
+    def _run(self, monkeypatch, old, new, today=None):
+        from qa_tools.common import validate_schedule as mod
+
+        monkeypatch.setattr(mod, "_content_at",
+                             lambda rel_path, ref: yaml.safe_dump(old, sort_keys=False))
+        src = Source(mod.ROOT / "contract" / "data-asset.yaml", REAL_CONTRACT_DIR)
+        return mod._retrospective_edit_errors(new, src, today=today)
+
+    def _version(self, doc):
+        return _calendar(doc, self.CAL)["versions"][0]
+
+    def _entry(self, doc, period):
+        return next(e for e in self._version(doc)["dates"] if e["period"] == period)
+
+    def test_an_edited_changelog_entry_does_not_license_a_past_date_move(
+            self, monkeypatch):
+        """The escape hatch cleared the finding when the changelog
+        differed IN ANY WAY. So rewording an existing entry - or fixing
+        a typo in one - silently licensed moving a date that history had
+        already been judged against.
+
+        The sibling gate on checks already has the right rule: a change
+        needs a NEW entry, not a different one
+        (`find_undocumented_changes` compares lengths). This brings the
+        two into line.
+        """
+        def old_mutate(doc):
+            self._version(doc)["changelog"] = ["initial authoring"]
+
+        def mutate(doc):
+            self._entry(doc, "2026-Q1")["date"] = "2026-02-15"
+            self._version(doc)["changelog"] = ["initial authoring (typo fixed)"]
+
+        old, new = self._docs(mutate, old_mutate)
+        errors = self._run(monkeypatch, old, new, today=date(2026, 9, 23))
+        assert errors, "an edited changelog entry cleared a past-date move"
+
+    def test_a_genuinely_new_changelog_entry_still_clears_it(self, monkeypatch):
+        """The gate must stay a "say what you did" gate, not a freeze.
+        This is the half that must NOT change."""
+        def old_mutate(doc):
+            self._version(doc)["changelog"] = ["initial authoring"]
+
+        def mutate(doc):
+            self._entry(doc, "2026-Q1")["date"] = "2026-02-15"
+            self._version(doc)["changelog"] = ["initial authoring",
+                                                "2026-09-25: agency confirmed the real date"]
+
+        old, new = self._docs(mutate, old_mutate)
+        assert self._run(monkeypatch, old, new, today=date(2026, 9, 23)) == []
+
+    def test_past_is_decided_on_the_assets_clock_not_the_runners(self, monkeypatch):
+        """`today = today or date.today()` read the RUNNER's date. The
+        asset clock is Australia/Perth, so for about a third of every
+        day the two are different calendar dates - and this function
+        uses "today" to decide whether a date is in the past at all.
+
+        Built so it fails against the old code for the right reason: the
+        moved date is in the past on the asset's clock and in the future
+        on any UTC-ish one, so only an asset-clock reading flags it.
+        """
+        from qa_tools.common import asset_time
+
+        straddles = "2027-02-28"
+
+        def old_mutate(doc):
+            self._entry(doc, "2027-Q1")["date"] = straddles
+
+        def mutate(doc):
+            self._entry(doc, "2027-Q1")["date"] = "2027-03-15"
+
+        # 07:00 in Perth on 1 March 2027 - which is still 28 February
+        # everywhere the runner is likely to be.
+        monkeypatch.setattr(asset_time, "now",
+                             lambda: asset_time.wall_clock(date(2027, 3, 1), "07:00"))
+        old, new = self._docs(mutate, old_mutate)
+        errors = self._run(monkeypatch, old, new, today=None)
+        assert errors, (
+            f"moving {straddles}, already past on the asset's clock, was not flagged - "
+            "the guard is reading the runner's date")
+
+
+class TestTheDiffBase:
+    """Which commit both gates compare against (#44).
+
+    Both `validate_schedule`'s past-date guard and
+    `validate_check_lifecycle` compared against `HEAD~1` at
+    `fetch-depth: 2`, so a push of two or more commits was only ever
+    checked on its last one. Move a past date in commit A, land commit B
+    on top, and neither gate sees it.
+    """
+
+    def test_it_falls_back_when_nothing_is_configured(self, monkeypatch):
+        from qa_tools.common import diff_base
+
+        monkeypatch.delenv("MOTHMAN_DIFF_BASE", raising=False)
+        assert diff_base.diff_base() == "HEAD~1"
+
+    def test_it_uses_a_configured_ref_that_resolves(self, monkeypatch):
+        # HEAD rather than an ancestor: `actions/checkout@v4` defaults
+        # to fetch-depth 1, so an ancestor ref resolves on a full local
+        # clone and NOT on the runner - a test that passes here and
+        # fails there, which is the one shape CLAUDE.md names outright.
+        # Reproduced against a real `git clone --depth 1` before
+        # changing it. HEAD resolves at any depth and proves the same
+        # thing: a configured ref is used rather than the fallback.
+        from qa_tools.common import diff_base
+
+        monkeypatch.setenv("MOTHMAN_DIFF_BASE", "HEAD")
+        assert diff_base.diff_base() == "HEAD"
+
+    def test_it_falls_back_when_the_configured_ref_does_not_resolve(self, monkeypatch):
+        """A first push sets the before-SHA to all zeros, and a shallow
+        checkout cannot reach an older one. Neither is a finding, and
+        neither should crash the gate."""
+        from qa_tools.common import diff_base
+
+        monkeypatch.setenv("MOTHMAN_DIFF_BASE", "0" * 40)
+        assert diff_base.diff_base() == "HEAD~1"
+
+    # The function existing is not the fix. The defect was that both
+    # gates named their own ref - one as a parameter default, one as a
+    # hardcoded string - so these two assert the WIRING, which is the
+    # part that was actually broken.
+
+    def test_the_schedule_guard_reads_the_ref_it_is_given(self, monkeypatch):
+        from qa_tools.common import validate_schedule as mod
+
+        seen = []
+
+        def spy(rel_path, ref):
+            seen.append(ref)
+            return None  # no previous content - the guard returns [] and stops
+
+        monkeypatch.setenv("MOTHMAN_DIFF_BASE", "HEAD")
+        monkeypatch.setattr(mod, "_content_at", spy)
+        src = Source(mod.ROOT / "contract" / "data-asset.yaml", REAL_CONTRACT_DIR)
+        mod._retrospective_edit_errors({}, src)
+        assert seen == ["HEAD"], (
+            f"the past-date guard compared against {seen} - a push of several "
+            "commits is only checked on its last one")
+
+    def test_the_check_gate_reads_the_ref_it_is_given(self, monkeypatch):
+        """The same hole, for every hand-authored check."""
+        from qa_tools.common import validate_check_lifecycle as mod
+
+        seen = []
+
+        def spy(ref):
+            seen.append(ref)
+            return []
+
+        monkeypatch.setenv("MOTHMAN_DIFF_BASE", "HEAD")
+        monkeypatch.setattr(mod, "collect_checks", spy)
+        mod.main()
+        assert seen[0] == "HEAD", (
+            f"the check-lifecycle gate compared against {seen[0]!r}")
