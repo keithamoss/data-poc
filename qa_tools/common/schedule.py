@@ -201,6 +201,35 @@ def parse_duration(value, where: str) -> timedelta:
     return timedelta(**{_DURATION_UNITS[m.group("unit")]: int(m.group("n"))})
 
 
+def format_duration(value: timedelta) -> str:
+    """A timedelta back in the form the config authors it in - `14d`,
+    `4h`.
+
+    The inverse of `parse_duration`, and it exists because the one
+    surface that displayed a claim window printed `str(timedelta)`:
+    `14 days, 0:00:00` and `4:00:00`. REQ-PIPE-050 rejects every form
+    but one on purpose - "four ways to write one duration is four ways
+    for thirty datasets' config to read differently" - so a display
+    inventing a fifth is the same problem from the other end. `4:00:00`
+    additionally reads as a time of day, in a table whose neighbouring
+    columns are times (post-build-review #27).
+
+    Whole days where it divides, whole hours otherwise, and minutes
+    only if some future config ever needs them - a duration this cannot
+    express has no authored form either, so falling back to the
+    timedelta's own repr would be showing something nobody could type
+    back in.
+    """
+    seconds = int(value.total_seconds())
+    if seconds and seconds % 86400 == 0:
+        return f"{seconds // 86400}d"
+    if seconds and seconds % 3600 == 0:
+        return f"{seconds // 3600}h"
+    raise ScheduleConfigError(
+        f"{value!r} has no authored form - a claim window is written in whole days "
+        f"or whole hours, like 14d or 4h, and nothing else parses.")
+
+
 def parse_month_name(value, where: str) -> int:
     """A full month NAME as its 1-12 number, case-insensitively.
 

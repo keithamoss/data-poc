@@ -39,10 +39,11 @@ WHAT THIS DELIBERATELY DOES NOT DO:
 """
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from collections import Counter, defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 
@@ -54,6 +55,11 @@ from qa_tools.common.schemas import DataAsset
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 CONTRACT_DIR = ROOT / "contract"
+
+#: Set by `mothman check` to say "you may tell me about a warning".
+#: Named here, beside the gate that emits it, and imported by the two
+#: callers rather than spelled out three times.
+WARNING_EXIT_VAR = "MOTHMAN_GATE_WARNING_EXIT"
 DATA_ASSET_YAML = CONTRACT_DIR / "data-asset.yaml"
 
 _MONTHS = ("January", "February", "March", "April", "May", "June",
@@ -112,6 +118,31 @@ class ConfigError:
     cause: str | None = None
     cause_hint: str | None = None
 
+    # WHICH DATASETS THIS BREAKS, for the header count. A calendar-
+    # scoped error used to contribute ZERO to it, however many datasets
+    # named that calendar - so a renamed calendar reported "affecting 1
+    # dataset(s)" with seven of seven broken, which is the
+    # safe-looking direction (post-build-review #18). Structural rather
+    # than parsed back out of `scope`, same reasoning as `cause`.
+    #
+    # Empty is meaningful: an error about the asset's own top-level
+    # configuration affects no NAMED dataset, and _report says so in
+    # words instead of inventing a number.
+    affects: tuple[str, ...] = ()
+
+    # THE EXACT VALUE THIS IS ABOUT, as a dotted path, so the schema
+    # layer and the semantic layer can be seen to be talking about the
+    # same thing. `claim_window: 14` used to produce one error from
+    # each, two lines apart, the same version 0-indexed and 1-indexed
+    # (post-build-review #20). None means "not about one value".
+    field: str | None = None
+
+    #: Which check produced this - "schema" for the declared model,
+    #: "semantic" for everything a shape cannot express. Only used to
+    #: decide which of two reports about ONE value survives, and the
+    #: semantic one always does.
+    layer: str = "semantic"
+
     def __str__(self) -> str:
         return f"{self.problem} {self.fix}"
 
@@ -136,6 +167,41 @@ def _month_number(value) -> int | None:
         return schedule.parse_month_name(value, "month")
     except schedule.ScheduleConfigError:
         return None
+
+
+#: What each key is meant to look like, for the fix line on a missing
+#: or wrongly-typed value. The generated fixes used to read "Add it."
+#: and "Correct the value.", naming no shape, no example and nowhere to
+#: look - against this gate's own NFR that every error be one a human
+#: can act on immediately (post-build-review #20). The hand-written
+#: fixes in the same report were already the standard; this brings the
+#: generated ones up to it.
+_SHAPES: dict[str, str] = {
+    "data_asset_id": "a short identifier for this data asset, like 'wa-health-quarterly'",
+    "name": "the calendar's name, as datasets refer to it - like 'quarterly'",
+    "effective_from": "the date this version starts applying, as YYYY-MM-DD - like 2027-01-01",
+    "changelog": "a list of lines saying what changed, like ['2027-01-01: authored 2027 dates']",
+    "claim_window": "a duration with its unit, like 14d or 4h",
+    "cadence_rule": "a cadence, currently only 'daily'",
+    "dates": "a list of period/date pairs, like [{period: 2027-Q1, date: 2027-02-01}]",
+    "period": "the period's name, like 2027-Q1",
+    "date": "the date the supply is expected, as YYYY-MM-DD",
+    "delivery_months": "a list of full month names, like [February, August]",
+    "versions": "a list of versions, each with its own effective_from and changelog",
+    "calendar": "the name of a calendar defined in this file",
+    "table": "the physical table this dataset lands in",
+    "contract": "the ODCS contract file covering this collection",
+    "id": "a stable identifier, lowercase with hyphens",
+}
+
+
+def _shape_of(loc: list[str]) -> str | None:
+    """The expected shape for a pydantic location, by its last named
+    segment - the indices in between say where, not what."""
+    for part in reversed(loc):
+        if not part.isdigit() and part in _SHAPES:
+            return _SHAPES[part]
+    return None
 
 
 def _duration_error(value, what: str) -> str | None:
@@ -165,22 +231,30 @@ def _schema_errors(raw: dict, src: Source) -> list[ConfigError]:
             loc = [str(p) for p in err["loc"]]
             scope = _scope_from_loc(raw, err["loc"])
             where = " -> ".join(loc) or "(top level)"
+            field = ".".join(loc) or None
+            shape = _shape_of(loc)
             if err["type"] == "extra_forbidden":
                 out.append(ConfigError(
                     src.name, scope,
                     f"{where} is not a key this configuration has.",
                     "Remove it, or correct the spelling - an unknown key is accepted "
-                    "nowhere here precisely because a dropped one is invisible."))
+                    "nowhere here precisely because a dropped one is invisible.",
+                    field=field, layer="schema"))
             elif err["type"] == "missing":
                 out.append(ConfigError(
                     src.name, scope,
                     f"{where} is required and is not there.",
-                    "Add it."))
+                    f"Add it: {shape}." if shape
+                    else "Add it - see the other entries at this level for the form.",
+                    field=field, layer="schema"))
             else:
                 out.append(ConfigError(
                     src.name, scope,
                     f"{where}: {err['msg']}.",
-                    "Correct the value."))
+                    f"Write {shape}." if shape
+                    else "Correct the value - see the other entries at this level "
+                         "for the form.",
+                    field=field, layer="schema"))
         return out
     return []
 
@@ -237,7 +311,7 @@ def _calendar_errors(raw: dict, src: Source) -> list[ConfigError]:
                 "Give each calendar one definition - a dataset naming this one "
                 "cannot say which it meant."))
 
-    for entry in entries:
+    for ci, entry in enumerate(entries):
         entry = entry or {}
         name = entry.get("name")
         scope = f"calendar {name!r}" if name else "calendar (unnamed)"
@@ -253,7 +327,8 @@ def _calendar_errors(raw: dict, src: Source) -> list[ConfigError]:
                 out.append(ConfigError(
                     src.name, scope,
                     f"version {i}'s effective_from is {when!r}, which is not a date.",
-                    "Write it as YYYY-MM-DD."))
+                    "Write it as YYYY-MM-DD.",
+                    field=f"calendars.{ci}.versions.{i - 1}.effective_from"))
 
             window = version.get("claim_window")
             if window is not None:
@@ -263,7 +338,8 @@ def _calendar_errors(raw: dict, src: Source) -> list[ConfigError]:
                         src.name, scope,
                         f"version {i}'s claim_window {problem}",
                         "Write a duration with its unit, like 14d or 4h. This is never "
-                        "guessed at - a bare number could mean either."))
+                        "guessed at - a bare number could mean either.",
+                        field=f"calendars.{ci}.versions.{i - 1}.claim_window"))
 
             out.extend(_version_date_errors(scope, i, version, src))
 
@@ -762,7 +838,84 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors += _expects_nothing_errors(raw, src)
     errors += _contract_errors(raw, src)
     errors += _retrospective_edit_errors(raw, src)
-    return errors
+    return _attribute(errors, raw)
+
+
+def _attribute(errors: list[ConfigError], raw: dict) -> list[ConfigError]:
+    """Fill in each error's `affects` - the datasets it actually breaks.
+
+    ONE PLACE READS A SCOPE BACK, deliberately. `scope` is a display
+    string this module builds in exactly two shapes, and the thing to
+    avoid is twenty call sites each re-deriving what it means; a single
+    resolver that owns both readings is a different proposition, and it
+    beats threading a dataset list through every construction site,
+    where the one that got missed would silently under-count.
+
+    A calendar-scoped error fans out to every dataset naming that
+    calendar - which is the whole of post-build-review #18: those
+    contributed zero before, so one renamed calendar reported
+    "affecting 1 dataset(s)" with seven of seven broken.
+
+    An error scoped to nothing affects no NAMED dataset and keeps an
+    empty tuple. _report says "the asset's own configuration" for that
+    case, which is truer than fanning a missing top-level key out to
+    all thirty.
+    """
+    on_calendar: dict[str, list[str]] = defaultdict(list)
+    known: set[str] = set()
+    for dataset, _collection in _walk_datasets(raw):
+        dataset_id = dataset.get("id")
+        if not dataset_id:
+            continue
+        known.add(str(dataset_id))
+        if dataset.get("calendar"):
+            on_calendar[str(dataset["calendar"])].append(str(dataset_id))
+
+    # ONE MISTAKE, ONE ERROR, across the schema/semantic seam. Both
+    # layers legitimately check `claim_window: 14`, and both used to
+    # report it - the same version, 0-indexed by pydantic and 1-indexed
+    # by the semantic check, two lines apart (post-build-review #20).
+    # The semantic message survives because it names the unit, gives
+    # two examples and says why it is never guessed at; the schema
+    # layer's generic one names nothing.
+    semantic_fields = {e.field for e in errors if e.field and e.layer == "semantic"}
+    errors = [e for e in errors
+              if not (e.layer == "schema" and e.field in semantic_fields)]
+
+    out = []
+    for error in errors:
+        if error.affects or not error.scope:
+            out.append(error)
+            continue
+        affects: tuple[str, ...] = ()
+        if error.scope.startswith("dataset "):
+            name = error.scope[len("dataset "):].strip().strip("'\"")
+            if name in known:
+                affects = (name,)
+        elif error.scope.startswith("calendar "):
+            name = error.scope[len("calendar "):].strip().strip("'\"")
+            affects = tuple(on_calendar.get(name, ()))
+        out.append(replace(error, affects=affects))
+    return out
+
+
+def _colour(text: str, code: str) -> str:
+    """ANSI, and only when a person is looking.
+
+    The whole report printed uncoloured, so on a failing gate the only
+    coloured thing on screen was the closing panel - which carried no
+    information (post-build-review #25). Rich is not used here because
+    this module is also run bare as a CI step, and a gate that imports
+    a rendering library to print eight lines has bought a dependency
+    for the case where colour is stripped anyway.
+
+    `isatty` rather than a flag: CI logs stay clean without anyone
+    remembering to ask, and NO_COLOR is honoured because it costs one
+    condition.
+    """
+    if os.environ.get("NO_COLOR") or not sys.stderr.isatty():
+        return text
+    return f"\033[{code}m{text}\033[0m"
 
 
 def _report(errors: list[ConfigError]) -> None:
@@ -774,10 +927,10 @@ def _report(errors: list[ConfigError]) -> None:
     the true count. The grouping is what carries the scale problem
     instead.
     """
-    datasets = {e.scope for e in errors if e.scope and e.scope.startswith("dataset ")}
+    datasets = {d for e in errors for d in e.affects}
     subject = f"{len(datasets)} dataset(s)" if datasets else "the asset's own configuration"
-    print(f"schedule validation FAILED - {len(errors)} error(s) affecting {subject}:",
-          file=sys.stderr)
+    headline = f"schedule validation FAILED - {len(errors)} error(s) affecting {subject}:"
+    print(_colour(headline, "1;31"), file=sys.stderr)
 
     # THE SHARED CAUSE, ONCE, ABOVE THE DETAIL (#19). One calendar
     # renamed by a character produces one error per dataset on it, and
@@ -800,22 +953,32 @@ def _report(errors: list[ConfigError]) -> None:
         if len(shared) < 2:
             continue
         _kind, _, value = cause.partition(":")
-        print(f"\n  {len(shared)} datasets name calendar {value!r}, which this asset does "
-              f"not define.{shared[0].cause_hint or ''}", file=sys.stderr)
+        print(_colour(f"\n  {len(shared)} datasets name calendar {value!r}, which this "
+                       f"asset does not define.{shared[0].cause_hint or ''}", "1;33"),
+              file=sys.stderr)
 
     by_file: dict[str, dict[str | None, list[ConfigError]]] = defaultdict(lambda: defaultdict(list))
     for error in errors:
         by_file[error.file][error.scope].append(error)
 
     for filename in sorted(by_file):
-        print(f"\n  {filename}", file=sys.stderr)
+        print(f"\n  {_colour(filename, '1')}", file=sys.stderr)
         scopes = by_file[filename]
         for scope in sorted(scopes, key=lambda s: (s is not None, s or "")):
             if scope:
-                print(f"    {scope}", file=sys.stderr)
+                print(f"    {_colour(scope, '36')}", file=sys.stderr)
             for error in scopes[scope]:
                 indent = "      " if scope else "    "
-                print(f"{indent}- {error.problem}\n{indent}  {error.fix}", file=sys.stderr)
+                print(f"{indent}{_colour('-', '31')} {error.problem}\n"
+                      f"{indent}  {error.fix}", file=sys.stderr)
+
+    # THE HEADLINE AGAIN, AT THE FOOT. Thirty datasets is sixty lines,
+    # and the closing panel used to say "see output above" - pointing a
+    # reader back past all of it to a line they had already scrolled off
+    # (post-build-review #25). Repeating the count where the eye already
+    # is costs one line and removes the scroll.
+    if len(errors) > 3:
+        print(f"\n{_colour(headline.rstrip(':') + '.', '1;31')}", file=sys.stderr)
 
 
 def main(src: Source | None = None) -> int:
@@ -853,13 +1016,26 @@ def main(src: Source | None = None) -> int:
     # is not there for the one that mattered. Printed AFTER the OK line
     # rather than instead of it, so it reads as an additional thing to
     # know rather than as the gate's verdict.
-    if src.asset_path == DATA_ASSET_YAML:
-        _warn_about_runway()
+    warned = _warn_about_runway() if src.asset_path == DATA_ASSET_YAML else False
+
+    # PASSED, WITH SOMETHING TO KNOW - and only when something asked to
+    # be told. `mothman check` sets MOTHMAN_GATE_WARNING_EXIT so it can
+    # render a fourth outcome instead of a green `passed` row followed
+    # by "Every gate passed" (post-build-review #23). CI runs this same
+    # command as its own workflow step, where any non-zero exit is a
+    # failed step, so it does not set the variable and this stays 0 -
+    # which is REQ-PIPE-053's own rule that a runway warning must never
+    # fail a build.
+    if warned:
+        configured = (os.environ.get(WARNING_EXIT_VAR) or "").strip()
+        if configured.isdigit():
+            return int(configured)
     return 0
 
 
-def _warn_about_runway() -> None:
-    """The low-runway warning, on stderr, never fatal.
+def _warn_about_runway() -> bool:
+    """The low-runway warning, on stderr, never fatal. True if one was
+    printed.
 
     Only for the REAL configuration - a test pointing this gate at a
     synthetic one is asking whether that config is VALID, and answering
@@ -870,13 +1046,22 @@ def _warn_about_runway() -> None:
 
     lines = runway.warning_lines(asset_time.local_date(asset_time.now()))
     if not lines:
-        return
+        return False
+    # THE VERDICT HAS TO LAND FIRST, and until this flush it did not.
+    # The OK line goes to stdout and this goes to stderr, so with
+    # stdout block-buffered - which is CI, and any plain shell - the
+    # warning arrived ABOVE the verdict it is written to follow, and
+    # the first thing under this gate in an Actions log was an
+    # unqualified WARNING. Invisible in this sandbox, which sets
+    # PYTHONUNBUFFERED (post-build-review #26).
+    sys.stdout.flush()
     print("", file=sys.stderr)
     for line in lines:
         print(f"  {line}", file=sys.stderr)
     note = runway.summary(asset_time.local_date(asset_time.now()))
     if note:
         print(f"\n  {note} The gate itself PASSED.", file=sys.stderr)
+    return True
 
 
 if __name__ == "__main__":

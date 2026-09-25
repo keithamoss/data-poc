@@ -689,6 +689,140 @@ class TestTheGateActuallyFailsTheBuild:
         assert validate_schedule.main() == 0
 
 
+class TestOneMistakeIsOneError:
+    """post-build-review #20. `claim_window: 14` produced TWO errors on
+    the same value, two lines apart, in two idioms:
+
+        calendars -> 0 -> versions -> 0 -> claim_window: Input should
+        be a valid string. Correct the value.
+        version 1's claim_window is 14, which is not a duration with a
+        unit. Write a duration with its unit, like 14d or 4h.
+
+    The same version, 0-indexed and 1-indexed. The build decision "so
+    one mistake is one error" was applied inside
+    `_expects_nothing_errors` and never across this seam - which also
+    inflated the header count #18 is about.
+
+    The SEMANTIC message survives, not the schema one: it names the
+    unit, gives two examples and says why it is never guessed at. The
+    schema layer's "Correct the value." names nothing.
+    """
+
+    def _doc(self, **version):
+        doc = yaml.safe_load((REAL_CONTRACT_DIR / "data-asset.yaml").read_text())
+        doc["calendars"][0]["versions"][0].update(version)
+        return doc
+
+    def _errors(self, doc, tmp_path):
+        from qa_tools.common import validate_schedule as mod
+        path = tmp_path / "data-asset.yaml"
+        path.write_text(yaml.safe_dump(doc))
+        return mod.validate(Source(path, REAL_CONTRACT_DIR))
+
+    def test_a_bare_number_claim_window_produces_one_error_not_two(self, tmp_path):
+        errors = [e for e in self._errors(self._doc(claim_window=14), tmp_path)
+                  if "claim_window" in e.problem]
+        assert len(errors) == 1, [str(e) for e in errors]
+
+    def test_the_one_that_survives_is_the_one_that_names_the_unit(self, tmp_path):
+        errors = [e for e in self._errors(self._doc(claim_window=14), tmp_path)
+                  if "claim_window" in e.problem]
+        assert "14d" in errors[0].fix
+        assert errors[0].fix != "Correct the value."
+
+    def test_a_missing_key_says_what_to_add_rather_than_add_it(self, tmp_path):
+        """The generated fix lines named no shape, no example and
+        nowhere to look - against an NFR reading "every error here must
+        be one a human can act on immediately"."""
+        doc = self._doc()
+        doc["calendars"][0]["versions"][0].pop("effective_from")
+        errors = [e for e in self._errors(doc, tmp_path) if "effective_from" in e.problem]
+        assert errors
+        assert errors[0].fix != "Add it."
+        assert "YYYY-MM-DD" in errors[0].fix or "2027-01-01" in errors[0].fix
+
+    def test_a_wrong_typed_value_says_what_shape_is_wanted(self, tmp_path):
+        errors = [e for e in self._errors(self._doc(changelog="not a list"), tmp_path)
+                  if "changelog" in e.problem]
+        assert errors
+        assert errors[0].fix != "Correct the value."
+
+
+class TestTheHeaderCountIsTheNumberOfDatasetsActuallyAffected:
+    """post-build-review #18. The header count came from
+    `{e.scope for e in errors if e.scope.startswith("dataset ")}`, so a
+    CALENDAR-scoped error contributed zero no matter how many datasets
+    named that calendar. The critic reproduced a run reporting
+    "affecting 1 dataset(s)" where seven of seven were affected.
+
+    Criterion 22 is met in form. The number is what a reader uses to
+    judge urgency, and it was wrong in the safe-looking direction.
+
+    WHAT "AFFECTED" MEANS, settled here because the fix needs it: a
+    dataset is affected when an error names it, or when an error names
+    a calendar it uses. An error about the asset's own top-level
+    configuration is NOT fanned out to every dataset - that case
+    already has its own wording and turning it into "7 datasets" would
+    trade one imprecise number for another.
+    """
+
+    def _doc(self):
+        return yaml.safe_load((REAL_CONTRACT_DIR / "data-asset.yaml").read_text())
+
+    def _report(self, errors, capsys):
+        from qa_tools.common import validate_schedule as mod
+        mod._report(errors)
+        return capsys.readouterr().err
+
+    def test_a_calendar_error_counts_the_datasets_on_that_calendar(self, capsys):
+        from qa_tools.common import validate_schedule as mod
+
+        errors = [mod.ConfigError("data-asset.yaml", "calendar 'quarterly'",
+                                   "is broken.", "Fix it.",
+                                   affects=("cp-clients", "cp-carers", "cp-case-workers"))]
+        assert "3 dataset(s)" in self._report(errors, capsys)
+
+    def test_one_dataset_counted_once_however_many_errors_name_it(self, capsys):
+        from qa_tools.common import validate_schedule as mod
+
+        errors = [
+            mod.ConfigError("data-asset.yaml", "dataset 'cp-clients'", "a.", "Fix.",
+                             affects=("cp-clients",)),
+            mod.ConfigError("data-asset.yaml", "calendar 'quarterly'", "b.", "Fix.",
+                             affects=("cp-clients",)),
+        ]
+        out = self._report(errors, capsys)
+        assert "2 error(s) affecting 1 dataset(s)" in out
+
+    def test_an_asset_level_error_still_says_so_rather_than_naming_every_dataset(self, capsys):
+        from qa_tools.common import validate_schedule as mod
+
+        errors = [mod.ConfigError("data-asset.yaml", None,
+                                   "has no data_asset_id.", "Add one.")]
+        assert "the asset's own configuration" in self._report(errors, capsys)
+
+    def test_the_real_gate_fans_a_calendar_error_out_to_its_datasets(self, tmp_path,
+                                                                      monkeypatch):
+        """End to end against the real config, which is where the
+        critic found it: rename the calendar the six CP datasets name
+        and the count must be six, not zero."""
+        from qa_tools.common import validate_schedule as mod
+
+        doc = self._doc()
+        for calendar in doc["calendars"]:
+            if calendar["name"] == "quarterly":
+                calendar["name"] = "quarterley"
+        path = tmp_path / "data-asset.yaml"
+        path.write_text(yaml.safe_dump(doc))
+        src = Source(path, REAL_CONTRACT_DIR)
+        errors = mod.validate(src)
+        affected = set()
+        for error in errors:
+            affected.update(error.affects)
+        assert len(affected) >= 6, (
+            f"a renamed calendar left {len(affected)} datasets counted as affected")
+
+
 class TestTheGateAndTheRuntimeReadAMonthTheSameWay:
     """post-build-review #34. `schedule.parse_month_name` lowercases;
     the gate's own `_month_number` did `_MONTHS.index()` against title

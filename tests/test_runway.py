@@ -108,10 +108,21 @@ class TestItWarnsOncePerCalendarNotOncePerDataset:
         assert lines[0].count("quarterly") >= 1
 
     def test_the_line_says_how_many_datasets_without_listing_them(self):
+        """Refined 2026-09-25 by post-build-review #22, and the refinement
+        is narrow: the rule was "name none of them", and it is now "name
+        the ONE the number belongs to, and none of the others".
+
+        The thing being avoided was never naming a dataset - it was one
+        fact repeated thirty times. A minimum with no owner is
+        unreproducible from the config, which is a different failure and
+        the one #22 found. Naming exactly one costs nothing at thirty
+        datasets and is what makes the figure checkable.
+        """
         line = runway.warning_lines(date(2026, 9, 23))[0]
-        assert "6 datasets name it" in line
-        for dataset in hierarchy.all_datasets():
-            assert dataset.dataset_id not in line, "naming them is the repetition this avoids"
+        assert "6 datasets name this calendar" in line
+        named = [d.dataset_id for d in hierarchy.all_datasets() if d.dataset_id in line]
+        assert named == ["cp-case-workers"], (
+            f"exactly the driving dataset should be named, not {named}")
 
     def test_the_summary_counts_calendars_when_more_than_one_is_low(self, tmp_path, monkeypatch):
         import shutil
@@ -291,3 +302,56 @@ class TestExhaustedDoesNotWearTheMildStatesWords:
         line = runway.warning_lines(date(2026, 9, 23))[0]
         assert line.startswith("WARNING (not failing the build)")
         assert runway.summary(date(2026, 9, 23)).endswith("low on runway.")
+
+
+class TestTheNumberCanBeCheckedAgainstTheFile:
+    """post-build-review #22. The warning read:
+
+        calendar 'quarterly' has only 2 future supply slot(s) left -
+        its last authored period is 2027-Q4 on 2027-11-01, and
+        6 datasets name it.
+
+    Every clause is true and the sentence is not. `remaining` is the
+    MIN across datasets - correctly, and runway.py's own docstring says
+    why - but it was attributed to the calendar, paired with the
+    CALENDAR's last period, and named neither the dataset driving it nor
+    that a minimum had been taken. Open `data-asset.yaml`, count five
+    future quarterly dates, and the tool's "2" is unreproducible.
+
+    The 2 belongs to cp-case-workers, whose own last period is 2027-Q3.
+    The dashboard side of REQ-PIPE-053 already made exactly this fix -
+    "a dataset's message names its OWN last period, not its calendar's"
+    - and the CLI side kept the old shape. At thirty datasets with mixed
+    participation it is the normal case, not an edge one.
+    """
+
+    AS_OF = date(2026, 9, 25)
+
+    def _line(self):
+        lines = [x for x in runway.warning_lines(self.AS_OF) if "quarterly" in x]
+        assert len(lines) == 1, lines
+        return lines[0]
+
+    def test_the_warning_names_the_dataset_the_number_belongs_to(self):
+        assert "cp-case-workers" in self._line(), (
+            "the number is the minimum across datasets and the sentence never "
+            "says whose it is - so nobody can reproduce it from the config")
+
+    def test_it_pairs_that_number_with_that_datasets_own_last_period(self):
+        """2 future slots and 2027-Q4 are facts about different objects.
+        cp-case-workers' own last period is 2027-Q3."""
+        line = self._line()
+        assert "2027-Q3" in line
+
+    def test_the_calendars_own_last_period_is_still_available_but_not_conflated(self):
+        """Not a deletion - the calendar's own horizon is worth knowing,
+        it just is not the same fact."""
+        assert "2027-Q4" in self._line()
+
+    def test_the_driving_dataset_is_on_the_runway_itself_not_only_in_prose(self):
+        """A caller that renders its own message - the dashboard does -
+        needs the fact, not a sentence to parse back out."""
+        r = runway.calendar_runway("quarterly", self.AS_OF)
+        assert r.driving_dataset == "cp-case-workers"
+        assert r.driving_last_period == "2027-Q3"
+        assert r.remaining == 2

@@ -34,6 +34,7 @@ own standing rule on that).
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -47,48 +48,76 @@ console = Console()
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# (label, argv, why-it-is-here). Node's suite is in here alongside the
-# Python ones rather than left to a separate habit - see this module's
-# own docstring.
-_GATES: tuple[tuple[str, list[str], str], ...] = (
+#: A gate that PASSED but has something worth knowing exits with this
+#: instead of 0. See _GATES below for why it is opt-in and env-gated
+#: rather than something any gate may emit whenever it likes.
+WARNING_EXIT = 78
+WARNING_EXIT_VAR = "MOTHMAN_GATE_WARNING_EXIT"
+
+# (label, argv, why-it-is-here, can-warn). Node's suite is in here
+# alongside the Python ones rather than left to a separate habit - see
+# this module's own docstring.
+#
+# THE FOURTH FIELD IS THE WARNING OPT-IN, and it is per gate rather
+# than global for one reason: a real failure that happened to exit 78
+# would otherwise be re-read as a warning, turning red into yellow.
+# That is the false-green direction, so only a gate that actually has a
+# warning state gets its sentinel interpreted (post-build-review #23).
+_GATES: tuple[tuple[str, list[str], str, bool], ...] = (
     ("ruff", ["uv", "run", "ruff", "check", "."],
-     "real bugs in Python, not style"),
+     "real bugs in Python, not style", False),
     ("yamllint", ["uv", "run", "yamllint", "--strict", "."],
-     "duplicate mapping keys, which PyYAML swallows silently"),
+     "duplicate mapping keys, which PyYAML swallows silently", False),
     # Not coverable by check-yaml/yamllint: these are *.md files, so
     # neither hook ever globs them - see the module's own docstring for
     # the incident that produced this gate.
     ("agents", ["uv", "run", "python3", "-m", "qa_tools.common.validate_agents"],
-     ".claude/agents/*.md frontmatter actually parses"),
+     ".claude/agents/*.md frontmatter actually parses", False),
     ("hierarchy", ["uv", "run", "mothman", "dashboard", "validate-hierarchy"],
-     "every contract agrees with the one agency/collection/dataset tree"),
+     "every contract agrees with the one agency/collection/dataset tree", False),
+    # The one gate with a warning state today: REQ-PIPE-053's low
+    # runway, which must be visible without failing the build.
     ("schedule", ["uv", "run", "mothman", "schedule", "validate"],
-     "a config typo can never leave a dataset expecting nothing"),
+     "a config typo can never leave a dataset expecting nothing", True),
     ("requirements", ["uv", "run", "mothman", "dashboard", "validate-requirements"],
-     "every linked test and implemented_by symbol still exists"),
+     "every linked test and implemented_by symbol still exists", False),
     ("changelog", ["uv", "run", "mothman", "dashboard", "validate-changelog"],
-     "CHANGELOG.yaml's schema and component tags"),
+     "CHANGELOG.yaml's schema and component tags", False),
     ("npm test", ["npm", "test", "--silent"],
-     "the dashboard template's own inline JS"),
+     "the dashboard template's own inline JS", False),
     ("pytest", ["uv", "run", "pytest"],
-     "the Python suite"),
+     "the Python suite", False),
 )
 
 
-def _run(label: str, argv: list[str]) -> int:
+def _run(label: str, argv: list[str], can_warn: bool = False) -> int:
     """Streams the gate's own output rather than capturing it.
 
     A summary table telling you `pytest` failed and nothing else would
     be worse than no command at all - the failure itself is what you
     need, and it needs to appear while it happens, not after every other
-    gate has finished."""
+    gate has finished.
+
+    Streaming is also why the warning channel is an exit code and not a
+    marker line in the output: reading the output would mean piping it,
+    and a gate whose stdout is a pipe stops colouring it.
+
+    `can_warn` opts the gate in through the environment rather than
+    letting it decide for itself. CI runs these same commands directly
+    as their own workflow steps, where any non-zero exit is a failed
+    step - so a gate must return 0 there, and only say more when
+    something asked it to.
+    """
     console.rule(f"[bold]{label}", style="dim")
     if shutil.which(argv[0]) is None:
         console.print(
             f"{argv[0]!r} is not installed - skipping {label}. "
             f"See CLAUDE.md's environment-setup bullet.", style="yellow")
         return 127
-    return subprocess.run(argv, cwd=ROOT).returncode
+    env = None
+    if can_warn:
+        env = {**os.environ, WARNING_EXIT_VAR: str(WARNING_EXIT)}
+    return subprocess.run(argv, cwd=ROOT, env=env).returncode
 
 
 @click.command("check")
@@ -108,31 +137,38 @@ def check_command(no_pytest: bool, only: str | None) -> None:
             # are not guessable from the command name.
             raise click.ClickException(
                 f"no gate called {only!r}. Available: "
-                f"{', '.join(label for label, _, _ in _GATES)}.")
+                f"{', '.join(label for label, _, _, _ in _GATES)}.")
 
-    results: list[tuple[str, int, str]] = []
-    for label, argv, why in gates:
+    results: list[tuple[str, int, str, bool]] = []
+    for label, argv, why, can_warn in gates:
         if no_pytest and label == "pytest":
             continue
-        results.append((label, _run(label, argv), why))
+        results.append((label, _run(label, argv, can_warn), why, can_warn))
 
     console.print()
     table = Table(title="mothman check", title_style="bold", header_style="dim")
     table.add_column("Gate")
     table.add_column("Result")
     table.add_column("What it covers", style="dim")
-    for label, code, why in results:
+    for label, code, why, can_warn in results:
         if code == 0:
             outcome = "[green]passed[/green]"
         elif code == 127:
             outcome = "[yellow]not installed[/yellow]"
+        elif can_warn and code == WARNING_EXIT:
+            outcome = "[yellow]passed, with a warning[/yellow]"
         else:
             outcome = f"[red]FAILED ({code})[/red]"
         table.add_row(label, outcome, why)
     console.print(table)
 
-    failed = [label for label, code, _ in results if code not in (0, 127)]
-    skipped = [label for label, code, _ in results if code == 127]
+    def _warned(code: int, can_warn: bool) -> bool:
+        return can_warn and code == WARNING_EXIT
+
+    failed = [label for label, code, _, can_warn in results
+              if code not in (0, 127) and not _warned(code, can_warn)]
+    skipped = [label for label, code, _, _ in results if code == 127]
+    warned = [label for label, code, _, can_warn in results if _warned(code, can_warn)]
     if failed:
         raise click.ClickException(f"{len(failed)} gate(s) failed: {', '.join(failed)}")
 
@@ -140,10 +176,23 @@ def check_command(no_pytest: bool, only: str | None) -> None:
     # that overstates its own coverage is worse than no summary - the
     # whole reason this command exists is that a suite nobody remembered
     # to run looked exactly like a suite that passed.
+    # A warning is reported BEFORE the closing line and never instead
+    # of it: the gate passed, and the command's exit code says so. What
+    # this fixes is the summary saying "Every gate passed" while a real
+    # warning sat eight gates and two minutes further up the scrollback
+    # (post-build-review #23).
+    if warned:
+        console.print(
+            f"Passed, with a warning from: {', '.join(warned)}. "
+            f"Scroll up for what it said - it is not failing the build.",
+            style="yellow")
+
     if skipped:
         console.print(f"Incomplete - no toolchain for: {', '.join(skipped)}. "
                       f"Everything that ran, passed. See CLAUDE.md's "
                       f"environment-setup bullet.", style="yellow")
+    elif warned:
+        pass  # already said above; "Every gate passed" would talk over it
     elif only is not None:
         # Same reasoning as the skipped-toolchain branch above: never
         # let a summary overstate what actually ran.

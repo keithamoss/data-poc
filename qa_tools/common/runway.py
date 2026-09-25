@@ -72,6 +72,14 @@ class CalendarRunway:
     last_date: date | None
     dataset_count: int
     threshold: int
+    #: The dataset whose count IS `remaining`, and that dataset's own
+    #: last period - not the calendar's. Carried as fields rather than
+    #: only written into the warning text, because the dashboard
+    #: renders its own message and should not parse one back out
+    #: (post-build-review #22).
+    driving_dataset: str | None = None
+    driving_last_period: str | None = None
+    driving_last_date: date | None = None
 
     @property
     def is_low(self) -> bool:
@@ -113,18 +121,32 @@ def calendar_runway(calendar_name: str, as_of: date) -> CalendarRunway:
     """
     calendar = schedule.calendar(calendar_name)
     periods = schedule.periods_for_calendar(calendar_name)
-    future_counts = []
+    # (future count, dataset_id, that dataset's own last owed period).
+    # The dataset is carried alongside its count because `remaining` is
+    # a minimum, and a minimum with no owner is a number nobody can
+    # check against the file (post-build-review #22).
+    per_dataset: list[tuple[int, str, object]] = []
     for dataset_id in _datasets_on(calendar_name):
         owed = [p for p in schedule.periods_for_dataset(dataset_id) if p.expected]
-        future_counts.append(len([p for p in owed if p.date > as_of]))
+        per_dataset.append((len([p for p in owed if p.date > as_of]),
+                             dataset_id, owed[-1] if owed else None))
+
+    # min() on the count alone, with the dataset id as a tie-break, so
+    # the same configuration always names the same dataset rather than
+    # whichever one the hierarchy happened to list first.
+    driver = min(per_dataset, key=lambda x: (x[0], x[1])) if per_dataset else None
+    driving_last = driver[2] if driver else None
 
     return CalendarRunway(
         calendar_name=calendar_name,
-        remaining=min(future_counts) if future_counts else 0,
+        remaining=driver[0] if driver else 0,
         last_period=periods[-1].name if periods else None,
         last_date=periods[-1].date if periods else None,
-        dataset_count=len(future_counts),
+        dataset_count=len(per_dataset),
         threshold=_threshold(calendar),
+        driving_dataset=driver[1] if driver else None,
+        driving_last_period=driving_last.name if driving_last else None,
+        driving_last_date=driving_last.date if driving_last else None,
     )
 
 
@@ -162,16 +184,22 @@ def warning_lines(as_of: date) -> list[str]:
     by colour - a reader who cannot tell a warning from a failure treats
     both as noise, and the one that mattered goes with it.
 
-    Names the calendar, its last authored period and HOW MANY datasets
-    name it, without listing them. Thirty dataset names is the fact
-    repeated thirty times, which is what this aggregation exists to
-    stop.
+    Names the calendar, HOW MANY datasets name it - without listing
+    them, since thirty dataset names is one fact repeated thirty times,
+    which is what this aggregation exists to stop - and, for the low
+    case, the ONE dataset the number actually belongs to.
+
+    That last part is not a detail: `remaining` is a minimum across
+    datasets, so naming the calendar and stopping made the figure
+    unreproducible from the config (post-build-review #22). The
+    calendar's own horizon is still given when it differs, as a
+    separate clause rather than folded into the same sentence.
     """
     lines = []
     for runway in low_runway(as_of):
-        datasets = (f"{runway.dataset_count} dataset names it"
+        datasets = (f"{runway.dataset_count} dataset names this calendar"
                     if runway.dataset_count == 1
-                    else f"{runway.dataset_count} datasets name it")
+                    else f"{runway.dataset_count} datasets name this calendar")
         if runway.is_exhausted:
             # NOT "WARNING", and that is the whole point of this branch
             # (plans/post-build-review.md #21, Keith's call 2026-09-24).
@@ -188,12 +216,26 @@ def warning_lines(as_of: date) -> list[str]:
                 f"contract/data-asset.yaml; `mothman schedule candidate-dates` proposes them. "
                 f"Until then those datasets cannot be processed.")
         else:
+            # THE NUMBER AND THE PERIOD BELONG TO ONE DATASET, and the
+            # sentence now says which. It used to attribute the minimum
+            # to the calendar and pair it with the CALENDAR's last
+            # period, so a reader who opened the config and counted
+            # found a different number and no way to reconcile them
+            # (post-build-review #22). The dashboard half of
+            # REQ-PIPE-053 had already made this fix - "a dataset's
+            # message names its OWN last period, not its calendar's" -
+            # and the CLI kept the old shape.
+            horizon = ""
+            if runway.driving_last_period != runway.last_period:
+                horizon = (f" The calendar itself runs to {runway.last_period} on "
+                            f"{runway.last_date}.")
             lines.append(
-                f"WARNING (not failing the build): calendar {runway.calendar_name!r} has only "
-                f"{runway.remaining} future supply slot(s) left - its last authored period is "
-                f"{runway.last_period} on {runway.last_date}, and {datasets}. Author the next "
-                f"year's dates in contract/data-asset.yaml; `mothman schedule candidate-dates` "
-                f"proposes them.")
+                f"WARNING (not failing the build): calendar {runway.calendar_name!r} runs out "
+                f"first for {runway.driving_dataset!r}, which has only {runway.remaining} "
+                f"future supply slot(s) left - its own last is {runway.driving_last_period} on "
+                f"{runway.driving_last_date}. {datasets[0].upper()}{datasets[1:]}."
+                f"{horizon} Author the next year's dates in contract/data-asset.yaml; "
+                f"`mothman schedule candidate-dates` proposes them.")
     return lines
 
 

@@ -1169,7 +1169,7 @@ just now, not by reading the critic's transcript.
     what tell a reader the gate read the whole file rather than falling
     out early.
 
-18. **[todo, 2026-09-24]** **[Testing & dev tooling]** **[A2] The
+18. **[done, 2026-09-25]** **[Testing & dev tooling]** **[A2] The
     header's dataset count is not the number of datasets affected.**
 
     **Verified** at `validate_schedule.py:709` - the count comes from
@@ -1185,6 +1185,26 @@ just now, not by reading the critic's transcript.
 
     **Cost:** small, but it needs a decision about what "affected"
     means, since it now has to fan a calendar error out to its datasets.
+
+    **DONE 2026-09-25.** `ConfigError` grew an `affects` tuple - the
+    datasets an error actually breaks - filled in by one resolver,
+    `_attribute()`, rather than parsed at the point of use. A
+    calendar-scoped error fans out to every dataset naming that
+    calendar; a dataset-scoped one is itself; an error about the
+    asset's own top-level configuration stays empty and keeps its
+    existing "the asset's own configuration" wording, which is truer
+    than fanning a missing key out to all thirty.
+
+    **What "affected" means, settled:** a dataset is affected when an
+    error names it, or when an error names a calendar it uses. The
+    renamed-calendar case the critic reproduced now reads "6 error(s)
+    affecting 6 dataset(s)" where it read "affecting 1 dataset(s)".
+
+    One place reads a scope string back, deliberately - `scope` is a
+    display string this module builds in two shapes, and a single
+    resolver owning both readings beats threading a dataset list
+    through twenty construction sites where the missed one would
+    silently under-count.
 
 19. **[done, 2026-09-24]** **[Testing & dev tooling]** **[A3] Every
     error names a correction; the one it names is the wrong one, and
@@ -1274,7 +1294,7 @@ just now, not by reading the critic's transcript.
     points a dataset at a name nobody ever defined and asserts no guess
     appears.
 
-20. **[todo, 2026-09-24]** **[Testing & dev tooling]** **[A4/A5] One
+20. **[done, 2026-09-25]** **[Testing & dev tooling]** **[A4/A5] One
     mistake produces two errors in two idioms, and the generated half of
     the fix lines names nothing.**
 
@@ -1300,6 +1320,27 @@ just now, not by reading the critic's transcript.
 
     **Cost:** small for the wording. Moderate for the double-fire, which
     is a real seam between two validators.
+
+    **DONE 2026-09-25, both halves.**
+
+    The wording: a `_SHAPES` map gives every key in this schema an
+    expected form, and the generated fixes now read "Add it: a list of
+    lines saying what changed, like ['2027-01-01: authored 2027
+    dates']." rather than "Add it." Where a key is not in the map the
+    fallback points at the neighbouring entries rather than saying
+    nothing.
+
+    The double-fire: `ConfigError` grew a `field` path and a `layer`
+    tag, and one report about one value survives - the SEMANTIC one,
+    because it names the unit, gives two examples and says why it is
+    never guessed at, where the schema layer's generic message named
+    nothing. Tagged explicitly rather than inferred from the message
+    text, same reasoning as `cause` in #19.
+
+    Measured on the real config with `claim_window: 14` and a removed
+    `changelog`: three errors before, two after, and the header count
+    is no longer inflated by the duplicate (which was #18's other
+    half).
 
 21. **[done, 2026-09-24]** **[Testing & dev tooling, Pipeline & publishing]** **[A6] The exhausted schedule wears the warning's
     label, in the one place a maintainer would act.**
@@ -1347,7 +1388,7 @@ just now, not by reading the critic's transcript.
     the assertion is about counting LOW calendars, which is what its
     name says.
 
-22. **[todo, 2026-09-24]** **[Testing & dev tooling]** **[A7] The
+22. **[done, 2026-09-25]** **[Testing & dev tooling]** **[A7] The
     runway number and the last period in one sentence belong to
     different objects, and the number cannot be checked against the
     file.**
@@ -1378,7 +1419,33 @@ just now, not by reading the critic's transcript.
     **Cost:** small. **Recommendation: fix**, and it is the same edit
     the dashboard already had.
 
-23. **[todo, 2026-09-24]** **[Testing & dev tooling]** **[A8] The
+    **DONE 2026-09-25.** `CalendarRunway` now carries
+    `driving_dataset`, `driving_last_period` and `driving_last_date` -
+    as fields, not only inside the sentence, because the dashboard
+    renders its own message and should not parse one back out. The
+    warning reads:
+
+    ```
+    WARNING (not failing the build): calendar 'quarterly' runs out
+    first for 'cp-case-workers', which has only 2 future supply slot(s)
+    left - its own last is 2027-Q3 on 2027-08-01. 6 datasets name this
+    calendar. The calendar itself runs to 2027-Q4 on 2027-11-01.
+    ```
+
+    Every number in it can now be checked against the file. The
+    calendar's own horizon is kept as a separate clause, and only when
+    it differs from the driving dataset's.
+
+    **One existing rule was refined rather than broken**, and it is
+    worth being precise: `test_the_line_says_how_many_datasets_without_
+    listing_them` asserted that NO dataset is named. The thing that
+    rule exists to prevent is one fact repeated thirty times, not
+    naming a dataset - so it is now "name the one the number belongs
+    to, and none of the others", asserted exactly that way. The
+    minimum is taken with the dataset id as a tie-break, so the same
+    configuration always names the same dataset.
+
+23. **[done, 2026-09-25]** **[Testing & dev tooling]** **[A8] The
     low-runway warning is printed and not surfaced.**
 
     **Verified** at `cli/check.py:126-130` - the summary table has
@@ -1418,7 +1485,38 @@ just now, not by reading the critic's transcript.
     something to know", which today they cannot express through a
     return code alone.
 
-24. **[todo, 2026-09-24]** **[Testing & dev tooling]** **[B1/B2/B3]
+    **DONE 2026-09-25.** `mothman check` has a fourth outcome, "passed,
+    with a warning", and the closing line no longer says "Every gate
+    passed" over the top of one.
+
+    **How a gate says it, and why not the obvious way.** Reading the
+    gate's output for a marker was rejected: `_run` streams rather than
+    captures on purpose, and capturing means piping, and a gate whose
+    stdout is a pipe stops colouring it. So the channel is an exit
+    code - but a gate cannot simply start returning non-zero, because
+    CI runs these same commands as their own workflow steps where any
+    non-zero exit is a failed step. The runner therefore OPTS THE GATE
+    IN through `MOTHMAN_GATE_WARNING_EXIT`, and CI simply does not set
+    it. `mothman schedule validate` exits 0 for CI and 78 for
+    `mothman check`, from the same code path.
+
+    **The sentinel is interpreted per gate, not globally** - a fourth
+    field on `_GATES`. A real failure that happened to exit 78 would
+    otherwise be re-read as a warning, turning red into yellow, which
+    is the false-green direction.
+
+    **A bug found by driving it rather than reading it:** the first
+    build worked at the gate and still rendered red, because
+    `cli/schedule.py`'s wrapper turned every non-zero return into the
+    same `ClickException`. The warning arrived as a plain exit 1. It
+    has its own test now - a wrapper that flattens exit codes reads as
+    correct and nothing else in the chain would notice.
+
+    Verified end to end on the real config: `mothman check --only
+    schedule` exits 0 and shows the yellow row; `mothman schedule
+    validate` exits 0.
+
+24. **[done, 2026-09-25]** **[Testing & dev tooling]** **[B1/B2/B3]
     Ordinary wrong input produces Python tracebacks.**
 
     **Verified by running all four just now**, real `uv run mothman`,
@@ -1455,7 +1553,32 @@ just now, not by reading the critic's transcript.
     too** - whatever `schedule` ends up doing here, `supply` should do
     the same way.
 
-25. **[todo, 2026-09-24]** **[Testing & dev tooling]** **[B4] On a
+    **DONE 2026-09-25.** `--until` is a real `click.DateTime`, so a bad
+    date now gets Click's own convention - "Invalid value for
+    '--until': 'notadate' does not match the format '%Y-%m-%d'" - like
+    every other flag in the tool. `--dataset` and `--calendar` are a
+    lazily-resolved choice type, so `--help` lists the real values and
+    a wrong one names them all. The two known config errors
+    (`UnknownDatasetError`, `ScheduleConfigError`) are wrapped in a
+    `ClickException` with the error's own message intact - unwrapped
+    from `KeyError`'s repr, which would otherwise print the message
+    inside escaped quotes and show the traceback through the thing
+    meant to replace it.
+
+    The fourth case, a daily calendar with no `--until`, is gone
+    entirely rather than caught: #29's window means the command no
+    longer needs the reader to supply a horizon.
+
+    **The choice type resolves LAZILY**, which is the one decision
+    worth keeping: the values come from `contract/data-asset.yaml`, and
+    reading it at import would make every `mothman --help` depend on
+    that file parsing. A gate exists to say whether it does; the help
+    should not be the thing that breaks first.
+
+    **`mothman supply` does not exist yet** - when it does, this is the
+    shape to copy.
+
+25. **[done, 2026-09-25]** **[Testing & dev tooling]** **[B4] On a
     failing gate, the only coloured thing on screen carries no
     information.** The four real errors print uncoloured - visually
     identical to the OK output - and the ending is a red, full-width,
@@ -1469,7 +1592,22 @@ just now, not by reading the critic's transcript.
 
     **Cost:** small.
 
-26. **[todo, 2026-09-24]** **[Testing & dev tooling]** **[B5] The
+    **DONE 2026-09-25.** The report colours its headline, the shared
+    cause, each filename, each scope and each error's bullet - with raw
+    ANSI and only when `sys.stderr.isatty()`, honouring `NO_COLOR`.
+    Rich was deliberately not used: this module also runs bare as a CI
+    step, where colour is stripped anyway, and importing a rendering
+    library to print eight lines buys a dependency for the case that
+    does not need it.
+
+    The closing panel's "see output above" is answered from the other
+    end: when there are more than three errors the headline is
+    repeated at the FOOT, where the eye already is. Thirty datasets is
+    sixty lines, and pointing a reader back past all of them to a line
+    they have already scrolled off is the thing that made the panel
+    useless.
+
+26. **[done, 2026-09-25]** **[Testing & dev tooling]** **[B5] The
     stdout/stderr split reverses the printed order, defeating the
     code's own stated intent.**
 
@@ -1498,7 +1636,13 @@ just now, not by reading the critic's transcript.
     **Cost:** trivial - one stream, or one flush.
     **Recommendation: fix.**
 
-27. **[todo, 2026-09-24]** **[Testing & dev tooling]** **[B6] The claim
+    **DONE 2026-09-25** - the flush, keeping the stream split. One
+    `sys.stdout.flush()` before the first write to stderr, with a test
+    that asserts the ORDER of the two rather than their content, since
+    the bug is invisible in this sandbox (which sets
+    `PYTHONUNBUFFERED`) and would come straight back otherwise.
+
+27. **[done, 2026-09-25]** **[Testing & dev tooling]** **[B6] The claim
     window renders as a raw `timedelta`.** `cli/schedule.py:71` prints
     `schedule.claim_window(dataset)` directly, giving `14 days, 0:00:00`
     and `4:00:00`. The config is authored `14d` and `4h`, and
@@ -1508,7 +1652,14 @@ just now, not by reading the critic's transcript.
     `4:00:00` reads as a time of day, in a table whose neighbouring
     columns are literally times (`09:00 +0800`).
 
-28. **[todo, 2026-09-24]** **[Testing & dev tooling]** **[B8/B9]
+    **DONE 2026-09-25.** A new `schedule.format_duration()`, the
+    inverse of `parse_duration`, used at both display sites - the
+    per-dataset view and the calendar list. It RAISES rather than
+    falling back to the timedelta's repr for a duration with no
+    authored form, because showing something nobody could type back in
+    is the whole problem.
+
+28. **[done, 2026-09-25]** **[Testing & dev tooling]** **[B8/B9]
     `candidate-dates` tells you to copy something it does not give you,
     and will propose any year you ask for.**
 
@@ -1527,7 +1678,28 @@ just now, not by reading the critic's transcript.
 
     **Cost:** small for the year guard. Small for a `--yaml` output.
 
-29. **[todo, 2026-09-24]** **[Testing & dev tooling]** **[B10] At daily
+    **DONE 2026-09-25.** The command proposes only the year actually
+    next in line, and refuses the other three cases by name: a year
+    already authored (naming the duplicate problem and the right year),
+    a year in the past, and a year that would skip one - which names
+    every year it would leave unauthored, since that is the silent
+    hole. It reads the last authored period from the calendar, which it
+    could always have done: the runway warning prints it one screen
+    earlier.
+
+    `--yaml` emits the version block its own help tells you to copy -
+    `effective_from`, a `changelog` line and the dates - printed bare
+    so it can be piped, with any weekend notes as a trailing comment
+    rather than inside the YAML.
+
+    Two existing tests used years the guard now refuses (2029 skips
+    2028; 2026 is authored). Both were rewritten to ask the calendar
+    which year is next rather than hard-coding one, so they do not go
+    stale the day somebody authors 2028. The weekend RULE stays covered
+    where it lives, in `tests/test_schedule.py`, against a year that
+    actually has one.
+
+29. **[done, 2026-09-25]** **[Testing & dev tooling]** **[B10] At daily
     cadence there is no way to ask "what's next?"**
     `schedule show --dataset birth-registrations --until 2026-09-24`
     prints **1370 lines** (counted just now), no pager, no `--from`, no
@@ -1548,7 +1720,19 @@ just now, not by reading the critic's transcript.
     it?* - becomes the default answer rather than something to be
     extracted from 1370 lines.
 
-30. **[todo, 2026-09-24]** **[Testing & dev tooling, Docs & process]**
+    **DONE 2026-09-25.** A single dataset shows three periods before
+    today and five after, with `->` against the next one actually
+    owed, and a footer saying how many were left out and how to see
+    them. `--all` is a real escape hatch - there is a test asserting it
+    genuinely prints everything, because a default that quietly becomes
+    a cap is a worse problem than the one this fixes. `--until` implies
+    the full list up to that date.
+
+    For a cadence rule the window also supplies the horizon the
+    calendar cannot, which is what removes #24's traceback: the bound
+    no longer has to come from the reader.
+
+30. **[done, 2026-09-25]** **[Testing & dev tooling, Docs & process]**
     **[B11/B12] Help text and footers explain things the reader never
     sees, and enumerate nothing they do.**
     `mothman schedule --help` shows **`validate  Gate: a config error
@@ -1565,6 +1749,19 @@ just now, not by reading the critic's transcript.
     distinction that no shipped config exercises, while the thing a
     reader would actually wonder about - why `cp-case-workers` shows 10
     rows against 20 calendar dates - is answered only by inference.
+
+    **DONE 2026-09-25.** The requirement id and the siting rationale
+    are comments now, which is who they were written for; the help text
+    says what the command does. Every command in the group carries
+    examples. `--dataset` and `--calendar` enumerate their real values
+    in `--help`. `--until` no longer claims to be needed for a daily
+    calendar, because it is not any more (#29).
+
+    The footer answers the question a reader actually has: "10
+    period(s), 10 slot(s). The calendar has 20; this dataset takes
+    delivery in February, August only." The period/slot distinction is
+    still shown when a config genuinely exercises it, rather than
+    explained when it does not.
 
 31. **[done, 2026-09-24]** **[Testing & dev tooling]** **[B13]
     `--dataset` means two different things - and it is actually three.**

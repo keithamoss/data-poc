@@ -133,6 +133,57 @@ releases:
               counted as healthy. Every figure is now counted in its own
               right, and the two quiet states appear in the key with
               their own totals whenever they are real.
+          - headline: "`schedule show` answers \"what's next?\" without a date dump"
+            components: ["Testing & dev tooling"]
+            description: >
+              Asking for a daily dataset's schedule either crashed, or
+              printed over a thousand rows once you worked out that it
+              wanted an end date. It now shows the last few periods and
+              the next few, marks the next supply owed, and says how
+              many it left out. Use --all for the full list.
+          - headline: Wrong input to a schedule command reads like an error, not a crash
+            components: ["Testing & dev tooling"]
+            description: >
+              A mistyped dataset name, or a malformed date, ended in
+              thirty lines of Python traceback - while the command next
+              to it answered the same mistake in a tidy box. Both now
+              do. The dataset and calendar options also list their real
+              values in --help, so there is less to guess at.
+          - headline: The runway warning names the dataset its number belongs to
+            components: ["Pipeline & publishing"]
+            description: >
+              It said a calendar had two supplies left and gave the
+              calendar's last date, which belonged to a different
+              dataset - so counting the dates in the file gave you a
+              different answer with no way to reconcile them. It now
+              names the dataset that runs out first and that dataset's
+              own last period.
+          - headline: "`mothman check` can say \"passed, with a warning\""
+            components: ["Testing & dev tooling"]
+            description: >
+              A gate could only pass or fail, so the low-runway warning
+              printed eight gates above a summary that said "Every gate
+              passed". There is now a fourth outcome that reports the
+              warning without failing anything.
+          - headline: Suggesting next year's delivery dates cannot leave a gap
+            components: ["Testing & dev tooling"]
+            description: >
+              The command the runway warning points you at would
+              propose a year already in the file, a year in the past, or
+              a year with unauthored ones before it - which is the empty
+              schedule the build check exists to prevent. It now
+              proposes only the year next in line, and --yaml gives you
+              the block to paste.
+          - headline: Configuration errors are easier to act on
+            components: ["Testing & dev tooling"]
+            description: >
+              One mistyped duration produced two errors saying different
+              things about the same value, and the generated advice was
+              "Add it." or "Correct the value." Each mistake is now
+              reported once, with the shape and an example of what
+              belongs there, and the count of affected datasets includes
+              those broken by a calendar rather than only those named
+              directly.
           - headline: Changing a delivery calendar no longer moves old claim windows
             components: ["Pipeline & publishing"]
             description: >
