@@ -2249,7 +2249,7 @@ here as its own question, not acted on.
     are still refused - case-insensitive is not lenient). Confirmed
     failing first.
 
-35. **[in-progress, 2026-09-25]** **[Pipeline & publishing]** **[A4] Two
+35. **[done, 2026-09-25]** **[Pipeline & publishing]** **[A4] Two
     wall-clock computations are not on the asset clock.**
     `REQ-PIPE-048` criterion 2 - "SHALL derive every wall-clock
     computation from that value, and SHALL NOT carry a hardcoded offset
@@ -2296,7 +2296,14 @@ here as its own question, not acted on.
     the same conversation - "sure, happy for you to put it in 44 and
     then address it there".
 
-    **What stays here is the dashboard half**: `assetTodayDateStr()`
+    **THE DASHBOARD HALF IS BUILT, 2026-09-25**, as `REQ-DASH-071`
+    criterion 14 - Keith's own answer to the "how loudly should a
+    browser fail" question below was "I think I should just probably
+    fail quite loudly. No need for a graceful fallback." Absent or
+    unresolvable now throws, naming the zone, and both ends are
+    asserted. That closes this entry.
+
+    **What stayed here was the dashboard half**: `assetTodayDateStr()`
     falling back silently to UTC when `ASSET_TIMEZONE` is null or the
     zone name does not resolve. Still open, still mine, and still the
     smaller of the two.
@@ -3038,7 +3045,7 @@ twice. It deliberately did not re-find the `TypeError`.
     `.pill.nodata` and `.pill.inactive` actually paint, so it measures
     the RULES rather than whichever pill a row happens to show.
 
-49. **[in-progress, 2026-09-24]** **[Dashboard UI]** **[V3/V5] The `nodata`
+49. **[done, 2026-09-25]** **[Dashboard UI]** **[V3/V5] The `nodata`
     pill fails WCAG AA in both themes, and its dashed border is not
     visible at all.**
 
@@ -3201,7 +3208,7 @@ twice. It deliberately did not re-find the `TypeError`.
     shrinking, and that is accepted - the phone is not a target, and
     "untidy" was the bar Keith set for it.
 
-53. **[in-progress, 2026-09-25]** **[Dashboard UI]** **[V11/V12/V13] The two
+53. **[parked, 2026-09-25]** **[Dashboard UI]** **[V11/V12/V13] The two
     new quiet-state branches were written with a different markup shape
     from the branch beside them.**
 
@@ -3372,7 +3379,7 @@ twice. It deliberately did not re-find the `TypeError`.
       single-sided threshold — status is this tool's own verdict",
       which wraps mid-sentence and reads as debug output.
 
-57. **[in-progress, 2026-09-25]** **[Dashboard UI]** **[V19/V20/V21/
+57. **[done, 2026-09-25]** **[Dashboard UI]** **[V19/V20/V21/
     V22/V24] Five smaller visual findings, recorded together.**
 
     - **`exhaustedMarker()` produces duplicate-looking pill pairs at
