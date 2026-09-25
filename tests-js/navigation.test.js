@@ -210,3 +210,69 @@ describe("a URL pointing at something that no longer exists", () => {
     expect(dashboard.document.getElementById("rail").textContent).toContain("Agencies");
   });
 });
+
+// A STALE COLUMN OR CHECK LINK IS THE SAME EVENT AS A STALE DATASET
+// ONE, and got none of the same treatment (post-build-review #11).
+// renderNotFound() was added for agency/collection/dataset after
+// exactly this class of bug; column and check were never extended.
+//
+// What happened instead: renderFromState() found no matching column,
+// fell through to hideDrawer(), and left the reader on the dataset page
+// with no message, STATE.columnName still set to the bad value, and the
+// broken segment still in the URL - so re-sharing propagates it. At
+// thirty datasets with evolving schemas, a stale column bookmark is the
+// common case rather than the edge.
+describe("a URL pointing at a column or check that no longer exists", () => {
+  const DATASET = {
+    tier: "dataset", agencyId: "registry-services",
+    collectionId: "civil-registration", datasetId: "birth-registrations",
+  };
+
+  // OPENED, not navigated to. navigate() never opens a drawer - it
+  // renders a tier and pushes a hash - so the stale-link case only
+  // arises when a URL is ARRIVED AT: an initial load, or back/forward.
+  // Both run renderFromState(), which popstate is the reachable lever
+  // for from out here (STATE is a module-scoped `let`, so it is not a
+  // window property a test can assign).
+  function open(state) {
+    const w = load();
+    w.location.hash = w.stateToHash(state);
+    w.dispatchEvent(new w.PopStateEvent("popstate", { state: null }));
+    return w;
+  }
+
+  it("says so rather than silently showing the dataset page", () => {
+    const w = open({ ...DATASET, columnName: "a_column_that_was_dropped" });
+    expect(dashboard.errors).toEqual([]);
+    const view = dashboard.document.getElementById("view").textContent;
+    expect(view).toMatch(/no longer/i);
+    expect(view).toMatch(/a_column_that_was_dropped/);
+    // The rest of the page is still the dataset the reader asked for -
+    // unlike a missing dataset, everything except the column resolved.
+    expect(view).toMatch(/Birth Registrations/);
+  });
+
+  it("does not leave the dead segment in the URL to be re-shared", () => {
+    const w = open({ ...DATASET, columnName: "a_column_that_was_dropped" });
+    expect(w.location.hash).not.toContain("a_column_that_was_dropped");
+  });
+
+  it("does not leave STATE pointing at the thing it could not find", () => {
+    const w = open({ ...DATASET, columnName: "a_column_that_was_dropped" });
+    expect(w.hashToState().columnName).toBeUndefined();
+  });
+
+  it("drops a dead check key too, not just a dead column", () => {
+    const w = open({ ...DATASET, columnName: "gone", checkKey: "retired_check" });
+    expect(dashboard.errors).toEqual([]);
+    expect(w.hashToState().checkKey).toBeUndefined();
+  });
+
+  // THE MUST-NOT-CHANGE HALF LIVES IN THE PLAYWRIGHT SUITE, not here,
+  // and deliberately: this harness carries only a hierarchy, so its
+  // datasets have zero columns and EVERY column name is stale in it.
+  // That makes it the right place to test what happens to a name that
+  // does not resolve, and the wrong place to test that a real one still
+  // opens its drawer - which needs real check data.
+  // tests/test_dashboard_e2e.py's TestAStaleDeepLinkSaysSo has it.
+});

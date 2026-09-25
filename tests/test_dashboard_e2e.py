@@ -85,7 +85,18 @@ def _state_to_path(state: dict) -> str:
     if state["tier"] == "agency":
         return f"/agency/{quoted['agencyId']}"
     if state["tier"] == "dataset":
-        return f"/agency/{quoted['agencyId']}/collection/{quoted['collectionId']}/dataset/{quoted['datasetId']}"
+        path = (f"/agency/{quoted['agencyId']}/collection/{quoted['collectionId']}"
+                f"/dataset/{quoted['datasetId']}")
+        # The drill-down segments, added 2026-09-25 for
+        # post-build-review #11. They were missing, which made a test
+        # that passed a `columnName` silently drive a plain dataset URL
+        # - the assertion then measured the dataset page and said
+        # nothing about the column at all.
+        if state.get("columnName"):
+            path += f"/column/{quoted['columnName']}"
+            if state.get("checkKey"):
+                path += f"/check/{quoted['checkKey']}"
+        return path
     return "/"
 
 
@@ -1701,3 +1712,106 @@ class TestEveryDatasetPageSurvivesItsOwnDrillDown:
             return out;
         }""")
         assert not missing, f"checks with no key, so no deep link and no Back: {missing}"
+
+
+class TestAStaleDeepLinkSaysSo:
+    """post-build-review #11, and the half tests-js cannot cover.
+
+    `renderNotFound()` was built for a bookmark pointing at an agency,
+    collection or dataset that no longer exists, and never extended to
+    a COLUMN or a CHECK. A stale column link landed on the dataset page
+    with no message, `STATE.columnName` still set to the value that
+    resolved to nothing, and the dead segment still in the URL - so
+    re-sharing propagated it. At thirty datasets with evolving schemas
+    that is the common case, not the edge.
+
+    The jsdom suite covers the not-found behaviour and cannot cover
+    this: its harness carries only a hierarchy, so every dataset has
+    zero columns and every column name is stale in it. Proving that a
+    REAL column still opens needs real check data, which is here.
+    """
+
+    STATE = {"tier": "dataset", "agencyId": "registry-services",
+             "collectionId": "civil-registration", "datasetId": "birth-registrations"}
+
+    def _first_column_key(self, page):
+        return page.evaluate("""() => {
+            const ds = DATA.agencies.find(a=>a.id==="registry-services")
+                .collections.find(c=>c.id==="civil-registration")
+                .datasets.find(d=>d.id==="birth-registrations");
+            return columnKey(ds.columns[0]);
+        }""")
+
+    def test_a_real_column_link_still_opens_its_drawer(self, clean_page, built_dashboard_html):
+        """The must-not-change half. Repairing a broken deep link is
+        worth nothing if it broke the working ones."""
+        _goto(clean_page, built_dashboard_html, state=self.STATE)
+        key = self._first_column_key(clean_page)
+        _goto(clean_page, built_dashboard_html, state={**self.STATE, "columnName": key})
+        clean_page.wait_for_timeout(400)
+        assert clean_page.locator("#drawer.open").count() == 1, (
+            "a column that exists no longer opens its drawer")
+        assert key in clean_page.url
+
+    def test_a_dropped_column_is_named_rather_than_ignored(self, clean_page,
+                                                            built_dashboard_html):
+        _goto(clean_page, built_dashboard_html,
+              state={**self.STATE, "columnName": "a_column_that_was_dropped"})
+        clean_page.wait_for_timeout(400)
+        notice = clean_page.locator(".stale-link-notice")
+        assert notice.count() == 1, "no notice - the stale link failed silently"
+        assert "a_column_that_was_dropped" in notice.inner_text()
+
+    def test_the_dead_segment_is_taken_out_of_the_url(self, clean_page,
+                                                       built_dashboard_html):
+        _goto(clean_page, built_dashboard_html,
+              state={**self.STATE, "columnName": "a_column_that_was_dropped"})
+        clean_page.wait_for_timeout(400)
+        assert "a_column_that_was_dropped" not in clean_page.url
+
+    def test_the_rest_of_the_dataset_page_still_renders(self, clean_page,
+                                                         built_dashboard_html):
+        """Deliberately NOT a full-page not-found: everything the reader
+        asked for except the column resolved, and is worth showing."""
+        _goto(clean_page, built_dashboard_html,
+              state={**self.STATE, "columnName": "a_column_that_was_dropped"})
+        clean_page.wait_for_timeout(400)
+        assert clean_page.locator("#view h2").count() == 1
+        assert clean_page.locator(".column-tile, .col-tile").count() > 0
+
+
+class TestTheLowRunwayWarningIsOnThePage:
+    """post-build-review #2 - REQ-PIPE-053's own criterion says the
+    warning appears "both in the dashboard and as a non-fatal warning in
+    the repository's gates", and only the gate half was built.
+
+    Live against the real committed config at the time of writing: the
+    quarterly calendar has 2 future slots against a threshold of 4, so a
+    warning is due right now, which is what makes this assertable
+    against the real built page rather than a fixture.
+    """
+
+    def test_it_is_visible_on_the_landing_view(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        notice = clean_page.locator(".notice-runway")
+        assert notice.count() == 1, (
+            "the low-runway warning is computed and still not rendered anywhere")
+        assert notice.first.is_visible()
+
+    def test_it_names_the_calendar_and_the_dataset_that_runs_out_first(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        text = clean_page.locator(".notice-runway").first.inner_text()
+        assert "quarterly" in text
+        assert "cp-case-workers" in text, (
+            "the number is a minimum across datasets and the notice does not say whose")
+
+    def test_it_says_in_words_that_nothing_has_failed(self, clean_page,
+                                                       built_dashboard_html):
+        """Criterion: distinguish a warning from a failure in text as
+        well as colour. A reader who cannot tell them apart treats both
+        as noise."""
+        text = None
+        _goto(clean_page, built_dashboard_html)
+        text = clean_page.locator(".notice-runway").first.inner_text().lower()
+        assert "nothing has failed" in text or "not failing" in text

@@ -133,6 +133,30 @@ releases:
               counted as healthy. Every figure is now counted in its own
               right, and the two quiet states appear in the key with
               their own totals whenever they are real.
+          - headline: The dashboard warns you before a delivery calendar runs out
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              The warning that a calendar is nearly out of dates was
+              computed and only ever shown in the build log, so the one
+              place people actually look never carried it. It now
+              appears on the front page, names the dataset that runs out
+              first, and says plainly that nothing has failed. It steps
+              aside once a calendar has actually run out, where the
+              existing notice takes over.
+          - headline: A link to a column that no longer exists says so
+            components: ["Dashboard UI"]
+            description: >
+              Opening an old bookmark for a column that had since been
+              renamed or dropped left you on the dataset page with no
+              explanation and the dead link still in the address bar, so
+              sharing it passed the problem on. You now get a short note
+              saying what is missing, the address bar is tidied up, and
+              the rest of the page still shows what you came for.
+          - headline: A sentence in the page footer reads properly again
+            components: ["Dashboard UI"]
+            description: >
+              Removing the illustrative datasets left two sentences run
+              together with no full stop between them, on every page.
           - headline: "`schedule show` answers \"what's next?\" without a date dump"
             components: ["Testing & dev tooling"]
             description: >

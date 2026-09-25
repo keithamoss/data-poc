@@ -638,7 +638,7 @@ post-build critic should see a requirement's own `evidence:`.
    deliberately excluded from that rollup. It is less misleading now
    that the quiet ones are visibly counted, and still not true.
 
-2. **[todo, 2026-09-24]** **[Dashboard UI, Pipeline & publishing]**
+2. **[done, 2026-09-25]** **[Dashboard UI, Pipeline & publishing]**
    **[F2] The low-runway warning is computed, tested, and never
    rendered anywhere in the dashboard.** `REQ-PIPE-053`'s criterion says
    "surface the low-runway warning both in the dashboard and as a
@@ -675,6 +675,26 @@ post-build critic should see a requirement's own `evidence:`.
    **SIGNED OFF 2026-09-25** - "we should rectify that, yep, definitely
    actually build that." To build, as the missed criterion it is rather
    than as a new feature.
+
+   **DONE 2026-09-25.** `lowRunwayNotice()` renders on the landing
+   view, above the fold, and is verified against the REAL built page
+   rather than a fixture - the live config has 2 quarterly slots
+   against a threshold of 4, so the warning is due right now.
+
+   Three decisions the criteria needed and did not state:
+   - **It names the dataset the number belongs to**, carried on the
+     runway itself as `drivingDataset`/`drivingLastPeriod` - the same
+     correction #22 needed on the CLI side, for the same reason:
+     `remaining` is a minimum across datasets, so naming only the
+     calendar pairs a number and a date belonging to different objects.
+   - **It says in WORDS that nothing has failed**, which is the
+     criterion about distinguishing a warning from a failure. Colour
+     alone cannot do it on a page already using red and amber for data
+     verdicts.
+   - **It goes silent once a calendar is actually exhausted.** "Running
+     low" stops being the news the moment it has run out, and two
+     notices about one calendar is the repetition the once-per-calendar
+     rule exists to prevent.
 
 3. **[todo, 2026-09-24]** **[Dashboard UI]** **[F3] Every date on the
    page renders in the VIEWER's timezone, not the asset's.** For any
@@ -1017,7 +1037,7 @@ post-build critic should see a requirement's own `evidence:`.
     unconditionally is how a link becomes a magic JavaScript button
     wearing an `<a>`, which is the thing this decision is against.
 
-11. **[todo, 2026-09-24]** **[Dashboard UI]** **[U4] A stale column or
+11. **[done, 2026-09-25]** **[Dashboard UI]** **[U4] A stale column or
     check deep link fails silently** - lands on the dataset page with no
     message, `STATE.columnName` still set to the bad value, and the
     broken segment still in the URL, so re-sharing propagates it.
@@ -1025,6 +1045,28 @@ post-build critic should see a requirement's own `evidence:`.
     and dataset after exactly this class of bug; it was not extended to
     column or check. At 30 datasets with evolving schemas, stale column
     bookmarks are the common case, not the edge.
+
+    **DONE 2026-09-25.** A dead column or check segment now repairs the
+    URL (`replaceState`, so Back still goes where the reader came from
+    rather than through the broken link they just arrived on), clears
+    it out of `STATE`, and says what happened.
+
+    **NOT a full-page not-found, deliberately**, which is where it
+    differs from the agency/dataset case it is modelled on: everything
+    the reader asked for except the column resolved, and is worth
+    showing. So the dataset page renders and the notice sits above it.
+
+    **A test-harness bug found while writing the tests, and worth its
+    own line** because it is the same shape as #43: `_state_to_path()`
+    in `tests/test_dashboard_e2e.py` emitted no `/column/` or `/check/`
+    segment at all. Any test passing a `columnName` was silently
+    driving a plain dataset URL, so the assertion measured the dataset
+    page and said nothing whatever about the column. Fixed alongside.
+
+    The must-not-change half - a real column link still opens its
+    drawer - is in the Playwright suite rather than the jsdom one, and
+    deliberately: that harness carries only a hierarchy, so every
+    dataset in it has zero columns and every column name is stale.
 
 12. **[done, 2026-09-24]** **[Dashboard UI]** **[U5] The placeholder
     check is not deep-linkable and Back cannot close its panel.** A real
@@ -1076,7 +1118,7 @@ post-build critic should see a requirement's own `evidence:`.
     making other offsets storable was `REQ-PIPE-048`'s entire point.
     **Same family as #3**; worth fixing together.
 
-15. **[todo, 2026-09-24]** **[Dashboard UI]** **[U8] A broken sentence
+15. **[done, 2026-09-25]** **[Dashboard UI]** **[U8] A broken sentence
     in the footer, on every page.**
 
     **Verified** at template:554: "…not just single-column rules Every
@@ -1087,6 +1129,10 @@ post-build critic should see a requirement's own `evidence:`.
 
     **Cost:** trivial. **Recommendation: fix** - it is visible on every
     page of the dashboard and it is one edit.
+
+    **DONE 2026-09-25.** The missing terminator, and the third
+    "computed the same way" went with it - it was the stranded half of
+    the removed mock-data sentence, not a clause the paragraph needed.
 
 16. **[todo, 2026-09-24]** **[Dashboard UI]** **[U9] The agency page
     overflows horizontally on a phone.** `scrollWidth` 537 against a

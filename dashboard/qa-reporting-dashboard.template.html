@@ -178,6 +178,11 @@ button{font:inherit; color:inherit;}
    by colour alone - the label says "Schedule ended" in words. */
 .pill.exhausted{background:var(--surface-alt); color:var(--ink); border:1.5px solid var(--ink-muted);}
 .pill.exhausted .ico{background:var(--ink-muted); border-radius:1px;}
+/* Running LOW, not run out - a different state from .notice-exhausted
+   and deliberately quieter than it, since nothing has failed and
+   nothing is unprocessable yet (post-build-review #2). */
+.notice-runway{border:1px dashed var(--ink-faint); background:var(--surface-alt);
+  border-radius:10px; padding:12px 14px; margin-bottom:16px; max-width:80ch;}
 .notice-exhausted{border:1.5px solid var(--ink-muted); background:var(--surface-alt);
   border-radius:10px; padding:12px 14px; margin-bottom:14px;}
 .notice-exhausted b{display:block; margin-bottom:4px;}
@@ -187,6 +192,14 @@ button{font:inherit; color:inherit;}
 .view-head{display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:6px;}
 .view-head h2{font-size:26px;}
 .view-sub{color:var(--ink-muted); font-size:14px; margin-top:4px; max-width:62ch;}
+/* A drill-down segment in the URL that no longer resolves
+   (post-build-review #11). Deliberately a notice above the page rather
+   than a replacement of it: unlike a missing dataset, everything the
+   reader asked for except the column is right there. */
+.stale-link-notice{border:1px solid var(--warn-border, var(--ink-faint)); border-radius:8px;
+  padding:10px 12px; margin-bottom:14px; font-size:13.5px; color:var(--ink);
+  background:var(--warn-bg, transparent); max-width:72ch;}
+.stale-link-notice code{font-size:12.5px;}
 /* Visually hidden, still announced. The route announcer (#10) has to
    reach a screen reader without appearing on the page; display:none
    and visibility:hidden would remove it from the accessibility tree
@@ -596,7 +609,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
   <main id="view"></main>
 
   <footer>
-    Proof-of-concept reporting layer over the central QA pipeline — worst-of status rollup, Agency → Data Collection → Dataset → Column. Registry Services → Civil Registration → <strong>Birth Registrations</strong> is real: its figures are computed by running the actual dbt-core, Soda Core, datacontract-cli, and Evidently AI binaries against real generated pipeline runs. The Department for Child Protection and Family Support → Child Protection collection (all 6 datasets) is also real, computed the same way — including cross-table foreign-key and business-rule checks, not just single-column rules Every dataset on this page is real, computed the same way — the illustrative mock datasets that used to sit alongside them were removed on 2026-09-23.
+    Proof-of-concept reporting layer over the central QA pipeline — worst-of status rollup, Agency → Data Collection → Dataset → Column. Registry Services → Civil Registration → <strong>Birth Registrations</strong> is real: its figures are computed by running the actual dbt-core, Soda Core, datacontract-cli, and Evidently AI binaries against real generated pipeline runs. The Department for Child Protection and Family Support → Child Protection collection (all 6 datasets) is also real, computed the same way — including cross-table foreign-key and business-rule checks, not just single-column rules. Every dataset on this page is real — the illustrative mock datasets that used to sit alongside them were removed on 2026-09-23.
     <br><br>
     <em>Internal project codename: Mothman.</em>
   </footer>
@@ -1736,9 +1749,22 @@ function scheduleRunwayAsOf(asOfDateStr, runway){
     // saying - one taking two months of four runs out twice as fast as
     // its siblings.
     if(fewest!==null && fewest < cal.threshold){
+      // WHOSE NUMBER IS IT. `fewest` is a minimum across datasets, so a
+      // message naming only the calendar pairs it with the CALENDAR's
+      // last period - a number and a date belonging to different
+      // objects, which nobody can reconcile against the config. Same
+      // correction the CLI's own warning needed
+      // (post-build-review #22 and #2).
+      const driver = (cal.datasets||[])
+        .map(ds=>({ds, remaining:(ds.dates||[]).filter(d=> d > asOfDateStr).length}))
+        .filter(x=> x.remaining === fewest)
+        .sort((a,b)=> String(a.ds.id).localeCompare(String(b.ds.id)))[0];
       out.low.push({name:cal.name, remaining:fewest, lastPeriod:cal.lastPeriod,
                      lastDate:cal.lastDate, datasetCount:(cal.datasets||[]).length,
-                     threshold:cal.threshold});
+                     threshold:cal.threshold,
+                     drivingDataset: driver ? driver.ds.id : null,
+                     drivingLastPeriod: driver ? (driver.ds.lastPeriod || cal.lastPeriod) : null,
+                     drivingLastDate: driver ? (driver.ds.lastDate || cal.lastDate) : null});
     }
   });
   out.low.sort((a,b)=> a.remaining - b.remaining);
@@ -2502,10 +2528,30 @@ function renderFromState(){
     openColumnDrawer(ctx.ag, ctx.col, ctx.ds, column, {pushHistory:false});
     const check = STATE.checkKey && column.checks.find(c=>c.key===STATE.checkKey);
     if(check) openCheckPanel(ctx.ag, ctx.col, ctx.ds, column, check, {pushHistory:false});
-    else hideCheckPanel();
+    else {
+      hideCheckPanel();
+      // A live column and a dead check - the other half of #11, and the
+      // likelier one, since a check is retired far more often than a
+      // column is dropped.
+      if(STATE.checkKey) forgetStaleSegment("check", STATE.checkKey, {checkKey:undefined});
+    }
   } else {
     hideDrawer();
     hideCheckPanel();
+    // A STALE COLUMN LINK IS AN ORDINARY EVENT, and used to be a silent
+    // one (post-build-review #11). The reader landed on the dataset
+    // page with no message, STATE.columnName still set to the value
+    // that resolved to nothing, and the dead segment still in the URL -
+    // so re-sharing propagated it. renderNotFound() was built for
+    // exactly this class and never extended past dataset level.
+    //
+    // NOT a full-page not-found, deliberately: unlike a missing
+    // dataset, everything the reader asked for EXCEPT the column is
+    // right there and worth showing. So the dataset page renders, the
+    // URL is repaired, and the message sits above it.
+    if(STATE.columnName){
+      forgetStaleSegment("column", STATE.columnName, {columnName:undefined, checkKey:undefined});
+    }
   }
   if(STATE.panel) openPanel(STATE.panel, {pushHistory:false});
   else hideAllPanelsDom();
@@ -2587,6 +2633,47 @@ function exhaustedNotice(){
   </div>`;
 }
 
+// THE OTHER HALF OF REQ-PIPE-053's OWN CRITERION - "surface the
+// low-runway warning both in the dashboard and as a non-fatal warning
+// in the repository's gates". The gate half shipped; this did not
+// exist, so the warning that exists to arrive BEFORE a schedule runs
+// out could only ever be read in CI (post-build-review #2).
+//
+// A WARNING, NOT A FAILURE, and it has to say so in words: this page's
+// own colour language is already carrying red and amber for data
+// verdicts, and a reader who cannot tell a configuration warning from
+// a failing check treats both as noise - which is how the one that
+// mattered goes with it.
+//
+// SILENT ONCE SOMETHING IS ACTUALLY EXHAUSTED. "Running low" stops
+// being the news the moment it has run out, and two notices about one
+// calendar is the repetition the once-per-calendar rule exists to
+// prevent.
+function lowRunwayNotice(runway){
+  const source = runway === undefined ? (DATA && DATA.scheduleRunway) : runway;
+  if(!source || !(source.low||[]).length || source.exhaustedCount) return "";
+  const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || "contract/data-asset.yaml";
+  const lines = source.low.map(cal=>{
+    const n = cal.datasetCount;
+    const who = cal.drivingDataset
+      ? `It runs out first for <b style="display:inline">${escHtml(cal.drivingDataset)}</b>,
+         whose own last is ${escHtml(String(cal.drivingLastPeriod))}.`
+      : "";
+    return `<li><b style="display:inline">${escHtml(cal.name)}</b> has
+      ${cal.remaining} supply slot${cal.remaining===1?"":"s"} left after the date being viewed.
+      ${who} ${n} dataset${n===1?"":"s"} name${n===1?"s":""} this calendar.</li>`;
+  }).join("");
+  return `<div class="notice-runway" role="status">
+    <b>Delivery dates are running out — nothing has failed</b>
+    <div style="color:var(--ink-muted); font-size:13px;">
+      <ul style="margin:6px 0 0; padding-left:18px;">${lines}</ul>
+      <div style="margin-top:6px;">This is a configuration task, not a problem with anyone's
+        data, and it is not failing any build. Add the next dates to <code>${file}</code> —
+        <code>mothman schedule candidate-dates</code> proposes them for review.</div>
+    </div>
+  </div>`;
+}
+
 function renderExec(view){
   // "Agencies", renamed from "Executive" on 2026-09-25 (Keith's call).
   // Tier 2 already IS one agency - its own breadcrumb label is that
@@ -2662,6 +2749,7 @@ function renderExec(view){
       ${quietKeys}
     </div>
     ${exhaustedNotice()}
+    ${lowRunwayNotice()}
     <div class="grid" id="agency-grid"></div>
   `;
   const grid = document.getElementById("agency-grid");
@@ -2702,6 +2790,24 @@ function renderNotFound(view, what, id){
           to go back to the executive overview.</div>
       </div>
     </div>`;
+}
+
+// Repair the URL and say what happened, for a drill-down segment that
+// no longer resolves (post-build-review #11). Replaces rather than
+// pushes, so Back still goes where the reader came from rather than
+// through the broken link they just arrived on.
+function forgetStaleSegment(what, id, patch){
+  STATE = {...STATE, ...patch};
+  history.replaceState(STATE, "", stateToHash(STATE) + location.search);
+  const view = document.getElementById("view");
+  if(!view) return;
+  const notice = document.createElement("div");
+  notice.className = "stale-link-notice";
+  notice.setAttribute("role", "status");
+  notice.innerHTML = `This link points at a ${what} called <code>${escHtml(String(id))}</code>,
+    which this dataset no longer has — it may have been renamed or removed since the link was
+    made. The rest of the page is current.`;
+  view.prepend(notice);
 }
 
 function renderAgency(view, agencyId){

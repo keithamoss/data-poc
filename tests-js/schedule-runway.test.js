@@ -187,3 +187,77 @@ describe("exhaustedMarker", () => {
     expect(w.exhaustedMarker(3)).toContain("schedules ended");
   });
 });
+
+// REQ-PIPE-053 asks for the low-runway warning "both in the dashboard
+// and as a non-fatal warning in the repository's gates". The gate half
+// worked. The dashboard half did not exist: scheduleRunwayAsOf() filled
+// out.low, buildData() stored it, and the only consumer was
+// exhaustedNotice(), which returns "" unless something is already
+// EXHAUSTED - so the warning that exists to arrive BEFORE that point
+// could never be seen (post-build-review #2).
+//
+// Two further criteria were vacuous as a consequence - "warn once for
+// that calendar, naming it, its last authored period and how many
+// datasets name it", and "distinguish a warning from a failure in text
+// as well as colour" - because there was no warning on the page to name
+// anything or to distinguish.
+//
+// Live at the time of writing: the real quarterly calendar has 2 future
+// slots against a threshold of 4.
+describe("the low-runway warning reaches the page", () => {
+  function notice(asOf) {
+    const w = load();
+    return w.lowRunwayNotice(w.scheduleRunwayAsOf(asOf, RUNWAY));
+  }
+
+  it("says nothing at all while there is plenty of runway", () => {
+    // A LOWERED THRESHOLD rather than an earlier date: twice-a-year
+    // only ever has two dates, so this fixture is "low" at every date
+    // in its own past. Same construction the roomy case above uses.
+    const w = load();
+    const roomy = {...RUNWAY, calendars: [{...RUNWAY.calendars[0], threshold: 1}]};
+    expect(w.lowRunwayNotice(w.scheduleRunwayAsOf("2026-01-01", roomy))).toBe("");
+  });
+
+  it("warns once for the calendar, naming it", () => {
+    const html = notice("2027-03-01");
+    expect(html).toContain("quarterly");
+    expect((html.match(/quarterly/g) || []).length).toBeGreaterThan(0);
+  });
+
+  it("names the dataset the number belongs to, and that dataset's own last period", () => {
+    // Same correction as the CLI's own warning (#22): `remaining` is a
+    // MINIMUM across datasets, so naming the calendar's last period
+    // pairs a number and a date belonging to different objects.
+    const html = notice("2027-03-01");
+    expect(html).toContain("twice-a-year");
+    expect(html).toContain("2027-Q3");
+  });
+
+  it("says how many datasets name the calendar, without listing them all", () => {
+    const html = notice("2027-03-01");
+    expect(html).toContain("2 datasets");
+    expect(html).not.toContain("every-quarter");
+  });
+
+  it("distinguishes itself from a failure in TEXT, not only in colour", () => {
+    const html = notice("2027-03-01");
+    expect(html).toMatch(/not failing|nothing has failed|no failure/i);
+  });
+
+  it("gives way to the exhausted notice rather than stacking with it", () => {
+    // Once a calendar has actually run out, "running low" is no longer
+    // the news and two notices about one calendar is noise.
+    const w = load();
+    const runway = w.scheduleRunwayAsOf("2028-01-01", RUNWAY);
+    expect(runway.exhaustedCount).toBeGreaterThan(0);
+    expect(w.lowRunwayNotice(runway)).toBe("");
+  });
+
+  it("carries the driving dataset on the runway itself, not only in prose", () => {
+    const w = load();
+    const low = w.scheduleRunwayAsOf("2027-03-01", RUNWAY).low[0];
+    expect(low.drivingDataset).toBe("twice-a-year");
+    expect(low.drivingLastPeriod).toBe("2027-Q3");
+  });
+});
