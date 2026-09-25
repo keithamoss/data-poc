@@ -39,8 +39,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-
-from qa_tools.common import yaml_io
+import yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -296,7 +295,7 @@ def _parse_dbt_singular_test(entry: dict, source: str) -> list[CheckMetadata]:
 
 def parse_dbt_check_metadata(schema_yml_path: Path | str) -> list[CheckMetadata]:
     with open(schema_yml_path) as f:
-        doc = yaml_io.load(f) or {}
+        doc = yaml.safe_load(f) or {}
     out: list[CheckMetadata] = []
     errors: list[str] = []
     source = str(schema_yml_path)
@@ -358,7 +357,7 @@ def dbt_check_id_lookup(schema_yml_path: Path | str) -> dict[tuple[str | None, s
     - used to tag each real check result with its own check_id at write
     time, not reconstructed from the check_id naming convention."""
     with open(schema_yml_path) as f:
-        doc = yaml_io.load(f) or {}
+        doc = yaml.safe_load(f) or {}
     lookup: dict[tuple[str | None, str | None, str], str] = {}
 
     def _record(test: Any, model: str, column: str | None) -> None:
@@ -422,7 +421,7 @@ def _parse_soda_check(check: Any, source: str, location: str) -> list[CheckMetad
 
 def parse_soda_check_metadata(soda_yml_path: Path | str) -> list[CheckMetadata]:
     with open(soda_yml_path) as f:
-        doc = yaml_io.load(f) or {}
+        doc = yaml.safe_load(f) or {}
     out: list[CheckMetadata] = []
     errors: list[str] = []
     source = str(soda_yml_path)
@@ -510,7 +509,7 @@ def contract_rule_attachments(contract_yaml_path: Path | str) -> list[tuple[str,
     the two were free to disagree before, and nothing would have said
     so."""
     with open(contract_yaml_path) as f:
-        doc = yaml_io.load(f) or {}
+        doc = yaml.safe_load(f) or {}
     out: list[tuple[str, str | None]] = []
     for table in doc.get("schema", []) or []:
         for rule in table.get("quality", []) or []:
@@ -527,7 +526,7 @@ def contract_rule_attachments(contract_yaml_path: Path | str) -> list[tuple[str,
 
 def parse_contract_check_metadata(contract_yaml_path: Path | str) -> list[CheckMetadata]:
     with open(contract_yaml_path) as f:
-        doc = yaml_io.load(f) or {}
+        doc = yaml.safe_load(f) or {}
     out: list[CheckMetadata] = []
     errors: list[str] = []
     source = str(contract_yaml_path)

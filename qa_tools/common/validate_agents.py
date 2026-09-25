@@ -23,7 +23,7 @@ Python, so a broken YAML file sails past every other gate.
 
 WHY IT CANNOT JUST BE `check-yaml`. That hook globs `*.yml`/`*.yaml`.
 These are `*.md` files with frontmatter, so it never looks at them. The
-frontmatter has to be sliced out before the YAML loader sees it, which
+frontmatter has to be sliced out before `yaml.safe_load` sees it, which
 is the only thing this module does that a stock hook could not.
 
 WHAT IT CHECKS, and each one is a real failure this could have had:
@@ -56,8 +56,6 @@ import sys
 from pathlib import Path
 
 import yaml
-
-from qa_tools.common import yaml_io
 
 AGENTS_DIR = Path(__file__).resolve().parent.parent.parent / ".claude" / "agents"
 
@@ -103,7 +101,7 @@ def validate_file(path: Path) -> tuple[list[str], int]:
         return ([f"{path.name}: no YAML frontmatter (expected a leading '---' block)"], 0)
 
     try:
-        front = yaml_io.load(block)
+        front = yaml.safe_load(block)
     except yaml.YAMLError as exc:
         # The real incident's shape. Worth naming the likely cause in
         # the message: the error PyYAML gives for a hard-wrapped plain

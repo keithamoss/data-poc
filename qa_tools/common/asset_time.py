@@ -43,8 +43,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-
-from qa_tools.common import yaml_io
+import yaml
 
 DATA_ASSET_YAML = Path(__file__).resolve().parent.parent.parent / "contract" / "data-asset.yaml"
 
@@ -67,7 +66,7 @@ def asset_timezone() -> ZoneInfo:
     change mid-run.
     """
     with open(DATA_ASSET_YAML) as f:
-        doc = yaml_io.load(f) or {}
+        doc = yaml.safe_load(f) or {}
     name = doc.get("timezone")
     if not name:
         raise ValueError(

@@ -49,8 +49,6 @@ from pathlib import Path
 
 import yaml
 
-from qa_tools.common import yaml_io
-
 from qa_tools.common import asset_time, schedule
 from qa_tools.common.diff_base import diff_base
 from qa_tools.common.schemas import DataAsset
@@ -625,7 +623,7 @@ def _contract_errors(raw: dict, src: Source) -> list[ConfigError]:
         if path.name == src.name or path.name in declared:
             continue
         try:
-            doc = yaml_io.load(path.read_text()) or {}
+            doc = yaml.safe_load(path.read_text()) or {}
         except yaml.YAMLError:
             continue  # reported by the yamllint gate, not twice here
         if not isinstance(doc, dict) or "slaProperties" not in doc:
@@ -648,7 +646,7 @@ def _grace_errors(declared: dict[str, str], src: Source) -> list[ConfigError]:
         if not path.exists():
             continue
         try:
-            doc = yaml_io.load(path.read_text()) or {}
+            doc = yaml.safe_load(path.read_text()) or {}
         except yaml.YAMLError:
             continue
         for item in (doc.get("slaProperties") or []):
@@ -773,7 +771,7 @@ def _retrospective_edit_errors(raw: dict, src: Source, today: date | None = None
     if previous is None:
         return []
     try:
-        old_doc = yaml_io.load(previous) or {}
+        old_doc = yaml.safe_load(previous) or {}
     except yaml.YAMLError:
         return []
     if not isinstance(old_doc, dict):
@@ -821,7 +819,7 @@ def validate(src: Source | None = None) -> list[ConfigError]:
                              "This file is the asset's own configuration; nothing works without it.")]
 
     try:
-        raw = yaml_io.load(src.asset_path.read_text()) or {}
+        raw = yaml.safe_load(src.asset_path.read_text()) or {}
     except yaml.YAMLError as exc:
         mark = getattr(exc, "problem_mark", None)
         where = f" at line {mark.line + 1}, column {mark.column + 1}" if mark else ""
@@ -996,7 +994,7 @@ def main(src: Source | None = None) -> int:
         return 1
 
     n_calendars = len(schedule.calendars())
-    n_datasets = len(list(_walk_datasets(yaml_io.load(src.asset_path.read_text()))))
+    n_datasets = len(list(_walk_datasets(yaml.safe_load(src.asset_path.read_text()))))
     # A STATEMENT ABOUT THE CONFIGURATION, NOT ABOUT TODAY
     # (plans/post-build-review.md #17, Keith's call 2026-09-24).
     #

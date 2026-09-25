@@ -2437,3 +2437,94 @@ files are the one real case where a test's legitimate job is to write
 somewhere shared. Option 3 would need it moved to a temporary output
 or given the opt-in, and that choice is the interesting part of the
 work rather than an implementation detail.
+
+
+23. **[investigate, 2026-09-25]** **[Testing & dev tooling]** Making a duplicate YAML key loud at READ time - researched, built, and reverted unbuilt.
+
+**Status:** investigate · **Category:** Testing & dev tooling
+
+Keith's ask, after this bug landed for the SECOND time in five days:
+"there's a way to have it just be very shouty when we do things like
+that." Then, having seen a first attempt: don't build it until I
+approve and until you've done more research, including online. That
+research is below, and it is why the entry exists - the attempt was
+reverted, and without this the reasoning would only be in a commit
+nobody knows to look for.
+
+**The bug.** PyYAML's `safe_load` accepts a repeated mapping key
+silently and keeps only the LAST one - `yaml.safe_load("a: 1\na: 2")`
+is `{'a': 2}`. It has cost this project twice:
+
+- 2026-09-20: `requirements.yaml`'s REQ-QAC-023 had two `decisions:`
+  blocks. Five real decisions were discarded with no error, including
+  a rejected design alternative deliberately moved there before the
+  prose describing it was deleted.
+- 2026-09-25: REQ-PIPE-053 gained a second `unmet_criteria:` block and
+  its original five entries vanished from every parsed view.
+
+**The second one is the instructive one.** A read-back check ran
+straight after the edit - the discipline CLAUDE.md asks for, precisely
+so an edit is confirmed rather than assumed - and printed a healthy
+"unmet: 1", because `safe_load` had already thrown the original away.
+The check was not skipped. It was performed, and it lied, because it
+was built on the same silent primitive as the bug.
+
+**What already covers it, and how well.** `.yamllint` enables
+`key-duplicates` for exactly this and it caught BOTH incidents - it is
+in pre-commit and in `mothman check`. What it cannot do is fail at the
+moment of the mistake; it fires at commit or at the next gate, after
+whatever has been built on the wrong value. In the 2026-09-25 case one
+duplicate key failed THREE gates at once and none of them was the
+thing that first read the file.
+
+**Upstream status, checked against the primary source rather than
+memory.** `yaml/pyyaml#165` has been open since May 2018. There is no
+flag: `safe_load(stream)` takes a stream and nothing else, so a loader
+subclass is the only in-library route. Duplicate keys violate the YAML
+spec, so this is non-conformance rather than fussiness.
+
+**THE FINDING THAT MATTERS, and the reason "just subclass it" is not
+the answer.** Three implementations, all run rather than reasoned
+about, against five cases:
+
+| approach | plain dup | merge `<<:` | merge WITH override |
+|---|---|---|---|
+| no `flatten_mapping` | raises | **crashes** | crashes |
+| `flatten_mapping` first | raises | passes | **false positive** |
+| skip the `<<` node, let SafeLoader flatten | raises | passes | passes |
+
+The first row is what was built and reverted - it raises
+`could not determine a constructor for the tag 'tag:yaml.org,2002:merge'`
+on any merge key. The second row is the fix suggested in the canonical
+gist's own comments, and it breaks the PRIMARY use of merge keys:
+`<<: *defaults` followed by overriding one field reads as a duplicate.
+The gist's comments flag both traps ("does not seem to work when the
+duplicate key comes from an anchor").
+
+Only the third row is correct: a merge is an INSTRUCTION, not a key,
+so the check skips that node and lets `SafeLoader` do its own
+flattening. Verified on plain duplicates, nested duplicates, merge
+without override, merge with override, and a two-anchor merge.
+
+**Why it was reverted anyway** (Keith, 2026-09-25, after seeing the
+above): the shipped version carried the row-one defect, latent rather
+than live - this repo has zero merge keys and zero anchors in its own
+YAML today, so nothing was broken - and `yamllint` already catches the
+real bug. Backing out and redoing it deliberately beat fixing forward
+on a repo-wide change made without the research.
+
+**If this is picked up again**, the pieces that were built and are
+worth rebuilding rather than rediscovering: a `SafeLoader` subclass
+raising an error naming the key and BOTH line numbers (the useful
+question is never "is there a duplicate" but "which one did I mean to
+keep"); 29 production call sites across 16 files; and a guard test
+that no production module calls `yaml.safe_load` directly. That guard
+should walk the FILESYSTEM rather than use `git grep` - git grep sees
+only tracked files, and a brand-new module is untracked exactly while
+it is being written, which is when the guard is most worth having.
+
+**Alternative not evaluated properly**: `ruamel.yaml` raises on
+duplicate keys by default and needs no custom loader, at the cost of a
+new dependency and a different API across those 29 sites. It is not
+installed here, so its merge-override behaviour is UNVERIFIED - worth
+testing before anyone treats it as the easy option.

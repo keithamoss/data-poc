@@ -44,8 +44,7 @@ import functools
 from dataclasses import dataclass
 from pathlib import Path
 
-
-from qa_tools.common import yaml_io
+import yaml
 
 DATA_ASSET_YAML = Path(__file__).resolve().parent.parent.parent / "contract" / "data-asset.yaml"
 
@@ -125,7 +124,7 @@ def _require(node: dict, key: str, where: str):
 @functools.lru_cache(maxsize=1)
 def _load() -> tuple[str, dict[str, Dataset]]:
     with open(DATA_ASSET_YAML) as f:
-        doc = yaml_io.load(f) or {}
+        doc = yaml.safe_load(f) or {}
 
     data_asset_id = doc.get("data_asset_id")
     if not data_asset_id:

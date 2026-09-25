@@ -46,8 +46,7 @@ import ast
 import sys
 from pathlib import Path
 
-
-from qa_tools.common import yaml_io
+import yaml
 from pydantic import ValidationError
 
 from qa_tools.common.schemas import Requirement, format_error
@@ -281,7 +280,7 @@ def main(path: str | None = None) -> int:
         print(f"requirements YAML not found at {target}", file=sys.stderr)
         return 1
     with open(target) as f:
-        doc = yaml_io.load(f) or {}
+        doc = yaml.safe_load(f) or {}
     raw = doc.get("requirements") if isinstance(doc, dict) else doc
     requirements = [r or {} for r in (raw or [])]
     errors = validate(requirements)
