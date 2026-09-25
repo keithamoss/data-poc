@@ -8793,8 +8793,56 @@ requirements:
       date: "2026-09-24"
     story: "As whoever maintains this pipeline, I want every arriving file loaded into staging on the strength of arrival alone, so that a supply is checkable before anybody has decided where it belongs, and so that staging can never be wrong about anything."
     moscow: must
-    status: not_started
+    status: built
     source: "Keith, delivery sprint 8, plans/supply-model.md Thread B - staging then promotion, and 'staged data lives IN the warehouse', settled 2026-09-23 at REQ-PIPE-034's sign-off. Test scenario register TS-12 and TS-32. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
+    linked_tests:
+      - tests/test_load_log.py
+      - tests/test_staging_loads.py
+      - tests/test_supply_db.py
+      - tests/test_cli_supply.py
+    implemented_by:
+      - qa_tools/common/load_log.py::record_load
+      - qa_tools/common/load_log.py::loaded_tables
+      - qa_tools/common/load_log.py::delivery_is_processed
+      - qa_tools/common/supply_db.py::arrival_key
+      - qa_tools/common/supply_db.py::staged_table
+      - qa_tools/common/supply_db.py::candidates_in
+      - qa_tools/common/supply_db.py::expected_tables
+      - qa_tools/bdm/build_per_run_warehouses.py::build_one
+      - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
+      - cli/supply.py::load_command
+      - cli/supply.py::failures_command
+    evidence:
+      - >
+        2026-09-25: behaviour-preserving, measured rather than argued. A full
+        `mothman pipeline run` over both collections after the rewrite diffed
+        6563 recorded check verdicts against the committed history it replaced -
+        identical, every one, with the status mix unchanged at 5235 pass / 1081
+        fail / 247 warn. The physical table names and timestamps changed; no
+        verdict did.
+      - >
+        2026-09-25: the real staging run wrote 150 load records for 60 deliveries
+        (42 Birth Registrations arrivals plus 18 Child Protection arrivals of six
+        tables each), and `mothman supply deliveries` reports 60/60 complete
+        against what recognition says each delivery should have produced.
+      - >
+        2026-09-25: a second `mothman supply load` immediately afterwards wrote
+        ZERO new records and re-staged every table, which is the bound on this
+        committed tree. Found by running it, not by reading it - the first
+        version wrote 42 duplicate records for a run in which nothing had
+        changed.
+      - >
+        2026-09-25: criterion 7 is asserted at the layer a check actually reads.
+        A test stages a table, deletes its load record, rebuilds the run's views,
+        and confirms the real DuckDB catalogue raises on the view while the
+        TABLE is still physically present - which is the whole distinction the
+        mechanism rests on.
+      - >
+        2026-09-25: criteria 5 and 6 tested against a real failed load. A missing
+        file leaves no table, writes a FAILED record naming the reason, writes no
+        LOADED record, removes a stale table left by an earlier attempt, and the
+        next file in the same delivery still stages.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     acceptance_criteria:
       - "WHEN a delivery is recognised, THE SYSTEM SHALL load every file it attributed to a dataset into one global staging schema, before any check runs over that delivery."
       - "THE SYSTEM SHALL record, for a staged table, only facts observed at arrival - which delivery carried it, which dataset it was attributed to, and when we received it."
@@ -8825,6 +8873,21 @@ requirements:
       - "CI and any read-committed-history path may never open or query the warehouse, including staging. Anything a later read needs must be computed here, at load time, by whoever legitimately has a connection, and committed alongside."
       - "Everything that loads a delivery is invoked through mothman."
     dependencies: [REQ-PIPE-057, REQ-PIPE-035]
+    unmet_criteria:
+      - criterion: >-
+          Criterion 5, in part - a file that cannot be loaded leaves no
+          table, records the arrival and the reason, and is listed by
+          `mothman supply failures`, but nothing yet renders that
+          dataset's supply as RED to a reader of the dashboard.
+        why: >-
+          The load side is done and durable. What is missing is the
+          presentation, and it already has an owner: REQ-DASH-070
+          criterion 1 names a failed load among the things that must
+          appear in one aggregated element for a human decision.
+          Building a second, different red for it here would be the
+          thing that requirement exists to prevent. Flagged rather than
+          quietly counted as done.
+        owner: REQ-DASH-070, this same batch
     decisions:
       - "Decided staging is a SCHEMA IN THE WAREHOUSE (Keith, 2026-09-23). Thread B said 'everything lands in staging on arrival' without saying where staging physically is, and the natural reading of 'promotion moves it into a period schema' is that staging sits somewhere else. It does not. Data is loaded as soon as it can be, checks run on it there, and the only thing not loaded is a file that cannot be read at all."
       - "Decided ONE GLOBAL staging schema rather than one mirroring slots or periods, and the REASON is recorded here because REQ-PIPE-034 records the departure from Keith's operational system without it - which is the worst combination, since a later session sees the difference, finds no argument, and corrects it back. A supply's slot is not known when it lands, and deferring that is the whole point of staging. A slot-mirrored staging schema forces the slot to be named at LOAD time. Three cases have no slot to name at all: an early supply not yet inside its claim window, a supply held because nothing is confidently claimable, and a mixed-period delivery. A mirror would need an unassigned schema alongside it, ending up with global AND mirrors. Keith's own summary on agreeing: we don't know where it should go, or indeed we need a human to make a decision."
@@ -9066,6 +9129,67 @@ requirements:
         it, so dropping it without noticing would have widened the gap
         rather than closed it. The obligation is now checkable, in the
         same shape as REQ-PIPE-069 criterion 2.
+      - >
+        BUILT 2026-09-25: the unique-name form decision 30 asked for is
+        `<table>__<arrival digits>` plus an ORDINAL where one dataset
+        matched several files. The ordinal is the whole point - a
+        supplier's filename was the obvious discriminator and is the
+        one thing that may not be used, because these become SQL
+        IDENTIFIERS and DuckDB's parameter binding covers values, not
+        identifiers. Every part of the name is now ours: our dataset
+        id, our receipt instant, our counter.
+      - >
+        BUILT 2026-09-25: an unchanged re-stage writes NO load record.
+        Found by running it rather than reading it - a second
+        `mothman supply load` over unchanged deliveries wrote 42
+        duplicate records saying exactly what the previous 42 said.
+        Over years of history at ~30 datasets that is a committed tree
+        growing without bound and carrying no signal.
+      - >
+        It does NOT weaken criterion 19, which was checked before
+        putting a deduplicate anywhere near an append-only log: that
+        criterion is about a CHANGE of outcome, a failed load
+        reprocessed into a loaded one, and a change is exactly what is
+        still written. What is suppressed is a repetition. Rejected the
+        alternative of pruning the tree periodically, which needs
+        somebody to remember and deletes real history when they get it
+        wrong.
+      - >
+        BUILT 2026-09-25: criterion 16 is answered against what
+        RECOGNITION says a delivery should have produced, not against
+        the catalogue. A file that failed outright leaves nothing in
+        the catalogue to count, which is precisely the case being
+        looked for - so the catalogue would report a delivery whose
+        only failure was total as complete.
+      - >
+        BUILT 2026-09-25, and it is a defect in what was already
+        shipped rather than a choice: NO TEST MAY WRITE INTO THIS
+        REPO'S COMMITTED HISTORY TREES. The processing log was one day
+        old and already held 109 test-run records out of 259 - table
+        names that only ever existed inside a temporary directory,
+        committed permanently. The cause is structural: these trees are
+        written several frames below whatever a test called, by
+        production code taking a directory argument nobody at the
+        test's level passes, so a test cannot reliably opt out.
+      - >
+        The same hole was live and WORSE for the delivery log, and it
+        would have fired on CI rather than here. Six tests invoke
+        `mothman pipeline run` without redirecting it, and that command
+        prunes the log against what is on disk. This machine has
+        `data/deliveries/`, so nothing is pruned; a freshly-cloned
+        runner has no `data/` at all, so the correct answer to "which
+        deliveries are present" is NONE and all sixty committed records
+        go. Exactly CLAUDE.md's own gitignored-tree trap, running in
+        the opposite direction.
+      - >
+        Fixed by one session-scoped autouse fixture redirecting all
+        three trees - processing log, delivery log, in-flight
+        observations - and asserted by a test that reads the constants
+        back rather than trusting the fixture. Rejected redirecting
+        through the environment, which would silently defeat the
+        per-test monkeypatches several existing tests already use;
+        patching the module constants leaves those working and still
+        restores to a temporary directory rather than to the real tree.
 
   - id: REQ-PIPE-061
     title: Arrivals are processed in receipt order, and an interrupted run loses nothing

@@ -1,8 +1,8 @@
 {
-  "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+  "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
   "run_by": null,
   "raw_output": {
-    "runId": "2d28805a-7b4e-4a0b-9e91-920c9b6d90d7",
+    "runId": "a1bcdbb8-47f1-4e71-8e05-4c3354c72a36",
     "datacontractCliVersion": "1.2.0",
     "dataContractId": "child-protection",
     "dataContractVersion": "1.0.0",
@@ -10,13 +10,13 @@
     "outputPortId": null,
     "server": "local_test",
     "filters": null,
-    "timestampStart": "2026-09-25 12:05:18.119309+00:00",
-    "timestampEnd": "2026-09-25 12:05:22.755381+00:00",
+    "timestampStart": "2026-09-25 12:21:31.043356+00:00",
+    "timestampEnd": "2026-09-25 12:21:35.850552+00:00",
     "result": "failed",
     "dryRun": false,
     "checks": [
       {
-        "id": "68319c42-0736-4e2a-8867-b21170259ac5",
+        "id": "94e7b044-5a9e-423b-8ef8-0fa27882cb1e",
         "key": "cp_clients__cp_client_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -40,7 +40,7 @@
         "failedSamples": null
       },
       {
-        "id": "b40a9d28-a84a-4c5d-a72a-6576edb0b395",
+        "id": "efbb5ae7-4903-4611-b961-cf9b0a0ae9b2",
         "key": "cp_clients__cp_client_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -67,7 +67,7 @@
         "failedSamples": null
       },
       {
-        "id": "ba1f0dd6-59bf-4165-acc5-5efe3ec0a9da",
+        "id": "0d5652ef-18f5-41c8-8c2e-bf0423c33dd5",
         "key": "cp_clients__cp_client_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -94,7 +94,7 @@
         "failedSamples": null
       },
       {
-        "id": "72ccf667-61f0-4259-94b6-6c0a79018eb1",
+        "id": "bf42f60e-9a00-4711-ae86-2234fd353f53",
         "key": "cp_clients__cp_client_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -122,7 +122,7 @@
         "failedSamples": null
       },
       {
-        "id": "33e62568-54d6-451b-94f7-da7ea7891960",
+        "id": "dc051d3e-0a09-4899-a4a8-03b01bdefc72",
         "key": "cp_clients__cp_client_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -150,7 +150,7 @@
         "failedSamples": null
       },
       {
-        "id": "c279560f-493f-49f8-8219-ada04f6f08c3",
+        "id": "22477368-712c-46f6-93a0-7de2b44d4ee9",
         "key": "cp_clients__given_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -174,7 +174,7 @@
         "failedSamples": null
       },
       {
-        "id": "9a92b0f3-37ea-4c42-8df8-227a5759af55",
+        "id": "2bebaa57-d054-4bec-a0ac-872ee495227b",
         "key": "cp_clients__given_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -201,7 +201,7 @@
         "failedSamples": null
       },
       {
-        "id": "eb591cb7-93c3-4401-a092-791b48e4faf0",
+        "id": "e9850709-1cf7-4646-b8d0-7c852973f290",
         "key": "cp_clients__given_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -229,7 +229,7 @@
         "failedSamples": null
       },
       {
-        "id": "36992a46-b7a6-42dd-afbf-3de7256dc594",
+        "id": "5bdd873e-1d3e-4e0b-84dc-94f8b3ee24be",
         "key": "cp_clients__family_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -253,7 +253,7 @@
         "failedSamples": null
       },
       {
-        "id": "dc857a56-f150-4e19-aab1-1456afe8aefc",
+        "id": "1b02ae1d-4416-479a-9aec-57c1266cdbc5",
         "key": "cp_clients__family_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -280,7 +280,7 @@
         "failedSamples": null
       },
       {
-        "id": "7dee0ff0-e4b2-425b-b385-7467921d900e",
+        "id": "6a29662e-1c94-445b-92a2-b20cb892e7dc",
         "key": "cp_clients__family_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -308,7 +308,7 @@
         "failedSamples": null
       },
       {
-        "id": "faa63c18-fe94-4c13-9454-61da04e0f232",
+        "id": "90551e8b-b4dd-4198-a46e-9380835bf79b",
         "key": "cp_clients__date_of_birth__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -332,7 +332,7 @@
         "failedSamples": null
       },
       {
-        "id": "a4a1e69a-bf30-461e-917e-f7ba338e9147",
+        "id": "711ca877-ce83-406e-9e0d-d4887f020bcb",
         "key": "cp_clients__date_of_birth__field_required",
         "category": "schema",
         "type": "field_required",
@@ -359,7 +359,7 @@
         "failedSamples": null
       },
       {
-        "id": "2f11daac-2dd8-454d-b521-4eec3c4ca985",
+        "id": "f7fa3e2f-4f68-4ac7-af8c-8c8f7bb51245",
         "key": "cp_clients__date_of_birth__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -387,7 +387,7 @@
         "failedSamples": null
       },
       {
-        "id": "08d724d5-bc11-492e-a9b3-a1d80acb111d",
+        "id": "1e9f6536-eb0a-42bf-9deb-861b317d7754",
         "key": "cp_clients__date_of_birth__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -413,7 +413,7 @@
         "failedSamples": null
       },
       {
-        "id": "7e4cf546-4f33-4c8a-a04b-28746f4dd0ad",
+        "id": "41db6999-f0eb-49a4-beb8-2d2bb6155770",
         "key": "cp_clients__sex__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -437,7 +437,7 @@
         "failedSamples": null
       },
       {
-        "id": "655ed8cf-4489-41f0-92f6-665fa592a474",
+        "id": "468e80c4-f45c-4e35-b96c-cfb1ece6c37b",
         "key": "cp_clients__sex__field_required",
         "category": "schema",
         "type": "field_required",
@@ -464,7 +464,7 @@
         "failedSamples": null
       },
       {
-        "id": "9d323ad5-8d87-4366-84a1-b454fee09f0d",
+        "id": "e1537786-7b93-4fb5-b71d-6d6235d618e4",
         "key": "cp_clients__sex__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -499,7 +499,7 @@
         "failedSamples": null
       },
       {
-        "id": "74ecf61b-773e-4259-ba57-d4d04907a291",
+        "id": "9d2b90f2-a5c8-4af7-8705-fdd9733264ff",
         "key": "cp_clients__suburb__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -523,7 +523,7 @@
         "failedSamples": null
       },
       {
-        "id": "f5c84f66-9f63-4f20-9a53-06f2db51fe2c",
+        "id": "a350d833-12c0-43b0-beef-347271b6456b",
         "key": "cp_clients__suburb__field_required",
         "category": "schema",
         "type": "field_required",
@@ -550,7 +550,7 @@
         "failedSamples": null
       },
       {
-        "id": "f79df6d1-558a-4cc1-9632-d3eda2f9a2d7",
+        "id": "517a098a-1879-4638-ac85-8e8feaf5f059",
         "key": "cp_clients__suburb__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -578,7 +578,7 @@
         "failedSamples": null
       },
       {
-        "id": "e4d6901a-f605-4136-8991-01cf58d21768",
+        "id": "285b8e5a-0b9f-42c6-beb8-4d5f17080c91",
         "key": "cp_clients__postcode__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -602,7 +602,7 @@
         "failedSamples": null
       },
       {
-        "id": "c6fc7545-be0f-46ad-ab5e-147a93478f22",
+        "id": "6410ea2e-6633-4d01-9df0-c1b597bc466f",
         "key": "cp_clients__postcode__field_required",
         "category": "schema",
         "type": "field_required",
@@ -629,7 +629,7 @@
         "failedSamples": null
       },
       {
-        "id": "43b1cc30-151b-41e0-867c-f3655fab9209",
+        "id": "4e495750-41e6-4b27-9ad8-1246273f309d",
         "key": "cp_clients__postcode__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -657,7 +657,7 @@
         "failedSamples": null
       },
       {
-        "id": "536615e3-23d9-459c-bb11-c3344143b1ad",
+        "id": "cdc38768-d7c7-4a9b-b23a-75b11eba6810",
         "key": "cp_clients__postcode__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -738,7 +738,7 @@
         "failedSamples": null
       },
       {
-        "id": "89bdbfda-aba5-4e91-9e25-e8ee0a105e71",
+        "id": "51db39bf-0f0c-4d28-be54-8cab5ad4fde3",
         "key": "cp_clients__case_opened_date__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -762,7 +762,7 @@
         "failedSamples": null
       },
       {
-        "id": "176e8154-8c99-479a-9d2c-51eae1f1bb7c",
+        "id": "4500977d-d6f4-44f0-a114-d4575f72e31e",
         "key": "cp_clients__case_opened_date__field_required",
         "category": "schema",
         "type": "field_required",
@@ -789,7 +789,7 @@
         "failedSamples": null
       },
       {
-        "id": "17d85e0e-6bb2-45e2-8697-260b8aaaedca",
+        "id": "d4c0bb35-b95b-4f21-9252-70f6a83c7c91",
         "key": "cp_clients__case_opened_date__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -817,7 +817,7 @@
         "failedSamples": null
       },
       {
-        "id": "47b5c31c-f893-4b0a-b874-ff1c93f3ac4b",
+        "id": "1b2c3045-f90b-48ad-b124-97a7c2ea2c81",
         "key": "cp_clients__case_status__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -841,7 +841,7 @@
         "failedSamples": null
       },
       {
-        "id": "7ac7d90a-8a90-422e-821c-06b3b853d613",
+        "id": "b3d203bc-7f6b-490a-8299-23d9f651203b",
         "key": "cp_clients__case_status__field_required",
         "category": "schema",
         "type": "field_required",
@@ -868,7 +868,7 @@
         "failedSamples": null
       },
       {
-        "id": "0a156bb7-db47-4c58-a5f5-b8e462181429",
+        "id": "2b3c0aec-b797-4302-8c96-b16695314239",
         "key": "cp_clients__case_status__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -902,7 +902,7 @@
         "failedSamples": null
       },
       {
-        "id": "81296d38-f20e-41e8-9acd-25d51ca04ca1",
+        "id": "80a52e13-f3a3-40de-9243-40508de64c83",
         "key": "cp_clients__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -926,7 +926,7 @@
         "failedSamples": null
       },
       {
-        "id": "08e6207d-33c8-46e1-99c3-bef6b780c040",
+        "id": "b9c7146a-8833-4372-b136-a267aeaeb996",
         "key": "cp_clients__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -953,7 +953,7 @@
         "failedSamples": null
       },
       {
-        "id": "e8275e67-0556-4e6d-9e30-ff72b18b191f",
+        "id": "1edb251e-d01c-40a9-a1f3-cd10a1b246dd",
         "key": "cp_clients__row_count",
         "category": "quality",
         "type": "row_count",
@@ -979,7 +979,7 @@
         "failedSamples": null
       },
       {
-        "id": "37c53336-6de2-4079-94be-36fd14a3fb38",
+        "id": "9dab781d-f688-441c-8772-aef42178fae6",
         "key": "cp_notifications__notification_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1003,7 +1003,7 @@
         "failedSamples": null
       },
       {
-        "id": "0be9e1aa-ed14-461a-8b56-1a577df2b826",
+        "id": "8491ce62-2cd2-4b10-a0fa-42b33ad66ca9",
         "key": "cp_notifications__notification_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1030,7 +1030,7 @@
         "failedSamples": null
       },
       {
-        "id": "427666e8-be37-4e73-84fb-dfdca73bab0b",
+        "id": "1381bffe-855a-4a2c-96f2-4ec6e936e021",
         "key": "cp_notifications__notification_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -1100,7 +1100,7 @@
         ]
       },
       {
-        "id": "c331ed56-f0db-483b-8ebd-13792b508be2",
+        "id": "17d31521-f1c2-4c84-9561-e0148c04f26b",
         "key": "cp_notifications__notification_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1128,7 +1128,7 @@
         "failedSamples": null
       },
       {
-        "id": "40268b53-73c7-4002-a334-c10cc31c6298",
+        "id": "60f09719-00d0-4384-a929-28ad1e2256b5",
         "key": "cp_notifications__notification_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -1199,7 +1199,7 @@
         ]
       },
       {
-        "id": "3c3dc15c-4116-4cc6-af4b-14491976729d",
+        "id": "338d37d0-204f-4463-b0d9-b4b0b983ba3b",
         "key": "cp_notifications__notification_id__quality_sql_2",
         "category": "quality",
         "type": "field_quality_sql",
@@ -1225,7 +1225,7 @@
         "failedSamples": null
       },
       {
-        "id": "9364c39a-2d3e-4125-9aa0-2a6b6cb5b99c",
+        "id": "10124958-2644-4fc5-aecd-1d5ed519eba8",
         "key": "cp_notifications__cp_client_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1249,7 +1249,7 @@
         "failedSamples": null
       },
       {
-        "id": "af71a2f8-dff6-4808-9d61-09c4ac6d913c",
+        "id": "af16dd52-af9c-471c-852d-5b35e167df2e",
         "key": "cp_notifications__cp_client_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1276,7 +1276,7 @@
         "failedSamples": null
       },
       {
-        "id": "ddcf6979-ad88-43dc-9eff-4e7692788f30",
+        "id": "c2a07cc5-4ad8-4687-8e44-680447d6ff8b",
         "key": "cp_notifications__cp_client_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1304,7 +1304,7 @@
         "failedSamples": null
       },
       {
-        "id": "67a744fb-884a-4d28-b6c7-138693b092f2",
+        "id": "fa12686c-806a-4f47-85ec-3134d957c8e8",
         "key": "cp_notifications__cp_client_id__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -1330,7 +1330,7 @@
         "failedSamples": null
       },
       {
-        "id": "f1da28ee-510d-4819-a0c5-cb3482251311",
+        "id": "ffc3b434-d87b-431a-a269-9ade0dd598f7",
         "key": "cp_notifications__notification_date__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1354,7 +1354,7 @@
         "failedSamples": null
       },
       {
-        "id": "0240d169-2ccb-40cc-83f6-a6597a7d8572",
+        "id": "92d91196-9864-41c6-b22a-b4d3c09ea126",
         "key": "cp_notifications__notification_date__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1381,7 +1381,7 @@
         "failedSamples": null
       },
       {
-        "id": "559782d7-6504-4f1f-9297-2cd28fd43fe8",
+        "id": "e97f8aa2-1037-40dd-a367-08d5c6e90d0c",
         "key": "cp_notifications__notification_date__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1409,7 +1409,7 @@
         "failedSamples": null
       },
       {
-        "id": "ecdef6bd-2d9e-4485-906b-82bf56cc15ad",
+        "id": "34b4b86f-95ea-4778-be5b-60edd64d0d47",
         "key": "cp_notifications__source_type__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1433,7 +1433,7 @@
         "failedSamples": null
       },
       {
-        "id": "ff6a2b9a-4321-4cec-ae44-9bc806292261",
+        "id": "fa3ab80a-9912-4421-bc5e-ac70a4e30aa3",
         "key": "cp_notifications__source_type__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1460,7 +1460,7 @@
         "failedSamples": null
       },
       {
-        "id": "656b7126-cbee-4563-8d1d-7f4e32f24c20",
+        "id": "947b58ba-0594-4848-b6db-79e034029ae4",
         "key": "cp_notifications__source_type__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1542,7 +1542,7 @@
         ]
       },
       {
-        "id": "c6e1ce0a-08e8-4b7e-823e-7adab8c4f5b9",
+        "id": "33563031-8a5f-4e2a-9d01-20df1d1ddd58",
         "key": "cp_notifications__concern_type__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1566,7 +1566,7 @@
         "failedSamples": null
       },
       {
-        "id": "b3d71d62-6c05-4264-89fb-efbf07f44613",
+        "id": "9979010a-b39a-42ee-9b89-d642f185977e",
         "key": "cp_notifications__concern_type__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1593,7 +1593,7 @@
         "failedSamples": null
       },
       {
-        "id": "a459f390-783b-4d1b-be69-0c898f0e6cef",
+        "id": "742eeb14-b39f-4954-9381-b7f12213bdfb",
         "key": "cp_notifications__concern_type__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1675,7 +1675,7 @@
         ]
       },
       {
-        "id": "e7bc84f9-a154-4614-8952-44f1a98e8a66",
+        "id": "d5300137-29db-4470-bb31-acfa6710d6ae",
         "key": "cp_notifications__risk_rating__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1699,7 +1699,7 @@
         "failedSamples": null
       },
       {
-        "id": "0d4fb93a-f5f7-4687-99f5-8c09472641d6",
+        "id": "f8c21eb9-55af-43cc-ad70-142f3a3868cb",
         "key": "cp_notifications__risk_rating__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1726,7 +1726,7 @@
         "failedSamples": null
       },
       {
-        "id": "5805ca5b-4786-40ea-974e-298c533e6e8a",
+        "id": "b22036ea-7dce-4f45-822a-396ae689b2e8",
         "key": "cp_notifications__risk_rating__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -1805,7 +1805,7 @@
         ]
       },
       {
-        "id": "e9e6125b-f050-43b1-833b-73207983b0a6",
+        "id": "da490e6e-f6ca-4c2b-b65f-8baabb7f57f1",
         "key": "cp_notifications__assigned_worker_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1829,7 +1829,7 @@
         "failedSamples": null
       },
       {
-        "id": "15aa8dbf-588a-45ab-9584-1cd9e082f988",
+        "id": "c6ab5092-b666-48bf-baa4-2f4dd25062d1",
         "key": "cp_notifications__assigned_worker_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1875,7 +1875,7 @@
         ]
       },
       {
-        "id": "a726959a-6601-4419-95d6-6a7d54e2148f",
+        "id": "0a3ba1a5-8103-4752-b5c6-5f8e8e57baa9",
         "key": "cp_notifications__assigned_worker_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -1922,7 +1922,7 @@
         ]
       },
       {
-        "id": "a25a03ea-5639-4bf9-8562-946182bc9406",
+        "id": "107557d5-13ff-45d9-bd4b-24c5090a6a38",
         "key": "cp_notifications__assigned_worker_id__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -1948,7 +1948,7 @@
         "failedSamples": null
       },
       {
-        "id": "08b849e3-730f-4d23-8679-1d9a9c1d5cef",
+        "id": "5b41be7b-4f86-4dc6-afe1-39836ee5feeb",
         "key": "cp_notifications__outcome__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -1972,7 +1972,7 @@
         "failedSamples": null
       },
       {
-        "id": "933aceeb-eea0-4db1-aa25-29121291f036",
+        "id": "d807bdb1-24ac-494f-a3b0-f28d5c6e462e",
         "key": "cp_notifications__outcome__field_required",
         "category": "schema",
         "type": "field_required",
@@ -1999,7 +1999,7 @@
         "failedSamples": null
       },
       {
-        "id": "a26b6b56-5e24-422e-a70e-5910d4b9db56",
+        "id": "6e0cf3f6-cdb6-416a-bcef-3ab911fc4125",
         "key": "cp_notifications__outcome__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -2077,7 +2077,7 @@
         ]
       },
       {
-        "id": "c8d75ca4-d7ed-4294-bbfa-0cb9d6fa6740",
+        "id": "aa442c2b-44e2-4d7f-8aab-d1f8a4e13e49",
         "key": "cp_notifications__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2101,7 +2101,7 @@
         "failedSamples": null
       },
       {
-        "id": "f8c750c9-9110-418c-b774-7f454bc85fb0",
+        "id": "ddbdced2-12b8-4099-b7a4-17ced25d0fa1",
         "key": "cp_notifications__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2128,7 +2128,7 @@
         "failedSamples": null
       },
       {
-        "id": "90747325-2361-4fe4-8ecb-cd9410c22307",
+        "id": "6fd03c06-2300-4887-96a9-89558ce4e7d1",
         "key": "cp_notifications__row_count",
         "category": "quality",
         "type": "row_count",
@@ -2154,7 +2154,7 @@
         "failedSamples": null
       },
       {
-        "id": "f062c437-5d59-424e-88e5-047463f7ae3e",
+        "id": "6a0be327-ab90-4a08-941e-987864fbf4a8",
         "key": "cp_investigations__investigation_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2178,7 +2178,7 @@
         "failedSamples": null
       },
       {
-        "id": "9940e209-ad5c-4879-8887-1591132da11f",
+        "id": "2ff10c89-7908-4bf5-848a-c12e090a2e69",
         "key": "cp_investigations__investigation_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2205,7 +2205,7 @@
         "failedSamples": null
       },
       {
-        "id": "39d0dcc7-1a27-4301-bb1e-377b07f4ef74",
+        "id": "c2557ee2-7f55-47f2-9b57-bb632ffa1953",
         "key": "cp_investigations__investigation_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -2232,7 +2232,7 @@
         "failedSamples": null
       },
       {
-        "id": "b7b5a330-f0a3-43c6-8e0f-6f09656a98e9",
+        "id": "5f846a07-8edb-42e1-ae70-ea61f67b0a6c",
         "key": "cp_investigations__investigation_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2260,7 +2260,7 @@
         "failedSamples": null
       },
       {
-        "id": "9e7f0ee6-1e91-49c1-91ef-ec16cd22c48a",
+        "id": "7caa7f22-8f63-45e7-9cc5-e559781a1f31",
         "key": "cp_investigations__investigation_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -2288,7 +2288,7 @@
         "failedSamples": null
       },
       {
-        "id": "4138f023-292b-4b40-94be-9088a7df8f03",
+        "id": "6613da55-f5c1-418f-83f9-428bbb4b2a51",
         "key": "cp_investigations__investigation_id__quality_sql_2",
         "category": "quality",
         "type": "field_quality_sql",
@@ -2314,7 +2314,7 @@
         "failedSamples": null
       },
       {
-        "id": "7b2a2d6f-afd7-4bdf-ad1b-be408538c932",
+        "id": "2fc62cfc-6938-44d8-9e51-fc96d43ea4af",
         "key": "cp_investigations__notification_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2338,7 +2338,7 @@
         "failedSamples": null
       },
       {
-        "id": "275f373e-4a9e-412d-a7d4-0580451a8b2c",
+        "id": "5eab9db2-a2da-4e8e-83d4-1adad0c4bdc9",
         "key": "cp_investigations__notification_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2365,7 +2365,7 @@
         "failedSamples": null
       },
       {
-        "id": "9f5280b0-658b-4435-9876-17c3bb0f7113",
+        "id": "ffaa2e94-cb41-4187-a639-b8a29d7bdf58",
         "key": "cp_investigations__notification_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2393,7 +2393,7 @@
         "failedSamples": null
       },
       {
-        "id": "540e77e5-8521-4aae-b12a-5f2d27161004",
+        "id": "181573da-5a8f-4717-abe5-12fd6743f315",
         "key": "cp_investigations__notification_id__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -2419,7 +2419,7 @@
         "failedSamples": null
       },
       {
-        "id": "4635edec-4275-4d6e-92dd-d895768ea65e",
+        "id": "1937b7f6-7ea5-4efb-85ac-db71f2cb5ad0",
         "key": "cp_investigations__cp_client_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2443,7 +2443,7 @@
         "failedSamples": null
       },
       {
-        "id": "95eb1222-b252-4ee6-84f3-a83b62ad893b",
+        "id": "e641c30e-0d48-4290-8aa3-4ba7c1ecf9b6",
         "key": "cp_investigations__cp_client_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2470,7 +2470,7 @@
         "failedSamples": null
       },
       {
-        "id": "af9e23eb-0022-4584-a5dd-ab74b5a1d522",
+        "id": "c2683f63-280f-4988-bde4-7669a09184dd",
         "key": "cp_investigations__cp_client_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2498,7 +2498,7 @@
         "failedSamples": null
       },
       {
-        "id": "e1d85632-b525-4380-9d04-686af6a351e1",
+        "id": "752696ed-7e48-4b52-99b5-46ff4d1a3fea",
         "key": "cp_investigations__cp_client_id__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -2524,7 +2524,7 @@
         "failedSamples": null
       },
       {
-        "id": "d8376b12-94e2-4e2a-958c-7c50e74a477a",
+        "id": "be94b9ee-a950-4a07-ac05-aea3d9b4ef2e",
         "key": "cp_investigations__start_date__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2548,7 +2548,7 @@
         "failedSamples": null
       },
       {
-        "id": "09a052db-674d-4b2e-8edc-78e3cd173c31",
+        "id": "9e30609d-265b-44ec-9f79-4b6bcb4b7cdf",
         "key": "cp_investigations__start_date__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2575,7 +2575,7 @@
         "failedSamples": null
       },
       {
-        "id": "3d8f1705-20a0-45ba-9b0d-54a0d5e1321b",
+        "id": "0c30bf5d-527b-4a37-97c8-29f991ce928d",
         "key": "cp_investigations__start_date__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2603,7 +2603,7 @@
         "failedSamples": null
       },
       {
-        "id": "a7c6f5dd-32f5-49ad-9c94-add45ae646d4",
+        "id": "4f6a8028-c4c1-4188-bab5-8b82cfe40baa",
         "key": "cp_investigations__end_date__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2627,7 +2627,7 @@
         "failedSamples": null
       },
       {
-        "id": "a74919ee-cb41-4148-ab28-06fa8b3f1c4e",
+        "id": "d7a96ca4-4ab1-447f-b493-36ae192a8a5a",
         "key": "cp_investigations__substantiated__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2651,7 +2651,7 @@
         "failedSamples": null
       },
       {
-        "id": "c8721ec2-d6a9-4bd9-a601-619f91d826a7",
+        "id": "037f1384-c13d-46e3-bb3b-5867fdda195e",
         "key": "cp_investigations__substantiated__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2678,7 +2678,7 @@
         "failedSamples": null
       },
       {
-        "id": "1df64e39-af21-4412-8300-30c041210b7f",
+        "id": "403a0873-f7dd-40cb-82ed-617053ecd5e6",
         "key": "cp_investigations__substantiated__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -2713,7 +2713,7 @@
         "failedSamples": null
       },
       {
-        "id": "90921cbd-b290-4d18-8660-be0a597a9329",
+        "id": "bc99f6e5-c8a2-4812-83a3-dc20032bf383",
         "key": "cp_investigations__lead_worker_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2737,7 +2737,7 @@
         "failedSamples": null
       },
       {
-        "id": "198e42e3-3065-474c-907c-cde4a8069563",
+        "id": "e0a326a9-876d-45b9-9b3f-568f67e5570f",
         "key": "cp_investigations__lead_worker_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2764,7 +2764,7 @@
         "failedSamples": null
       },
       {
-        "id": "d1f88bee-ec49-4c3e-8d66-54e3beaea016",
+        "id": "48b59f65-e32d-4f16-80f4-810a29b41dca",
         "key": "cp_investigations__lead_worker_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -2792,7 +2792,7 @@
         "failedSamples": null
       },
       {
-        "id": "c1b33423-3a7a-45b0-bd2a-15112317be62",
+        "id": "29950df0-a6f8-4f13-ac83-b609c663b180",
         "key": "cp_investigations__lead_worker_id__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -2818,7 +2818,7 @@
         "failedSamples": null
       },
       {
-        "id": "a6bf762f-f9f5-4d5d-90d2-72e61344dfe7",
+        "id": "2f93faf8-c6b4-4ff2-ae4d-4c6b77020fe9",
         "key": "cp_investigations__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2842,7 +2842,7 @@
         "failedSamples": null
       },
       {
-        "id": "1c62a4aa-c9ad-4b63-8fec-65865696fcb4",
+        "id": "69a5cf60-eae4-4d8e-96ac-c4a22d1e8951",
         "key": "cp_investigations__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2869,7 +2869,7 @@
         "failedSamples": null
       },
       {
-        "id": "4c2e684d-5e84-4e7d-b9c8-e31e87f352da",
+        "id": "385615a7-f627-4e9e-b493-3d2248de6441",
         "key": "cp_investigations__row_count",
         "category": "quality",
         "type": "row_count",
@@ -2895,7 +2895,7 @@
         "failedSamples": null
       },
       {
-        "id": "99347f53-581b-469c-9701-ba35c62003da",
+        "id": "e5363d0e-3a37-48c6-96f4-a027071f280c",
         "key": "cp_placements__placement_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -2919,7 +2919,7 @@
         "failedSamples": null
       },
       {
-        "id": "f58afdcf-ccf2-4ea1-8f87-0cb70d0b0f1c",
+        "id": "3117b6be-a79f-480c-a155-da469f2ca144",
         "key": "cp_placements__placement_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -2946,7 +2946,7 @@
         "failedSamples": null
       },
       {
-        "id": "176501a7-8745-497a-8fd7-d5ae491e6760",
+        "id": "b7c226c4-ccab-4053-95a3-10d36eba1f09",
         "key": "cp_placements__placement_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -2992,7 +2992,7 @@
         ]
       },
       {
-        "id": "007f93c4-1aed-4fc3-861e-a53f0850858a",
+        "id": "1209aa6a-25a3-42f6-93ad-52556228096a",
         "key": "cp_placements__placement_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3020,7 +3020,7 @@
         "failedSamples": null
       },
       {
-        "id": "9f914aa0-9407-4345-a2a0-658e7afbfa30",
+        "id": "70533abd-3532-4b77-a42e-392ad055f11e",
         "key": "cp_placements__placement_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -3067,7 +3067,7 @@
         ]
       },
       {
-        "id": "85553c1c-207d-4799-92aa-1e7354219108",
+        "id": "00d8db97-24bd-49e3-a805-486621db09cc",
         "key": "cp_placements__cp_client_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3091,7 +3091,7 @@
         "failedSamples": null
       },
       {
-        "id": "dc45c9e4-c09a-4fce-b2d7-db96c9714766",
+        "id": "bd2bd889-1373-43f9-bf5a-4f10e2bffeaf",
         "key": "cp_placements__cp_client_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3137,7 +3137,7 @@
         ]
       },
       {
-        "id": "8e5376c1-5619-4b61-909f-0d729c91a1ff",
+        "id": "aa526aee-cb32-4eb4-a747-203d796421e8",
         "key": "cp_placements__cp_client_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3184,7 +3184,7 @@
         ]
       },
       {
-        "id": "1904e914-efbc-4fde-b0e6-585c789437e7",
+        "id": "df04380d-8784-46ec-a5f4-885c94cbd458",
         "key": "cp_placements__cp_client_id__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -3210,7 +3210,7 @@
         "failedSamples": null
       },
       {
-        "id": "9c6f76f7-2ca7-49e5-a322-e6714f0c5cfa",
+        "id": "d930693d-90df-4b32-b2c3-d1602dc6c40d",
         "key": "cp_placements__placement_type__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3234,7 +3234,7 @@
         "failedSamples": null
       },
       {
-        "id": "0f8cedfe-0914-4958-82c2-f66876b8a1ae",
+        "id": "e6d75f88-3503-4cf2-923f-912fa3819d9f",
         "key": "cp_placements__placement_type__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3261,7 +3261,7 @@
         "failedSamples": null
       },
       {
-        "id": "a8521c42-3647-4e1e-aa68-c04fea269a0c",
+        "id": "665f6871-2c19-4bd8-868a-efdbabb6d857",
         "key": "cp_placements__placement_type__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -3308,7 +3308,7 @@
         ]
       },
       {
-        "id": "fce473c5-bf16-40be-b06a-148ff0e1f6a3",
+        "id": "ad6666d3-86ca-401a-8ffb-25f0773e5dc3",
         "key": "cp_placements__carer_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3332,7 +3332,7 @@
         "failedSamples": null
       },
       {
-        "id": "19f57c7c-83ce-4f99-87b3-b89cfeac68cf",
+        "id": "0718c454-c9a3-430e-9eac-a5ecd3b10479",
         "key": "cp_placements__carer_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3359,7 +3359,7 @@
         "failedSamples": null
       },
       {
-        "id": "c7f2b442-2c8b-449e-b60f-3df4f43c2117",
+        "id": "49d4baaf-f0fd-40a2-a9b8-4c1b987ea600",
         "key": "cp_placements__carer_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3387,7 +3387,7 @@
         "failedSamples": null
       },
       {
-        "id": "d8e6cc1d-0c96-4fc1-99c5-4516d6f9978d",
+        "id": "b697fffa-6472-43b8-9dff-91f3b04853f9",
         "key": "cp_placements__carer_id__quality_sql_1",
         "category": "quality",
         "type": "field_quality_sql",
@@ -3413,7 +3413,7 @@
         "failedSamples": null
       },
       {
-        "id": "217d71fe-e6db-4023-b9cc-62ecf6778294",
+        "id": "5c75c405-634e-49a6-b073-ef2467b81dfc",
         "key": "cp_placements__carer_id__quality_sql_2",
         "category": "quality",
         "type": "field_quality_sql",
@@ -3439,7 +3439,7 @@
         "failedSamples": null
       },
       {
-        "id": "6c25b950-8566-46cb-ab69-4e8ab4122432",
+        "id": "bb56e017-262b-430b-86f9-daafa2360de0",
         "key": "cp_placements__placement_start__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3463,7 +3463,7 @@
         "failedSamples": null
       },
       {
-        "id": "ec51ce30-d6b0-41ac-89a3-3b8319dac352",
+        "id": "fcea74a3-33ab-487d-b3e6-c6920e37b214",
         "key": "cp_placements__placement_start__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3501,7 +3501,7 @@
         ]
       },
       {
-        "id": "f112c785-9e1e-4a12-91c7-5e7e334f8fb2",
+        "id": "bed48f71-41ea-4fe4-bc1a-babf8bb500dc",
         "key": "cp_placements__placement_start__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3540,7 +3540,7 @@
         ]
       },
       {
-        "id": "51a823ca-d25f-4ed4-8a2a-606fe4b993dd",
+        "id": "927a1446-f3da-437b-ac61-12464862eb45",
         "key": "cp_placements__placement_end__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3564,7 +3564,7 @@
         "failedSamples": null
       },
       {
-        "id": "6fa28fe8-d745-4cb8-8cda-6efcd9b60bbb",
+        "id": "d32d04e8-4f83-489e-9340-ba1a55777ec1",
         "key": "cp_placements__placement_suburb__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3588,7 +3588,7 @@
         "failedSamples": null
       },
       {
-        "id": "1b67fbf3-f548-4b63-b09a-4c5b0d62dc7d",
+        "id": "bcf0aa50-f4ef-4b30-a8fe-59ab09f5493f",
         "key": "cp_placements__placement_suburb__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3615,7 +3615,7 @@
         "failedSamples": null
       },
       {
-        "id": "9bb90978-2946-4da3-a4ad-c887d65245fe",
+        "id": "339c1fd6-9fad-4352-910e-895fef483ffc",
         "key": "cp_placements__placement_suburb__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3643,7 +3643,7 @@
         "failedSamples": null
       },
       {
-        "id": "a93a4ad9-10dc-429a-aa9a-02dc49cb9ff7",
+        "id": "11dc10eb-ca52-4cec-8d89-c784ad1efd93",
         "key": "cp_placements__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3667,7 +3667,7 @@
         "failedSamples": null
       },
       {
-        "id": "53cc65d4-a76f-4da8-9f20-a75105db36dc",
+        "id": "ca0b97a7-ed8a-426f-9369-90f59dfc5783",
         "key": "cp_placements__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3694,7 +3694,7 @@
         "failedSamples": null
       },
       {
-        "id": "b8899e93-8928-47e6-88a6-3ad9161a4efd",
+        "id": "a62ac84f-c406-466e-a306-adfbb3bbf738",
         "key": "cp_placements__row_count",
         "category": "quality",
         "type": "row_count",
@@ -3720,7 +3720,7 @@
         "failedSamples": null
       },
       {
-        "id": "1bdc3e57-628c-4076-8acc-a8c801491772",
+        "id": "21aa0393-23d0-4e22-acbb-15d038530c82",
         "key": "cp_carers__carer_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3744,7 +3744,7 @@
         "failedSamples": null
       },
       {
-        "id": "c280dd02-0ff3-492e-adf3-18ba62a4f175",
+        "id": "1bdf8d30-4b96-4ea2-8467-bf447137113d",
         "key": "cp_carers__carer_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3771,7 +3771,7 @@
         "failedSamples": null
       },
       {
-        "id": "09eb147b-71c2-4048-9925-3106cd10d222",
+        "id": "0dc9bf11-5ca7-4d4c-89c0-227ae83c9f8a",
         "key": "cp_carers__carer_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -3798,7 +3798,7 @@
         "failedSamples": null
       },
       {
-        "id": "417c3b53-f494-4789-bd5f-0d1665d307a7",
+        "id": "55938281-fd07-4d17-9e4a-80cb1ffa9e94",
         "key": "cp_carers__carer_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3826,7 +3826,7 @@
         "failedSamples": null
       },
       {
-        "id": "1ff489df-1b6f-4d23-8c58-9898e99994cd",
+        "id": "ccdee7d9-0919-48a4-a583-0b1dfc3d6d03",
         "key": "cp_carers__carer_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -3854,7 +3854,7 @@
         "failedSamples": null
       },
       {
-        "id": "763ef9f2-272b-4f7c-9773-c171c5462ba8",
+        "id": "c37ed3a5-9ac7-40df-bc23-4dca876862ef",
         "key": "cp_carers__given_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3878,7 +3878,7 @@
         "failedSamples": null
       },
       {
-        "id": "89f6d3f7-3617-4d3f-a332-990164f22c22",
+        "id": "7f1355a4-12a7-48a9-acc9-23758d1255bd",
         "key": "cp_carers__given_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3905,7 +3905,7 @@
         "failedSamples": null
       },
       {
-        "id": "068cfea8-b0b9-474a-b8ca-ae98053da46d",
+        "id": "13d4e9a2-dbf9-423c-9ab2-aef28a3357d0",
         "key": "cp_carers__given_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -3933,7 +3933,7 @@
         "failedSamples": null
       },
       {
-        "id": "1b16161f-5cc7-4c5b-b3f6-74b6725701e3",
+        "id": "52faa6ee-d6cc-43d5-a80c-46de6dcf1f26",
         "key": "cp_carers__family_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -3957,7 +3957,7 @@
         "failedSamples": null
       },
       {
-        "id": "7a083366-e2ce-4af5-bafa-b7c91a304739",
+        "id": "7df66c4c-701d-4de7-9b87-01714d1c6d60",
         "key": "cp_carers__family_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -3984,7 +3984,7 @@
         "failedSamples": null
       },
       {
-        "id": "37aa8823-17c3-4877-831c-0595dbb0f91b",
+        "id": "1616edbb-ef61-4014-8749-ce751dcdbf93",
         "key": "cp_carers__family_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -4012,7 +4012,7 @@
         "failedSamples": null
       },
       {
-        "id": "ba2e4b70-6f51-487d-9c68-37d8bc1b7860",
+        "id": "d1688dfd-534e-48a5-a394-8210ba7b26d9",
         "key": "cp_carers__carer_type__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4036,7 +4036,7 @@
         "failedSamples": null
       },
       {
-        "id": "585fd1d9-a386-402f-a0f6-835ec16105a8",
+        "id": "e75cf4e4-e7d9-4e66-bbf4-61b2b5d36855",
         "key": "cp_carers__carer_type__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4063,7 +4063,7 @@
         "failedSamples": null
       },
       {
-        "id": "faac12a2-dcf5-440e-b34f-d36e8ba9ab21",
+        "id": "32e63d74-83d6-40f5-954b-90311f00bad9",
         "key": "cp_carers__carer_type__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -4098,7 +4098,7 @@
         "failedSamples": null
       },
       {
-        "id": "7a2ad9e4-868e-419d-9b04-a43746091a63",
+        "id": "0e8641b7-f3b3-4b68-815d-48c34334b712",
         "key": "cp_carers__approval_status__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4122,7 +4122,7 @@
         "failedSamples": null
       },
       {
-        "id": "e64379a5-6424-4fd8-a297-29b693f2cafe",
+        "id": "7c679b42-37f9-428f-9258-0f32a1779e60",
         "key": "cp_carers__approval_status__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4149,7 +4149,7 @@
         "failedSamples": null
       },
       {
-        "id": "7bd5afc0-a386-4e87-b566-8f6316732ab2",
+        "id": "485223e2-3fb4-4d4f-be94-942cdb794bc9",
         "key": "cp_carers__approval_status__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -4184,7 +4184,7 @@
         "failedSamples": null
       },
       {
-        "id": "7ad83ee3-e027-4715-b2ac-1701fa801cbd",
+        "id": "4f7a56a0-a4f7-4ed8-b15e-c5288ef8eb05",
         "key": "cp_carers__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4208,7 +4208,7 @@
         "failedSamples": null
       },
       {
-        "id": "87efa793-245d-4a10-a272-116dae510aca",
+        "id": "b88f3332-23ca-46df-a1ad-a00743bd4d8e",
         "key": "cp_carers__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4235,7 +4235,7 @@
         "failedSamples": null
       },
       {
-        "id": "dcfb30ed-3006-457c-b47a-3af986edebbe",
+        "id": "d17e6f84-c240-435d-b97a-b129c4c1cd6f",
         "key": "cp_carers__row_count",
         "category": "quality",
         "type": "row_count",
@@ -4261,7 +4261,7 @@
         "failedSamples": null
       },
       {
-        "id": "85f6d9b2-7d4a-4d26-b33b-3949c430a927",
+        "id": "5e4e50d8-7981-45c0-8368-ed7c67a0f668",
         "key": "cp_case_workers__worker_id__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4285,7 +4285,7 @@
         "failedSamples": null
       },
       {
-        "id": "15fdd5c6-226b-41e4-bb8b-492510fc3ec3",
+        "id": "9e277416-161b-462e-bda4-696c982dcf8e",
         "key": "cp_case_workers__worker_id__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4312,7 +4312,7 @@
         "failedSamples": null
       },
       {
-        "id": "87f9a0a5-a633-435c-97d4-ff8519697f29",
+        "id": "07593056-db2e-423b-8d71-9f6789931a33",
         "key": "cp_case_workers__worker_id__field_unique",
         "category": "schema",
         "type": "field_unique",
@@ -4339,7 +4339,7 @@
         "failedSamples": null
       },
       {
-        "id": "7b3c1e39-9783-494c-874b-4c373f0ae74d",
+        "id": "4e327058-d73e-4d1f-9b01-ddcc5c26315b",
         "key": "cp_case_workers__worker_id__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -4367,7 +4367,7 @@
         "failedSamples": null
       },
       {
-        "id": "af10753d-6955-4ace-bb42-5e950442647f",
+        "id": "62809adc-3746-4b03-8a09-4e6c35a92cc2",
         "key": "cp_case_workers__worker_id__field_duplicate_values",
         "category": "quality",
         "type": "field_duplicate_values",
@@ -4395,7 +4395,7 @@
         "failedSamples": null
       },
       {
-        "id": "20343f8d-2efc-4f2a-9ec9-648b450e355c",
+        "id": "988c3e49-e55b-400a-be55-144127f19ed9",
         "key": "cp_case_workers__given_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4419,7 +4419,7 @@
         "failedSamples": null
       },
       {
-        "id": "552b2c14-0251-4199-aad1-f963b3e5b599",
+        "id": "92220e2c-0fc1-4da0-8404-52343c03062f",
         "key": "cp_case_workers__given_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4446,7 +4446,7 @@
         "failedSamples": null
       },
       {
-        "id": "3a928a54-f0e2-4050-b40b-72ceb4cb0002",
+        "id": "cf90b7ed-a994-4439-91be-a6ce310c9fb6",
         "key": "cp_case_workers__given_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -4474,7 +4474,7 @@
         "failedSamples": null
       },
       {
-        "id": "5fec8cf1-c9a5-4e90-a7ef-d397a8ec6d90",
+        "id": "a12b93cc-9618-4e38-b821-b5b612e72343",
         "key": "cp_case_workers__family_name__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4498,7 +4498,7 @@
         "failedSamples": null
       },
       {
-        "id": "fcdb50a0-803b-406f-b1cf-eea4a0a6a16a",
+        "id": "6b4d2b1b-f0f5-4124-a79f-487d2f73bcba",
         "key": "cp_case_workers__family_name__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4525,7 +4525,7 @@
         "failedSamples": null
       },
       {
-        "id": "a8c6f758-f6af-4933-8cf0-ee482de2157f",
+        "id": "07447bb8-1545-4876-bc85-a44312588f56",
         "key": "cp_case_workers__family_name__field_null_values",
         "category": "quality",
         "type": "field_null_values",
@@ -4553,7 +4553,7 @@
         "failedSamples": null
       },
       {
-        "id": "44845a5a-3b9b-4264-9447-dee2473aa8e3",
+        "id": "efbf56bb-c9f2-497e-8e4b-56338b9b9027",
         "key": "cp_case_workers__team_region__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4577,7 +4577,7 @@
         "failedSamples": null
       },
       {
-        "id": "8545164f-5536-41ca-a5ba-3ee08010edf1",
+        "id": "cfe64ff8-13cb-4ef1-a32c-7d7f2b63518c",
         "key": "cp_case_workers__team_region__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4604,7 +4604,7 @@
         "failedSamples": null
       },
       {
-        "id": "1b95ef0f-6953-4af7-98c5-c9435477cfd7",
+        "id": "ff201028-66c0-48d1-9d46-045b1a430198",
         "key": "cp_case_workers__team_region__field_invalid_values",
         "category": "quality",
         "type": "field_invalid_values",
@@ -4646,7 +4646,7 @@
         "failedSamples": null
       },
       {
-        "id": "77ec2982-6dbd-426e-a4f7-fe3edf7c04e8",
+        "id": "3e6b4137-c4ab-488e-a64d-d9466f54558f",
         "key": "cp_case_workers__extract_timestamp__field_is_present",
         "category": "schema",
         "type": "field_is_present",
@@ -4670,7 +4670,7 @@
         "failedSamples": null
       },
       {
-        "id": "d1291079-0518-4d6c-afec-c908c62ea0a4",
+        "id": "522c01f0-4839-44fa-9d81-cc441b1eed4a",
         "key": "cp_case_workers__extract_timestamp__field_required",
         "category": "schema",
         "type": "field_required",
@@ -4697,7 +4697,7 @@
         "failedSamples": null
       },
       {
-        "id": "190fd69c-82c9-41e7-8c4f-b4471d06f1e7",
+        "id": "604b2943-a7c0-453f-8a39-e2b8b8ef4421",
         "key": "cp_case_workers__row_count",
         "category": "quality",
         "type": "row_count",
@@ -4727,87 +4727,87 @@
       {
         "level": "INFO",
         "message": "Testing data contract",
-        "timestamp": "2026-09-25 12:05:18.119359+00:00"
+        "timestamp": "2026-09-25 12:21:31.043405+00:00"
       },
       {
         "level": "INFO",
         "message": "Data Contract CLI 1.2.0 running as CLI locally",
-        "timestamp": "2026-09-25 12:05:18.120308+00:00"
+        "timestamp": "2026-09-25 12:21:31.044524+00:00"
       },
       {
         "level": "INFO",
         "message": "Running tests for data contract child-protection with server local_test",
-        "timestamp": "2026-09-25 12:05:18.394616+00:00"
+        "timestamp": "2026-09-25 12:21:31.334272+00:00"
       },
       {
         "level": "INFO",
         "message": "Running checks with ibis",
-        "timestamp": "2026-09-25 12:05:18.438276+00:00"
+        "timestamp": "2026-09-25 12:21:31.372643+00:00"
       },
       {
         "level": "INFO",
         "message": "Connecting to local csv via duckdb",
-        "timestamp": "2026-09-25 12:05:18.438305+00:00"
+        "timestamp": "2026-09-25 12:21:31.372674+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_clients for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_010/cp_clients.csv",
-        "timestamp": "2026-09-25 12:05:18.453190+00:00"
+        "timestamp": "2026-09-25 12:21:31.386116+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'cp_client_id', 'VARCHAR', False, None, False), (1, 'given_name', 'VARCHAR', False, None, False), (2, 'family_name', 'VARCHAR', False, None, False), (3, 'date_of_birth', 'DATE', False, None, False), (4, 'sex', 'VARCHAR', False, None, False), (5, 'suburb', 'VARCHAR', False, None, False), (6, 'postcode', 'VARCHAR', False, None, False), (7, 'case_opened_date', 'DATE', False, None, False), (8, 'case_status', 'VARCHAR', False, None, False), (9, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-25 12:05:18.663420+00:00"
+        "timestamp": "2026-09-25 12:21:31.581682+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_notifications for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_010/cp_notifications.csv",
-        "timestamp": "2026-09-25 12:05:18.663455+00:00"
+        "timestamp": "2026-09-25 12:21:31.581719+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'notification_id', 'VARCHAR', False, None, False), (1, 'cp_client_id', 'VARCHAR', False, None, False), (2, 'notification_date', 'DATE', False, None, False), (3, 'source_type', 'VARCHAR', False, None, False), (4, 'concern_type', 'VARCHAR', False, None, False), (5, 'risk_rating', 'VARCHAR', False, None, False), (6, 'assigned_worker_id', 'VARCHAR', False, None, False), (7, 'outcome', 'VARCHAR', False, None, False), (8, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-25 12:05:19.032647+00:00"
+        "timestamp": "2026-09-25 12:21:31.887604+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_investigations for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_010/cp_investigations.csv",
-        "timestamp": "2026-09-25 12:05:19.032690+00:00"
+        "timestamp": "2026-09-25 12:21:31.887643+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'investigation_id', 'VARCHAR', False, None, False), (1, 'notification_id', 'VARCHAR', False, None, False), (2, 'cp_client_id', 'VARCHAR', False, None, False), (3, 'start_date', 'DATE', False, None, False), (4, 'end_date', 'DATE', False, None, False), (5, 'substantiated', 'VARCHAR', False, None, False), (6, 'lead_worker_id', 'VARCHAR', False, None, False), (7, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-25 12:05:19.106079+00:00"
+        "timestamp": "2026-09-25 12:21:31.953361+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_placements for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_010/cp_placements.csv",
-        "timestamp": "2026-09-25 12:05:19.106117+00:00"
+        "timestamp": "2026-09-25 12:21:31.953403+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'placement_id', 'VARCHAR', False, None, False), (1, 'cp_client_id', 'VARCHAR', False, None, False), (2, 'placement_type', 'VARCHAR', False, None, False), (3, 'carer_id', 'VARCHAR', False, None, False), (4, 'placement_start', 'DATE', False, None, False), (5, 'placement_end', 'DATE', False, None, False), (6, 'placement_suburb', 'VARCHAR', False, None, False), (7, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-25 12:05:19.230351+00:00"
+        "timestamp": "2026-09-25 12:21:32.037127+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_carers for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_010/cp_carers.csv",
-        "timestamp": "2026-09-25 12:05:19.230398+00:00"
+        "timestamp": "2026-09-25 12:21:32.037167+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'carer_id', 'VARCHAR', False, None, False), (1, 'given_name', 'VARCHAR', False, None, False), (2, 'family_name', 'VARCHAR', False, None, False), (3, 'carer_type', 'VARCHAR', False, None, False), (4, 'approval_status', 'VARCHAR', False, None, False), (5, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-25 12:05:19.334380+00:00"
+        "timestamp": "2026-09-25 12:21:32.098528+00:00"
       },
       {
         "level": "INFO",
         "message": "Creating table cp_case_workers for /home/user/data-poc/qa_tools/cp/../../data/cp_raw/cp_run_010/cp_case_workers.csv",
-        "timestamp": "2026-09-25 12:05:19.334420+00:00"
+        "timestamp": "2026-09-25 12:21:32.098570+00:00"
       },
       {
         "level": "INFO",
         "message": "DuckDB Table Info: [(0, 'worker_id', 'VARCHAR', False, None, False), (1, 'given_name', 'VARCHAR', False, None, False), (2, 'family_name', 'VARCHAR', False, None, False), (3, 'team_region', 'VARCHAR', False, None, False), (4, 'extract_timestamp', 'DATE', False, None, False)]",
-        "timestamp": "2026-09-25 12:05:19.358322+00:00"
+        "timestamp": "2026-09-25 12:21:32.126121+00:00"
       }
     ]
   },
@@ -4822,7 +4822,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -4844,7 +4844,7 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -4866,7 +4866,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -4888,7 +4888,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -4910,7 +4910,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -4932,7 +4932,7 @@
       "dimension": "conformity",
       "label": null,
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -4954,7 +4954,7 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -4976,7 +4976,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -4998,7 +4998,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5020,7 +5020,7 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5042,7 +5042,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5064,7 +5064,7 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5086,7 +5086,7 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 527,
       "unit": "count",
       "warn_threshold": null,
@@ -5108,7 +5108,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5130,7 +5130,7 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 7,
       "unit": "count",
       "warn_threshold": null,
@@ -5158,7 +5158,7 @@
       "dimension": "completeness",
       "label": null,
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 2,
       "unit": "count",
       "warn_threshold": null,
@@ -5180,7 +5180,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5202,7 +5202,7 @@
       "dimension": "consistency",
       "label": "Referential integrity",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 3,
       "unit": "count",
       "warn_threshold": null,
@@ -5224,7 +5224,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5246,7 +5246,7 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 5,
       "unit": "count",
       "warn_threshold": null,
@@ -5274,7 +5274,7 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 9,
       "unit": "count",
       "warn_threshold": null,
@@ -5302,7 +5302,7 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 9,
       "unit": "count",
       "warn_threshold": null,
@@ -5330,7 +5330,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 2,
       "unit": "count",
       "warn_threshold": null,
@@ -5355,7 +5355,7 @@
       "dimension": "consistency",
       "label": "Referential integrity",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 4,
       "unit": "count",
       "warn_threshold": null,
@@ -5377,7 +5377,7 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 12,
       "unit": "count",
       "warn_threshold": null,
@@ -5405,7 +5405,7 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 1001,
       "unit": "count",
       "warn_threshold": null,
@@ -5427,7 +5427,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5449,7 +5449,7 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5471,7 +5471,7 @@
       "dimension": "consistency",
       "label": null,
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5493,7 +5493,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5515,7 +5515,7 @@
       "dimension": "consistency",
       "label": "Referential integrity",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5537,7 +5537,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5559,7 +5559,7 @@
       "dimension": "consistency",
       "label": "Referential integrity",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5581,7 +5581,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5603,7 +5603,7 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5625,7 +5625,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5647,7 +5647,7 @@
       "dimension": "consistency",
       "label": "Referential integrity",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5669,7 +5669,7 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 181,
       "unit": "count",
       "warn_threshold": null,
@@ -5691,7 +5691,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5713,7 +5713,7 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 2,
       "unit": "count",
       "warn_threshold": null,
@@ -5738,7 +5738,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 2,
       "unit": "count",
       "warn_threshold": null,
@@ -5763,7 +5763,7 @@
       "dimension": "consistency",
       "label": "Referential integrity",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 7,
       "unit": "count",
       "warn_threshold": null,
@@ -5785,7 +5785,7 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 1,
       "unit": "count",
       "warn_threshold": null,
@@ -5809,7 +5809,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5831,7 +5831,7 @@
       "dimension": "consistency",
       "label": "Referential integrity",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 2,
       "unit": "count",
       "warn_threshold": null,
@@ -5853,7 +5853,7 @@
       "dimension": "consistency",
       "label": null,
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 6,
       "unit": "count",
       "warn_threshold": null,
@@ -5875,7 +5875,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 1,
       "unit": "count",
       "warn_threshold": null,
@@ -5899,7 +5899,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5921,7 +5921,7 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 242,
       "unit": "count",
       "warn_threshold": null,
@@ -5943,7 +5943,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5965,7 +5965,7 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -5987,7 +5987,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -6009,7 +6009,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -6031,7 +6031,7 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -6053,7 +6053,7 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -6075,7 +6075,7 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 289,
       "unit": "count",
       "warn_threshold": null,
@@ -6097,7 +6097,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -6119,7 +6119,7 @@
       "dimension": "uniqueness",
       "label": "Duplicate rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -6141,7 +6141,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -6163,7 +6163,7 @@
       "dimension": "completeness",
       "label": "Null rate",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -6185,7 +6185,7 @@
       "dimension": "conformity",
       "label": "Invalid values",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 0,
       "unit": "count",
       "warn_threshold": null,
@@ -6207,7 +6207,7 @@
       "dimension": "completeness",
       "label": "Row count",
       "run_id": "cp_run_010",
-      "run_timestamp": "2026-09-25T20:04:46.104923+08:00",
+      "run_timestamp": "2026-09-25T20:20:53.775539+08:00",
       "metric_value": 60,
       "unit": "count",
       "warn_threshold": null,

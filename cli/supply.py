@@ -120,12 +120,34 @@ def deliveries_command(wanted: str | None) -> None:
     seen = {d.name: arrivals.recognise(d) for d in received}
 
     if received:
-        table = Table("Delivery", "Received", "Attributed to", "Notes",
+        # LOADED IS A SEPARATE QUESTION FROM RECOGNISED, and showing
+        # them side by side is the point (REQ-PIPE-060 criterion 16):
+        # a delivery can be perfectly recognised and only half staged,
+        # and without this the half-staged one looks identical to the
+        # healthy one.
+        from qa_tools.common import load_log, supply_db
+        done = load_log.latest_by_table()
+
+        table = Table("Delivery", "Received", "Attributed to", "Loaded", "Notes",
                        box=None, pad_edge=False)
         for d in received:
             placed, notes, _collections = _describe(d, seen[d.name],
                                                      detailed=wanted is not None)
-            table.add_row(d.name, display_time.format_instant(d.received_at), placed, notes)
+            expected = supply_db.expected_tables(seen[d.name], d.received_at)
+            loaded = sum(1 for name in expected.values()
+                          if name in done and done[name].loaded)
+            if not expected:
+                state = "[dim]-[/dim]"
+            elif loaded == len(expected):
+                state = f"{loaded}/{len(expected)}"
+            else:
+                # PARTIAL IS THE STATE WORTH SEEING. A delivery is
+                # processed only where every file attributed to a
+                # dataset has a load record, so anything short of that
+                # is a delivery the next run must process again.
+                state = f"[yellow]{loaded}/{len(expected)}[/yellow]"
+            table.add_row(d.name, display_time.format_instant(d.received_at), placed,
+                           state, notes)
         console.print(table)
 
     if in_flight:
@@ -164,7 +186,7 @@ def unplaceable_command() -> None:
     """Deliveries nothing could place - reported, never guessed at.
 
     A delivery where no file matched any dataset's pattern. It does not
-    fail a run (criterion 13): attributing one by elimination - "the
+    fail a run: attributing one by elimination - "the
     only thing in a Birth Registrations delivery must be Birth
     Registrations" - is how a garbage file quietly becomes a supply.
     """
@@ -240,3 +262,88 @@ def log_command(as_sql: bool) -> None:
     console.print(table)
     console.print(f"\n[dim]{len(found)} delivery record(s). "
                    f"`--sql` prints how to query them.[/dim]")
+
+
+@supply_group.command("load")
+@click.option("--collection", "collection_id", default=None,
+               help="One collection only. Both are staged when this is left out.")
+def load_command(collection_id: str | None) -> None:
+    """Stage every recognised delivery into the supply database.
+
+    Loads what has arrived, and nothing else: no period, no slot, no
+    supersession. A file that cannot be loaded leaves no table and is
+    listed by `mothman supply failures`.
+    """
+    # ARRIVAL IS THE ONLY TRIGGER (REQ-PIPE-060 criterion 10). Nothing
+    # here asks which period a supply belongs to or what it supersedes,
+    # because none of that is known at arrival and staging may not be
+    # wrong about anything.
+    #
+    # SEQUENTIAL, DELIBERATELY (criterion 9). One DuckDB file takes one
+    # writer, and a staging fan-out would have workers of a single
+    # invocation collide on its lock. Staging is serial and the tools
+    # fan out afterwards, over views that are already built.
+    from qa_tools.common import load_log
+
+    known = {"bdm": ("civil-registration", "qa_tools.bdm.build_per_run_warehouses"),
+             "cp": ("child-protection", "qa_tools.cp.build_cp_warehouses")}
+    if collection_id is not None and collection_id not in known:
+        raise click.ClickException(
+            f"unknown collection {collection_id!r} - one of {', '.join(sorted(known))}")
+
+    before = set(load_log.loaded_tables())
+    failed_before = {r.physical for r in load_log.failures()}
+    records_before = len(load_log.records())
+
+    import importlib
+
+    for key in sorted(known) if collection_id is None else [collection_id]:
+        _collection, module = known[key]
+        console.print(f"[bold]{key}[/bold] - staging every recognised delivery")
+        importlib.import_module(module).build_all()
+
+    staged = sorted(set(load_log.loaded_tables()) - before)
+    changed = len(load_log.records()) - records_before
+    # TWO DIFFERENT NUMBERS, and saying only the first was misleading
+    # in practice: a re-run of an unchanged delivery loads every table
+    # again and makes NOTHING newly readable, which read as "0 table(s)
+    # newly loaded" over a page of successful staging.
+    console.print(f"\n{len(staged)} table(s) newly readable, "
+                   f"{changed} load record(s) written "
+                   f"[dim](an unchanged re-stage writes none)[/dim].")
+    new_failures = [r for r in load_log.failures() if r.physical not in failed_before]
+    if new_failures:
+        console.print(f"[red]{len(new_failures)} failed to load[/red] "
+                       f"[dim]- `mothman supply failures` for the queue[/dim]")
+
+
+@supply_group.command("failures")
+def failures_command() -> None:
+    """Loads that failed, and are waiting on a person.
+
+    Never retried on their own: the call is yours, and it is either to
+    reject that supply or to fix the cause and stage it again. Reads
+    committed records only - no database is opened.
+    """
+    # A REPROCESS NEEDS NO SPECIAL HANDLING (REQ-PIPE-060 criteria 17
+    # and 19). The FILE is unchanged and our ability to read it
+    # changed, and deliveries are immutable on disk, so staging again
+    # re-reads the same bytes and writes a NEW record rather than
+    # editing this one - the history of what went wrong survives the
+    # fix.
+    from qa_tools.common import asset_time, display_time, load_log
+
+    found = load_log.failures()
+    if not found:
+        console.print("No load is currently recorded as failed.")
+        return
+    console.print(f"[red]{len(found)} load(s) failed[/red] "
+                   f"[dim]- reject the supply, or fix and reprocess[/dim]\n")
+    table = Table("Delivery", "Dataset", "Recorded", "Why", box=None, pad_edge=False)
+    for record in found:
+        table.add_row(
+            record.delivery, record.dataset_id,
+            display_time.format_instant(
+                asset_time.parse_instant(record.recorded_at, "processing log")),
+            record.reason or "unrecorded")
+    console.print(table)

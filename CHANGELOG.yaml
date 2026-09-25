@@ -444,6 +444,28 @@ releases:
               dataset elsewhere in the same tool. They now take
               `--collection`. Commands that genuinely take a dataset are
               unchanged.
+          - headline: A file is loaded or it is not
+            components: ["Pipeline & publishing"]
+            description: >
+              Every supply now carries a record saying it finished
+              loading, and a check can only read one that has it. If a
+              load is cut short, nothing is left behind for a check to
+              mistake for a short delivery.
+          - headline: Stage what arrived, ask questions later
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman supply load` puts every delivery into the
+              warehouse on the strength of having arrived - no period,
+              no slot, nothing it cannot know yet. Each supply is kept
+              under its own arrival time, so a resupply never writes
+              over the one before it.
+          - headline: The ones that would not load
+            components: ["Pipeline & publishing"]
+            description: >
+              A file that cannot be read no longer stops the rest of its
+              delivery. `mothman supply failures` lists what failed and
+              why, and waits for you - reject the supply, or fix the
+              cause and load it again.
 
   - date: "2026-09-24"
     summary: >

@@ -142,31 +142,42 @@ def run_id_of(schema: str) -> str | None:
     return schema[len(RUN_SCHEMA_PREFIX):]
 
 
-def staged_table(table: str, run_id: str, discriminator: str = "") -> str:
+def arrival_key(received_at) -> str:
+    """One arrival's instant, as a table-name segment.
+
+    OUR OWN RECEIPT INSTANT, never a supplier's filename and never the
+    delivery's name (REQ-PIPE-060's security decision): these become
+    SQL identifiers, and DuckDB's parameter binding covers values, not
+    identifiers. Everything that reaches a name here is either ours or
+    a validated dataset id.
+    """
+    text = received_at if isinstance(received_at, str) else received_at.isoformat()
+    return re.sub(r"[^0-9]", "", text)[:20] or "0"
+
+
+def staged_table(table: str, received_at, ordinal: int = 0) -> str:
     """The physical name a staged table takes.
 
-    One name per (logical table, arrival), never an overwrite - a
+    ONE NAME PER (LOGICAL TABLE, ARRIVAL), carrying that arrival's own
+    instant (REQ-PIPE-060 criterion 4), and never an overwrite - a
     resupply is a NEW TABLE in the same schema, matching Keith's real
     operational database. The cheapest implementation is the wrong one:
-    `CREATE OR REPLACE`, which is what the retired per-run builders did,
-    keeps exactly one version and so destroys the history the
-    read-the-newest rule exists for.
-
-    `REQ-PIPE-060` refines this to carry the arrival INSTANT rather than
-    a run id, once arrivals have instants of their own. The shape - one
-    physical table per arrival, resolved to a logical name by a view -
-    is what matters here and does not change.
+    `CREATE OR REPLACE` on a shared name, which is what the retired
+    per-run builders did, keeps exactly one version and so destroys the
+    history the read-the-newest rule exists for.
     """
-    name = f"{_ident(table, 'table name')}__{_ident(run_id, 'run id')}"
-    if not discriminator:
+    name = f"{_ident(table, 'table name')}__{arrival_key(received_at)}"
+    if not ordinal:
         return name
     # A HELD SUPPLY STAGES EVERY FILE THAT MATCHED (REQ-PIPE-059), so
-    # two files claiming one dataset in one delivery need two physical
+    # two files claiming one dataset in one arrival need two physical
     # names. Without this the second overwrites the first and the hold
-    # has nothing left to resolve WITH - which is the exact failure the
-    # hold exists to prevent, reintroduced one layer down.
-    safe = re.sub(r"[^0-9A-Za-z]+", "_", discriminator).strip("_") or "x"
-    return f"{name}__{safe}"
+    # has nothing left to resolve WITH - the exact failure the hold
+    # exists to prevent, reintroduced one layer down.
+    #
+    # AN ORDINAL, not the filename: a supplier's filename must never
+    # reach a SQL identifier, and the ordinal is ours.
+    return f"{name}__{int(ordinal)}"
 
 
 def ensure_schemas(conn) -> None:
@@ -210,12 +221,13 @@ class Resolution:
 
 
 def split_staged(physical: str) -> tuple[str, str, str] | None:
-    """`(logical table, run id, discriminator)` for a staged table name,
+    """`(logical table, arrival key, ordinal)` for a staged table name,
     or None for a name that is not one.
 
-    `__` is the separator because no table or run id in this project
-    contains one - `cp_case_workers` and `cp_run_003` are all single
-    underscores - so the segments come apart unambiguously.
+    `__` is the separator because no table name in this project
+    contains one - `cp_case_workers` is single underscores throughout -
+    and the arrival key and ordinal are digits, so the segments come
+    apart unambiguously.
     """
     parts = physical.split("__")
     if len(parts) < 2 or not all(parts[:2]):
@@ -224,38 +236,63 @@ def split_staged(physical: str) -> tuple[str, str, str] | None:
 
 
 def candidates_in(conn, schema: str, logical_names: Sequence[str],
-                   run_id: str | None = None) -> dict[str, list[str]]:
+                   arrival: str | None = None,
+                   loaded: frozenset[str] | None = None) -> dict[str, list[str]]:
     """Every physical table in `schema` that claims one of these logical
     names, keyed by the name it claims.
 
-    `run_id` SCOPES IT TO ONE ARRIVAL, and leaving it out is almost
+    `arrival` SCOPES IT TO ONE ARRIVAL, and leaving it out is almost
     never what a caller wants. The bug that put it here: a QA run built
     its views from every version ever staged, so on the forty-second
     run the logical name had forty-two candidates, the ambiguity rule
     correctly refused to choose between them, and dbt failed to find a
     table that was sitting right there. The rule was right; the
     question it was asked was wrong. Candidates for a run are the
-    tables that run staged - several only where several files claimed
-    one dataset in one delivery, which is REQ-PIPE-059's case and the
-    ambiguity this is really for.
+    tables that arrival staged - several only where several files
+    claimed one dataset in one delivery, which is REQ-PIPE-059's case
+    and the ambiguity this is really for.
 
-    Matched on the `<table>__<run id>` convention `staged_table()`
+    `loaded` IS THE LOAD-RECORD GATE (REQ-PIPE-060 criterion 7). A
+    physically present table with no load record is not a candidate,
+    because physical presence is not readability: without a
+    whole-delivery transaction a truncated table is physically there
+    and physically readable, and a truncated table in staging is
+    indistinguishable from a genuinely short supply. Pass None to skip
+    the gate, which only a caller that is not building a check's view
+    should do.
+
+    Matched on the `<table>__<arrival>` convention `staged_table()`
     writes, and NOT by a prefix test: `cp_case_workers__x` must never
     be a candidate for `cp_case`, and a prefix test says it is.
     """
-    rows = conn.execute(
-        "SELECT table_name FROM information_schema.tables WHERE table_schema = ?",
-        [schema]).fetchall()
+    # NARROWED IN SQL where the arrival is known, rather than listing
+    # the schema and filtering here. Staging only ever grows - a new
+    # table per arrival, never an overwrite, across ~30 datasets and
+    # years - so the table count is the fastest-growing thing in this
+    # design, and an ordinary question must not have to enumerate all
+    # of it. The LIKE is a SUPERSET filter, not the decision: the exact
+    # `<table>__<arrival>` test below still decides.
+    if arrival is None:
+        rows = conn.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = ?",
+            [schema]).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema = ? AND table_name LIKE ?",
+            [schema, f"%__{arrival}%"]).fetchall()
     wanted = set(logical_names)
     found: dict[str, list[str]] = {name: [] for name in wanted}
     for (physical,) in rows:
         parts = split_staged(physical)
         if parts is None:
             continue
-        logical, staged_run, _discriminator = parts
+        logical, staged_arrival, _ordinal = parts
         if logical not in wanted:
             continue
-        if run_id is not None and staged_run != run_id:
+        if arrival is not None and staged_arrival != arrival:
+            continue
+        if loaded is not None and physical not in loaded:
             continue
         found[logical].append(physical)
     return found
@@ -443,3 +480,31 @@ def resolution_for(conn, run_id: str) -> Resolution:
         else:
             res.absent.append(logical)
     return res
+
+
+def expected_tables(recognition, received_at) -> dict[str, str]:
+    """The physical tables one delivery should have produced, keyed by
+    dataset id where that dataset produced exactly one.
+
+    REQ-PIPE-060 criterion 16 asks whether a delivery is processed, and
+    that question cannot be answered without knowing what "all of it"
+    was. Derived from RECOGNITION rather than from the catalogue,
+    because the catalogue only ever knows what did load - a file that
+    failed outright leaves nothing there to count, which is precisely
+    the case being looked for.
+
+    A dataset that matched several files (REQ-PIPE-059's held supply)
+    contributes one entry per file, keyed `<dataset id>#<ordinal>`: the
+    hold is resolved by a person looking at both, so both must be
+    accounted for.
+    """
+    from qa_tools.common import hierarchy
+
+    out: dict[str, str] = {}
+    for dataset_id, names in sorted(recognition.by_dataset.items()):
+        table = hierarchy.dataset(dataset_id).table
+        several = len(names) > 1
+        for ordinal, _name in enumerate(sorted(names), start=1):
+            key = f"{dataset_id}#{ordinal}" if several else dataset_id
+            out[key] = staged_table(table, received_at, ordinal if several else 0)
+    return out

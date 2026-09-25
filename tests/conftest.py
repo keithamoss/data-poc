@@ -133,6 +133,80 @@ def supply_db_path(tmp_path_factory):
         os.environ[supply_db.SUPPLY_DB_ENV] = before
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _committed_history_is_off_limits(tmp_path_factory):
+    """No test writes into this repo's committed history trees.
+
+    AUTOUSE AND SESSION-SCOPED ON PURPOSE. The trees here - the
+    processing log, the delivery log, the in-flight observations - are
+    written several frames below whatever a test actually called, by
+    real production code paths that take a directory argument nobody
+    at the test's level passes. So a test cannot opt in reliably; it
+    has to be opted in for.
+
+    THIS IS NOT PRECAUTIONARY. Both halves of it have already happened
+    in this repo. `mothman pipeline run` once cleared the whole
+    delivery log at its top, and the suite - which invokes that command
+    with the real work stubbed - deleted sixty committed records on the
+    next gate run. And the processing log, one day old, had 109
+    test-run records in it out of 259, each one a table name that only
+    ever existed inside a temporary directory.
+
+    The prune half is the worse of the two and is still live without
+    this: six tests invoke `pipeline run` without redirecting the
+    delivery log, and the prune removes every record for a delivery
+    not on disk. On this machine `data/deliveries/` exists so nothing
+    is pruned; on a freshly-cloned CI runner there is no `data/` at
+    all, so the correct answer to "which deliveries are present" is
+    NONE and all sixty records go. Exactly the shape CLAUDE.md records
+    for gitignored trees, in the opposite direction.
+
+    Patches the module constants rather than the environment, so a test
+    that redirects one of these itself still overrides this and still
+    restores to a temporary directory rather than to the real tree.
+    """
+    from qa_tools.common import delivery_log, in_flight_log, load_log
+
+    root = tmp_path_factory.mktemp("committed_history")
+    guarded = [(load_log, "PROCESSING_LOG_DIR", "processing_log"),
+                (delivery_log, "DELIVERY_LOG_DIR", "delivery_log"),
+                (in_flight_log, "OBSERVATIONS_DIR", "observations")]
+    before = [(module, name, getattr(module, name)) for module, name, _ in guarded]
+    for module, name, folder in guarded:
+        setattr(module, name, root / folder)
+    yield root
+    for module, name, value in before:
+        setattr(module, name, value)
+
+
+@pytest.fixture
+def real_committed_history(_committed_history_is_off_limits):
+    """Opt one test back on to the REAL committed trees, for READING.
+
+    The guard above is about writes and deletes, and redirecting
+    everything also hides the trees from the handful of tests whose
+    whole point is the real corpus - REQ-PIPE-058's collision gate, for
+    one, which reads the committed delivery log precisely so it can run
+    in CI without touching data/.
+
+    Deliberately not autouse and deliberately named: a test that wants
+    the real tree has to say so, which is the difference between an
+    exception and a hole.
+    """
+    from qa_tools.common import delivery_log, in_flight_log, load_log
+
+    root = delivery_log.ROOT
+    restore = [(load_log, "PROCESSING_LOG_DIR", load_log.PROCESSING_LOG_DIR),
+                (delivery_log, "DELIVERY_LOG_DIR", delivery_log.DELIVERY_LOG_DIR),
+                (in_flight_log, "OBSERVATIONS_DIR", in_flight_log.OBSERVATIONS_DIR)]
+    load_log.PROCESSING_LOG_DIR = root / "processing_log"
+    delivery_log.DELIVERY_LOG_DIR = root / "delivery_log"
+    in_flight_log.OBSERVATIONS_DIR = root / "observations" / "in_flight"
+    yield root
+    for module, name, value in restore:
+        setattr(module, name, value)
+
+
 @pytest.fixture(scope="session")
 def bdm_duckdb_dir(supply_db_path, bdm_raw_dir):
     """bdm_raw_dir's same two runs, staged into this worker's supply

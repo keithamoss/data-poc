@@ -228,3 +228,27 @@ def test_a_delivery_still_present_keeps_its_record_across_a_run(monkeypatch, tmp
     assert result.exit_code == 0, result.output
     assert (log_dir / "monday.json").exists(), \
         "a run that rewrote nothing must not take the record with it"
+
+
+def test_the_committed_history_trees_are_never_the_real_ones_in_a_test():
+    """The guard in conftest, asserted rather than trusted.
+
+    Six tests in this file invoke `pipeline run` without redirecting
+    anything, and that command prunes the delivery log against what is
+    on disk. On a freshly-cloned CI runner there is no `data/` at all,
+    so the honest answer to "which deliveries are present" is NONE and
+    every committed record would go. A test that merely passes is not
+    evidence the tree survived, which is why this asserts the
+    redirection itself.
+    """
+    from qa_tools.common import delivery_log, in_flight_log, load_log
+
+    root = delivery_log.ROOT
+    for module, name in ((load_log, "PROCESSING_LOG_DIR"),
+                          (delivery_log, "DELIVERY_LOG_DIR"),
+                          (in_flight_log, "OBSERVATIONS_DIR")):
+        current = getattr(module, name)
+        assert root not in current.parents and current != root, (
+            f"{module.__name__}.{name} points into the real repo at {current} - a test "
+            f"that writes there puts temporary names into permanent history, and a test "
+            f"that prunes there deletes it")

@@ -134,3 +134,65 @@ class TestWhichFilenamesEachDatasetClaims:
         assert result.exit_code == 0
         assert "birth-registrations" in result.output
         assert "cp_clients" in result.output
+
+
+class TestWhatWasActuallyLoaded:
+    """REQ-PIPE-060 criteria 12, 16 and 18, at the surface a person
+    reaches them through."""
+
+    @pytest.fixture(autouse=True)
+    def _log(self, tmp_path, monkeypatch):
+        from qa_tools.common import load_log
+        directory = tmp_path / "processing_log"
+        monkeypatch.setattr(load_log, "PROCESSING_LOG_DIR", directory)
+        return directory
+
+    def test_load_is_a_subcommand_of_the_supply_group(self):
+        """Criterion 12. A test of build_all() would pass with this
+        command unregistered, which is not the claim."""
+        assert "load" in supply_group.commands
+        assert "load" in CliRunner().invoke(cli, ["supply", "--help"]).output
+
+    def test_a_delivery_with_nothing_loaded_shows_as_partial(self, dirs):
+        _drop(dirs, "monday", {"cp_clients.csv": "a\n1\n"})
+        result = _run(["deliveries"])
+        assert result.exit_code == 0, result.output
+        assert "0/1" in result.output, (
+            "a recognised-but-unstaged delivery must not read the same as a healthy "
+            "one - that is the whole of criterion 16")
+
+    def test_a_fully_loaded_delivery_shows_as_complete(self, dirs, _log):
+        from qa_tools.common import arrivals, load_log, supply_db
+        _drop(dirs, "monday", {"cp_clients.csv": "a\n1\n"})
+        found = arrivals.recognise(delivery.survey().received[0])
+        for physical in supply_db.expected_tables(found, WHEN).values():
+            load_log.record("monday", "cp-clients", physical, load_log.LOADED,
+                             WHEN.isoformat(), log_dir=_log)
+        result = _run(["deliveries"])
+        assert result.exit_code == 0, result.output
+        assert "1/1" in result.output
+
+    def test_failures_lists_the_reason_and_says_nothing_when_there_are_none(self, _log):
+        from qa_tools.common import load_log
+
+        empty = _run(["failures"])
+        assert empty.exit_code == 0 and "No load is currently recorded as failed" in empty.output
+
+        load_log.record("monday", "cp-clients", "cp_clients__2026", load_log.FAILED,
+                         WHEN.isoformat(), reason="UnicodeDecodeError: byte 0x9c",
+                         log_dir=_log)
+        result = _run(["failures"])
+        assert result.exit_code == 0, result.output
+        assert "monday" in result.output
+        assert "UnicodeDecodeError" in result.output, (
+            "the reason IS the record's value - a queue that only says 'one failed' is "
+            "a queue nobody drains")
+
+    def test_a_failed_load_does_not_make_the_command_exit_non_zero(self, _log):
+        """A supply needing human action is an operational state, not a
+        broken tool - the same line every other command in this group
+        draws."""
+        from qa_tools.common import load_log
+        load_log.record("monday", "cp-clients", "cp_clients__2026", load_log.FAILED,
+                         WHEN.isoformat(), reason="bad csv", log_dir=_log)
+        assert _run(["failures"]).exit_code == 0

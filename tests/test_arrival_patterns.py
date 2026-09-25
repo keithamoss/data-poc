@@ -213,9 +213,14 @@ class TestTheConfigurationGate:
         line = validate_arrival_patterns.validate(log_dir=tmp_path / "nothing-here")
         assert "no delivery has been logged yet" in line
 
-    def test_the_real_corpus_is_the_committed_delivery_log(self):
+    def test_the_real_corpus_is_the_committed_delivery_log(self, real_committed_history):
         """The gate reads what REQ-PIPE-069 wrote, not data/ - which is
-        what lets it run in CI at all."""
+        what lets it run in CI at all.
+
+        One of the few tests that genuinely wants the REAL committed
+        tree, so it asks for it by name - conftest redirects those trees
+        for every other test, to stop a run writing into or pruning
+        project history."""
         line = validate_arrival_patterns.validate()
         assert "recorded filename(s)" in line, line
 

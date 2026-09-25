@@ -118,19 +118,22 @@ class TestBothFilesAreStagedAndNeitherIsReadable:
     remembering."""
 
     def test_two_files_stage_as_two_physical_tables(self):
-        assert supply_db.staged_table("t", "r", "a.csv") \
-            != supply_db.staged_table("t", "r", "b.csv")
+        # AN ORDINAL, not the supplier's filename: these become SQL
+        # identifiers, and DuckDB's parameter binding covers values,
+        # not identifiers (REQ-PIPE-060).
+        assert supply_db.staged_table("t", "r", 1) != supply_db.staged_table("t", "r", 2)
 
     def test_neither_resolves_to_the_logical_name(self, tmp_path, monkeypatch):
         monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(tmp_path / "s.duckdb"))
         conn = supply_db.connect()
         supply_db.ensure_schemas(conn)
-        for filename in ("a.csv", "b.csv"):
-            physical = supply_db.staged_table("birth_registrations", "run_001", filename)
+        for ordinal in (1, 2):
+            physical = supply_db.staged_table("birth_registrations", "run_001", ordinal)
             conn.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" '
                           "AS SELECT 1 AS id")
         res = supply_db.create_run_views(conn, "run_001", supply_db.candidates_in(
-            conn, supply_db.STAGING_SCHEMA, ["birth_registrations"], run_id="run_001"))
+            conn, supply_db.STAGING_SCHEMA, ["birth_registrations"],
+            arrival=supply_db.arrival_key("run_001")))
         assert res.resolved == {}
         assert len(res.ambiguous["birth_registrations"]) == 2
         with pytest.raises(duckdb.CatalogException):
@@ -144,11 +147,12 @@ class TestBothFilesAreStagedAndNeitherIsReadable:
         monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(tmp_path / "s.duckdb"))
         conn = supply_db.connect()
         supply_db.ensure_schemas(conn)
-        for filename, rows in (("a.csv", 1), ("b.csv", 7)):
-            physical = supply_db.staged_table("t", "run_001", filename)
+        for ordinal, rows in ((1, 1), (2, 7)):
+            physical = supply_db.staged_table("t", "run_001", ordinal)
             conn.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" '
                           f"AS SELECT * FROM range({rows})")
-        found = supply_db.candidates_in(conn, supply_db.STAGING_SCHEMA, ["t"], run_id="run_001")
+        found = supply_db.candidates_in(conn, supply_db.STAGING_SCHEMA, ["t"],
+                                         arrival=supply_db.arrival_key("run_001"))
         assert len(found["t"]) == 2
         conn.close()
 
