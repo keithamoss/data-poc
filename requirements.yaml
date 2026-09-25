@@ -9641,9 +9641,10 @@ requirements:
         In practice that makes the hold unreachable on a contiguous daily
         calendar where the filled slot is always the one being arrived into;
         it fires where the filled slot is NOT the current one, which is a
-        supply promoted out of order or a calendar with gaps. Worth Keith's
-        eye, because a branch that cannot fire is indistinguishable from one
-        that is wrong.
+        supply promoted out of order or a calendar with gaps. Put to Keith
+        because a branch that cannot fire is indistinguishable from one that
+        is wrong, and CONFIRMED BY HIM 2026-09-25: "that's spot on". The
+        reading is settled rather than assumed.
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     source: "Keith, delivery sprint 9, plans/supply-model.md Thread H first chaos pass #3 - monotonic filling - with its own named limit. Test scenario register TS-5, TS-6c. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
@@ -9821,7 +9822,60 @@ requirements:
       date: "2026-09-24"
     story: "As an operator, I want to be shown the filings the rule was not sure about and the supplies that landed on top of something already accepted, so that the two cases the rule genuinely cannot resolve reach a person while they are still cheap to correct."
     moscow: must
-    status: not_started
+    status: built
+    linked_tests:
+      - tests/test_landed_on_accepted.py
+      - tests/test_assignment.py
+    implemented_by:
+      - qa_tools/common/landed_on_accepted.py::report
+      - qa_tools/common/landed_on_accepted.py::may_auto_promote
+      - qa_tools/common/landed_on_accepted.py::LandedOnAccepted
+      - qa_tools/common/assignment.py::assign
+      - qa_tools/common/assignment.py::Assignment
+    unmet_criteria:
+      - criterion: >-
+          Criteria 2 and 8, in part - surfacing an ambiguous assignment for
+          review, and reporting both cases as warnings that do not stop
+          processing. The marks and the report are produced and tested; no
+          run emits them yet.
+        why: >-
+          Both need a filing to attach to, and REQ-PIPE-062's filings are
+          deliberately not recorded until promotion exists. The report also
+          needs to know WHEN a supply was accepted, which is promotion state
+          and has no source until batch 4. Built and unwired rather than
+          approximated from arrival state, which would report the wrong
+          instant.
+        owner: the promotion sprint (batch 4), with REQ-DASH-070 for the UI
+    evidence:
+      - >
+        2026-09-25: the ambiguity mark is tested against a CONTROL that must
+        NOT be marked - if every oldest-claimable assignment were flagged the
+        mark would carry no information at all - and against an on-time
+        assignment, which is never ambiguous.
+      - >
+        2026-09-25: a test of mine had criterion 1 backwards and the run
+        caught it. It expected ambiguity where the chosen slot WAS the oldest,
+        which can never have an earlier unfilled slot by construction. The
+        real case is a slot closed by monotonic filling sitting unfilled while
+        a later claimable one is taken - late for the later slot, or a
+        backfill for the closed one, and no rule can tell.
+      - >
+        2026-09-25: proximity is proved to be the explanation and not the
+        trigger by reporting the SAME arrival with and without an adjacent
+        window - both fire, and only the wording differs. That is the whole
+        reason the threshold version was rejected: any "within X" number is
+        arbitrary and a case just outside it slips through in silence.
+      - >
+        2026-09-25: criterion 6 tested directly - an arrival for a slot that
+        was never filled stays silent, so the ordinary repair path after a
+        rejection does not become wallpaper.
+      - >
+        2026-09-25: criterion 9 exists as a real function rather than as prose
+        in a sprint-11 requirement, and a test asserts it cannot see the new
+        supply's own status - otherwise it could be talked into promoting a
+        green duplicate over data already accepted. That carve-out went
+        missing once already as an IOU against work that did not exist.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     source: "Keith's own proposal, 2026-09-21, plans/supply-model.md Thread E - 'arrival into an already-filled slot: warn, and never auto-promote' - plus the ambiguous-assignment default in the same thread. Test scenario register TS-4, TS-1's tail, TS-3a and TS-3c. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
       - "WHERE a supply is assigned to the oldest claimable unfilled slot while an earlier slot for the same dataset is also unfilled, THE SYSTEM SHALL mark that assignment as made under ambiguity."

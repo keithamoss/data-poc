@@ -525,6 +525,13 @@ releases:
     changes:
       - category: Fixed
         items:
+          - headline: A guess now looks like a guess
+            components: ["Pipeline & publishing"]
+            description: >
+              Where the pipeline had to choose between a late delivery
+              and an early one, it now says the filing was a guess
+              instead of presenting it as settled, and flags it for
+              someone to check while it is still cheap to correct.
           - headline: Agency cards line up again
             components: ["Dashboard UI"]
             description: >

@@ -103,6 +103,14 @@ class Assignment:
     branch: str
     considered: tuple[str, ...]
     resupply_of: str | None = None
+    #: An assignment the rule made but could not be sure of
+    #: (REQ-PIPE-065 criterion 1): it took the oldest claimable
+    #: unfilled slot while an EARLIER slot for the same dataset was
+    #: also unfilled, so the supply might have been for that one. It
+    #: defaults BACKWARD because late is commoner than early, and says
+    #: so rather than presenting the guess as certain.
+    ambiguous: bool = False
+    ambiguity: str | None = None
     #: For a HELD supply: why each slot it looked at was unavailable
     #: (REQ-PIPE-064 criterion 4). A hold that says only "no slot"
     #: tells a person nothing they can act on, and acting on it is the
@@ -134,7 +142,8 @@ class Assignment:
         return {"dataset_id": self.dataset_id, "supply_id": self.supply_id,
                 "slot": self.slot, "branch": self.branch,
                 "considered": list(self.considered), "resupply_of": self.resupply_of,
-                "unavailable": [list(pair) for pair in self.unavailable]}
+                "unavailable": [list(pair) for pair in self.unavailable],
+                "ambiguous": self.ambiguous, "ambiguity": self.ambiguity}
 
 
 def current_slot(slots: Sequence[slots_mod.Slot], at: datetime) -> slots_mod.Slot | None:
@@ -248,9 +257,24 @@ def assign(dataset_id: str, supply_id: str, at: datetime,
     if oldest is not None:
         if oldest.name not in considered:
             considered.append(oldest.name)
+        # MARKED WHERE IT CANNOT BE SURE (REQ-PIPE-065 criterion 1). An
+        # arrival while a PRIOR slot is also unfilled cannot be told
+        # apart from a late one by any rule, so it defaults backward -
+        # late is commoner than early - and says that it guessed. The
+        # alternative is presenting a guess as certain, which is a
+        # false-confidence problem rather than a missing nicety.
+        earlier = [s.name for s in slots
+                    if s.name != oldest.name and s.due_at < oldest.due_at
+                    and s.name not in filled]
         return Assignment(dataset_id=dataset_id, supply_id=supply_id,
                            slot=oldest.name, branch=OLDEST_CLAIMABLE,
-                           considered=tuple(considered))
+                           considered=tuple(considered),
+                           ambiguous=bool(earlier),
+                           ambiguity=(
+                               f"filed to {oldest.name}, but {', '.join(earlier)} "
+                               f"{'is' if len(earlier) == 1 else 'are'} also unfilled - a late "
+                               f"supply and an early one look identical here, so this defaulted "
+                               f"backward and needs review" if earlier else None))
 
     # 3. A RESUPPLY of the most recently filled slot - but only where
     #    that slot is the one the arrival is actually IN. This is the
