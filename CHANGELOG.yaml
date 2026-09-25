@@ -133,6 +133,17 @@ releases:
               counted as healthy. Every figure is now counted in its own
               right, and the two quiet states appear in the key with
               their own totals whenever they are real.
+          - headline: A column with no quality rule now says so instead of showing green
+            components: ["Dashboard UI", "QA checks & contract"]
+            description: >
+              Eleven columns across the Child Protection datasets have no
+              automated rule defined. Each showed a green tick, with the
+              explanation buried four clicks away in the check panel — so
+              a column nobody checks looked exactly like one that had
+              passed, and in three cases turned a whole table-level
+              section green on its own. They now read "No rule defined"
+              in a disabled grey at every level. It is not a verdict: it
+              neither drags a dataset down nor lifts it up.
           - headline: The dashboard warns you before a delivery calendar runs out
             components: ["Dashboard UI", "Pipeline & publishing"]
             description: >

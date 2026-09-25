@@ -320,13 +320,22 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                 # in the whole app relying on the warn/fail fallback, and
                 # a fallback with exactly one synthetic caller is a trap,
                 # not a safety net: it keeps three status implementations
-                # alive to serve data this file makes up. "No rule
-                # defined" is a real gap, honestly labelled in `note` -
-                # it is not a failure, so green is the truthful answer.
+                # alive to serve data this file makes up.
+                #
+                # `inactive`, NOT green (post-build-review #4, Keith's
+                # own direction: "a grey, as in a disabled kind of grey
+                # colour - kind of speaks to it's inactive"). The old
+                # comment here argued green was truthful BECAUSE the gap
+                # was labelled in `note` - and `note` renders in exactly
+                # one place, the check panel. So at every level a reader
+                # actually looks, an unchecked column read as a healthy
+                # one, and a table-scope placeholder rolled a whole
+                # section to green on its own. Green is a VERDICT, and
+                # nothing was checked here.
                 "dimension": "", "unit": "count", "warn": None, "fail": None,
-                "current": 0, "current_status": "green", "previous": 0,
+                "current": 0, "current_status": "inactive", "previous": 0,
                 "history": [{"run_id": m["run_id"], "run_date": _run_date(m), "value": 0,
-                             "status": "green"} for m in manifest],
+                             "status": "inactive"} for m in manifest],
                 "note": "Neither the ODCS contract nor the Soda/dbt check files define a rule for this "
                         "column today — this is a real gap, not a hidden failure.",
             }]

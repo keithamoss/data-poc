@@ -23,7 +23,8 @@ from pathlib import Path
 
 import pytest
 
-from qa_tools.common.dataset_status import (
+from qa_tools.common.dataset_status import (  # noqa: I001
+    rollup_statuses,
     CHECK_STATUSES,
     dashboard_status,
     DATASET_STATUSES,
@@ -112,6 +113,21 @@ class TestEveryRollupCase:
     def test_it_refuses_rather_than_returning_green(self, case):
         with pytest.raises(UnknownStatusError):
             worst_of(case["statuses"])
+
+
+class TestEveryDatasetRollupCase:
+    """The FILTERING rollup, as opposed to the ordering one above.
+
+    Added 2026-09-25 with `inactive` (post-build-review #4). This side
+    had no equivalent at all - `dataset_status()` called `worst_of()`
+    directly, so the first check carrying a status with no verdict
+    would have raised inside the GitHub Issues automation.
+    """
+
+    @pytest.mark.parametrize("case", CASES["dataset_rollup_cases"]["cases"],
+                             ids=_ids(CASES["dataset_rollup_cases"]["cases"]))
+    def test_it_returns_what_the_table_says(self, case):
+        assert rollup_statuses(case["statuses"]) == case["expect"], case["why"]
 
 
 class TestEveryRetiredCase:

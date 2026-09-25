@@ -178,6 +178,20 @@ button{font:inherit; color:inherit;}
    by colour alone - the label says "Schedule ended" in words. */
 .pill.exhausted{background:var(--surface-alt); color:var(--ink); border:1.5px solid var(--ink-muted);}
 .pill.exhausted .ico{background:var(--ink-muted); border-radius:1px;}
+/* NO RULE DEFINED - post-build-review #4, Keith's own direction: "a
+   grey, as in a disabled kind of grey colour - kind of speaks to it's
+   inactive". A DISABLED grey rather than a quiet one, and the
+   difference from .pill.nodata is deliberate: nodata is a temporary
+   absence that may resolve itself tomorrow, this is a standing fact
+   about the configuration. Hence the struck-through marker and the
+   flat, unsaturated fill a reader already reads as "switched off".
+   Never distinguished by colour alone - the label says "No rule
+   defined" in words. */
+.pill.inactive{background:var(--surface-alt); color:var(--ink-muted); border:1px solid var(--ink-faint); opacity:.85;}
+.pill.inactive .ico{background:transparent; border:1.5px solid var(--ink-muted); border-radius:50%;
+  position:relative;}
+.pill.inactive .ico::after{content:""; position:absolute; left:-1px; right:-1px; top:50%;
+  height:1.5px; background:var(--ink-muted); transform:rotate(-45deg);}
 /* Running LOW, not run out - a different state from .notice-exhausted
    and deliberately quieter than it, since nothing has failed and
    nothing is unprocessable yet (post-build-review #2). */
@@ -218,6 +232,10 @@ button{font:inherit; color:inherit;}
    three colours plus two footnotes. */
 .legend-key i.nodata{background:var(--ink-faint); border-radius:2px;}
 .legend-key i.exhausted{background:var(--ink-muted); border-radius:2px;}
+/* Hollow, not filled - the swatch for "switched off" should not look
+   like a colour in the same family as the verdicts (#4). */
+.legend-key i.inactive{background:transparent; border:1.5px solid var(--ink-muted);
+  border-radius:50%;}
 
 /* ============ Plans tab (running-thoughts.md #10) ============ */
 .plans-filterbar{margin-top:16px; padding:14px; background:var(--surface-alt); border:1px solid var(--line); border-radius:var(--radius-md);}
@@ -891,7 +909,7 @@ function fmtMetric(x, unit){
 // all read green.
 const STATUS_ORDER = {nodata:-1, green:0, amber:1, red:2};
 const STATUS_LABEL = {nodata:"No data", green:"Green", amber:"Amber", red:"Red",
-                       exhausted:"Schedule ended"};
+                       exhausted:"Schedule ended", inactive:"No rule defined"};
 // REQ-QAC-047. The vocabulary above and its Python twin in
 // qa_tools/common/dataset_status.py are held to the SAME committed table
 // - status-cases.json at the repo root, read by tests-js/
@@ -900,13 +918,27 @@ const STATUS_LABEL = {nodata:"No data", green:"Green", amber:"Amber", red:"Red",
 // already does. That is what stops the two drifting the way they did in
 // plans/qa-pipeline.md item 74, where the drift rendered a check with 14
 // real violations green.
-const UNORDERED_STATUSES = ["exhausted"];
+// `inactive` joins `exhausted` OUTSIDE the ordering, and for the same
+// reason rather than by analogy: a column with no rule defined has not
+// passed anything, so it cannot be ranked against verdicts without
+// inventing a position nobody agreed. Ranking it low makes it lose
+// every rollup and vanish; ranking it high makes an unasked question
+// outrank a real failure. Both are wrong, so it is surfaced by
+// rollupStatuses() explicitly instead (post-build-review #4).
+const UNORDERED_STATUSES = ["exhausted", "inactive"];
 // Recognition is scoped to WHERE a status was read from. `exhausted` is
 // a property of a dataset's SCHEDULE - a check result carrying one means
 // something upstream wrote a dataset-level status onto a check, and a
 // flat vocabulary would render that bug rather than report it.
-const CHECK_STATUSES = Object.keys(STATUS_ORDER);
-const DATASET_STATUSES = CHECK_STATUSES.concat(UNORDERED_STATUSES);
+// A check MAY carry `inactive` - unlike `exhausted`, it is a property
+// of the check itself (there is no rule) rather than of the dataset's
+// schedule, so a check result carrying one is correct rather than a
+// symptom of something upstream writing at the wrong level.
+const CHECK_STATUSES = Object.keys(STATUS_ORDER).concat(["inactive"]);
+// Deduped: `inactive` is in both lists on purpose - it is a valid
+// CHECK status and an unordered one - so a plain concat would list it
+// twice and the shared table's own vocabulary case would catch it.
+const DATASET_STATUSES = [...new Set(CHECK_STATUSES.concat(UNORDERED_STATUSES))];
 // Fails rather than guessing, and that is the whole point. The previous
 // behaviour returned ANY truthy recorded status, so an unrecognised one
 // passed straight out to a rollup that could not order it -
@@ -1286,7 +1318,10 @@ function buildRealDataset(d){
   // "no red amber and greens... but I should still be able to see the
   // historical graphs and comparison stuff" - the aggregate-level pills
   // go neutral, the drill-down data underneath doesn't).
-  columns.forEach(c=> c.status = d.staleAsOf ? "nodata" : worstOf(c.checks.filter(ck=>!ck.retired).map(checkStatus)));
+  // rollupStatuses, not worstOf: a check may carry `inactive`, which
+  // worstOf refuses to rank - correctly - and which this has to turn
+  // into a column status rather than throw on (post-build-review #4).
+  columns.forEach(c=> c.status = d.staleAsOf ? "nodata" : rollupStatuses(c.checks.filter(ck=>!ck.retired).map(checkStatus)));
 
   const arrivalHistory = d.arrivalHistory.map((a,i)=>({ idx:i, date: toDate(a.run_date), arrivalStatus: a.arrivalStatus }));
 
@@ -1693,7 +1728,10 @@ function rollup(datasets){
     if(datasets.some(d=>d.scheduleExhausted)) return "exhausted";
     return datasets.length ? "nodata" : "green";
   }
-  return worstOf(live.map(d=> worstOf(d.columns.map(c=>c.status))));
+  // Both levels roll rather than order, for the same reason: a column
+  // whose only check has no rule is `inactive`, and a collection of
+  // those is inactive rather than green (post-build-review #4).
+  return rollupStatuses(live.map(d=> rollupStatuses(d.columns.map(c=>c.status))));
 }
 // Same "don't let nodata silently win OR silently vanish" logic as
 // rollup() above, one level up (collections -> agency) - a collection's
@@ -1702,11 +1740,25 @@ function rollup(datasets){
 // that surface (STATUS_ORDER.nodata is below green, so it can only ever
 // lose a reduce that starts from "green").
 function rollupStatuses(statuses){
-  const live = statuses.filter(s=> s!=="nodata" && s!=="exhausted");
+  const live = statuses.filter(s=> s!=="nodata" && s!=="exhausted" && s!=="inactive");
   if(!live.length){
+    // THE QUIET STATES, IN ORDER OF WHAT A READER CAN DO ABOUT THEM.
+    // An ended schedule is why nothing is happening at all, so it stays
+    // the headline. `inactive` comes next: "nobody defined a rule" is a
+    // standing fact somebody can act on, where `nodata` is temporal and
+    // may resolve itself tomorrow.
     if(statuses.includes("exhausted")) return "exhausted";
+    // post-build-review #4. Without this line a section whose only
+    // check is a placeholder rolls up GREEN - which is precisely the
+    // false green that finding is about, since green was the
+    // placeholder's own recorded status and nothing above the check
+    // panel distinguished "no rule" from "rule passed".
+    if(statuses.includes("inactive")) return "inactive";
     return statuses.length ? "nodata" : "green";
   }
+  // Note what this does NOT do: an inactive column sitting beside real
+  // ones contributes nothing at all. It must not drag a dataset down -
+  // nothing is failing - and must not lift it either.
   return worstOf(live);
 }
 
@@ -1909,7 +1961,7 @@ function buildData(asOfDateStr){
           ds.status = "exhausted";
           col.exhaustedCount++; ag.exhaustedCount++;
         } else if(!ds.noDataAsOf){
-          ds.status = worstOf(ds.columns.map(c=>c.status));
+          ds.status = rollupStatuses(ds.columns.map(c=>c.status));
         }
       });
       col.status = rollup(col.datasets);
@@ -2721,7 +2773,11 @@ function renderExec(view){
   // "(0)" counters would be furniture on the ordinary page, and this
   // legend is also the page's own statement of its colour language -
   // which named three statuses while the vocabulary has five.
-  const quietKeys = ["nodata","exhausted"]
+  // `inactive` joins the quiet states that appear in the legend only
+  // when they are real (post-build-review #4, and #56 on the legend
+  // naming three of five). Listing a state nobody is in is noise; not
+  // naming one somebody IS in is the thing the legend exists to stop.
+  const quietKeys = ["nodata","exhausted","inactive"]
     .filter(s=> agencyCount(s) > 0)
     .map(s=> `<span><i class="${s}"></i>${STATUS_LABEL[s]} (${agencyCount(s)})</span>`)
     .join("");

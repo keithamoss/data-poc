@@ -1815,3 +1815,87 @@ class TestTheLowRunwayWarningIsOnThePage:
         _goto(clean_page, built_dashboard_html)
         text = clean_page.locator(".notice-runway").first.inner_text().lower()
         assert "nothing has failed" in text or "not failing" in text
+
+
+class TestAnUncheckedColumnSaysSoAtEveryLevel:
+    """post-build-review #4, signed off 2026-09-25 with Keith's own
+    direction: "a grey, as in a disabled kind of grey colour - kind of
+    speaks to it's inactive".
+
+    A column with no rule defined got a synthesised placeholder check
+    whose recorded status was GREEN, with the honest explanation in a
+    `note` that renders in exactly one place - the check panel, four
+    clicks deep. So at every level a reader actually looks, an unchecked
+    column read as a healthy one, and a table-scope placeholder rolled a
+    whole "Table-level checks" section to green on its own.
+
+    Eleven of these exist across the seven real datasets. At thirty
+    datasets the critic called it the most likely thing in the whole
+    review to become a real false-green incident.
+    """
+
+    STATE = {"tier": "dataset", "agencyId": "child-protection-family-support",
+             "collectionId": "child-protection", "datasetId": "cp-clients"}
+
+    def test_no_placeholder_still_claims_to_be_green(self, clean_page,
+                                                      built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        wrong = clean_page.evaluate("""() => {
+            const out = [];
+            (DATA.agencies||[]).forEach(ag => ag.collections.forEach(col =>
+              col.datasets.forEach(ds => (ds.columns||[]).forEach(c =>
+                (c.checks||[]).forEach(ck => {
+                  if(ck.key === "no_rule_defined" && ck.current_status !== "inactive")
+                    out.push(`${ds.id}.${c.name}=${ck.current_status}`);
+                })))));
+            return out;
+        }""")
+        assert wrong == [], wrong
+
+    def test_the_column_tile_reads_inactive_rather_than_green(self, clean_page,
+                                                               built_dashboard_html):
+        """The level the reader actually looks at."""
+        _goto(clean_page, built_dashboard_html, state=self.STATE)
+        status = clean_page.evaluate("""() => {
+            const ds = DATA.agencies.find(a=>a.id==="child-protection-family-support")
+              .collections.find(c=>c.id==="child-protection")
+              .datasets.find(d=>d.id==="cp-clients");
+            const col = ds.columns.find(c=>c.name==="extract_timestamp");
+            return rollupStatuses((col.checks||[]).map(checkStatus));
+        }""")
+        assert status == "inactive", (
+            f"a column with no rule defined rolls up as {status!r}")
+
+    def test_a_table_scope_section_of_placeholders_is_not_green(self, clean_page,
+                                                                 built_dashboard_html):
+        """The critic's specific observation: a table-scope placeholder
+        rolling a whole section to green on its own."""
+        _goto(clean_page, built_dashboard_html, state=self.STATE)
+        status = clean_page.evaluate("""() => {
+            const ds = DATA.agencies.find(a=>a.id==="child-protection-family-support")
+              .collections.find(c=>c.id==="child-protection")
+              .datasets.find(d=>d.id==="cp-clients");
+            const col = ds.columns.find(c=>/table/i.test(c.name));
+            return col ? rollupStatuses((col.checks||[]).map(checkStatus)) : "no-such-column";
+        }""")
+        assert status == "inactive", status
+
+    def test_an_inactive_column_does_not_drag_its_dataset_down(self, clean_page,
+                                                                built_dashboard_html):
+        """The constraint the finding stated: it must not win a worstOf
+        against a real verdict, in either direction."""
+        _goto(clean_page, built_dashboard_html, state=self.STATE)
+        same = clean_page.evaluate("""() => {
+            const ds = DATA.agencies.find(a=>a.id==="child-protection-family-support")
+              .collections.find(c=>c.id==="child-protection")
+              .datasets.find(d=>d.id==="cp-clients");
+            const all = ds.columns.map(c=> rollupStatuses((c.checks||[]).map(checkStatus)));
+            const real = all.filter(s=> s !== "inactive");
+            return rollupStatuses(all) === rollupStatuses(real);
+        }""")
+        assert same, "the inactive columns changed the dataset's own status"
+
+    def test_the_pill_is_labelled_in_words_not_only_by_colour(self, clean_page,
+                                                              built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, state=self.STATE)
+        assert clean_page.evaluate("() => STATUS_LABEL.inactive") == "No rule defined"

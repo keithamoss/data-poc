@@ -66,7 +66,13 @@ ORDERED_STATUSES = {"nodata": -1, "green": 0, "amber": 1, "red": 2}
 # up status, never through it. Asked to order one, worst_of() fails,
 # because the only two honest answers are "throw" and "green", and green
 # is how item 74 happened.
-UNORDERED_STATUSES = {"exhausted"}
+# `inactive` joins `exhausted` here for the same reason rather than by
+# analogy: a column with no rule defined has not passed anything, so
+# ranking it against verdicts invents a position nobody agreed. Low, and
+# it loses every rollup and vanishes; high, and an unasked question
+# outranks a real failure (post-build-review #4). rollup_statuses()
+# below is where a caller handles it explicitly instead.
+UNORDERED_STATUSES = {"exhausted", "inactive"}
 
 RECOGNISED_STATUSES = set(ORDERED_STATUSES) | UNORDERED_STATUSES
 
@@ -76,7 +82,11 @@ RECOGNISED_STATUSES = set(ORDERED_STATUSES) | UNORDERED_STATUSES
 # carrying it means something upstream wrote a dataset-level status onto
 # a check. A flat vocabulary would render that bug instead of reporting
 # it.
-CHECK_STATUSES = set(ORDERED_STATUSES)
+# A check MAY carry `inactive` - unlike `exhausted`, it is a property of
+# the check itself (no rule is defined for it) rather than of the
+# dataset's schedule, so a check result carrying one is correct rather
+# than a symptom of something upstream writing at the wrong level.
+CHECK_STATUSES = set(ORDERED_STATUSES) | {"inactive"}
 DATASET_STATUSES = RECOGNISED_STATUSES
 
 # Retained under its original name because callers outside this module
@@ -160,6 +170,40 @@ _DASHBOARD_STATUS_BY_TOOL_STATUS = {
 }
 
 
+#: Quiet states in order of what a reader can do about them. An ended
+#: schedule is why nothing is happening at all, so it stays the
+#: headline; "nobody defined a rule" is a standing fact somebody can act
+#: on; "no run within tolerance as of this date" is temporal and may
+#: resolve itself tomorrow.
+_QUIET_PRECEDENCE = ("exhausted", "inactive", "nodata")
+
+
+def rollup_statuses(statuses) -> str:
+    """Roll a column or dataset up, quiet states included.
+
+    THE DIFFERENCE FROM `worst_of` IS THE WHOLE REASON THIS EXISTS.
+    `worst_of` orders, and refuses anything it cannot order. This first
+    decides what to do with the statuses that carry no verdict at all:
+    a status carrying no verdict never competes with one that does, and
+    never disappears either.
+
+    The dashboard has had this as `rollupStatuses()` since the quiet
+    states were introduced; THIS SIDE DID NOT, and `dataset_status()`
+    called `worst_of()` directly - so the first check carrying
+    `inactive` would have raised inside the GitHub Issues automation
+    (post-build-review #4). Held to the same committed table as its
+    twin, `status-cases.json`'s `dataset_rollup_cases`.
+    """
+    statuses = list(statuses)
+    live = [s for s in statuses if s not in _QUIET_PRECEDENCE]
+    if live:
+        return worst_of(live)
+    for quiet in _QUIET_PRECEDENCE:
+        if quiet in statuses:
+            return quiet
+    return "green"
+
+
 def dashboard_status(tool_status: str | None) -> str | None:
     """Maps a real tool verdict onto the dashboard's own green/amber/red
     vocabulary. None for anything unrecognised (or absent), so callers
@@ -237,7 +281,10 @@ def dataset_status(dataset: dict) -> str:
     "retired" the same way the dashboard treats it: `retired_as_of` is
     set (a real, hand-authored declaration, never inferred from
     absence)."""
-    return worst_of(
+    # rollup_statuses rather than worst_of: a check may now carry a
+    # status with no verdict (`inactive`), which worst_of refuses to
+    # rank - correctly. See that function's own docstring.
+    return rollup_statuses(
         dashboard_status_of(ck, "current", "current_status", ck["warn"], ck["fail"])
         for col in dataset.get("columns", [])
         for ck in col.get("checks", [])

@@ -730,7 +730,7 @@ post-build critic should see a requirement's own `evidence:`.
    (Keith's own sighting that the dashboard should display Perth time,
    not UTC) - they are the same subject arriving from two directions.
 
-4. **[todo, 2026-09-24]** **[Dashboard UI, QA checks & contract]**
+4. **[done, 2026-09-25]** **[Dashboard UI, QA checks & contract]**
    **[F4] The "No automated quality rule defined" placeholder reads as
    a passing check at every level a reader actually looks.** Its honest
    label is four clicks deep; everywhere above that, an unchecked
@@ -786,6 +786,63 @@ post-build critic should see a requirement's own `evidence:`.
    UP to. It must not win a `worstOf()` against a real verdict, and it
    must not silently vanish either - which is precisely the shape
    already settled for `nodata`.
+
+   **DONE 2026-09-25, and here is the answer to that question.**
+
+   `inactive` is **outside the ordering**, with `exhausted`, rather
+   than given a number. Both available numbers are wrong: low and it
+   loses every rollup and vanishes; high and an unasked question
+   outranks a real failure. So `worstOf`/`worst_of` REFUSE it, and the
+   filtering rollup handles it explicitly - a status carrying no
+   verdict never competes with one that does, and never disappears
+   either. Quiet-state precedence is `exhausted` > `inactive` >
+   `nodata`, ordered by what a reader can act on: an ended schedule is
+   why nothing is happening at all; "nobody wrote a rule" is a standing
+   fact; "no run within tolerance as of this date" is temporal and may
+   resolve itself tomorrow.
+
+   **The Python twin had no filtering rollup at all** - `dataset_status()`
+   called `worst_of()` directly, so the first check carrying `inactive`
+   would have raised inside the GitHub Issues automation. It has
+   `rollup_statuses()` now, held to a new `dataset_rollup_cases`
+   section of the shared table, because that behaviour is genuinely
+   different from ordering and both sides need it.
+
+   **Three consumers, found the hard way and worth recording** - this
+   is `CLAUDE.md`'s own "enumerate every consumer mechanically" lesson
+   arriving again:
+   - `pipeline/dashboard_check_labels.py`'s `status_rank()` indexed
+     `STATUS_ORDER` directly and took the whole dashboard build down
+     with a `KeyError`. That was the RIGHT failure - loud, at build
+     time - and it now ranks an unorderable status below everything,
+     locally, for headline sorting only.
+   - Three `worstOf()` call sites in the template (`buildRealDataset`,
+     `rollup`, and the exec-tier dataset loop) could all now receive
+     one. All three roll rather than order.
+
+   **My first attempt at the shared table was wrong and the harness
+   caught it**: I wrote the filtering behaviour as `rollup_cases`,
+   which drive `worstOf` - the ordering function - so they asserted
+   that an unorderable status returns a value. The cases are split
+   correctly now.
+
+   **A reporting gap found alongside**, not fixed: when a test in
+   `tests-js/status-parity.test.js` fails, Vitest's own stack-trace
+   reader hits an `EISDIR` and the remaining tests in that file never
+   report. It surfaced as "35 passed (42)" with one failure and seven
+   tests unaccounted for. Not silent - the failure was reported - but
+   a run that says 42 and measures 35 is worth knowing about.
+
+   **Verified against the real built page**, not a fixture: all eleven
+   placeholders now read `inactive`, both table-scope sections roll up
+   `inactive` rather than green, and the inactive columns provably do
+   not change their dataset's own status in either direction.
+
+   **What this does NOT fix, stated plainly:** a dataset whose columns
+   are ALL inactive still rolls up `inactive`, which is right - but the
+   sibling case `worst_of(["nodata"]) === "green"` remains the pinned
+   false green of #45, and sprint 17 still owns it. Adding a third
+   quiet state does not change that, and deliberately did not try to.
 
 5. **[done, 2026-09-24]** **[Dashboard UI]** **[F5] An uncaught
    `TypeError` on three of seven datasets, at the DEFAULT as-of, on an

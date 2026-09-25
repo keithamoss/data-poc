@@ -72,10 +72,27 @@ def status_rank(current, warn, fail, status: str | None = None) -> int:
     """0 = green, 1 = amber, 2 = red, for sorting. Thin wrapper over the
     canonical rule - the real tool verdict wins where one exists,
     threshold math is the fallback, and a None bound means "no bound of
-    that kind", never zero."""
-    return STATUS_ORDER[dashboard_status_of(
+    that kind", never zero.
+
+    A STATUS WITH NO VERDICT SORTS BELOW EVERYTHING, which is the one
+    thing `STATUS_ORDER` cannot answer: `inactive` is deliberately
+    outside the ordering (post-build-review #4), so indexing it raised a
+    KeyError and took the whole dashboard build down. That was the right
+    failure - loud, at build time - but this function's job is to put
+    checks in an order for a HEADLINE, and "there is no rule for this
+    column" belongs at the bottom of that list rather than anywhere in
+    it. Ranked here, locally, rather than by giving `inactive` a number
+    in the shared vocabulary, which is exactly the invented ordering
+    that vocabulary refuses.
+    """
+    resolved = dashboard_status_of(
         {"current": current, "current_status": status}, "current", "current_status", warn, fail
-    )]
+    )
+    return STATUS_ORDER.get(resolved, _UNRANKED)
+
+
+#: Below nodata's -1, so a check carrying no verdict at all sorts last.
+_UNRANKED = -2
 
 
 def rank_for_headline(checks_out: list[dict]) -> None:

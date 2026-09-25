@@ -114,6 +114,20 @@ describe("every rollup case", () => {
   }
 });
 
+// The FILTERING rollup, as opposed to the ordering one above. Added
+// 2026-09-25 with `inactive` (post-build-review #4): a status carrying
+// no verdict never competes with one that does, and never disappears
+// either - which worst_of() cannot express, because it refuses to rank
+// them at all.
+describe("every dataset rollup case", () => {
+  for (const c of CASES.dataset_rollup_cases.cases) {
+    it(`${c.id} returns what the table says`, () => {
+      const w = load();
+      expect(w.rollupStatuses(c.statuses), c.why).toBe(c.expect);
+    });
+  }
+});
+
 describe("every retired case", () => {
   for (const c of CASES.retired_cases) {
     it(`${c.id} matches the table's filtering rule`, () => {
