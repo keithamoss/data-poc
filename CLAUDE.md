@@ -590,6 +590,14 @@ Rough layout:
   #59). Worth knowing for anyone reading a red e2e result late in a
   UTC day: check whether the assertion depends on an ambient date
   before reading it as a regression.
+  -> **~174s/1407 tests (2026-09-25, REQ-DASH-071)**. Up ~42s on 171
+  more tests, and that is where the growth went - no new hot spot. Most
+  of the new ones are real-browser e2e, which costs far more per test
+  than the rest of the suite: one class alone walks all seven dataset
+  pages in a real Chromium, and another deliberately waits fifteen
+  seconds to prove the masthead does NOT tick. JS suite 294 tests in
+  ~19s.
+
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.

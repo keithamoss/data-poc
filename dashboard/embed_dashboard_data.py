@@ -299,6 +299,15 @@ def embed() -> None:
     html = _replace_const(html, "ASSET_TIMEZONE",
                            json.dumps(str(asset_time.asset_timezone().key)))
     print(f"Re-embedded ASSET_TIMEZONE = {asset_time.asset_timezone().key}")
+
+    # BUILT_AT - REQ-DASH-071 criterion 13. When THIS page was built,
+    # which only the build knows. The masthead used to count seconds up
+    # from a hardcoded 4, so what a reader saw was the age of their own
+    # browser tab rather than the age of the data
+    # (plans/post-build-review.md #60).
+    built_at = asset_time.now()
+    html = _replace_const(html, "BUILT_AT", json.dumps(built_at.isoformat()))
+    print(f"Re-embedded BUILT_AT = {built_at.isoformat()}")
     print(f"Re-embedded HIERARCHY = {len(tree['agencies'])} agenc(ies), "
           f"{sum(len(a['collections']) for a in tree['agencies'])} collection(s), "
           f"{len(hierarchy.all_datasets())} dataset(s)")

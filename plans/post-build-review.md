@@ -730,9 +730,13 @@ post-build critic should see a requirement's own `evidence:`.
      notices about one calendar is the repetition the once-per-calendar
      rule exists to prevent.
 
-3. **[todo, 2026-09-24]** **[Dashboard UI]** **[F3] Every date on the
+3. **[done, 2026-09-25]** **[Dashboard UI]** **[F3] Every date on the
    page renders in the VIEWER's timezone, not the asset's.** For any
    viewer west of UTC the displayed date is a day early, silently.
+
+   **BUILT by `REQ-DASH-071`, 2026-09-25**, together with #51 and #60 -
+   they are one subject arriving from four directions, and the
+   requirement's own `decisions:` is where the thinking now lives.
 
    **Verified.** `fmtDate()` (template:764) and `fmtDateShort()` (:765)
    are bare `toLocaleDateString("en-US", …)` with no `timeZone` option,
@@ -1249,9 +1253,17 @@ post-build critic should see a requirement's own `evidence:`.
     all, which is its own latent risk - the first test written here
     asserts it renders with no console error for exactly that reason.
 
-14. **[todo, 2026-09-24]** **[Dashboard UI]** **[U7] The asset's own
+14. **[done, 2026-09-25]** **[Dashboard UI]** **[U7] The asset's own
     timezone is configured, and the page still shows two zones side by
-    side.** A dataset page reads `SLA: … by 09:00 AWST` next to
+    side.**
+
+    **BUILT by `REQ-DASH-071`, 2026-09-25.** Both halves: the arrival is
+    now a real instant on the asset's clock, and the hardcoded `" AWST"`
+    is gone from `cadenceLabel()` - it was the last thing on the page
+    naming a clock. `expected_time` keeps its written `14:00` form,
+    because it is a deadline echoed out of `contract/*.yaml` rather than
+    an instant (criterion 8).
+ A dataset page reads `SLA: … by 09:00 AWST` next to
     `Latest arrival: 01:00 UTC`, leaving the reader to convert in their
     head to answer "did it meet the deadline". Both strings are
     hardcoded: `cadenceLabel()` writes `"AWST"` literally, and
@@ -3100,8 +3112,14 @@ twice. It deliberately did not re-find the `TypeError`.
     rather than reading the declaration, for the reason this finding
     exists.
 
-51. **[todo, 2026-09-24]** **[Dashboard UI]** **[V8/V9] `REQ-PIPE-048`'s
+51. **[done, 2026-09-25]** **[Dashboard UI]** **[V8/V9] `REQ-PIPE-048`'s
     stored offsets reach two render sites, and neither handles them.**
+
+    **BUILT by `REQ-DASH-071`, 2026-09-25.** Keith took the first of the
+    three options below - one formatter, every user-facing instant on the
+    asset's clock, its own requirement. Both sites now call it, the stale
+    comment is rewritten, and a real-browser test walks all seven dataset
+    pages looking for exactly the raw shape this entry counted 43 of.
 
     **Verified in the real built data and the real template, and this
     resolves a puzzle the two dashboard critics each saw half of.** One
@@ -3455,9 +3473,17 @@ twice. It deliberately did not re-find the `TypeError`.
 
 ### Found by this session, not by a critic
 
-60. **[todo, 2026-09-25]** **[Dashboard UI]** **The masthead's
+60. **[done, 2026-09-25]** **[Dashboard UI]** **The masthead's
     "Live" clock measures nothing at all, and says the data was updated
     when it was not.**
+
+    **BUILT by `REQ-DASH-071` criterion 13, 2026-09-25.** The masthead
+    now reads `Built <instant>` from a `BUILT_AT` const the embed step
+    writes, the `setInterval` is gone, and the dot no longer pulses -
+    a pulse says a feed is arriving, and nothing arrives after a static
+    file is opened. A real-browser test reads the stamp, waits fifteen
+    seconds - long enough to have caught the old clock twice - and
+    asserts it has not moved.
 
     **Found by Keith, 2026-09-25**, reading the requirement draft's
     first open question: "I'm not sure that masthead is working... it

@@ -250,100 +250,18 @@ anything here that turns into real build work becomes a requirement in
    title. A count of distinct values is exactly the metric a reader
    would otherwise assume was a row count.
 
-5. **[todo, 2026-09-24]** **[Dashboard UI]** **The dashboard should
+5. **[done, 2026-09-25]** **[Dashboard UI]** **The dashboard should
    display Perth time, not UTC.** Keith's own sighting, 2026-09-24.
 
-   **The mechanism for this already exists and is used in exactly one
-   place**, which is what makes this a real gap rather than a feature
-   request. `contract/data-asset.yaml` carries `timezone:
-   Australia/Perth`; `dashboard/embed_dashboard_data.py` embeds it into
-   the template's `const ASSET_TIMEZONE` (`REQ-PIPE-048`); and the
-   template reads it at exactly one call site -
-   `assetTodayDateStr()` - which decides the default as-of date. That
-   one use was itself introduced to fix a real, live version of this
-   bug: `liveNowDateStr()` used `toISOString()`, so between midnight
-   and 08:00 Perth the default as-of date was YESTERDAY, every working
-   morning for eight hours, unnoticed because nobody opened the
-   dashboard that early.
-
-   **Everywhere else still ignores it.** Three separate shapes, worth
-   keeping distinct because they are wrong in different ways:
-
-   - **An hour is hard-coded as UTC and labelled as such.**
-     `buildRealDataset()` builds `arrivedAt` by slicing characters
-     11-16 out of an ISO timestamp and appending the literal string
-     `" UTC (earliest extract, latest run)"`. So the arrival time on
-     screen is a UTC clock reading, correctly labelled and eight hours
-     from the time anyone in the office experienced.
-   - **Dates render in the VIEWER's zone, not the asset's.** `fmtDate()`
-     and `fmtDateShort()` call `toLocaleDateString("en-US", ...)` with
-     no `timeZone` option at all. For a reader sitting in Perth that
-     happens to give the right answer, which is exactly why it has
-     survived. It is wrong for anyone else, and it makes a committed
-     snapshot's rendering depend on who opens it.
-   - **A `Date` built from a date-only string is UTC midnight**, so the
-     same `toLocaleDateString` call renders the PREVIOUS day for any
-     viewer in a zone behind UTC. Same off-by-one family as the bug
-     `ASSET_TIMEZONE` was introduced to fix, in a different function.
-
-   Also unchecked, and probably fine but worth looking at in the same
-   pass: the snapshot banner formats its capture time with
-   `toLocaleTimeString(..., {timeZoneName:"short"})`, which is the
-   viewer's zone but at least says which zone it is - honest rather
-   than correct.
-
-   **The likely shape of the fix**, not yet decided: route every date
-   and time formatter through `ASSET_TIMEZONE` the way
-   `assetTodayDateStr()` already does, rather than adding a second
-   mechanism. The real questions are whether the asset's zone is always
-   the right one to show (it is the zone the DATA is about, which is
-   the argument for it, and this PoC's own target is two assets in
-   separate deployments rather than one page serving several zones),
-   and whether times should carry a visible zone label once they are no
-   longer saying "UTC" - a bare "14:32" that used to read "14:32 UTC"
-   loses information unless it says what it now means.
-
-   **VERIFIED 2026-09-24, and it constrains this item and any other
-   "change over time" check, row counts included.** Keith asked whether
-   Soda's row-count check can express an expected increase and separate
-   amber/red thresholds for change over time. Answered by real
-   experiment against the installed `soda-core 3.5.6`, not from docs -
-   `docs.soda.io` is blocked from this environment, and a real run is a
-   better primary source regardless.
-
-   - **Absolute row-count bands with both tiers already work, and we
-     already use them.** `contract/bdm-birth-registrations-soda-checks.
-     yml`'s `row_count` check carries `warn: when < 500` and `fail: when
-     < 100 / when > 20000`. Re-ran it live against a three-row table: it
-     evaluated and FAILED as expected.
-   - **SodaCL does have change-over-time syntax, and it does accept
-     tiered thresholds.** `change for row_count`, `change percent for
-     row_count` and `change avg last 7 for row_count` all parse, and a
-     `warn:`/`fail:` pair on one parses cleanly - no syntax error.
-   - **But Soda Core cannot EXECUTE any of them.** `soda/scan.py`'s
-     `__get_historic_data_from_soda_cloud_metric_store()` logs "Soda
-     Core must be configured to connect to Soda Cloud to use
-     change-over-time checks" and returns `{}` - the measurement history
-     lives in Soda Cloud, and Soda Core has no local store for it. The
-     check then crashes evaluating (`'NoneType' object has no attribute
-     'get'`), is marked NOT EVALUATED, and the scan returns exit code 3.
-   - **The failure mode is the dangerous one: the check DISAPPEARS.** A
-     not-evaluated check is absent from `scan.get_scan_results()
-     ["checks"]` entirely - verified, the list came back empty. This
-     repo's runners read exactly that structure and ignore
-     `scan.execute()`'s return code, so adding such a check would
-     produce no red, no amber and no visible error - just a declared
-     `check_id` that never reports. That is a silently missing check,
-     which is the false-green direction.
-
-   **So any change-over-time check in this project has to be computed
-   by us**, against committed `qa_results/` history, rather than
-   declared in SodaCL - which is the same conclusion this item was
-   heading for anyway, and now applies equally to row-count change.
-   Note the history is already there and already committed, so the
-   comparison needs no live data access; per `CLAUDE.md`'s hard rule it
-   would still be computed at run time by whoever legitimately holds a
-   connection, never in the dashboard build.
+   **BUILT by `REQ-DASH-071`, 2026-09-25.** All three shapes this
+   sighting separated are closed - the hard-coded `" UTC"` slice, the
+   bare `toLocaleDateString` with no zone, and the date-only string
+   read as midnight UTC - along with the snapshot banner's own
+   viewer-zone time, which it had flagged as honest rather than
+   correct. Both of its open questions were answered by Keith and are
+   recorded on the requirement: the asset's zone is always the one to
+   show, and a time carries NO zone label, because there is only one
+   clock and a label would imply a second.
 
 6. **[todo, 2026-09-24]** **[QA checks & contract]** **Known
    date-of-birth outliers, declared explicitly, with a tiered
@@ -730,3 +648,53 @@ anything here that turns into real build work becomes a requirement in
     There is no geocoding or census data in the repo today - checked -
     so something has to be generated either way, and `plans/
     data-generation.md` is where that lands rather than here.
+
+13. **[todo, 2026-09-24]** **[QA checks & contract]** **Soda Core
+   cannot execute a change-over-time check at all, so any such check in
+   this project has to be computed by us.**
+
+   Split out of item 5 on 2026-09-25: it was appended there while that
+   item was open, and it is a different subject that outlived it.
+
+   **VERIFIED 2026-09-24, and it constrains any "change over time"
+   check, row counts included.** Keith asked whether
+   Soda's row-count check can express an expected increase and separate
+   amber/red thresholds for change over time. Answered by real
+   experiment against the installed `soda-core 3.5.6`, not from docs -
+   `docs.soda.io` is blocked from this environment, and a real run is a
+   better primary source regardless.
+
+   - **Absolute row-count bands with both tiers already work, and we
+     already use them.** `contract/bdm-birth-registrations-soda-checks.
+     yml`'s `row_count` check carries `warn: when < 500` and `fail: when
+     < 100 / when > 20000`. Re-ran it live against a three-row table: it
+     evaluated and FAILED as expected.
+   - **SodaCL does have change-over-time syntax, and it does accept
+     tiered thresholds.** `change for row_count`, `change percent for
+     row_count` and `change avg last 7 for row_count` all parse, and a
+     `warn:`/`fail:` pair on one parses cleanly - no syntax error.
+   - **But Soda Core cannot EXECUTE any of them.** `soda/scan.py`'s
+     `__get_historic_data_from_soda_cloud_metric_store()` logs "Soda
+     Core must be configured to connect to Soda Cloud to use
+     change-over-time checks" and returns `{}` - the measurement history
+     lives in Soda Cloud, and Soda Core has no local store for it. The
+     check then crashes evaluating (`'NoneType' object has no attribute
+     'get'`), is marked NOT EVALUATED, and the scan returns exit code 3.
+   - **The failure mode is the dangerous one: the check DISAPPEARS.** A
+     not-evaluated check is absent from `scan.get_scan_results()
+     ["checks"]` entirely - verified, the list came back empty. This
+     repo's runners read exactly that structure and ignore
+     `scan.execute()`'s return code, so adding such a check would
+     produce no red, no amber and no visible error - just a declared
+     `check_id` that never reports. That is a silently missing check,
+     which is the false-green direction.
+
+   **So any change-over-time check in this project has to be computed
+   by us**, against committed `qa_results/` history, rather than
+   declared in SodaCL, and that now applies equally to row-count
+   change.
+   Note the history is already there and already committed, so the
+   comparison needs no live data access; per `CLAUDE.md`'s hard rule it
+   would still be computed at run time by whoever legitimately holds a
+   connection, never in the dashboard build.
+

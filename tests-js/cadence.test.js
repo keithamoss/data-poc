@@ -19,21 +19,27 @@ function load() {
   return dashboard.window;
 }
 
+// NO ZONE LABEL since REQ-DASH-071 criterion 6: everything a reader
+// sees is on the asset's clock, so naming one implies a second to
+// distinguish it from. The TIME keeps its written "14:00" form, which
+// is criterion 8 - it is a deadline echoed out of contract/*.yaml, not
+// an instant, and a reader checking the tile against the contract is
+// comparing those two strings.
 describe("cadenceLabel", () => {
   it("labels a daily cadence", () => {
     const w = load();
-    expect(w.cadenceLabel({ type: "daily", expected_time: "14:00" })).toBe("Daily, by 14:00 AWST");
+    expect(w.cadenceLabel({ type: "daily", expected_time: "14:00" })).toBe("Daily, by 14:00");
   });
 
   it("labels a weekly cadence with the real weekday name", () => {
     const w = load();
-    expect(w.cadenceLabel({ type: "weekly", weekday: 2, expected_time: "09:00" })).toBe("Weekly (Wed), by 09:00 AWST");
+    expect(w.cadenceLabel({ type: "weekly", weekday: 2, expected_time: "09:00" })).toBe("Weekly (Wed), by 09:00");
   });
 
   it("labels a quarterly cadence with real month names and day", () => {
     const w = load();
     const label = w.cadenceLabel({ type: "quarterly", anchor_months: [1, 4, 7, 10], day_of_month: 15, expected_time: "17:00" });
-    expect(label).toBe("Quarterly (Jan/Apr/Jul/Oct, day 15), by 17:00 AWST");
+    expect(label).toBe("Quarterly (Jan/Apr/Jul/Oct, day 15), by 17:00");
   });
 });
 

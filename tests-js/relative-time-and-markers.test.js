@@ -63,7 +63,14 @@ describe("fmtRelativeTime", () => {
     expect(ago(w, { days: 60 })).toBe("2 months ago");
     expect(ago(w, { days: 300 })).toBe("10 months ago");
     expect(ago(w, { days: 400 })).toBe("1 year ago");
-    expect(ago(w, { days: 1000 })).toBe("3 years ago");
+    // FLOORED, not rounded - 1000 days is 2.7 years and reads "2".
+    // Changed by REQ-DASH-071, which folded this function into the one
+    // rule both the browser and the CLI now share, held to
+    // display-time-cases.json. That table's own never-falls-back case
+    // (6.7 years -> "6 years ago") settles the direction: a reader who
+    // counts back from a floored answer lands inside the period named,
+    // and from a rounded one can land before it started.
+    expect(ago(w, { days: 1000 })).toBe("2 years ago");
   });
 
   it("never says 12 months when it means a year", () => {

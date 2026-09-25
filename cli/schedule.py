@@ -21,6 +21,8 @@ import rich_click as click
 from rich.console import Console
 from rich.table import Table
 
+from qa_tools.common import display_time
+
 console = Console()
 
 
@@ -210,9 +212,15 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
         marker = ""
         if slot and p.date >= today:
             marker = "->" if p.name == _next_owed(shown, by_period, today) else ""
+        # THE PERIOD'S DATE IS A CONFIG ECHO and keeps its written form
+        # (criterion 8) - a reader comparing this table against
+        # contract/data-asset.yaml is comparing those two columns. The
+        # DUE and CLAIMABLE instants are not in any file: this computes
+        # them, so they are written the way everything else a person
+        # reads is written (REQ-DASH-071).
         table.add_row(marker, p.name, p.date.isoformat(), expected,
-                       slot.due_at.strftime("%Y-%m-%d %H:%M %z") if slot else "-",
-                       slot.claim_opens_at.strftime("%Y-%m-%d %H:%M %z") if slot else "-")
+                       display_time.format_instant(slot.due_at) if slot else "-",
+                       display_time.format_instant(slot.claim_opens_at) if slot else "-")
     console.print(table)
 
     owed = len(by_period)

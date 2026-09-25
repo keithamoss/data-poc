@@ -129,9 +129,12 @@ button{font:inherit; color:inherit;}
   display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-muted);
   background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:6px 12px 6px 10px;
 }
-.live .dot{width:7px;height:7px;border-radius:50%;background:var(--good); box-shadow:0 0 0 3px var(--good-soft); animation:pulse 2.4s infinite;}
-@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.45;}}
-@media (prefers-reduced-motion: reduce){.live .dot{animation:none;}}
+/* NO LONGER PULSES (REQ-DASH-071 criterion 13, post-build-review #60).
+   A pulsing dot says a feed is arriving; this page is a static build and
+   nothing arrives after it is opened. The dot stays as a quiet "this was
+   built" marker, and goes grey when it was not. */
+.live .dot{width:7px;height:7px;border-radius:50%;background:var(--good); box-shadow:0 0 0 3px var(--good-soft);}
+.live.unbuilt .dot{background:var(--ink-faint); box-shadow:none;}
 
 /* ============ Breadcrumb / zoom rail ============ */
 .rail{display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding-block:16px; font-size:13.5px;}
@@ -695,7 +698,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
       <button class="snapshots-btn" id="plans-btn" type="button">🗂 Plans</button>
       <button class="snapshots-btn" id="demo-btn" type="button">▶ Demo</button>
       <button class="snapshots-btn" id="snapshots-btn" type="button">🕐 Past snapshots</button>
-      <div class="live"><span class="dot"></span><span id="clock-text">Live · updated moments ago</span></div>
+      <div class="live"><span class="dot"></span><span id="clock-text">Not built</span></div>
     </div>
   </header>
 
@@ -915,9 +918,178 @@ function rngFor(seedStr){ const seedFn=hashSeed(seedStr); return mulberry32(seed
 const DAY = 24*3600*1000;
 const TODAY = new Date("2026-09-13T00:00:00Z");
 function runDate(idxFromToday){ return new Date(TODAY.getTime() - idxFromToday*DAY); }
-function fmtDate(d){ return d.toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}); }
-function fmtDateShort(d){ return d.toLocaleDateString("en-US",{month:"short",day:"numeric"}); }
+/* ---- The one way this page writes a date (REQ-DASH-071) ------------
+   WHY. Every date here rendered in the VIEWER's timezone, not the
+   asset's - bare toLocaleDateString with no timeZone option, fed
+   midnight UTC - so for any reader west of Greenwich the displayed date
+   was a day early, silently. Measured in America/New_York: the header
+   read "As of: Sep 23" while showing the 24th's data, and six datasets
+   reported arriving on 31 July when they arrived on 1 August.
+
+   THE FORMAT IS ONE STRING WITH AN OPTIONAL TIME IN FRONT OF IT rather
+   than two formats, so there is no rule about when the comma appears -
+   it always does, in the same place. No timezone label anywhere,
+   because there is only one: everything a person reads is on the
+   asset's own clock, and a label would imply a second zone to be
+   distinguished from.
+
+   ITS TWIN IS qa_tools/common/display_time.py, and the two are held to
+   the same committed table - display-time-cases.json, read by
+   tests-js/display-time.test.js and tests/test_display_time.py.
+   Neither suite owns it. Same shape as status-cases.json and for the
+   same reason. */
+const _WEEKDAY_FULL = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const _MONTH_FULL = ["January","February","March","April","May","June","July",
+                      "August","September","October","November","December"];
+
+/* REQ-DASH-071 criterion 14. The asset's clock is not optional and has
+   no substitute. A date placed on the READER's clock, or on UTC, is a
+   different date for eight hours of every day in Perth - and it says so
+   without saying so. That is the bug REQ-PIPE-048 was written to end,
+   and the old assetTodayDateStr() still carried its residue
+   (post-build-review #35): it caught an unknown zone and quietly
+   carried on with the viewer's own.
+
+   So both halves throw. A page that will not draw a date is something
+   somebody fixes; a page that draws the wrong one is not. */
+function assetTimezoneOrFail(){
+  const tz = ASSET_TIMEZONE;
+  if(typeof tz !== "string" || !tz.trim()){
+    throw new Error("no asset timezone is embedded (contract/data-asset.yaml -> "
+      + "timezone), so no instant can be placed on the asset's clock");
+  }
+  try { new Intl.DateTimeFormat("en-GB", {timeZone: tz}); }
+  catch(e){
+    throw new Error(`asset timezone "${tz}" is not a zone this browser knows, `
+      + "so no instant can be placed on the asset's clock");
+  }
+  return tz;
+}
+
+// The asset's own clock, as the parts a format needs. Intl is what does
+// the zone arithmetic - hand-rolling an offset is the thing
+// REQ-PIPE-048 exists to stop, and it does not know about a zone's own
+// history the way the platform does.
+// A NAIVE STRING IS REFUSED rather than guessed at. One with no offset
+// could be anything, and guessing is exactly how a date lands on the
+// wrong day - the bug this standard ends. (Date() would read it as the
+// BROWSER's local time and say nothing at all about having done so.)
+// Shared by every entry point here, so the refusal cannot be true of
+// one of them and not another - its Python twin leans on
+// asset_time.parse_instant for the same reason.
+function asInstant(value){
+  const at = value instanceof Date ? value : new Date(value);
+  if(isNaN(at.getTime())) throw new Error(`not an instant: ${value}`);
+  if(typeof value === "string" && /^\d{4}-\d{2}-\d{2}[T ][\d:.]+$/.test(value.trim())){
+    throw new Error(`instant has no timezone offset, so it cannot be placed: ${value}`);
+  }
+  return at;
+}
+
+function assetParts(value){
+  const at = asInstant(value);
+  const tz = assetTimezoneOrFail();
+  const f = new Intl.DateTimeFormat("en-GB", {timeZone: tz, weekday:"long",
+    day:"numeric", month:"numeric", year:"numeric", hour:"numeric", minute:"2-digit",
+    hour12:false});
+  const got = {};
+  f.formatToParts(at).forEach(p=>{ got[p.type] = p.value; });
+  return {weekday: got.weekday, day: Number(got.day), month: Number(got.month),
+          year: Number(got.year), hour: Number(got.hour) % 24, minute: Number(got.minute)};
+}
+
+/* A PLAIN CALENDAR DATE IS NOT AN INSTANT and is rendered as written.
+   "2026-09-29" names a day, not a moment, so there is nothing to place
+   on any clock - putting it through the zone machinery would re-read it
+   as midnight UTC and, in a zone behind UTC, hand back the day before.
+   Its Python twin, display_time.format_day, draws the same distinction
+   on the type it is given. */
+const _PLAIN_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+function fmtDay(value){
+  const plain = typeof value === "string" && _PLAIN_DATE.exec(value.trim());
+  if(plain){
+    const [y, m, d] = [Number(plain[1]), Number(plain[2]), Number(plain[3])];
+    const weekday = _WEEKDAY_FULL[new Date(Date.UTC(y, m-1, d)).getUTCDay()];
+    return `${weekday}, ${d} ${_MONTH_FULL[m-1]} ${y}`;
+  }
+  const p = assetParts(value);
+  return `${p.weekday}, ${p.day} ${_MONTH_FULL[p.month-1]} ${p.year}`;
+}
+
+function fmtInstant(value){
+  const p = assetParts(value);
+  const hour = p.hour % 12 || 12;           // 0 and 12 both read as 12
+  const meridiem = p.hour < 12 ? "am" : "pm";
+  return `${hour}:${String(p.minute).padStart(2,"0")}${meridiem} ${fmtDay(value)}`;
+}
+
+/* `now` is REQUIRED and has no default, which is the point rather than
+   an inconvenience: this page is routinely read AS OF a past or future
+   date, and a relative string measured against the real clock while the
+   page shows 2027 is not merely unhelpful, it is false. Making every
+   caller name its own reference is what stops that being forgotten. */
+/* A YEAR IS TWELVE MONTHS HERE, not 365 days, and that is deliberate:
+   with a 30-day month and a 365-day year there is a five-day window
+   where this prints "12 months ago", which Keith ruled out on
+   2026-09-24. Making the year the month's own multiple removes the
+   window rather than special-casing it. */
+const _REL_MONTH = 2592000;                       // 30 days
+const _REL_UNITS = [[_REL_MONTH*12,"year"],[_REL_MONTH,"month"],[604800,"week"],
+                     [86400,"day"],[3600,"hour"],[60,"minute"]];
+function fmtRelative(value, now){
+  const delta = (asInstant(value).getTime() - asInstant(now).getTime())/1000;
+  const seconds = Math.abs(delta);
+  if(seconds < 45) return "just now";
+  for(const [size, name] of _REL_UNITS){
+    if(seconds >= size){
+      const n = Math.floor(seconds/size);
+      const unit = n === 1 ? name : name + "s";
+      return delta > 0 ? `in ${n} ${unit}` : `${n} ${unit} ago`;
+    }
+  }
+  return "just now";
+}
+
+/* CRITERION 12. "Now" is not the reader's clock once the reader has
+   moved the as-of date: a feed saying "3 hours ago" while the page is
+   showing last March is not unhelpful, it is false. The reference is the
+   LAST MOMENT OF THE SELECTED DAY - the latest thing the page claims to
+   represent - which collapses to real now on the default as-of, because
+   that day has not finished yet.
+
+   The zone offset is asked of the platform rather than stored, same as
+   assetParts(): the probe's own y/m/d come back from Intl, so the
+   subtraction is correct whatever calendar day midday UTC lands on in
+   the asset's zone. */
+function assetEndOfDay(dateStr){
+  const probe = new Date(dateStr+"T12:00:00Z");
+  const p = assetParts(probe);
+  const offsetMs = Date.UTC(p.year, p.month-1, p.day, p.hour, p.minute) - probe.getTime();
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m-1, d, 23, 59, 59) - offsetMs);
+}
+function asOfNow(){
+  const real = new Date();
+  if(!CURRENT_AS_OF) return real;
+  const end = assetEndOfDay(CURRENT_AS_OF);
+  return end < real ? end : real;
+}
+
+function fmtDate(d){ return fmtDay(d); }
+function fmtDateShort(d){ return fmtDay(d); }
 function fmtInt(x){ return x.toLocaleString("en-US"); }
+// REQ-DASH-071. lastArrival.arrivedAt is a real INSTANT and now reads
+// as one, in the single form this project uses everywhere. What it used
+// to be is the reason the standard exists: the wall clock was
+// character-sliced out of the stored string and labelled " UTC"
+// unconditionally - so a supply that landed at 1:29pm on the asset's
+// clock read "05:29 UTC" - and the date beside it came from a DIFFERENT
+// field (the run date), routinely days apart from the instant it was
+// punctuating.
+//
+// The paragraph below is the 2026-09-16 history that got it as far as
+// carrying a date at all, kept because it explains why there is a date
+// in this string in the first place:
 // lastArrival.arrivedAt on its own is only ever a time ("05:07 local",
 // "14:32 UTC (earliest extract, latest run)") - Keith's own report,
 // 2026-09-16: on its own that reads as "arrived at this time" with no
@@ -926,14 +1098,25 @@ function fmtInt(x){ return x.toLocaleString("en-US"); }
 // Pairs it with lastArrival.date (fmtDate's existing "Jul 1, 2026"
 // format, reused rather than inventing a new date style) using the
 // same " · " separator this UI already uses elsewhere.
-function fmtArrival(lastArrival){ return `${lastArrival.arrivedAt} · ${fmtDate(lastArrival.date)}`; }
+function fmtArrival(lastArrival){ return fmtInstant(lastArrival.arrivedAt); }
 // Phase 5j: a human-readable label for a dataset's own real cadence
 // config (ds.sla.cadence - pipeline/cadence.py/contract slaProperties:),
 // replacing the old hand-authored sla.frequency/expectedBy display text.
 const WEEKDAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function cadenceLabel(cadence){
-  const byTime = `by ${cadence.expected_time} AWST`;
+  // NO ZONE LABEL (REQ-DASH-071 criterion 6, post-build-review #14).
+  // " AWST" was hardcoded here, and it was the last thing on the page
+  // naming a clock - in a four-across strip where the tile beside it
+  // read "05:29 UTC", so a reader had to add eight in their head,
+  // across two tiles, to judge the verdict in the same cell. Both are
+  // now the asset's clock and there is nothing to distinguish.
+  //
+  // expected_time KEEPS ITS WRITTEN FORM - "14:00", exactly as
+  // contract/*.yaml authors it (criterion 8). It is a deadline out of a
+  // config file, not an instant, and a reader checking this tile
+  // against the contract is comparing those two strings.
+  const byTime = `by ${cadence.expected_time}`;
   if(cadence.type==="daily") return `Daily, ${byTime}`;
   if(cadence.type==="weekly") return `Weekly (${WEEKDAY_NAMES[cadence.weekday]}), ${byTime}`;
   if(cadence.type==="quarterly"){
@@ -1265,9 +1448,22 @@ const HIERARCHY = null;
 // every working morning, for eight hours. Nobody had noticed because
 // the dashboard was only ever opened later in the day.
 //
-// Falls back to the viewer's own zone when absent, which is the raw
-// template's case and no worse than what it did before.
+// NULL HERE IS THE RAW TEMPLATE, which has no asset and so has no
+// clock - the same "nothing embedded" fact as the null HIERARCHY above,
+// and the page already has a state that says so. It does NOT fall back
+// to the viewer's zone any more (REQ-DASH-071 criterion 14): a built
+// dashboard whose zone is absent or unresolvable refuses to draw an
+// instant at all rather than drawing one from the wrong clock.
 const ASSET_TIMEZONE = null;
+// BUILT_AT - REQ-DASH-071 criterion 13. The instant this page was
+// built, written by dashboard/embed_dashboard_data.py from the build
+// itself. NULL HERE is the raw template, which was never built, and the
+// masthead says exactly that rather than inventing a time.
+//
+// It replaces a fake clock (post-build-review #60) that counted up from
+// "4s ago" at seven seconds per seven seconds, so the number a reader
+// saw was the age of their own browser tab.
+const BUILT_AT = null;
 const REAL_BIRTH_REG_DATA = null;
 const REAL_CP_DATA = null;
 const SNAPSHOT_MANIFEST = [];
@@ -1407,7 +1603,11 @@ function buildRealDataset(d){
     id: d.id, name: d.name, provider: d.provider, deliveryFormat: d.deliveryFormat,
     sla: d.sla,
     lastArrival: { date: toDate(d.lastArrival.run_date),
-      arrivedAt: d.lastArrival.arrivedAt.slice(11,16)+" UTC (earliest extract, latest run)",
+      // CARRIED WHOLE (REQ-DASH-071). It used to be sliced to a wall
+      // clock and labelled " UTC" here, in the data layer, which put a
+      // format decision two transforms away from the thing rendering
+      // it and made the real instant unrecoverable downstream.
+      arrivedAt: d.lastArrival.arrivedAt,
       arrivalStatus: d.lastArrival.arrivalStatus },
     arrivalHistory,
     rowCount: d.rowCount, prevRowCount: d.prevRowCount,
@@ -1615,7 +1815,7 @@ function buildSupplyHistory(d){
     .sort((a,b)=> b.cycleStart.localeCompare(a.cycleStart));
 }
 function cycleLabel(cadence, cycleStartStr){
-  const label = fmtDate(new Date(cycleStartStr+"T00:00:00Z"));
+  const label = fmtDay(cycleStartStr);
   if(cadence.type==="daily") return label;
   if(cadence.type==="weekly") return `Week of ${label}`;
   return `Cycle starting ${label}`;
@@ -1936,14 +2136,19 @@ function dateStrDiffDays(fromDateStr, toDateStr_){
 // because it formats as YYYY-MM-DD; the locale is a formatting detail,
 // the timeZone is the part that matters.
 function assetTodayDateStr(){
-  const tz = ASSET_TIMEZONE;
-  if(!tz) return toDateStr(new Date());  // raw template, no embedded config
-  try { return new Date().toLocaleDateString("en-CA", {timeZone: tz}); }
-  catch(e){ return toDateStr(new Date()); }  // unknown zone - never blank the page over it
+  const p = assetParts(new Date());      // throws if there is no asset clock
+  return `${p.year}-${String(p.month).padStart(2,"0")}-${String(p.day).padStart(2,"0")}`;
 }
 function liveNowDateStr(){ return assetTodayDateStr(); }
+// The raw, unbuilt template has no asset clock because it has no asset.
+// That is not criterion 14's "cannot be resolved" case - there is
+// nothing to resolve - so it is answered here, once, rather than by a
+// fallback inside the formatter where it would also catch a real
+// misconfiguration. The as-of chrome, which is the only thing that
+// needs a date before any data is loaded, simply is not drawn.
+const HAS_ASSET_CLOCK = typeof ASSET_TIMEZONE === "string" && ASSET_TIMEZONE.trim() !== "";
 function defaultAsOf(){
-  return liveNowDateStr();
+  return HAS_ASSET_CLOCK ? liveNowDateStr() : null;
 }
 // URL query-string persistence, deliberately separate from the
 // hash-based STATE mechanism used for drill-down navigation (Thread C -
@@ -3074,7 +3279,7 @@ function renderAgency(view, agencyId){
           return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
             <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}</td>
-            <td>${arrivalPillHtml} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${fmtArrival(ds.lastArrival)}</span></td>
+            <td>${arrivalPillHtml} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;" title="Earliest extract in the latest run">${fmtArrival(ds.lastArrival)}</span></td>
             <td class="mono">${fmtInt(ds.rowCount)}</td>
             <td class="mono" style="color:var(--ink-muted);">${fmtDate(ds.lastArrival.date)}</td>
             <td style="min-width:100px;">${dsSpark}</td>
@@ -3167,13 +3372,16 @@ function renderSupplyCycleRows(entries, datasetId){
       ? (e.daysSincePrevious!=null
           ? `<span class="mono" style="color:var(--ink-muted); font-size:12.5px;">${e.daysSincePrevious} ${pluralize(e.daysSincePrevious,"day")} since previous</span>`
           : "")
-      : `${e.arrivalStatus ? arrivalPill(e.arrivalStatus,"sm") : ""} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt||""}</span>`;
+      // e.arrivedAt used to be emitted RAW here - offset, microseconds
+      // and all ("2026-09-16T05:17:30.280161+00:00"), 43 of them down
+      // one column. REQ-DASH-071.
+      : `${e.arrivalStatus ? arrivalPill(e.arrivalStatus,"sm") : ""} <span class="mono" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt ? fmtInstant(e.arrivedAt) : ""}</span>`;
     // data-run-id alongside data-run-date: run_date is NOT unique (a
     // resupply shares its base run's date - plans/conceptual-design.md
     // Thread A found 352 real BDM runs across only 123 distinct dates),
     // so anything needing to address exactly one row needs the run_id.
     return `<tr data-run-date="${e.run_date}" data-run-id="${e.run_id}">
-      <td class="mono">${e.run_date}</td>
+      <td>${fmtDay(e.run_date)}</td>
       <td>${statusBadge}</td>
       <td>${arrivalCell}</td>
       <td class="mono">${e.rowCount!=null ? fmtInt(e.rowCount) : "—"}</td>
@@ -3276,8 +3484,8 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
           Its calendar <b style="display:inline">${ended.calendar}</b> has no dates after
           <b style="display:inline">${ended.lastPeriod}</b>
-          (${fmtDate(new Date(ended.lastDate+"T00:00:00Z"))}), so as of
-          <b style="display:inline">${fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"))}</b> no supply
+          (${fmtDay(ended.lastDate)}), so as of
+          <b style="display:inline">${fmtDay(CURRENT_AS_OF)}</b> no supply
           is expected, none can be filed, and QA cannot run for it.<br><br>
           Nothing is wrong with the data. Add the next delivery dates to
           <code>${file}</code> — <code>mothman schedule candidate-dates</code> proposes them for
@@ -3313,7 +3521,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <b>Nothing had been supplied by this date.</b>
         <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
           There is no QA run within the accepted freshness window as of
-          <b style="display:inline">${fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"))}</b>. Pick a
+          <b style="display:inline">${fmtDay(CURRENT_AS_OF)}</b>. Pick a
           later date, or reset to the default, using the 📅 As of control above.
         </div>
       </div>
@@ -3332,13 +3540,13 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     ${exhaustedBanner}
     ${ds.noDataAsOf ? `
     <div style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:64ch;">
-      As of <b>${fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"))}</b>, nothing has landed yet in this dataset's
-      current expected cycle (started <b>${fmtDate(new Date(cycleStartDate(ds.sla.cadence, CURRENT_AS_OF)+"T00:00:00Z"))}</b>) -
+      As of <b>${fmtDay(CURRENT_AS_OF)}</b>, nothing has landed yet in this dataset's
+      current expected cycle (started <b>${fmtDay(cycleStartDate(ds.sla.cadence, CURRENT_AS_OF))}</b>) -
       so the figures below show its full real history, but no column reads red/amber/green as CURRENT status.
     </div>` : ""}
     <div class="sla-strip">
       <div class="sla-tile"><div class="k">SLA</div><div class="v" style="font-size:14px;">${cadenceLabel(ds.sla.cadence)}</div></div>
-      <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono">${fmtArrival(ds.lastArrival)} ${ds.lastArrival.arrivalStatus!=="onTime" ? "("+arrivalStatusLabel(ds.lastArrival.arrivalStatus)+")" : ""}</div></div>
+      <div class="sla-tile"><div class="k">Latest arrival</div><div class="v mono" title="Earliest extract in the latest run">${fmtArrival(ds.lastArrival)} ${ds.lastArrival.arrivalStatus!=="onTime" ? "("+arrivalStatusLabel(ds.lastArrival.arrivalStatus)+")" : ""}</div></div>
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>
       <div class="sla-tile"><div class="k">Rows, latest run</div><div class="v mono">${fmtInt(ds.rowCount)} <span style="font-size:11.5px; color:${rowDelta>=0?'var(--good)':'var(--bad)'};">(${rowDelta>=0?'+':''}${fmtInt(rowDelta)})</span></div></div>
     </div>
@@ -4135,12 +4343,13 @@ function renderSnapshotsPanel(){
   </div>`;
   const rows = SNAPSHOT_MANIFEST.slice().reverse().map(s=>{
     const name = s.file.replace(/\.gz$/, "");
-    const taken = new Date(s.taken_at);
-    const time = taken.toLocaleTimeString("en-US", {hour:"2-digit", minute:"2-digit", timeZoneName:"short"});
+    // REQ-DASH-071. Was a bare toLocaleTimeString with a "GMT+8"-style
+    // zone label, on the READER's clock - the one place on the page
+    // that named a zone, and it named whichever one the browser was in.
     const sizeKb = Math.max(1, Math.round(s.compressed_size_bytes/1024));
     return `<div class="snapshot-row">
         <div class="meta">
-          <div class="date">${fmtDate(taken)} · ${time}</div>
+          <div class="date">${fmtInstant(s.taken_at)}</div>
           <div class="sub">commit ${s.commit_sha} · ${sizeKb} KB compressed</div>
         </div>
         <a href="snapshots/${name}" target="_blank" rel="noopener">Open ›</a>
@@ -4213,21 +4422,19 @@ document.getElementById("snapshots-panel-close").addEventListener("click", close
 // a month at 30, and a year decided by the month count rather than by a
 // day threshold - which is what stops "12 months ago" ever being
 // printed for something a reader would call a year.
-function fmtRelativeTime(isoString){
-  const then = new Date(isoString), now = new Date();
-  const mins = Math.round((now-then)/60000);
-  if(mins<1) return "just now";
-  if(mins<60) return `${mins} ${pluralize(mins,"minute")} ago`;
-  const hours = Math.round(mins/60);
-  if(hours<24) return `${hours} ${pluralize(hours,"hour")} ago`;
-  const days = Math.round(hours/24);
-  if(days<7) return `${days} ${pluralize(days,"day")} ago`;
-  if(days<30){ const weeks = Math.round(days/7); return `${weeks} ${pluralize(weeks,"week")} ago`; }
-  const months = Math.round(days/30.44);
-  if(months<12) return `${months} ${pluralize(months,"month")} ago`;
-  const years = Math.round(days/365.25);
-  return `${years} ${pluralize(years,"year")} ago`;
-}
+//
+// REQ-DASH-071 folded the rule itself into fmtRelative() above, which is
+// held to the same committed case table as its Python twin, so this is
+// now only the one thing that was ever local to it: WHICH `now` the
+// activity feed measures against. Real wall-clock now is right here and
+// else on this page - the feed is about when results reached the shared
+// branch - but it is still read AS OF a date (criterion 12), so asOfNow()
+// is what supplies it.
+// (The counting changed slightly in the fold: units are floored rather
+// than rounded, so 1000 days reads "2 years ago" rather than "3". The
+// table is the standard; rounding up past a boundary the reader can
+// count to is the older behaviour, not the agreed one.)
+function fmtRelativeTime(isoString){ return fmtRelative(isoString, asOfNow()); }
 function renderActivityPanel(){
   const body = document.getElementById("activity-panel-body");
   if(!CHANGELOG_FEED.length){
@@ -4353,7 +4560,7 @@ function renderChangelogPanel(){
     ).join("");
     return `
       <div style="margin-bottom:24px; padding-bottom:20px; border-bottom:1px solid var(--line);">
-        <div style="font:700 15px 'IBM Plex Mono',monospace; margin-bottom:6px;">${e.date}</div>
+        <div style="font:700 15px 'IBM Plex Mono',monospace; margin-bottom:6px;">${fmtDay(e.date)}</div>
         ${e.summary ? `<div style="font-size:13px; color:var(--ink-muted); margin-bottom:12px; line-height:1.5;">${e.summary}</div>` : ""}
         ${sections}
       </div>`;
@@ -4412,7 +4619,7 @@ function renderRequirementsPanel(){
     // yet - see requirements.yaml's own header comment for why they
     // weren't backfilled).
     const dateWritten = r.date_written
-      ? `<span class="mono" style="font-size:11px; color:var(--ink-faint);">${r.date_written}</span>` : "";
+      ? `<span style="font-size:11px; color:var(--ink-faint);">${fmtDay(r.date_written)}</span>` : "";
     const source = r.source
       ? `<div style="margin-top:8px; font-size:11.5px; color:var(--ink-faint);">Source: ${r.source}</div>` : "";
     // Sits in the pill row rather than down with source/dates, because
@@ -4422,7 +4629,7 @@ function renderRequirementsPanel(){
     // that is the normal resting state for one still being drafted, and
     // CI already refuses to let it reach any other status unsigned.
     const signedOff = r.signed_off
-      ? `<span style="font-size:11.5px; color:var(--ink-faint);">Signed off by ${r.signed_off.by}, <span class="mono">${r.signed_off.date}</span></span>` : "";
+      ? `<span style="font-size:11.5px; color:var(--ink-faint);">Signed off by ${r.signed_off.by}, ${fmtDay(r.signed_off.date)}</span>` : "";
     const nfrs = (r.non_functional_requirements||[]).length
       ? `<div style="margin-top:10px; font-size:12px;"><b>Non-functional:</b>
           <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${r.non_functional_requirements.map(n=>`<li>${n}</li>`).join("")}</ul>
@@ -4731,7 +4938,7 @@ function renderPlansEntry(e){
   const expanded = PLANS_EXPANDED.has(e.id);
   const statusPill = e.status ? plansStatusPill(e.status) : "";
   const badges = e.components.map(componentBadge).join(" ");
-  const dateLabel = e.date ? `<span class="mono" style="color:var(--ink-faint); font-size:11px;">${e.date}</span>` : "";
+  const dateLabel = e.date ? `<span style="color:var(--ink-faint); font-size:11px;">${fmtDay(e.date)}</span>` : "";
   const preview = !expanded ? `<div class="plans-entry-preview">${inlinePlansMd(e.body.slice(0,180))}${e.body.length>180?"…":""}</div>` : "";
   const full = expanded ? `<div class="plans-entry-body">${renderPlansMarkdown(e.body)}</div>` : "";
   return `
@@ -4860,8 +5067,12 @@ document.getElementById("wordmark-btn").addEventListener("click", ()=> navigate(
 // renderFromState() so picking a date doesn't also silently close
 // whatever the person was looking at.
 function updateAsOfButtonLabel(){
+  const btn = document.getElementById("asof-btn");
+  // No asset clock means no asset (see HAS_ASSET_CLOCK) - hide the
+  // control rather than label it with a date from somewhere else.
+  if(!CURRENT_AS_OF){ if(btn) btn.hidden = true; return; }
   const label = document.getElementById("asof-btn-label");
-  if(label) label.textContent = fmtDate(new Date(CURRENT_AS_OF+"T00:00:00Z"));
+  if(label) label.textContent = fmtDay(CURRENT_AS_OF);
 }
 function applyAsOf(dateStr){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
@@ -4873,7 +5084,7 @@ function applyAsOf(dateStr){
 }
 function openAsOfPanel(){
   document.getElementById("asof-input").value = CURRENT_AS_OF;
-  document.getElementById("asof-default-label").textContent = fmtDate(new Date(DEFAULT_AS_OF+"T00:00:00Z"));
+  document.getElementById("asof-default-label").textContent = fmtDay(DEFAULT_AS_OF);
   document.getElementById("asof-backdrop").classList.add("open");
   document.getElementById("asof-panel").classList.add("open");
   setDrawerHidden("asof-panel", false);
@@ -4911,16 +5122,30 @@ document.addEventListener("keydown", (e)=>{
 });
 
 /* =========================================================================
-   7. Boot + fake "live" clock
+   7. Boot + the masthead build stamp
 ========================================================================= */
-let secondsAgo = 4;
-setInterval(()=>{
-  secondsAgo += 7;
+/* CRITERION 13, and post-build-review #60. This used to be a fake clock:
+   `let secondsAgo = 4` and a setInterval adding 7 every 7 seconds, under
+   a header that called it what it was. It read "Live · updated 4s ago"
+   on a page whose data had not changed since it was built, and the
+   number it counted up was the age of the BROWSER TAB - leave it open
+   overnight and it claimed the data was eleven hours old, which is a
+   statement about the reader, not about the asset.
+   What a reader actually needs is when this page was built, which the
+   build itself knows and nothing else does. */
+function renderBuildStamp(){
   const el = document.getElementById("clock-text");
   if(!el) return;
-  if(secondsAgo<60) el.textContent = `Live · updated ${secondsAgo}s ago`;
-  else el.textContent = `Live · updated ${Math.floor(secondsAgo/60)}m ago`;
-}, 7000);
+  if(!BUILT_AT){
+    // The raw template, which was not built - saying so is the honest
+    // answer and matches the "No data embedded" state it renders.
+    el.textContent = "Not built";
+    el.closest(".live")?.classList.add("unbuilt");
+    return;
+  }
+  el.textContent = `Built ${fmtInstant(BUILT_AT)}`;
+}
+renderBuildStamp();
 
 // Initial load: STATE already resolved from location.hash (or the {tier:
 // "exec"} default) up where it's declared. replaceState (not pushState)

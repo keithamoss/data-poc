@@ -9132,7 +9132,7 @@ requirements:
       decode a raw timestamp, or work out which of two adjacent tiles I
       should believe.
     moscow: must
-    status: not_started
+    status: built
     source: >-
       Keith, voice-dictated, 2026-09-24 evening, settling the visual
       critic's Q4 and widening it himself - "let's make a call... that
@@ -9142,6 +9142,9 @@ requirements:
       2026-09-25, NOT through delivery-scoper - flagged per Keith's own
       standing rule of 2026-09-23 that a batch's provenance is stated
       before it is presented, not after being asked.
+    signed_off:
+      by: Keith
+      date: "2026-09-25"
     acceptance_criteria:
       - >-
         THE SYSTEM SHALL render a date, wherever a person reads one, as
@@ -9291,4 +9294,127 @@ requirements:
         one. The failure it fixes is two surfaces disagreeing about the
         same instant, so one requirement covering both is the point; a
         split would let them drift again while both read as built.
+      - >-
+        Decided a PLAIN CALENDAR DATE is not an instant and is rendered
+        as written, in both twins. "2026-09-29" names a day, not a
+        moment, so there is nothing to place on any clock - putting it
+        through the zone machinery would re-read it as midnight UTC and,
+        in a zone behind UTC, hand back the day before. Found while
+        wiring, not while designing.
+      - >-
+        Decided a year is TWELVE MONTHS rather than 365 days in the
+        relative form. With a 30-day month and a 365-day year there is a
+        five-day window that prints "12 months ago", which Keith ruled
+        out on 2026-09-24; making the year the month's own multiple
+        removes the window instead of special-casing it. Folding
+        fmtRelativeTime() into the shared rule also changed its
+        counting from rounded to floored, so 1000 days now reads "2
+        years ago" rather than "3" - the committed table's own
+        never-falls-back case (6.7 years to "6 years ago") settles the
+        direction.
+      - >-
+        Decided the RAW, UNBUILT TEMPLATE says "Not built" and draws no
+        instant at all, rather than being given a clock of its own. It
+        has no asset, so it has no asset clock, which is the same
+        "nothing embedded" fact as its null HIERARCHY and not
+        criterion 14's "cannot be resolved" case - there is nothing to
+        resolve. Rejected letting the formatter fall back for it, which
+        would have put a silent branch inside the one function whose
+        job is to refuse one.
+      - >-
+        Known narrowing, recorded rather than fixed: a run_date reaches
+        several render sites as a Date built at midnight UTC
+        (buildRealDataset's own toDate), so it is placed on the asset's
+        clock like any other instant. For an asset EAST of UTC - which
+        every deployment of this is - that is the same calendar day and
+        reads correctly. For one west of UTC it would read a day early,
+        and the fix is for toDate to build asset-midnight rather than
+        for the formatter to guess. Not done here because toDate's
+        output also feeds as-of comparison arithmetic that constructs
+        UTC midnight directly, and two conventions coexisting would be
+        worse than one narrow one.
+      - >-
+        Known cost, accepted: "Friday, 25 September 2026" is four times
+        the width of "2026-09-25", and the dense mono columns that used
+        to carry the short form - the supply-history table, the mothman
+        schedule table's Due and Claimable columns - are now
+        noticeably wider and wrap in a narrow terminal. The standard as
+        signed off has no carve-out for a compact column, so it was
+        applied everywhere rather than selectively; if a column reads
+        worse for it, that is a visual finding against this build, not
+        a reason to grow a second format.
     open_questions: []
+    linked_tests:
+      - tests/test_display_time.py
+      - tests-js/display-time.test.js
+      - tests/test_dashboard_e2e.py
+      - tests/test_cli_schedule.py
+      - tests-js/relative-time-and-markers.test.js
+    implemented_by:
+      - qa_tools/common/display_time.py::format_day
+      - qa_tools/common/display_time.py::format_instant
+      - qa_tools/common/display_time.py::format_relative
+      - dashboard/embed_dashboard_data.py::embed
+      - cli/schedule.py::_show_dataset
+    evidence:
+      - >-
+        2026-09-25: the FORMAT lives in display-time-cases.json at the
+        repo root, which neither test suite owns. 24 cases - 5 day, 7
+        instant, 12 relative - are read by tests/test_display_time.py
+        and tests-js/display-time.test.js and run through their own
+        side. Same shape as status-cases.json and for the same reason:
+        two implementations of one rule drifted once already on this
+        project and the drift rendered a check with 14 real violations
+        green.
+      - >-
+        2026-09-25: the call sites were ENUMERATED before anything was
+        changed, which the requirement's own non-functional constraint
+        asked for - 26 fmtDate, 2 fmtDateShort, 3 fmtArrival, a
+        character-sliced wall clock labelled " UTC", a raw ISO string
+        with microseconds in the supply-history timing column, a
+        toLocaleTimeString with a browser-zone label in the snapshots
+        picker, and the masthead counter. The wide-and-shallow risk the
+        constraint named is a site missed, so the guard below asserts
+        on the page rather than on the formatter.
+      - >-
+        2026-09-25: the criterion-7 guard was CONFIRMED TO BITE by
+        planting the old behaviour back - restoring the raw run_date
+        cell fails 6 of the 7 dataset pages, naming the offending
+        string. The guard walks every dataset page in a real browser
+        and looks for an ISO instant, an ISO date or a bare wall clock
+        in what a reader can actually see.
+      - >-
+        2026-09-25: criterion 14 is asserted from both ends - with no
+        asset timezone embedded, and with one Intl cannot resolve, the
+        page throws naming the zone rather than drawing a date. That
+        replaces assetTodayDateStr()'s own two silent fallbacks to the
+        viewer's clock (post-build-review #35's second residue), which
+        were the fixed bug returning with no signal.
+      - >-
+        2026-09-25: criterion 13 is asserted by waiting. The masthead
+        used to count up every 7 seconds from a hardcoded 4, so the
+        number a reader saw was the age of their own browser tab; the
+        test reads the stamp, waits 15 seconds - long enough to have
+        caught the old clock twice - and asserts it has not moved.
+      - >-
+        2026-09-25: criterion 9 has a real gate rather than a
+        convention. A test greps the committed template for the
+        browser's own date formatters and for a second
+        Intl.DateTimeFormat caller, and names the file a new one grew
+        in. Number formatting is deliberately not caught by it, because
+        a gate that cries wolf earns an exemption list and then gets
+        ignored.
+      - >-
+        2026-09-25: the two runtimes are compared DIRECTLY as well as
+        against the table - a real-browser test calls the page's own
+        fmtInstant and the CLI's own display_time.format_instant on the
+        same three instants and asserts the strings match. The table
+        proves each side right on its own; this proves they agree.
+      - >-
+        2026-09-25: 1407 Python tests and 294 JS tests pass, and all
+        nine mothman gates are green - including the real-browser render
+        check, which holds the built page to zero console errors and so
+        is what would catch a formatter throwing at a viewer. The Python
+        suite gained 171 tests and about 42 seconds against the last
+        recorded full run the same day; the new ones are mostly
+        real-browser, which costs far more per test than the rest.

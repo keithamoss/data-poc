@@ -32,6 +32,14 @@ import { JSDOM } from "jsdom";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const TEMPLATE_PATH = path.join(__dirname, "..", "..", "dashboard", "qa-reporting-dashboard.template.html");
 
+// The real asset's own zone, taken from the committed case table rather
+// than written out again here - display-time-cases.json already has to
+// declare it, and two copies of a timezone is exactly the kind of
+// second statement this project keeps deleting.
+export const ASSET_TIMEZONE_DEFAULT = JSON.parse(
+  readFileSync(path.join(__dirname, "..", "..", "display-time-cases.json"), "utf-8"),
+).asset_timezone;
+
 function stubMatchMedia(window) {
   window.matchMedia = window.matchMedia || function matchMedia(query) {
     return {
@@ -65,7 +73,7 @@ function stubMatchMedia(window) {
  * Caller must call `close()` when done (afterEach) - jsdom windows aren't
  * garbage-collected on their own the way a real browser tab is.
  */
-export function loadDashboard({ html, hierarchy } = {}) {
+export function loadDashboard({ html, hierarchy, assetTimezone } = {}) {
   let source = html ?? readFileSync(TEMPLATE_PATH, "utf-8");
   if (hierarchy !== undefined) {
     const line = `const HIERARCHY = ${JSON.stringify(hierarchy)};`;
@@ -74,6 +82,28 @@ export function loadDashboard({ html, hierarchy } = {}) {
     if (source === before) {
       throw new Error("could not find `const HIERARCHY = ...;` to replace - has the template changed?");
     }
+  }
+  // Same mechanism, for the asset clock (REQ-DASH-071). Every
+  // user-facing instant is rendered on it, so a test about how a date
+  // READS has to set it the way the real build does rather than
+  // assigning to window afterwards.
+  //
+  // EMBEDDED BY DEFAULT, unlike the hierarchy above, because a built
+  // dashboard always has one - the embed step reads it from
+  // contract/data-asset.yaml on every build. A test that left it out
+  // would be exercising a page that cannot exist. Pass `null`
+  // explicitly to get the other case: criterion 14's loud refusal.
+  {
+    const tz = assetTimezone === undefined ? ASSET_TIMEZONE_DEFAULT : assetTimezone;
+    const pattern = /const ASSET_TIMEZONE = .*?;\n/;
+    // Checked by MATCHING, not by comparing before and after: passing
+    // null substitutes the template's own value for itself, so an
+    // unchanged string here would be a false alarm rather than a
+    // missing const.
+    if (!pattern.test(source)) {
+      throw new Error("could not find `const ASSET_TIMEZONE = ...;` to replace - has the template changed?");
+    }
+    source = source.replace(pattern, `const ASSET_TIMEZONE = ${JSON.stringify(tz)};\n`);
   }
 
   const errors = [];

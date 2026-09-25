@@ -76,7 +76,11 @@ class TestShow:
         everything = _runner.invoke(schedule_cli.schedule_group,
                                      ["show", "--dataset", "birth-registrations", "--all"])
         assert everything.exit_code == 0, everything.output
-        assert everything.output.count("+0800") > windowed.output.count("+0800") * 10
+        # Counted on the time-of-day, which every Due and Claimable
+        # cell carries. It used to count "+0800" - the offset the
+        # display standard stopped printing (REQ-DASH-071 criterion 6:
+        # one clock, so nothing to distinguish it from).
+        assert everything.output.count("2:00pm") > windowed.output.count("2:00pm") * 10
 
     def test_the_window_says_how_much_it_left_out(self):
         """A trimmed list that does not admit it is trimmed is the same
@@ -167,7 +171,8 @@ def test_show_dataset_puts_the_deadline_on_the_page():
     assert result.exit_code == 0, result.output
     assert "Due" in result.output
     assert "Claimable from" in result.output
-    assert "09:00" in result.output, "the dataset's own expected time of day"
+    # "9:00am", not "09:00" - REQ-DASH-071 criterion 3.
+    assert "9:00am" in result.output, "the dataset's own expected time of day"
     assert "slot(s)" in result.output
 
 

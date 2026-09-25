@@ -363,8 +363,14 @@ class TestReleaseNotesPanel:
         rows_text = body.inner_text()
 
         assert "No release notes yet" not in rows_text
-        assert re.search(r"\b\d{4}-\d{2}-\d{2}\b", rows_text), \
+        # The day heading, in the one form this project writes a date in
+        # (REQ-DASH-071). It used to be the raw "2026-09-20" out of
+        # CHANGELOG.yaml, which criterion 7 rules out wherever a person
+        # can see it - so the ISO shape's ABSENCE is asserted too.
+        assert re.search(r"\b\w+day, \d{1,2} \w+ \d{4}\b", rows_text), \
             f"no dated day rendered in the release notes panel: {rows_text[:200]!r}"
+        assert not re.search(r"\b\d{4}-\d{2}-\d{2}\b", rows_text), \
+            f"a raw ISO date reached the release notes panel: {rows_text[:200]!r}"
         # A category heading and at least one component tag - the two
         # things the rewrite explicitly KEPT.
         assert any(c in rows_text for c in ("NEW", "IMPROVED", "FIXED")), rows_text[:300]
@@ -2144,3 +2150,94 @@ class TestABuiltRequirementShowsItsOwnHoles:
             return out;
         }""")
         assert bad == [], bad
+
+
+class TestTheDisplayStandardHoldsInARealBrowser:
+    """REQ-DASH-071, built 2026-09-25.
+
+    The unit suites (tests/test_display_time.py and its browser twin
+    tests-js/display-time.test.js) hold the two FORMATTERS to one
+    committed case table. This holds the PAGE to the formatters, which
+    is a different claim and the one that actually failed before: every
+    formatter on this page was already correct about its own arguments,
+    and the bug was that three render sites did not call them - one
+    character-sliced a wall clock out of the stored string and appended
+    " UTC", one emitted the stored string raw, microseconds and offset
+    included, and one counted seconds up from a hardcoded 4.
+
+    Same reasoning as CLAUDE.md's own shape-change rule: assert at the
+    layer a human sees, not at the layer that computes.
+    """
+
+    ALL_DATASETS = [
+        ("registry-services", "civil-registration", "birth-registrations"),
+        ("child-protection-family-support", "child-protection", "cp-clients"),
+        ("child-protection-family-support", "child-protection", "cp-carers"),
+        ("child-protection-family-support", "child-protection", "cp-case-workers"),
+        ("child-protection-family-support", "child-protection", "cp-notifications"),
+        ("child-protection-family-support", "child-protection", "cp-investigations"),
+        ("child-protection-family-support", "child-protection", "cp-placements"),
+    ]
+
+    # An ISO-8601 instant, an ISO date, or a bare wall clock. Criterion 7
+    # rules out all three wherever a person can read one.
+    RAW = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}|\b\d{4}-\d{2}-\d{2}\b|\b\d{2}:\d{2}:\d{2}\b")
+
+    @pytest.mark.parametrize("agency,collection,dataset_id", ALL_DATASETS)
+    def test_no_dataset_page_shows_a_raw_timestamp(
+            self, clean_page, built_dashboard_html, agency, collection, dataset_id):
+        _goto(clean_page, built_dashboard_html, state={
+            "tier": "dataset", "agencyId": agency,
+            "collectionId": collection, "datasetId": dataset_id})
+        text = clean_page.locator("#view").inner_text()
+        assert not self.RAW.search(text), (
+            f"{dataset_id} renders a raw timestamp: "
+            f"{self.RAW.search(text).group(0)!r} in {text[:400]!r}")
+
+    def test_the_supply_history_timing_column_reads_as_a_sentence(
+            self, clean_page, built_dashboard_html):
+        """43 raw "2026-09-16T05:17:30.280161+00:00" strings were landing
+        in this one column when the requirement was written."""
+        _goto(clean_page, built_dashboard_html, state={
+            "tier": "dataset", "agencyId": "registry-services",
+            "collectionId": "civil-registration", "datasetId": "birth-registrations"})
+        cells = clean_page.locator("#view table tr td").all_inner_texts()
+        timings = [c for c in cells if re.search(r"\d{1,2}:\d{2}(am|pm)", c)]
+        assert timings, "no formatted timing rendered in the supply history at all"
+        for cell in timings:
+            assert re.search(r"\d{1,2}:\d{2}(am|pm) \w+day, \d{1,2} \w+ \d{4}", cell), cell
+
+    def test_the_masthead_says_when_the_page_was_built(
+            self, clean_page, built_dashboard_html):
+        """Criterion 13 / post-build-review #60. It used to say "Live ·
+        updated 4s ago" and count up, so the number a reader saw was the
+        age of their own browser tab."""
+        _goto(clean_page, built_dashboard_html)
+        first = clean_page.locator("#clock-text").inner_text()
+        assert first.startswith("Built "), first
+        assert re.search(r"\d{1,2}:\d{2}(am|pm) \w+day, \d{1,2} \w+ \d{4}$", first), first
+
+    def test_the_masthead_does_not_count_up_while_the_page_sits_there(
+            self, clean_page, built_dashboard_html):
+        """The other half of criterion 13: no elapsed time measured from
+        when the reader opened it. The old clock ticked every 7 seconds;
+        this waits long enough to have caught it twice."""
+        _goto(clean_page, built_dashboard_html)
+        first = clean_page.locator("#clock-text").inner_text()
+        clean_page.wait_for_timeout(15_000)
+        assert clean_page.locator("#clock-text").inner_text() == first
+
+    def test_the_page_and_the_python_twin_agree_on_a_real_instant(
+            self, clean_page, built_dashboard_html):
+        """The cross-runtime check the shared case table cannot make:
+        both implementations pass the table independently, and this
+        asserts the PAGE's own function against the CLI's own function
+        on the same value."""
+        from qa_tools.common import display_time
+
+        _goto(clean_page, built_dashboard_html)
+        for value in ("2026-09-16T05:17:30.280161+00:00",
+                      "2026-01-01T16:00:00+00:00",
+                      "2026-09-29T14:15:00+08:00"):
+            in_browser = clean_page.evaluate(f"fmtInstant({value!r})")
+            assert in_browser == display_time.format_instant(value), value
