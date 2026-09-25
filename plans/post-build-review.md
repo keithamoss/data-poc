@@ -977,7 +977,7 @@ post-build critic should see a requirement's own `evidence:`.
    actually changes**, which is the half neither critic found. Seven
    failed before the fix.
 
-6. **[todo, 2026-09-24]** **[Dashboard UI]** **[F6] The executive
+6. **[done, 2026-09-25]** **[Dashboard UI]** **[F6] The executive
    tier's own explanatory sentence is now false.** It reads "worst-of,
    so nothing silently hides behind a healthy average" (template:2521)
    directly above the legend counter that is doing precisely that (#1).
@@ -1289,7 +1289,7 @@ post-build critic should see a requirement's own `evidence:`.
     "computed the same way" went with it - it was the stranded half of
     the removed mock-data sentence, not a clause the paragraph needed.
 
-16. **[todo, 2026-09-24]** **[Dashboard UI]** **[U9] The agency page
+16. **[done, 2026-09-25]** **[Dashboard UI]** **[U9] The agency page
     overflows horizontally on a phone.** `scrollWidth` 537 against a
     390px viewport, driven by `TABLE.dataset-table` at 539px: "Rows,
     latest run" is clipped mid-word and "Last QA run" / "Trend" are
@@ -1299,6 +1299,14 @@ post-build critic should see a requirement's own `evidence:`.
 
     **Recorded as reported** - the visual critic has this one in scope
     and may add measurements.
+
+    **CLOSED 2026-09-25 as an ACCEPTED LIMITATION, not a fix.** The
+    phone is not a target (Keith's standing decision below), so the
+    Tier-2 table's own responsive strategy is deliberately not
+    attempted. The cheap half of his instruction IS done: the three
+    badge rows and the collection title now carry `flex-wrap`, so a
+    status marker wraps instead of being clipped. Desktop width is
+    untouched - they wrap only when they would otherwise overflow.
 
 ### A standing decision that closes several findings at once
 
@@ -2437,7 +2445,7 @@ here as its own question, not acted on.
     scoped - the finding is the DATE. It stops being theoretical when
     the calendar runs out, which is a known, computable day.
 
-39. **[todo, 2026-09-24]** **[Pipeline & publishing]** **[B1/B2] Three
+39. **[done, 2026-09-25]** **[Pipeline & publishing]** **[B1/B2] Three
     model functions built in this batch have zero production callers.**
 
     **Verified by grep across `cli/ qa_tools/ pipeline/ generator/
@@ -3164,7 +3172,7 @@ twice. It deliberately did not re-find the `TypeError`.
     UTC-vs-AWST question separately. **This is the same subject as #3,
     #14 and road-testing item 5**, arriving from a fourth direction.
 
-52. **[todo, 2026-09-24]** **[Dashboard UI]** **[V6/V7] The mobile
+52. **[done, 2026-09-25]** **[Dashboard UI]** **[V6/V7] The mobile
     overflow's widest driver is the badge row, not the table - a
     different fix from the one #16 implies.**
 
@@ -3185,6 +3193,13 @@ twice. It deliberately did not re-find the `TypeError`.
     `flex-wrap`: container `clientWidth` 358 against `scrollWidth` 368,
     and the `1 schedule ended` pill's right edge sits 10px past the
     container's. The new marker is the thing cut off.
+
+    **CLOSED 2026-09-25, the cheap half only.** `flex-wrap:wrap` is on
+    `.collection-title` and on the three badge rows this entry measured,
+    which is one line each and is what stops the marker being clipped.
+    The badge row's own 336px owner pill still wraps rather than
+    shrinking, and that is accepted - the phone is not a target, and
+    "untidy" was the bar Keith set for it.
 
 53. **[in-progress, 2026-09-25]** **[Dashboard UI]** **[V11/V12/V13] The two
     new quiet-state branches were written with a different markup shape

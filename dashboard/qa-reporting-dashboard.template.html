@@ -353,7 +353,14 @@ button{font:inherit; color:inherit;}
 
 /* ============ Agency view: collections/datasets ============ */
 .collection-block{margin-bottom:28px;}
-.collection-title{display:flex; align-items:center; gap:10px; margin-bottom:10px;}
+/* flex-wrap, here and on the three badge rows below (post-build-review
+   #16/#52, the "shave off some of the rough edges" half of Keith's
+   2026-09-25 phone decision). The phone is NOT a target and no
+   responsive strategy is being attempted - these wrap only when they
+   would otherwise overflow, so desktop width is untouched, and what
+   they stop is a status marker being clipped ten pixels off the edge
+   rather than moving to the next line. */
+.collection-title{display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;}
 .collection-title h3{font-size:16px; font-family:"Public Sans",sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted);}
 .dataset-table{width:100%; border-collapse:collapse; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); overflow:hidden;}
 .dataset-table th{
@@ -3239,7 +3246,7 @@ function renderAgency(view, agencyId){
         <h2>${ag.name}</h2>
         <div class="view-sub">Real-time QA state across ${ag.name}'s data collections — for internal data teams and this agency's own data providers.</div>
       </div>
-      <div style="display:flex; align-items:center; gap:8px;">${pill(ag.status)}${githubFolderLink("agencies", ag.id)}${assignmentBadge("agencies", ag.id)}</div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ag.status)}${githubFolderLink("agencies", ag.id)}${assignmentBadge("agencies", ag.id)}</div>
     </div>
     <div id="collections"></div>
   `;
@@ -3515,7 +3522,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
           <h2>${ds.name}</h2>
           <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}</div>
         </div>
-        <div style="display:flex; align-items:center; gap:8px;">${pill("nodata")} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill("nodata")} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
       </div>
       <div class="notice-exhausted" role="status">
         <b>Nothing had been supplied by this date.</b>
@@ -3535,7 +3542,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <h2>${ds.name}${ds.realRunCount?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:""}</h2>
         <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${ds.realRunCount?" · figures below are computed by real dbt/Soda/datacontract-cli/Evidently tools against real generated runs — not fabricated in the browser.":""}</div>
       </div>
-      <div style="display:flex; align-items:center; gap:8px;">${pill(ds.status)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ds.status)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
     </div>
     ${exhaustedBanner}
     ${ds.noDataAsOf ? `
