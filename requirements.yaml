@@ -7080,6 +7080,48 @@ requirements:
       having gone wrong.
     moscow: must
     status: built
+    unmet_criteria:
+      # post-build-review #33, built 2026-09-25. These were named in a
+      # `decisions:` note - accurate, and in a field nobody has to read.
+      # A criterion this requirement does not meet now has somewhere
+      # structured to sit, and the gate can see it.
+      - criterion: >-
+          IF a dataset has no slot covering the date being processed, THEN THE
+          SYSTEM SHALL fail for that dataset.
+        why: >-
+          Describes a filing layer that does not exist yet. Nothing files a
+          supply against a slot, so there is nothing to fail at.
+        owner: batch 3, sprint 8 (staging and filing)
+      - criterion: THE SYSTEM SHALL fail at filing, before QA runs for that dataset.
+        why: Same filing layer - there is no filing step to fail before.
+        owner: batch 3, sprint 8 (staging and filing)
+      - criterion: >-
+          THE SYSTEM SHALL scope that failure to the affected dataset, and SHALL
+          NOT stop processing any other dataset.
+        why: Scopes a failure that cannot occur yet.
+        owner: batch 3, sprint 8 (staging and filing)
+      - criterion: >-
+          WHILE a dataset's schedule is exhausted, THE SYSTEM SHALL continue to
+          accept that dataset's supplies, so that the backlog can be filed
+          correctly once dates exist.
+        why: >-
+          The dashboard says this in words and nothing implements it - accepting
+          a supply into a backlog needs staging.
+        owner: batch 3, sprint 8 (staging and filing)
+      - criterion: >-
+          THE SYSTEM SHALL state, in that message, how many supplies are waiting
+          and since when, and SHALL NOT state how many days have elapsed.
+        why: >-
+          The exhausted notice says how many datasets cannot be processed and
+          never what is piling up, because nothing tracks a backlog yet. Raised
+          independently as post-build-review #7.
+        owner: batch 3, sprint 8 (staging and filing)
+      - criterion: >-
+          WHEN a run skips a dataset because its schedule is exhausted, THE
+          SYSTEM SHALL state in that run's own summary how many datasets were
+          processed and how many were skipped.
+        why: No run currently skips a dataset for this reason, so no summary says so.
+        owner: batch 3, sprint 8 (staging and filing)
     source: >
       Keith, 2026-09-21, plans/supply-model.md Thread C - "exhausted
       schedule - hard failure, scoped per dataset", stronger than the

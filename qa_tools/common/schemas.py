@@ -135,6 +135,30 @@ class SignOff(_Strict):
         return v
 
 
+class UnmetCriterion(_Strict):
+    """One acceptance criterion a `built` requirement does not meet.
+
+    WHY A FIELD AND NOT A THIRD STATUS (post-build-review #33, Keith's
+    own call, 2026-09-25): `status` is what the register is indexed and
+    filtered by, so a third value would make every consumer of it
+    decide what "partly built" means - and the honest answer for the
+    requirement that prompted this is that it IS built and has a hole
+    in it. A hole is a property of the record, not a different kind of
+    record.
+
+    ALL THREE FIELDS ARE REQUIRED, and that is the point rather than
+    strictness for its own sake. "Some criteria are unmet" is what the
+    prose already said, in a `decisions:` note nobody had to read; a
+    record that cannot name WHICH, WHY and WHO NEXT is the same
+    sentence in a different place. `owner` is free text because the
+    next owner is as often a finding or a sprint as a person.
+    """
+
+    criterion: NonEmptyStr
+    why: NonEmptyStr
+    owner: NonEmptyStr
+
+
 class Requirement(_Strict):
     id: str = Field(pattern=_ID_PATTERN)
     title: NonEmptyStr
@@ -178,6 +202,12 @@ class Requirement(_Strict):
     non_functional_requirements: list[str] = []
     dependencies: list[str] = []
     open_questions: list[str] = []
+
+    # Acceptance criteria a `built` requirement does not actually meet.
+    # Empty for the overwhelming majority, which must not have to say
+    # so. Only meaningful once something has been built - see the model
+    # validator below.
+    unmet_criteria: list[UnmetCriterion] = []
 
     @field_validator("date_written")
     @classmethod
@@ -231,8 +261,15 @@ class Requirement(_Strict):
         """
         if self.status == "built":
             return []
-        return [name for name in ("linked_tests", "implemented_by", "evidence")
-                if getattr(self, name)]
+        out = [name for name in ("linked_tests", "implemented_by", "evidence")
+               if getattr(self, name)]
+        # Nothing is built, so nothing can be UNmet - and allowing it
+        # would make the field mean two different things: "built with a
+        # hole" on one record and "scoped but not attempted" on
+        # another (post-build-review #33).
+        if self.unmet_criteria:
+            out.append("unmet_criteria")
+        return out
 
 
 class ChangelogItem(_Strict):

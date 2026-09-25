@@ -2051,7 +2051,7 @@ things the critics tried to break and could not.
 
 ### A process question, not a code one
 
-33. **[todo, 2026-09-24]** **[Docs & process]** **`REQ-PIPE-053` is
+33. **[done, 2026-09-25]** **[Docs & process]** **`REQ-PIPE-053` is
     marked `built` and its dashboard half is not built** (#2). The
     requirement's own `[BUILD]` decision already records that `built`
     overclaims for the filing-layer criteria, and says so plainly - so
@@ -2070,7 +2070,40 @@ things the critics tried to break and could not.
     proposal is summarised here so it does not live only in a chat log:
     add an optional `unmet_criteria:` list to a requirement - each
     entry naming the criterion, why it is unmet and who owns it next -
-    rather than adding a third status. Awaiting his yes.
+    rather than adding a third status.
+
+    **SIGNED OFF AND BUILT 2026-09-25** ("ship it").
+
+    **Why a field and not a third status**, recorded because it is the
+    part a future session would otherwise re-litigate: `status` is what
+    the register is indexed and filtered by, so a third value would
+    make every consumer of it decide what "partly built" means - and
+    the honest answer for the requirement that prompted this is that it
+    IS built and has a hole in it. A hole is a property of the record,
+    not a different kind of record.
+
+    **All three sub-fields are required**, which is the point rather
+    than strictness: "some criteria are unmet" is exactly what the
+    prose already said, and a record that cannot name WHICH, WHY and
+    WHO NEXT is the same sentence in a different place. `owner` is free
+    text because the next owner is as often a sprint or a finding as a
+    person.
+
+    **It cannot appear on a `not_started` requirement** - nothing is
+    built, so nothing is unmet, and allowing it would make the field
+    mean two different things.
+
+    **Applied to `REQ-PIPE-053`**, which now carries its six
+    filing-layer criteria as structured records rather than as a
+    `decisions:` note: the four dashboard criteria (#2) are genuinely
+    met as of today, so what remains is the staging work that honestly
+    belongs to batch 3, sprint 8. Criterion 9 is #7, which resolves the
+    same way.
+
+    **And it reaches a reader**, which was the actual complaint - the
+    requirements panel renders the block above `decisions:` and the
+    evidence, because "this is not all there" changes how everything
+    below it should be read.
 
 ### From `delivery-critic` (functional, 2026-09-24)
 

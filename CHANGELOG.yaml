@@ -133,6 +133,16 @@ releases:
               counted as healthy. Every figure is now counted in its own
               right, and the two quiet states appear in the key with
               their own totals whenever they are real.
+          - headline: A finished requirement can now admit what it did not finish
+            components: ["Docs & process"]
+            description: >
+              The requirements register could only say "built" or "not
+              started", so one marked built while six of its criteria
+              were not built at all read as complete, with the gap
+              recorded in a notes field nobody had to open. A
+              requirement can now list the criteria it does not meet,
+              each saying why and who picks it up next, and the
+              Requirements panel shows them above everything else.
           - headline: Quiet status pills no longer disappear under the cursor
             components: ["Dashboard UI"]
             description: >

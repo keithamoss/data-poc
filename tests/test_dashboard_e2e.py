@@ -2104,3 +2104,43 @@ class TestTheQuietPillsSurviveBeingLookedAt:
         assert widths["exhausted"] != widths["nodata"], (
             f"both borders render at {widths['exhausted']} - the intended weight "
             "difference does not exist on this display")
+
+
+class TestABuiltRequirementShowsItsOwnHoles:
+    """post-build-review #33, Keith: "I'm open to that. Give me a
+    proposal" then "ship it".
+
+    REQ-PIPE-053 was marked `built` while six of its criteria were not
+    built at all, and the only record of that was a `decisions:` note -
+    accurate, and in a field nobody has to read. The register's binary
+    built/not_started model had no way to say "built except for these",
+    so `built` overclaimed and nothing in CI could tell.
+
+    The proposal built here is an optional `unmet_criteria:` list
+    rather than a third STATUS: status is what the register is indexed
+    and filtered by, and the honest answer for this requirement is that
+    it IS built and has a hole in it.
+    """
+
+    def test_the_panel_names_them_rather_than_burying_them_in_decisions(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        found = clean_page.evaluate("""() => {
+            const r = (REQUIREMENTS||[]).find(x => x.id === "REQ-PIPE-053");
+            return r ? (r.unmet_criteria||[]).length : -1;
+        }""")
+        assert found == 6, f"REQ-PIPE-053 carries {found} unmet criteria"
+
+    def test_every_unmet_criterion_says_which_why_and_who_next(
+            self, clean_page, built_dashboard_html):
+        """A record that cannot answer those three is the same sentence
+        the prose already carried, in a different place."""
+        _goto(clean_page, built_dashboard_html)
+        bad = clean_page.evaluate("""() => {
+            const out = [];
+            (REQUIREMENTS||[]).forEach(r => (r.unmet_criteria||[]).forEach(u => {
+                if(!u.criterion || !u.why || !u.owner) out.push(r.id);
+            }));
+            return out;
+        }""")
+        assert bad == [], bad

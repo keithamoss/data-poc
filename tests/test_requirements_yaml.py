@@ -52,6 +52,12 @@ def test_parses_a_full_entry(tmp_path):
         "date_written": "", "non_functional_requirements": [], "dependencies": [],
         "open_questions": [], "evidence": [], "implemented_by": [],
         "decisions": [], "signed_off": None,
+        # post-build-review #33. This pins the WHOLE shape on purpose,
+        # so a new field has to be added here to pass - which is how it
+        # should behave: the parser's output is what the dashboard
+        # renders, and a field appearing in it silently is one nobody
+        # decided to show.
+        "unmet_criteria": [],
     }
 
 

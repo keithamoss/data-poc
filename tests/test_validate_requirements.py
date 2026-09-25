@@ -518,3 +518,58 @@ def test_sign_off_rejects_an_undeclared_field():
     errors = validate([_valid_entry(signed_off={"by": "Keith", "date": "2026-09-20",
                                                 "note": "looks good"})])
     assert any("note" in e for e in errors), errors
+
+
+# ---- unmet_criteria (post-build-review #33) --------------------------
+#
+# REQ-PIPE-053 is marked `built` and one of its dashboard criteria is
+# not built (#2) - a criterion on a sprint whose dashboard work WAS in
+# scope, which delivery-dashboard-ux had already rescued once from
+# being lost in scoping. The register's binary built/not_started model
+# had no way to say "built except for these", so `built` overclaimed
+# and nothing in CI could tell.
+#
+# Keith, 2026-09-25: "I'm open to that. Give me a proposal", then
+# "ship it". The proposal, and what is built here: an optional
+# `unmet_criteria:` list rather than a third STATUS. A status is what
+# the register is indexed and filtered by; adding a third value would
+# make every consumer of `status` decide what it means, and the honest
+# answer for REQ-PIPE-053 is that it IS built and has a hole in it.
+
+def test_a_built_requirement_may_declare_unmet_criteria():
+    entry = _valid_entry(unmet_criteria=[
+        {"criterion": "surface the low-runway warning in the dashboard",
+         "why": "the gate half shipped; the dashboard half was never built",
+         "owner": "post-build-review #2"},
+    ])
+    assert validate([entry]) == []
+
+
+def test_an_unmet_criterion_must_say_which_one_and_why():
+    """A bare list of strings would let "some criteria are unmet" pass
+    as a record, which is what the prose already did."""
+    for bad in ([{"criterion": "x"}], [{"why": "y"}], ["just a string"]):
+        assert validate([_valid_entry(unmet_criteria=bad)]), (
+            f"{bad!r} was accepted as an unmet-criteria record")
+
+
+def test_an_unmet_criterion_must_name_who_owns_it_next():
+    """The field exists so a gap has somewhere to go, not so it has
+    somewhere to sit."""
+    assert validate([_valid_entry(unmet_criteria=[
+        {"criterion": "x", "why": "y"}])])
+
+
+def test_a_requirement_that_is_not_started_cannot_have_unmet_criteria():
+    """Nothing is built, so nothing is unmet - and allowing it would
+    make the field mean two different things."""
+    entry = _valid_entry(status="not_started", linked_tests=[], implemented_by=[],
+                         evidence=[], decisions=[], signed_off=None,
+                         unmet_criteria=[{"criterion": "x", "why": "y", "owner": "z"}])
+    assert validate([entry])
+
+
+def test_omitting_it_entirely_is_still_valid():
+    """The overwhelming majority of requirements have no hole, and must
+    not have to say so."""
+    assert validate([_valid_entry()]) == []

@@ -4397,6 +4397,19 @@ function renderRequirementsPanel(){
         </div>` : "";
     const deps = (r.dependencies||[]).length
       ? `<div style="margin-top:8px; font-size:12px; color:var(--ink-muted);">Depends on: ${r.dependencies.map(d=>`<code>${d}</code>`).join(", ")}</div>` : "";
+    // A BUILT REQUIREMENT'S OWN HOLES, where a reader will see them
+    // (post-build-review #33). The register marked REQ-PIPE-053 `built`
+    // while one of its dashboard criteria was not built at all, and the
+    // only record of that was a `decisions:` note nobody had to read.
+    // Rendered ABOVE the decisions and the evidence, because "this is
+    // not all there" changes how everything below it should be read.
+    const unmet = (r.unmet_criteria||[]).length
+      ? `<div style="margin-top:10px; padding:8px 10px; border:1px dashed var(--ink-faint); border-radius:6px; font-size:12px;">
+          <b>Built, except for ${r.unmet_criteria.length} ${r.unmet_criteria.length===1?"criterion":"criteria"}:</b>
+          <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${r.unmet_criteria.map(u=>`
+            <li>${escHtml(u.criterion)}<br>
+              <span style="color:var(--ink-muted);">${escHtml(u.why)} — next: ${escHtml(u.owner)}</span></li>`).join("")}</ul>
+        </div>` : "";
     const openQs = (r.open_questions||[]).length
       ? `<div style="margin-top:10px; padding:8px 10px; background:var(--surface-alt); border-radius:6px; font-size:12px;">
           <b>Open questions:</b>
@@ -4434,6 +4447,7 @@ function renderRequirementsPanel(){
         <div style="font-size:13px; color:var(--ink-muted); margin-bottom:10px;">${r.story}</div>
         <ul style="margin:0; padding-left:18px; font-size:12.5px; line-height:1.5;">${criteria}</ul>
         ${nfrs}
+        ${unmet}
         ${decisions}
         ${impl}
         ${tests}
