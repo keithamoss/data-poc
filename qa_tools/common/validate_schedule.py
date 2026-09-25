@@ -117,13 +117,24 @@ class ConfigError:
 
 
 def _month_number(value) -> int | None:
-    """A full English month name, or None. Deliberately strict - see
-    schedule.parse_month_name(), whose reading this mirrors."""
+    """A full English month name, or None.
+
+    DELEGATES to `schedule.parse_month_name()` rather than mirroring
+    it. It used to mirror it, and the two drifted in the way a mirror
+    always eventually does: the runtime lowercased and this did
+    `_MONTHS.index()` against title case, so `delivery_months:
+    [february]` - honoured perfectly at runtime - was refused here with
+    "which is not a month", plus a cascaded second error saying the
+    dataset expected no supply at all (post-build-review #34).
+
+    The gate's job is to refuse what the runtime cannot read. That is
+    only true if it asks the runtime, so it asks.
+    """
     if not isinstance(value, str):
         return None
     try:
-        return _MONTHS.index(value.strip()) + 1
-    except ValueError:
+        return schedule.parse_month_name(value, "month")
+    except schedule.ScheduleConfigError:
         return None
 
 

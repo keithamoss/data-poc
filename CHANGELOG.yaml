@@ -133,6 +133,34 @@ releases:
               counted as healthy. Every figure is now counted in its own
               right, and the two quiet states appear in the key with
               their own totals whenever they are real.
+          - headline: Changing a delivery calendar no longer moves old claim windows
+            components: ["Pipeline & publishing"]
+            description: >
+              How early a supply may be filed against a slot was read
+              from whichever version of the calendar is current, and
+              applied to every slot including ones years old. Shortening
+              the window today would have quietly moved when past
+              supplies became claimable. Each slot now uses the window
+              that was in force on its own date. A window set on an
+              individual dataset is unaffected - it has no versions to
+              move between.
+          - headline: An unrecognised collection is now an error, not an empty day
+            components: ["Pipeline & publishing"]
+            description: >
+              Asking for the arrivals of a collection that does not
+              exist returned nothing at all, which looks exactly like a
+              collection that has had no deliveries. Renaming one would
+              have given you a pipeline that processed nothing and said
+              nothing was wrong. It now stops and tells you which
+              collections there are.
+          - headline: Lower-case month names are accepted where they always worked
+            components: ["Pipeline & publishing"]
+            description: >
+              Writing "february" instead of "February" in a delivery
+              calendar was refused by the build check with "which is not
+              a month", even though the pipeline itself read it
+              perfectly. The check now asks the pipeline how it reads a
+              month rather than keeping its own second opinion.
           - headline: Every commit in a push is now checked for quiet edits
             components: ["Pipeline & publishing"]
             description: >

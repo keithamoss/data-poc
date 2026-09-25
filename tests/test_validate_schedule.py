@@ -689,6 +689,54 @@ class TestTheGateActuallyFailsTheBuild:
         assert validate_schedule.main() == 0
 
 
+class TestTheGateAndTheRuntimeReadAMonthTheSameWay:
+    """post-build-review #34. `schedule.parse_month_name` lowercases;
+    the gate's own `_month_number` did `_MONTHS.index()` against title
+    case. So `delivery_months: [february]` - which the runtime honours
+    perfectly - was refused at the gate with "which is not a month",
+    and the refusal cascaded into a second, untrue error saying the
+    dataset expects no supply at all.
+
+    A false RED rather than a false green, but the same
+    two-implementations-of-one-rule shape `REQ-QAC-047` exists to stamp
+    out, one requirement earlier in the same batch.
+
+    Held to EACH OTHER rather than each to its own expectation, which
+    is what the finding asked for: a parity test keeps them together
+    when either one changes.
+    """
+
+    CASES = ["February", "february", "FEBRUARY", "  February  ", "fEbRuArY",
+              "January", "december",
+              "Febuary", "Feb", "2", "", "Smarch"]
+
+    def test_every_spelling_reads_the_same_in_both(self):
+        from qa_tools.common import schedule
+        from qa_tools.common import validate_schedule as mod
+
+        for value in self.CASES:
+            try:
+                runtime = schedule.parse_month_name(value, "test")
+            except schedule.ScheduleConfigError:
+                runtime = None
+            assert mod._month_number(value) == runtime, (
+                f"{value!r}: the gate says {mod._month_number(value)!r} and the runtime "
+                f"says {runtime!r} - config one accepts, the other refuses")
+
+    def test_a_lowercase_month_is_not_reported_as_not_a_month(self):
+        """The end-to-end consequence, at the layer a maintainer sees."""
+        from qa_tools.common import validate_schedule as mod
+
+        assert mod._month_number("february") == 2
+
+    def test_a_real_typo_is_still_refused(self):
+        """The must-not-change half - case-insensitive is not lenient."""
+        from qa_tools.common import validate_schedule as mod
+
+        assert mod._month_number("Febuary") is None
+        assert mod._month_number("Feb") is None
+
+
 class TestTheGuardIsNotAsNarrowAsItLooked:
     """post-build-review #44, the cheap hardening, 2026-09-25.
 

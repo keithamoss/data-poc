@@ -563,8 +563,16 @@ def periods_for_dataset(dataset_id: str, until: date | None = None) -> list[Data
     return _decorate(periods)
 
 
-def claim_window(dataset_id: str, contract_value: str | None = None) -> timedelta:
+def claim_window(dataset_id: str, contract_value: str | None = None,
+                  on: date | None = None) -> timedelta:
     """How long BEFORE a slot's due instant its claim window opens.
+
+    `on` IS THE PERIOD'S OWN DATE, and passing it is what makes the
+    answer effective-dated: the calendar version in force on that date
+    supplies the default, not whichever version happens to be current
+    when the question is asked. Omitting it means "as things stand
+    today", which is what a `mothman schedule show` line wants and what
+    no slot derivation should ever want (post-build-review #42).
 
     BEFORE, and the first line of this docstring used to say "after",
     which was wrong in the one way that matters (found building
@@ -605,10 +613,38 @@ def claim_window(dataset_id: str, contract_value: str | None = None) -> timedelt
     supply is in order to assign it - earliness is a reported
     consequence of assignment, so earlyWindow would name the wrong half
     of what this does.
+
+    WHY THE CONTRACT OVERRIDE IS NOT VERSIONED AND THE CALENDAR DEFAULT
+    IS: the override is declared in the dataset's own ODCS contract,
+    which has no effective_from and no version sequence, so there is no
+    date at which one of its values was in force rather than another.
+    The calendar has exactly that, which is the whole reason the
+    default can move under history and the override cannot.
     """
     if contract_value is not None:
         return parse_duration(contract_value, f"dataset {dataset_id!r} claimWindow")
-    return calendar_for_dataset(dataset_id).current.claim_window
+    cal = calendar_for_dataset(dataset_id)
+    if on is None:
+        return cal.current.claim_window
+    return _version_in_force(cal, on).claim_window
+
+
+def _version_in_force(cal: Calendar, on: date) -> CalendarVersion:
+    """The version whose period of effect contains `on`.
+
+    A date BEFORE the first version's effective_from takes that first
+    version rather than raising - the same thing `periods_for_calendar`
+    does implicitly by never generating such a period, and the only
+    answer that does not turn "this calendar was authored later than
+    its own earliest data" into an error nobody can act on.
+    """
+    chosen = cal.versions[0]
+    for version, start, end in _effect_windows(cal):
+        if on >= start and (end is None or on < end):
+            return version
+        if on >= start:
+            chosen = version
+    return chosen
 
 
 def candidate_dates(calendar_name: str, year: int) -> list[tuple[Period, str]]:

@@ -265,3 +265,106 @@ class TestItTouchesNoData:
         monkeypatch.setattr(Path, "open", watching)
         slots.slots_for_dataset("cp-clients")
         assert not [p for p in opened if "/data/" in p or p.endswith("duckdb")], opened
+
+
+class TestTheClaimWindowIsEffectiveDated:
+    """post-build-review #42. `claim_window()` read `calendar.current`
+    and `slots_for_dataset` applied that one value to every slot,
+    including slots for periods years in the past. Author a version
+    changing 14d to 7d and every historical slot's `claim_opens_at`
+    moved.
+
+    That is exactly the retroactivity `REQ-PIPE-051` built
+    `_effect_windows()` to prevent for period DATES, arriving through
+    the other half of the same config:
+    `periods_for_calendar()` got it right and `claim_window()` did not.
+
+    It matters more than a display detail because Thread E's settled
+    assignment rule is "the oldest slot whose claim window is open" -
+    so a window that moves retroactively means re-deriving a past
+    assignment can give a different answer than the one history was
+    actually filed under.
+    """
+
+    def _two_windows(self):
+        """Same shape as test_schedule.py's own two-version fixture,
+        except that what differs between the versions is the CLAIM
+        WINDOW rather than the dates."""
+        return {"data_asset_id": "data-asset-1",
+                "calendars": [{"name": "c", "versions": [
+                    {"effective_from": "2023-01-01", "changelog": ["initial"],
+                     "claim_window": "14d",
+                     "dates": [{"period": "2024-Q1", "date": "2024-02-01"}]},
+                    {"effective_from": "2027-01-01",
+                     "changelog": ["2027-01-01: window shortened to 7 days"],
+                     "claim_window": "7d",
+                     "dates": [{"period": "2027-Q1", "date": "2027-02-01"}]},
+                ]}],
+                "hierarchy": {"agencies": [{"id": "a", "name": "A", "collections": [
+                    {"id": "col", "name": "Col", "contract": "c.yaml", "datasets": [
+                        {"id": "d", "name": "D", "table": "t", "calendar": "c"}]}]}]}}
+
+    def _repoint(self, tmp_path, monkeypatch):
+        import shutil
+
+        import yaml
+
+        contract_dir = tmp_path / "contract"
+        shutil.copytree("contract", contract_dir)
+        path = contract_dir / "data-asset.yaml"
+        path.write_text(yaml.safe_dump(self._two_windows()))
+        monkeypatch.setattr(schedule, "DATA_ASSET_YAML", path)
+        monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", path)
+        schedule._load.cache_clear()
+        schedule._dataset_schedules.cache_clear()
+        hierarchy._load.cache_clear()
+        # The fixture's contract is a stand-in; the timing that matters
+        # here comes from the calendar, so pin the contract side flat.
+        import pipeline.cadence as cadence
+        monkeypatch.setattr(cadence, "parse_cadence_from_contract",
+                             lambda path, element=None: {"expected_time": "09:00",
+                                                          "latency_minutes": 0})
+        monkeypatch.setattr(cadence, "parse_claim_window_from_contract",
+                             lambda path, element=None: None)
+
+    def test_a_past_slot_keeps_the_window_that_was_in_force_on_its_own_date(
+            self, tmp_path, monkeypatch):
+        self._repoint(tmp_path, monkeypatch)
+        try:
+            by_period = {s.name: s for s in slots.slots_for_dataset("d")}
+            old = by_period["2024-Q1"]
+            assert old.claim_opens_at == old.due_at - timedelta(days=14), (
+                "the 2024 slot took the 2027 version's 7-day window - authoring a new "
+                "calendar version moved a claim window that history was filed under")
+        finally:
+            schedule._load.cache_clear()
+            schedule._dataset_schedules.cache_clear()
+            hierarchy._load.cache_clear()
+
+    def test_a_current_slot_takes_the_current_version(self, tmp_path, monkeypatch):
+        """The other half - effective-dating must not freeze the window
+        at the oldest version either."""
+        self._repoint(tmp_path, monkeypatch)
+        try:
+            by_period = {s.name: s for s in slots.slots_for_dataset("d")}
+            new = by_period["2027-Q1"]
+            assert new.claim_opens_at == new.due_at - timedelta(days=7)
+        finally:
+            schedule._load.cache_clear()
+            schedule._dataset_schedules.cache_clear()
+            hierarchy._load.cache_clear()
+
+    def test_a_contract_override_still_wins_at_every_date(self, tmp_path, monkeypatch):
+        """Criterion 10's override is declared in the ODCS contract, not
+        in the calendar, so it is not versioned and must not become so."""
+        self._repoint(tmp_path, monkeypatch)
+        import pipeline.cadence as cadence
+        monkeypatch.setattr(cadence, "parse_claim_window_from_contract",
+                             lambda path, element=None: "2h")
+        try:
+            for slot in slots.slots_for_dataset("d"):
+                assert slot.claim_opens_at == slot.due_at - timedelta(hours=2)
+        finally:
+            schedule._load.cache_clear()
+            schedule._dataset_schedules.cache_clear()
+            hierarchy._load.cache_clear()

@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from qa_tools.common import arrivals, delivery
+from qa_tools.common import arrivals, delivery, hierarchy
 
 PERTH = timezone(timedelta(hours=8))
 WHEN = datetime(2026, 8, 24, 14, 36, 3, tzinfo=PERTH)
@@ -53,6 +53,37 @@ def _cp(dirs, name, when=WHEN):
 def _for(dirs, collection="civil-registration", prefix="run_"):
     d, r = dirs
     return arrivals.arrivals_for(collection, prefix, d, r)
+
+
+class TestAnUnknownCollectionIsAnError:
+    """post-build-review #41. `arrivals_for()` answered an unknown
+    collection id with `[]` - a pipeline that processes nothing and
+    reports nothing wrong, which is the false-green direction.
+
+    It matters because the id is restated inline in several entry
+    points (#36), so renaming a collection in `contract/data-asset.yaml`
+    used to give every BDM/CP run zero arrivals rather than an error.
+    Everywhere else in this layer an unknown id raises -
+    `hierarchy.dataset`, `schedule.calendar`, `datasets_in_collection` -
+    and this was the one exception.
+    """
+
+    def test_a_renamed_collection_raises_rather_than_returning_nothing(self, dirs):
+        _bdm(dirs, "d1")
+        with pytest.raises(hierarchy.UnknownDatasetError, match="civil-registration-RENAMED"):
+            _for(dirs, collection="civil-registration-RENAMED")
+
+    def test_the_error_names_the_collections_that_do_exist(self, dirs):
+        """The usual cause is a near miss, so the error has to be
+        actionable without opening the config."""
+        with pytest.raises(hierarchy.UnknownDatasetError, match="civil-registration"):
+            _for(dirs, collection="civil-registrations")
+
+    def test_a_real_collection_with_no_deliveries_still_answers_empty(self, dirs):
+        """The must-not-change half: nothing having arrived yet is an
+        ordinary state, not an error. Only an id the tree does not
+        define is."""
+        assert _for(dirs) == []
 
 
 class TestADeliveryIsRecognisedNotLabelled:

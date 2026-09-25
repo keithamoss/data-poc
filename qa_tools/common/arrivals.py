@@ -134,7 +134,17 @@ def arrivals_for(collection_id: str, run_id_prefix: str,
 
     Run ids are assigned from receipt order within the collection, so
     they are dateless, deterministic and derived from a real observable.
+
+    AN UNKNOWN COLLECTION RAISES rather than answering `[]`, which is
+    what it used to do. Empty means "nothing has arrived yet", an
+    ordinary state; a collection the tree does not define is a
+    different thing entirely, and returning the same answer for both
+    made a renamed collection look like a quiet day - a pipeline
+    processing nothing and reporting nothing wrong
+    (post-build-review #41). Everywhere else in this layer an unknown
+    id raises, and this was the exception.
     """
+    hierarchy.datasets_in_collection(collection_id)  # raises if unknown
     out: list[Arrival] = []
     for d in delivery.list_deliveries(deliveries_dir, receipts_dir):
         found, by_dataset, unmatched = recognise(d)

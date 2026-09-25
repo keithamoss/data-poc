@@ -1760,7 +1760,7 @@ because **three evidence claims are overstated** (#35, #39, #43). Worth
 deciding whether a future critic gets criteria-only extracts; recorded
 here as its own question, not acted on.
 
-34. **[todo, 2026-09-24]** **[Pipeline & publishing]** **[A3] Month
+34. **[done, 2026-09-25]** **[Pipeline & publishing]** **[A3] Month
     names are case-insensitive in the runtime and case-SENSITIVE in the
     gate, so valid config is rejected with an untrue message.**
 
@@ -1795,6 +1795,20 @@ here as its own question, not acted on.
     failing test first,** and the test should be the parity kind: the
     two functions should be held to each other, not each to its own
     expectation.
+
+    **DONE 2026-09-25, and not with a `.lower()`.** The gate's
+    `_month_number()` now DELEGATES to `schedule.parse_month_name()`
+    rather than mirroring its reading, so there is one implementation
+    of the rule instead of two that agree until they do not. A gate's
+    job is to refuse what the runtime cannot read, which is only true
+    if it asks the runtime.
+
+    The parity test the finding asked for, holding the two to each
+    other across twelve spellings rather than each to its own
+    expectation, plus the end-to-end case (`february` is month 2, not
+    "not a month") and the must-not-change half (`Febuary` and `Feb`
+    are still refused - case-insensitive is not lenient). Confirmed
+    failing first.
 
 35. **[in-progress, 2026-09-25]** **[Pipeline & publishing]** **[A4] Two
     wall-clock computations are not on the asset clock.**
@@ -1995,7 +2009,7 @@ here as its own question, not acted on.
     rather than leave two signed criteria disagreeing - a future session
     reading 040 alone would conclude the bookkeeping file is a defect.
 
-41. **[todo, 2026-09-24]** **[Pipeline & publishing]** **[D2]
+41. **[done, 2026-09-25]** **[Pipeline & publishing]** **[D2]
     `arrivals_for()` answers an unknown collection with silence.**
 
     **Verified** at `qa_tools/common/arrivals.py:141-142` - `if found !=
@@ -2019,9 +2033,18 @@ here as its own question, not acted on.
     "no permissive fallback" stance `CLAUDE.md` takes elsewhere.
 
     **SIGNED OFF 2026-09-25** - "yep, we should definitely raise on
-    unknown collection id." To build.
+    unknown collection id."
 
-42. **[todo, 2026-09-24]** **[Pipeline & publishing]** **[B6] The claim
+    **DONE 2026-09-25.** `arrivals_for()` now calls
+    `hierarchy.datasets_in_collection(collection_id)` first, which
+    already raised the right error naming the real collections - the
+    function simply never asked it. Three tests, the first two
+    confirmed failing first: a renamed collection raises, the error
+    names what does exist, and the must-not-change half - a real
+    collection with nothing delivered yet still answers `[]`, because
+    empty is an ordinary state and only an undefined id is not.
+
+42. **[done, 2026-09-25]** **[Pipeline & publishing]** **[B6] The claim
     window is not effective-dated, so a new calendar version moves
     history.**
 
@@ -2082,6 +2105,33 @@ here as its own question, not acted on.
     window as well as to the dates** - plus tightening 052's criterion
     10 to name the version, which touches `requirements.yaml`'s own
     claims and so is Keith's.
+
+    **DONE 2026-09-25** (the code half; the criterion-10 wording is
+    still Keith's and is listed with the other register items).
+    `schedule.claim_window()` takes an optional `on:` date and resolves
+    the default through a new `_version_in_force()`, built on
+    `_effect_windows()` - the same mechanism the dates already use.
+    `slots_for_dataset()` now asks per period, on that period's own
+    date, instead of hoisting one value out of the loop.
+
+    Two decisions worth keeping. **The contract override stays
+    unversioned**: it is declared in the dataset's own ODCS contract,
+    which has no `effective_from` and no version sequence, so there is
+    no date at which one of its values was in force rather than
+    another - only the calendar default can move under history.
+    **A date before the first version's `effective_from` takes that
+    first version** rather than raising, which is what
+    `periods_for_calendar` already does implicitly by never generating
+    such a period; raising would turn "this calendar was authored later
+    than its own earliest data" into an error nobody can act on.
+
+    Three tests, the first confirmed failing first against a real
+    two-version calendar whose versions differ in claim window rather
+    than in dates: the 2024 slot opened seven days before its due
+    instant instead of fourteen, taking the 2027 version's value. The
+    other two are the halves that must not change - a current slot
+    still takes the current version, and a contract override still wins
+    at every date.
 
 43. **[done, 2026-09-24]** **[Testing & dev tooling]** **[C1/C3/C4] Two
     gates claimed to catch "a throw reaching a viewer" do not, and the

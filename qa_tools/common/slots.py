@@ -113,12 +113,18 @@ def slots_for_dataset(dataset_id: str, until: date | None = None) -> list[Slot]:
     """
     expected_time, grace_minutes, window_override = _contract_timing(dataset_id)
     grace = timedelta(minutes=grace_minutes)
-    window = schedule.claim_window(dataset_id, window_override)
 
     out = []
     for dataset_period in schedule.periods_for_dataset(dataset_id, until=until):
         if not dataset_period.expected:
             continue
+        # Resolved PER PERIOD, on that period's own date. Hoisting this
+        # out of the loop is what made a new calendar version move every
+        # historical slot's claim_opens_at - the same retroactivity
+        # _effect_windows() already prevents for the dates themselves
+        # (post-build-review #42).
+        window = schedule.claim_window(dataset_id, window_override,
+                                        on=dataset_period.period.date)
         due_at = asset_time.wall_clock(dataset_period.date, expected_time)
         out.append(Slot(dataset_id=dataset_id, period=dataset_period.period,
                          due_at=due_at, grace=grace, claim_opens_at=due_at - window))
