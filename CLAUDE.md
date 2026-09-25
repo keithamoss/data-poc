@@ -611,6 +611,20 @@ Rough layout:
   more tests since the entry above, and that is where the growth went -
   no new hot spot. JS suite 315 tests in ~18s.
 
+  -> **~200s/1830 tests (2026-09-26, the overnight sprint batch)**. Up
+  ~20s on 96 more tests since the entry above; most of the new ones are
+  real-browser e2e, which costs far more per test than the rest. JS
+  suite 335 tests in ~22s. One REAL, TIME-DEPENDENT test defect
+  surfaced in the run before this one and is fixed rather than waived:
+  an e2e assertion drove the DEFAULT as-of date - today on the asset
+  clock - against Birth Registrations, which is daily, so the moment
+  the Perth date rolled past the newest generated run its row correctly
+  went quiet and the assertion had nothing to find. Nothing about the
+  page was wrong. Worth knowing before reading that shape as a
+  regression: anything asserting on a DAILY dataset's current-cycle
+  state has a shelf life of one day unless it takes the as-of date from
+  the data rather than from the clock.
+
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.

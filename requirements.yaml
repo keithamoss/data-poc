@@ -4124,6 +4124,16 @@ requirements:
       - Seeded and deterministic, so regenerating twice produces the
         same history and a diff stays a real correctness check.
     dependencies: [REQ-PIPE-034, REQ-PIPE-036, REQ-QAC-037]
+    open_questions:
+      - >
+        BLOCKED, 2026-09-26. Criterion 2 stores a cross-table result
+        under its own cross-table scope, and where that scope lives and
+        what it is called is REQ-QAC-037's own unresolved open question
+        - so this cannot be built without answering it there first.
+        Criterion 4's regeneration from scratch is also a large,
+        one-way change to every committed file and wants a person
+        watching it rather than an unattended run.
+
     decisions:
       - >
         SCOPE NARROWED 2026-09-24 (Keith), in a requirement already
@@ -6187,6 +6197,27 @@ requirements:
         regeneration that moves a past date should say so in its commit
         message.
     dependencies: [REQ-GEN-040, REQ-GEN-042, REQ-GEN-043, REQ-PIPE-049, REQ-PIPE-051]
+    open_questions:
+      - >
+        BLOCKED ON A CONFIGURATION DECISION THAT IS KEITH'S, found
+        2026-09-26 while working through the requirement. Criterion 2
+        requires each scenario to be generated under a schedule
+        configuration that makes its stated outcome correct, and
+        criterion 8 requires those configurations to be expressed as
+        effective-dated versions of the same calendar. The register's
+        daily scenarios need three different ones: TS-1 is "daily, due
+        12:00", TS-2 is "daily, due ~22:00", and TS-3c/3d and TS-10 are
+        evening-before - the supply for day D due 22:00 on D-1, with a
+        four-hour window. Birth Registrations is the only daily dataset
+        and is currently due 14:00 with sixty minutes' grace, so
+        hosting them means splitting its history into eras with
+        different due times, which changes what every existing Birth
+        Registrations verdict means. That is a product decision rather
+        than an implementation one. Criterion 11 also forbids two
+        scenarios needing incompatible configurations inside one
+        version's period of effect, so the eras have to be laid out
+        deliberately rather than derived.
+
     decisions:
       - Decided against a scenario label on the injected runs (Keith,
         2026-09-22 - "this is still just a proof of concept remember").
