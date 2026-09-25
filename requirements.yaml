@@ -1488,6 +1488,18 @@ requirements:
         actually meets today - the real committed history has nothing
         outstanding, and "nothing is waiting" must not look like "this
         panel is broken".
+      - >
+        2026-09-26: one of criterion 11's own e2e assertions was FOUND
+        WRONG the same night, by the gate rather than in review. It
+        drove the default as-of date - today on the asset clock - and
+        went red the moment the Perth date rolled past the newest
+        generated run: Birth Registrations is daily, so a day later its
+        newest supply falls outside its own current cycle and the row
+        correctly renders the quiet state, which has no arrival cell to
+        carry a qualifier. Nothing about the page was wrong. It now
+        takes the as-of date from the page's own data. Same shape as
+        plans/post-build-review.md #59, and it would have gone red in
+        CI on the next run for the same reason.
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     unmet_criteria:
       - criterion: >
@@ -6398,7 +6410,7 @@ requirements:
       showing what the model does is one click rather than a date picker
       and an explanation.
     moscow: should
-    status: not_started
+    status: built
     source: >
       Keith, 2026-09-22, on the test scenario register - "if I click on a
       test, it takes me to the relevant as-of date and then the relevant
@@ -6436,6 +6448,72 @@ requirements:
         standalone document, which is a real constraint on REQ-GEN-045
         rather than an afterthought.
     dependencies: [REQ-GEN-045, REQ-DASH-041]
+    linked_tests:
+      - tests-js/scenario-panel.test.js
+      - tests/test_dashboard_e2e.py
+    implemented_by:
+      - dashboard/qa-reporting-dashboard.template.html::scenarioTarget
+      - dashboard/qa-reporting-dashboard.template.html::goToScenario
+      - dashboard/qa-reporting-dashboard.template.html::renderScenariosPanel
+      - dashboard/embed_dashboard_data.py::embed
+      - qa_tools/common/scenario_map.py::read_map_data
+    evidence:
+      - >
+        2026-09-25: criterion 3 is asserted as what the map MAY NOT
+        CONTAIN as well as what the page does with it. The target
+        carries a state and an as-of date and nothing else; the
+        embedded map is asserted to contain no "http" and no "#/"
+        anywhere; and a coordinate that already looks like a URL
+        resolves to no target at all rather than being followed.
+      - >
+        2026-09-25: criterion 4 is the state of EVERY entry today, which
+        makes it the one worth asserting hardest - nothing is injected
+        yet, so a panel full of dead links is exactly the failure this
+        rules out. The rendered panel is asserted to contain zero <a>
+        elements and zero activatable controls.
+      - >
+        2026-09-25: a coordinate this page cannot place - a dataset
+        since renamed or retired - resolves to no target rather than to
+        a page that does not exist. Sending a reader somewhere broken
+        is worse than telling them it has gone.
+      - >
+        2026-09-25: the as-of date is applied BEFORE the navigation, not
+        after. applyAsOf() rebuilds the data and re-renders, so
+        navigating first would render the target page at the old date
+        and then replace it - a visible flash of the wrong answer,
+        which on a page about as-of dates is the one flash worth
+        avoiding.
+      - >
+        2026-09-25: A SIDE PANEL rather than a top-level tab, unlike
+        Plans and Demo, and criterion 2 is the reason: selecting an
+        entry navigates AWAY to the thing it names. Leaving a tab to do
+        that is a worse motion than closing a panel over the page you
+        are about to land on, and this is a list you consult rather
+        than a place you work. It behaves like every other side panel,
+        including being a real history entry the back button closes.
+      - >
+        2026-09-25: criterion 5's "committed file, and no data/ access"
+        is satisfied by the map carrying its own machine-readable copy
+        INSIDE the markdown, as an HTML comment. One committed file for
+        both readers. A JSON sidecar was rejected: two files that must
+        agree is the shape this project keeps removing, one staleness
+        gate cannot cover both, and the pair drifts the first time
+        somebody regenerates one.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
+    unmet_criteria:
+      - criterion: >
+          Criterion 2 - navigating to the as-of date and the page an
+          entry names - is built and unit-tested through
+          scenarioTarget(), but no entry carries coordinates today, so
+          the click path is never exercised end to end in a browser.
+        why: >
+          REQ-GEN-044 places the scenarios and writes the coordinates,
+          and it is not built - it needs schedule-configuration
+          decisions that are Keith's. Recorded rather than claimed,
+          because "every entry renders as plain text" is simultaneously
+          criterion 4 passing properly and criterion 2 passing
+          vacuously, and those read identically in a register.
+        owner: REQ-GEN-044
     decisions:
       - Decided this is a separate requirement from the map's
         generation, because the two are verified in entirely different

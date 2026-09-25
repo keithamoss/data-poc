@@ -2329,12 +2329,28 @@ class TestOutstandingDecisions:
         """Criterion 11. A punctuality verdict is measured against the
         slot a supply is currently filed to, so it is not a fixed
         historical fact - and a reader who does not know that reads a
-        changed figure as the page being wrong."""
+        changed figure as the page being wrong.
+
+        THE AS-OF DATE COMES FROM THE PAGE'S OWN DATA, not from today.
+        The first version of this test drove the default as-of, which
+        is today on the asset clock, and went red the moment the Perth
+        date rolled past the newest generated run: Birth Registrations
+        is DAILY, so a day later its newest supply falls outside its own
+        current cycle and the row correctly renders the quiet state,
+        which has no arrival cell to carry a qualifier. Nothing about
+        the page was wrong. That is post-build-review #59's shape
+        exactly - an assertion resting on an ambient date - and it
+        would have gone red in CI on the next run for the same reason.
+        """
         _goto(clean_page, built_dashboard_html)
+        newest = clean_page.evaluate(
+            "REAL_BIRTH_REG_DATA.runs[REAL_BIRTH_REG_DATA.runs.length-1].run_date")
+        _goto(clean_page, built_dashboard_html, as_of=newest)
         clean_page.locator("#agency-grid .card").first.click()
         clean_page.wait_for_timeout(400)
         titles = clean_page.locator("td span[title*='currently filed to']")
-        assert titles.count() > 0, "no arrival verdict on Tier 2 carries the qualifier"
+        assert titles.count() > 0, (
+            f"no arrival verdict on Tier 2 carries the qualifier as of {newest}")
 
 
 @pytest.fixture
@@ -2477,3 +2493,62 @@ class TestPerDatasetArrivals:
                       "collectionId": "child-protection", "datasetId": "cp-carers"})
         text = clean_page.locator("#view").inner_text()
         assert text.strip(), "the cut-short dataset's own page rendered nothing"
+
+
+class TestScenariosPanel:
+    """REQ-DASH-046, in a real browser against the real built page.
+
+    The dashboard deliberately carries NO label on a deliberately
+    broken supply - "this is still just a proof of concept", and the
+    red is the point - so this panel is the one place that says which
+    red was on purpose.
+    """
+
+    def test_it_opens_and_renders_the_committed_map(self, clean_page, built_dashboard_html):
+        """Criteria 1 and 6 - the console-error collector this suite
+        runs under covers the second."""
+        _goto(clean_page, built_dashboard_html)
+        clean_page.locator("#scenarios-btn").click()
+        clean_page.wait_for_timeout(400)
+
+        body = clean_page.locator("#scenarios-panel-body").inner_text()
+        assert "which red was on purpose" in body.lower()
+        assert "TS-1" in body, body[:300]
+
+    def test_an_entry_with_no_coordinates_is_plain_text_not_a_link(
+            self, clean_page, built_dashboard_html):
+        """Criterion 4, and today that is EVERY entry - nothing is
+        injected yet, so a panel full of dead links is exactly the
+        failure this rules out."""
+        _goto(clean_page, built_dashboard_html)
+        clean_page.locator("#scenarios-btn").click()
+        clean_page.wait_for_timeout(400)
+
+        panel = clean_page.locator("#scenarios-panel")
+        assert panel.locator("a").count() == 0, "the panel rendered a link"
+        assert panel.locator("button[data-scenario]").count() == 0, (
+            "an entry with no coordinates rendered as an activatable control")
+        assert "no data behind it" in panel.inner_text()
+
+    def test_the_committed_map_carries_no_url_for_the_page_to_follow(
+            self, clean_page, built_dashboard_html):
+        """Criterion 3. The page constructs the link; a URL written into
+        the map would break silently the next time a route changed."""
+        _goto(clean_page, built_dashboard_html)
+        embedded = clean_page.evaluate("JSON.stringify(SCENARIO_MAP)")
+        assert embedded and embedded != "[]", "no scenario map was embedded"
+        assert "http" not in embedded
+        assert "#/" not in embedded
+
+    def test_it_is_a_real_history_entry_that_the_back_button_closes(
+            self, clean_page, built_dashboard_html):
+        """The same behaviour every other side panel has - a panel that
+        swallowed the back button would be the one that felt broken."""
+        _goto(clean_page, built_dashboard_html)
+        clean_page.locator("#scenarios-btn").click()
+        clean_page.wait_for_timeout(400)
+        assert "panel=scenarios" in clean_page.url
+
+        clean_page.go_back()
+        clean_page.wait_for_timeout(400)
+        assert "panel=scenarios" not in clean_page.url

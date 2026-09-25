@@ -756,6 +756,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
       <button class="snapshots-btn" id="activity-btn" type="button">📋 Recent activity</button>
       <button class="snapshots-btn" id="changelog-btn" type="button">🗒 Release notes</button>
       <button class="snapshots-btn" id="requirements-btn" type="button">📐 Requirements</button>
+      <button class="snapshots-btn" id="scenarios-btn" type="button">🎬 Scenarios</button>
       <button class="snapshots-btn" id="leaderboard-btn" type="button">🏆 Leaderboard</button>
       <button class="snapshots-btn" id="plans-btn" type="button">🗂 Plans</button>
       <button class="snapshots-btn" id="demo-btn" type="button">▶ Demo</button>
@@ -906,6 +907,24 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
     <button class="drawer-close" id="requirements-panel-close" aria-label="Close">✕</button>
   </div>
   <div class="drawer-body" id="requirements-panel-body"></div>
+</aside>
+
+<!-- REQ-DASH-046. A SIDE PANEL rather than a top-level tab, unlike
+     Plans and Demo, and the reason is criterion 2: selecting an entry
+     NAVIGATES AWAY to the thing it names. Leaving a tab to do that is
+     a worse motion than closing a panel over the page you are about to
+     land on - and this is a reference list you consult, not a place
+     you work. -->
+<div class="backdrop" id="scenarios-backdrop"></div>
+<aside class="drawer" id="scenarios-panel" aria-hidden="true" inert>
+  <div class="drawer-head">
+    <div>
+      <div class="legend-key" style="margin:0 0 4px;">Which red was on purpose</div>
+      <h3>Scenarios</h3>
+    </div>
+    <button class="drawer-close" id="scenarios-panel-close" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body" id="scenarios-panel-body"></div>
 </aside>
 
 <!-- running-thoughts.md #3 ("gamification MVP", 2026-09-18; redesigned
@@ -1613,6 +1632,17 @@ const SCHEDULE_RUNWAY = null;
 // of warning. The empty shape below is the raw template's own state
 // and is itself a real one - criterion 13 asks the page to SAY nothing
 // is waiting rather than render an empty box.
+// SCENARIO_MAP - REQ-DASH-046: the committed scenario map
+// (SCENARIOS.md), embedded as structured entries by
+// dashboard/embed_dashboard_data.py from the machine-readable block
+// inside that same markdown file. One committed file for both readers,
+// so there is no sidecar to drift from it.
+//
+// COORDINATES ONLY. An entry names a dataset, a period and an as-of
+// date; the LINK is constructed here, because the generator that wrote
+// the map does not know this page's routing scheme and a URL written
+// there would break silently the next time a route changed.
+const SCENARIO_MAP = [];
 const OUTSTANDING = {items:[], total:0, blockingCount:0, byAgency:{}, byCollection:{}, byDataset:{}, summary:"Nothing is waiting for a person."};
 const CHANGELOG_FEED = [];
 const RELEASE_NOTES = {intro:[], entries:[]};
@@ -3010,7 +3040,7 @@ function hashToState(){
 
 // panel=/cmp= (see comment above): read from location.search, same
 // URLSearchParams pattern asOfFromUrl() already established.
-const SIDE_PANELS = ["activity","changelog","requirements","snapshots","leaderboard"];
+const SIDE_PANELS = ["activity","changelog","requirements","snapshots","leaderboard","scenarios"];
 function panelFromUrl(){
   const v = new URLSearchParams(location.search).get("panel");
   return SIDE_PANELS.includes(v) ? v : undefined;
@@ -4662,7 +4692,7 @@ function renderSnapshotsPanel(){
 // deliberately NOT one of these 4 - it keeps its own separate, no-
 // history-entry behaviour (openAsOfPanel()/closeAsOfPanel() below,
 // unchanged) since Thread C's own design already settled that.
-const PANEL_RENDER = {activity:renderActivityPanel, changelog:renderChangelogPanel, requirements:renderRequirementsPanel, snapshots:renderSnapshotsPanel, leaderboard:renderLeaderboardPanel};
+const PANEL_RENDER = {activity:renderActivityPanel, changelog:renderChangelogPanel, requirements:renderRequirementsPanel, snapshots:renderSnapshotsPanel, leaderboard:renderLeaderboardPanel, scenarios:renderScenariosPanel};
 function showPanelDom(name){
   document.getElementById(`${name}-backdrop`).classList.add("open");
   document.getElementById(`${name}-panel`).classList.add("open");
@@ -4990,6 +5020,124 @@ function renderRequirementsPanel(){
   }).join("");
 }
 document.getElementById("requirements-btn").addEventListener("click", ()=> openPanel("requirements"));
+
+/* ---- Scenarios (REQ-DASH-046) ---------------------------------------
+   The synthetic history has deliberately awkward supplies in it, and
+   the dashboard carries NO label on them - "this is still just a proof
+   of concept", and the red is the point. So this panel is the thing
+   that says which red was on purpose, and takes you to it.
+
+   THE LINK IS CONSTRUCTED HERE, FROM COORDINATES (criterion 3). The
+   generator knows where a scenario landed; it does not know this
+   page's routing scheme, and a URL written into the committed map
+   would break silently the next time a route changed. So the map
+   carries a dataset, a period and an as-of date, and this turns them
+   into a navigation.
+*/
+function scenarioTarget(entry){
+  // WHERE A COORDINATE POINTS, or null. `null` is the ordinary state
+  // for most entries - a unit scenario has no data behind it - and it
+  // is criterion 4's whole case: an entry with nowhere to go renders
+  // as plain text rather than as a link that does nothing.
+  const coords = entry && entry.coordinates;
+  if(!coords || !coords.dataset) return null;
+  for(const agency of (HIERARCHY.agencies||[])){
+    for(const collection of (agency.collections||[])){
+      for(const dataset of (collection.datasets||[])){
+        if(dataset.id === coords.dataset || dataset.name === coords.dataset){
+          return {asOf: coords.asOf || null,
+                  nav: {tier:"dataset", agencyId:agency.id,
+                        collectionId:collection.id, datasetId:dataset.id}};
+        }
+      }
+      if(collection.id === coords.dataset || collection.name === coords.dataset){
+        return {asOf: coords.asOf || null,
+                nav: {tier:"agency", agencyId:agency.id}};
+      }
+    }
+  }
+  // A COORDINATE THIS PAGE CANNOT PLACE IS NOT A LINK. A dataset since
+  // renamed or retired still has a map entry, and sending a reader to
+  // a page that does not exist is worse than telling them it has gone.
+  return null;
+}
+
+function goToScenario(index){
+  const entry = SCENARIO_MAP[index];
+  const target = scenarioTarget(entry);
+  if(!target) return;
+  closePanel();
+  // THE AS-OF DATE FIRST, then the navigation. applyAsOf() rebuilds
+  // DATA and re-renders, so navigating first would render the target
+  // page at the old date and then replace it - a visible flash of the
+  // wrong answer, which on a page about as-of dates is the one flash
+  // worth avoiding.
+  if(target.asOf) applyAsOf(target.asOf);
+  navigate(target.nav);
+}
+
+const SCENARIO_MODE_LABEL = {INJECT:"In the data", unit:"Unit test", both:"Unit test and data"};
+
+function renderScenariosPanel(){
+  const body = document.getElementById("scenarios-panel-body");
+  if(!SCENARIO_MAP.length){
+    body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted);">
+      No scenario map embedded — this page renders the repo's own committed
+      <code>SCENARIOS.md</code>, rebuilt with the synthetic history itself.
+    </div>`;
+    return;
+  }
+  const placed = SCENARIO_MAP.filter(e=>scenarioTarget(e)).length;
+  const injected = SCENARIO_MAP.filter(e=>e.mode==="INJECT").length;
+  const intro = `<div style="font-size:13px; color:var(--ink-muted); margin-bottom:14px; max-width:64ch;">
+    The sample data has deliberately awkward supplies in it — a delivery that arrives
+    in the wrong order, a file nothing can place, a table that will not load. Nothing
+    on the pages labels them, because a red supply should read the way a real one
+    would. <b>This is the list that says which red was on purpose.</b>
+    <div style="margin-top:6px;">${placed} of ${injected} ${pluralize(injected,"scenario")}
+      marked for the data ${placed===1?"has":"have"} somewhere to go today.</div>
+  </div>`;
+
+  const bySection = new Map();
+  SCENARIO_MAP.forEach((entry, index)=>{
+    const section = entry.section || "Other";
+    if(!bySection.has(section)) bySection.set(section, []);
+    bySection.get(section).push({entry, index});
+  });
+
+  const sections = [...bySection.entries()].map(([section, entries])=>{
+    const rows = entries.map(({entry, index})=>{
+      const target = scenarioTarget(entry);
+      const coords = entry.coordinates;
+      const where = target
+        ? `<button type="button" class="pill tag sm" data-scenario="${index}"
+             style="border:0; cursor:pointer; font:inherit;"><span class="ico"></span>${escHtml(coords.dataset)} · ${escHtml(coords.period)} · as of ${escHtml(coords.asOf)}</button>`
+        : `<span style="font-size:11.5px; color:var(--ink-faint);">${
+             entry.mode==="INJECT" ? "not in the data yet" : "no data behind it — a unit test"}</span>`;
+      return `<div style="border-top:1px solid var(--line); padding:9px 0;">
+        <div style="display:flex; align-items:baseline; gap:7px; flex-wrap:wrap;">
+          <b style="font-weight:650;">${escHtml(entry.id)}</b>
+          <span>${escHtml(entry.title||"")}</span>
+          <span class="pill nodata sm"><span class="ico"></span>${escHtml(SCENARIO_MODE_LABEL[entry.mode]||entry.mode)}</span>
+        </div>
+        <div style="color:var(--ink-muted); font-size:12.5px; margin-top:3px;">${inlinePlansMd(escHtml(entry.demonstrates||""))}</div>
+        <div style="margin-top:5px;">${where}</div>
+      </div>`;
+    }).join("");
+    return `<h4 style="margin:16px 0 0;">${escHtml(section)}</h4>${rows}`;
+  }).join("");
+
+  body.innerHTML = intro + sections;
+  // Wired after the markup exists rather than with an inline onclick,
+  // matching how every other list on this page binds its rows.
+  body.querySelectorAll("[data-scenario]").forEach(el=>{
+    el.addEventListener("click", ()=> goToScenario(Number(el.dataset.scenario)));
+  });
+}
+
+document.getElementById("scenarios-btn").addEventListener("click", ()=> openPanel("scenarios"));
+document.getElementById("scenarios-backdrop").addEventListener("click", closePanel);
+document.getElementById("scenarios-panel-close").addEventListener("click", closePanel);
 document.getElementById("requirements-backdrop").addEventListener("click", closePanel);
 document.getElementById("requirements-panel-close").addEventListener("click", closePanel);
 

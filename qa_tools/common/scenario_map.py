@@ -201,6 +201,69 @@ def _entry(scenario: scenarios_mod.Scenario, placement: Placement | None) -> lis
     return lines
 
 
+#: The machine-readable copy, inside the markdown rather than beside
+#: it (REQ-DASH-046 criterion 5). ONE COMMITTED FILE, still markdown,
+#: still self-explanatory to a person - an HTML comment renders as
+#: nothing on GitHub - and the dashboard reads exact data rather than
+#: re-parsing prose it would then have to keep in step.
+#:
+#: The alternative was a JSON sidecar, rejected because two files that
+#: must agree is the shape this project keeps removing: one staleness
+#: gate cannot cover both, and the pair drifts the first time somebody
+#: regenerates one.
+_DATA_OPEN = "<!-- scenario-map-data\n"
+_DATA_CLOSE = "\n-->"
+
+
+def _data_block(scenarios: Iterable[scenarios_mod.Scenario],
+                 placements: Mapping[str, Placement]) -> str:
+    entries = []
+    for scenario in scenarios:
+        placement = placements.get(scenario.id)
+        entry = {
+            "id": scenario.id, "mode": scenario.mode, "title": scenario.title,
+            "section": scenario.section,
+            "demonstrates": _sentence(scenario.expect or scenario.body or ""),
+            "breaksAs": _sentence(scenario.breaks_as) if scenario.breaks_as else None,
+            "config": scenario.config,
+            # COORDINATES, NEVER A LINK (criterion 5 of REQ-GEN-045 and
+            # criterion 3 of REQ-DASH-046). The dashboard builds the
+            # link from these; nothing here knows a route.
+            "coordinates": None,
+        }
+        if placement is not None and placement.is_complete:
+            entry["coordinates"] = {
+                "dataset": placement.dataset,
+                "supplies": list(placement.supplies),
+                "period": placement.period,
+                "asOf": placement.as_of,
+            }
+        entries.append(entry)
+    return _DATA_OPEN + json.dumps({"scenarios": entries}, indent=1) + _DATA_CLOSE
+
+
+def read_map_data(map_path: Path | str | None = None) -> list[dict]:
+    """The structured entries embedded in the committed map.
+
+    Read by the dashboard build, which may open no data/ - so this
+    reads the COMMITTED markdown and nothing else. A map with no data
+    block returns nothing rather than raising, because the document is
+    still a document without it.
+    """
+    text = Path(map_path or MAP_PATH).read_text()
+    start = text.find(_DATA_OPEN)
+    if start < 0:
+        return []
+    end = text.find(_DATA_CLOSE, start)
+    if end < 0:
+        return []
+    try:
+        raw = json.loads(text[start + len(_DATA_OPEN):end])
+    except json.JSONDecodeError:
+        return []
+    return list(raw.get("scenarios") or ())
+
+
 def build_map(scenarios: Iterable[scenarios_mod.Scenario],
                placements: Mapping[str, Placement]) -> str:
     """The whole document.
@@ -230,6 +293,7 @@ def build_map(scenarios: Iterable[scenarios_mod.Scenario],
         lines += [f"## {section}", ""]
         for scenario in entries:
             lines += _entry(scenario, placements.get(scenario.id))
+    lines += ["", _data_block(scenarios, placements)]
     return "\n".join(lines).rstrip() + "\n"
 
 

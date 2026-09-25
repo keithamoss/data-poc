@@ -191,6 +191,7 @@ from dashboard.requirements_yaml import parse_requirements
 from qa_tools.common import asset_time
 from qa_tools.common import hierarchy
 from qa_tools.common import outstanding
+from qa_tools.common import scenario_map
 from qa_tools.common import runway
 from qa_tools.common import schedule
 from qa_tools.common.acceptance_sync import build_decisions
@@ -371,6 +372,16 @@ def embed() -> None:
     # purpose: this is asset-level and spans both collections, and
     # computing it per-collection is how it would have become two
     # queues - which is the thing the requirement exists to prevent.
+    # SCENARIO_MAP - REQ-DASH-046. Read from the COMMITTED SCENARIOS.md
+    # and nothing else: the coordinates were written there by the
+    # generator, which is the only thing that knows where a scenario
+    # landed, and this build may open nothing under data/.
+    scenario_entries = scenario_map.read_map_data()
+    html = _replace_const(html, "SCENARIO_MAP",
+                           json.dumps(scenario_entries, separators=(",", ":")))
+    print(f"Re-embedded SCENARIO_MAP = {len(scenario_entries)} scenario(s), "
+          f"{sum(1 for e in scenario_entries if e.get('coordinates'))} with coordinates")
+
     outstanding_now = outstanding.survey().as_record()
     html = _replace_const(html, "OUTSTANDING",
                            json.dumps(outstanding_now, separators=(",", ":")))
