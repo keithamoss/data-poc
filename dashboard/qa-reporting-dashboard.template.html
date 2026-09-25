@@ -2588,7 +2588,19 @@ function exhaustedNotice(){
 }
 
 function renderExec(view){
-  setRail([{tier:"Tier 1", label:"Executive", nav:{tier:"exec"}}]);
+  // "Agencies", renamed from "Executive" on 2026-09-25 (Keith's call).
+  // Tier 2 already IS one agency - its own breadcrumb label is that
+  // agency's name - so the plural is doing real work: "Tier 1 Agency /
+  // Tier 2 Department for Child Protection" would read as though the
+  // top tier were a particular agency. It also matches its siblings,
+  // since Tier 1 already hosts Plans and Demo, both named for what
+  // they contain.
+  //
+  // LABEL ONLY. The route is still `exec` and the URL is still `/`, so
+  // no link anybody has ever shared breaks. Older comments in this
+  // file still say "the Executive tier" and are left alone - they are
+  // accurate about when they were written.
+  setRail([{tier:"Tier 1", label:"Agencies", nav:{tier:"exec"}}]);
   // NOTHING EMBEDDED (REQ-DASH-055). Since the whole tree comes from
   // HIERARCHY, opening the raw template directly gives an empty page -
   // and an empty page that renders the ordinary chrome reads as "this
@@ -2629,7 +2641,7 @@ function renderExec(view){
   view.innerHTML = `
     <div class="view-head">
       <div>
-        <h2>Executive overview</h2>
+        <h2>Agencies</h2>
         <div class="view-sub">Rolled-up status across every agency in the multi-agency data asset. A red anywhere below makes the parent red; an amber with no red makes it amber — worst-of, so nothing silently hides behind a healthy average.</div>
       </div>
     </div>
@@ -2669,7 +2681,7 @@ function renderExec(view){
 // Found while removing fourteen datasets at once (REQ-DASH-055), which
 // is what made the case easy to hit, but it was always reachable.
 function renderNotFound(view, what, id){
-  setRail([{tier:"Tier 1", label:"Executive", nav:{tier:"exec"}}]);
+  setRail([{tier:"Tier 1", label:"Agencies", nav:{tier:"exec"}}]);
   view.innerHTML = `
     <div class="view-head">
       <div>
@@ -2685,7 +2697,7 @@ function renderNotFound(view, what, id){
 function renderAgency(view, agencyId){
   const ag = DATA.agencies.find(a=>a.id===agencyId);
   if(!ag) return renderNotFound(view, "Agency", agencyId);
-  setRail([{tier:"Tier 1",label:"Executive",nav:{tier:"exec"}}, {tier:"Tier 2",label:ag.name, nav:{tier:"agency",agencyId}}]);
+  setRail([{tier:"Tier 1",label:"Agencies",nav:{tier:"exec"}}, {tier:"Tier 2",label:ag.name, nav:{tier:"agency",agencyId}}]);
   view.innerHTML = `
     <div class="view-head">
       <div>
@@ -2883,7 +2895,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   const ds = col.datasets.find(d=>d.id===datasetId);
   if(!ds) return renderNotFound(view, "Dataset", datasetId);
   setRail([
-    {tier:"Tier 1",label:"Executive",nav:{tier:"exec"}},
+    {tier:"Tier 1",label:"Agencies",nav:{tier:"exec"}},
     {tier:"Tier 2",label:ag.name, nav:{tier:"agency",agencyId}},
     {tier:"Tier 3",label:ds.name, nav:{tier:"dataset",agencyId,collectionId,datasetId}},
   ]);

@@ -202,11 +202,11 @@ describe("a URL pointing at something that no longer exists", () => {
     expect(dashboard.document.getElementById("view").textContent).toMatch(/not found/i);
   });
 
-  it("still offers a way back to the executive tier from a not-found state", () => {
+  it("still offers a way back to the top tier from a not-found state", () => {
     const w = load();
     w.navigate({ tier: "agency", agencyId: "transportation" });
     // A dead end with no exit is the other half of this bug: rendering
     // nothing and rendering something unusable are the same to a reader.
-    expect(dashboard.document.getElementById("rail").textContent).toContain("Executive");
+    expect(dashboard.document.getElementById("rail").textContent).toContain("Agencies");
   });
 });
