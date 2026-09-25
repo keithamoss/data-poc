@@ -7744,7 +7744,7 @@ requirements:
       date: "2026-09-24"
     story: "As whoever maintains this pipeline, I want the pipeline to work out for itself what arrived together and to say plainly what it could not place, so that filing starts from an observed transport unit rather than from anything a supplier told us or the generator wrote down."
     moscow: must
-    status: not_started
+    status: built
     source: "Keith, delivery sprint 7, plans/supply-model.md Thread B (the DELIVERY is the arrival unit) and Thread H second chaos pass, plus test scenario register TS-15 and TS-17. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
       - "THE SYSTEM SHALL treat one delivery as one observed transport unit, and SHALL establish its boundary without reading the contents of any file in it."
@@ -8118,6 +8118,110 @@ requirements:
         than relying on nobody adding one while debugging. (3) This repo
         is public and whatever is reported gets published, so the render
         path must reach the DOM via textContent, never innerHTML.
+      - >
+        Decided the in-flight observation is committed to its own
+        `observations/in_flight/` tree rather than under qa_results/,
+        which is keyed by agency and collection. An in-flight delivery
+        has no collection - nothing in it has been attributed yet -
+        so filing it under one would mean choosing a collection for a
+        delivery precisely because we do not yet know what it is for.
+      - >
+        Decided NOTHING is written when nothing is in flight. "The run
+        saw nothing" is the ordinary state of most runs, and a file per
+        run saying so would be churn carrying no signal. Criterion 7
+        asks for a record WHERE such a delivery is present, which is
+        exactly this - and it means the churn the decisions above warn
+        about only ever costs anything when there is something to say.
+      - >
+        Criterion 11 IS BUILT NARROWER THAN IT IS WRITTEN, and the
+        narrowing is stated rather than left to be discovered. It says
+        an unexpected table is one matching a pattern for a dataset
+        with no slot IN THAT PERIOD; which period a supply fills is
+        REQ-PIPE-062's answer and does not exist yet. What is built is
+        a dataset with no slots AT ALL, which is the same event at a
+        coarser grain and catches the case the criterion exists for -
+        a supplier sending something nothing is owed from.
+      - >
+        `slots_for_dataset(...) != []` is the obvious spelling of "is
+        anything owed from this dataset" and it RAISES: a cadence-rule
+        calendar generates for ever, so asking it for slots with no
+        horizon is a question with no answer, and it says so rather
+        than picking one. slots.is_owed_supplies() answers the question
+        actually being asked. Recorded because the obvious spelling
+        looks right, and the failure is a traceback from three frames
+        down rather than a wrong answer.
+    unmet_criteria:
+      - criterion: >-
+          Criterion 18 - a run's identity is still derived from its
+          position in the receipt-ordered, collection-filtered list
+          that recognition produces.
+        why: >-
+          The criterion forbids that derivation and names no
+          replacement. Keith's call, 2026-09-25, over two alternatives:
+          a committed run-id map built here would be absorbed almost
+          immediately by REQ-PIPE-069's delivery log, which is where a
+          delivery gets a durable record of its own, and deriving an id
+          from the delivery itself would re-key all 60 committed runs -
+          which criterion 19 exists to prevent happening as a side
+          effect. Criterion 19's guard IS built, so the fragile
+          derivation now fails loudly rather than silently renaming
+          history.
+        owner: REQ-PIPE-069, where a delivery gets a committed identity
+    linked_tests:
+      - tests/test_arrivals.py
+      - tests/test_cli_supply.py
+      - tests/test_run_id_guard.py
+      - tests/test_delivery_boundary.py
+      - tests/test_in_flight_log.py
+    implemented_by:
+      - qa_tools/common/arrivals.py::recognise
+      - qa_tools/common/delivery.py::survey
+      - qa_tools/common/delivery_boundary.py::check_all
+      - qa_tools/common/run_id_guard.py::check
+      - qa_tools/common/in_flight_log.py::record
+      - qa_tools/common/slots.py::is_owed_supplies
+    evidence:
+      - >-
+        2026-09-25: criterion 19's guard was checked against the REAL
+        committed history, not a fixture - today's recognition still
+        assigns all 60 committed run ids to the same deliveries. It
+        holds because every delivery in this PoC has a receipt and none
+        spans collections, and the test says so in as many words, so a
+        future failure reads as "that stopped being true" rather than
+        as a mystery.
+      - >-
+        2026-09-25: that check was run BEFORE building anything, which
+        is what turned a blocker into a non-event. The architect called
+        run identity the likeliest "we found out when CI went red" item
+        in the batch; establishing first that neither behaviour change
+        touches a real run id meant the work could proceed without
+        waiting on REQ-PIPE-038's re-keying.
+      - >-
+        2026-09-25: a receipt-less delivery used to take every OTHER
+        delivery down with it - read_receipt() raises and the listing
+        read them in a comprehension, so one incomplete upload stopped
+        the whole pipeline. What did not change is the rule underneath:
+        a receipt instant is still never invented from a file's
+        modification time. Skipping and reporting keeps the rule and
+        drops the collateral damage.
+      - >-
+        2026-09-25: a latent bug in this batch's own earlier work was
+        found here and is worth recording as a testing lesson rather
+        than a fix. The arrival-pattern gate called a function that
+        does not exist, and nothing noticed: every real dataset
+        declares a pattern so the line never ran, and the test written
+        for it monkeypatched the function out. The test now exercises
+        the real one.
+      - >-
+        2026-09-25: recognition reads each delivery ONCE per
+        invocation. The CLI's first version called it three times per
+        delivery - three passes over every file and three copies of
+        every warning - against this requirement's own constraint to
+        read each delivery once per run rather than once per
+        collection.
+      - >-
+        2026-09-25: all ten mothman gates green, 1502 Python tests and
+        294 JS tests.
   - id: REQ-PIPE-058
     title: A file's dataset comes from that dataset's own declared pattern, and the patterns are gated
     date_written: "2026-09-23"

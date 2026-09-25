@@ -342,6 +342,13 @@ releases:
               build yet.
       - category: Improved
         items:
+          - headline: One slow upload no longer stops everything
+            components: ["Pipeline & publishing"]
+            description: >
+              A delivery still being uploaded used to halt the whole
+              run. It is now left alone and picked up once complete, and
+              you can see what is still arriving and which files have
+              landed so far.
           - headline: Adding a dataset stops being a code change
             components: ["Pipeline & publishing"]
             description: >

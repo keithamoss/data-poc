@@ -27,7 +27,7 @@ import os
 import sys
 
 
-from qa_tools.common import arrivals, run_id_guard, supply_db
+from qa_tools.common import arrivals, delivery, in_flight_log, run_id_guard, supply_db
 from qa_tools.common import hierarchy
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common.git_identity import get_run_by
@@ -141,6 +141,22 @@ def run_pipeline_cp(sequential: bool = False) -> dict:
     # RECOGNISED FROM DISK, never read from a declaration
     # (REQ-GEN-043) - see orchestrate_bdm.py's identical comment.
     found_arrivals = arrivals.arrivals_for("child-protection", "cp_run_")
+
+    # WHAT THIS RUN SAW IN FLIGHT (REQ-PIPE-057 criteria 5 and 7).
+    # Reported on EVERY run, with no interval and no threshold -
+    # persistence becomes visible through repetition, so if it is still
+    # there tomorrow you have seen it five times. Committed because the
+    # alternative, terminal output only, loses the one genuinely bad
+    # case: a delivery whose boundary never closes because something
+    # upstream is broken would be visible to whoever ran the pipeline
+    # and to nobody else. In-flight being the NORMAL state is exactly
+    # what would let a stuck one hide.
+    still_arriving = delivery.survey().in_flight
+    for entry in still_arriving:
+        print(f"note: delivery {entry.name!r} is present with no receipt record yet "
+               f"({len(entry.files)} file(s): {', '.join(entry.files) or 'none'}) - "
+               f"not processed.")
+    in_flight_log.record(cp_common.COLLECTION_ID, asset_time.now().isoformat(), still_arriving)
     manifest = [a.as_entry() for a in found_arrivals]
 
     # The first manifest entry (cp_run_01, always clean by RUN_PLAN
