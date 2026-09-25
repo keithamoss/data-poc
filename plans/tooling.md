@@ -2348,3 +2348,92 @@ directory, read` from vitest's own stack-trace parser - an error that
 looks like a broken test file and is not. `npx vitest run <path>` works
 correctly. Worth either documenting or wrapping, since the natural
 thing to type is the one that breaks.
+
+
+22. **[investigate, 2026-09-25]** **[Testing & dev tooling]** What the test suite actually touches in the real trees, measured - and what a structural guarantee would cost.
+
+**Status:** investigate · **Category:** Testing & dev tooling
+
+Keith's ask, 2026-09-25, in his own words: "I don't want tests or
+anything of that shape touching real outputs, real data, or the real
+database." This is the measurement that question deserved, plus the
+options for making it structurally true rather than true today. Audit
+only - he chose that over building the guard now, so nothing here is
+scoped work yet.
+
+**What prompted it.** `REQ-PIPE-060` found the processing log one day
+old and already carrying 109 test-run records out of 259 - table names
+that had only ever existed inside a temporary directory, committed
+permanently. The same hole was live and worse for the delivery log:
+six tests invoke `mothman pipeline run`, which prunes that log against
+what is on disk, and a freshly-cloned CI runner has no `data/` at all,
+so the correct answer to "which deliveries are present" is NONE and
+all sixty committed records would go. Both are fixed by a
+session-scoped autouse fixture in `tests/conftest.py`.
+
+**The measurement.** A content-hash inventory of 10,683 files across
+`data/`, `reports/`, `processing_log/`, `delivery_log/`,
+`observations/`, `qa_results/`, `dashboard/snapshots/` and
+`dbt_project/target/`, taken before and after a full `uv run pytest`
+(1565 tests, all passing, 171.79s), with the fix in place:
+
+```
+CREATED:  0
+DELETED:  0
+MODIFIED: 3
+   dashboard/qa-reporting-dashboard.html
+   reports/results_bdm.json
+   reports/results_cp.json
+```
+
+Git working tree clean afterwards. All three are gitignored build
+artifacts written by `tests/test_dashboard_e2e.py`'s build fixture, and
+they are why `--dist loadfile` is load-bearing rather than tuning -
+they are shared files parallel workers would otherwise race to rewrite
+(#10).
+
+**A correction worth keeping, because the reasoning was wrong rather
+than merely cautious.** Three further exposures were reported to Keith
+from READING the code - `data/raw/`, `data/cp_raw/` (CP's loader copies
+CSVs into `raw_dir`, which defaults to the real tree) and the real
+`data/supply.duckdb` (redirected by `MOTHMAN_SUPPLY_DB`, but only for
+the 9 test files that request the fixture, out of 16 that mention it).
+The measurement says no test actually takes any of those paths. They
+are reachable, not taken. Inferring risk from a default instead of
+measuring it is the same shape as every other incident CLAUDE.md
+records, just in the safe direction - and it is worth noting that the
+direction was safe only by luck.
+
+**The options, for whenever this is scoped.**
+
+1. **Leave it.** The committed trees are covered and the residue is
+   three ephemeral files. Cheapest, and it stays true only as long as
+   nobody adds a test that takes one of the reachable paths - which is
+   precisely what nothing would flag.
+2. **Extend the redirect list.** Point `MOTHMAN_SUPPLY_DB`, `RAW_DIR`,
+   `CP_RAW_DIR` and `reports/` at temporary directories for the whole
+   session, the same way the three committed trees now are. Small,
+   and it shares the current fix's real weakness: a fourth tree added
+   next month is not covered, because nobody updates the list. That is
+   the same failure mode that produced the original bug.
+3. **Deny by default.** A session fixture intercepting writes
+   (`open`, `Path.write_*`, `mkdir`, `unlink`, `duckdb.connect`) that
+   RAISES when the resolved path is under one of this repo's real
+   output paths, with a named opt-in fixture for the handful of tests
+   that legitimately want the real tree - `real_committed_history`
+   already exists and does exactly that for reads. This is the only
+   option that covers a tree added later, because it denies everything
+   under the repo rather than enumerating what to protect.
+
+   Two things it would not cover, both worth knowing before anyone
+   scopes it as complete: SUBPROCESSES (dbt and Soda are separate
+   processes and inherit no monkeypatched builtin - they are pointed
+   at per-worker temp dirs today, which should be verified rather than
+   assumed), and any module that reads a path constant into a local at
+   import time.
+
+**Worth pairing with whoever does this**: the e2e build fixture's three
+files are the one real case where a test's legitimate job is to write
+somewhere shared. Option 3 would need it moved to a temporary output
+or given the opt-in, and that choice is the interesting part of the
+work rather than an implementation detail.
