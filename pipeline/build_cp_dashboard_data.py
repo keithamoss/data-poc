@@ -402,8 +402,6 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
     # Before this the element was parsed and discarded, so all six
     # inherited cp_clients' values whether or not they had their own.
     cadence = parse_cadence_from_contract(CONTRACT_PATH, element=table)
-
-    max_lag_hours = dataset_stats[latest_run]["arrival"][table]["max_lag_hours"]
     earliest_extract = dataset_stats[latest_run]["arrival"][table]["earliest_extract"]
     latest_status = classify_arrival(
         cadence, date.fromisoformat(_run_date(latest_entry)), _parse_extract_timestamp(str(earliest_extract)))
@@ -421,7 +419,6 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
             cadence, date.fromisoformat(_run_date(m)), _parse_extract_timestamp(str(arrival["earliest_extract"])))
         arrival_by_run[run_id] = {
             "arrivedAt": str(arrival["earliest_extract"]), "arrivalStatus": status,
-            "maxLagHours": round(arrival["max_lag_hours"], 1),
         }
         arrival_history.append({"run_id": run_id, "run_date": _run_date(m), "arrivalStatus": status})
 
@@ -435,7 +432,6 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
             "run_date": _run_date(latest_entry),
             "arrivedAt": str(earliest_extract),
             "arrivalStatus": latest_status,
-            "maxLagHours": round(max_lag_hours, 1),
         },
         "arrivalHistory": arrival_history,
         "arrivalByRun": arrival_by_run,

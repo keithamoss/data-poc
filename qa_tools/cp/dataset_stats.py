@@ -102,16 +102,15 @@ def _arrival(conn: duckdb.DuckDBPyConnection, run_date: str) -> dict[str, dict]:
     for each of the 6 tables (its own build_one_table() call), a real
     gap missed on the first pass at this module (found re-tracing the
     live-query call sites a second time, not assumed complete)."""
+    # MAX_LAG_HOURS RETIRED 2026-09-25 - see the counterpart in
+    # qa_tools/bdm/dataset_stats.py for the full reasoning. In short:
+    # never an arrival measure, carried through both dashboard build
+    # paths, and rendered nowhere at all.
     out = {}
     for table in TABLES:
-        max_lag_hours = conn.execute(
-            f"SELECT MAX(date_diff('second', TIMESTAMP '{run_date}', extract_timestamp)) / 3600.0 "
-            f"FROM {table}"
-        ).fetchone()[0]
         earliest_extract = conn.execute(f"SELECT MIN(extract_timestamp) FROM {table}").fetchone()[0]
-        out[table] = {"max_lag_hours": max_lag_hours,
-                      "earliest_extract": asset_time.record_source_instant(
-                          earliest_extract, f"earliest_extract for table {table}")}
+        out[table] = {"earliest_extract": asset_time.record_source_instant(
+            earliest_extract, f"earliest_extract for table {table}")}
     return out
 
 

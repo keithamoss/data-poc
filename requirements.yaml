@@ -3018,9 +3018,27 @@ requirements:
         real file reads.
       - >
         2026-09-25: the committed delivery-log filenames now carry the
-        receipt instant and sequence, so a directory listing IS receipt order
-        and the walk can stop at the first hit. All 60 existing records were
-        migrated with `git mv`, content untouched.
+        receipt instant, so a directory listing IS receipt order and the walk
+        can stop at the first hit. All 60 existing records were migrated,
+        content untouched.
+      - >
+        2026-09-25, A DEFECT IN THIS CHANGE, found by a gate and fixed the
+        same evening. The filename first carried the receipt SEQUENCE as well
+        as the instant - but the sequence is re-issued when the synthetic
+        data is regenerated, so the same delivery at the same instant
+        produced a new path, and the write-once guard never fired because it
+        only asked whether THAT path existed. Measured on the real tree: 120
+        records for 60 deliveries, and every dataset arrival history exactly
+        doubled. Fixed two ways - the name carries only the stable instant,
+        and the guard now asks whether this DELIVERY has a record under any
+        filename, so a future naming change cannot defeat it silently.
+        Covered by three tests confirmed failing against the reinstated
+        defect first.
+      - >
+        THE GENERAL RULE worth carrying: a write-once record whose filename
+        encodes a MUTABLE value is not write-once. The instant is a fact
+        about the arrival and is stable; the sequence is a fact about the
+        receipt we wrote, and is not.
       - >
         2026-09-25: criterion 5 tested with a real FAILED load record - the
         supply is still the dataset's latest arrival, and no table exists for
@@ -9519,6 +9537,19 @@ requirements:
         recording was turned off - 108 supplies filed, 6 by the on-time branch
         and 102 by oldest-claimable, and a second pass wrote nothing, which is
         criterion 10 holding on real data.
+      - >
+        2026-09-25, A CI-ONLY FAILURE IN THESE TESTS, caught by Keith looking
+        at the Actions tab rather than by anything here. tests/test_filing.py
+        read data/deliveries/ for its fixtures - a GITIGNORED tree, absent on
+        a freshly-cloned runner - so it passed locally and failed on CI for
+        four consecutive pushes with "expected one filing per CP dataset, got
+        0". CLAUDE.md documents this exact trap in as many words and it was
+        walked into anyway. The tests now build their own deliveries in
+        tmp_path, verified by reproducing the CI condition locally: move data/
+        aside, run the suite, which is the cheapest check for this class.
+        A third test in the same class was passing VACUOUSLY for the same
+        reason - it asserted against an empty list - and now asserts the
+        fixture produced an arrival before asserting anything about it.
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     source: "Keith, delivery sprint 9 - the highest-risk sprint in the plan. plans/supply-model.md Thread E in full, including both cascades found by his own stress tests, plus Thread D's split of assignment from promotion. Test scenario register TS-1, TS-2, TS-3a-d, TS-6a, TS-6b, TS-9, TS-10. Honours the deferral REQ-PIPE-052 wrote: 'the rules that USE it - oldest claimable unfilled slot, on-time-wins-for-the-current-slot, monotonic filling, hold for a human - are slot ASSIGNMENT and belong to batch 3'. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
@@ -9930,7 +9961,85 @@ requirements:
       date: "2026-09-24"
     story: "As an agency data owner, I want lateness measured against the period a supply was actually filed to, so that a supply filed to Q3 is never reported late for Q2 and a genuinely early one is never reported twelve weeks late."
     moscow: must
-    status: not_started
+    status: built
+    linked_tests:
+      - tests/test_arrival_classification.py
+      - tests/test_dataset_stats.py
+      - tests/test_build_dashboard_data.py
+      - tests/test_build_cp_dashboard_data.py
+    implemented_by:
+      - qa_tools/common/arrival_classification.py::classify
+      - qa_tools/common/arrival_classification.py::describe
+      - qa_tools/bdm/dataset_stats.py::_arrival
+      - qa_tools/cp/dataset_stats.py::_arrival
+    unmet_criteria:
+      - criterion: >-
+          Criterion 9, in part - recording the classification with the supply
+          so every consumer reads it rather than recomputing. The classifier
+          is built and tested; nothing records its output yet.
+        why: >-
+          It classifies against the ASSIGNED SLOT, and REQ-PIPE-062's filings
+          are deliberately not recorded until promotion exists. With no
+          filing there is no slot, so every real supply would classify as
+          UNFILED - correct by criterion 8 and useless as a record.
+        owner: the promotion sprint (batch 4)
+      - criterion: >-
+          Criteria 10 and 11 - retiring the arrival-date derivation, and
+          retiring the path that blanks a resupply's recorded classification
+          in the dashboard template.
+        why: >-
+          Keith's call, 2026-09-25, on measured evidence: retiring the old
+          derivation today would replace the dashboard's current answer with
+          352 supplies reading "unfiled", because the new classifier has no
+          filings to measure against. Un-blanking the resupply status has the
+          same shape in reverse - it would surface the OLD derivation's
+          answer for resupplies, which decision 9 establishes is meaningless,
+          so the blanking's own justification still holds until the new
+          derivation is live. Both retirements are one change with the
+          recording above, not before it.
+        owner: the promotion sprint (batch 4)
+      - criterion: >-
+          Criterion 12, in part - the arrival block's `earliest_extract`
+          survives.
+        why: >-
+          max_lag_hours is retired, verified dead first. earliest_extract is
+          not dead: it feeds lastArrival.arrivedAt, which the template
+          renders in eight places, and it feeds the live classify_arrival()
+          that criteria 10 and 11 cannot yet retire. It is a supplier-derived
+          instant that REQ-PIPE-060 criterion 11 already forbids as an
+          arrival time, so it goes when our own receipt instant replaces it -
+          in the same change as the rest.
+        owner: the promotion sprint (batch 4)
+    evidence:
+      - >
+        2026-09-25: both failures of the derivation this replaces are tested
+        directly, because both are plausible enough to be reinstated by
+        accident. A quarterly supply arriving 2026-07-25 for the 2026-08-01
+        anchor now classifies EARLY; under the old backwards-looking
+        cycle_start() it resolved to the 2026-05-01 anchor and read about
+        twelve weeks late for a quarter filled months ago. A 10pm arrival
+        meant for the next day classifies early against tomorrow's slot
+        instead of late against today's.
+      - >
+        2026-09-25: a CONTROL asserts the same arrival instant classifies
+        differently against a different slot - late against yesterday's,
+        early against tomorrow's. Without it the signature change could be
+        doing nothing and the tests would not notice.
+      - >
+        2026-09-25: max_lag_hours retired, and VERIFIED DEAD BEFORE
+        DELETING rather than on the strength of the decision that named it.
+        Zero references in the dashboard template, zero in the JS suite; the
+        only references outside the pipeline were tests asserting it was
+        carried. It was never an arrival measure at all - MAX(extract_timestamp
+        minus date_registered), a within-supply staleness figure sitting in an
+        arrival block.
+      - >
+        2026-09-25: the 20-line filter whose stated justification was that
+        deliberately-disordered rows "directly distort classify_arrival()'s
+        real early/onTime/late classification" is retained for now, because
+        that classification is retained for now. It goes with criteria 10 and
+        11, and its reason for existing goes with it.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     source: "Keith, delivery sprint 10, plans/supply-model.md Thread D - settled 2026-09-21, and every substantive decision in that thread is uncarried by any requirement. Test scenario register TS-9, TS-10, TS-16. Scoped by delivery-scoper, sprints 7-10 pass, 2026-09-23."
     acceptance_criteria:
       - "THE SYSTEM SHALL classify a supply's arrival as early, on time or late against the due instant of the slot it was ASSIGNED to."

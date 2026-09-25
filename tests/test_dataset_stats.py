@@ -41,7 +41,6 @@ def test_bdm_compute_dataset_stats_shape():
     assert stats["row_count"] == 3, "measured from the warehouse, not taken from the arrival"
     assert stats["value_counts"]["sex"] == [["M", 1], ["F", 1], ["X", 0], ["(invalid code)", 1]]
     assert stats["check_aggregates"]["sex"]["total_invalid"] == 1  # the 'Q' row
-    assert stats["arrival"]["max_lag_hours"] is not None
     # scoped to run_01 only, not run_02's later data
     assert "2021" not in str(stats["arrival"]["earliest_extract"])
 
@@ -164,4 +163,3 @@ def test_cp_compute_dataset_stats_shape():
     assert stats["value_counts"]["concern_type"] == [["Neglect", 1], ["(invalid code)", 1]]
     assert stats["check_aggregates"]["cp_clients.postcode"]["total_invalid"] == 1  # the '9999' row
     assert set(stats["arrival"].keys()) == set(cp_stats.TABLES)
-    assert stats["arrival"]["cp_clients"]["max_lag_hours"] is not None

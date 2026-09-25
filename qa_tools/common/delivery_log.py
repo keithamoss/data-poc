@@ -79,7 +79,7 @@ class DeliveryLogError(RuntimeError):
 def path_for(delivery, log_dir: Path | None = None) -> Path:
     """This delivery's committed record.
 
-    THE NAME CARRIES THE RECEIPT ORDER, and that is a performance
+    THE NAME CARRIES THE RECEIPT INSTANT, and that is a performance
     contract rather than decoration (REQ-PIPE-034's own non-functional
     constraint). Answering "when did this dataset last arrive" must not
     cost a walk of every arrival ever received - and with names that
@@ -88,15 +88,45 @@ def path_for(delivery, log_dir: Path | None = None) -> Path:
     by receipt, so that walk runs newest-first and stops at the first
     hit, bounded by deliveries since that dataset last supplied.
 
+    IT CARRIES THE INSTANT AND NOT THE RECEIPT SEQUENCE, and the
+    difference is a real defect this had for one evening. The sequence
+    is re-issued when the synthetic data is regenerated - the same
+    delivery, the same instant, a different number - so a filename
+    built from it produced a SECOND record for every delivery, and the
+    write-once guard below never fired because it only asked whether
+    THAT path existed. Measured: 120 records for 60 deliveries, and
+    every dataset's arrival history exactly doubled.
+
+    THE GENERAL RULE, because this will be reachable for again: a
+    write-once record whose filename encodes a MUTABLE value is not
+    write-once. The instant is a fact about the arrival; the sequence
+    is a fact about the receipt WE wrote, and only the first is stable.
+    Ordering ties are broken by the receipt's own sequence at the point
+    ordering is decided, which does not need it to be in this name.
+
     Takes a Delivery rather than a name, because a name alone cannot
     produce this filename.
     """
     directory = Path(log_dir or DELIVERY_LOG_DIR)
     safe = _UNSAFE.sub("_", delivery.name).strip("._") or "unnamed"
-    # Zero-padded so the sequence sorts as a number rather than as text,
-    # which is the whole point of putting it here.
-    return directory / (f"{asset_time.arrival_key(delivery.received_at)}"
-                         f"--{int(delivery.sequence):09d}--{safe}.json")
+    return directory / f"{asset_time.arrival_key(delivery.received_at)}--{safe}.json"
+
+
+def _existing_record(delivery_name: str, log_dir: Path | None = None) -> Path | None:
+    """This delivery's committed record under ANY filename.
+
+    Globbed on the delivery's own safe name rather than on a full path,
+    so a change to how records are named can never again defeat the
+    write-once rule silently.
+    """
+    directory = Path(log_dir or DELIVERY_LOG_DIR)
+    if not directory.is_dir():
+        return None
+    safe = _UNSAFE.sub("_", delivery_name).strip("._") or "unnamed"
+    for path in sorted(directory.glob(f"*--{safe}.json")):
+        return path
+    legacy = directory / f"{safe}.json"
+    return legacy if legacy.is_file() else None
 
 
 def record(delivery, recognition, log_dir: Path | None = None) -> Path | None:
@@ -113,7 +143,11 @@ def record(delivery, recognition, log_dir: Path | None = None) -> Path | None:
     Returns the path written, or None where one already existed.
     """
     path = path_for(delivery, log_dir)
-    if path.exists():
+    # WRITE-ONCE BY DELIVERY, not by path. Asking only whether this
+    # exact filename exists is what let a re-issued receipt sequence
+    # write a second record for a delivery already logged, so the guard
+    # now asks the question the criterion actually asks.
+    if _existing_record(delivery.name, log_dir) is not None:
         return None
     path.parent.mkdir(parents=True, exist_ok=True)
 

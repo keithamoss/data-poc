@@ -196,3 +196,59 @@ class TestItIsTheCollisionGatesCorpus:
         (tmp_path / "broken.json").write_text("{not json")
         with pytest.raises(validate_arrival_patterns.ArrivalPatternConfigError):
             validate_arrival_patterns.committed_filenames(tmp_path)
+
+
+class TestWriteOnceSurvivesAReIssuedReceipt:
+    """A real defect, found by a gate rather than by review
+    (2026-09-25).
+
+    REQ-PIPE-034 put the receipt's SEQUENCE in the committed record's
+    filename so a directory listing would be in receipt order. But the
+    sequence is re-issued when the synthetic data is regenerated - same
+    delivery, same instant, different number - so `path_for()` produced
+    a new path and the write-once guard, which only asked whether THAT
+    path existed, never fired. Measured on the real tree: 120 records
+    for 60 deliveries, and every dataset's arrival history exactly
+    doubled.
+
+    THE GENERAL RULE: a write-once record whose filename encodes a
+    MUTABLE value is not write-once.
+    """
+
+    def test_a_delivery_is_not_logged_twice_when_its_sequence_changes(self, tmp_path):
+        first, delivery_one, recognition = _one(tmp_path)
+        assert first is not None
+
+        # The same delivery, same receipt instant, a re-issued sequence.
+        again = _Delivery(name=delivery_one.name, files=delivery_one.files,
+                           received_at=delivery_one.received_at,
+                           anomalies=delivery_one.anomalies,
+                           sequence=delivery_one.sequence + 60)
+        assert delivery_log.record(again, recognition, log_dir=tmp_path) is None, (
+            "a second record for a delivery already logged is exactly what write-once "
+            "forbids, whatever the filename works out to")
+        assert len(list(tmp_path.glob("*.json"))) == 1
+
+    def test_the_filename_carries_the_instant_and_not_the_sequence(self, tmp_path):
+        written, delivery_one, _ = _one(tmp_path)
+        assert "--" in written.name
+        assert f"{delivery_one.sequence:09d}" not in written.name, (
+            "the instant is a fact about the ARRIVAL and is stable; the sequence is a "
+            "fact about the receipt we wrote, and is not")
+
+    def test_records_still_sort_into_receipt_order(self, tmp_path):
+        """The reason the instant is in the name at all - a listing has
+        to BE receipt order, or finding a dataset's last arrival means
+        opening every record."""
+        from datetime import datetime, timedelta, timezone
+
+        perth = timezone(timedelta(hours=8))
+        for n, day in enumerate([3, 1, 2], start=1):
+            d = _Delivery(name=f"drop-{day}", files=("cp_clients.csv",),
+                           received_at=datetime(2026, 6, day, 9, tzinfo=perth),
+                           sequence=n)
+            delivery_log.record(d, _Recognition(
+                by_dataset={"cp-clients": ("cp_clients.csv",)},
+                collections=("child-protection",)), log_dir=tmp_path)
+        names = [p.name for p in sorted(tmp_path.glob("*.json"))]
+        assert [n.split("--")[1] for n in names] == ["drop-1.json", "drop-2.json", "drop-3.json"]

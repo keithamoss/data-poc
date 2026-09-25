@@ -114,31 +114,65 @@ class TestADatasetsFilingsAreItsOwn:
 
 
 class TestFilingRealArrivals:
-    """The entry point the orchestrators call, against real arrivals."""
+    """The entry point the orchestrators call, against real arrivals.
 
-    def test_every_dataset_in_a_delivery_is_filed_separately(self, filings):
+    IT BUILDS ITS OWN DELIVERIES rather than reading data/deliveries/,
+    and that is not a stylistic preference - it is the difference
+    between green and red. data/ is GITIGNORED, so a freshly-cloned CI
+    runner has none at all: the first version of these tests read the
+    real tree, passed here, and failed on the runner for four
+    consecutive pushes with "expected one filing per CP dataset, got
+    0". CLAUDE.md records this exact trap, and it was walked into
+    anyway.
+    """
+
+    @staticmethod
+    def _delivery(tmp_path, name, files, when, sequence):
+        deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
+        folder = deliveries / name
+        folder.mkdir(parents=True, exist_ok=True)
+        receipts.mkdir(parents=True, exist_ok=True)
+        for filename in files:
+            (folder / filename).write_text("a\n1\n")
+        (receipts / f"{name}.json").write_text(json.dumps(
+            {"delivery": name, "received_at": when, "sequence": sequence}))
+        return deliveries, receipts
+
+    def _arrivals(self, tmp_path, collection="child-protection", prefix="cp_run_"):
         from qa_tools.common import arrivals
 
-        found = arrivals.arrivals_for("child-protection", "cp_run_")[:1]
+        deliveries, receipts = self._delivery(
+            tmp_path, "monday",
+            ["cp_clients.csv", "cp_carers.csv", "cp_placements.csv",
+             "cp_notifications.csv", "cp_investigations.csv", "cp_case_workers.csv"],
+            "2026-02-01T09:00:00+08:00", 1)
+        return arrivals.arrivals_for(collection, prefix, deliveries, receipts)
+
+    def test_every_dataset_in_a_delivery_is_filed_separately(self, filings, tmp_path):
+        found = self._arrivals(tmp_path)
+        assert found, "the fixture must actually produce an arrival, or this proves nothing"
         written = filing.file_arrivals(found, filings)
         assert len(written) == 6, f"expected one filing per CP dataset, got {len(written)}"
         assert len({a.dataset_id for a in written}) == 6
         assert len({a.supply_id for a in written}) == 6, "each dataset needs its own id"
 
-    def test_a_second_pass_files_nothing(self, filings):
-        from qa_tools.common import arrivals
-
-        found = arrivals.arrivals_for("child-protection", "cp_run_")[:2]
+    def test_a_second_pass_files_nothing(self, filings, tmp_path):
+        found = self._arrivals(tmp_path)
         assert filing.file_arrivals(found, filings)
         assert filing.file_arrivals(found, filings) == [], (
             "criterion 10 - a supply already filed is left alone on every later run")
 
-    def test_a_red_supply_is_filed_on_the_same_terms(self, filings):
+    def test_a_red_supply_is_filed_on_the_same_terms(self, filings, tmp_path):
         """Criterion 11. A supply never promoted still carries where it
         was filed - "arrived three weeks late AND was bad" is what
         belongs on the record."""
         from qa_tools.common import arrivals
 
-        found = arrivals.arrivals_for("civil-registration", "run_")[:1]
+        deliveries, receipts = self._delivery(
+            tmp_path, "bdm-drop", ["birth_registrations_2026-02-01.csv"],
+            "2026-02-01T09:00:00+08:00", 1)
+        found = arrivals.arrivals_for("civil-registration", "run_", deliveries, receipts)
+        assert found, "the fixture must actually produce an arrival"
         written = filing.file_arrivals(found, filings)
-        assert [a.slot for a in written] != [None], "a supply must be filed before it is checked"
+        assert written and all(a.slot is not None for a in written), (
+            "a supply must be filed before it is checked")

@@ -97,10 +97,24 @@ def _sex_value_counts(conn: duckdb.DuckDBPyConnection, run_id: str) -> list[list
 
 
 def _arrival(conn: duckdb.DuckDBPyConnection, run_id: str) -> dict:
-    max_lag_hours = conn.execute(
-        """SELECT MAX(date_diff('second', date_registered, extract_timestamp)) / 3600.0
-           FROM birth_registrations WHERE run_id = ?""", [run_id]
-    ).fetchone()[0]
+    # MAX_LAG_HOURS RETIRED 2026-09-25 (REQ-PIPE-066 criterion 12). It
+    # was never an arrival measure despite living in this block: it was
+    # MAX(extract_timestamp minus date_registered), a WITHIN-SUPPLY
+    # staleness figure. Verified before deleting - computed, committed,
+    # carried through BOTH dashboard build paths as maxLagHours, and
+    # rendered NOWHERE; zero references in the dashboard template and
+    # zero in the JS suite, with the only references outside the
+    # pipeline being tests asserting it was carried. Dead weight with a
+    # misleading name.
+    #
+    # The real finding it gestured at is EXTRACT-TO-RECEIPT LAG - the
+    # gap between when a supplier extracted and when WE received -
+    # which is genuine signal about supplier behaviour and quite
+    # different from whether a supply was on time. Keith's call is that
+    # it belongs as a CHECK rather than a committed stat, where a
+    # tolerance and a verdict can live: plans/running-thoughts.md #43.
+    # It needs this batch's receipt instant to compute, so it is not
+    # this field wearing a new name.
     # A real bug found 2026-09-17 (Phase 5j's arrival-status work): a
     # plain MIN(extract_timestamp) over every row picks up
     # generator.dirty.inject_extract_timestamp_disorder's own rows too -
@@ -128,8 +142,7 @@ def _arrival(conn: duckdb.DuckDBPyConnection, run_id: str) -> dict:
         earliest_extract = conn.execute(
             "SELECT MIN(extract_timestamp) FROM birth_registrations WHERE run_id = ?", [run_id]
         ).fetchone()[0]
-    return {"max_lag_hours": max_lag_hours,
-            "earliest_extract": asset_time.record_source_instant(
+    return {"earliest_extract": asset_time.record_source_instant(
                 earliest_extract, f"earliest_extract for run {run_id}")}
 
 

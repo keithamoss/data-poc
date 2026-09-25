@@ -2339,3 +2339,33 @@ to SEE them, and there is already a separate ordering check that does).
     changes the hash and changes no threshold - so comparing on what
     history already holds would miss exactly the class of change that
     matters most.
+
+
+43. **[todo, 2026-09-25]** **[QA checks & contract]** Extract-to-receipt lag, as a CHECK rather than a committed statistic.
+
+**Status:** todo (2026-09-25) · **Category:** QA checks & contract
+
+Keith's call while retiring `max_lag_hours` (REQ-PIPE-066 decision 14).
+The field that was deleted was never an arrival measure - it was
+`MAX(extract_timestamp - date_registered)`, a WITHIN-SUPPLY staleness
+figure sitting in an arrival block, computed and committed on every run
+and rendered nowhere at all.
+
+The real finding it gestured at is different and worth having: the gap
+between when a supplier EXTRACTED their data and when WE RECEIVED it.
+That is genuine signal about supplier behaviour - a supplier whose
+extracts are consistently eight hours stale by the time they arrive is
+telling you something - and it is quite separate from whether the
+supply was on time, which is now measured against the assigned slot.
+
+**Why a check and not a stat** (Keith): a check is where a tolerance
+and a verdict can live. A committed number with no threshold is
+something everyone scrolls past; a check that goes amber at a stated
+gap is something somebody acts on.
+
+**Not the deleted field wearing a new name**, and worth stating because
+it will look like one: it needs OUR receipt instant, which only exists
+from REQ-PIPE-060 onward. The old field could not have computed it,
+because it never knew when we received anything.
+
+Belongs with batch 5's check work.

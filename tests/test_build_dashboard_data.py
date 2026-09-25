@@ -36,14 +36,14 @@ FIXTURE_DATASET_STATS = {
         "arrival_record": FIXTURE_RUNS[0],
         "row_count": 3,
         "value_counts": {"sex": [["M", 1], ["F", 2], ["X", 0]]},
-        "arrival": {"max_lag_hours": 5.0, "earliest_extract": "2026-09-01T10:00:00+00:00"},
+        "arrival": {"earliest_extract": "2026-09-01T10:00:00+00:00"},
         "check_aggregates": {"sex": {"type": "categorical", "suppressed": False, "total_invalid": 0, "values": []}},
     },
     "run_002": {
         "arrival_record": FIXTURE_RUNS[1],
         "row_count": 4,
         "value_counts": {"sex": [["M", 2], ["F", 1], ["X", 1]]},
-        "arrival": {"max_lag_hours": 6.0, "earliest_extract": "2026-09-02T10:00:00+00:00"},
+        "arrival": {"earliest_extract": "2026-09-02T10:00:00+00:00"},
         "check_aggregates": {"sex": {"type": "categorical", "suppressed": False, "total_invalid": 1,
                                       "values": [{"value": "X", "count": 1}]}},
     },
@@ -184,7 +184,6 @@ def test_arrival_status_is_genuinely_computed_from_real_cadence(tmp_path, monkey
     data = bdd.build()
 
     assert data["arrivalByRun"]["run_001"]["arrivalStatus"] == "onTime"
-    assert data["arrivalByRun"]["run_001"]["maxLagHours"] == 5.0
     assert data["arrivalByRun"]["run_002"]["arrivalStatus"] == "late"
     history_by_run = {h["run_id"]: h["arrivalStatus"] for h in data["arrivalHistory"]}
     assert history_by_run == {"run_001": "onTime", "run_002": "late"}

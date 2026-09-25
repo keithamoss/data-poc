@@ -407,14 +407,12 @@ def build() -> dict:
     # its slaProperties carry `element: birth_registrations`, and since
     # REQ-PIPE-049 that means something rather than being ignored.
     cadence = parse_cadence_from_contract(CONTRACT_PATH, element=hierarchy.dataset("birth-registrations").table)
-
-    max_lag_hours = dataset_stats[latest_run]["arrival"]["max_lag_hours"]
     earliest_extract = dataset_stats[latest_run]["arrival"]["earliest_extract"]
     latest_status = classify_arrival(
         cadence, date.fromisoformat(_run_date(latest_entry)), _parse_extract_timestamp(earliest_extract))
 
     # Genuinely per-run now, not a hardcoded True for every run but the
-    # latest - every run's own max_lag_hours/earliest_extract already
+    # latest - every run's own earliest_extract already
     # exists in its committed dataset_stats.json (Phase 3), just not
     # previously surfaced here. arrival_by_run mirrors stats["byRun"]
     # above (run_id-keyed, for Thread C's as-of UI); arrival_history
@@ -431,7 +429,6 @@ def build() -> dict:
             cadence, date.fromisoformat(_run_date(m)), _parse_extract_timestamp(arrival["earliest_extract"]))
         arrival_by_run[run_id] = {
             "arrivedAt": arrival["earliest_extract"], "arrivalStatus": status,
-            "maxLagHours": round(arrival["max_lag_hours"], 1),
         }
         arrival_history.append({"run_id": run_id, "run_date": _run_date(m), "arrivalStatus": status})
 
@@ -445,7 +442,6 @@ def build() -> dict:
             "run_date": _run_date(latest_entry),
             "arrivedAt": earliest_extract,
             "arrivalStatus": latest_status,
-            "maxLagHours": round(max_lag_hours, 1),
         },
         "arrivalHistory": arrival_history,
         "arrivalByRun": arrival_by_run,

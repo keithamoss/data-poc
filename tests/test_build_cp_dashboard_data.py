@@ -33,13 +33,13 @@ FIXTURE_DATASET_STATS = {
     "cp_run_001": {
         "row_counts": {"cp_notifications": 3},
         "value_counts": {"concern_type": [["Neglect", 2], ["Physical abuse", 1]]},
-        "arrival": {"cp_notifications": {"max_lag_hours": 5.0, "earliest_extract": "2025-11-01T05:00:00+00:00"}},
+        "arrival": {"cp_notifications": {"earliest_extract": "2025-11-01T05:00:00+00:00"}},
         "check_aggregates": {},
     },
     "cp_run_002": {
         "row_counts": {"cp_notifications": 4},
         "value_counts": {"concern_type": [["Neglect", 3], ["Physical abuse", 1]]},
-        "arrival": {"cp_notifications": {"max_lag_hours": 30.0, "earliest_extract": "2026-02-01T20:00:00+00:00"}},
+        "arrival": {"cp_notifications": {"earliest_extract": "2026-02-01T20:00:00+00:00"}},
         "check_aggregates": {},
     },
 }
@@ -94,6 +94,5 @@ def test_arrival_status_is_genuinely_computed_from_real_cadence():
 
     assert dataset["arrivalByRun"]["cp_run_001"]["arrivalStatus"] == "onTime"
     assert dataset["arrivalByRun"]["cp_run_002"]["arrivalStatus"] == "late"
-    assert dataset["arrivalByRun"]["cp_run_002"]["maxLagHours"] == 30.0
     history_by_run = {h["run_id"]: h["arrivalStatus"] for h in dataset["arrivalHistory"]}
     assert history_by_run == {"cp_run_001": "onTime", "cp_run_002": "late"}
