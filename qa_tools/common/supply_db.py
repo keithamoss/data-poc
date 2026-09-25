@@ -280,3 +280,46 @@ def drop_orphan_run_schemas(conn, keep: Sequence[str] = ()) -> list[str]:
         conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
         dropped.append(schema)
     return dropped
+
+
+# ---------------------------------------------------------------------------
+# dbt's scratch database
+#
+# The one tool that WRITES, and the reason a per-run file still exists
+# anywhere. dbt materialises its staging models and its --store-failures
+# audit tables somewhere; pointed at the supply database it would take
+# DuckDB's exclusive lock and stall every parallel reader. So it gets its
+# own small file and ATTACHes the supply database read-only, which is
+# Keith's call of 2026-09-25 over serialising the whole fan-out.
+#
+# NOT THE THING CRITERION 7 FORBIDS, and the distinction is worth being
+# precise about: SUPPLY DATA lives in one database. What lands here is
+# dbt's own derived output - a tool artefact, and delivery sprint 15
+# stops invoking dbt this way at all.
+#
+# Both paths hang off the supply database's own directory, so a test
+# worker that has its own database gets its own scratch for free - the
+# per-worker uniqueness the retired data/duckdb_runs/ layout used to
+# provide, inherited rather than re-invented.
+# ---------------------------------------------------------------------------
+
+def scratch_dir() -> Path:
+    return supply_db_path().parent / "dbt_scratch"
+
+
+def dbt_scratch_db(run_id: str) -> Path:
+    d = scratch_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    return d / f"{_ident(run_id, 'run id')}.duckdb"
+
+
+def dbt_target_path(run_id: str) -> Path:
+    """dbt's own target/ for this run.
+
+    Never DBT_PROJECT_DIR/target/, which is a fixed repo-relative path
+    shared by every invocation - two runs scheduled onto different
+    parallel workers would clobber each other's manifest.json and
+    run_results.json mid-write. A real risk, reproduced rather than
+    theorised (plans/running-thoughts.md #12).
+    """
+    return scratch_dir() / "dbt_target" / _ident(run_id, "run id")

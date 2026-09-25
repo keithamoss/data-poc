@@ -120,7 +120,6 @@ def _load_delivery_from_folder(folder: str, run_id: str) -> None:
             f"a CP delivery needs all 6 real tables, the cross-table checks can't run on a partial set")
     for table in TABLES:
         build_cp_warehouses.add_table_to_run(run_id, table, os.path.join(folder, f"{table}.csv"),
-                                              out_dir=build_cp_warehouses.OUT_DIR,
                                               raw_dir=build_cp_warehouses.CP_RAW_DIR)
 
 
@@ -271,9 +270,9 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
     for other_table in (t for t in TABLES if t != table):
         build_cp_warehouses.add_table_to_run(
             run_id, other_table, os.path.join(raw_dir(), other_tables_run_id, f"{other_table}.csv"),
-            out_dir=build_cp_warehouses.OUT_DIR, raw_dir=build_cp_warehouses.CP_RAW_DIR)
+            raw_dir=build_cp_warehouses.CP_RAW_DIR)
     build_cp_warehouses.add_table_to_run(
-        run_id, table, file_path, out_dir=build_cp_warehouses.OUT_DIR, raw_dir=build_cp_warehouses.CP_RAW_DIR)
+        run_id, table, file_path, raw_dir=build_cp_warehouses.CP_RAW_DIR)
 
     entry = {"run_id": run_id, "dirty_severity": None,
              "received_at": asset_time.isoformat(asset_time.start_of_day(date.fromisoformat(run_date)))}

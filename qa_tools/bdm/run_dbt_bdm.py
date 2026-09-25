@@ -66,6 +66,7 @@ import os
 import duckdb
 
 from . import bdm_common
+from qa_tools.common import supply_db
 from qa_tools.common.check_lifecycle import dbt_check_id_lookup
 from qa_tools.common.dbt_common import (
     ENGINE_TAG, parse_threshold, run_dbt, test_nodes,
@@ -76,7 +77,6 @@ from qa_tools.common.qa_results_writer import write_qa_result
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 DBT_PROJECT_DIR = os.path.join(ROOT, "dbt_project")
 PROFILES_DIR = os.path.join(os.path.dirname(__file__), "..", "dbt_profiles")
-DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "duckdb_runs")
 SCHEMA_YML_PATH = os.path.join(DBT_PROJECT_DIR, "models", "staging", "schema.yml")
 
 # Built once from schema.yml itself, not the compiled manifest - see
@@ -248,7 +248,12 @@ def _status_for(count: int, warn_t: float | None, fail_t: float | None) -> str:
 
 
 def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
-    db_path = os.path.join(DUCKDB_RUNS_DIR, f"{run_id}.duckdb")
+    # dbt's own SCRATCH database, not the supply database - see
+    # qa_tools/common/supply_db.py for why the one writer gets a file of
+    # its own and ATTACHes the supply database read-only (REQ-PIPE-068).
+    # Its staging models and --store-failures audit tables land here, and
+    # the connection opened further down reads them from here too.
+    db_path = str(supply_db.dbt_scratch_db(run_id))
     # A single `dbt build` (build the model, then run its tests) instead of
     # separate `dbt run` + `dbt test` subprocess calls - dbt-core's fixed
     # per-invocation startup cost (~2.4s just for `dbt --version`, before
@@ -259,20 +264,20 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     # then also contains the model-build step's own result, which the
     # parsing below already silently skips (nodes.get() returns None for
     # anything that isn't a test node), so nothing further changes.
-    # Lives beside db_path (DUCKDB_RUNS_DIR/<run_id>.duckdb), not under
-    # DBT_PROJECT_DIR/target/ - that's a fixed, repo-relative path shared
-    # by every invocation regardless of DUCKDB_RUNS_DIR, so two tests
-    # reusing the same run_id (tests/test_run_dbt_bdm.py's own two tests,
-    # by design, matching conftest.py's fixture-built data) would collide
-    # if ever scheduled onto different parallel workers - a real risk,
-    # not hypothetical (plans/running-thoughts.md #12, confirmed by
-    # reproducing it). DUCKDB_RUNS_DIR is already genuinely unique per
-    # real production run (untouched) and, in tests, already monkeypatched
-    # to a per-worker tmp dir - so basing target_path on it inherits that
-    # same uniqueness for free, no test-file changes needed.
-    target_path = os.path.join(DUCKDB_RUNS_DIR, "dbt_target", run_id)
+    # Never DBT_PROJECT_DIR/target/ - a fixed, repo-relative path shared
+    # by every invocation, so two tests reusing the same run_id
+    # (tests/test_run_dbt_bdm.py's own two, by design, matching
+    # conftest.py's fixture-built data) would collide if ever scheduled
+    # onto different parallel workers - a real risk, not hypothetical
+    # (plans/running-thoughts.md #12, confirmed by reproducing it).
+    # supply_db.dbt_target_path() hangs off the supply database's own
+    # directory, so a worker with its own database inherits that
+    # uniqueness for free - the same property the retired
+    # data/duckdb_runs/ layout used to give it.
+    target_path = str(supply_db.dbt_target_path(run_id))
     run_dbt(db_path, "build", ["stg_birth_registrations", *_SINGULAR_TESTS], target_path,
-            PROFILES_DIR, DBT_PROJECT_DIR, ROOT)
+            PROFILES_DIR, DBT_PROJECT_DIR, ROOT,
+            run_schema=supply_db.run_schema(run_id))
 
     with open(os.path.join(target_path, "manifest.json")) as f:
         manifest = json.load(f)

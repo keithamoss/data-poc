@@ -7,6 +7,18 @@ version: 2
 # input directly.
 sources:
   - name: raw
+    # REQ-PIPE-068. The source keeps its logical name - every model
+    # still says `source('raw', ...)` and no SQL changed - but it now
+    # resolves into the ATTACHed supply database, through the view
+    # schema belonging to the run being tested. A bare table name
+    # therefore means exactly one arrival's rows, which is what the
+    # retired per-run database files used to deliver.
+    #
+    # A logical name has a view only where exactly one staged table
+    # claims it, so a duplicated or missing supply is ABSENT here
+    # rather than silently resolving to whichever version sorted first.
+    database: supply
+    schema: "{{ env_var('DBT_RUN_SCHEMA') }}"
     description: >
       Runs loaded straight from the generator's CSVs, tagged with
       run_id/run_date. One row per birth registration

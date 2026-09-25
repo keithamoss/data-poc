@@ -33,10 +33,9 @@ import os
 import sys
 from datetime import date
 
-import duckdb
 
 from . import bdm_common
-from qa_tools.common import arrivals
+from qa_tools.common import arrivals, supply_db
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
@@ -107,7 +106,13 @@ def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str
     # own docstring - Keith's hard rule, 2026-09-16: CI must never touch
     # data, only ever committed history.
     _announce(on_step, RUN_STEPS[4])
-    conn = duckdb.connect(WAREHOUSE_DB_PATH, read_only=True)
+    # Through the run's own view schema, like every other read of supply
+    # data (REQ-PIPE-068 criterion 2). It used to connect to the
+    # combined all-runs warehouse and filter by run_id in SQL, which
+    # made "which rows is this run allowed to see" a property of the
+    # query rather than of what the run can reach.
+    conn = supply_db.connect(read_only=True)
+    conn.execute(f"SET search_path = '{supply_db.run_schema(run_id)}'")
     stats = dataset_stats.compute_dataset_stats(conn, run_id, entry)
     conn.close()
     # run_by stamped only on this write, not the 4 real-tool writes above -
@@ -191,29 +196,18 @@ def run_single(run_id: str, csv_path: str, run_date: str, reference_run_id: str,
                   asset_time.start_of_day(date.fromisoformat(run_date))),
               "delivery": run_id}
 
-    # out_dir passed explicitly, read off the module attribute rather than
-    # relying on build_one()'s own default parameter value - a real bug
-    # caught while writing this function's own test: a default arg is
-    # bound once at module-import time, so a test (or any other caller)
-    # monkeypatching build_per_run_warehouses.OUT_DIR afterwards would be
-    # silently ignored and this would write into the REAL data/duckdb_runs/
-    # instead - reproduced for real (a stray pytest_bdm_dirty.duckdb
-    # actually appeared there) before this fix.
-    db_path = build_per_run_warehouses.build_one(run_id, dest_path, run_date,
-                                                  out_dir=build_per_run_warehouses.OUT_DIR)
+    # Stages the arrival and builds this run's views (REQ-PIPE-068).
+    #
+    # THE GLOBAL THAT USED TO LIVE HERE IS GONE. _run_one()'s
+    # dataset_stats step connected to a module-level WAREHOUSE_DB_PATH -
+    # the combined all-runs warehouse in the batch path, which does not
+    # exist at all in a single-arrival Lambda world - so this function
+    # rebound that global to the run's own database file before calling
+    # it. With one supply database there is nothing to rebind: both
+    # paths open the same database and read through the run's own view
+    # schema, which is what scoped the rows all along.
+    build_per_run_warehouses.build_one(run_id, dest_path, run_date)
 
-    # _run_one()'s own dataset_stats computation connects to the module-
-    # level WAREHOUSE_DB_PATH global - the combined, all-runs warehouse
-    # (pipeline/load.py) in the batch path, which doesn't exist at all in
-    # a single-arrival Lambda world. Rebound here (global, not a local -
-    # _run_one() reads the module's own global namespace, re-resolved on
-    # every call, not captured at def time) to this run's own per-run
-    # file instead - build_one() above now also creates a
-    # main.birth_registrations VIEW there for exactly this reason (see
-    # its own comment). Safe: a single Lambda invocation is single-
-    # threaded, so there's no concurrent call this could race with.
-    global WAREHOUSE_DB_PATH
-    WAREHOUSE_DB_PATH = db_path
     return _run_one(entry, run_timestamp, run_by, reference_run_id, reference_csv, on_step=on_step)
 
 

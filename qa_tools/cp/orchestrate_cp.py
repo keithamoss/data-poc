@@ -26,9 +26,8 @@ import json
 import os
 import sys
 
-import duckdb
 
-from qa_tools.common import arrivals
+from qa_tools.common import arrivals, supply_db
 from qa_tools.common import hierarchy
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common.git_identity import get_run_by
@@ -46,7 +45,6 @@ from qa_tools.common import asset_time
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 MANIFEST_PATH = os.path.join(ROOT, "data", "cp_raw", "manifest.json")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
-CP_DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
 
 
 # The real, discrete steps one run of the check chain goes through, in
@@ -89,7 +87,8 @@ def _run_one(entry: dict, run_timestamp: str, run_by: str, reference_run_id: str
     # Same rationale as orchestrate_bdm.py's identical block - see
     # qa_tools/bdm/dataset_stats.py's own docstring.
     _announce(on_step, RUN_STEPS[4])
-    conn = duckdb.connect(os.path.join(CP_DUCKDB_RUNS_DIR, f"{run_id}.duckdb"), read_only=True)
+    conn = supply_db.connect(read_only=True)
+    conn.execute(f"SET search_path = '{supply_db.run_schema(run_id)}'")
     stats = dataset_stats.compute_dataset_stats(conn, entry)
     conn.close()
     # run_by stamped only on this write - see orchestrate_bdm.py's

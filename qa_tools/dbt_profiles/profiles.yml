@@ -2,13 +2,22 @@
 # so this is committed rather than gitignored like a normal profiles.yml
 # with credentials would be.
 #
-# DBT_DB_PATH is set per-invocation by qa_tools/bdm/run_dbt_bdm.py
-# (or qa_tools/cp/run_dbt_cp.py), pointed at either the combined
-# data/warehouse.duckdb or one of the per-run data/duckdb_runs/<run_id>
-# .duckdb files - see that file's docstring for why dbt is run once per
-# run rather than once against the combined warehouse. This one profile
-# is shared by both datasets (one dbt_project/), even though its name
-# ("birth_registrations") predates Child Protection being added.
+# DBT_DB_PATH is dbt's own SCRATCH database for one run, set per
+# invocation by qa_tools/common/dbt_common.py's run_dbt(). dbt writes -
+# its staging models, and the --store-failures audit tables - and
+# DuckDB gives a writer an exclusive lock over the whole file, so
+# pointing dbt at the supply database would stall every parallel reader
+# (REQ-PIPE-068, and the lock behaviour was verified by real experiment
+# rather than taken from docs).
+#
+# DBT_SUPPLY_DB is the one supply database, ATTACHed READ-ONLY as
+# `supply`. dbt_project/models/staging/sources.yml resolves the `raw`
+# source through it, into the per-run view schema DBT_RUN_SCHEMA names -
+# so a bare table name in a model means exactly one arrival's rows,
+# which is what the retired per-run database files used to deliver.
+#
+# This one profile is shared by both datasets (one dbt_project/), even
+# though its name ("birth_registrations") predates Child Protection.
 #
 # Usage: dbt run --profiles-dir qa_tools/dbt_profiles --project-dir dbt_project
 birth_registrations:
@@ -18,3 +27,7 @@ birth_registrations:
       type: duckdb
       path: "{{ env_var('DBT_DB_PATH') }}"
       threads: 1
+      attach:
+        - path: "{{ env_var('DBT_SUPPLY_DB') }}"
+          alias: supply
+          read_only: true

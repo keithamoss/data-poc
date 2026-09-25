@@ -68,7 +68,7 @@ def _check_aggregates(conn: duckdb.DuckDBPyConnection) -> dict[str, dict]:
     """Keyed by "table.column" (a string, not a tuple - this becomes JSON)."""
     out = {}
     for (table, col), spec in AGGREGATE_SPEC.items():
-        full_table = f"raw.{table}"
+        full_table = f"{table}"
         if spec["kind"] == "categorical":
             value = categorical_aggregate(conn, full_table, col, spec["invalid_condition"], spec["classification"])
         else:
@@ -79,7 +79,7 @@ def _check_aggregates(conn: duckdb.DuckDBPyConnection) -> dict[str, dict]:
 
 def _concern_type_value_counts(conn: duckdb.DuckDBPyConnection) -> list[list]:
     rows = conn.execute(
-        "SELECT concern_type, COUNT(*) FROM raw.cp_notifications GROUP BY concern_type"
+        "SELECT concern_type, COUNT(*) FROM cp_notifications GROUP BY concern_type"
     ).fetchall()
     known = ["Neglect", "Physical abuse", "Emotional abuse", "Sexual abuse",
              "Domestic violence exposure", "Parental substance use", "Parental mental health concern"]
@@ -106,9 +106,9 @@ def _arrival(conn: duckdb.DuckDBPyConnection, run_date: str) -> dict[str, dict]:
     for table in TABLES:
         max_lag_hours = conn.execute(
             f"SELECT MAX(date_diff('second', TIMESTAMP '{run_date}', extract_timestamp)) / 3600.0 "
-            f"FROM raw.{table}"
+            f"FROM {table}"
         ).fetchone()[0]
-        earliest_extract = conn.execute(f"SELECT MIN(extract_timestamp) FROM raw.{table}").fetchone()[0]
+        earliest_extract = conn.execute(f"SELECT MIN(extract_timestamp) FROM {table}").fetchone()[0]
         out[table] = {"max_lag_hours": max_lag_hours,
                       "earliest_extract": asset_time.record_source_instant(
                           earliest_extract, f"earliest_extract for table {table}")}
@@ -139,7 +139,7 @@ def compute_dataset_stats(conn: duckdb.DuckDBPyConnection, arrival: dict) -> dic
         "arrival_record": bdm_stats._arrival_record(arrival),
         # Measured per table, for the reason BDM's own counterpart
         # gives - the generator's row_counts were bookkeeping.
-        "row_counts": {t: conn.execute(f"SELECT COUNT(*) FROM raw.{t}").fetchone()[0]
+        "row_counts": {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
                         for t in TABLES},
         "value_counts": {"concern_type": _concern_type_value_counts(conn)},
         "check_aggregates": _check_aggregates(conn),

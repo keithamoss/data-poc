@@ -34,9 +34,9 @@ rows.
 from __future__ import annotations
 import os
 
-import duckdb
 
 from . import bdm_common
+from qa_tools.common import supply_db
 from qa_tools.common.soda_common import (
     ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys, check_id_from_resource_attributes,
 )
@@ -44,7 +44,6 @@ from qa_tools.common.qa_results_writer import write_qa_result
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 SODA_CHECKS_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-soda-checks.yml")
-DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "duckdb_runs")
 
 AGENCY_ID = bdm_common.AGENCY_ID
 COLLECTION_ID = bdm_common.COLLECTION_ID
@@ -110,12 +109,15 @@ _CUSTOM_CHECK_DIMENSION = {
 def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     from soda.scan import Scan
 
-    db_path = os.path.join(DUCKDB_RUNS_DIR, f"{run_id}.duckdb")
-    conn = duckdb.connect(db_path, read_only=True)
-    # dbt's source config puts the loaded table in a schema literally named
-    # "raw" (see build_per_run_warehouses.py) - Soda's checks file refers to
-    # the bare table name, so it needs "raw" on the search path to resolve.
-    conn.execute("SET search_path = 'raw'")
+    # READ-ONLY, and that is load-bearing rather than tidy: DuckDB lets
+    # any number of readers share one database and lets a single writer
+    # exclude all of them, so a reader that opened read-write would lock
+    # out every other worker in the fan-out (REQ-PIPE-068).
+    conn = supply_db.connect(read_only=True)
+    # Soda's checks file refers to bare table names, so the run's own
+    # view schema goes on the search path - one arrival's rows, resolved
+    # only where exactly one staged table claims the name.
+    conn.execute(f"SET search_path = '{supply_db.run_schema(run_id)}'")
     n_total = conn.execute("SELECT COUNT(*) FROM birth_registrations").fetchone()[0]
 
     scan = Scan()

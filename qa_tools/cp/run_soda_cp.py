@@ -15,8 +15,8 @@ shared via qa_tools/common/soda_common.py - see plans/qa-pipeline.md #84.
 from __future__ import annotations
 import os
 
-import duckdb
 
+from qa_tools.common import supply_db
 from qa_tools.common import hierarchy
 from qa_tools.common.soda_common import (
     ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys, check_id_from_resource_attributes,
@@ -26,7 +26,6 @@ from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 SODA_CHECKS_PATH = os.path.join(ROOT, "contract", "child-protection-soda-checks.yml")
-CP_DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
 
 # dimension for the 3 named `failed rows` business-rule checks - matches
 # the dimension each rule's contract/child-protection-contract.yaml quality
@@ -57,9 +56,10 @@ _CUSTOM_CHECK_COLUMN = {
 def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
     from soda.scan import Scan
 
-    db_path = os.path.join(CP_DUCKDB_RUNS_DIR, f"{run_id}.duckdb")
-    conn = duckdb.connect(db_path, read_only=True)
-    conn.execute("SET search_path = 'raw'")
+    # Read-only, and the run's own view schema on the search path - see
+    # the BDM counterpart for why both matter (REQ-PIPE-068).
+    conn = supply_db.connect(read_only=True)
+    conn.execute(f"SET search_path = '{supply_db.run_schema(run_id)}'")
     n_total_by_table = {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in cp_common.TABLES}
 
     scan = Scan()

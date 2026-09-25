@@ -52,6 +52,7 @@ import os
 
 import duckdb
 
+from qa_tools.common import supply_db
 from qa_tools.common import hierarchy
 from qa_tools.common.check_lifecycle import dbt_check_id_lookup
 from qa_tools.common.dbt_common import (
@@ -64,7 +65,6 @@ from . import cp_common
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 DBT_PROJECT_DIR = os.path.join(ROOT, "dbt_project")
 PROFILES_DIR = os.path.join(os.path.dirname(__file__), "..", "dbt_profiles")
-CP_DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
 SCHEMA_YML_PATH = os.path.join(DBT_PROJECT_DIR, "models", "staging", "schema.yml")
 
 # Built once from schema.yml itself, not the compiled manifest - see
@@ -212,7 +212,9 @@ def _status_for(count: int, warn_t: float | None, fail_t: float | None) -> str:
 
 
 def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
-    db_path = os.path.join(CP_DUCKDB_RUNS_DIR, f"{run_id}.duckdb")
+    # dbt's own SCRATCH database - see the BDM counterpart and
+    # qa_tools/common/supply_db.py (REQ-PIPE-068).
+    db_path = str(supply_db.dbt_scratch_db(run_id))
     # A single `dbt build` (build the 6 models, then run their tests)
     # instead of separate `dbt run` + `dbt test` calls - dbt-core's fixed
     # per-invocation startup cost was being paid twice per run for no
@@ -223,11 +225,12 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
     # non-test nodes entirely (KeyError-safe since we only look them up
     # for uids present in `nodes`, which is test-only).
     # See qa_tools/bdm/run_dbt_bdm.py's own evaluate_dbt_bdm() comment on
-    # this same fix - lives beside db_path (CP_DUCKDB_RUNS_DIR), not under
-    # the fixed, repo-relative DBT_PROJECT_DIR/target/, for real parallel-
-    # test safety (plans/running-thoughts.md #12).
-    target_path = os.path.join(CP_DUCKDB_RUNS_DIR, "dbt_target", run_id)
-    run_dbt(db_path, "build", CP_MODELS + CP_SINGULAR_TESTS, target_path, PROFILES_DIR, DBT_PROJECT_DIR, ROOT)
+    # this same fix - never the fixed, repo-relative
+    # DBT_PROJECT_DIR/target/, for real parallel-test safety
+    # (plans/running-thoughts.md #12).
+    target_path = str(supply_db.dbt_target_path(run_id))
+    run_dbt(db_path, "build", CP_MODELS + CP_SINGULAR_TESTS, target_path, PROFILES_DIR,
+            DBT_PROJECT_DIR, ROOT, run_schema=supply_db.run_schema(run_id))
 
     with open(os.path.join(target_path, "manifest.json")) as f:
         manifest = json.load(f)
