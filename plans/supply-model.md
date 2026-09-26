@@ -1310,7 +1310,7 @@ comparisons against the expected-supply sequence.
    First because it is baked into all 257 hand-authored checks; changing
    it later is a corpus-wide edit.
 
-2. **[done, 2026-09-23]** **[Data generation]** **Generator delivers one
+2. **[in-progress, 2026-09-26]** **[Data generation]** **Generator delivers one
    table at a time, and injects the scenario shapes.** All three parts
    BUILT, 2026-09-23. `REQ-GEN-042` did the VOCABULARY - slot vs
    delivery, period vs receipt instant, dateless deterministic run ids,
@@ -1429,7 +1429,7 @@ comparisons against the expected-supply sequence.
    picker silently returns nothing on a quarterly asset until batch
    6.**
 
-7. **[todo, 2026-09-22]** **[Pipeline & publishing]** **Delivery
+7. **[done, 2026-09-26]** **[Pipeline & publishing]** **Delivery
    recognition and file mapping.** What constitutes a delivery for a
    given source (folder, prefix, session); the per-dataset filename
    pattern that maps a file to a table; the **hold for a human** when
@@ -1443,10 +1443,10 @@ comparisons against the expected-supply sequence.
    **Scoped 2026-09-23**: `REQ-PIPE-057` (the boundary, and what
    recognition reports), `REQ-PIPE-058` (file-to-dataset patterns and
    their gate), `REQ-PIPE-059` (two files, one dataset - hold). All
-   three unsigned. Before this, arrival and staging assumed a delivery
+   three signed 2026-09-23 and BUILT 2026-09-25. Before this, arrival and staging assumed a delivery
    had already been recognised and its files already attributed.
 
-8. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Arrival and
+8. **[done, 2026-09-26]** **[Pipeline & publishing]** **Arrival and
    staging.** Our own receipt timestamp, never the supplier's; staging
    asserting only arrival facts; replay in arrival-timestamp order
    (Threads B and H).
@@ -1457,7 +1457,7 @@ comparisons against the expected-supply sequence.
    **Scoped 2026-09-23**: `REQ-PIPE-060` (staging asserts only arrival
    facts) and `REQ-PIPE-061` (receipt-order processing and backlog
    drain - the rule `REQ-PIPE-053` already depends on by name). Both
-   unsigned.
+   signed 2026-09-23 and BUILT 2026-09-25.
 
    **SPRINT 13 SPLIT, and its single-database half moves HERE** (Keith,
    2026-09-24). Staging has nowhere to stage into otherwise: it needs
@@ -1478,7 +1478,7 @@ comparisons against the expected-supply sequence.
    blocker does not bite here either. If QA ever moves earlier than 15,
    this split stops holding and both halves have to move together.
 
-9. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Slot
+9. **[done, 2026-09-26]** **[Pipeline & publishing]** **Slot
    assignment.** Claim windows, on-time-wins-for-the-current-slot,
    monotonic filling, and hold-for-a-human when nothing is confidently
    claimable (Threads E and H).
@@ -1491,9 +1491,10 @@ comparisons against the expected-supply sequence.
    `REQ-PIPE-064` (hold for a human), `REQ-PIPE-065` (ambiguity and
    filled-slot arrivals). Four requirements rather than one,
    deliberately - the sprint's own risk note is the argument for each
-   rule having its own criteria and its own tests. All unsigned.
+   rule having its own criteria and its own tests. All four signed
+   2026-09-23 and BUILT 2026-09-25.
 
-10. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Arrival
+10. **[done, 2026-09-26]** **[Pipeline & publishing]** **Arrival
    classification.** Early / on-time / late against the ASSIGNED slot,
    never a slot re-derived from the arrival date (Thread D).
 
@@ -1502,7 +1503,8 @@ comparisons against the expected-supply sequence.
 
    **Scoped 2026-09-23**: `REQ-PIPE-066` (classify against the assigned
    slot, and retire the arrival-date derivation) and `REQ-PIPE-067`
-   (the verdict follows the filing). Both unsigned.
+   (the verdict follows the filing). Both signed 2026-09-23 and BUILT
+   2026-09-25.
 
 11. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Promotion and
     rejection.** Auto on green/amber into an EMPTY slot; red never;
@@ -1548,11 +1550,19 @@ comparisons against the expected-supply sequence.
     the triggering event, so a cancelled run costs nothing. Settled
     2026-09-22, see Thread H.
 
-13. **[todo, 2026-09-21]** **[Pipeline & publishing]** **SPLIT
+13. **[done, 2026-09-26]** **[Pipeline & publishing]** **SPLIT
     2026-09-24 (Keith). What remains here is SCHEMA-PER-PERIOD**; the
     single-database half - retiring the per-run warehouses, one database
     per test worker (Thread J) - **moved to sprint 8**, because staging
     has nowhere to stage into without it.
+
+    **Scoped and BUILT**: `REQ-PIPE-035` carries schema-per-period in
+    its criteria 1, 2, 3, 5 and 9 - one run against one period's
+    schema, one run per period where a delivery spans several, every
+    dataset in the asset held in that one schema, and a temporal
+    reference resolved as a cross-schema read. This sprint named no
+    requirement until 2026-09-26, which is why a scan of the sprint
+    list read it as unscoped when it was in fact delivered.
 
     Test isolation is deliberate rather than incidental - the per-run
     databases were providing it by accident and `pytest-xdist` is the
@@ -1573,7 +1583,7 @@ comparisons against the expected-supply sequence.
     this entry knew is on the requirement; the surrounding sprint list
     stays whole until its last dependent batch is built.
 
-15. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Delivery-
+15. **[done, 2026-09-26]** **[Pipeline & publishing]** **Delivery-
     triggered QA.** `REQ-PIPE-036` - QA runs once per DELIVERY, per
     period touched, rather than per table arrival.
 
@@ -1584,7 +1594,7 @@ comparisons against the expected-supply sequence.
     `REQ-PIPE-036` was revised against this the same day, so the sprint
     can be built from the requirement as it now stands.
 
-16. **[todo, 2026-09-21]** **[QA checks & contract]** **Check
+16. **[in-progress, 2026-09-26]** **[QA checks & contract]** **Check
     dependencies, and the zero-active-checks gate.** `depends_on` on
     multi-table checks plus its validation, and `REQ-QAC-037` lifting
     cross-table checks to the collection scope (Thread I). Plus the CI
@@ -1600,19 +1610,26 @@ comparisons against the expected-supply sequence.
     same green-by-vacuum path, and retirement is gradual so nothing
     prompts a look.
 
+    **Part BUILT, part unscoped** - which is why this sprint is
+    `in-progress` rather than `done`. `REQ-QAC-037` landed 2026-09-26
+    (cross-table checks in their own scope, folded into every dataset
+    they read), but it carries three UNMET criteria of its own that
+    wait on promotion, and neither `depends_on` validation nor the
+    zero-ACTIVE-checks gate has a requirement at all.
+
 17. **[todo, 2026-09-21]** **[QA checks & contract]** **Red-for-unrun.**
     The status, its qualifying chip, and the pointer indicator on a
     healthy table blocked by a neighbour (Thread I).
 
-18. **[todo, 2026-09-21]** **[QA checks & contract]** **Drift and trend
+18. **[done, 2026-09-26]** **[QA checks & contract]** **Drift and trend
     dependencies.** A declared temporal reference; missing-but-expected
     is red, no-prior-period is `nodata`. `REQ-PIPE-035` was rewritten
     2026-09-22 and now carries both cases as acceptance criteria, so
     this sprint no longer has to fix the requirement before building
-    it.
+    it. BUILT 2026-09-25 - criteria 7 and 8 are the two cases.
 
-19. **[todo, 2026-09-21]** **[Dashboard UI]** **Supply history and
-    as-of under per-dataset arrivals.** `REQ-DASH-041`.
+19. **[done, 2026-09-26]** **[Dashboard UI]** **Supply history and
+    as-of under per-dataset arrivals.** `REQ-DASH-041`, BUILT.
 
 20. **[todo, 2026-09-21]** **[Dashboard UI]** **Freshness axis and
     banners.** Freshness capping the headline status; the
