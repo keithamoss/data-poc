@@ -39,23 +39,35 @@ docs (2026-09-25 - and `duckdb.org` is blocked from this environment
 anyway): many processes may open one DuckDB file READ-ONLY at the same
 time, and a single writer excludes everyone, read-only readers
 included - `IOException: Could not set lock on file ... Conflicting
-lock is held`. That is why:
+lock is held`.
 
-  - the view schema is built ONCE, serially, before any fan-out, and
-  - every tool that only reads - Soda, datacontract-cli, Evidently -
-    opens this database read-only and so may run in parallel, and
-  - dbt, the one tool that writes, gets a small scratch database of its
-    own and ATTACHes this one read-only (Keith's call, 2026-09-25).
+THAT CONSTRAINT IS GONE (REQ-PIPE-087). The engine is PostgreSQL, where
+readers and writers do not exclude each other, so three pieces of
+design that existed only to work around a file lock have been removed
+rather than ported:
 
-That last one is the only reason a per-run FILE still exists anywhere,
-and the distinction matters: criterion 7 forbids a database per run for
-SUPPLY DATA, which now lives here and nowhere else. dbt's scratch file
-holds its own materialised staging views and its own test results - a
-tool artefact, replaced at delivery sprint 15 when dbt stops being
-invoked this way at all.
+  - dbt no longer gets a scratch database of its own with this one
+    ATTACHed read-only. It writes its models and its --store-failures
+    tables into its own SCHEMA in the same database, which is what the
+    workaround was imitating.
+  - `read_only=True` no longer buys parallelism, because nothing was
+    ever serialised. It is kept, and now does what it says: the session
+    is set READ ONLY, so a reader that tries to write fails instead of
+    succeeding quietly.
+  - the view schema is still built once, serially, before any fan-out -
+    but for the original reason (every tool must see the same
+    resolution) rather than to avoid a lock.
+
+DuckDB is still a dependency and still has one job: reading what
+arrives. A supplier sends CSV or Parquet, DuckDB reads it, and the rows
+go into PostgreSQL. It is never a warehouse again.
+
+WHAT THIS COSTS, said plainly because it is the real trade: running the
+PoC now needs a PostgreSQL to point at. There is no file to open.
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 from dataclasses import dataclass, field
@@ -64,17 +76,36 @@ from typing import Mapping, Sequence
 
 from qa_tools.common.asset_time import arrival_key
 
-import duckdb
+import psycopg
 
 ROOT = Path(__file__).resolve().parent.parent.parent
+
+#: PostgreSQL's own hard limit on an identifier, and the reason it is
+#: checked here rather than discovered later: Postgres TRUNCATES a
+#: longer name silently, where DuckDB accepted any length. A truncated
+#: schema name collides with its neighbour and a truncated staged table
+#: loses the arrival that distinguishes it - both of which read as data
+#: loss rather than as a naming problem, and neither of which raises.
+MAX_IDENTIFIER = 63
 
 #: Overridable so a test worker gets its own database. That is the
 #: deliberate isolation REQ-PIPE-068's own NFR asks for: isolation used
 #: to fall out of a database per run, this requirement removes the
 #: database per run, and something has to replace it. One database per
 #: WORKER is allowed - criterion 7 forbids one per RUN.
-SUPPLY_DB_ENV = "MOTHMAN_SUPPLY_DB"
-DEFAULT_SUPPLY_DB = ROOT / "data" / "supply.duckdb"
+#: DELIBERATELY RENAMED from MOTHMAN_SUPPLY_DB rather than reused. The
+#: value's SHAPE changed - a filesystem path became a connection string
+#: - and a stale path silently reinterpreted as a DSN would fail in a
+#: way that names neither problem. A new name makes every consumer
+#: visit the change, which is what this project's own rule about shape
+#: changes asks for.
+SUPPLY_DSN_ENV = "MOTHMAN_SUPPLY_DSN"
+
+#: NO DEFAULT, and this is not an omission. There is no local file to
+#: fall back to any more, so a default would have to name somebody's
+#: database - and the one thing worse than failing to connect is
+#: connecting to the wrong environment. REQ-PIPE-093 makes this a
+#: first-class rule for every operation; this is where it starts.
 
 #: Where a supply lands before anything has decided which slot it fills.
 STAGING_SCHEMA = "staging"
@@ -101,33 +132,145 @@ class SupplyDbError(RuntimeError):
     reasonable-looking default."""
 
 
-def supply_db_path() -> Path:
-    """The one database. `MOTHMAN_SUPPLY_DB` wins where it is set."""
-    override = os.environ.get(SUPPLY_DB_ENV)
-    return Path(override) if override else DEFAULT_SUPPLY_DB
+def supply_db_dsn() -> str:
+    """The connection string for the one database.
+
+    Raises rather than guessing where it is unset, which is the whole
+    point - see SUPPLY_DSN_ENV's own note. The error names the variable
+    and what to do, because the person who hits this is usually setting
+    the project up for the first time.
+    """
+    dsn = os.environ.get(SUPPLY_DSN_ENV)
+    if not dsn:
+        raise SupplyDbError(
+            f"{SUPPLY_DSN_ENV} is not set, and there is no default - this "
+            f"pipeline has no local database file to fall back to. Set it to a "
+            f"real PostgreSQL connection string, e.g. "
+            f"postgresql://user@host:5432/supply. A dev container and CI each "
+            f"supply one; see README's Development section.")
+    return dsn
 
 
-def connect(read_only: bool = False, path: str | os.PathLike | None = None):
+def _translate(sql: str, params) -> str:
+    """`?` placeholders to psycopg's `%s`, and ONLY where params say so.
+
+    The whole dialect difference between the retired engine and this one
+    lives here, which is deliberate: the alternative was rewriting every
+    placeholder at ~40 call sites, a large mechanical diff with far more
+    room to get one wrong than one function has.
+
+    IT REFUSES RATHER THAN GUESSES when the counts disagree. A silent
+    rewrite is the failure mode to avoid: SQL carrying a literal `?`
+    inside a quoted string would be corrupted by a blind replace, and
+    the symptom would be a malformed query nobody could trace back to
+    here. A mismatch means exactly that case, so it raises and names the
+    statement. No caller in this project puts a literal `?` in SQL; if
+    one ever needs to, it must not go through here.
+    """
+    holes = sql.count("?")
+    if holes != len(params):
+        raise SupplyDbError(
+            f"{holes} '?' placeholder(s) but {len(params)} parameter(s) - "
+            f"refusing to guess which is right: {sql}")
+    return sql.replace("?", "%s")
+
+
+class SupplyConnection:
+    """A PostgreSQL connection that takes this project's own SQL.
+
+    A THIN BOUNDARY, NOT AN ABSTRACTION LAYER. It exists so that the
+    ~40 statements already written across qa_tools/ keep working
+    unchanged, and so the one place the driver is visible is this file.
+    It deliberately does not try to be a database-agnostic wrapper -
+    there is one engine, and pretending otherwise would invite somebody
+    to point it at a second one.
+
+    AUTOCOMMIT IS ON, matching how the retired engine behaved and how
+    every caller here is written: each statement stands alone. Where a
+    caller genuinely needs several statements to land together - a
+    filing decision and its effect, REQ-PIPE-091 - it must open its own
+    transaction explicitly rather than rely on a default, because a
+    transaction that is implicit is one nobody knows the boundaries of.
+    """
+
+    def __init__(self, raw: "psycopg.Connection"):
+        self._raw = raw
+
+    def execute(self, sql: str, params: Sequence | None = None):
+        if params is None:
+            return self._raw.execute(sql)
+        return self._raw.execute(_translate(sql, params), list(params))
+
+    def commit(self) -> None:
+        self._raw.commit()
+
+    def close(self) -> None:
+        self._raw.close()
+
+    @property
+    def raw(self) -> "psycopg.Connection":
+        """For the one caller that legitimately needs the driver - a COPY
+        stream, or a real transaction. Reaching for this in ordinary code
+        is a sign the boundary above is missing something."""
+        return self._raw
+
+    def __enter__(self) -> "SupplyConnection":
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.close()
+
+
+def connect(read_only: bool = False, dsn: str | None = None) -> SupplyConnection:
     """Open the supply database.
 
-    READ-ONLY IS THE RIGHT DEFAULT FOR A CHECK and the wrong one for
-    this signature, so it is spelt out at every call site instead: a
-    reader that quietly opened read-write would take the exclusive lock
-    and lock out every parallel reader, which is a failure that shows up
-    as someone else's crash rather than its own.
+    `read_only` NOW MEANS WHAT IT SAYS. Under the retired engine it was
+    load-bearing for a different reason - a writer took an exclusive
+    file lock and shut out every reader, so a reader that opened
+    read-write broke other processes rather than itself. PostgreSQL has
+    no such contention, so this is no longer about parallelism at all:
+    it sets the session READ ONLY, which turns "this code should not
+    write" from a convention into something the database enforces.
+
+    A FAILURE TO CONNECT IS LOUD AND NAMES THE HOST (REQ-PIPE-087
+    criterion 12). It never falls back to another database, a cached
+    copy, or a file - all three were available under the old engine and
+    all three would hide the one thing worth knowing.
     """
-    db = Path(path) if path is not None else supply_db_path()
-    if read_only and not db.exists():
+    target = dsn if dsn is not None else supply_db_dsn()
+    try:
+        raw = psycopg.connect(target, autocommit=True)
+    except psycopg.Error as exc:
         raise SupplyDbError(
-            f"no supply database at {db} - nothing has been staged yet. "
-            f"Run `mothman pipeline run` to build one, or set {SUPPLY_DB_ENV}.")
-    db.parent.mkdir(parents=True, exist_ok=True)
-    return duckdb.connect(str(db), read_only=read_only)
+            f"cannot reach the supply database at {_redact(target)}: {exc}") from exc
+    if read_only:
+        raw.execute("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY")
+    return SupplyConnection(raw)
+
+
+def _redact(dsn: str) -> str:
+    """A DSN in an error message, without its password.
+
+    Errors from here reach logs, CI output and a public repository's own
+    Actions pages, so this is not politeness - a connection string is a
+    credential, and the failure that prints one is the failure nobody
+    notices until it is indexed.
+    """
+    return re.sub(r"://([^:/@]+):[^@]*@", r"://\1:***@", dsn)
 
 
 def _ident(name: str, what: str) -> str:
     if not _SAFE_ID.match(name or ""):
         raise SupplyDbError(f"{what} is not a usable identifier: {name!r}")
+    # POSTGRES TRUNCATES SILENTLY past 63 bytes, so this is the one real
+    # portability trap in the move off the old engine - see
+    # MAX_IDENTIFIER. Checked on the encoded length rather than the
+    # character count, because the limit is bytes.
+    if len(name.encode("utf-8")) > MAX_IDENTIFIER:
+        raise SupplyDbError(
+            f"{what} is {len(name.encode('utf-8'))} bytes, over PostgreSQL's "
+            f"{MAX_IDENTIFIER}-byte identifier limit, and would be silently "
+            f"truncated into a collision: {name!r}")
     return name
 
 
@@ -359,28 +502,45 @@ def drop_orphan_run_schemas(conn, keep: Sequence[str] = ()) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# dbt's scratch database
+# dbt's own output, and where the file-shaped leftovers live
 #
-# The one tool that WRITES, and the reason a per-run file still exists
-# anywhere. dbt materialises its staging models and its --store-failures
-# audit tables somewhere; pointed at the supply database it would take
-# DuckDB's exclusive lock and stall every parallel reader. So it gets its
-# own small file and ATTACHes the supply database read-only, which is
-# Keith's call of 2026-09-25 over serialising the whole fan-out.
+# THE SCRATCH DATABASE IS GONE (REQ-PIPE-087). dbt used to get a small
+# DuckDB file of its own with the supply database ATTACHed read-only,
+# for one reason only: pointed at the supply database directly it took
+# DuckDB's exclusive lock and stalled every parallel reader. PostgreSQL
+# has no such contention, so dbt now writes its models and its
+# --store-failures tables into its own SCHEMA in the one database, which
+# is what the workaround was imitating all along.
 #
-# NOT THE THING CRITERION 7 FORBIDS, and the distinction is worth being
-# precise about: SUPPLY DATA lives in one database. What lands here is
-# dbt's own derived output - a tool artefact, and delivery sprint 15
-# stops invoking dbt this way at all.
+# What still needs a directory is genuinely file-shaped: the CSV a
+# loader hands to the database, and dbt's own target/ (manifest.json,
+# run_results.json - artefacts dbt writes to disk, not to a warehouse).
 #
-# Both paths hang off the supply database's own directory, so a test
-# worker that has its own database gets its own scratch for free - the
-# per-worker uniqueness the retired data/duckdb_runs/ layout used to
-# provide, inherited rather than re-invented.
+# PER-WORKER ISOLATION USED TO FALL OUT OF THE DATABASE'S OWN PATH, and
+# there is no path any more, so it is derived from the DSN instead -
+# same property, stated rather than inherited: two workers pointed at
+# two databases get two scratch directories, and two processes sharing
+# one database share one, which is correct because they share its
+# tables too.
+#
+# DBT_SCHEMA is where dbt's own models land. Named, not defaulted: dbt
+# would otherwise use `public`, and a model sitting in `public` beside
+# real supply schemas is exactly the ambiguity this design removes.
 # ---------------------------------------------------------------------------
 
+#: dbt's own schema in the one database - its models and its
+#: --store-failures audit tables. Never a supply schema.
+DBT_SCHEMA = "dbt"
+
 def scratch_dir() -> Path:
-    return supply_db_path().parent / "dbt_scratch"
+    """Where this database's file-shaped scratch lives.
+
+    Keyed by a short digest of the DSN rather than by the DSN itself,
+    which would put a credential into a path - see _redact()'s own note
+    for why that matters in this repository.
+    """
+    key = hashlib.sha256(supply_db_dsn().encode("utf-8")).hexdigest()[:12]
+    return ROOT / "data" / "dbt_scratch" / key
 
 
 def staging_csv(physical: str) -> Path:
@@ -398,12 +558,6 @@ def staging_csv(physical: str) -> Path:
     return directory / f"{_ident(physical, 'staged table')}.csv"
 
 
-def dbt_scratch_db(run_id: str) -> Path:
-    d = scratch_dir()
-    d.mkdir(parents=True, exist_ok=True)
-    return d / f"{_ident(run_id, 'run id')}.duckdb"
-
-
 def dbt_target_path(run_id: str) -> Path:
     """dbt's own target/ for this run.
 
@@ -415,25 +569,6 @@ def dbt_target_path(run_id: str) -> Path:
     """
     return scratch_dir() / "dbt_target" / _ident(run_id, "run id")
 
-
-def connect_dbt_scratch(run_id: str, read_only: bool = True):
-    """Open dbt's scratch database for a run, with the supply database
-    ATTACHed read-only exactly as dbt's own profile attaches it.
-
-    WITHOUT THE ATTACH THIS RAISES `Catalog "supply" does not exist`,
-    which is how it was found: dbt's staging models are VIEWS, and a
-    view carries its source reference rather than its source's rows -
-    `stg_birth_registrations` is defined over
-    `supply.<run schema>.birth_registrations`. Reading it from a
-    connection that has never heard of `supply` fails at bind time. The
-    rows are fine; the name is not resolvable.
-
-    Both sides open read-only, so this adds no lock contention - many
-    readers on one DuckDB file is exactly the case that is safe.
-    """
-    conn = duckdb.connect(str(dbt_scratch_db(run_id)), read_only=read_only)
-    conn.execute(f"ATTACH IF NOT EXISTS '{supply_db_path()}' AS supply (READ_ONLY)")
-    return conn
 
 
 # ---------------------------------------------------------------------------
@@ -483,7 +618,11 @@ def resolution_for(conn, run_id: str) -> Resolution:
         rows = conn.execute(
             f'SELECT logical, physical, state FROM "{STAGING_SCHEMA}"."{_RESOLUTIONS}" '
             "WHERE run_id = ? ORDER BY logical, physical", [run_id]).fetchall()
-    except duckdb.CatalogException:
+    except psycopg.errors.UndefinedTable:
+        # Nothing has been staged in this database yet, so the carrier
+        # table does not exist. Same meaning as the retired engine's
+        # CatalogException, handled the same way - a caller asking is
+        # reporting, and "nothing recorded" beats a traceback.
         return res
     for logical, physical, state in rows:
         if state == "resolved":

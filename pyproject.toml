@@ -5,10 +5,14 @@ description = "QA/data-pipeline PoC for a multi-agency government data asset (BD
 requires-python = ">=3.11"
 dependencies = [
     "dbt-core>=1.12",
-    "dbt-duckdb>=1.11",
-    "duckdb>=1.0",
-    "soda-core-duckdb>=3.5",
-    "datacontract-cli[duckdb]>=1.2",
+    "dbt-postgres>=1.9", # the warehouse engine (REQ-PIPE-087). dbt-duckdb is gone:
+    # every tool now checks what is in PostgreSQL, not a file
+    "psycopg[binary]>=3.2", # this project's own PostgreSQL driver - binary wheel so
+    # an evaluator needs no libpq or compiler to run the PoC
+    "duckdb>=1.0", # RETAINED, and narrowly: reading what arrives (CSV, Parquet and
+    # whatever else a supplier sends). Never a warehouse any more - REQ-PIPE-087
+    "soda-core-postgres>=3.5",
+    "datacontract-cli[postgres]>=1.2",
     "evidently>=0.7",
     "pandas>=2.2",
     "numpy>=1.26",
@@ -92,7 +96,12 @@ dev = [
 # This override tells uv's resolver to trust that, so `uv sync` resolves
 # everything in one step instead of needing a manual two-step pip dance.
 [tool.uv]
-override-dependencies = ["duckdb>=1.5"]
+# override-dependencies = ["duckdb>=1.5"] is GONE (REQ-PIPE-087). It existed
+# because soda-core-duckdb pinned an older duckdb than this project wanted, and
+# an override is a blunt instrument - it silences a real conflict rather than
+# resolving it. With the Soda adapter now postgres, nothing pins duckdb at all,
+# so the resolution is honest again. Measured: 160 packages resolved, against
+# 190 under the duckdb set.
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
