@@ -15,7 +15,6 @@ from click.testing import CliRunner
 
 import cli.bdm as bdm
 import cli.common as common
-import qa_tools.common.supply_db as supply_db
 import qa_tools.bdm.build_per_run_warehouses as build_per_run_warehouses
 import qa_tools.bdm.run_datacontract_bdm as run_datacontract_bdm
 import qa_tools.bdm.run_evidently_bdm as run_evidently_bdm
@@ -44,7 +43,6 @@ def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
     from pathlib import Path
 
     from qa_tools.common import delivery
-    from qa_tools.common import supply_db
     monkeypatch.setattr(delivery, "DELIVERIES_DIR", Path(raw_dir) / "deliveries")
     monkeypatch.setattr(delivery, "RECEIPTS_DIR", Path(raw_dir) / "receipts")
     monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", raw_dir)
@@ -56,7 +54,8 @@ def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
     # this worker - so `duckdb_dir` is that database's path and every
     # module resolves it the same way the real pipeline does, through
     # the environment (REQ-PIPE-068).
-    monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(duckdb_dir))
+    # The environment already points at this worker's database
+    # (conftest's supply_dsn); duckdb_dir is what staged the data into it.
 
 
 def _patch_delivery_dirs(monkeypatch, root):
@@ -186,7 +185,8 @@ def test_run_check_leaves_the_arrival_record_on_disk_exactly_as_it_found_it(
     # One supply database, named by the environment - the three
     # module attributes this replaces pointed at a directory of
     # per-run DuckDB files (REQ-PIPE-068).
-    monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(bdm_duckdb_dir))
+    # The environment already points at this worker's database
+    # (conftest's supply_dsn); bdm_duckdb_dir is what staged the data into it.
 
     def _fingerprint() -> list[tuple[str, str]]:
         out = []

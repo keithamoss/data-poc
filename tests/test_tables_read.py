@@ -15,6 +15,8 @@ from pathlib import Path
 import duckdb
 import pytest
 
+import dbsupport
+
 from qa_tools.common import qa_results_reader, qa_results_writer, supply_db
 from qa_tools.common import tables_read as tr
 
@@ -152,7 +154,9 @@ class TestItReachesTheCommittedFile:
             resolved={"cp_placements": "cp_placements__20260801010000",
                        "cp_carers": "cp_carers__20260801010000"}))
         conn.close()
-        monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(db))
+        # An EMPTY database on this worker's PostgreSQL, which is what a
+        # fresh file used to give (REQ-TEST-095).
+        dbsupport.reset_supply_db()
 
         # A REAL check_id from this repo's own sources, so this cannot
         # pass against a declaration that no longer exists.
@@ -186,7 +190,9 @@ class TestItReachesTheCommittedFile:
         tables_read.json records the same resolution for the whole run,
         so an absence here is visible against a file that is always
         written."""
-        monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(tmp_path / "missing.duckdb"))
+        # An EMPTY database on this worker's PostgreSQL, which is what a
+        # fresh file used to give (REQ-TEST-095).
+        dbsupport.reset_supply_db()
         qa_results_writer._declared_reads_tables.cache_clear()
 
         qa_results_writer.write_qa_result(

@@ -24,5 +24,5 @@ select
     source_system_record_id,
     extract_timestamp,
     run_id,
-    run_date,
+    run_date
 from source

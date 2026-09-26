@@ -110,7 +110,7 @@ def bdm_delivery_dirs(bdm_raw_dir):
 TEST_DSN_ENV = "MOTHMAN_TEST_DSN"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=True)
 def supply_dsn(worker_id):
     """ONE SUPPLY DATABASE PER TEST WORKER, in a real PostgreSQL.
 

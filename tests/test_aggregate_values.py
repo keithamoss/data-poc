@@ -152,7 +152,7 @@ class TestATieIsBrokenTheSameWayEveryTime:
     def _table(self, conn, name, rows):
         conn.execute(f"CREATE TABLE {name}(v VARCHAR)")
         for label, n in rows:
-            conn.execute(f"INSERT INTO {name} SELECT '{label}' FROM range({n})")
+            conn.execute(f"INSERT INTO {name} SELECT '{label}' FROM generate_series(1, {n})")
 
     def _values(self, conn, name):
         return [d["value"] for d in

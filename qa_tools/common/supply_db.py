@@ -339,7 +339,10 @@ def load_csv_into(conn: SupplyConnection, schema: str, table: str,
 
         raw = conn.raw
         with raw.transaction():
-            raw.execute(f'DROP TABLE IF EXISTS "{schema}"."{table}"')
+            # CASCADE: re-loading an arrival replaces a table a run's
+            # view schema may already point at, and PostgreSQL refuses a
+            # plain DROP in that case where the retired engine allowed it.
+            raw.execute(f'DROP TABLE IF EXISTS "{schema}"."{table}" CASCADE')
             raw.execute(f'CREATE TABLE "{schema}"."{table}" ({ddl})')
             result = duck.execute("SELECT * FROM arriving")
             copied = 0

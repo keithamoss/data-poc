@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import pytest
 
-import qa_tools.common.supply_db as supply_db
 import qa_tools.bdm.run_dbt_bdm as run_dbt_bdm
 
 # The run_ids bdm_duckdb_dir's fixture deliveries are RECOGNISED as, not
@@ -33,7 +32,8 @@ def _dbt_bdm(monkeypatch, bdm_duckdb_dir):
     # real repo-relative location, so no manual cleanup is needed here
     # (pytest's own tmp dir retention handles it, same as every other
     # tmp_path_factory-based fixture in this suite).
-    monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(bdm_duckdb_dir))
+    # The environment already points at this worker's database
+    # (conftest's supply_dsn); bdm_duckdb_dir is what staged the data into it.
     captured = {}
     monkeypatch.setattr(run_dbt_bdm, "write_qa_result",
                          lambda *a, **k: captured.setdefault("write_qa_result_called", True))

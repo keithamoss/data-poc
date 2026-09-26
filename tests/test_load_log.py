@@ -14,6 +14,8 @@ import json
 
 import pytest
 
+import dbsupport
+
 from qa_tools.common import load_log, supply_db
 
 
@@ -54,7 +56,9 @@ class TestAnUnrecordedTableIsUnloaded:
     """Criteria 7 and 15."""
 
     def test_a_staged_table_with_no_record_is_not_a_candidate(self, tmp_path, monkeypatch, log_dir):
-        monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(tmp_path / "supply.duckdb"))
+        # An EMPTY database on this worker's PostgreSQL, which is what a
+        # fresh file used to give (REQ-TEST-095).
+        dbsupport.reset_supply_db()
         conn = supply_db.connect()
         supply_db.ensure_schemas(conn)
         physical = supply_db.staged_table("cp_clients", "2026-09-25T09:00:00+08:00")

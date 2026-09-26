@@ -13,8 +13,10 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
 
-import duckdb
+import psycopg
 import pytest
+
+import dbsupport
 
 from qa_tools.common import arrivals, delivery, delivery_log, holds, supply_db
 
@@ -130,7 +132,9 @@ class TestBothFilesAreStagedAndNeitherIsReadable:
         assert supply_db.staged_table("t", "r", 1) != supply_db.staged_table("t", "r", 2)
 
     def test_neither_resolves_to_the_logical_name(self, tmp_path, monkeypatch):
-        monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(tmp_path / "s.duckdb"))
+        # An EMPTY database on this worker's PostgreSQL, which is what a
+        # fresh file used to give (REQ-TEST-095).
+        dbsupport.reset_supply_db()
         conn = supply_db.connect()
         supply_db.ensure_schemas(conn)
         for ordinal in (1, 2):
@@ -142,7 +146,7 @@ class TestBothFilesAreStagedAndNeitherIsReadable:
             arrival=supply_db.arrival_key("run_001")))
         assert res.resolved == {}
         assert len(res.ambiguous["birth_registrations"]) == 2
-        with pytest.raises(duckdb.CatalogException):
+        with pytest.raises(psycopg.errors.UndefinedTable):
             conn.execute(f'SELECT * FROM "{res.schema}"."birth_registrations"')
         conn.close()
 
@@ -150,13 +154,15 @@ class TestBothFilesAreStagedAndNeitherIsReadable:
         """The failure the hold exists to prevent, reintroduced one
         layer down: one physical name for both files loses one of them
         and the hold has nothing left to resolve WITH."""
-        monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(tmp_path / "s.duckdb"))
+        # An EMPTY database on this worker's PostgreSQL, which is what a
+        # fresh file used to give (REQ-TEST-095).
+        dbsupport.reset_supply_db()
         conn = supply_db.connect()
         supply_db.ensure_schemas(conn)
         for ordinal, rows in ((1, 1), (2, 7)):
             physical = supply_db.staged_table("t", "run_001", ordinal)
             conn.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" '
-                          f"AS SELECT * FROM range({rows})")
+                          f"AS SELECT * FROM generate_series(1, {rows})")
         found = supply_db.candidates_in(conn, supply_db.STAGING_SCHEMA, ["t"],
                                          arrival=supply_db.arrival_key("run_001"))
         assert len(found["t"]) == 2

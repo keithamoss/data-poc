@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import csv
 
-import duckdb
+import psycopg
 import pytest
+
+import dbsupport
 
 from qa_tools.bdm import build_per_run_warehouses as bdm
 from qa_tools.common import load_log, supply_db
@@ -21,7 +23,9 @@ _LATER = "2026-11-01T09:00:00+08:00"
 
 @pytest.fixture
 def staging(tmp_path, monkeypatch):
-    monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(tmp_path / "supply.duckdb"))
+    # An EMPTY database on this worker's PostgreSQL, which is what a
+    # fresh file used to give (REQ-TEST-095).
+    dbsupport.reset_supply_db()
     return tmp_path
 
 
@@ -171,7 +175,7 @@ class TestOnlyLoadedTablesAreReadable:
                 arrival=supply_db.arrival_key(_RECEIPT),
                 loaded=load_log.loaded_tables(log_dir)))
             assert res.resolved == {} and res.absent == [bdm.TABLE]
-            with pytest.raises(duckdb.CatalogException):
+            with pytest.raises(psycopg.errors.UndefinedTable):
                 conn.execute(f'SELECT * FROM "{res.schema}"."{bdm.TABLE}"')
         finally:
             conn.close()

@@ -16,7 +16,6 @@ from click.testing import CliRunner
 
 import cli.common as common
 import cli.cp as cp
-import qa_tools.common.supply_db as supply_db
 import qa_tools.cp.build_cp_warehouses as build_cp_warehouses
 import qa_tools.cp.orchestrate_cp as orchestrate_cp
 import qa_tools.cp.run_datacontract_cp as run_datacontract_cp
@@ -48,7 +47,8 @@ def _patch_cp_dirs(monkeypatch, raw_dir, duckdb_dir, delivery_dirs=None):
     monkeypatch.setattr(run_evidently_cp, "CP_RAW_DIR", raw_dir)
     # One database, named by the environment - see the BDM
     # counterpart's own comment (REQ-PIPE-068).
-    monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(duckdb_dir))
+    # The environment already points at this worker's database
+    # (conftest's supply_dsn); duckdb_dir is what staged the data into it.
 
 
 def test_raw_dir_reads_build_cp_warehouses_live_not_a_frozen_import_time_copy(monkeypatch):

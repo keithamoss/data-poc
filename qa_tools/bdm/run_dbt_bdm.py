@@ -314,7 +314,17 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
         relation_name = node.get("relation_name")
         if test_name in _AUDIT_AGGREGATE_SQL and relation_name and status != "error":
             sql = _AUDIT_AGGREGATE_SQL[test_name].format(relation=relation_name)
-            verified_count = conn.execute(sql).fetchone()[0]
+            # int(), and this is load-bearing rather than defensive.
+            # PostgreSQL's SUM() over a bigint returns NUMERIC, which
+            # psycopg faithfully gives back as a decimal.Decimal - where
+            # the retired engine returned a plain integer. A Decimal
+            # reaching metric_value is not a cosmetic difference: it is
+            # what qa_results/ serialises, and json.dumps REFUSES a
+            # Decimal outright, so every run writing an accepted_values
+            # or unique result would have failed at the write. COUNT()
+            # is unaffected; SUM() is the one that changes shape
+            # (REQ-PIPE-087).
+            verified_count = int(conn.execute(sql).fetchone()[0] or 0)
             failures = verified_count
             if warn_t is not None or fail_t is not None:
                 status = _status_for(verified_count, warn_t, fail_t)

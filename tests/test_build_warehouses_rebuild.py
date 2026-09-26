@@ -22,8 +22,8 @@ from qa_tools.common import supply_db
 from qa_tools.cp.build_cp_warehouses import build_all as build_all_cp
 
 
-def _staged(db_path, logical):
-    conn = supply_db.connect(read_only=True, path=db_path)
+def _staged(dsn, logical):
+    conn = supply_db.connect(read_only=True, dsn=dsn)
     try:
         return sorted(supply_db.candidates_in(
             conn, supply_db.STAGING_SCHEMA, [logical])[logical])

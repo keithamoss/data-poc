@@ -11,7 +11,6 @@ reason to stub any of them out here."""
 from __future__ import annotations
 import os
 
-import qa_tools.common.supply_db as supply_db
 import qa_tools.bdm.build_per_run_warehouses as build_per_run_warehouses
 import qa_tools.bdm.orchestrate_bdm as orchestrate_bdm
 import qa_tools.bdm.run_datacontract_bdm as run_datacontract_bdm
@@ -42,7 +41,8 @@ def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
     # One supply database, named by the environment - the three
     # module attributes this replaces pointed at a directory of
     # per-run DuckDB files (REQ-PIPE-068).
-    monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(duckdb_dir))
+    # The environment already points at this worker's database
+    # (conftest's supply_dsn); duckdb_dir is what staged the data into it.
     monkeypatch.setattr(run_datacontract_bdm, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(run_dbt_bdm, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(run_soda_bdm, "write_qa_result", lambda *a, **k: None)
@@ -112,7 +112,8 @@ def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_prese
     # One supply database, named by the environment - the three
     # module attributes this replaces pointed at a directory of
     # per-run DuckDB files (REQ-PIPE-068).
-    monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(cp_duckdb_dir))
+    # The environment already points at this worker's database
+    # (conftest's supply_dsn); cp_duckdb_dir is what staged the data into it.
     monkeypatch.setattr(run_datacontract_cp, "CP_RAW_DIR", cp_raw_dir)
     monkeypatch.setattr(run_evidently_cp, "CP_RAW_DIR", cp_raw_dir)
     for mod in (run_dbt_cp, run_soda_cp, run_datacontract_cp, run_evidently_cp):

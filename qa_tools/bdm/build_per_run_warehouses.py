@@ -122,7 +122,14 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
             rows = len(df)
         except Exception as exc:  # noqa: BLE001 - every load failure is the same outcome
             # NO TABLE AT ALL rather than a truncated one (criterion 5).
-            conn.execute(f'DROP TABLE IF EXISTS "{supply_db.STAGING_SCHEMA}"."{physical}"')
+            # CASCADE, and this is a real behavioural difference rather
+            # than a tidy-up: a run's view schema holds views over this
+            # table, and PostgreSQL refuses to drop a table those depend
+            # on where the retired engine allowed it
+            # (DependentObjectsStillExist). Dropping the views with it is
+            # correct - the table failed to load, so a view onto it
+            # resolves to nothing anyone should read.
+            conn.execute(f'DROP TABLE IF EXISTS "{supply_db.STAGING_SCHEMA}"."{physical}" CASCADE')
             load_log.record_load(delivery_name, DATASET_ID, physical, load_log.FAILED,
                              asset_time.now().isoformat(),
                              reason=f"{type(exc).__name__}: {exc}", log_dir=log_dir)
