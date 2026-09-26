@@ -2838,5 +2838,78 @@ Belongs with batch 5's check work.
     service container through a mapped port on `localhost` rather than
     by its label.
 
+    **AN OPEN GAP THIS SESSION CREATED, named rather than left as an
+    IOU: DO THE LOAD-TIME FILE CHECKS REACH THE DASHBOARD?** The agreed
+    shape above adds a small set of file-shape checks at load time, and
+    NOTHING SAYS WHERE THEIR RESULTS GO. Keith spotted it. Today a
+    failed load surfaces only in `mothman supply failures` - terminal
+    only - so the dashboard shows a dataset quietly holding no data for
+    that period with no explanation of why, which is the confusing
+    quiet state this project has already spent real effort on.
+
+    **Agreed answer (Keith, 2026-09-26): yes, they reach the dashboard,
+    as THEIR OWN SCOPE, never folded into the data checks' status.** A
+    red saying "the file had ragged rows" is a different KIND of claim
+    from "14 records violate the contract", and merging them recreates
+    the two-subjects confusion the load-first decision exists to
+    resolve. The model already has both shapes to copy: `_cross-table`
+    is a distinct scope under a collection (`REQ-QAC-037`), and
+    `REQ-PIPE-079`'s `awaiting-supply`/`overdue-supply`/
+    `awaiting-decision` reason codes are already about the SUPPLY
+    rather than the data. The cost is that this becomes a FIFTH tool in
+    `qa_results/`, so its checks need `check_id`s, lifecycle metadata
+    and prose held to `docs/check-authoring-rules.md`. **To be scoped
+    after the Aurora work** (Keith's own ordering).
+
+    **LOCKING THE ENGINE VERSION - what is actually achievable, checked
+    rather than assumed (2026-09-26).**
+
+    | Environment | Pinnable |
+    |---|---|
+    | Aurora (production) | the engine version you choose - THE ANCHOR |
+    | CI service container | exactly, by image tag |
+    | Dev Container | exactly, same image |
+    | local non-prod install | no - whatever their package manager gives |
+    | Claude Code cloud session | no - whatever the image shipped |
+
+    Two of five pin exactly. **The major is ALREADY aligned** between
+    the two that cannot be: this session has `postgresql-16` at
+    **16.13**, the GitHub runner has **16.15**, both from Ubuntu
+    24.04's own repository - same major, different point-in-time
+    package snapshot. **The minor cannot be pinned in a cloud
+    session**: Ubuntu's repo offers exactly one candidate at a time,
+    and `apt.postgresql.org` - the PGDG repository that carries several
+    minors - is BLOCKED by this session's egress policy. Even
+    allow-listed it would decay, because PGDG drops old minors
+    eventually.
+
+    **So the approach is: declare a MAJOR, assert it, accept minor
+    drift, and anchor on Aurora.**
+
+    - Declare it in a committed file and GATE it - a check reading
+      `current_setting('server_version_num')` that fails when the
+      major disagrees. That turns "same version" from hope into an
+      assertion. The precedent is this repo's own `.python-version`,
+      added after a silent runner-versus-local divergence burned eight
+      commits of red CI; identical failure mode.
+    - Minor drift within a major is safe for what this design leans
+      on. Catalogue-only `SET SCHEMA`, transactional DDL, schema
+      resolution and concurrent writers are all major-version
+      properties; minors are bug and security fixes.
+    - **Anchor on Aurora, not on community PostgreSQL.** Aurora's
+      available engine versions lag upstream, so the number is whatever
+      Aurora offers and everything else follows it. Choosing 17 locally
+      and finding Aurora on 16 is the avoidable mistake.
+    - **Worth doing anyway: give CI a PINNED SERVICE CONTAINER rather
+      than the runner's preinstalled PostgreSQL.** Then CI and the Dev
+      Container are byte-identical and the cloud session is the only
+      outlier, aligned on major and asserted.
+
+    **AND THE ONE THAT IS NOT JUST ANOTHER ROW IN THAT TABLE: AURORA
+    IS NOT VANILLA POSTGRESQL.** Different storage layer, its own
+    divergences. Pinning "16.x" everywhere does NOT establish that
+    Aurora 16 behaves identically, so it is a separate compatibility
+    question rather than a version number to match.
+
     **STILL UNREAD:** Aurora's divergences from vanilla PostgreSQL.
     That domain is now allow-listed.
