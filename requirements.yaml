@@ -12598,3 +12598,123 @@ requirements:
         delivery is recognised with nothing read from any file - two
         tables land at the same instant and claim different periods
         because their slots were in different states.
+
+  - id: REQ-PIPE-078
+    title: A hold is a recorded state that survives the run that raised it
+    date_written: "2026-09-26"
+    story: >
+      As a data engineer operating this pipeline, I want a supply
+      nothing could place to still be waiting for me tomorrow, so that a
+      hold is a piece of work I can pick up rather than a message that
+      scrolled past in one run output.
+    moscow: must
+    status: not_started
+    source: >
+      REQ-DASH-070's own unmet criterion 1 and supply_holds.py's own
+      docstring ("THIS IS A DEAD END UNTIL SPRINT 12"), plus Thread E's
+      when-nothing-is-claimable rule. Scoped by delivery-scoper, batch
+      4, 2026-09-26.
+    signed_off:
+      by: Keith
+      date: "2026-09-26"
+    acceptance_criteria:
+      - >
+        WHEN a rule cannot place a supply, THE SYSTEM SHALL record the
+        hold durably, naming the supply, the reason and the run that
+        raised it.
+      - >
+        THE SYSTEM SHALL keep a hold recorded until a recorded decision
+        resolves it, and SHALL NOT clear it because a later run passed
+        over it.
+      - >
+        THE SYSTEM SHALL record a hold raised by the assignment rule on
+        the same terms as one raised at delivery level.
+      - >
+        THE SYSTEM SHALL let the dashboard build read every outstanding
+        hold from committed history alone, with no access to anything
+        under data/.
+      - >
+        THE SYSTEM SHALL NOT promote or arrival-classify a held supply.
+      - >
+        WHEN a hold is resolved, THE SYSTEM SHALL record which decision
+        resolved it.
+      - >
+        THE SYSTEM SHALL keep a held supply staged, and SHALL NOT
+        discard it or move it to the rejected schema.
+      - >
+        THE SYSTEM SHALL support counting and grouping holds without
+        reading one record per supply.
+      - >
+        THE SYSTEM SHALL NOT run any check over a held supply until it
+        is filed, and SHALL NOT record a check result against a supply
+        that has no period.
+      - >
+        WHERE a cross-table check reads a held table, THE SYSTEM SHALL
+        report that check as red and SHALL name the held table as the
+        reason.
+    non_functional_requirements:
+      - >
+        They AGGREGATE, and that is a scale requirement rather than a
+        presentation choice (supply_holds.py's own docstring). At two
+        datasets a banner per held supply is fine; at ~30 it is thirty
+        banners, which is how people learn to ignore a whole class of
+        warning.
+      - >
+        A hold nobody can clear is indistinguishable from a bug, so the
+        record has to carry the resolution path, not just the fact.
+      - >
+        This is the store REQ-DASH-070 was built to read and could not,
+        so the shape has to match what that requirement's aggregated
+        element already expects rather than inventing a second
+        vocabulary for the same items.
+      - >
+        Recording a hold means writing a state that a later decision
+        mutates, which is a different discipline from the write-once
+        filing beside it. Say plainly in the code which of the two any
+        new record is.
+    dependencies: [REQ-PIPE-074, REQ-PIPE-064, REQ-PIPE-059]
+    decisions:
+      - >
+        Decided a hold is the CORRECT OUTPUT of a rule, not a defect in
+        it. Where a rule genuinely cannot know, it says so rather than
+        committing silently - defaulting a supply nothing can place into
+        a future slot is the forward cascade arriving by the recovery
+        path.
+      - >
+        Decided a held supply is NOT QA'd (supply_holds.py). The single-
+        table checks could run without a period, but drift and previous-
+        period comparison cannot, so partial QA produces a verdict that
+        has to be thrown away once the slot is known - or worse, a GREEN
+        one sitting in history against no period at all.
+      - >
+        Decided the blast radius is scoped to what depends on the held
+        thing: every other dataset in the delivery is processed
+        normally, and any cross-table check reading a held table reads
+        RED naming it.
+      - >
+        Recorded as the reason this is its own requirement rather than a
+        criterion on promotion: REQ-DASH-070 is BUILT and structurally
+        empty for want of this store, so the store is the deliverable
+        and the display already exists.
+      - >
+        A HELD SUPPLY IS NOT CHECKED AT ALL UNTIL IT IS FILED (Keith,
+        2026-09-26), closing a question plans/supply-model.md carried as
+        an open pick with three options and said should be answered once
+        for both hold cases. supply_holds.py had already implemented
+        this answer, so the decision confirms the code rather than
+        changing it - and recording it here is what stops the prose and
+        the code disagreeing, which is the state they were in. The
+        reasoning, from that module's own docstring: the single-table
+        checks COULD run without a period, but drift and previous-period
+        comparison cannot, so partial QA produces a verdict that has to
+        be thrown away once the slot is known - or worse, a GREEN one
+        sitting in history against no period at all. Rejected running
+        only the period-independent checks, which buys an early sanity
+        read at the cost of a partial result that has to be labelled
+        partial everywhere it appears; rejected checking against the
+        most recent period, where every comparative check is measured
+        against a period the supply may not belong to, so a red could be
+        an artefact of the guess. The blast radius is scoped rather than
+        zero: every other dataset in the delivery is processed normally,
+        and any cross-table check reading a held table reads RED naming
+        it.
