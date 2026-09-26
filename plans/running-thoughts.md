@@ -3289,6 +3289,144 @@ Belongs with batch 5's check work.
     and Aurora's major-version support timeline (how long 16 remains
     available), which bears on the 16-versus-17 choice above.
 
+    **AND AN OPEN QUESTION UPSTREAM OF ALL OF IT, raised 2026-09-26 at
+    22:00 and DELIBERATELY NOT ANSWERED: WHY DOES THE REPOSITORY HOLD
+    RESULTS OR DATA AT ALL?** Keith's own words, and he killed a running
+    `delivery-scoper` mid-batch rather than let it draft twelve
+    requirements on a premise this may overturn. That was the right
+    call; the reading is not wasted, because #45 is unchanged as the
+    brief.
+
+    **WHAT SURFACED IT: a database is PER-ENVIRONMENT and git is
+    SHARED.** Local dev has its own PostgreSQL, dev/UAT another, prod
+    Aurora. So there is no single decision log - there is one per
+    environment - while the committed export lives in a repository,
+    which has no environment. Three hazards follow. Whose export gets
+    committed, when a developer running locally would otherwise commit
+    toy decisions over the real ones? Which environment's dashboard
+    does one export path describe, when each asset is its own
+    deployment with its own dashboard? And criterion 17 of
+    `REQ-GHUB-082` gets a real job back, because an export genuinely
+    can lag - the question becomes which database it lagged behind.
+
+    **THE FOUR REASONS THE REPOSITORY HOLDS `qa_results/` TODAY, and
+    they do not all survive PostgreSQL:**
+
+    1. **The CI rule** - the dashboard is built by GitHub Actions, CI
+       must not touch the warehouse, so whatever it renders must
+       already be in files. **This is the load-bearing one.**
+    2. **Permanence** - git on a public remote, readable in ten years
+       with no infrastructure and no restore procedure.
+    3. **Auditability with NO CREDENTIALS** - anyone can read the whole
+       history with `git log`. A database needs access granted.
+    4. **Zero infrastructure** - this PoC gets evaluated on other
+       people's machines and today publishes a dashboard with no server
+       at all.
+
+    **REASON 1 IS REALLY A CHAIN, and seeing it as one is what opens
+    the question:** the dashboard is a static site, so it is built by
+    CI, so it must not touch the warehouse, so what it renders must be
+    in files, so the files are committed. Which means the honest answer
+    to "why does the repo hold data" is **because the publisher is
+    GitHub Actions, and GitHub Actions is the wrong place to hold
+    warehouse credentials.**
+
+    **A THIRD OPTION NEITHER OF US HAD ON THE TABLE.** The rule Keith
+    actually wrote is not "committed files are required" - it is that a
+    pipeline must not be one accident away from being pointed at
+    something real. **If the dashboard build ran INSIDE the environment
+    rather than in GitHub Actions**, it could query PostgreSQL
+    legitimately, produce the same static artifact, and NOTHING would
+    need committing. The publisher moves to where the data already is.
+    It would cost Thread A's "CI is the only publish path" as currently
+    written, and the Pages deploy as currently wired. It would keep the
+    static output, the snapshot archive, and no credentials in CI. And
+    **it would make the per-environment problem vanish**, because each
+    environment would build and publish its own dashboard from its own
+    database - which is what "entirely separate instances, each with
+    its own dashboard" already describes.
+
+    **THE STRONGEST COUNTERWEIGHT IS REASON 3.** `git log` over a
+    decision history is a genuinely good audit story that a database
+    does not replicate - no credentials, no restore, no tooling.
+    Reasons 2 and 4 matter too, and 4 matters specifically for the PoC
+    being evaluated rather than for production.
+
+    **WHAT IS AGREED BUT HELD PENDING THIS.** Six rewrites to
+    `REQ-GHUB-082` were put to Keith and five approved: stop
+    enumerating the operations (define the set once in criterion 1 so
+    the next addition touches one criterion rather than five - the
+    four-becomes-seven drift happened precisely because five criteria
+    each carried a count); criterion 7 reports when the entry is
+    COMMITTED rather than "on the push that carries it"; criterion 18's
+    open question closes because one serialisation point makes it
+    exact; criterion 27 records to the decision log rather than to the
+    committed log; and NFR 2 loses its OFFLINE claim while keeping its
+    real point, that the TUI needs no GitHub even though it now needs
+    the database, so it stays the MORE AVAILABLE route on a network
+    where a third-party domain may not be reachable. He also settled
+    that `inherit` and `un-inherit` live elsewhere in the TUI rather
+    than in criterion 14's queue, which is shaped for supplies awaiting
+    a decision and has no entry for "Q3 has no view for
+    cp-case-workers". **Criterion 17 is the one held**, because its
+    correct wording depends entirely on the question above.
+
+    **KEITH'S FIRST RESPONSE, 2026-09-26 22:15 - NOT A DECISION, and
+    recorded as his position rather than as settled.** He is "happy to
+    give up reason 3, and probably 2 too", and "open to having the
+    dashboard build run inside the environment and NEVER in GitHub".
+    What follows is the analysis he asked for in reply, not an agreed
+    design.
+
+    - **GIVING UP REASON 2 IS CHEAPER THAN IT LOOKS, because
+      `dashboard/snapshots/*.html.gz` ALREADY DOES THAT JOB.** They are
+      committed, self-contained and openable in ten years with nothing
+      but a browser. So the durable-readable property survives even if
+      `qa_results/` stops being committed - snapshots were always the
+      mechanism for it, not `qa_results/`.
+    - **THE MOVE IS PROBABLY REQUIRED ANYWAY RATHER THAN A COST.** In
+      production this dashboard describes real data quality for two
+      government agencies. Public GitHub Pages is almost certainly the
+      wrong place for it, and it only works today because the data is
+      synthetic. So the current Pages wiring is a PoC-only arrangement
+      that was always going to need replacing.
+    - **IT CASCADES FURTHER THAN THE DECISION LOG.** If the dashboard
+      can query the database then `qa_results/` ITSELF stops needing to
+      be committed. That touches `build_results_from_history.py` (which
+      becomes "rebuild from the database"); **`changelog.py`'s
+      git-history walk, which disappears ENTIRELY** - a straight win,
+      since CLAUDE.md records it as a real performance bug and a
+      database has actual timestamps rather than inferring them from
+      commits; **`REQ-PIPE-074` criterion 13**, "readable by the
+      dashboard build with no access to anything under `data/`", which
+      becomes WRONG and is SIGNED; and the never-touch-data rule's own
+      wording, which would become "the publisher runs where the data
+      is, and GitHub never does" - same intent, different mechanism.
+      **Retention also becomes possible**, where today `qa_results/`
+      only grows and retention is explicitly out of scope because git
+      cannot forget.
+    - **WHAT GETS GENUINELY HARDER.** Hosting: Pages is free, zero-ops
+      and HTTPS-included, where inside the environment you need S3 plus
+      CloudFront or an internal server, which is infrastructure and
+      possibly procurement. The real-browser render gate has to move
+      with the build, so the environment needs Chromium. Build
+      availability couples to the database - committed files always
+      build, and Aurora Serverless v2's scale-to-zero is exactly what a
+      quarterly asset would want. And evaluating the PoC on someone
+      else's machine gets further away, though PostgreSQL already did
+      that to the pipeline.
+    - **WHAT GETS EASIER.** No committed-results tree to keep
+      consistent, no git walking, **the per-environment versus shared-git
+      mismatch vanishes completely** - each environment builds and
+      publishes its own dashboard from its own database, which is what
+      "entirely separate instances, each with its own dashboard" already
+      described - and "CI is the only publish path" stops needing to be
+      a RULE, because publishing becomes a pipeline step where the data
+      lives.
+    - **WHAT IS ACTUALLY LOST:** `git log` and `git diff` over QA
+      history, which he has said he will give up, and the public
+      dashboard, which production probably does not want.
+
     **SETTLED 2026-09-26, and earlier than planned: THE DECISION LOG
     LIVES IN THE DATABASE, WITH A COMMITTED EXPORT.** Keith's original
     sequencing was Postgres first and this question second, on the
