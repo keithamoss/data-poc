@@ -3710,10 +3710,10 @@ requirements:
         a delivery.
       - THE SYSTEM SHALL NOT trigger a QA run on a clock, and SHALL NOT
         require a periodic sweep to resolve a table that never arrived.
-      - THE SYSTEM SHALL scope each tool invocation to one dataset, so
-        that the tool's raw output describes that dataset alone and
-        needs neither duplicating nor filtering to be stored per
-        dataset.
+      - THE SYSTEM SHALL store each tool invocation's raw output exactly
+        once - neither duplicated across the datasets that invocation
+        covers, nor filtered down to one of them - while the check
+        results derived from it are filed per dataset.
       - THE SYSTEM SHALL NOT require every table in a collection to have
         arrived before running an arriving dataset's own single-table
         checks.
@@ -3764,6 +3764,7 @@ requirements:
     linked_tests:
       - tests/test_tables_read.py
       - tests/test_period_schema.py
+      - tests/test_history_rekey.py
     implemented_by:
       - qa_tools/common/tables_read.py::attach
       - qa_tools/common/tables_read.py::undeclared_cross_table
@@ -3821,6 +3822,24 @@ requirements:
         say which. The loud failure names the collection, the tool and
         the run id, and chains the original exception rather than
         replacing it.
+      - >
+        2026-09-26: criterion 4 was NARROWED to its purpose (Keith) and
+        is met by REQ-PIPE-038's `_raw` scope, not by the per-dataset
+        invocation it used to name. Asserted three ways in
+        tests/test_history_rekey.py's TestRawOutputIsRecordedOnce: the
+        raw document lives once under `_raw`, every dataset-scoped file
+        carries `raw_output: null` rather than a copy, and the stored
+        document still holds every key the invocation produced rather
+        than a per-dataset subset. The NFR asks for this to be
+        MEASURED rather than assumed, and the honest measurement is
+        that nothing shrank: committed history is 26.03 MB against
+        25.88 MB before, because raw output was already stored once
+        per collection and there was no existing duplication to
+        remove. What the measurement shows instead is what was
+        AVOIDED - copying each raw document into every dataset it
+        covers would add 46.35 MB to the same corpus, taking it to
+        72.38 MB, and that is with two collections rather than the
+        thirty this is a PoC for.
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     unmet_criteria:
       - criterion: >
@@ -3837,36 +3856,25 @@ requirements:
           exists - what is missing is the mixed-period case, which
           cannot arise until something files.
         owner: the promotion sprint (batch 4)
-      - criterion: >
-          Criterion 4 - each tool invocation is still scoped to a
-          COLLECTION rather than to one dataset, so Child Protection's
-          dbt, Soda and datacontract-cli runs each produce one raw
-          output covering six datasets.
-        why: >
-          The payoff criterion 4 names - raw output that needs neither
-          duplicating nor filtering to be stored per dataset - is only
-          collectable once qa_results/ is keyed per dataset, which is
-          REQ-PIPE-038's own criterion. Splitting the invocations first
-          would multiply tool runs sixfold against the NFR's ~45s
-          budget and store the same bytes in six places, which is the
-          opposite of what the criterion asks for. Measured today:
-          25.88 MB committed, 15.68 MB of it raw output (61%).
-        owner: >
-          nobody - re-checked 2026-09-26 and this one is DIFFERENT from
-          the other stale deferrals. REQ-PIPE-038 shipped, so the
-          payoff this waited for is collected: qa_results/ is keyed per
-          dataset and raw output is stored once without duplicating or
-          filtering it. But it got there by deciding AGAINST what this
-          criterion asks. Splitting a Child Protection scan into six
-          per-dataset invocations would multiply tool runs sixfold and
-          break every cross-table check, since a check joining two
-          tables cannot run inside a single-dataset scan - so REQ-
-          PIPE-038 records raw output once in its own `_raw` scope
-          instead. This criterion is therefore not deferred, it is
-          superseded, and it needs Keith rather than a builder: either
-          it is withdrawn or it means something narrower than it
-          says.
     decisions:
+      - >
+        Rejected scoping each TOOL INVOCATION to one dataset (Keith,
+        2026-09-26), which is what criterion 4 originally asked for -
+        it was narrowed that day to the purpose behind it, and the
+        mechanism is recorded here so nobody re-proposes it. Two
+        reasons, and the second is fatal rather than merely
+        expensive. It multiplies tool runs sixfold on Child
+        Protection against an NFR budget of ~45s for the whole
+        pipeline. And it BREAKS EVERY CROSS-TABLE CHECK: a check
+        joining cp_placements to cp_carers cannot run inside a scan
+        that can see only one of them, so the 24 real cross-table
+        checks REQ-PIPE-036's own criterion 10 covers would have
+        nowhere to run. REQ-PIPE-038 collected the payoff a different
+        way - one collection-wide invocation as today, its raw output
+        written once to a reserved `_raw` scope, and the verified
+        records fanned out per dataset - so raw output is neither
+        duplicated nor filtered and a dataset's history is still
+        readable on its own.
       - Decided the trigger is the DELIVERY, not the table (Keith,
         2026-09-22), which is why this requirement was revised rather
         than built as written. Under per-table triggering, six CP tables

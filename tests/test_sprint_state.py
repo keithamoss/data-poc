@@ -119,6 +119,28 @@ class TestBlocked:
         assert ss.BLOCKED == "blocked"
 
 
+class TestTheSurveyRowStaysOneLine:
+    """Not a rule of the requirement - the `owner` field is free text
+    and several real entries are a paragraph recording why a deferral
+    was re-checked, which is worth having in the register and is not
+    what a survey row is for."""
+
+    def test_a_paragraph_owner_is_cut_to_its_leading_clause(self):
+        assert ss._who("unowned - needs a requirement. Re-checked "
+                        "2026-09-26 and the blocker has SHIPPED: lots "
+                        "more prose follows here.") == "unowned - needs a requirement"
+
+    def test_a_short_owner_is_left_alone(self):
+        assert ss._who("the promotion sprint (batch 4)") == "the promotion sprint (batch 4)"
+
+    def test_a_long_unpunctuated_owner_never_runs_past_the_row(self):
+        assert len(ss._who("x " * 200)) <= 60
+
+    def test_no_real_row_overflows(self):
+        """The corpus, which is where this went wrong."""
+        assert all(len(s.summary()) <= 100 for s in ss.survey())
+
+
 class TestAnUnscopedSprint:
     """Criterion 7 - said to be unscoped rather than merely unstarted,
     because the two need different work: one needs building, the other

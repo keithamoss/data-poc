@@ -75,6 +75,20 @@ BLOCKED = "blocked"
 IN_PROGRESS = "in-progress"
 
 
+def _who(owner: str) -> str:
+    """The first clause of an `owner`, for a one-line survey row.
+
+    The field is free text and several entries are a paragraph - the
+    re-check of a stale deferral belongs there, but it is not what a
+    row of the survey is for. Kept to the leading clause rather than
+    truncated at a character count, so a row never ends mid-word.
+    REQ-DOCS-073 makes the field resolvable, which retires this.
+    """
+    head = re.split(r"(?<=[a-z0-9\)])[.,;] ", owner.strip(), maxsplit=1)[0]
+    head = " ".join(head.split())
+    return head if len(head) <= 60 else head[:57].rstrip() + "..."
+
+
 @dataclass
 class Sprint:
     number: int
@@ -115,7 +129,8 @@ class Sprint:
         counts = f"{self.met}/{self.total}"
         line = f"{self.number:>3}  {self.derived:12} {counts:>7}"
         if self.derived == BLOCKED:
-            line += f"  waiting on {', '.join(sorted(set(self.waiting_on)))}"
+            owners = sorted({_who(w) for w in self.waiting_on})
+            line += f"  waiting on {', '.join(owners)}"
         return line
 
 
