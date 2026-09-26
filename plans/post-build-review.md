@@ -3590,3 +3590,62 @@ twice. It deliberately did not re-find the `TypeError`.
     and in CI for days, and would have gone red in CI on any push made
     in that eight-hour window, looking exactly like a regression in
     whatever that push happened to touch.
+
+61. **[done, 2026-09-26]** **[Dashboard UI]** **A scope section whose
+    only check is the "no rule defined" placeholder claimed GREEN - the
+    exact false green #4 closed, in a second renderer that never picked
+    the fix up.**
+
+    **Found by this session, 2026-09-26**, while building
+    `REQ-QAC-037`. Moving cp-placements' two table-level business rules
+    into the new cross-table section left its Table-level section
+    holding nothing but the synthesized placeholder - and the page drew
+    a green pill over the words "No automated quality rule defined".
+
+    **Verified, and the code had already written the finding down.**
+    `rollupStatuses()` carries this comment, added by #4's own fix:
+
+    ```js
+    // post-build-review #4. Without this line a section whose only
+    // check is a placeholder rolls up GREEN - which is precisely the
+    // false green that finding is about ...
+    if(statuses.includes("inactive")) return "inactive";
+    ```
+
+    The section renderer did not call it. It kept its own reduce:
+
+    ```js
+    const worst = checks.reduce((acc, ck)=>
+      STATUS_ORDER[checkStatus(ck)] > STATUS_ORDER[acc] ? checkStatus(ck) : acc, "green");
+    ```
+
+    `STATUS_ORDER` has no entry for `inactive` - deliberately, it is
+    one of the `UNORDERED_STATUSES` - so `undefined > 0` is false and
+    the seed `"green"` survives untouched. A status the ordering
+    excludes on purpose reads, to a reduce seeded with green, exactly
+    like a status that lost.
+
+    **This was already live for five of the six CP datasets**, which is
+    the part worth keeping visible: `REQ-QAC-037` did not introduce it,
+    it moved it onto the one dataset the tests happened to drive. The
+    finding sat behind a page nobody had opened rather than behind a
+    condition nobody had hit.
+
+    **Fixed** by calling `rollupStatuses()` in both section renderers -
+    the dataset page's and the collection page's. The collection one
+    cannot hold a placeholder today, and was changed anyway: a seeded
+    reduce over `STATUS_ORDER` is now a known-bad shape in this
+    codebase, not a stylistic choice. A real-browser test asserts the
+    pill reads "No rule defined", and asserts first that the section
+    really does hold only the placeholder, so it fails loudly rather
+    than passing vacuously if a real table-level check is ever added
+    to cp-placements.
+
+    **The standing lesson is `CLAUDE.md`'s own, arriving from a new
+    direction.** That rule says to enumerate every consumer when a
+    VALUE's shape changes. Here the value did not change - the
+    VOCABULARY did, when `inactive` was added to a status set two
+    functions already reduced over. `grep`ping for `STATUS_ORDER[`
+    after the fact found six call sites, of which two were sections.
+    A new member of a closed set is a shape change, and the same
+    enumeration applies.

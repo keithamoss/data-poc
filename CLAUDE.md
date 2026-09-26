@@ -625,6 +625,10 @@ Rough layout:
   state has a shelf life of one day unless it takes the as-of date from
   the data rather than from the clock.
 
+  -> **~215s/1872 tests (2026-09-26, REQ-QAC-037's display half)**.
+  Up ~15s on 42 more tests since the entry above - no new hot spot. JS
+  suite 346 tests in ~24s.
+
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.

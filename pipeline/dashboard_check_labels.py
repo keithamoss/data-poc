@@ -158,6 +158,32 @@ def url_key(check_id: str) -> str:
     return parsed.tail if parsed else check_id
 
 
+def pooled_url_key(check_id: str) -> str:
+    """`url_key()` for a check rendered in a POOLED section.
+
+    `url_key()` returns the check's tail, and REQ-QAC-023 guarantees a
+    tail is unique WITHIN ITS COLUMN. A scope section breaks that
+    precondition: the cross-table one gathers checks from several real
+    columns into a single pseudo-column, so `relationships_soda` on
+    `cp_client_id` and `relationships_soda` on `carer_id` arrive with
+    the same key.
+
+    Nothing raised. The template finds a row's check by key and takes
+    the first match, so cp-placements showed "Client reference" on a
+    row that is really "Carer reference", and both rows opened the same
+    panel (found 2026-09-26, by reading the page rather than the JSON).
+
+    So a check that HAS a column carries it in its key. A supply- or
+    table-level check has none - its column parses as None - and keeps
+    the bare tail, which is both already unique among its peers and
+    what today's URLs use.
+    """
+    parsed = try_parse(check_id)
+    if not parsed:
+        return check_id
+    return f"{parsed.column}.{parsed.tail}" if parsed.column else parsed.tail
+
+
 def tool_ref(check_id: str) -> str:
     """The terse "which tool, which check" line shown under a card's
     plain-English headline - "dbt:not_null", "soda:missing_count",

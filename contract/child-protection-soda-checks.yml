@@ -456,6 +456,7 @@ checks for cp_notifications:
       samples limit: 100000
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.escalation_completeness_soda
+        reads_tables: [cp_investigations]
         category: completeness
         introduced_date: "2023-01-15"
         description: >
@@ -652,6 +653,7 @@ checks for cp_investigations:
       samples limit: 100000
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.closed_case_hygiene_soda
+        reads_tables: [cp_clients]
         name: Closed-case hygiene
         category: consistency
         introduced_date: "2023-01-15"
@@ -810,6 +812,7 @@ checks for cp_placements:
       samples limit: 100000
       attributes:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.approval_compliance_soda
+        reads_tables: [cp_carers]
         name: Carer approval compliance
         category: consistency
         introduced_date: "2023-01-15"

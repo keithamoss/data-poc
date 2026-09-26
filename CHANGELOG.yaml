@@ -124,13 +124,42 @@ releases:
               years before Birth Registrations first supplied anything, so
               every day in between counted as a delivery that never arrived.
               It now starts when the feed does.
-          - headline: Late supplies land on the right day
+          - headline: Both tables now count
+            components: ["QA checks & contract"]
+            description: >
+              A check comparing two tables used to count against whichever
+              one it happened to be written under, so the other could read
+              green while a check about it was failing. It now appears on
+              both, and counts against both.
+          - headline: Late supplies land right
             components: ["Pipeline & publishing"]
             description: >
               Because those empty days counted as still waiting to be filled,
               a supply arriving late was filed against the oldest of them
               rather than the day it was for - in one case three and a half
               years earlier.
+          - headline: Two checks wearing one name
+            components: ["Dashboard UI"]
+            description: >
+              Where two checks of the same tool sat side by side, the second
+              borrowed the first's name and opened the first's details. Both
+              now show their own, so a row about carers no longer reads as a
+              row about clients.
+          - headline: No rule is not a pass
+            components: ["Dashboard UI"]
+            description: >
+              A section with no quality rule defined showed a green tick, which
+              read as "checked and fine" rather than "nothing checked". It now
+              says so plainly instead.
+      - category: Improved
+        items:
+          - headline: Cross-table checks have a home
+            components: ["Dashboard UI"]
+            description: >
+              Checks about the relationship between two tables now have a
+              section of their own on the collection page, and appear on
+              every table they read rather than only the one they were
+              written under.
   - date: "2026-09-25"
     summary: >
       Every date and time now reads the same way, supplies are kept in

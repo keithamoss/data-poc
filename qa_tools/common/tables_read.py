@@ -141,6 +141,21 @@ def attach(results: Sequence[dict], resolved: Mapping[str, str],
 _DBT_CROSS_TABLE = "relationships"
 _SODA_CROSS_TABLE = re.compile(r"must exist in\s+(\w+)", re.I)
 
+#: The two BUSINESS-RULE shapes, added 2026-09-26 after the first three
+#: turned out to cover only the mechanical ones. Six real checks - three
+#: dbt singular tests and their three SodaCL twins - joined a second
+#: table and declared nothing, and the gate said the repo was clean.
+#:
+#: They hid because a business rule does not announce itself in its
+#: check TYPE the way `relationships` and "must exist in" do: it is an
+#: ordinary `failed rows` or an ordinary singular test, and the join is
+#: in its SQL. So these two scans read the SQL rather than the type,
+#: which is what the contract scan already did - and the reason that
+#: one alone caught the datacontract third of each pair.
+_DBT_REF = re.compile(r"ref\(\s*['\"](\w+)['\"]\s*\)")
+_DBT_MODEL_PREFIX = "stg_"
+_SODA_QUERY_KEYS = ("fail query", "warn query", "failed rows query")
+
 
 def _known_tables() -> set[str]:
     from qa_tools.common import hierarchy
@@ -181,25 +196,85 @@ def _dbt_cross_table_checks(path: Path, known: set[str]) -> list[tuple[str, str]
     return found
 
 
-def _soda_cross_table_checks(path: Path) -> list[tuple[str, str]]:
+def _dbt_singular_cross_table_checks(path: Path) -> list[tuple[str, str]]:
+    """(check_id, why) for every dbt SINGULAR test whose SQL joins.
+
+    A singular test is a `.sql` file beside the models with its metadata
+    declared under this schema's own top-level `tests:` key, so neither
+    half tells the whole story: the name and the check_id are in the
+    YAML, and the joins are in the file. This reads both.
+
+    Two or more distinct `ref()`s is the signal. That is deliberately
+    the shape rather than "names a known table", because a singular
+    test cannot name a physical table at all - it goes through `ref()`
+    by construction, which makes this the reliable scan of the two
+    added here.
+    """
+    tests_dir = path.parents[2] / "tests"
     found = []
-    for block in (_yaml(path) or {}).items() if isinstance(_yaml(path), dict) else []:
-        key, checks = block
+    for entry in (_yaml(path).get("tests") or []):
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("name", "")
+        meta = ((entry.get("config") or {}).get("meta") or {})
+        sql = tests_dir / f"{name}.sql"
+        if not sql.exists():
+            continue
+        try:
+            refs = {m.removeprefix(_DBT_MODEL_PREFIX) for m in _DBT_REF.findall(sql.read_text())}
+        except OSError:
+            continue
+        if len(refs) < 2 or meta.get("reads_tables"):
+            continue
+        found.append((meta.get("check_id") or name,
+                       f"dbt singular test {name} joins {sorted(refs)}"))
+    return found
+
+
+def _soda_cross_table_checks(path: Path, known: set[str] | None = None) -> list[tuple[str, str]]:
+    """(check_id, why) for every SodaCL check that reads another table.
+
+    Two shapes. The sentence form ("must exist in X") announces itself
+    in the check text. The BUSINESS-RULE form does not: it is a plain
+    `failed rows` whose join lives in a `fail query`, so the only way to
+    see it is to read the SQL and look for a table that is not the one
+    this `checks for` block is about.
+
+    `known` is optional so a caller testing the sentence form alone
+    need not build the hierarchy; without it the query scan is skipped
+    rather than guessing what counts as a table name.
+    """
+    doc = _yaml(path)
+    found = []
+    for key, checks in (doc.items() if isinstance(doc, dict) else []):
         if not key.startswith("checks for") or not isinstance(checks, list):
             continue
+        owner = key.removeprefix("checks for").strip()
         for check in checks:
             if isinstance(check, str):
-                text, attributes = check, {}
+                text, body, attributes = check, {}, {}
             elif isinstance(check, dict) and len(check) == 1:
                 text, body = next(iter(check.items()))
-                attributes = (body or {}).get("attributes") or {} if isinstance(body, dict) else {}
+                body = body if isinstance(body, dict) else {}
+                attributes = body.get("attributes") or {}
             else:
                 continue
-            match = _SODA_CROSS_TABLE.search(text)
-            if not match or attributes.get("reads_tables"):
+            if attributes.get("reads_tables"):
                 continue
-            found.append((attributes.get("check_id") or text,
-                           f"soda check {text!r} reads {match.group(1)}"))
+            match = _SODA_CROSS_TABLE.search(text)
+            if match:
+                found.append((attributes.get("check_id") or text,
+                               f"soda check {text!r} reads {match.group(1)}"))
+                continue
+            if not known:
+                continue
+            query = " ".join(str(body.get(k, "")) for k in _SODA_QUERY_KEYS)
+            others = sorted(table for table in known
+                             if table != owner
+                             and re.search(rf"\b{re.escape(table)}\b", query))
+            if others:
+                found.append((attributes.get("check_id") or text,
+                               f"soda {text!r} on {owner} queries {others}"))
     return found
 
 
@@ -241,25 +316,36 @@ def undeclared_cross_table(dbt_schema: Path | str | None = None,
                             contracts: Iterable[Path | str] = ()) -> list[str]:
     """Checks that LOOK cross-table and declare nothing.
 
-    A MECHANICAL GATE, not a proof. It catches the three shapes this
-    project actually writes - a dbt `relationships` test, a SodaCL
-    "must exist in" sentence, and an ODCS SQL rule whose query names a
-    real table (its own being `{model}`) - so a clean result says those
-    three are complete, not that no check anywhere reads a table by
-    some other means.
+    A MECHANICAL GATE, not a proof. It catches the five shapes this
+    project actually writes:
 
-    Stated that way round deliberately: a gate whose limits are not
-    written down gets read as a guarantee, and the next author adds a
-    fourth shape it cannot see.
+    * a dbt `relationships` test,
+    * a dbt singular test whose SQL `ref()`s two models,
+    * a SodaCL "must exist in" sentence,
+    * a SodaCL `failed rows` whose `fail query` names another table,
+    * an ODCS SQL rule whose query names a real table (its own being
+      `{model}`).
+
+    So a clean result says those five are complete, not that no check
+    anywhere reads a table by some other means.
+
+    Stated that way round deliberately, and it earned the phrasing the
+    day after it was written: the first version claimed three shapes
+    and was read as a guarantee, while six real business rules joined a
+    second table beneath it. They were found by eye, from a duplicated
+    section on a dataset page, not by the gate. A sixth shape will
+    happen the same way.
     """
     known = _known_tables()
     problems = []
     if dbt_schema is not None and Path(dbt_schema).exists():
         for check_id, why in _dbt_cross_table_checks(Path(dbt_schema), known):
             problems.append(f"{check_id}: {why}, but declares no reads_tables")
+        for check_id, why in _dbt_singular_cross_table_checks(Path(dbt_schema)):
+            problems.append(f"{check_id}: {why}, but declares no reads_tables")
     for path in soda_checks:
         if Path(path).exists():
-            for check_id, why in _soda_cross_table_checks(Path(path)):
+            for check_id, why in _soda_cross_table_checks(Path(path), known):
                 problems.append(f"{check_id}: {why}, but declares no reads_tables")
     for path in contracts:
         if Path(path).exists():

@@ -335,3 +335,158 @@ class TestTheGateRefusesAReservedDatasetId:
         from qa_tools.common import validate_hierarchy
 
         assert "reserved_name_errors" in inspect.getsource(validate_hierarchy.validate)
+
+
+class TestTheBusinessRuleShapes:
+    """The two shapes the gate's first version could not see
+    (2026-09-26).
+
+    It knew a dbt `relationships` test and a SodaCL "must exist in"
+    sentence, both of which announce a join in their check TYPE. A
+    business rule does not: it is an ordinary singular test or an
+    ordinary `failed rows`, and the join is in its SQL. Six real checks
+    were joining a second table under a gate that called the repo
+    clean, and they were found by eye - one business rule appearing
+    twice on a dataset page, once in the table section and once in the
+    cross-table one, because only its datacontract third had declared.
+    """
+
+    def _dbt_project(self, tmp_path, sql: str, declare: bool):
+        tests = tmp_path / "tests"
+        tests.mkdir()
+        (tests / "joins_two.sql").write_text(sql)
+        staging = tmp_path / "models" / "staging"
+        staging.mkdir(parents=True)
+        declaration = "        reads_tables: [cp_clients]\n" if declare else ""
+        (staging / "schema.yml").write_text(
+            "version: 2\n"
+            "tests:\n"
+            "  - name: joins_two\n"
+            "    config:\n"
+            "      meta:\n"
+            "        check_id: a.b.c.d.e.joins_two_dbt\n"
+            f"{declaration}"
+            "        category: consistency\n")
+        return staging / "schema.yml"
+
+    def test_a_dbt_singular_test_joining_two_models_must_declare(self, tmp_path):
+        schema = self._dbt_project(
+            tmp_path,
+            "select * from {{ ref('stg_cp_investigations') }} i\n"
+            "join {{ ref('stg_cp_clients') }} c on i.cp_client_id = c.cp_client_id\n",
+            declare=False)
+
+        problems = tr.undeclared_cross_table(dbt_schema=schema)
+
+        assert len(problems) == 1
+        assert "joins_two_dbt" in problems[0]
+        assert "cp_clients" in problems[0] and "cp_investigations" in problems[0]
+
+    def test_declaring_it_satisfies_the_gate(self, tmp_path):
+        schema = self._dbt_project(
+            tmp_path,
+            "select * from {{ ref('stg_cp_investigations') }} i\n"
+            "join {{ ref('stg_cp_clients') }} c on i.cp_client_id = c.cp_client_id\n",
+            declare=True)
+
+        assert tr.undeclared_cross_table(dbt_schema=schema) == []
+
+    def test_a_singular_test_over_one_model_is_left_alone(self, tmp_path):
+        """The gate costs an author a declaration for every false
+        positive, so a single-table rule must not be one. Two of this
+        repo's five singular tests are exactly that."""
+        schema = self._dbt_project(
+            tmp_path,
+            "select * from {{ ref('stg_cp_clients') }} where case_status is null\n",
+            declare=False)
+
+        assert tr.undeclared_cross_table(dbt_schema=schema) == []
+
+    def _soda_file(self, tmp_path, declare: bool):
+        declaration = "        reads_tables: [cp_carers]\n" if declare else ""
+        path = tmp_path / "soda.yml"
+        path.write_text(
+            "checks for cp_placements:\n"
+            "  - failed rows:\n"
+            "      name: Carer approval compliance\n"
+            "      fail query: |\n"
+            "        SELECT p.placement_id\n"
+            "        FROM cp_placements p JOIN cp_carers c ON p.carer_id = c.carer_id\n"
+            "        WHERE c.approval_status <> 'Approved'\n"
+            "      attributes:\n"
+            "        check_id: a.b.c.d.e.approval_compliance_soda\n"
+            f"{declaration}"
+            "        category: consistency\n")
+        return path
+
+    def test_a_soda_fail_query_naming_another_table_must_declare(self, tmp_path):
+        problems = tr.undeclared_cross_table(
+            soda_checks=[self._soda_file(tmp_path, declare=False)])
+
+        assert len(problems) == 1
+        assert "approval_compliance_soda" in problems[0]
+        assert "cp_carers" in problems[0]
+
+    def test_a_soda_fail_query_naming_only_its_own_table_is_left_alone(self, tmp_path):
+        """`cp_placements` appears in this query too - it is the FROM.
+        A scan that flagged its own table would flag every business
+        rule in the repo."""
+        path = tmp_path / "soda.yml"
+        path.write_text(
+            "checks for cp_placements:\n"
+            "  - failed rows:\n"
+            "      fail query: SELECT placement_id FROM cp_placements WHERE end_date < start_date\n"
+            "      attributes:\n"
+            "        check_id: a.b.c.d.e.dates_soda\n")
+
+        assert tr.undeclared_cross_table(soda_checks=[path]) == []
+
+    def test_declaring_the_soda_rule_satisfies_the_gate(self, tmp_path):
+        assert tr.undeclared_cross_table(
+            soda_checks=[self._soda_file(tmp_path, declare=True)]) == []
+
+    def test_the_six_real_business_rules_declare_what_they_join(self):
+        """Named individually rather than counted, because the point is
+        that each pair's three tools now agree - which is what stopped
+        one rule rendering in two sections at once."""
+        from qa_tools.common.validate_check_lifecycle import collect_checks
+
+        declared = {c.check_id.split(".")[-1]: c.reads_tables
+                     for c in collect_checks(None) if c.reads_tables}
+        for suffix, table in [
+            ("escalation_completeness_dbt", "cp_investigations"),
+            ("escalation_completeness_soda", "cp_investigations"),
+            ("closed_case_investigation_hygiene_dbt", "cp_clients"),
+            ("closed_case_hygiene_soda", "cp_clients"),
+            ("placement_carer_approval_dbt", "cp_carers"),
+            ("approval_compliance_soda", "cp_carers"),
+        ]:
+            assert declared.get(suffix) == [table], suffix
+
+
+class TestTheReservedNameIsGuardedBeforeItReachesGit:
+    """Keith's own ask, 2026-09-26: tests that the reserved name is not
+    used, AND a guard against it ever being used. The first half is
+    TestTheReservedScope above; this is the second."""
+
+    def test_a_pre_commit_hook_runs_the_hierarchy_gate(self):
+        import yaml
+
+        config = yaml.safe_load(Path(".pre-commit-config.yaml").read_text())
+        hooks = [h for repo in config["repos"] for h in repo.get("hooks", [])]
+        hook = next((h for h in hooks if h["id"] == "mothman-check-hierarchy"), None)
+
+        assert hook is not None, "the reserved name has no pre-commit guard"
+        assert "hierarchy" in hook["entry"]
+
+    def test_the_hook_watches_the_files_that_define_the_tree(self):
+        """A hook scoped to the wrong paths never runs. The hierarchy
+        is defined in contract/, so that is what has to trigger it."""
+        import re as _re
+        import yaml
+
+        config = yaml.safe_load(Path(".pre-commit-config.yaml").read_text())
+        hook = next(h for repo in config["repos"] for h in repo.get("hooks", [])
+                     if h["id"] == "mothman-check-hierarchy")
+
+        assert _re.search(hook["files"], "contract/child-protection-contract.yaml")

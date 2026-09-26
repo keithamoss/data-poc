@@ -698,3 +698,24 @@ anything here that turns into real build work becomes a requirement in
    would still be computed at run time by whoever legitimately holds a
    connection, never in the dashboard build.
 
+14. **"Client reference" three times in a row, with nothing to tell
+    them apart.** Noticed 2026-09-26 while driving the new cross-table
+    section (REQ-QAC-037) on the Child Protection collection page. The
+    section lists 21 checks and only 9 distinct labels: "Client
+    reference" appears three times, "Carer reference" three times, and
+    so on. They are genuinely different checks - the dbt, Soda and
+    datacontract-cli versions of the same relationship, and the same
+    relationship on different tables - so de-duping them would hide
+    real results. But a reader cannot tell which is which from the row.
+
+    **Status:** todo (2026-09-26) · **Category:** Dashboard UI
+
+    Not new to this section: the dataset pages have shown the same
+    repetition all along, and the collection page has simply gathered
+    it into one place where it is finally obvious. Worth saying because
+    that is the point of road-testing - the section did not create the
+    problem, it revealed it.
+
+    A row probably needs to name its participants and its tool, but
+    that is a guess and this entry is a sighting rather than a
+    diagnosis.

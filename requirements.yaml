@@ -3961,7 +3961,7 @@ requirements:
       that a broken relationship cannot read as somebody else's problem
       just because the check happened to be filed under their table.
     moscow: must
-    status: not_started
+    status: built
     source: >
       Keith, plans/publishing-and-history.md item 6 answer 2,
       2026-09-20 - rejected recording against the triggering dataset,
@@ -4008,7 +4008,167 @@ requirements:
         the user - CLAUDE.md's standing lesson from item 74, where a
         green data layer hid a false green in the render layer.
     dependencies: [REQ-PIPE-035, REQ-PIPE-036, REQ-QAC-039]
+    linked_tests:
+      - tests/test_cross_table_scope.py
+      - tests/test_tables_read.py
+      - tests-js/cross-table.test.js
+      - tests/test_dashboard_e2e.py
+    implemented_by:
+      - qa_tools/common/tables_read.py::CROSS_TABLE_SCOPE
+      - qa_tools/common/tables_read.py::is_reserved_scope
+      - qa_tools/common/qa_results_writer.py::write_qa_result
+      - qa_tools/common/qa_results_reader.py::read_cross_table_results
+      - qa_tools/common/validate_hierarchy.py::reserved_name_errors
+      - qa_tools/common/tables_read.py::undeclared_cross_table
+      - pipeline/build_cp_dashboard_data.py::build
+      - pipeline/dashboard_check_labels.py::pooled_url_key
+      - dashboard/qa-reporting-dashboard.template.html::collectionCrossTableChecks
+      - dashboard/qa-reporting-dashboard.template.html::collectionCrossTableSection
+    evidence:
+      - >
+        2026-09-26: measured after regenerating Child Protection - 540
+        cross-table results in the reserved scope and ZERO left in the
+        dataset files, out of 3,204 in all. Criterion 2 is asserted as
+        the result LEAVING, not merely arriving, because a record in
+        two places is two records to keep in step. (432 on the first
+        regeneration, before the six business rules below were found to
+        be undeclared; the six add 108, being 6 checks over 18 runs.)
+      - >
+        2026-09-26: the reserved name is enforced rather than agreed.
+        The hierarchy gate refuses any agency, collection or dataset id
+        beginning with an underscore, which was proved by editing a
+        real id to `_cp-clients` and watching it refuse, then
+        restoring. Widened past dataset ids because neither a
+        collection nor an agency could collide today but both would
+        make the tree unreadable the same way.
+      - >
+        2026-09-26: A REAL DIVERGENCE FOUND WHILE BUILDING, of the
+        local-green CI-silent shape. The reserved scope is a SIBLING of
+        the run directories, so the rebuild path CI publishes from
+        walked straight past it - 3,204 results live against 2,772
+        rebuilt, all 126 relationships_soda and 126 relationships_dbt
+        gone, nothing anywhere saying so. Both rebuild paths now read
+        it, and the two builds were verified to agree afterwards on all
+        3,204 results, every field.
+      - >
+        2026-09-26: criteria 6 and 7 are ONE MECHANISM rather than two.
+        A cross-table check becomes a pseudo-column carrying a `scope`,
+        which is the same device REQ-DASH-033 used - so the template
+        renders it as a section, keeps it out of the column grid, and
+        folds its verdict into the dataset's status by the ordinary
+        worst-of rule, with no special case anywhere. A test asserts
+        the folding stops when the scoped column is removed, so nobody
+        later tidies it into a field of its own and silently unfolds
+        it.
+      - >
+        2026-09-26: the folding test was WRONG FIRST and its own guard
+        caught it. cp-carers has a failing Duplicate rate check of its
+        own in five runs, so "is it ever red" was true with or without
+        folding. It now asserts the narrow claim - that a run exists
+        where the dataset is green on its own checks and red once the
+        cross-table section counts.
+      - >
+        2026-09-26: the collection section is deduped by check_id and
+        asserted so. Display LABELS legitimately repeat - "Client
+        reference" names the dbt, Soda and datacontract-cli versions of
+        one relationship, on three tables - which is a real
+        readability problem the section made visible rather than
+        created, logged as plans/road-testing.md #14.
+      - >
+        2026-09-26: THE GATE'S FIRST VERSION WAS BLIND TO THE SHAPE
+        THIS PROJECT ACTUALLY WRITES. It knew a dbt `relationships`
+        test, a SodaCL "must exist in" sentence and an ODCS SQL rule -
+        the shapes that announce a join in their check TYPE. Six real
+        business rules do not: three dbt singular tests and their three
+        SodaCL twins are ordinary `failed rows` and ordinary singular
+        tests with the join in their SQL, and every one read a second
+        table while declaring nothing. The gate called the repo clean.
+        They were found by eye, from "Carer approval compliance"
+        appearing twice on the cp-placements page - once in the table
+        section and once in the cross-table one - because only the
+        datacontract third of that trio had declared. All six now
+        declare, and the gate reads SQL for two more shapes: a singular
+        test with two `ref()`s, and a `fail query` naming a table other
+        than its own block's. Both scans were confirmed to fail against
+        the pre-fix gate before being wired in.
+      - >
+        2026-09-26: A SECOND REAL DEFECT, FOUND THE SAME WAY - by
+        reading the rendered page rather than the built JSON.
+        REQ-QAC-023 guarantees a check's tail is unique WITHIN ITS
+        COLUMN, and `url_key()` keys on exactly that. A scope section
+        breaks the precondition: it pools checks from several real
+        columns, so `relationships_soda` on `cp_client_id` and
+        `relationships_soda` on `carer_id` arrived as one key. Nothing
+        raised. The template finds a row's check by key and takes the
+        first match, so cp-placements rendered "Client reference" on a
+        row that is really "Carer reference", and both rows opened the
+        same panel. `pooled_url_key()` qualifies the key with the
+        check's own column where it has one; supply- and table-level
+        checks parse with no column and keep today's URLs unchanged.
+      - >
+        2026-09-26: this requirement also surfaced a false green that
+        belongs to REQ-DASH-033 - written up in
+        plans/post-build-review.md rather than claimed here. Moving
+        cp-placements' two table-level rules into the cross-table
+        section left its table section holding nothing but the
+        "no automated quality rule defined" placeholder, under a GREEN
+        pill. post-build-review #4 had already settled this and fixed
+        it in `rollupStatuses()`; the section renderer kept its own
+        reduce over STATUS_ORDER, which has no entry for `inactive`, so
+        the comparison was always false and the "green" seed survived.
+        Both section renderers now call `rollupStatuses()`.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
+    unmet_criteria:
+      - criterion: >
+          Criterion 3 - evaluating a cross-table check against a single
+          period's schema with the staged delivery overlaid, the
+          surface REQ-PIPE-035 defines.
+        why: >
+          REQ-PIPE-035 built that surface and could not wire it: a run
+          cannot be scoped to a period until a supply has one, and
+          REQ-PIPE-062's filings are deliberately unrecorded until
+          promotion exists. Cross-table checks are evaluated today
+          exactly as every other check is, against the run's own view
+          schema.
+        owner: the promotion sprint (batch 4)
+      - criterion: >
+          Criteria 4 and 5 - re-evaluating a cross-table check when a
+          table it depends on arrives, only within the same period, and
+          naming the arrival that caused the re-evaluation.
+        why: >
+          Both are period-scoped rules and inherit criterion 3's
+          blocker. Criterion 5 additionally needs a re-evaluation to
+          point at, which cannot exist until 4 does. What IS built and
+          carried is the dependency itself - REQ-PIPE-036's
+          reads_tables declares which tables each check reads, which is
+          what a re-evaluation trigger will be keyed on.
+        owner: the promotion sprint (batch 4)
     decisions:
+      - >
+        A CHECK RENDERED IN A POOLED SECTION IS KEYED BY ITS OWN COLUMN
+        PLUS ITS TAIL, not by the tail alone (2026-09-26). REQ-QAC-023
+        guarantees tail uniqueness WITHIN A COLUMN and `url_key()`
+        relies on it; a scope section pools several real columns, which
+        silently breaks that precondition. Rejected keying on the full
+        check_id - it is six segments long and four of them are already
+        in the URL. Rejected qualifying every scoped check the same way:
+        a supply- or table-level check's column parses as the `(table)`
+        sentinel or as nothing, so qualifying it would put `%28table%29`
+        back into URLs that REQ-DASH-026 had just got rid of. The rule
+        is therefore "qualify where there IS a column", which is
+        precisely the case where the pooling happens.
+      - >
+        THE CROSS-TABLE GATE READS SQL, NOT CHECK TYPES, FOR BUSINESS
+        RULES (2026-09-26). The first version keyed on the three shapes
+        that announce a join in their type, and missed six real checks
+        whose join is in a `fail query` or a singular test's `.sql`
+        file. Rejected requiring `reads_tables` on EVERY check, which
+        would make 259 authors declare nothing 253 times to catch six.
+        Rejected inferring reads from a run's query log, which would
+        make the declaration depend on the check having run. What the
+        gate deliberately still does NOT do is prove the absence of a
+        sixth shape - its docstring says so in those words, because the
+        first version's did not and was read as a guarantee.
       - >
         SETTLED 2026-09-26 (Keith), resolving this requirement's one
         open question. The cross-table scope is a RESERVED FOLDER at

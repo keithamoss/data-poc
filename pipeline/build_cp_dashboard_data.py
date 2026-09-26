@@ -35,7 +35,7 @@ from qa_tools.cp.dataset_stats import AGGREGATE_SPEC
 from qa_tools.common.validate_check_lifecycle import collect_checks
 from pipeline.cadence import classify_arrival, parse_cadence_from_contract
 from qa_tools.common import asset_time
-from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, tool_ref, url_key
+from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, pooled_url_key, tool_ref, url_key
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
@@ -99,6 +99,24 @@ TABLE_META = {
     "cp_carers": "One row per approved (or in-approval) carer available for placements.",
     "cp_case_workers": "One row per case worker who may be assigned notifications or lead investigations.",
 }
+
+# REQ-QAC-037 criteria 6 and 7. A cross-table check gets a pseudo-column
+# of its own, the same mechanism REQ-DASH-033 gave supply-level and
+# table-level checks - a `scope` makes the template render it as a
+# SECTION rather than among the real columns, and being in `columns` at
+# all is what folds its verdict into the dataset's status.
+#
+# WHY IT CANNOT JUST KEEP ITS OWN COLUMN NAME: a referential check
+# declared on cp_notifications reads cp_client_id, which is a column of
+# cp_notifications and not of cp_carers. Attaching the result to carers
+# under that name would invent a cp_client_id column on a table that
+# has none.
+CROSS_TABLE_PSEUDO_COLUMN = "Cross-table checks"
+CROSS_TABLE_META = (
+    "cross-table",
+    "Checks about the relationship between this table and another. A failure "
+    "here is a disagreement between tables rather than a fault in either one "
+    "alone, so it counts against every table the check reads.")
 
 COLUMN_META = {
     "cp_clients": {
@@ -174,12 +192,31 @@ COLUMN_META = {
 }
 
 
+COLUMN_SCOPE_KEY[CROSS_TABLE_PSEUDO_COLUMN] = "cross-table"
+for _table_meta in COLUMN_META.values():
+    _table_meta[CROSS_TABLE_PSEUDO_COLUMN] = CROSS_TABLE_META
+
+
+def _cross_table_check_ids() -> set[str]:
+    """Every check that reads a table other than its own.
+
+    Read from the check definitions rather than from the results, so a
+    check that happens to be absent from one run is still known to be
+    cross-table - the alternative would move a check between sections
+    depending on whether it ran.
+    """
+    from qa_tools.common import tables_read
+
+    return set(tables_read.declared_by_check_id(collect_checks(None)))
+
+
 def build_one_table(table: str, results: list[dict], manifest: list[dict], dataset_stats: dict,
                      lifecycle_by_id: dict) -> dict:
     dataset_id = hierarchy.dataset_for_table(table).dataset_id
     column_meta = COLUMN_META[table]
     all_columns = list(column_meta.keys())
 
+    cross_table_ids = _cross_table_check_ids()
     by_column: dict[str, dict[tuple, dict]] = {}
     for r in results:
         # Row-count checks used to be skipped outright here, and the
@@ -192,7 +229,12 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         # so the workaround outlived its bug, and the cost of keeping it
         # was 12 real checks rendering nowhere
         # (REQ-DASH-032).
-        if r["column_name"] == "(table)":
+        if r["check_id"] in cross_table_ids:
+            # Ahead of the column_name branches below, deliberately: a
+            # cross-table check has a column name of its own and it
+            # means nothing on the tables it READS.
+            col = CROSS_TABLE_PSEUDO_COLUMN
+        elif r["column_name"] == "(table)":
             col = (SUPPLY_LEVEL_PSEUDO_COLUMN if r["check_name"] in _SUPPLY_LEVEL_CHECK_NAMES
                    else BUSINESS_RULE_PSEUDO_COLUMN)
         else:
@@ -261,7 +303,11 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                          else display_name(check_name, engine_short, slot["label"])),
                 # The URL-facing identity, stable across heading rewrites
                 # (REQ-DASH-026). Never `name`.
-                "key": url_key(slot["check_id"]),
+                # pooled_url_key() in a scope section, where checks
+                # from several real columns share one pseudo-column and
+                # a bare tail is no longer unique. See its own docstring.
+                "key": (pooled_url_key(slot["check_id"]) if col in COLUMN_SCOPE_KEY
+                        else url_key(slot["check_id"])),
                 # REQ-DASH-026: the terse "dbt:not_null" line under
                 # the headline. Same string as `key` above, tool
                 # moved to the front - deliberately, so the card and
@@ -472,6 +518,25 @@ def build() -> dict:
 
     by_table = {t: [r for r in results if r["dataset_id"] == hierarchy.dataset_for_table(t).dataset_id]
                 for t in cp_common.TABLES}
+    # REQ-QAC-037 criteria 6 and 7: a cross-table result belongs to
+    # EVERY table it reads, not only to the one it happened to be
+    # declared on. Which table that was is an artefact of where
+    # somebody wrote the check down - a referential check between
+    # placements and carers is equally about both - and letting it
+    # decide who sees the result, and whose status carries it, is the
+    # arbitrariness this requirement removes.
+    #
+    # THE RESULT IS SHARED, NOT COPIED. The same record object is added
+    # to each participant's list, and it is recorded once under the
+    # reserved scope; criterion 2 forbids a second record, not a second
+    # reader.
+    from qa_tools.common import tables_read
+
+    reads = tables_read.declared_by_check_id(collect_checks(None))
+    for r in results:
+        for other in reads.get(r.get("check_id")) or ():
+            if other in by_table and r not in by_table[other]:
+                by_table[other].append(r)
     datasets = [build_one_table(t, by_table[t], manifest, dataset_stats, lifecycle_by_id) for t in cp_common.TABLES]
     return {"datasets": datasets}
 

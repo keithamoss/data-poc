@@ -34,7 +34,7 @@ from qa_tools.common.validate_check_lifecycle import collect_checks
 from pipeline.cadence import classify_arrival, parse_cadence_from_contract
 from qa_tools.common import asset_time
 from qa_tools.common import hierarchy
-from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, tool_ref, url_key
+from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, pooled_url_key, tool_ref, url_key
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 REAL_RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
@@ -240,7 +240,11 @@ def build() -> dict:
                          else display_name(check_name, engine_short, slot["label"])),
                 # The URL-facing identity, stable across heading rewrites
                 # (REQ-DASH-026). Never `name`.
-                "key": url_key(slot["check_id"]),
+                # pooled_url_key() in a scope section, where checks
+                # from several real columns share one pseudo-column and
+                # a bare tail is no longer unique. See its own docstring.
+                "key": (pooled_url_key(slot["check_id"]) if col in COLUMN_SCOPE_KEY
+                        else url_key(slot["check_id"])),
                 # REQ-DASH-026: the terse "dbt:not_null" line under
                 # the headline. Same string as `key` above, tool
                 # moved to the front - deliberately, so the card and

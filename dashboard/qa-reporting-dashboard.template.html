@@ -3025,9 +3025,70 @@ const COLUMN_SCOPES = [
    blurb:"Did the right amount of data arrive, and is it current?"},
   {scope:"table", title:"Table-level checks",
    blurb:"Rules that span the whole table rather than any one column."},
+  // REQ-QAC-037 criteria 6 and 7. THE SAME MECHANISM, deliberately -
+  // the requirement asks for "a section of their own following the
+  // pattern REQ-DASH-033 established", and a third entry here is that
+  // pattern rather than a lookalike built beside it.
+  //
+  // It appears on EVERY table the check reads, not only the one it was
+  // declared on, and being in `columns` is also what folds its verdict
+  // into that dataset's status - Keith's call, 2026-09-26, superseding
+  // Thread I's "healthy neighbour green". The cost he took knowingly:
+  // a dataset goes red for a disagreement with a neighbour, on a day
+  // nothing about that dataset changed.
+  {scope:"cross-table", title:"Cross-table checks",
+   blurb:"Checks about the relationship between this table and another. A failure is a disagreement between tables rather than a fault in either one alone, so it counts against both."},
 ];
 function scopedColumns(ds, scope){ return (ds.columns||[]).filter(c=> c.scope===scope); }
 function realColumns(ds){ return (ds.columns||[]).filter(c=> !c.scope); }
+
+// REQ-QAC-037 criterion 6's collection half. The same checks the
+// dataset pages show, gathered once for the collection they actually
+// belong to - a referential check between placements and carers is a
+// fact about the collection, and the dataset pages repeat it because
+// that is where somebody is standing when they need it.
+//
+// DEDUPED BY check_id, because every participating dataset carries the
+// same record - shared, not copied (criterion 2). Without this the
+// collection would list "Carer reference" once per table that reads
+// it, which reads as several problems where there is one.
+function collectionCrossTableChecks(col){
+  const seen = new Map();
+  for(const ds of (col.datasets||[])){
+    for(const c of (ds.columns||[])){
+      if(c.scope !== "cross-table") continue;
+      for(const ck of (c.checks||[])){
+        if(ck.retired || seen.has(ck.check_id)) continue;
+        seen.set(ck.check_id, {check: ck, column: c, dataset: ds});
+      }
+    }
+  }
+  return [...seen.values()];
+}
+
+function collectionCrossTableSection(ag, col){
+  const entries = collectionCrossTableChecks(col);
+  if(!entries.length) return "";
+  // rollupStatuses(), for the reason the dataset-page section above
+  // gives. Nothing here can be `inactive` today - these entries are
+  // real cross-table checks, deduped by check_id, never the
+  // placeholder - but a seeded reduce over STATUS_ORDER is the shape
+  // that produced a false green once already, and there is no reason
+  // for this page to keep its own arithmetic.
+  const worst = rollupStatuses(entries.map(e=> checkStatus(e.check)));
+  const rows = entries.map(e=> `
+    <button class="scope-check" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:e.dataset.id})}'>
+      <span class="label"><span class="nm">${escHtml(e.check.label || e.check.name || e.check.check_id)}</span></span>
+      ${pill(checkStatus(e.check),"sm")}
+    </button>`).join("");
+  return `<div class="scope-section" data-scope="cross-table" style="margin-bottom:14px;">
+    <div class="head"><h3>Cross-table checks</h3>${pill(worst,"sm")}</div>
+    <div class="blurb">Checks about the relationship between two tables in this collection.
+      A failure is a disagreement between them rather than a fault in either one alone, so it
+      counts against every table the check reads.</div>
+    ${rows}
+  </div>`;
+}
 
 function stateToHash(state){ return "#" + stateToPath(state); }
 function hashToState(){
@@ -3568,6 +3629,7 @@ function renderAgency(view, agencyId){
     <div class="collection-block">
       <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}</div>
       ${outstandingMarker("collection", col.id)}
+      ${collectionCrossTableSection(ag, col)}
       <div class="overflow-x">
       <table class="dataset-table">
         <thead><tr><th>Dataset</th><th>Status</th><th>Latest arrival</th><th>Rows, latest run</th><th>Last QA run</th><th>Trend</th></tr></thead>
@@ -3911,11 +3973,18 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     const columns = scopedColumns(ds, sc.scope);
     const checks = columns.flatMap(c=> (c.checks||[]).filter(ck=> !ck.retired));
     if(!checks.length) return "";
-    // Same rollup rule a column tile uses - the worst status among its
-    // own checks - so a section reads as part of the same page rather
-    // than as a special case with its own arithmetic.
-    const worst = checks.reduce((acc, ck)=>
-      STATUS_ORDER[checkStatus(ck)] > STATUS_ORDER[acc] ? checkStatus(ck) : acc, "green");
+    // rollupStatuses(), not a reduce over STATUS_ORDER - and that is
+    // the whole point rather than a tidy-up. A check may carry
+    // `inactive`, which STATUS_ORDER has no entry for, so `undefined >
+    // 0` was always false and the seed value "green" survived: a
+    // section holding nothing but the "no automated quality rule
+    // defined" placeholder claimed GREEN. That is exactly the false
+    // green post-build-review #4 is about, and rollupStatuses() is
+    // where it was already fixed - this renderer simply had its own
+    // arithmetic and never picked the fix up (found 2026-09-26, when
+    // REQ-QAC-037 moved cp-placements' last two table-level rules into
+    // the cross-table section and left the section empty).
+    const worst = rollupStatuses(checks.map(checkStatus));
     const rows = columns.flatMap(c=> (c.checks||[]).filter(ck=> !ck.retired).map(ck=> `
       <button class="scope-check" data-col="${columnKey(c)}" data-check="${ck.key}">
         <span class="label"><span class="nm"></span><span class="tr"></span><span class="ds"></span></span>

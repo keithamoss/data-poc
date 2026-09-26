@@ -1083,11 +1083,15 @@ class TestSupplyAndTableLevelSections:
             })),
         }))""")
 
-    def test_both_sections_render_above_the_column_grid(self, clean_page, built_dashboard_html):
+    def test_every_section_renders_above_the_column_grid(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html, self._CP)
 
         sections = self._sections(clean_page)
-        assert [s["scope"] for s in sections] == ["supply", "table"]
+        # REQ-QAC-037 added the third. The ORDER is asserted, not just
+        # the set: supply, then table, then cross-table reads outward
+        # from the dataset, and a section appearing in a different place
+        # each page would be its own defect.
+        assert [s["scope"] for s in sections] == ["supply", "table", "cross-table"]
         assert clean_page.evaluate("""() => {
             const wrap = document.getElementById('scope-sections');
             const grid = document.getElementById('col-grid');
@@ -1108,12 +1112,37 @@ class TestSupplyAndTableLevelSections:
         _goto(clean_page, built_dashboard_html, self._CP)
 
         by_scope = {s["scope"]: s["status"] for s in self._sections(clean_page)}
-        assert set(by_scope) == {"supply", "table"}
+        assert set(by_scope) == {"supply", "table", "cross-table"}
         for status in by_scope.values():
-            assert status in {"Green", "Amber", "Red"}
-        # they are genuinely rolled up independently, not both showing
-        # the dataset's own status
-        assert by_scope["supply"] != by_scope["table"]
+            assert status in {"Green", "Amber", "Red", "No rule defined", "No data"}
+        # they are genuinely rolled up independently, not all three
+        # showing the dataset's own status
+        assert len(set(by_scope.values())) > 1
+
+    def test_a_section_with_no_real_check_does_not_claim_green(
+            self, clean_page, built_dashboard_html):
+        """A real false green, found 2026-09-26.
+
+        post-build-review #4 already settled this - `rollupStatuses()`
+        carries a comment saying in as many words that "a section whose
+        only check is a placeholder rolls up GREEN ... precisely the
+        false green that finding is about". The fix went into that
+        function and the SECTION renderer kept its own reduce over
+        STATUS_ORDER, which has no entry for `inactive`, so the
+        comparison was always false and the seed value survived.
+
+        It became visible when REQ-QAC-037 moved cp-placements' two
+        table-level business rules into the cross-table section, leaving
+        its table section with nothing but the placeholder - and a Green
+        pill over the words "No automated quality rule defined".
+        """
+        _goto(clean_page, built_dashboard_html, self._CP)
+
+        table = next(s for s in self._sections(clean_page) if s["scope"] == "table")
+        assert [r["name"] for r in table["rows"]] == ["No automated quality rule defined"], (
+            "this dataset has a real table-level check now - the test needs a "
+            "different one, not deleting")
+        assert table["status"] == "No rule defined"
 
     def test_the_pseudo_columns_no_longer_appear_among_the_real_columns(
             self, clean_page, built_dashboard_html):
@@ -1131,9 +1160,18 @@ class TestSupplyAndTableLevelSections:
         _goto(clean_page, built_dashboard_html, self._CP)
 
         rows = [r for s in self._sections(clean_page) for r in s["rows"]]
-        repeated = [r for r in rows if sum(1 for x in rows if x["name"] == r["name"]) > 1]
-        assert repeated, "expected at least one name shared across tools"
-        assert len({r["tool"] for r in repeated}) == len(repeated)
+        by_name: dict[str, list[str]] = {}
+        for row in rows:
+            by_name.setdefault(row["name"], []).append(row["tool"])
+        shared = {name: tools for name, tools in by_name.items() if len(tools) > 1}
+        assert shared, "expected at least one name shared across tools"
+        # Per NAME, not across the whole section. Two differently-named
+        # rows may legitimately share a tool - "Client reference" and
+        # "Carer reference" are both soda:relationships - and an
+        # assertion over all repeated rows at once forbids that, which
+        # is a rule this page has never had.
+        for name, tools in shared.items():
+            assert len(set(tools)) == len(tools), f"{name!r} repeats a tool: {tools}"
 
     def test_a_row_opens_that_check_directly_with_a_readable_url(
             self, clean_page, built_dashboard_html):
@@ -2552,3 +2590,106 @@ class TestScenariosPanel:
         clean_page.go_back()
         clean_page.wait_for_timeout(400)
         assert "panel=scenarios" not in clean_page.url
+
+
+class TestCrossTableChecks:
+    """REQ-QAC-037 criteria 6 and 7, in a real browser.
+
+    The requirement's own NFR asks for exactly this: it changes the
+    shape of a stored result, so assert at the last transform before
+    the user rather than at the first one after the source.
+    """
+
+    COLLECTION = ("#/agency/child-protection-family-support"
+                   "/collection/child-protection")
+
+    def test_the_collection_gathers_them_into_one_section(
+            self, clean_page, built_dashboard_html):
+        """Criterion 6's collection half, and deduped - every
+        participating dataset carries the same record, so an
+        un-deduped section would list one problem several times."""
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "agency", "agencyId": "child-protection-family-support"})
+        section = clean_page.locator('.scope-section[data-scope="cross-table"]')
+        assert section.count() == 1, f"expected one section, got {section.count()}"
+        rows = section.first.locator("button.scope-check")
+        assert rows.count() > 0
+        # DEDUPED BY check_id, which is the actual claim. Display
+        # LABELS legitimately repeat - "Client reference" is the name
+        # of the dbt, Soda and datacontract-cli versions of the same
+        # relationship, on each of three tables - so asserting unique
+        # labels would assert something untrue about the corpus.
+        ids = clean_page.evaluate("""() => {
+            const cp = DATA.agencies.flatMap(a=>a.collections)
+                .find(c=>c.id === "child-protection");
+            return collectionCrossTableChecks(cp).map(e=>e.check.check_id);
+        }""")
+        assert ids, "the collection gathered no cross-table checks"
+        assert len(ids) == len(set(ids)), "a check_id appears twice in the section"
+        assert rows.count() == len(ids)
+
+    def test_a_dataset_that_only_reads_a_check_still_shows_it(
+            self, clean_page, built_dashboard_html):
+        """Criterion 6's dataset half. cp-carers declares none of these
+        checks - it is only read BY them - so before this requirement
+        its page showed nothing about them at all."""
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "dataset", "agencyId": "child-protection-family-support",
+                      "collectionId": "child-protection", "datasetId": "cp-carers"})
+        section = clean_page.locator('.scope-section[data-scope="cross-table"]')
+        assert section.count() == 1, "cp-carers shows no cross-table section"
+        assert section.first.locator("button.scope-check").count() > 0
+
+    def test_a_cross_table_failure_turns_a_participating_dataset_red(
+            self, clean_page, built_dashboard_html):
+        """Criterion 7, and the cost Keith took knowingly on 2026-09-26,
+        superseding Thread I's "healthy neighbour green": cp-carers goes
+        red for a disagreement with a neighbour, on a day nothing about
+        cp-carers itself changed.
+
+        Asserted through the PAGE's own status function rather than off
+        the rendered pill, so it cannot pass because some other check
+        happens to be red on the same dataset.
+        """
+        _goto(clean_page, built_dashboard_html)
+        # ASSERTED PER RUN, not over the whole history, and the first
+        # version of this test got that wrong. cp-carers has its own
+        # failing Duplicate rate check in five runs, so "is it ever
+        # red" was true with or without folding and proved nothing.
+        # The real claim is narrower: there is at least one run where
+        # this dataset is green on its own checks and red once the
+        # cross-table section is counted.
+        found = clean_page.evaluate("""() => {
+            const cp = DATA.agencies.flatMap(a=>a.collections)
+                .find(c=>c.id === "child-protection");
+            const ds = cp.datasets.find(d=>d.id === "cp-carers");
+            const scoped = ds.columns.filter(c=>c.scope === "cross-table");
+            const without = {columns: ds.columns.filter(c=>c.scope !== "cross-table")};
+            const withAll = datasetStatusByRun(ds);
+            const ownOnly = datasetStatusByRun(without);
+            const turned = [];
+            for(const [runId, status] of withAll){
+                if(status === "red" && ownOnly.get(runId) !== "red") turned.push(runId);
+            }
+            return {nCross: scoped.flatMap(c=>c.checks||[]).length, turned};
+        }""")
+        assert found["nCross"] > 0, "cp-carers carries no cross-table checks"
+        assert found["turned"], (
+            "no run exists where cp-carers is red only because of a cross-table "
+            "check - folding is not reaching this dataset's status")
+
+    def test_a_cross_table_check_is_not_among_the_real_columns(
+            self, clean_page, built_dashboard_html):
+        """A referential check declared on cp_notifications reads
+        cp_client_id, which is not a column of cp_carers. Rendering it
+        as one would invent a column."""
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "dataset", "agencyId": "child-protection-family-support",
+                      "collectionId": "child-protection", "datasetId": "cp-carers"})
+        invented = clean_page.evaluate("""() => {
+            const cp = DATA.agencies.flatMap(a=>a.collections)
+                .find(c=>c.id === "child-protection");
+            const ds = cp.datasets.find(d=>d.id === "cp-carers");
+            return realColumns(ds).map(c=>c.name);
+        }""")
+        assert "cp_client_id" not in invented, invented

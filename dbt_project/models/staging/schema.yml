@@ -126,6 +126,7 @@ tests:
     config:
       meta:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.escalation_completeness_dbt
+        reads_tables: [cp_investigations]
         name: Escalation completeness
         category: completeness
         introduced_date: "2023-01-15"
@@ -138,6 +139,7 @@ tests:
     config:
       meta:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.closed_case_investigation_hygiene_dbt
+        reads_tables: [cp_clients]
         name: Closed-case hygiene
         category: consistency
         introduced_date: "2023-01-15"
@@ -150,6 +152,7 @@ tests:
     config:
       meta:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.placement_carer_approval_dbt
+        reads_tables: [cp_carers]
         name: Carer approval compliance
         category: consistency
         introduced_date: "2023-01-15"
