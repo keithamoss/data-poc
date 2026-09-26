@@ -244,3 +244,29 @@ describe("renderPlans (raw template, empty PLANS placeholder)", () => {
     expect(w.document.getElementById("plans-list").innerHTML).toContain("No plans entries match");
   });
 });
+
+// REQ-DOCS-073's dependency view. Only the empty path is reachable
+// here: SPRINT_DEPENDENCIES is a top-level `const`, null in the
+// template, so it cannot be swapped in from outside - the same
+// limitation this file's own header describes for PLANS. The real
+// content rendering is covered against the real built dashboard by
+// tests/test_dashboard_e2e.py.
+describe("renderSprintDependencies", () => {
+  it("renders nothing at all when there is no embedded graph", () => {
+    // Asserted through the function, not on the const: a top-level
+    // `const` never reaches `window`, which is what this file's own
+    // header says and what the first draft of this test forgot.
+    const w = load();
+    expect(w.renderSprintDependencies()).toBe("");
+  });
+
+  it("does not break the Plans tab when the graph is absent", () => {
+    // The template is opened with no data by real people - a
+    // half-rendered tab is the failure this guards.
+    const w = load();
+    const view = w.document.getElementById("view");
+    w.renderPlans(view);
+    expect(view.querySelector("#plans-list")).not.toBeNull();
+    expect(view.querySelector("details.plans-deps")).toBeNull();
+  });
+});

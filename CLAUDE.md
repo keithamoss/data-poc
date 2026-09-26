@@ -691,6 +691,36 @@ Rough layout:
   after the gates, including a plans file or a changelog entry, the
   gates run again before the commit does.
 
+  **Which makes the gate the LAST thing before the commit, never a
+  background task started hopefully.** Real incident, 2026-09-26:
+  three `mothman check` runs were started and killed - one because a
+  requirement was edited after it began, one to free `reports/` for an
+  audit - burning roughly fifteen minutes on results that were thrown
+  away, and about eight watchers were armed across them, several on the
+  same run. No two gates ever ran at once; the waste was all churn, and
+  from the outside it looked like a swarm. Keith noticed before I did.
+
+  So, mechanically: **finish every edit, then one gate, then one
+  watcher, then commit.** If something turns up while a gate is running
+  - a question to answer, a defect to chase, a file to tidy - it waits
+  for the commit. Batching the edits and paying for one run beats
+  paying for three and keeping none. The pull toward starting a gate
+  early is that it feels like parallelism; it is not, because any edit
+  invalidates it.
+
+  **And know what the run costs before deciding to wait on it.**
+  Measured 2026-09-26, having asserted "about ten minutes" all
+  afternoon without ever timing it: the full `mothman check` is
+  **~5 minutes** (295s), of which ~85% is `tests/test_dashboard_e2e.py`
+  - 142 real-browser tests that `--dist loadfile` pins to a single
+  worker, making that one file the critical path while everything else
+  finishes alongside it. `npm test` is ~24s and the nine validators
+  ~20s combined. **`mothman check --no-pytest` is ~45 seconds** and is
+  the right call when selective tests have already covered the change,
+  which CLAUDE.md's own selective-testing amendment already encourages.
+  Don't estimate this figure - it is written down, and re-measure it
+  when it looks wrong.
+
   **And the same rule for an EDIT: confirm it is on disk, by reading it
   back.** Real incident, 2026-09-23, an hour after the entry above. A
   multi-edit Python heredoc made three replacements to
@@ -778,6 +808,19 @@ Rough layout:
   sitting in `unmet_criteria` counts as not met whoever owns it. Written
   after 11 of 25 tags were found to disagree with the register, one of
   them stale for three days and repeated twice in conversation as fact.
+
+  **What a deferral WAITS ON is data, not prose** (REQ-DOCS-073,
+  2026-09-26). Every `unmet_criteria` entry carries a `blocked_by`
+  naming sprint numbers and/or requirement ids, or saying `unowned:
+  true` - the free-text `owner` stays alongside it and still carries
+  the why. `mothman plans dependencies` renders what waits on what in
+  both directions, the dashboard's Plans tab shows the same graph, and
+  the `sprints` gate WARNS (never fails, never auto-clears) when every
+  blocker a deferral names has since shipped. Two things that bite:
+  a requirement can be owned by more than one sprint, so ownership
+  resolves to a tuple; and `unowned` is not a blocker, so a sprint
+  whose remainder is unowned reads `in-progress` rather than
+  `blocked` - three sprints moved that way the day this landed.
 
 - **`requirements.yaml` is the permanent artifact. `plans/*.md` is
   working material that gets deleted as its requirements land.** Keith's

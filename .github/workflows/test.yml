@@ -131,6 +131,24 @@ jobs:
       - name: Lint YAML (duplicate keys)
         run: uv run yamllint --strict .
 
+      # reports/*.json is gitignored, so a freshly-cloned runner has
+      # none - and ten tests across three files guard on it and call
+      # pytest.skip when it is absent. They were therefore SILENTLY
+      # SKIPPING here, including the whole data-layer coverage for
+      # REQ-QAC-037's cross-table checks, while passing locally where
+      # a developer had built. Worse than absent coverage: it reports
+      # green and nobody knows what it proved. Verified by reproducing
+      # the runner's condition locally - move reports/ aside, run those
+      # files, watch ten tests skip.
+      #
+      # This is the same CI-safe chain deploy-pages.yml runs: both
+      # commands read committed qa_results/ history only and never open
+      # data/ or a warehouse, per CLAUDE.md's standing rule.
+      - name: Build the dashboard data the suite reads
+        run: |
+          uv run mothman dashboard rebuild-results
+          uv run mothman dashboard build-data
+
       - name: Run test suite
         run: uv run pytest --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov-report=term-missing
 

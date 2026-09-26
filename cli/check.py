@@ -91,8 +91,11 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
     # of the same thing, so they can drift - and did, on 11 of 25
     # sprints, one of them stale for three days and repeated twice in
     # conversation as fact before anyone checked.
-    ("sprints", ["uv", "run", "python3", "-m", "qa_tools.common.sprint_state"],
-     "a sprint's written status matches what its criteria say", False),
+    # REQ-DOCS-073 gave this gate a warning state: a deferral whose
+    # blocker has since shipped is worth re-testing, and is not a
+    # failure - see sprint_state.main() for why it must not be one.
+    ("sprints", ["uv", "run", "mothman", "plans", "sprints"],
+     "a sprint's written status matches what its criteria say", True),
     ("changelog", ["uv", "run", "mothman", "dashboard", "validate-changelog"],
      "CHANGELOG.yaml's schema and component tags", False),
     ("npm test", ["npm", "test", "--silent"],

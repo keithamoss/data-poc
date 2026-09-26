@@ -2214,6 +2214,83 @@ class TestABuiltRequirementShowsItsOwnHoles:
         assert bad == [], bad
 
 
+class TestTheDependencyViewInThePlansTab:
+    """REQ-DOCS-073 criterion 6, against the real built dashboard.
+
+    The page must not re-derive this: qa_tools/common/sprint_state.py
+    computes it and `mothman plans dependencies` renders the same
+    structure. So what is worth asserting here is that the page shows
+    what that function produced, not that the page's own arithmetic
+    agrees with itself - this project has already shipped a shared
+    rule implemented twice and had one copy render a check with
+    fourteen real violations green.
+    """
+
+    def test_it_matches_what_the_python_computed(self, clean_page, built_dashboard_html):
+        from qa_tools.common.sprint_state import dependency_data
+
+        expected = dependency_data()
+        assert expected["sprints"], "no sprint is waiting on anything - this test is vacuous"
+
+        _goto(clean_page, built_dashboard_html)
+        embedded = clean_page.evaluate("() => SPRINT_DEPENDENCIES")
+        assert embedded == expected
+
+    def test_the_tab_renders_a_row_per_sprint_in_the_graph(
+            self, clean_page, built_dashboard_html):
+        from qa_tools.common.sprint_state import dependency_data
+
+        _goto(clean_page, built_dashboard_html)
+        clean_page.evaluate("() => navigate({tier:'plans'})")
+        clean_page.wait_for_selector("details.plans-deps")
+        rows = clean_page.locator("details.plans-deps tbody tr")
+        assert rows.count() == len(dependency_data()["sprints"])
+
+    def test_it_is_collapsed_until_asked_for(self, clean_page, built_dashboard_html):
+        """The Plans tab's job is the hundred-odd entries below it. A
+        ten-row table expanded by default pushes the thing people came
+        for off the screen."""
+        _goto(clean_page, built_dashboard_html)
+        clean_page.evaluate("() => navigate({tier:'plans'})")
+        clean_page.wait_for_selector("details.plans-deps")
+        assert not clean_page.locator("details.plans-deps").evaluate("d => d.open")
+
+    def test_the_summary_names_the_worst_blocker_without_opening(
+            self, clean_page, built_dashboard_html):
+        """The single fact the whole view exists to surface, readable
+        without interacting - promotion holds up more than anything
+        else, which the sprint list alone could never show."""
+        from qa_tools.common.sprint_state import dependency_data
+
+        worst = max(dependency_data()["sprints"], key=lambda s: s["holds_up"])
+        _goto(clean_page, built_dashboard_html)
+        clean_page.evaluate("() => navigate({tier:'plans'})")
+        text = clean_page.locator("details.plans-deps summary").inner_text()
+        assert f"sprint {worst['sprint']}" in text and str(worst["holds_up"]) in text
+
+    def test_a_shared_requirement_does_not_double_count(
+            self, clean_page, built_dashboard_html):
+        """REQ-PIPE-035 is owned by two sprints. Counting per owner
+        rather than per criterion made promotion read as holding up
+        twenty when it holds up seventeen."""
+        from qa_tools.common.sprint_state import all_deferrals
+
+        _goto(clean_page, built_dashboard_html)
+        embedded = clean_page.evaluate("() => SPRINT_DEPENDENCIES")
+        most = max(s["holds_up"] for s in embedded["sprints"])
+        assert most <= len(all_deferrals())
+
+    def test_it_renders_without_console_errors(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        errors = []
+        clean_page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+        clean_page.evaluate("() => navigate({tier:'plans'})")
+        clean_page.wait_for_selector("details.plans-deps")
+        clean_page.locator("details.plans-deps summary").click()
+        clean_page.wait_for_timeout(200)
+        assert errors == []
+
+
 class TestTheDisplayStandardHoldsInARealBrowser:
     """REQ-DASH-071, built 2026-09-25.
 

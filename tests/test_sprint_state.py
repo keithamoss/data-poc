@@ -32,14 +32,29 @@ def _plan(tmp_path, entries: list[tuple[int, str, list[str]]]):
     return path
 
 
-def _register(tmp_path, reqs: list[tuple[str, str, int, list[str]]]):
+def _blocked_by(owner):
+    """A deferral's resolvable blocker, from the shorthand a test uses.
+
+    An int is a sprint, a `REQ-` string is a requirement, anything else
+    is unowned - which keeps the tests readable while still exercising
+    the real three-way shape.
+    """
+    if isinstance(owner, int):
+        return {"sprints": [owner]}
+    if isinstance(owner, str) and owner.startswith("REQ-"):
+        return {"requirements": [owner]}
+    return {"unowned": True}
+
+
+def _register(tmp_path, reqs: list[tuple[str, str, int, list]]):
     """`reqs` is (id, status, criteria count, unmet owners)."""
     out = []
     for req_id, status, n, unmet in reqs:
         out.append({
             "id": req_id, "status": status,
             "acceptance_criteria": [f"THE SYSTEM SHALL do thing {i}." for i in range(n)],
-            **({"unmet_criteria": [{"criterion": "x", "why": "y", "owner": o}
+            **({"unmet_criteria": [{"criterion": "x", "why": "y", "owner": str(o),
+                                     "blocked_by": _blocked_by(o)}
                                     for o in unmet]} if unmet else {}),
         })
     path = tmp_path / "reqs.yaml"
@@ -80,13 +95,13 @@ class TestADeferralIsNotMet:
     requirement-level count cannot see that at all."""
 
     def test_a_built_requirement_with_deferrals_is_not_complete(self, tmp_path):
-        s = _one(tmp_path, "done", [("REQ-X-001", "built", 12, ["sprint 11", "sprint 11"])])
+        s = _one(tmp_path, "done", [("REQ-X-001", "built", 12, [11, 11])])
         assert (s.met, s.total) == (10, 12)
         assert s.derived != ss.DONE
 
     def test_counting_requirements_instead_would_have_said_done(self, tmp_path):
         """The rejected design, asserted so nobody reverts to it."""
-        s = _one(tmp_path, "done", [("REQ-X-001", "built", 12, ["sprint 11"])])
+        s = _one(tmp_path, "done", [("REQ-X-001", "built", 12, [11])])
         built = all(True for _ in [1])  # every requirement IS built
         assert built and s.derived != ss.DONE
 
@@ -96,17 +111,17 @@ class TestBlocked:
     "built all of its stuff and it's waiting on someone else"."""
 
     def test_a_sprint_owing_only_deferrals_is_blocked(self, tmp_path):
-        s = _one(tmp_path, "done", [("REQ-X-001", "built", 5, ["the promotion sprint"])])
+        s = _one(tmp_path, "done", [("REQ-X-001", "built", 5, [11])])
         assert s.derived == ss.BLOCKED
 
     def test_it_names_what_it_waits_on(self, tmp_path):
-        s = _one(tmp_path, "done", [("REQ-X-001", "built", 5, ["the promotion sprint"])])
-        assert "the promotion sprint" in s.summary()
+        s = _one(tmp_path, "done", [("REQ-X-001", "built", 5, [11])])
+        assert "sprint 11" in s.summary()
 
     def test_work_of_its_own_outranks_a_deferral(self, tmp_path):
         """A sprint with an unbuilt requirement AND a deferral is
         in-progress, not blocked - somebody can still work on it."""
-        s = _one(tmp_path, "in-progress", [("REQ-X-001", "built", 5, ["elsewhere"]),
+        s = _one(tmp_path, "in-progress", [("REQ-X-001", "built", 5, [11]),
                                             ("REQ-X-002", "not_started", 3, [])])
         assert s.derived == ss.IN_PROGRESS
 
@@ -120,21 +135,30 @@ class TestBlocked:
 
 
 class TestTheSurveyRowStaysOneLine:
-    """Not a rule of the requirement - the `owner` field is free text
-    and several real entries are a paragraph recording why a deferral
-    was re-checked, which is worth having in the register and is not
-    what a survey row is for."""
+    """The row is built from resolved blockers now, not from the prose.
 
-    def test_a_paragraph_owner_is_cut_to_its_leading_clause(self):
-        assert ss._who("unowned - needs a requirement. Re-checked "
-                        "2026-09-26 and the blocker has SHIPPED: lots "
-                        "more prose follows here.") == "unowned - needs a requirement"
+    This class used to test a truncator over the free-text `owner`,
+    written the same afternoon because several owners are a paragraph.
+    REQ-DOCS-073 removed the need for it rather than improving it -
+    the labels come from `blocked_by`, so they are short by
+    construction.
+    """
 
-    def test_a_short_owner_is_left_alone(self):
-        assert ss._who("the promotion sprint (batch 4)") == "the promotion sprint (batch 4)"
-
-    def test_a_long_unpunctuated_owner_never_runs_past_the_row(self):
-        assert len(ss._who("x " * 200)) <= 60
+    def test_a_paragraph_owner_never_reaches_the_row(self, tmp_path):
+        paragraph = ("the promotion sprint (batch 4). Re-checked 2026-09-26 and "
+                      "the blocker has SHIPPED, so the reason recorded here is "
+                      "no longer the real one, and it needs a person to look.")
+        plan = _plan(tmp_path, [(1, "blocked", ["REQ-X-001"])])
+        reqs = tmp_path / "reqs.yaml"
+        reqs.write_text(yaml.safe_dump({"requirements": [{
+            "id": "REQ-X-001", "status": "built",
+            "acceptance_criteria": ["a", "b", "c"],
+            "unmet_criteria": [{"criterion": "x", "why": "y", "owner": paragraph,
+                                 "blocked_by": {"sprints": [9]}}],
+        }]}))
+        row = ss.survey(plan, reqs)[0].summary()
+        assert "sprint 9" in row
+        assert "Re-checked" not in row and len(row) <= 100
 
     def test_no_real_row_overflows(self):
         """The corpus, which is where this went wrong."""
@@ -229,6 +253,166 @@ class TestTheGate:
         from cli.check import _GATES
 
         assert any(g[0] == "sprints" for g in _GATES)
+
+
+class TestWhatCountsAsBlocked:
+    """REQ-DOCS-073 made "deferred to ANOTHER sprint" resolvable, and
+    three sprints changed state the day it landed - all three in the
+    honest direction."""
+
+    def test_an_unowned_deferral_does_not_block(self, tmp_path):
+        """Nobody is going to build it, so the sprint holding it has a
+        gap of its own rather than a dependency. Sprints 1, 6 and 7
+        were all reading `blocked` on exactly this."""
+        s = _one(tmp_path, "in-progress", [("REQ-X-001", "built", 5, ["nobody"])])
+        assert s.derived == ss.IN_PROGRESS
+
+    def test_a_deferral_to_this_sprints_own_work_does_not_block(self, tmp_path):
+        """The case prose could never tell: a requirement this sprint
+        owns is not somebody else."""
+        plan = _plan(tmp_path, [(1, "in-progress", ["REQ-X-001", "REQ-X-002"])])
+        reqs = _register(tmp_path, [("REQ-X-001", "built", 5, ["REQ-X-002"]),
+                                     ("REQ-X-002", "built", 3, [])])
+        assert ss.survey(plan, reqs)[0].derived == ss.IN_PROGRESS
+
+    def test_a_deferral_to_another_sprints_requirement_does_block(self, tmp_path):
+        plan = _plan(tmp_path, [(1, "blocked", ["REQ-X-001"]),
+                                 (2, "done", ["REQ-X-002"])])
+        reqs = _register(tmp_path, [("REQ-X-001", "built", 5, ["REQ-X-002"]),
+                                     ("REQ-X-002", "built", 3, [])])
+        assert ss.survey(plan, reqs)[0].derived == ss.BLOCKED
+
+
+class TestSharedOwnership:
+    """A REAL DEFECT, found by running the view rather than by reading
+    it. `REQ-PIPE-035` is owned by sprint 13 for schema-per-period and
+    by sprint 18 for drift; resolving a requirement to ONE sprint kept
+    whichever came last in the file and deleted sprint 13 from the
+    dependency view entirely."""
+
+    def test_a_requirement_can_be_owned_by_two_sprints(self, tmp_path):
+        # No register needed: ownership is read from the plan alone,
+        # which is the point - a requirement's owners are declared,
+        # never inferred from the register.
+        plan = _plan(tmp_path, [(1, "blocked", ["REQ-X-001"]),
+                                 (2, "blocked", ["REQ-X-001"])])
+        assert ss.owning_sprints(plan)["REQ-X-001"] == (1, 2)
+
+    def test_both_owners_appear_in_the_view(self, tmp_path):
+        plan = _plan(tmp_path, [(1, "blocked", ["REQ-X-001"]),
+                                 (2, "blocked", ["REQ-X-001"]),
+                                 (9, "todo", [])])
+        reqs = _register(tmp_path, [("REQ-X-001", "built", 4, [9])])
+        rows = ss.dependency_data(plan, reqs)["sprints"]
+        assert {r["sprint"] for r in rows} == {1, 2, 9}
+
+    def test_a_shared_criterion_is_counted_once(self, tmp_path):
+        """Not once per owning sprint. Promotion read as holding up
+        twenty criteria when it holds up seventeen."""
+        plan = _plan(tmp_path, [(1, "blocked", ["REQ-X-001"]),
+                                 (2, "blocked", ["REQ-X-001"]),
+                                 (9, "todo", [])])
+        reqs = _register(tmp_path, [("REQ-X-001", "built", 4, [9])])
+        nine = [r for r in ss.dependency_data(plan, reqs)["sprints"] if r["sprint"] == 9][0]
+        assert nine["holds_up"] == 1
+        assert nine["holds_up_sprints"] == [1, 2]
+
+
+class TestTheStaleDeferralWarning:
+    """Criteria 2 and 3."""
+
+    def test_a_deferral_whose_blocker_shipped_is_reported(self, tmp_path):
+        plan = _plan(tmp_path, [(1, "blocked", ["REQ-X-001"])])
+        reqs = _register(tmp_path, [("REQ-X-001", "built", 4, ["REQ-X-002"]),
+                                     ("REQ-X-002", "built", 3, [])])
+        found = ss.satisfied_blockers(plan, reqs)
+        assert len(found) == 1 and "REQ-X-002" in found[0]
+
+    def test_an_outstanding_blocker_is_not_reported(self, tmp_path):
+        """Guards the guard: if everything were reported the test above
+        would pass while proving nothing."""
+        plan = _plan(tmp_path, [(1, "blocked", ["REQ-X-001"])])
+        reqs = _register(tmp_path, [("REQ-X-001", "built", 4, ["REQ-X-002"]),
+                                     ("REQ-X-002", "not_started", 3, [])])
+        assert ss.satisfied_blockers(plan, reqs) == []
+
+    def test_one_outstanding_blocker_keeps_the_whole_deferral_live(self, tmp_path):
+        """A deferral naming several is only stale once ALL have
+        landed - REQ-PIPE-065 names promotion AND a built requirement,
+        and is not stale."""
+        plan = _plan(tmp_path, [(1, "blocked", ["REQ-X-001"]), (9, "todo", [])])
+        reqs = tmp_path / "reqs.yaml"
+        reqs.write_text(yaml.safe_dump({"requirements": [
+            {"id": "REQ-X-001", "status": "built",
+             "acceptance_criteria": ["a", "b", "c", "d"],
+             "unmet_criteria": [{"criterion": "x", "why": "y", "owner": "z",
+                                  "blocked_by": {"sprints": [9],
+                                                  "requirements": ["REQ-X-002"]}}]},
+            {"id": "REQ-X-002", "status": "built", "acceptance_criteria": ["a"]},
+        ]}))
+        assert ss.satisfied_blockers(plan, reqs) == []
+
+    def test_it_is_never_treated_as_met(self, tmp_path):
+        """Criterion 4, asserted rather than described. Seven deferrals
+        had blockers that shipped on 2026-09-26 and not one of them
+        turned out to be met."""
+        plan = _plan(tmp_path, [(1, "blocked", ["REQ-X-001"])])
+        reqs = _register(tmp_path, [("REQ-X-001", "built", 4, ["REQ-X-002"]),
+                                     ("REQ-X-002", "built", 3, [])])
+        s = ss.survey(plan, reqs)[0]
+        assert s.met == 3 and s.total == 4 and s.derived != ss.DONE
+
+    def test_the_gate_warns_rather_than_fails(self, monkeypatch, capsys):
+        """Criterion 3. Exercised through main() against the real
+        files, with the warning channel `mothman check` uses."""
+        monkeypatch.setattr(ss, "satisfied_blockers",
+                            lambda *a, **k: ["REQ-X-001: waits on sprint 9, which has landed"])
+        monkeypatch.setenv(ss.WARNING_EXIT_VAR, "78")
+        assert ss.main() == 78
+        assert "worth re-testing" in capsys.readouterr().out
+
+    def test_without_the_channel_it_is_a_plain_pass(self, monkeypatch):
+        """CI runs these commands directly as workflow steps, where any
+        non-zero exit fails the step."""
+        monkeypatch.setattr(ss, "satisfied_blockers",
+                            lambda *a, **k: ["REQ-X-001: waits on sprint 9, which has landed"])
+        monkeypatch.delenv(ss.WARNING_EXIT_VAR, raising=False)
+        assert ss.main() == 0
+
+
+class TestTheDependencyView:
+    """Criterion 5 - both directions."""
+
+    def test_it_says_what_a_sprint_waits_on(self, tmp_path):
+        plan = _plan(tmp_path, [(1, "blocked", ["REQ-X-001"]), (9, "todo", [])])
+        reqs = _register(tmp_path, [("REQ-X-001", "built", 4, [9])])
+        one = [r for r in ss.dependency_data(plan, reqs)["sprints"] if r["sprint"] == 1][0]
+        assert one["waits_on"] == ["sprint 9"]
+
+    def test_it_says_what_waits_on_a_sprint(self, tmp_path):
+        plan = _plan(tmp_path, [(1, "blocked", ["REQ-X-001"]), (9, "todo", [])])
+        reqs = _register(tmp_path, [("REQ-X-001", "built", 4, [9])])
+        nine = [r for r in ss.dependency_data(plan, reqs)["sprints"] if r["sprint"] == 9][0]
+        assert nine["holds_up"] == 1 and nine["holds_up_sprints"] == [1]
+
+    def test_a_requirement_no_sprint_owns_is_still_in_the_graph(self, tmp_path):
+        """A REAL HOLE in the first version, which walked the survey:
+        REQ-PIPE-068 is owned by no sprint, so its edge vanished."""
+        plan = _plan(tmp_path, [(9, "todo", [])])
+        reqs = _register(tmp_path, [("REQ-X-001", "built", 4, [9])])
+        data = ss.dependency_data(plan, reqs)
+        assert data["unowned_waits_on"] == ["sprint 9"]
+        nine = [r for r in data["sprints"] if r["sprint"] == 9][0]
+        assert nine["holds_up"] == 1 and nine["holds_up_unowned"]
+
+    def test_the_text_view_renders_the_same_data(self, tmp_path):
+        """One implementation, two renderings - the CLI and the
+        dashboard must not drift."""
+        plan = _plan(tmp_path, [(1, "blocked", ["REQ-X-001"]), (9, "todo", [])])
+        reqs = _register(tmp_path, [("REQ-X-001", "built", 4, [9])])
+        lines = ss.dependency_view(plan, reqs)
+        assert any("waits on:   sprint 9" in ln for ln in lines)
+        assert any("holds up:   1 criterion in sprint 1" in ln for ln in lines)
 
 
 class TestTheRealFiles:

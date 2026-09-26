@@ -1302,7 +1302,7 @@ the two status implementations. And **the slot is the spine**: overdue,
 staleness, assignment, classification and promotion are all defined as
 comparisons against the expected-supply sequence.
 
-1. **[blocked, 2026-09-26]** **[QA checks & contract]** **Check identity.**
+1. **[in-progress, 2026-09-26]** **[QA checks & contract]** **Check identity.**
    `REQ-QAC-039` - one hierarchy, stated once, including in a check's own
    `check_id`. BUILT 2026-09-23; that requirement now owns the decisions,
    including two the build itself turned up.
@@ -1399,7 +1399,7 @@ comparisons against the expected-supply sequence.
    gate: it is measured in slots, and slots do not exist until sprint
    6, so it belongs to `REQ-PIPE-053`.
 
-6. **[blocked, 2026-09-26]** **[Pipeline & publishing]** **Periods and
+6. **[in-progress, 2026-09-26]** **[Pipeline & publishing]** **Periods and
    slots.** All three parts BUILT, 2026-09-23. `REQ-PIPE-051`
    derives the period sequence version by version - which turned out to
    fix a real latent bug, not just add a function: authoring a second
@@ -1441,7 +1441,7 @@ comparisons against the expected-supply sequence.
    picker silently returns nothing on a quarterly asset until batch
    6.**
 
-7. **[blocked, 2026-09-26]** **[Pipeline & publishing]** **Delivery
+7. **[in-progress, 2026-09-26]** **[Pipeline & publishing]** **Delivery
    recognition and file mapping.** What constitutes a delivery for a
    given source (folder, prefix, session); the per-dataset filename
    pattern that maps a file to a table; the **hold for a human** when

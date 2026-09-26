@@ -48,7 +48,7 @@ from __future__ import annotations
 import re
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from qa_tools.common.vocab import (
     CHANGELOG_CATEGORIES,
@@ -135,6 +135,45 @@ class SignOff(_Strict):
         return v
 
 
+class BlockedBy(_Strict):
+    """What a deferred criterion is waiting on, resolvably (REQ-DOCS-073).
+
+    A LIST OF SPRINTS AND/OR A LIST OF REQUIREMENTS, not one or the
+    other (Keith, 2026-09-26). Requirement ids alone cannot express the
+    commonest case in the register - seventeen of twenty-eight
+    deferrals wait on the promotion sprint, which owns no requirement
+    yet, so there is no id to point at. Sprints alone would lose the
+    precision the free text already has, where a deferral names
+    `REQ-PIPE-062` rather than the sprint containing it.
+
+    `unowned` IS THE THIRD CASE AND IT IS EXPLICIT ON PURPOSE. Several
+    criteria are unmet while waiting on nothing at all - they need a
+    requirement written before anyone can build them. That is a
+    different thing from being blocked, and it matters: a sprint whose
+    remainder is unowned has work of its own to do, where one waiting
+    on another sprint does not. Spelling it out rather than letting two
+    empty lists mean it keeps "nobody has to do anything yet" distinct
+    from "somebody forgot to fill this in".
+    """
+
+    sprints: list[int] = []
+    requirements: list[str] = []
+    unowned: bool = False
+
+    @model_validator(mode="after")
+    def _says_something(self) -> "BlockedBy":
+        named = bool(self.sprints or self.requirements)
+        if named and self.unowned:
+            raise ValueError(
+                "cannot be both `unowned` and waiting on a named sprint or "
+                "requirement - pick whichever is true")
+        if not named and not self.unowned:
+            raise ValueError(
+                "must name at least one sprint or requirement, or say "
+                "`unowned: true`")
+        return self
+
+
 class UnmetCriterion(_Strict):
     """One acceptance criterion a `built` requirement does not meet.
 
@@ -146,17 +185,27 @@ class UnmetCriterion(_Strict):
     in it. A hole is a property of the record, not a different kind of
     record.
 
-    ALL THREE FIELDS ARE REQUIRED, and that is the point rather than
+    ALL FOUR FIELDS ARE REQUIRED, and that is the point rather than
     strictness for its own sake. "Some criteria are unmet" is what the
     prose already said, in a `decisions:` note nobody had to read; a
     record that cannot name WHICH, WHY and WHO NEXT is the same
-    sentence in a different place. `owner` is free text because the
-    next owner is as often a finding or a sprint as a person.
+    sentence in a different place.
+
+    `owner` STAYS FREE TEXT ALONGSIDE `blocked_by` rather than being
+    replaced by it (REQ-DOCS-073's own non-functional constraint). The
+    two say different things and both are worth keeping: `blocked_by`
+    is what the tooling resolves, `owner` is the sentence explaining
+    what about that blocker matters here, which an id cannot carry.
+    The register already proved the prose alone insufficient - seven
+    deferrals pointed at work that had since shipped and nothing could
+    tell, because "waiting on X" and "was waiting on X, which has
+    landed" are indistinguishable to anything reading prose.
     """
 
     criterion: NonEmptyStr
     why: NonEmptyStr
     owner: NonEmptyStr
+    blocked_by: BlockedBy
 
 
 class Requirement(_Strict):

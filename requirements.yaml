@@ -1067,7 +1067,15 @@ requirements:
           from one. Moving them is a real piece of work rather than a
           repoint, and delivery sprint 15 rebuilds how QA is invoked
           anyway. Flagged rather than quietly counted as done.
-        owner: Keith, to place at sprint 15 or sooner
+        owner: >
+          Keith, to place at sprint 15 or sooner - and `unowned` rather
+          than sprint 15 is his own call, 2026-09-26, when the
+          resolvable field was introduced. Sprint 15 is where it would
+          most naturally land, not what it is waiting for: nothing in
+          that sprint has to finish before this can be picked up, it
+          needs a decision about when.
+        blocked_by:
+          unowned: true
     linked_tests:
       - tests/test_supply_db.py
       - tests/test_build_warehouses_rebuild.py
@@ -1515,6 +1523,8 @@ requirements:
           this to read, and this requirement may never open data/ or
           re-run the rule. Re-check when filings are recorded.
         owner: the promotion sprint (batch 4)
+        blocked_by:
+          sprints: [11]
       - criterion: >
           Criterion 1, in part - a slot closed by monotonic filling and
           left unfilled produces no item. The derivation is built and
@@ -1526,6 +1536,8 @@ requirements:
           none can therefore be closed-and-unfilled. Built against the
           real rule rather than stubbed, so it lights up on its own.
         owner: the promotion sprint (batch 4)
+        blocked_by:
+          sprints: [11]
       - criterion: >
           Criterion 9, in part - the uncertain-filing qualifier is
           rendered at all three sites an assignment appears (the Tier 2
@@ -1540,6 +1552,8 @@ requirements:
           when the writer turns on is written by somebody who has
           forgotten why the shape is what it is.
         owner: the promotion sprint (batch 4)
+        blocked_by:
+          sprints: [11]
     decisions:
       - >
         SETTLED 2026-09-24 (Keith), option (a) of two: ONE REQUIREMENT
@@ -3101,6 +3115,8 @@ requirements:
           last_promoted() returns None and says so in words rather than
           approximating. REQ-DASH-056 cannot be computed until this lands.
         owner: batch 4 (Thread G's decision log)
+        blocked_by:
+          sprints: [12]
     evidence:
       - >
         2026-09-25: built against the real committed history rather than a
@@ -3447,6 +3463,8 @@ requirements:
           period into committed QA history. Turning it on is one call
           at the top of each orchestrator once filings are recorded.
         owner: the promotion sprint (batch 4)
+        blocked_by:
+          sprints: [11]
       - criterion: >
           Criteria 6, 7 and 8 - red-for-unrun - are built as a decision
           function with its own tests, but no check's verdict is
@@ -3459,6 +3477,8 @@ requirements:
           starts life red on all its drift checks, which is how people
           learn to ignore a signal.
         owner: the promotion sprint (batch 4)
+        blocked_by:
+          sprints: [11]
       - criterion: >
           Criterion 9's temporal reference resolves a PERIOD schema, and
           today's drift check still compares against a fixed reference
@@ -3468,6 +3488,8 @@ requirements:
           reference_view() is built, tested as a real cross-schema VIEW
           rather than a copy, and is what the drift check moves onto.
         owner: the promotion sprint (batch 4)
+        blocked_by:
+          sprints: [11]
     decisions:
       - >
         SCOPE NARROWED 2026-09-24 (Keith), in a requirement already
@@ -3856,6 +3878,8 @@ requirements:
           exists - what is missing is the mixed-period case, which
           cannot arise until something files.
         owner: the promotion sprint (batch 4)
+        blocked_by:
+          sprints: [11]
     decisions:
       - >
         Rejected scoping each TOOL INVOCATION to one dataset (Keith,
@@ -4153,6 +4177,8 @@ requirements:
           exactly as every other check is, against the run's own view
           schema.
         owner: the promotion sprint (batch 4)
+        blocked_by:
+          sprints: [11]
       - criterion: >
           Criteria 4 and 5 - re-evaluating a cross-table check when a
           table it depends on arrives, only within the same period, and
@@ -4165,6 +4191,8 @@ requirements:
           reads_tables declares which tables each check reads, which is
           what a re-evaluation trigger will be keyed on.
         owner: the promotion sprint (batch 4)
+        blocked_by:
+          sprints: [11]
     decisions:
       - >
         A CHECK RENDERED IN A POOLED SECTION IS KEYED BY ITS OWN COLUMN
@@ -4816,6 +4844,8 @@ requirements:
           hand-maintained contract-filename map that was the same shape has
           gone (post-build-review #36, 2026-09-25); the literals have not.
         owner: "post-build-review #36"
+        blocked_by:
+          unowned: true
     source: >
       Keith's own question, 2026-09-20 - "what is it that actually
       groups Child Protection data together as a collection?" - and the
@@ -6797,6 +6827,8 @@ requirements:
           rather than claimed, because a vacuous pass reads identically
           to a real one in a register.
         owner: REQ-GEN-044
+        blocked_by:
+          requirements: [REQ-GEN-044]
     decisions:
       - Decided the map carries COORDINATES and the dashboard constructs
         the LINK (Keith's own framing, 2026-09-22). The generator knows
@@ -6931,6 +6963,8 @@ requirements:
           criterion 4 passing properly and criterion 2 passing
           vacuously, and those read identically in a register.
         owner: REQ-GEN-044
+        blocked_by:
+          requirements: [REQ-GEN-044]
     decisions:
       - Decided this is a separate requirement from the map's
         generation, because the two are verified in entirely different
@@ -8316,6 +8350,8 @@ requirements:
           NOTES a dataset with no slots and carries on where these
           require it to FAIL for that dataset, and assign() raises
           nothing on an empty slot list.
+        blocked_by:
+          unowned: true
       - criterion: THE SYSTEM SHALL fail at filing, before QA runs for that dataset.
         why: Same filing layer - there is no filing step to fail before.
         owner: >
@@ -8327,6 +8363,8 @@ requirements:
           NOTES a dataset with no slots and carries on where these
           require it to FAIL for that dataset, and assign() raises
           nothing on an empty slot list.
+        blocked_by:
+          unowned: true
       - criterion: >-
           THE SYSTEM SHALL scope that failure to the affected dataset, and SHALL
           NOT stop processing any other dataset.
@@ -8340,6 +8378,8 @@ requirements:
           NOTES a dataset with no slots and carries on where these
           require it to FAIL for that dataset, and assign() raises
           nothing on an empty slot list.
+        blocked_by:
+          unowned: true
       - criterion: >-
           THE SYSTEM SHALL state, in that message, how many supplies are waiting
           and since when, and SHALL NOT state how many days have elapsed.
@@ -8356,6 +8396,8 @@ requirements:
           NOTES a dataset with no slots and carries on where these
           require it to FAIL for that dataset, and assign() raises
           nothing on an empty slot list.
+        blocked_by:
+          unowned: true
       - criterion: >-
           WHEN a run skips a dataset because its schedule is exhausted, THE
           SYSTEM SHALL state in that run's own summary how many datasets were
@@ -8370,6 +8412,8 @@ requirements:
           NOTES a dataset with no slots and carries on where these
           require it to FAIL for that dataset, and assign() raises
           nothing on an empty slot list.
+        blocked_by:
+          unowned: true
     source: >
       Keith, 2026-09-21, plans/supply-model.md Thread C - "exhausted
       schedule - hard failure, scoped per dataset", stronger than the
@@ -9275,6 +9319,8 @@ requirements:
           (`f"{run_id_prefix}{index:03d}"`) exactly as criterion 18
           forbids. The replacement the deferral said it lacked now
           exists.
+        blocked_by:
+          unowned: true
     linked_tests:
       - tests/test_arrivals.py
       - tests/test_cli_supply.py
@@ -9931,6 +9977,8 @@ requirements:
           on is a filing to present, and REQ-PIPE-062's filings are not
           recorded until promotion exists. The dashboard was never the
           blocker.
+        blocked_by:
+          sprints: [11]
     decisions:
       - "Decided staging is a SCHEMA IN THE WAREHOUSE (Keith, 2026-09-23). Thread B said 'everything lands in staging on arrival' without saying where staging physically is, and the natural reading of 'promotion moves it into a period schema' is that staging sits somewhere else. It does not. Data is loaded as soon as it can be, checks run on it there, and the only thing not loaded is a file that cannot be read at all."
       - "Decided ONE GLOBAL staging schema rather than one mirroring slots or periods, and the REASON is recorded here because REQ-PIPE-034 records the departure from Keith's operational system without it - which is the worst combination, since a later session sees the difference, finds no argument, and corrects it back. A supply's slot is not known when it lands, and deferring that is the whole point of staging. A slot-mirrored staging schema forces the slot to be named at LOAD time. Three cases have no slot to name at all: an early supply not yet inside its claim window, a supply held because nothing is confidently claimable, and a mixed-period delivery. A mirror would need an unassigned schema alongside it, ending up with global AND mirrors. Keith's own summary on agreeing: we don't know where it should go, or indeed we need a human to make a decision."
@@ -10460,6 +10508,8 @@ requirements:
           as data. filing.file_arrivals() is the single call that turns it
           on, and both orchestrators carry a comment saying so.
         owner: the promotion sprint (batch 4)
+        blocked_by:
+          sprints: [11]
     evidence:
       - >
         2026-09-25: both cascades are tested as REAL SEQUENCES rather than
@@ -10711,6 +10761,8 @@ requirements:
           to skip. Satisfied today by there being nothing to do it wrong,
           which is not the same as satisfied. Re-check when promotion lands.
         owner: the promotion sprint (batch 4)
+        blocked_by:
+          sprints: [11]
     evidence:
       - >
         2026-09-25: the refusal is tested against a CONTROL that must not be
@@ -10837,6 +10889,9 @@ requirements:
           approximated from arrival state, which would report the wrong
           instant.
         owner: the promotion sprint (batch 4), with REQ-DASH-070 for the UI
+        blocked_by:
+          sprints: [11]
+          requirements: [REQ-DASH-070]
     evidence:
       - >
         2026-09-25: the ambiguity mark is tested against a CONTROL that must
@@ -10943,6 +10998,8 @@ requirements:
           filing there is no slot, so every real supply would classify as
           UNFILED - correct by criterion 8 and useless as a record.
         owner: the promotion sprint (batch 4)
+        blocked_by:
+          sprints: [11]
       - criterion: >-
           Criteria 10 and 11 - retiring the arrival-date derivation, and
           retiring the path that blanks a resupply's recorded classification
@@ -10958,6 +11015,8 @@ requirements:
           derivation is live. Both retirements are one change with the
           recording above, not before it.
         owner: the promotion sprint (batch 4)
+        blocked_by:
+          sprints: [11]
       - criterion: >-
           Criterion 12, in part - the arrival block's `earliest_extract`
           survives.
@@ -10970,6 +11029,8 @@ requirements:
           arrival time, so it goes when our own receipt instant replaces it -
           in the same change as the rest.
         owner: the promotion sprint (batch 4)
+        blocked_by:
+          sprints: [11]
     evidence:
       - >
         2026-09-25: both failures of the derivation this replaces are tested
@@ -11121,6 +11182,9 @@ requirements:
           as done, because "computed correctly" and "shown correctly" are
           different claims and this requirement makes both.
         owner: the promotion sprint (batch 4), with REQ-DASH-070 for the UI
+        blocked_by:
+          sprints: [11]
+          requirements: [REQ-DASH-070]
     evidence:
       - >
         2026-09-25: the fixture deliberately STARTS FROM THE WRONG ANSWER and
@@ -11648,13 +11712,16 @@ requirements:
       blocker ships I am told the deferral is now worth re-testing
       instead of it sitting there being quietly wrong.
     moscow: should
-    status: not_started
+    status: built
     source: >
       Keith, 2026-09-26 - "I'm keen to be able to better track
       dependencies between sprints, well, between the bits of sprints."
       Prompted by finding that seven deferrals in the register already
       point at requirements that have since been built, so the register
       understates its own progress and nothing says so.
+    signed_off:
+      by: Keith
+      date: "2026-09-26"
     acceptance_criteria:
       - THE SYSTEM SHALL record, for each entry in unmet_criteria, what
         that criterion waits on, as a list of sprint numbers and/or a
@@ -11684,6 +11751,75 @@ requirements:
       - The existing free-text reasoning on each deferral is kept - it
         carries WHY, which a resolvable id does not.
     dependencies: [REQ-DOCS-072]
+    linked_tests:
+      - tests/test_sprint_state.py
+      - tests/test_validate_requirements.py
+      - tests/test_cli_plans.py
+      - tests/test_dashboard_e2e.py::TestTheDependencyViewInThePlansTab
+    implemented_by:
+      - qa_tools/common/schemas.py::BlockedBy
+      - qa_tools/common/sprint_state.py::Deferral
+      - qa_tools/common/sprint_state.py::owning_sprints
+      - qa_tools/common/sprint_state.py::all_deferrals
+      - qa_tools/common/sprint_state.py::satisfied_blockers
+      - qa_tools/common/sprint_state.py::dependency_data
+      - qa_tools/common/sprint_state.py::dependency_view
+      - qa_tools/common/validate_requirements.py::_sprint_numbers
+      - cli/plans.py::dependencies_command
+      - dashboard/embed_dashboard_data.py::embed
+    evidence:
+      - >
+        2026-09-26: all 28 deferrals in the register were migrated to
+        carry `blocked_by`, and the migration is asserted to have
+        changed NOTHING else - the script re-parses the file and
+        compares it to the original with only `blocked_by` removed.
+        61 insertions, zero deletions in the diff. Of the 28, 18 name
+        a sprint, 4 name a requirement and 8 are `unowned`;
+        seventeen of the eighteen are the promotion sprint.
+      - >
+        2026-09-26: THREE SPRINTS CHANGED STATE the moment the blocker
+        became resolvable, all in the honest direction. Sprints 1, 6
+        and 7 read `blocked` on deferrals whose `owner` prose said
+        "unowned - needs a requirement" or "the next session to pick
+        it up" - neither of which is another sprint, so nothing was
+        coming and the sprints have real work of their own. They now
+        read `in-progress`. The counted tally moved from 10 blocked /
+        5 done / 1 in-progress / 9 todo to 7 / 5 / 4 / 9.
+      - >
+        2026-09-26: A REAL DEFECT found by running the view rather
+        than reading it. `REQ-PIPE-035` is owned by sprint 13 for
+        schema-per-period AND by sprint 18 for drift - both claims
+        real - and resolving a requirement to ONE sprint silently kept
+        whichever came last in the file, deleting sprint 13 from the
+        dependency view. Ownership is a tuple now. A second defect
+        from the same shape: counting held criteria per OWNING SPRINT
+        rather than per criterion made promotion read as holding up 20
+        when it holds up 17. Both covered by TestSharedOwnership.
+      - >
+        2026-09-26: A SECOND REAL DEFECT, in the CLI, also found by
+        running it. The view writes a sprint's state in square
+        brackets and Rich parses those as a style tag - `[blocked]` is
+        not a style, so it was dropped and every row rendered with its
+        status missing. Fixed by printing `Text` rather than a markup
+        string; the test was written first and confirmed failing
+        against the bug.
+      - >
+        2026-09-26: the stale-deferral warning is asserted NOT TO PASS
+        VACUOUSLY. Nothing in the register is stale today - every
+        deferral naming a built requirement also names the promotion
+        sprint, which is not done - so a fixture holds a deferral
+        whose only blocker IS built and asserts it is reported, and
+        its twin asserts an outstanding blocker is not. A third
+        asserts that one outstanding blocker among several keeps the
+        whole deferral live.
+      - >
+        2026-09-26: criterion 4 is asserted rather than described -
+        a deferral whose blocker has shipped still counts as UNMET,
+        so the sprint holding it does not read `done`. The gate
+        returns the warning exit only when `mothman check` asks for
+        it, and a plain 0 otherwise, because CI runs the same command
+        directly as a workflow step where any non-zero fails it.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     decisions:
       - >
         THE BLOCKER IS A LIST OF SPRINT NUMBERS AND/OR A LIST OF
@@ -11738,6 +11874,28 @@ requirements:
         everywhere else. Proved by the 2026-09-26 re-check: seven
         deferrals had blockers that shipped and NOT ONE of them turned
         out to be met.
+      - >
+        A SPRINT NAMED AS THE LIKELY LANDING PLACE IS NOT A BLOCKER
+        (Keith, 2026-09-26, on REQ-PIPE-068's own deferral). Its
+        `owner` read "Keith, to place at sprint 15 or sooner" and the
+        migration first mapped that to sprint 15, which reads as a
+        dependency and is not one - nothing in sprint 15 has to finish
+        before the work can start; it needs a scheduling decision.
+        `unowned` says that, and the distinction matters precisely
+        because the whole point of the field is that a blocker
+        shipping is a signal. A sprint 15 that finished would have
+        raised a re-test prompt for a criterion nothing had unblocked.
+      - >
+        OWNERSHIP OF A REQUIREMENT IS SHARED, NOT EXCLUSIVE, found by
+        building this (2026-09-26) rather than decided in advance.
+        REQ-DOCS-072's `**Owns:**` line assumed one sprint per
+        requirement; `REQ-PIPE-035` is owned by sprint 13 for
+        schema-per-period and by sprint 18 for drift and trend, and
+        both claims are real. Rejected forcing exclusivity by editing
+        the plan, which would have made one of the two sprints lie
+        about its own scope to suit a data structure. Rejected also
+        keeping a single owner and picking the first - it is the same
+        arbitrary choice as the last, just less visible.
       - >
         A REGEX OVER THE PROSE CANNOT DO THIS, which is why criterion 1
         asks for a resolvable field rather than better parsing.

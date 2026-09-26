@@ -187,6 +187,7 @@ import re
 
 from dashboard.changelog_yaml import parse_changelog
 from dashboard.plans_md import parse_plans
+from qa_tools.common.sprint_state import dependency_data
 from dashboard.requirements_yaml import parse_requirements
 from qa_tools.common import asset_time
 from qa_tools.common import hierarchy
@@ -461,6 +462,15 @@ def embed() -> None:
     html = _replace_const(html, "PLANS", json.dumps(plans, separators=(",", ":")))
     print(f"Re-embedded PLANS = {len(plans['items'])} items, "
           f"{len(plans['threads'])} threads")
+
+    # REQ-DOCS-073. Computed by the same function `mothman plans
+    # dependencies` renders, never re-derived in the page's own JS -
+    # see the template's own const comment for why that matters here.
+    deps = dependency_data()
+    html = _replace_const(html, "SPRINT_DEPENDENCIES",
+                           json.dumps(deps, separators=(",", ":")))
+    print(f"Re-embedded SPRINT_DEPENDENCIES = {len(deps['sprints'])} sprint(s) "
+          f"in the graph, {len(deps['stale'])} deferral(s) worth re-testing")
 
     if os.path.exists(DEMO_CAST_PATH):
         with open(DEMO_CAST_PATH) as f:

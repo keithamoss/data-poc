@@ -1673,6 +1673,24 @@ const LEADERBOARD = [];
 // drawer.
 const PLANS = {items:[], threads:[]};
 
+// SPRINT_DEPENDENCIES — REQ-DOCS-073's dependency view: which delivery
+// sprint is waiting on which, derived from each deferred acceptance
+// criterion's own `blocked_by`. Same "null here, real data only in the
+// built output" treatment as every other const above.
+//
+// COMPUTED IN PYTHON AND EMBEDDED, never re-derived here, and that is
+// deliberate rather than convenient. qa_tools/common/sprint_state.py's
+// dependency_data() is the single implementation; the CLI's `mothman
+// plans dependencies` renders the same structure. This page has
+// already paid once for a shared rule implemented twice - four
+// independent copies of the status logic, one of which rendered a
+// check with fourteen real violations green.
+//
+// Shape: {sprints: [{sprint, status, met, total, waits_on, holds_up,
+// holds_up_sprints, holds_up_unowned}], unowned_waits_on: [...],
+// stale: [...]}.
+const SPRINT_DEPENDENCIES = null;
+
 // DEMO_CAST — plans/tooling.md #1 Phase 6's "Demo" tab: a real recording
 // of the actual mothman CLI/TUI (Quality Assurance wizard, Birth
 // Registrations, Synthetic mode - scoped via AskUserQuestion with Keith,
@@ -5489,6 +5507,73 @@ function renderPlansList(){
   });
 }
 
+// REQ-DOCS-073 criterion 6 - the dependency view, in the tab where the
+// plan itself is read rather than only in a terminal. Renders
+// SPRINT_DEPENDENCIES, which qa_tools/common/sprint_state.py computed
+// at build time; nothing here re-derives it.
+//
+// COLLAPSED BY DEFAULT. The Plans tab's job is the 100+ entries below
+// it, and a ten-row table above them pushes the thing people came for
+// off the screen. It opens to a one-line summary naming the sprint
+// that blocks the most, which is the single fact the whole view exists
+// to surface.
+function renderSprintDependencies(){
+  const data = SPRINT_DEPENDENCIES;
+  if(!data || !(data.sprints||[]).length) return "";
+  const rows = data.sprints.map(s=>{
+    const counts = s.total === null ? "not scoped yet" : `${s.met}/${s.total}`;
+    const waits = (s.waits_on||[]).length
+      ? s.waits_on.map(w=>escHtml(w)).join(", ")
+      : `<span style="color:var(--ink-faint);">—</span>`;
+    let holds = `<span style="color:var(--ink-faint);">—</span>`;
+    if(s.holds_up){
+      const where = (s.holds_up_sprints||[]).map(n=>`sprint ${n}`);
+      if(s.holds_up_unowned) where.push("work no sprint owns");
+      holds = `<b>${s.holds_up}</b> ${s.holds_up===1?"criterion":"criteria"} in ${escHtml(where.join(", "))}`;
+    }
+    return `<tr>
+      <td style="white-space:nowrap;">Sprint ${s.sprint} ${
+        // `unscoped` is a fact about this view, not a plans status, so
+        // it does NOT go into PLANS_STATUS_LABEL - REQ-DOCS-072's own
+        // constraint was that exactly one word joined that vocabulary.
+        s.status === "unscoped"
+          ? `<span class="pill nodata sm"><span class="ico"></span>Not scoped</span>`
+          : plansStatusPill(s.status)}</td>
+      <td style="white-space:nowrap; color:var(--ink-muted);">${counts}</td>
+      <td>${waits}</td>
+      <td>${holds}</td>
+    </tr>`;
+  }).join("");
+  const orphans = (data.unowned_waits_on||[]).length
+    ? `<div style="margin-top:8px; font-size:12px; color:var(--ink-muted);">
+        Requirements no sprint owns are waiting too, on ${data.unowned_waits_on.map(w=>escHtml(w)).join(", ")}.
+      </div>` : "";
+  // A blocker that has since shipped is a prompt to re-test, never a
+  // claim that the criterion is met - see REQ-DOCS-073's own decision.
+  const stale = (data.stale||[]).length
+    ? `<div style="margin-top:10px; padding:8px 10px; border:1px dashed var(--amber); border-radius:6px; font-size:12px;">
+        <b>Worth re-testing</b> — every blocker below has since been delivered, which means
+        the criterion <em>can</em> now be met, not that it has been.
+        <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${data.stale.map(s=>`<li>${escHtml(s)}</li>`).join("")}</ul>
+      </div>` : "";
+  const worst = [...data.sprints].sort((a,b)=> (b.holds_up||0) - (a.holds_up||0))[0];
+  const headline = worst && worst.holds_up
+    ? `sprint ${worst.sprint} holds up ${worst.holds_up} ${worst.holds_up===1?"criterion":"criteria"}`
+    : "nothing is blocking anything else";
+  return `<details class="plans-deps" style="margin:0 0 14px;">
+    <summary style="cursor:pointer; font-size:13px;">
+      <b>What is waiting on what</b>
+      <span style="color:var(--ink-muted);"> — ${escHtml(headline)}</span>
+    </summary>
+    <table class="tbl" style="margin-top:10px; font-size:12.5px;">
+      <thead><tr><th>Sprint</th><th>Criteria met</th><th>Waits on</th><th>Holds up</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${orphans}
+    ${stale}
+  </details>`;
+}
+
 function renderPlans(view){
   setRail([{tier:"Tier 1", label:"Plans", nav:{tier:"plans"}}]);
   view.innerHTML = `
@@ -5498,6 +5583,7 @@ function renderPlans(view){
         <div class="view-sub">This project's own planning memory (<code>plans/*.md</code>) - real design decisions, open questions, and build history, browsable here instead of only on GitHub.</div>
       </div>
     </div>
+    ${renderSprintDependencies()}
     ${renderPlansFilterBar()}
     <div id="plans-count" class="plans-count"></div>
     <div id="plans-list"></div>

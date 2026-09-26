@@ -3649,3 +3649,72 @@ twice. It deliberately did not re-find the `TypeError`.
     after the fact found six call sites, of which two were sections.
     A new member of a closed set is a shape change, and the same
     enumeration applies.
+
+62. **[done, 2026-09-26]** **[Testing & dev tooling]** **Ten tests
+    were silently skipping in CI, including the whole data-layer
+    coverage for cross-table checks - shipped that same morning.**
+
+    **Found while waiting on a subagent**, from Keith's own question
+    "anything small we can do while we wait", by auditing what the
+    suite asserts against real trees rather than fixtures. The audit
+    was prompted by `CLAUDE.md`'s own standing warning about tests
+    that pass locally and fail on a fresh clone; this turned out to
+    be the OTHER half of that warning, which that bullet does not
+    cover: a test that neither passes nor fails, and reports green.
+
+    **The shape.** `reports/*.json` is gitignored build output. Ten
+    tests across three files guard on it and call `pytest.skip` when
+    it is absent:
+
+    - `tests/test_cross_table_scope.py` - 6 (four tests, one
+      parametrised ×3). This is `REQ-QAC-037`'s entire data-layer
+      coverage.
+    - `tests/test_asset_time_semantics.py` - 3, through a fixture.
+    - `tests/test_history_rekey.py` - 1, `REQ-PIPE-038`'s
+      duplicate-key guard.
+
+    `.github/workflows/test.yml` had no build step, so a freshly
+    cloned runner has no `reports/` and every one of them skipped.
+
+    **Why it was invisible, and why it is worse than a red test.**
+    Locally they run, because a developer has built. In CI they
+    reported green while proving nothing, and a skip does not fail a
+    build or show up in a summary anybody reads. Nondeterministically,
+    too: `tests/test_dashboard_e2e.py`'s session fixture DOES build
+    `reports/`, so whether these tests execute depended on whether
+    that module's worker happened to get there first - and under
+    `--dist loadfile` it is a different worker.
+
+    **Verified by reproducing the runner's condition** rather than
+    reasoned about: move `reports/` aside, run the three files, watch
+    ten skip. Then with the fix in place, from the same reports-less
+    tree, all 59 pass and nothing skips.
+
+    **Fixed** by running the same CI-safe chain `deploy-pages.yml`
+    already runs - `mothman dashboard rebuild-results` then `mothman
+    dashboard build-data` - as a step in the test job before pytest.
+    Both read committed `qa_results/` history only and never open
+    `data/` or a warehouse, so the standing rule holds. Chosen over a
+    shared session fixture in `conftest.py`, which would have to
+    survive several workers racing to write the same real files - the
+    race `plans/tooling.md` #10 already recorded and `--dist loadfile`
+    only avoids because each file's tests stay on one worker. A CI
+    step has no such problem.
+
+    **Two smaller findings from the same audit, neither fixed:**
+
+    - `tests/test_run_id_guard.py:111` skips when no deliveries are on
+      disk. CI must never build data, so that test gives ZERO CI
+      coverage by design. Defensible, but it should be known rather
+      than assumed - noted here rather than changed.
+    - `tests/test_history_rekey.py:310,328` guard on `qa_results/`,
+      which is committed and therefore always present. The skip can
+      never fire. Harmless, but it reads as a real precondition and is
+      not one.
+
+    **The standing lesson**, and it is a genuine addition to the fresh-
+    clone rule `CLAUDE.md` already carries: when a test guards on a
+    build artifact, ask what it does on a runner that has never built
+    one. "Fails" is the answer that rule anticipates and is the SAFE
+    one - somebody sees it. "Skips" is the dangerous one, because the
+    suite stays green and the coverage quietly leaves.

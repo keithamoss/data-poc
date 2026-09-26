@@ -44,12 +44,14 @@ from __future__ import annotations
 
 import ast
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 import yaml
 from pydantic import ValidationError
 
 from qa_tools.common.schemas import Requirement, format_error
+from qa_tools.common.sprint_state import SPRINTS_FILE, parse_sprints
 from qa_tools.common.vocab import COMPONENT_CODES
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -195,6 +197,17 @@ def _schema_errors(raw: list[dict]) -> tuple[list[str], list[Requirement]]:
     return errors, ok
 
 
+@lru_cache(maxsize=1)
+def _sprint_numbers() -> frozenset[int]:
+    """Every sprint number the delivery plan actually has.
+
+    Read once per process: the plan does not change under a running
+    validator, and the alternative is re-parsing a 1,800-line markdown
+    file for each of the register's deferrals.
+    """
+    return frozenset(number for number, _tag, _owns in parse_sprints())
+
+
 def _cross_reference_errors(requirements: list[Requirement]) -> list[str]:
     """The half no schema library can express - claims checked against
     the real codebase and against the rest of the document.
@@ -235,6 +248,20 @@ def _cross_reference_errors(requirements: list[Requirement]) -> list[str]:
             if dep not in all_ids:
                 errors.append(f"{r.id}: dependencies entry {dep!r} does not match any real "
                                f"requirement id in this file")
+        # REQ-DOCS-073 criterion 7. A blocker nothing can resolve is
+        # worse than free text, because free text at least does not
+        # claim to be checkable - and a typo'd id silently drops the
+        # deferral out of every dependency view that looks it up.
+        for i, u in enumerate(r.unmet_criteria):
+            where = f"{r.id}: unmet_criteria[{i}].blocked_by"
+            for dep in u.blocked_by.requirements:
+                if dep not in all_ids:
+                    errors.append(f"{where} names {dep!r}, which is not a requirement id "
+                                   f"in this file")
+            for number in u.blocked_by.sprints:
+                if number not in _sprint_numbers():
+                    errors.append(f"{where} names sprint {number}, which is not a sprint in "
+                                   f"{SPRINTS_FILE.name}")
     return errors
 
 

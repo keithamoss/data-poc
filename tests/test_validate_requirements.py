@@ -540,7 +540,8 @@ def test_a_built_requirement_may_declare_unmet_criteria():
     entry = _valid_entry(unmet_criteria=[
         {"criterion": "surface the low-runway warning in the dashboard",
          "why": "the gate half shipped; the dashboard half was never built",
-         "owner": "post-build-review #2"},
+         "owner": "post-build-review #2",
+         "blocked_by": {"unowned": True}},
     ])
     assert validate([entry]) == []
 
@@ -565,8 +566,67 @@ def test_a_requirement_that_is_not_started_cannot_have_unmet_criteria():
     make the field mean two different things."""
     entry = _valid_entry(status="not_started", linked_tests=[], implemented_by=[],
                          evidence=[], decisions=[], signed_off=None,
-                         unmet_criteria=[{"criterion": "x", "why": "y", "owner": "z"}])
+                         unmet_criteria=[{"criterion": "x", "why": "y", "owner": "z",
+                                           "blocked_by": {"unowned": True}}])
     assert validate([entry])
+
+
+# ---- blocked_by (REQ-DOCS-073) --------------------------------------
+#
+# `owner` was already a dependency edge - "the promotion sprint (batch
+# 4)" - and nothing could resolve it, so seven deferrals sat pointing
+# at work that had shipped and the register understated its own
+# progress. These cover the resolvable half.
+
+def _deferral(**blocked_by):
+    return _valid_entry(unmet_criteria=[
+        {"criterion": "x", "why": "y", "owner": "z", "blocked_by": blocked_by}])
+
+
+def test_a_deferral_must_say_what_it_waits_on():
+    """Omitting it is refused rather than defaulted: a deferral with no
+    blocker is a real state (`unowned`) and must be said out loud, not
+    arrived at by leaving a field off."""
+    assert validate([_valid_entry(unmet_criteria=[
+        {"criterion": "x", "why": "y", "owner": "z"}])])
+
+
+def test_a_sprint_that_does_not_exist_is_refused():
+    """Criterion 7. Silent in the worst direction otherwise - a typo'd
+    number drops the deferral out of every view that resolves it."""
+    problems = validate([_deferral(sprints=[999])])
+    assert problems and "999" in problems[0]
+
+
+def test_a_requirement_that_does_not_exist_is_refused():
+    problems = validate([_deferral(requirements=["REQ-NOPE-999"])])
+    assert problems and "REQ-NOPE-999" in problems[0]
+
+
+def test_a_real_sprint_is_accepted():
+    """Guards the guard: if every sprint number were rejected, the test
+    above would pass while proving nothing."""
+    assert validate([_deferral(sprints=[11])]) == []
+
+
+def test_it_may_name_both_a_sprint_and_a_requirement():
+    """Keith, 2026-09-26 - and/or, not either/or. Seventeen deferrals
+    wait on a sprint that owns no requirement, so ids alone cannot
+    express them; naming a requirement is more precise where one
+    exists."""
+    entry = _deferral(sprints=[11])
+    entry["unmet_criteria"][0]["blocked_by"]["requirements"] = [entry["id"]]
+    assert validate([entry]) == []
+
+
+def test_empty_is_refused_rather_than_read_as_unowned():
+    """`unowned` says nobody has it; two empty lists say somebody
+    forgot to fill this in. Keeping them distinct is the point."""
+    assert validate([_deferral()])
+
+
+def test_unowned_cannot_also_name_a_blocker():
+    assert validate([_deferral(unowned=True, sprints=[11])])
 
 
 def test_omitting_it_entirely_is_still_valid():
