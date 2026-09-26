@@ -39,12 +39,52 @@ DATASET_ID = hierarchy.dataset_for_table("cp_notifications").dataset_id
 REFERENCE_RUN_ID = "cp_run_01_2026-07-06"
 
 
+_COLUMN = "concern_type"
+
+
+def _csv_frame(run_id: str):
+    return read_csv_explicit_nulls(
+        os.path.join(CP_RAW_DIR, run_id, "cp_notifications.csv"), _NULL_VALUES)[[_COLUMN]]
+
+
+def _current_frame(run_id: str):
+    """This run's column, from the warehouse - see the BDM counterpart.
+    Falls back to the CSV only where the run has no view schema."""
+    import pandas as pd
+
+    from qa_tools.common import supply_db
+
+    try:
+        with supply_db.connect(read_only=True, label="mothman:evidently-cp") as conn:
+            conn.execute(f'SET search_path TO "{supply_db.run_schema(run_id)}"')
+            rows = conn.execute(f"SELECT {_COLUMN} FROM cp_notifications").fetchall()
+        return pd.DataFrame({_COLUMN: [r[0] for r in rows]})
+    except Exception:
+        return _csv_frame(run_id)
+
+
+def _reference_frame(reference_run_id: str):
+    """Rebuilt from what that run RECORDED, so its rows need not be
+    found - see qa_tools/common/evidently_common.py for why that is
+    exact for a categorical column."""
+    from qa_tools.common.evidently_common import (
+        frame_from_value_counts, reference_value_counts,
+    )
+
+    counts = reference_value_counts(
+        cp_common.AGENCY_ID, cp_common.COLLECTION_ID, reference_run_id, _COLUMN)
+    if counts:
+        return frame_from_value_counts(counts, _COLUMN)
+    return _csv_frame(reference_run_id)
+
+
 def evaluate_evidently_cp(run_id: str, run_timestamp: str,
                                 reference_run_id: str = REFERENCE_RUN_ID) -> list[dict]:
-    reference = read_csv_explicit_nulls(
-        os.path.join(CP_RAW_DIR, reference_run_id, "cp_notifications.csv"), _NULL_VALUES)[["concern_type"]]
-    current = read_csv_explicit_nulls(
-        os.path.join(CP_RAW_DIR, run_id, "cp_notifications.csv"), _NULL_VALUES)[["concern_type"]]
+    """Reads the warehouse for the current run and the RECORDED
+    distribution for the reference (REQ-QAC-088, 2026-09-27) - the BDM
+    counterpart carries the full account."""
+    reference = _reference_frame(reference_run_id)
+    current = _current_frame(run_id)
     n_total = len(current)
 
     psi, psi_snapshot = compute_psi(current, reference, "concern_type")

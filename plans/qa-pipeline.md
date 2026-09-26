@@ -5339,7 +5339,7 @@ relative, not a schedule — this is weeks of work, not months.
     already covered against real committed history by this project's
     existing `TestRunWindowsAgainstRealCommittedHistory` tests).
 
-87. **[todo, 2026-09-27]** **[QA checks & contract]** Evidently should read the RECORDED reference distribution, not hunt for a past run's rows - and it was never blocked.
+87. **[done, 2026-09-27]** **[QA checks & contract]** Evidently reads the RECORDED reference distribution rather than hunting for a past run's rows - and it was never blocked.
 
     **This entry previously said "blocked" and that was wrong.** Keith
     pushed back ("dig into that, do research online, how we resolve
@@ -5402,8 +5402,30 @@ relative, not a schedule — this is weeks of work, not months.
     rule for anything historical - recorded QA results, never actual
     data. Real Evidently still runs; nothing here hand-rolls PSI.
 
-    **Not built yet.** It changes `evaluate_evidently_bdm`/`_cp`'s
-    signatures and their orchestrator call sites.
+    **BUILT the same day.** `evidently_common.py` grew
+    `reference_value_counts()`, `recorded_row_count()` and
+    `frame_from_value_counts()`; both evaluators now read the current
+    run from its own view schema and the reference from what was
+    recorded. The CSV path survives only as a FALLBACK for the ad-hoc
+    local-file mode, where a supply has been checked without ever being
+    staged and so has no recorded stats - that is a real case, not
+    defensive coding.
+
+    The row-count-growth check moved the same way and is a small
+    improvement in its own right: the previous run's count is now the
+    one `dataset_stats` measured from the warehouse when that run was
+    checked, rather than a number re-derived by re-reading its CSV.
+
+    `tests/test_evidently_recorded_reference.py` covers it, and its
+    shape is deliberate - the EXISTING Evidently tests pass whether the
+    reference comes from a CSV, the warehouse or a recording, because
+    they assert on the verdict and all three agree. They could not have
+    caught this change and cannot catch it regressing. The new ones
+    assert exactness (bit-identical PSI, not `approx` - an approx here
+    would hide the very drift this is about), the scale-invariance that
+    makes it safe at a million rows, loud refusal of a malformed
+    recording, and that this repo's own committed history really does
+    carry the recording in the shape the code expects.
 
 ## Held over from the original (equivalent-only) build
 

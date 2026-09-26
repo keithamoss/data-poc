@@ -78,32 +78,115 @@ def _resolve_csv(csv_path: str) -> str:
     """
     return csv_path if os.path.isabs(csv_path) else os.path.join(RAW_DIR, csv_path)
 
-def _row_count(csv_filename: str) -> tuple[int, dict]:
+def _previous_run_id(manifest: list[dict], run_id: str) -> str | None:
+    """The immediately preceding run in manifest order, or None for the
+    first run - unlike PSI's comparison against a fixed baseline run,
+    "did row count grow" is inherently about consecutive runs, not a
+    fixed reference.
+
+    Returns the RUN ID rather than its csv_path (2026-09-27): the count
+    now comes from what that run recorded, so its file is only a
+    fallback for a run that was never staged."""
+    for i, entry in enumerate(manifest):
+        if entry["run_id"] == run_id:
+            return manifest[i - 1]["run_id"] if i > 0 else None
+    return None
+
+
+def _csv_path_of(manifest: list[dict], run_id: str) -> str:
+    for entry in manifest:
+        if entry["run_id"] == run_id:
+            return entry["csv_path"]
+    raise KeyError(f"{run_id} is not in this manifest")
+
+
+def _recorded_previous_count(manifest: list[dict], previous_run_id: str) -> int | None:
+    from qa_tools.common.evidently_common import recorded_row_count
+
+    return recorded_row_count(AGENCY_ID, COLLECTION_ID, previous_run_id)
+
+
+def _row_count_of(df) -> tuple[int, dict]:
+    """Evidently's own RowCount metric over a frame already in hand.
+
+    Takes a frame rather than a filename (2026-09-27) so the current
+    run's count comes from the warehouse rows this module already read,
+    rather than from re-opening the CSV it no longer depends on."""
     from evidently import Report
     from evidently.metrics import RowCount
 
-    df = read_csv_explicit_nulls(_resolve_csv(csv_filename), _NULL_VALUES)
     snapshot = Report(metrics=[RowCount()]).run(df, None)
     result = snapshot.dict()
     return int(result["metrics"][0]["value"]), result
 
 
-def _previous_run_file(manifest: list[dict], run_id: str) -> str | None:
-    """The immediately preceding run in manifest order, or None for the
-    first run - unlike PSI's comparison against a fixed baseline run,
-    "did row count grow" is inherently about consecutive runs, not a
-    fixed reference."""
-    for i, entry in enumerate(manifest):
-        if entry["run_id"] == run_id:
-            return manifest[i - 1]["csv_path"] if i > 0 else None
-    return None
+def _current_frame(run_id: str, csv_filename: str):
+    """This run's `sex` column, from the warehouse.
+
+    Falls back to the CSV only where the run has no view schema - the
+    ad-hoc local-file path, where somebody is checking a file that was
+    never staged. A staged run always reads the warehouse, which is the
+    whole point of REQ-QAC-088.
+    """
+    import pandas as pd
+
+    from qa_tools.common import supply_db
+
+    try:
+        with supply_db.connect(read_only=True, label="mothman:evidently-bdm") as conn:
+            conn.execute(f'SET search_path TO "{supply_db.run_schema(run_id)}"')
+            rows = conn.execute("SELECT sex FROM birth_registrations").fetchall()
+        return pd.DataFrame({"sex": [r[0] for r in rows]})
+    except Exception:
+        # A run with no staged view - the local-file path. Reading the
+        # file it was handed is correct there; there is nothing else.
+        return read_csv_explicit_nulls(_resolve_csv(csv_filename), _NULL_VALUES)[["sex"]]
+
+
+def _reference_frame(reference_run_id: str, reference_csv: str):
+    """The reference distribution, rebuilt from what was RECORDED for
+    that run rather than by finding its rows again.
+
+    Its rows may be anywhere by now - staged, promoted into a period
+    schema, or aged out - and none of that matters, because
+    `dataset_stats` wrote its `sex` distribution down when it ran.
+    """
+    from qa_tools.common.evidently_common import (
+        frame_from_value_counts, reference_value_counts,
+    )
+
+    counts = reference_value_counts(AGENCY_ID, COLLECTION_ID, reference_run_id, "sex")
+    if counts:
+        return frame_from_value_counts(counts, "sex")
+    # No recorded stats: a reference that has never been through the
+    # pipeline here, which is real on the local-file path and on a
+    # first-ever run.
+    return read_csv_explicit_nulls(_resolve_csv(reference_csv), _NULL_VALUES)[["sex"]]
 
 
 def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
                                  reference_run_id: str = REFERENCE_RUN_ID,
                                  reference_csv: str = f"{REFERENCE_RUN_ID}.csv") -> list[dict]:
-    reference = read_csv_explicit_nulls(_resolve_csv(reference_csv), _NULL_VALUES)[["sex"]]
-    current = read_csv_explicit_nulls(_resolve_csv(csv_filename), _NULL_VALUES)[["sex"]]
+    """THE CURRENT RUN COMES FROM THE WAREHOUSE; THE REFERENCE COMES
+    FROM WHAT WAS RECORDED (REQ-QAC-088, 2026-09-27).
+
+    This was the last tool reading the supplier's CSV, which made it the
+    one answering a different question from the other three - they
+    checked what had been loaded, it checked what had been sent.
+
+    The current run reads through its own view schema, which is open
+    while it is being checked. The REFERENCE does not need its rows at
+    all: its distribution was recorded by dataset_stats when it ran, so
+    it is rebuilt from that. See evidently_common's own section for why
+    that reconstruction is exact rather than approximate, and for the
+    categorical-only limit.
+
+    `csv_filename` and `reference_csv` are still accepted and are now
+    only a FALLBACK, for the ad-hoc local-file path where a supply has
+    been checked without being staged and has no recorded stats yet.
+    """
+    reference = _reference_frame(reference_run_id, reference_csv)
+    current = _current_frame(run_id, csv_filename)
     n_total = len(current)
 
     psi, psi_snapshot = compute_psi(current, reference, "sex")
@@ -137,10 +220,20 @@ def evaluate_evidently_bdm(run_id: str, csv_filename: str, run_timestamp: str,
     manifest = [a.as_entry() | {"csv_path": str(a.path_for("birth-registrations"))}
                 for a in arrivals.arrivals_for("civil-registration", "run_")
                 if "birth-registrations" not in a.held]
-    previous_file = _previous_run_file(manifest, run_id)
-    if previous_file is not None:
-        current_count, row_count_snapshot = _row_count(csv_filename)
-        previous_count, _ = _row_count(previous_file)  # previous run's own snapshot, already captured when that run was processed
+    previous_run_id = _previous_run_id(manifest, run_id)
+    if previous_run_id is not None:
+        # THE CURRENT COUNT IS MEASURED, THE PREVIOUS ONE WAS RECORDED.
+        # Both used to come from re-reading a CSV. The previous run's
+        # count was written down by dataset_stats when that run was
+        # checked, so re-deriving it is both unnecessary and less true -
+        # the recording is what the warehouse actually held.
+        current_count, row_count_snapshot = _row_count_of(current)
+        previous_count = _recorded_previous_count(manifest, previous_run_id)
+        if previous_count is None:
+            previous_count = _row_count_of(
+                read_csv_explicit_nulls(
+                    _resolve_csv(_csv_path_of(manifest, previous_run_id)),
+                    _NULL_VALUES))[0]
         raw_output["row_count"] = row_count_snapshot
         rate_drop = (previous_count - current_count) / previous_count if previous_count else 0.0
         results.append({

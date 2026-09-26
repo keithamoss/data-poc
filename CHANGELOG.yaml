@@ -130,6 +130,13 @@ releases:
               It still reads the CSV or Parquet a supplier sends and works
               out what is in it, which is the job it is best at. The rows
               then stream into PostgreSQL. It is never a warehouse.
+          - headline: Drift is measured against the warehouse too
+            components: ["QA checks & contract"]
+            description: >
+              The last check still reading the supplier's file now reads
+              what was loaded, like the other three. It compares against
+              the distribution recorded when the reference supply was
+              checked, so it keeps working however old that supply gets.
           - headline: datacontract-cli checks the warehouse, not the file
             components: ["QA checks & contract"]
             description: >
