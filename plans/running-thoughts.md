@@ -2736,9 +2736,44 @@ Belongs with batch 5's check work.
       "an isolated, Anthropic-managed VM".
 
     So the accurate statement is: **no Docker in a default cloud
-    session, by policy** - not because the product documents it as
-    unsupported, and not something to design around as though it were
-    a permanent property.
+    session, by policy**.
+
+    **AND THE PUBLIC RECORD SETTLES IT FURTHER (searched 2026-09-26 at
+    Keith's own ask, after the docs turned out to be silent).** Two
+    issues on `anthropics/claude-code` are exactly this, and BOTH ARE
+    CLOSED:
+
+    - **#53430, "[BUG] Docker daemon not started on web environment"**
+      (opened 26 April 2026) - **closed as NOT PLANNED**. The reporter
+      hit the same thing: the CLI is installed, the socket does not
+      exist, and the daemon cannot be started. Closing it as not
+      planned is the part that matters - it is a stated property of
+      the platform rather than a defect awaiting a fix.
+    - **#29515, "[FEATURE] Docker support in Claude Code web
+      environment"** (opened 28 February 2026, labelled
+      `area:claude-code-web`, `area:sandbox`, `platform:web`,
+      `enhancement`) - also closed. It asked for exactly what would
+      help here: `docker compose` to bring up Postgres and friends for
+      integration tests inside one session.
+
+    **A CONCRETE WARNING WORTH HAVING BEFORE SOMEBODY TRIES IT:**
+    #53430 reports that attempting to start the daemon FROM A SETUP
+    SCRIPT crashes the environment. The cloud environment's setup
+    script is the obvious place to reach for, and it is the wrong
+    lever.
+
+    The workarounds people land on are the ones this entry already
+    arrived at independently: run the service natively in the session,
+    or run Claude Code locally where it has the host's daemon.
+
+    **WHICH PARTLY RESTORES THE ORIGINAL INSTINCT, ON BETTER
+    EVIDENCE.** This entry first asserted Docker was impossible, then
+    corrected that to "withheld by default, and permittable" once the
+    refusal turned out to be a policy decision. The public record
+    lands between the two: Anthropic has been asked for this twice and
+    declined both times, so treating it as a stable property of the
+    platform IS justified - just for a documented reason rather than
+    an assumed one.
 
     **THE CONCLUSION SURVIVES THE CORRECTION, and it is worth being
     clear WHY, because the reasoning changed underneath it.**
