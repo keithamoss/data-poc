@@ -11462,8 +11462,10 @@ requirements:
         its prose merely mentions, and SHALL NOT infer ownership from any
         requirement id appearing in a sprint's text.
     non_functional_requirements:
-      - Adds no new status vocabulary - done, in-progress and not-started
-        are already in the closed set every plans file uses.
+      - Adds exactly ONE value to the status vocabulary, `blocked`. The
+        other three the gate reports - done, in-progress, not-started -
+        are already in the closed set every plans file uses, and no
+        existing value changes meaning.
       - Runs in the existing `mothman check`, with no network and no access
         to anything under data/.
     dependencies: []
