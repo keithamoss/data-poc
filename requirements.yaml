@@ -13711,13 +13711,18 @@ requirements:
         treat it as a refusal or append a duplicate entry.
     non_functional_requirements:
       - >
-        SECURITY, and this is the one that needs a real answer before it
-        ships: this repository is PUBLIC, so anybody with a GitHub
+        SECURITY, and this was the one needing a real answer before
+        anything shipped - ANSWERED by criterion 12 and decision 7, an
+        allowlist in contract/people.yaml. This repository is PUBLIC, so anybody with a GitHub
         account can comment on a ticket. Promotion changes what
         downstream consumers read, which is a materially larger write
         than the existing /accept badge. Either the workflow restricts
         the acting author to a known set, or this is accepted as a PoC
-        risk with eyes open - it should not be discovered later.
+        risk with eyes open - it should not be discovered later. Kept
+        here rather than deleted because the constraint outlives the
+        answer: the repository is still public, so anything later added
+        to either route inherits this exposure and has to say how it is
+        closed.
       - >
         COMPATIBILITY: the TUI route is the only one that works with no
         network and no GitHub reachability. On a government network
@@ -13732,9 +13737,10 @@ requirements:
       - >
         OPERABILITY at 30 datasets: a quarterly promotion round is up to
         30 decisions raised in a short window, each currently triggering
-        a rebuild, a deploy and a snapshot. That cost is real and is
-        discussed in this requirement's open questions rather than
-        assumed away.
+        a rebuild, a deploy and a snapshot. That cost is real and is NOT
+        addressed here - it belongs to sprint 12, which owns the backlog
+        drain and the concurrency configuration. Recorded so that it is
+        a known deferral rather than something nobody costed.
       - >
         The gh CLI needs authentication, which is automatic inside a
         GitHub Actions job and a one-time gh auth login locally - the
@@ -13815,15 +13821,18 @@ requirements:
         is the status quo for /accept, but /accept moves a badge and
         this moves data.
       - >
-        THE BUILD ORDER IS ACCEPTED AS SPRINT 11 THEN 12, EVEN THOUGH
-        THE PRIMARY SURFACE ARRIVES SECOND (Keith, 2026-09-26). Sprint
+        THE BUILD ORDER IS ACCEPTED AS SPRINT 11 THEN 12, WHICH PUTS
+        THE TERMINAL FIRST AND GITHUB SECOND (Keith, 2026-09-26; this
+        originally read "even though the primary surface arrives
+        second", a framing decision 1 has since abolished). Sprint
         12 owns the GitHub write path - the backlog drain, the
         concurrency configuration and the last-wins conflict rule, all
         settled in Thread H and deliberately not restated as criteria
         here - so sprint 11 can build the shared implementation and the
-        TUI adapter but not the GitHub one. Design ordering is
-        unchanged; only build ordering reverses, and criterion 11's one-
-        implementation-plus-adapters shape is what makes the second
+        TUI adapter but not the GitHub one. Neither route being primary,
+        this is now simply the order they are built in rather than an
+        awkwardness to accept, and criterion 11's one-implementation-
+        plus-adapters shape is what makes the second
         adapter cheap when sprint 12 lands. Rejected folding sprint 12's
         channel into this batch, which would pull Thread H's concurrency
         and conflict rules forward and make sprint 11 considerably
@@ -13864,7 +13873,7 @@ requirements:
         datasets is a small fraction of what is waiting. But an offer in
         flow is what stops a person who has JUST seen a red result
         having to navigate back to a queue to act on it. Both, therefore
-        - with criterion 17 requiring they reach the same
+        - with criterion 15 requiring they reach the same
         implementation, which is what NFR 3's drift warning is about and
         is the same discipline criterion 11 already applies across the
         GitHub and TUI routes.
@@ -13911,7 +13920,7 @@ requirements:
         say, chiefly criterion 8's supersede confirmation and
         REQ-PIPE-075 criteria 4 and 10 - because a second enumeration
         would be a second source of truth for the same rules. Note the
-        distinction criterion 20 draws, which is the one most easily got
+        distinction criterion 21 draws, which is the one most easily got
         wrong: promoting a supply already promoted into the same slot is
         a NO-OP, not a refusal (REQ-PIPE-075 criterion 10 says change
         nothing and add no entry), and reporting it as an error would
