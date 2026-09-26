@@ -2784,12 +2784,36 @@ is not structural, it is only **who pulls the trigger**:
 
 | Asset | Decision rule | Trigger |
 |---|---|---|
-| Quarterly | which quarter this fills | a human, as today |
+| Quarterly | which quarter this fills | ~~a human, as today~~ automatic |
 | Daily | oldest unfilled slot, unless inside a later slot's early window | automatic |
 
 One policy flag per asset, same machinery. The automatic rule is safe
 to be imperfect precisely because tables move - a wrong promotion is a
 correction, not a rebuild.
+
+**CORRECTED 2026-09-26 (Keith), and BOTH columns of that table have
+since been overtaken - struck through rather than deleted so the
+correction is visible to anyone who read the original.**
+
+The TRIGGER column was wrong, and this thread contradicted itself
+about it in two places without anyone noticing until `REQ-PIPE-075`
+was scoped. The table gives the quarterly asset a human trigger and
+"one policy flag per asset"; the QA-gates-promotion paragraph further
+down this same thread makes green-and-amber auto-promotion
+unconditional for everything. Both read as settled. Keith settled it
+the second way: **green or amber promotes itself on BOTH assets, and
+only red waits for a person.** He rejected the per-asset flag - which
+matches how the team works today, and would have cost ~30 separate
+approvals a quarter now that bulk promote is ruled out - and rejected
+a per-dataset flag, because at thirty datasets a setting like that is
+set once, forgotten, and fails quietly. `REQ-PIPE-075` decision 12
+carries the full reasoning.
+
+The DECISION RULE column was overtaken earlier and separately, by
+`REQ-PIPE-062`, which made slot assignment a pure derivation with no
+human in it on either asset. So the daily/quarterly difference this
+table was drawn to capture has now dissolved on both axes rather than
+one: same assignment rule, same promotion trigger.
 
 Note what this dissolves: the "arrives 10pm, belongs to tomorrow"
 cutoff and the "arrives a week early" case stop being two mechanisms.

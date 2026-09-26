@@ -11906,3 +11906,198 @@ requirements:
         sentence saying it shipped. "Waiting on X" and "was waiting on
         X, which has since landed" are indistinguishable to anything
         reading prose.
+
+  - id: REQ-PIPE-074
+    title: Every filing decision is recorded once, in one append-only log that refuses an anonymous entry
+    date_written: "2026-09-26"
+    story: >
+      As manager of the data team, I want one append-only record of who
+      decided what, when and why, so that when someone asks a year later
+      why we accepted a supply into Q3, the answer is a lookup rather
+      than an archaeology exercise across two mechanisms.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/supply-model.md Thread G plus Thread B's
+      staging/promotion thread, given to delivery-scoper as batch 4
+      scoping input, 2026-09-26.
+    signed_off:
+      by: Keith
+      date: "2026-09-26"
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL record every filing decision - promote, reject,
+        demote and re-file - as an entry in one append-only log, and
+        SHALL NOT keep a second record of any of them anywhere else.
+      - >
+        THE SYSTEM SHALL record, with each entry, the actor, the instant
+        the decision took effect, the instant the entry was written, the
+        action, the supply acted on, the slot or slots involved, and a
+        reason.
+      - >
+        THE SYSTEM SHALL record an automatic decision in that same log,
+        with the rule as the actor.
+      - >
+        THE SYSTEM SHALL distinguish an actor that is a person from an
+        actor that is a rule.
+      - >
+        IF a decision arrives with no identified actor, THEN THE SYSTEM
+        SHALL refuse to record it, and SHALL NOT substitute a default, a
+        placeholder or an "unknown" identity.
+      - >
+        IF a decision rejects a supply, promotes a red supply, or
+        supersedes a supply already promoted, and carries no reason,
+        THEN THE SYSTEM SHALL refuse to record it.
+      - >
+        THE SYSTEM SHALL record a routine promotion that carries no
+        reason.
+      - >
+        THE SYSTEM SHALL NOT modify or remove an entry once written, and
+        SHALL express every reversal as a new entry.
+      - >
+        THE SYSTEM SHALL record a re-file as ONE entry carrying a from-
+        slot, a to-slot and one reason, and SHALL NOT express it as a
+        demotion followed by a promotion.
+      - >
+        THE SYSTEM SHALL hold each dataset's entries such that reading
+        one dataset's decisions costs nothing in the size of any other
+        dataset's history.
+      - >
+        THE SYSTEM SHALL commit the log to the repository, and SHALL NOT
+        hold it only in the warehouse.
+      - >
+        THE SYSTEM SHALL answer, for any dataset, the identity of its
+        most recently promoted supply, from that log alone.
+      - >
+        THE SYSTEM SHALL be readable by the dashboard build with no
+        access to anything under data/.
+    non_functional_requirements:
+      - >
+        LAYOUT MIRRORS qa_results/, KEY FOR KEY (Keith, 2026-09-26):
+        decisions/<agency>/<collection>/<dataset>/... - the full
+        hierarchy, not the dataset alone. This log grows forever and is
+        committed, so its layout is a scale decision rather than a
+        filing convention: at ~30 datasets with years of history, a
+        single collection-level file means every read filters everybody
+        else's decisions, which is precisely what REQ-PIPE-038 re-keyed
+        qa_results/ to escape. Note the draft of this NFR claimed
+        filings/ already took that same shape and it DOES NOT -
+        filing.path_for() writes a flat filings/<dataset_id>/, with no
+        agency or collection above it. So qa_results/ is the model to
+        copy and filings/ is not; whether filings/ should be re-keyed to
+        match is a real inconsistency, and it belongs to whichever
+        requirement owns that tree rather than to this one.
+      - >
+        Do NOT resolve anything about an entry by walking git history.
+        CLAUDE.md records the real incident where changelog.py's per-
+        commit git walk cost 13 seconds on twelve commits and scaled
+        with diff size; a decision log read on every dashboard build is
+        exactly that shape again.
+      - >
+        Retention is explicitly out of scope for the PoC (Keith,
+        2026-09-23, Thread B) - this only grows, and that is accepted
+        rather than unasked.
+      - >
+        PRIVACY, and the PoC accepts the risk knowingly (Keith,
+        2026-09-26). The reason field is free operator prose, committed
+        to a PUBLIC repository, and append-only means it can never be
+        redacted. For this PoC that is accepted as-is, because the data
+        is synthetic and nothing real can leak. It does NOT carry over:
+        before the first real reason is written in a real deployment, a
+        constraint has to be stated, because a reason like "rejected,
+        the duplicate placement records for the Smith children" would be
+        a permanent disclosure with no removal path. The trigger is real
+        data, not a date.
+      - >
+        Append-only has to be enforced by something, not just intended.
+        A mothman check gate over the committed log - entries only ever
+        added, never edited - is the cheap version, and it is the only
+        thing standing between "audit trail" and "a file people edit".
+    dependencies: [REQ-PIPE-062, REQ-PIPE-034]
+    decisions:
+      - >
+        Decided the committed log is the SYSTEM OF RECORD and any input
+        channel is only a channel (Thread G, Keith 2026-09-22). GitHub
+        issues can be edited and deleted, so treating them as the store
+        lets somebody silently rewrite history, which is the thing
+        append-only exists to prevent.
+      - >
+        Decided automated decisions go in the SAME log with the rule as
+        actor, rather than a separate mechanism for auto-promotions
+        (Thread G). One log means "why is this supply promoted" has a
+        single answer location, and it makes the stickiness rule -
+        automation only acts on a supply no human has touched -
+        checkable directly from the log rather than from a flag.
+      - >
+        Decided a reason is MANDATORY for the consequential decisions
+        and optional for a routine promote (Thread G). The question that
+        arrives a year later in a government agency is "why did we
+        accept this into Q3", and a trail recording the what but not the
+        why answers the easy half.
+      - >
+        Decided the log REFUSES an entry with no identity rather than
+        recording it as unknown (Thread G, 2026-09-22).
+        git_identity.py's get_run_by() already hard-errors rather than
+        falling back to a placeholder, and that discipline extends here:
+        an audit trail with anonymous entries is worse than none,
+        because it looks complete.
+      - >
+        Decided a re-file is ONE atomic entry, rejecting the demote-
+        then-promote composition (Thread B, TS-11, settled 2026-09-22).
+        Under the composed version a reader a year later has to infer
+        that two entries were one act, so "why is this supply in Q3?"
+        becomes a correlation exercise. Note this survived un-decide
+        being settled as a real operation, which the original framing
+        said it could not - they are different acts with different
+        reasons.
+      - >
+        Decided the actor shape is actor: {kind: human | rule, id:
+        <email | principal | rule name>} (Thread G), because auto-
+        promotions share the log and a reader must be able to tell a
+        person from a rule without inferring it from the id's format.
+      - >
+        Recorded as a boundary rather than a decision: this requirement
+        owns the RECORD. The GitHub Issues write CHANNEL, the backlog
+        drain, the concurrency configuration and the conflicting-
+        decision resolution are delivery sprint 12's, and are named in
+        REQ-GHUB-082 and its own open questions so the seam is explicit
+        rather than discovered.
+      - >
+        SPRINT 11 OWNS THE RECORD, SPRINT 12 OWNS THE CHANNEL (Keith,
+        2026-09-26), settling which sprint this requirement belongs to.
+        Sprint 12's entry claimed the decision log, but sprint 11 cannot
+        be built without one - auto-promotion IS a decision and
+        filled_slots() has to read from somewhere. This is the seam
+        Thread G itself draws. Consequence to apply rather than assume:
+        sprint 12 shrinks to the GitHub write path, the backlog drain,
+        the concurrency config and the last-wins rule, and its plans
+        entry needs re-labelling to match. Rejected merging 11 and 12,
+        which would have made one batch larger than the twelve
+        requirements already here; rejected a throwaway stub in 11
+        replaced by the real log in 12, on the grounds that building
+        something you intend to discard is how two records of the same
+        thing come to exist.
+      - >
+        NO CONSTRAINT ON THE REASON TEXT FOR THE PoC (Keith,
+        2026-09-26), against a flagged privacy risk he was shown and
+        accepted. Free operator prose, no authoring rule, no structured
+        reason code. The reasoning is that the data is synthetic so
+        nothing real can leak, and the cost of a closed code set is that
+        it is wrong the first time somebody hits a reason it lacks.
+        Rejected a stated authoring rule (the treatment check prose
+        gets) and rejected codes-only, which would have removed the very
+        thing the story asks for - a year-later reader wanting to know
+        why. What survives is a constraint on the FUTURE, recorded in
+        this requirement's own privacy NFR rather than left in
+        conversation: a real deployment needs the rule before its first
+        real reason, and the trigger is real data rather than a date.
+      - >
+        THE DECISION LOG IS KEYED agency/collection/dataset, MIRRORING
+        qa_results/ (Keith, 2026-09-26, at sign-off). Recorded because
+        the draft NFR asserted that filings/ already used that shape and
+        it does not - filing.path_for() writes a flat
+        filings/<dataset_id>/ with no agency or collection above it. A
+        future session reading "same shape as filings/" would therefore
+        have built the wrong tree. qa_results/ under REQ-PIPE-038 is the
+        model; filings/ is the counter-example, and re-keying it is left
+        to whichever requirement owns that tree.
