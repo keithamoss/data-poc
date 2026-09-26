@@ -13192,6 +13192,9 @@ requirements:
       B names the tension and nobody resolved it; Thread H wrinkle 1
       corrected the underlying rule and Thread K settled the as-
       corrected default. Scoped by delivery-scoper, batch 4, 2026-09-26.
+    signed_off:
+      by: Keith
+      date: "2026-09-26"
     acceptance_criteria:
       - >
         THE SYSTEM SHALL answer "as at T" with the supply most recently
@@ -13270,6 +13273,39 @@ requirements:
         route - the table present in exactly one schema, and the
         decision recorded - so that nothing downstream can tell which
         was used.
+      - >
+        THE SYSTEM SHALL label the date control "In place on" rather
+        than "As of", and SHALL NOT use wording that can be read as what
+        was known at that date.
+      - >
+        THE SYSTEM SHALL state, in the date control's own panel, that
+        the view uses everything known today including decisions made
+        since, and SHALL name the snapshot archive as the way to see
+        what the page itself said on a past date.
+      - >
+        WHERE a date other than the current one is selected, THE SYSTEM
+        SHALL state that same distinction on the page itself, so that a
+        reader arriving by a link with a past date already set meets it
+        without opening the panel.
+      - >
+        THE SYSTEM SHALL name the date control's own element ids and its
+        query-string parameter after the label the control carries, and
+        SHALL NOT keep "asof" as an identifier anywhere in the page.
+      - >
+        WHERE a link carries the previous "asof" query parameter, THE
+        SYSTEM SHALL honour the date it names and SHALL replace it with
+        the current parameter in the address bar, so that a saved link
+        keeps working without leaving two spellings to maintain.
+      - >
+        THE SYSTEM SHALL rename the variables and functions that carry
+        this concept to match the label, across the template, the Python
+        that builds and reads it, and both test suites, and SHALL NOT
+        leave one file holding a mixture of the two names.
+      - >
+        THE SYSTEM SHALL update the prose in requirements.yaml itself,
+        including requirements already signed off, to use the label the
+        page now carries, and SHALL NOT change what any of those
+        requirements requires while doing so.
     non_functional_requirements:
       - >
         Cost of the replay: this is a fold over one dataset's decision
@@ -13508,7 +13544,70 @@ requirements:
         treats a source that states nothing. Both routes must be
         indistinguishable downstream, which is what keeps this an
         optimisation rather than two behaviours.
-
+      - >
+        THE DATE CONTROL IS LABELLED "IN PLACE ON", NOT "AS OF" (Keith,
+        2026-09-26, his own observation at sign-off). "As at T" carries
+        two readings and this page contains BOTH of the things they
+        name: the VALID-TIME reading, what was in place on that date as
+        we now understand it, which is what this requirement builds; and
+        the TRANSACTION-TIME reading, what we knew or said at that date,
+        which is what dashboard/snapshots/ already is. His words: "as at
+        T DOES NOT mean what we knew at that point (that's the job of
+        snapshots), but what all of the events and decisions so far
+        resolve to". NOTE THE ARGUMENT FOR KEEPING IT, since it is not
+        weak: in accounting and government reporting "as at 30 June"
+        already means the position on that date with later corrections
+        applied, which is exactly this requirement's semantics, so the
+        term is defensible in isolation. What defeats that is proximity
+        - an "As of" button sitting beside a "Snapshots" button is the
+        pairing that invites the wrong reading, and a label only has to
+        be unambiguous where both things are on screen together. "In
+        place on" points at the DATA rather than at our knowledge, which
+        is the distinction doing the work; rejected "Position on", the
+        accounting register, as colder for a non-finance reader. THE
+        EXPLANATION GOES IN TWO PLACES, and the second is the one that
+        matters: the panel, where somebody changing the date reads it at
+        the moment it applies, AND on the page whenever a non-current
+        date is selected, because a reader arriving at a deep link with
+        a past date already set never opens the panel at all. Rejected a
+        tooltip on the button, which is read only by people who already
+        suspect they are confused. SCOPE NOTE, REVERSED THE SAME
+        AFTERNOON (Keith): this session first carved the CODE out -
+        element ids, the ?asof= query parameter - on the grounds that
+        renaming a URL parameter breaks every saved link for no reader-
+        facing gain. Keith overrode that on consistency ("happy to
+        rename the element ids and URL params - for consistency", then
+        "ditto any variable names or functions", then "happy to do it as
+        part of the build of 081"), so criteria 23-26 carry it. The link
+        objection is answered rather than waved past - the old parameter
+        is still honoured and rewritten to the new one, so a saved link
+        keeps working and stops being a second spelling to maintain.
+      - >
+        THE RENAME REACHES THE CODE AND THE REGISTER, NOT ONLY THE COPY
+        (Keith, 2026-09-26, reversing this session's own carve-out - see
+        the scope note on the decision above). Measured before deciding:
+        921 occurrences of "asof", "as_of" or "as-of" across the repo -
+        template 164, tests 109, requirements.yaml 83, tests-js 67,
+        qa_tools 34, pipeline 11, contract 6, generator 5, cli 1,
+        workflows 1. The two carve-outs this session raised resolved
+        differently. The register's 83, in requirements already signed:
+        Keith's answer was "Update them too", on the grounds that a
+        register half in one vocabulary is worse than either. The config
+        key "as_of_offset_days": he asked what renaming it would even
+        mean, and the answer is that there is nothing to rename -
+        contract/data-asset.yaml has not carried that key since
+        2026-09-17, when per-dataset cadence replaced the flat global
+        staleness offset. It survives only in historical prose (the
+        contract file's own header note, three plans references, and a
+        stale CLAUDE.md table cell that still describes the file as
+        holding it). Rejected renaming the surviving prose mentions,
+        which name a thing that no longer exists and would read as
+        current if relabelled. PROPOSED SPELLING, for whoever builds it:
+        the id prefix and query parameter become "inplace" (?inplace=,
+        inplace-btn, inplace-panel), CURRENT_AS_OF/DEFAULT_AS_OF become
+        CURRENT_IN_PLACE_ON/DEFAULT_IN_PLACE_ON, and openAsOfPanel/
+        applyAsOf follow. Not fixed by a criterion, which requires only
+        that the names match the label and that no file mixes the two.
   - id: REQ-GHUB-082
     title: "An operator records a filing decision from GitHub or from the terminal, and both write the same entry"
     date_written: "2026-09-26"
