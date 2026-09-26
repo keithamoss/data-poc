@@ -5339,36 +5339,71 @@ relative, not a schedule — this is weeks of work, not months.
     already covered against real committed history by this project's
     existing `TestRunWindowsAgainstRealCommittedHistory` tests).
 
-87. **[blocked, 2026-09-27]** **[QA checks & contract]** Evidently is the
-    one tool still reading the supplier's CSV rather than the warehouse -
-    the remaining half of `REQ-QAC-088` criterion 2 - and it is blocked on
-    a real question rather than on effort. Found while finishing the
-    PostgreSQL switch, and worth writing down precisely because the naive
-    version of the fix produces a FALSE GREEN, which is the dangerous
-    direction.
+87. **[todo, 2026-09-27]** **[QA checks & contract]** Evidently should read the RECORDED reference distribution, not hunt for a past run's rows - and it was never blocked.
 
-    `qa_tools/bdm/run_evidently_bdm.py` needs rows from THREE runs, not
-    one: the current run, the fixed PSI reference run (`run_01`), and the
-    immediately preceding run for the row-count-growth check. The current
-    run is easy - its own view schema is open while it is being checked.
-    The other two are the problem. A run's view schema is transient and
-    dropped when the run ends, so a past run's rows have to be found by
-    their STAGED table - and once promotion exists (`REQ-PIPE-081`,
-    `REQ-PIPE-098`) a past run's rows are no longer in `staging` at all,
-    they are in whichever period schema they were promoted into.
+    **This entry previously said "blocked" and that was wrong.** Keith
+    pushed back ("dig into that, do research online, how we resolve
+    that - that's critical") and the premise did not survive ten
+    minutes of looking. Recorded as a correction rather than quietly
+    rewritten, because the wrong version was a reasoned argument and
+    the reasoning is the instructive part.
 
-    Today every run happens to still be in `staging`, because nothing
-    promotes yet. So a version of this written now would pass its tests,
-    pass CI, and silently start comparing against the wrong rows - or
-    against nothing - the day promotion lands. A drift check that reads
-    the wrong baseline does not fail; it reports no drift.
+    **What I claimed.** Evidently needs rows from three runs - the
+    current one, the fixed PSI reference, and the previous run for the
+    row-count-growth check. A run's view schema is dropped when its run
+    ends, so a past run's rows must be found by their staged table; and
+    once promotion exists those rows live in a period schema instead.
+    Therefore Evidently needs a "where are run X's rows now" lookup
+    that only the promotion sprints can provide.
 
-    What it actually needs first is a way to ask "where are run X's rows
-    now", which is promotion's business, not Evidently's. Either that
-    locator is built as part of the promotion sprints and Evidently
-    follows it, or `REQ-QAC-088` accepts a narrower criterion saying
-    Evidently compares only supplies in the same schema. Not something to
-    settle at 2am on the strength of what happens to be true today.
+    **Why it is wrong.** Every one of those three needs is ALREADY
+    RECORDED, per run, by `dataset_stats` - which exists for exactly
+    this reason, computed at the one point in the pipeline with a
+    legitimate live connection (Phase 3, plans/publishing-and-history.md):
+
+    - `value_counts["sex"]` - the full categorical distribution of the
+      column the PSI check runs on.
+    - `row_count` - measured from the warehouse, not from bookkeeping.
+
+    So the reference does not need to be FOUND, because it was written
+    down when it was cheap to write down. Only the CURRENT run needs
+    rows, and its own view schema is open while it is being checked.
+
+    **PSI from a reconstructed reference is EXACT, not an
+    approximation**, and this is the part worth verifying rather than
+    assuming. For a categorical column PSI depends only on the category
+    proportions, so expanding recorded counts back into rows reproduces
+    the reference distribution exactly. Measured against real Evidently
+    0.7.23: PSI from real reference rows and PSI from a reference
+    rebuilt out of `value_counts` came back bit-identical
+    (`0.03422418388845692` both ways).
+
+    Dividing every count by their GCD is also exact, for the same
+    reason - 492,000 reference rows reduced to 41 gave the identical
+    float. Worth knowing for the 30-dataset target, though not a
+    general escape: arbitrary counts usually have a GCD of 1, and a
+    full expansion of a million-row reference is a few megabytes, which
+    is fine.
+
+    **The one real limit, and it should fail loudly rather than
+    silently approximate.** This is exact for CATEGORICAL drift. A
+    numeric column's drift needs binned histograms, and a value-count
+    distribution is not one - so if a numeric drift check is ever added,
+    `dataset_stats` must record fixed-bin histograms for it, and the
+    code must refuse a numeric column rather than quietly doing
+    something defensible-looking.
+
+    **Why this is better than what it replaces, and better than the fix
+    I proposed.** Today Evidently reads the supplier's CSV - the last
+    tool not checking what landed (REQ-QAC-088 criteria 2 and 3).
+    Reading recorded statistics instead is immune to promotion,
+    retention and deletion of old supplies; it needs no lookup from the
+    promotion sprints, so it unblocks now; and it obeys CLAUDE.md's own
+    rule for anything historical - recorded QA results, never actual
+    data. Real Evidently still runs; nothing here hand-rolls PSI.
+
+    **Not built yet.** It changes `evaluate_evidently_bdm`/`_cp`'s
+    signatures and their orchestrator call sites.
 
 ## Held over from the original (equivalent-only) build
 

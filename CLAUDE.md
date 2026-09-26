@@ -1193,11 +1193,18 @@ Rough layout:
   real children and real births. Recorded QA metadata - which checks
   ran, what they found, when, by whom - is not that, and once
   REQ-PIPE-089 lands it is what the dashboard build reads. So the rule
-  a build must satisfy is: **it may read recorded results, and may
-  never read a staging, period, rejected or run-view schema.** Stated as
-  "no live connection at all" it would forbid the very design
-  REQ-PIPE-092 requires, and a rule that forbids the intended design is
-  a rule somebody deletes.
+  a build must satisfy is Keith's own wording, 2026-09-27: **a build may
+  read recorded QA results, never actual data, and never anything
+  else.**
+
+  Note the third clause, which is the one doing work an earlier draft of
+  this rule left out. "Never actual data" rules out the staging, period,
+  rejected and run-view schemas. "Never anything else" closes the gap
+  after it: the build is not entitled to browse the database for
+  whatever it finds useful, only to read the recorded results. Stated
+  instead as "no live connection at all" the rule would forbid the very
+  design REQ-PIPE-092 requires, and a rule that forbids the intended
+  design is a rule somebody deletes.
 
   Both halves of that are load-bearing, so do not relax either: the
   staging schemas stay off limits to every read-committed-history path,
@@ -1380,6 +1387,23 @@ Rough layout:
     the blocked host, so the redirect is not a way around it.
     `code.claude.com` (Claude Code's own docs) remains reachable and
     needs no workaround.
+  - **`docs.evidentlyai.com`** and **`www.evidentlyai.com`** - Evidently's
+    own documentation, and the one remaining QA tool whose docs are not
+    reachable (dbt, Soda and datacontract-cli all are). Hit 2026-09-27
+    asking whether Evidently can compute drift from a summary
+    distribution rather than raw rows - Keith's own "do research
+    online" on a question he called critical. Both a real `curl: (56)
+    CONNECT tunnel failed, response 403`. Worth allow-listing on the
+    same grounds as the other three: primary documentation for a core
+    dependency, not background reading.
+
+    The question was answered anyway, by real experiment against the
+    installed 0.7.23 - PSI from a reference rebuilt out of recorded
+    value counts came back bit-identical to PSI from the real rows -
+    which this file's own standing lesson already says outranks the
+    docs for anything installed here. The docs would still have been
+    worth reading for what Evidently intends rather than what it
+    happens to do.
   - **`skills.lc`** - a design-review skill writeup, wanted for the
     UX-reviewer-agent precedent research.
   - **`patch-diff.githubusercontent.com`** - `cfisch3r/estimate` PR
