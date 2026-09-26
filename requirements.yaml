@@ -12025,6 +12025,11 @@ requirements:
       - >
         THE SYSTEM SHALL be readable by the dashboard build with no
         access to anything under data/.
+      - >
+        THE SYSTEM SHALL write each decision as its own file under that
+        dataset's directory, named so that entries sort in the order
+        they took effect, and SHALL NOT append to a file shared with
+        another decision.
     non_functional_requirements:
       - >
         LAYOUT MIRRORS qa_results/, KEY FOR KEY (Keith, 2026-09-26):
@@ -12064,9 +12069,12 @@ requirements:
         data, not a date.
       - >
         Append-only has to be enforced by something, not just intended.
-        A mothman check gate over the committed log - entries only ever
-        added, never edited - is the cheap version, and it is the only
-        thing standing between "audit trail" and "a file people edit".
+        A mothman check gate over the committed log is the cheap
+        version, and it is the only thing standing between "audit
+        trail" and "a file people edit". One file per decision makes
+        that gate nearly trivial: the rule is that a path may appear
+        and may never change or vanish, which is a diff against the
+        previous commit rather than a parse of a file's interior.
     dependencies: [REQ-PIPE-062, REQ-PIPE-034]
     decisions:
       - >
@@ -12155,7 +12163,30 @@ requirements:
         have built the wrong tree. qa_results/ under REQ-PIPE-038 is the
         model; filings/ is the counter-example, and re-keying it is left
         to whichever requirement owns that tree.
-
+      - >
+        ONE FILE PER DECISION, NOT ONE APPEND-ONLY FILE PER DATASET
+        (Keith, 2026-09-26, answering a gap this requirement had left -
+        the layout NFR named the directory and stopped there).
+        CONCURRENCY DECIDED IT. The log travels by git and has two
+        write routes, so two people deciding between pulls is the
+        NORMAL case rather than the rare one; appending to a shared
+        file puts both writes at the same end-of-file and produces a
+        merge conflict in a log whose whole purpose is to be
+        authoritative. Separate files never touch. Two things fall out
+        for free: append-only becomes a path-level rule a gate can
+        check by diff - a file may appear, never change or vanish -
+        rather than something requiring the file's interior to be
+        parsed; and the layout then genuinely mirrors qa_results/,
+        which the NFR above asks for and which is already a directory
+        of per-item files rather than one accumulating file. The
+        filename has to sort by the instant the decision TOOK EFFECT,
+        since that is the order the log is read in. Rejected one
+        append-only file per dataset, which makes reading one dataset's
+        history a single open - a real advantage, and not worth a merge
+        conflict on the system of record. Rejected one file per period,
+        which groups the way people ask questions ("why is this supply
+        in Q3?") but conflicts precisely when two people act on the
+        same period, which is when they are most likely to.
   - id: REQ-PIPE-075
     title: A slot is filled only by a recorded promotion, and green or amber promotes itself into an empty one
     date_written: "2026-09-26"
@@ -13642,16 +13673,18 @@ requirements:
         in the body of that input.
       - >
         IF the person raising a decision cannot be identified, THEN THE
-        SYSTEM SHALL refuse it and SHALL say so on the ticket.
+        SYSTEM SHALL refuse it.
       - >
         THE SYSTEM SHALL treat GitHub as the input channel and the
         committed log as the record, and SHALL NOT read current filing
         state back out of an issue.
       - >
-        WHEN a decision has been applied, THE SYSTEM SHALL report its
-        outcome on that dataset's ticket, whichever route raised it, so
-        that a decision taken in the terminal appears on the ticket in
-        the same way one raised there does.
+        WHEN a decision's entry has reached the shared log, THE SYSTEM
+        SHALL report its outcome on that dataset's ticket whichever
+        route raised it, so that a decision taken in the terminal
+        appears there in the same way one raised on the ticket does -
+        on the push that carries it rather than the instant it is
+        taken.
       - >
         THE SYSTEM SHALL require explicit confirmation for a re-file
         whether or not its target slot already holds a promoted supply,
@@ -13666,9 +13699,9 @@ requirements:
         THE SYSTEM SHALL expose the four operations through one
         implementation, with each route as an adapter onto it.
       - >
-        THE SYSTEM SHALL accept a filing decision only from an actor named
-        in contract/people.yaml, and SHALL refuse one from anybody else
-        and say so on the ticket.
+        THE SYSTEM SHALL accept a filing decision only from an actor
+        named in contract/people.yaml, and SHALL refuse one from
+        anybody else.
       - >
         THE SYSTEM SHALL rename the TUI's existing qa_results/ promotion
         to "Save to history", across its prompt, its success panel, its
@@ -13704,9 +13737,11 @@ requirements:
         route that raised it, SHALL name the recorded decision that
         makes it impermissible, and SHALL NOT append an entry.
       - >
-        WHERE a decision raised on GitHub is refused, or fails for any
-        other reason, THE SYSTEM SHALL post the reason as a comment on
-        the ticket that raised it, and SHALL NOT fail silently.
+        WHERE a decision raised on GitHub is refused for ANY reason -
+        an unidentified actor, one outside the allowlist, a missing
+        reason, a rule that forbids it - or fails for any other reason,
+        THE SYSTEM SHALL post that reason as a comment on the ticket
+        that raised it, and SHALL NOT fail silently.
       - >
         THE SYSTEM SHALL apply that same judgement on both routes, from
         the one implementation, and SHALL NOT let either route permit
@@ -14021,6 +14056,45 @@ requirements:
         having the TUI call gh directly, which needs authentication on
         every operator's machine and fails in exactly the environment
         NFR 2 exists to protect.
+      - >
+        ONE ALLOWLIST FOR BOTH ROUTES, KEYED THROUGH people.yaml (Keith,
+        2026-09-26, agreeing with this session's reading). THE PROBLEM
+        is that the two routes identify a person by different keys:
+        GitHub authenticates a HANDLE, and the terminal has
+        git_identity.py's run_by, a git config user.email. So
+        criterion 25's "everyone who may act needs a GitHub username"
+        looks wrong for a terminal-only operator, especially under NFR
+        2's premise that the terminal must work where GitHub is not
+        reachable. IT IS NOT WRONG, and criterion 3 is why: neither
+        route may do something the other cannot, and that applies to
+        WHO as much as to WHICH OPERATION. A person who could decide in
+        the terminal but not on a ticket is a route doing something the
+        other cannot, at the level of people. people.yaml is the join -
+        email for the terminal, handle for GitHub, one entry per
+        person, one list. Rejected two lists keyed separately, which
+        makes "may this person act" a question with two answers that
+        can disagree, and nothing to say which wins.
+      - >
+        REPORTING A REFUSAL IS ONE RULE, NOT THREE (this session,
+        2026-09-26, found reading the finished criteria back).
+        Criteria 5 and 12 each carried their own "and say so on the
+        ticket", and criterion 20 then stated the general case, so
+        three rules described one behaviour. Duplicated rules are how
+        two implementations drift, which is precisely what NFR 3 warns
+        about, so 5 and 12 now state only the REFUSAL and criterion 20
+        owns the reporting for every cause including theirs.
+      - >
+        WORTH KNOWING BEFORE THIS SHIPS, recorded because it will
+        otherwise be discovered: contract/people.yaml today holds four
+        people and exactly one GitHub handle - Keith's. Brian Cohen,
+        Reg and Arthur are the placeholder entries, and between them
+        they hold Child Protection's QA, peer-review and manager
+        assignments. So on the day criterion 12 lands, Keith is the
+        only person who can raise a filing decision for any dataset,
+        and nobody can raise one for Child Protection but him. That is
+        acceptable for a PoC with one real user and is not a reason to
+        weaken the allowlist; it is a reason for whoever deploys this
+        for real to fill the file first.
   - id: REQ-PIPE-083
     title: "An overdue slot becomes a ticket, once, whether or not anything else arrives"
     date_written: "2026-09-26"
