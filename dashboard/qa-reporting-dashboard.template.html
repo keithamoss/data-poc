@@ -5269,10 +5269,16 @@ document.getElementById("leaderboard-panel-close").addEventListener("click", clo
 const PLANS_STATUS_LABEL = {
   done:"Done", "in-progress":"In progress", investigate:"Investigate",
   todo:"To do", parked:"Parked", superseded:"Superseded",
+  // REQ-DOCS-072. A sprint that has built everything it OWNS, whose
+  // remaining criteria are all deferred to another sprint. Grey rather
+  // than amber on purpose: nothing is happening inside a blocked
+  // sprint and the action belongs to its blocker, so amber would
+  // compete with the entries that genuinely want attention now.
+  blocked:"Blocked",
 };
 const PLANS_STATUS_CLASS = {
   done:"green", "in-progress":"amber", investigate:"amber",
-  todo:"tag", parked:"nodata", superseded:"nodata",
+  todo:"tag", parked:"nodata", superseded:"nodata", blocked:"nodata",
 };
 function plansStatusLabel(s){ return PLANS_STATUS_LABEL[s] || s; }
 function plansStatusPill(s){ return `<span class="pill ${PLANS_STATUS_CLASS[s]||"nodata"} sm"><span class="ico"></span>${plansStatusLabel(s)}</span>`; }
@@ -5361,7 +5367,7 @@ const PLANS_ENTRIES = (function(){
   return [...items, ...threads];
 })();
 
-const PLANS_ALL_STATUSES = ["done","in-progress","investigate","todo","parked","superseded"];
+const PLANS_ALL_STATUSES = ["done","in-progress","blocked","investigate","todo","parked","superseded"];
 const PLANS_ALL_COMPONENTS = ["Data generation","QA checks & contract","Pipeline & publishing",
   "Dashboard UI","GitHub workflow & people","Testing & dev tooling","Docs & process"];
 const PLANS_ALL_FILES = ["wider","qa-pipeline","dashboard","data-generation","tooling",

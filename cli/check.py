@@ -87,6 +87,12 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
      "one filename can only ever belong to one dataset", False),
     ("requirements", ["uv", "run", "mothman", "dashboard", "validate-requirements"],
      "every linked test and implemented_by symbol still exists", False),
+    # REQ-DOCS-072. The delivery plan and the register are two records
+    # of the same thing, so they can drift - and did, on 11 of 25
+    # sprints, one of them stale for three days and repeated twice in
+    # conversation as fact before anyone checked.
+    ("sprints", ["uv", "run", "python3", "-m", "qa_tools.common.sprint_state"],
+     "a sprint's written status matches what its criteria say", False),
     ("changelog", ["uv", "run", "mothman", "dashboard", "validate-changelog"],
      "CHANGELOG.yaml's schema and component tags", False),
     ("npm test", ["npm", "test", "--silent"],

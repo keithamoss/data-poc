@@ -11418,6 +11418,9 @@ requirements:
   - id: REQ-DOCS-072
     title: A sprint's status is counted from its criteria, never hand-maintained
     date_written: "2026-09-26"
+    signed_off:
+      by: Keith
+      date: "2026-09-26"
     story: >
       As Keith, reading the delivery plan to decide what to do next, I
       want each sprint to say how many of its acceptance criteria are
@@ -11425,7 +11428,52 @@ requirements:
       from the bits somebody deferred" - and so the plan cannot drift
       away from the register while nobody is looking.
     moscow: should
-    status: not_started
+    status: built
+    linked_tests:
+      - tests/test_sprint_state.py
+      - tests-js/plans.test.js
+    implemented_by:
+      - qa_tools/common/sprint_state.py::survey
+      - qa_tools/common/sprint_state.py::disagreements
+      - qa_tools/common/sprint_state.py::unknown_requirements
+      - qa_tools/common/sprint_state.py::Sprint
+      - cli/check.py::_GATES
+    evidence:
+      - >
+        2026-09-26: run against the real corpus, the counted state is
+        10 blocked, 9 todo, 5 done, 1 in-progress across 25 sprints -
+        against a written plan that claimed 16 done. Sixteen was the
+        number that prompted this requirement and five is the honest
+        one; the ten blocked are sprints that built everything they own
+        and are waiting, almost all of them on promotion.
+      - >
+        2026-09-26: `todo` is emitted rather than "not-started", which
+        this requirement's own criteria say in prose. Writing a second
+        new spelling for a state the closed vocabulary already names
+        would have broken the non-functional constraint - exactly one
+        value added - to satisfy the wording of a criterion. Caught by
+        running the gate and seeing nine sprints "disagree" on nothing
+        but a name.
+      - >
+        2026-09-26: the gate is proved against the real files, not only
+        fixtures. `TestTheRealFiles` asserts the plan and register agree,
+        that every owned id exists, that all 25 sprints declare
+        ownership, and - guarding the guard - that the counts are not
+        vacuous and that each of `done`, `blocked` and `todo` is
+        actually reachable, so no branch is dead code.
+      - >
+        2026-09-26: the rejected design is asserted rather than only
+        described. `test_counting_requirements_instead_would_have_said_done`
+        holds a requirement that is `built` with a deferral and checks
+        the sprint is NOT done - so anyone who later simplifies this to
+        count requirements finds out from a test.
+      - >
+        2026-09-26: the JS chip is tested by CLICKING it, after a first
+        attempt asserted on `PLANS_ALL_STATUSES` and failed - it is a
+        `const`, so it never reaches `window` in the jsdom harness. The
+        clicking version is the better test anyway: it proves the filter
+        works rather than that a list contains a string.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     source: >
       Keith, 2026-09-26, after asking whether the sprints scoped a few
       days earlier were finished. Checking properly found 11 of 25

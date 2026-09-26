@@ -1302,10 +1302,12 @@ the two status implementations. And **the slot is the spine**: overdue,
 staleness, assignment, classification and promotion are all defined as
 comparisons against the expected-supply sequence.
 
-1. **[done, 2026-09-23]** **[QA checks & contract]** **Check identity.**
+1. **[blocked, 2026-09-26]** **[QA checks & contract]** **Check identity.**
    `REQ-QAC-039` - one hierarchy, stated once, including in a check's own
    `check_id`. BUILT 2026-09-23; that requirement now owns the decisions,
    including two the build itself turned up.
+
+   **Owns:** `REQ-QAC-039`
 
    First because it is baked into all 257 hand-authored checks; changing
    it later is a corpus-wide edit.
@@ -1323,6 +1325,8 @@ comparisons against the expected-supply sequence.
    before they were due or arbitrarily after. Each requirement owns its
    own decisions now, including the dozen the builds themselves turned
    up.
+
+   **Owns:** `REQ-GEN-040`, `REQ-GEN-042`, `REQ-GEN-043`, `REQ-GEN-044`, `REQ-GEN-045`
 
    **One deliberate hold, Keith's own call 2026-09-23**: those shapes
    are CAPABILITY, not committed history. A partial Child Protection
@@ -1355,6 +1359,8 @@ comparisons against the expected-supply sequence.
    intended behaviour, which is the argument for a shared table in one
    incident.
 
+   **Owns:** `REQ-QAC-047`
+
    Landed BEFORE per-check `nodata` exists, which was the point.
 
 4. **[done, 2026-09-23]** **[Pipeline & publishing]** **Timezone
@@ -1363,6 +1369,8 @@ comparisons against the expected-supply sequence.
    carry their offset (Thread H). BUILT as `REQ-PIPE-048`, which now
    owns the decisions - including one the build turned up: the
    dashboard had been showing YESTERDAY's date every Perth morning.
+
+   **Owns:** `REQ-PIPE-048`
 
    Small, independent, and every later sprint compares instants. Built
    out of sprint order for exactly that reason, once building
@@ -1378,6 +1386,8 @@ comparisons against the expected-supply sequence.
    because `REQ-GEN-042` turned out to depend on it rather than sit
    beside it. Each requirement owns its own decisions.
 
+   **Owns:** `REQ-PIPE-049`, `REQ-PIPE-050`
+
    **The retrospective-edit guard was built after all** - the open
    question `REQ-PIPE-050` carried, settled by Keith 2026-09-23 once
    the cost was confirmed as one `git show` of one file rather than the
@@ -1389,7 +1399,7 @@ comparisons against the expected-supply sequence.
    gate: it is measured in slots, and slots do not exist until sprint
    6, so it belongs to `REQ-PIPE-053`.
 
-6. **[done, 2026-09-23]** **[Pipeline & publishing]** **Periods and
+6. **[blocked, 2026-09-26]** **[Pipeline & publishing]** **Periods and
    slots.** All three parts BUILT, 2026-09-23. `REQ-PIPE-051`
    derives the period sequence version by version - which turned out to
    fix a real latent bug, not just add a function: authoring a second
@@ -1399,6 +1409,8 @@ comparisons against the expected-supply sequence.
    instant, grace allowance and claim window. `REQ-PIPE-053` did the
    low-runway warning measured in slots, and the exhausted-schedule
    state (Thread C). Each owns its own decisions.
+
+   **Owns:** `REQ-PIPE-051`, `REQ-PIPE-052`, `REQ-PIPE-053`
 
    **One deliberate hold on `REQ-PIPE-053`, and it is why that
    requirement's `built` overclaims.** Its criteria about failing at
@@ -1429,12 +1441,14 @@ comparisons against the expected-supply sequence.
    picker silently returns nothing on a quarterly asset until batch
    6.**
 
-7. **[done, 2026-09-26]** **[Pipeline & publishing]** **Delivery
+7. **[blocked, 2026-09-26]** **[Pipeline & publishing]** **Delivery
    recognition and file mapping.** What constitutes a delivery for a
    given source (folder, prefix, session); the per-dataset filename
    pattern that maps a file to a table; the **hold for a human** when
    two files in one delivery match one dataset's pattern (Thread H,
    second chaos pass #3/#4).
+
+   **Owns:** `REQ-PIPE-057`, `REQ-PIPE-058`, `REQ-PIPE-059`
 
    **New sprint, added 2026-09-22.** The delivery boundary is
    load-bearing - it is what replaced the clock-driven trigger - and
@@ -1446,10 +1460,12 @@ comparisons against the expected-supply sequence.
    three signed 2026-09-23 and BUILT 2026-09-25. Before this, arrival and staging assumed a delivery
    had already been recognised and its files already attributed.
 
-8. **[done, 2026-09-26]** **[Pipeline & publishing]** **Arrival and
+8. **[blocked, 2026-09-26]** **[Pipeline & publishing]** **Arrival and
    staging.** Our own receipt timestamp, never the supplier's; staging
    asserting only arrival facts; replay in arrival-timestamp order
    (Threads B and H).
+
+   **Owns:** `REQ-PIPE-060`, `REQ-PIPE-061`
 
    Arrival order is load-bearing, not tidiness: assignment reads slot
    state, so discovery order changes the answer.
@@ -1478,10 +1494,12 @@ comparisons against the expected-supply sequence.
    blocker does not bite here either. If QA ever moves earlier than 15,
    this split stops holding and both halves have to move together.
 
-9. **[done, 2026-09-26]** **[Pipeline & publishing]** **Slot
+9. **[blocked, 2026-09-26]** **[Pipeline & publishing]** **Slot
    assignment.** Claim windows, on-time-wins-for-the-current-slot,
    monotonic filling, and hold-for-a-human when nothing is confidently
    claimable (Threads E and H).
+
+   **Owns:** `REQ-PIPE-062`, `REQ-PIPE-063`, `REQ-PIPE-064`, `REQ-PIPE-065`
 
    The highest-risk sprint in the plan - two cascades were found here by
    stress-testing, one created by the fix for the other.
@@ -1494,9 +1512,11 @@ comparisons against the expected-supply sequence.
    rule having its own criteria and its own tests. All four signed
    2026-09-23 and BUILT 2026-09-25.
 
-10. **[done, 2026-09-26]** **[Pipeline & publishing]** **Arrival
+10. **[blocked, 2026-09-26]** **[Pipeline & publishing]** **Arrival
    classification.** Early / on-time / late against the ASSIGNED slot,
    never a slot re-derived from the arrival date (Thread D).
+
+   **Owns:** `REQ-PIPE-066`, `REQ-PIPE-067`
 
    Separate from sprint 9 so the assignment rules can be verified before
    anything reports on them.
@@ -1511,6 +1531,8 @@ comparisons against the expected-supply sequence.
     landing in a filled slot never (Thread B). Plus the **mixed-period
     delivery gate** - a delivery whose tables land in different PERIODS
     runs QA but never auto-promotes (Thread H, TS-33).
+
+    **Owns:** nothing yet - this sprint is unscoped.
 
     *Scope grew 2026-09-22*: the mixed-period gate is a promotion rule
     rather than an assignment one, so it lives here. Note its condition
@@ -1558,6 +1580,8 @@ comparisons against the expected-supply sequence.
     scope); and the log **refusing to record a decision with no
     identity** (Thread G).
 
+    **Owns:** nothing yet - this sprint is unscoped.
+
     *Scope grew 2026-09-22*: the write path is GitHub Issues, from the
     standing principle that the dashboard is read-only. It extends
     `ticket_sync.py`'s existing `/accept` mechanism rather than being
@@ -1577,11 +1601,13 @@ comparisons against the expected-supply sequence.
     the triggering event, so a cancelled run costs nothing. Settled
     2026-09-22, see Thread H.
 
-13. **[done, 2026-09-26]** **[Pipeline & publishing]** **SPLIT
+13. **[blocked, 2026-09-26]** **[Pipeline & publishing]** **SPLIT
     2026-09-24 (Keith). What remains here is SCHEMA-PER-PERIOD**; the
     single-database half - retiring the per-run warehouses, one database
     per test worker (Thread J) - **moved to sprint 8**, because staging
     has nowhere to stage into without it.
+
+    **Owns:** `REQ-PIPE-035`
 
     **Scoped and BUILT**: `REQ-PIPE-035` carries schema-per-period in
     its criteria 1, 2, 3, 5 and 9 - one run against one period's
@@ -1610,9 +1636,13 @@ comparisons against the expected-supply sequence.
     this entry knew is on the requirement; the surrounding sprint list
     stays whole until its last dependent batch is built.
 
-15. **[done, 2026-09-26]** **[Pipeline & publishing]** **Delivery-
+    **Owns:** `REQ-PIPE-038`
+
+15. **[blocked, 2026-09-26]** **[Pipeline & publishing]** **Delivery-
     triggered QA.** `REQ-PIPE-036` - QA runs once per DELIVERY, per
     period touched, rather than per table arrival.
+
+    **Owns:** `REQ-PIPE-036`
 
     *Reworded 2026-09-22*: the requirement's intent survives - Child
     Protection's QA stays independent of Birth Registrations' - but the
@@ -1621,11 +1651,13 @@ comparisons against the expected-supply sequence.
     `REQ-PIPE-036` was revised against this the same day, so the sprint
     can be built from the requirement as it now stands.
 
-16. **[in-progress, 2026-09-26]** **[QA checks & contract]** **Check
+16. **[blocked, 2026-09-26]** **[QA checks & contract]** **Check
     dependencies, and the zero-active-checks gate.** `depends_on` on
     multi-table checks plus its validation, and `REQ-QAC-037` lifting
     cross-table checks to the collection scope (Thread I). Plus the CI
     gate failing a table with **zero ACTIVE checks** (TS-21).
+
+    **Owns:** `REQ-QAC-037`
 
     The cannot-run rule is not computable without `depends_on` - "any
     table it spans" is not knowable from a tool's check syntax.
@@ -1648,15 +1680,21 @@ comparisons against the expected-supply sequence.
     The status, its qualifying chip, and the pointer indicator on a
     healthy table blocked by a neighbour (Thread I).
 
-18. **[done, 2026-09-26]** **[QA checks & contract]** **Drift and trend
+    **Owns:** nothing yet - this sprint is unscoped.
+
+18. **[blocked, 2026-09-26]** **[QA checks & contract]** **Drift and trend
     dependencies.** A declared temporal reference; missing-but-expected
     is red, no-prior-period is `nodata`. `REQ-PIPE-035` was rewritten
     2026-09-22 and now carries both cases as acceptance criteria, so
     this sprint no longer has to fix the requirement before building
     it. BUILT 2026-09-25 - criteria 7 and 8 are the two cases.
 
+    **Owns:** `REQ-PIPE-035`
+
 19. **[done, 2026-09-26]** **[Dashboard UI]** **Supply history and
     as-of under per-dataset arrivals.** `REQ-DASH-041`, BUILT.
+
+    **Owns:** `REQ-DASH-041`
 
 20. **[todo, 2026-09-21]** **[Dashboard UI]** **Freshness axis and
     banners.** Freshness capping the headline status; the
@@ -1664,8 +1702,12 @@ comparisons against the expected-supply sequence.
     when the pipeline that would have produced results did not run);
     arrival-into-a-filled-slot; the blocked-check pointer (Threads C and I).
 
+    **Owns:** nothing yet - this sprint is unscoped.
+
 21. **[todo, 2026-09-21]** **[Dashboard UI]** **Decision-log display and
     the as-corrected default** (Thread K).
+
+    **Owns:** nothing yet - this sprint is unscoped.
 
 22. **[todo, 2026-09-22]** **[Dashboard UI]** **The activity feed.**
     `CHANGELOG_FEED` (built by `qa_tools/common/changelog.py`) stops
@@ -1677,6 +1719,8 @@ comparisons against the expected-supply sequence.
     significant - so a routine early arrival reads differently from
     something needing action (Threads B and H).
 
+    **Owns:** nothing yet - this sprint is unscoped.
+
     **New sprint, added 2026-09-22.** It came out of TS-10 and TS-15 and
     had no home. Not `RELEASE_NOTES` (the repo-root `CHANGELOG.yaml`
     tracking the PoC's own development), which is a different feed and
@@ -1685,11 +1729,15 @@ comparisons against the expected-supply sequence.
 23. **[todo, 2026-09-21]** **[Dashboard UI]** **Automatic snapshots**, on
     every publish, deduplicated by content hash (Thread K).
 
+    **Owns:** nothing yet - this sprint is unscoped.
+
 24. **[todo, 2026-09-22]** **[Dashboard UI]** **Time-granular "as at".**
     The as-of control accepts an optional TIME alongside the date, so an
     intra-day sequence - promoted 14:00, demoted 22:00 - can be viewed
     at any point rather than only at its end state (Thread H, second
     chaos pass #6).
+
+    **Owns:** nothing yet - this sprint is unscoped.
 
     Scoped in at Keith's request, 2026-09-22, having first been recorded
     as an unscoped later refinement.
@@ -1718,6 +1766,8 @@ comparisons against the expected-supply sequence.
     at the previous period.** Keith, 2026-09-24. A genuinely new
     concept, adjacent to promotion and rejection (sprint 11) rather than
     part of either, and it has no requirement anywhere yet.
+
+    **Owns:** nothing yet - this sprint is unscoped.
 
     **NAME COLLISION, FLAGGED FIRST because this file has been bitten
     by exactly this before** (see "The collision: delivery already means

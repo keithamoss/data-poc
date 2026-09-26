@@ -33,6 +33,9 @@ describe("plansStatusLabel / plansStatusPill", () => {
     ["todo", "To do"],
     ["parked", "Parked"],
     ["superseded", "Superseded"],
+    // REQ-DOCS-072 - a sprint that has built everything it owns and
+    // whose remaining criteria all belong to another sprint.
+    ["blocked", "Blocked"],
   ])("labels %s as %s", (status, label) => {
     const w = load();
     expect(w.plansStatusLabel(status)).toBe(label);
@@ -48,6 +51,16 @@ describe("plansStatusLabel / plansStatusPill", () => {
     expect(w.plansStatusPill("done")).toContain("pill green");
     expect(w.plansStatusPill("parked")).toContain("pill nodata");
   });
+
+  it("gives blocked a quiet pill, not an amber one", () => {
+    // Grey on purpose: nothing is happening inside a blocked sprint and
+    // the action belongs to its blocker, so amber would compete with
+    // the entries that genuinely want attention now.
+    const w = load();
+    expect(w.plansStatusPill("blocked")).toContain("pill nodata");
+    expect(w.plansStatusPill("blocked")).not.toContain("amber");
+  });
+
 });
 
 describe("inlinePlansMd", () => {
@@ -155,6 +168,18 @@ describe("plansEntryMatchesFilter", () => {
     const w = load();
     renderedView(w);
     expect(w.plansEntryMatchesFilter(entry({}))).toBe(true);
+  });
+
+  it("offers blocked as a real filter chip", () => {
+    // REQ-DOCS-072. Asserted by clicking the chip rather than by
+    // reading PLANS_ALL_STATUSES, which is a const and so never
+    // reaches `window` - and which would prove the list contains a
+    // string, not that the filter works.
+    const w = load();
+    const view = renderedView(w);
+    clickChip(view, "status", "blocked");
+    expect(w.plansEntryMatchesFilter(entry({ status: "blocked" }))).toBe(true);
+    expect(w.plansEntryMatchesFilter(entry({ status: "done" }))).toBe(false);
   });
 
   it("excludes an entry whose status isn't in a non-empty status filter, once a status chip is clicked", () => {
