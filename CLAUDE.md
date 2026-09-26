@@ -389,12 +389,21 @@ Rough layout:
   now installed and verified (2026-09-18 night, `plans/running-
   thoughts.md` #12): the real dbt-target-path collision this bullet
   used to flag as unchecked was confirmed real (reproduced it), fixed
-  at the source (`evaluate_dbt_bdm()`/`evaluate_dbt_cp()` now build
-  `target_path` from `DUCKDB_RUNS_DIR`/`CP_DUCKDB_RUNS_DIR` - already
-  genuinely unique per run, already monkeypatched to a per-worker tmp
-  dir in tests - instead of the fixed, repo-relative `dbt_project/
-  target/`), and the other 3 tools' own fixtures were confirmed already
-  safe (their scratch dirs were already monkeypatched to per-worker
+  at the source: `target_path` stopped being the fixed, repo-relative
+  `dbt_project/target/` that every invocation shared, and became a
+  per-run path instead. **The mechanism has since changed and the old
+  names are gone** - it was `DUCKDB_RUNS_DIR`/`CP_DUCKDB_RUNS_DIR`,
+  which REQ-PIPE-068 retired along with the per-run DuckDB files
+  themselves; grepping for either env var now finds nothing. Today it
+  is `qa_tools/common/supply_db.py`'s own `dbt_target_path(run_id)`,
+  hanging off the supply database's own directory, so a test worker
+  with its own database gets its own dbt scratch for free - the
+  per-worker uniqueness inherited rather than re-invented. Note the
+  retired layout leaves real litter behind: a checkout that ran the
+  pipeline before 068 still has `data/duckdb_runs/` and
+  `data/cp_duckdb_runs/` on disk (407MB in this sandbox), read by
+  nothing and safe to delete. The other 3 tools' own fixtures were
+  confirmed already safe (their scratch dirs were already monkeypatched to per-worker
   `tmp_path_factory` dirs). **Parallel is now the DEFAULT** (2026-09-19,
   Keith's own call, reversing the earlier serial-by-default preference):
   `pyproject.toml`'s `addopts = "-n auto --dist loadfile"` means a bare

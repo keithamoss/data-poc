@@ -13706,9 +13706,9 @@ requirements:
     date_written: "2026-09-26"
     story: >
       As a data engineer deciding what goes into a period, I want to
-      promote, reject, demote or re-file from the GitHub ticket I am
-      already working, and from the terminal when I am already there, so
-      that a decision is a comment rather than a deployment and neither
+      record a filing decision from the GitHub ticket I am already
+      working, and from the terminal when I am already there, so that
+      a decision is a comment rather than a deployment and neither
       route can do something the other cannot.
     moscow: must
     status: not_started
@@ -13720,11 +13720,14 @@ requirements:
       2026-09-26.
     acceptance_criteria:
       - >
-        THE SYSTEM SHALL accept promote, reject, demote and re-file as
-        structured decisions raised on a dataset's own GitHub ticket.
+        THE SYSTEM SHALL accept promote, reject, demote, re-file,
+        substitute, inherit and un-inherit as structured filing
+        decisions raised on a dataset's own GitHub ticket, and every
+        criterion below that says "a filing decision" SHALL mean any
+        one of those seven.
       - >
-        THE SYSTEM SHALL offer those same four operations in the mothman
-        TUI.
+        THE SYSTEM SHALL offer every one of those operations in the
+        mothman TUI.
       - >
         THE SYSTEM SHALL write an identical decision-log entry whichever
         route raised the decision, and SHALL NOT give either route an
@@ -13738,15 +13741,14 @@ requirements:
         SYSTEM SHALL refuse it.
       - >
         THE SYSTEM SHALL treat GitHub as the input channel and the
-        committed log as the record, and SHALL NOT read current filing
+        decision log as the record, and SHALL NOT read current filing
         state back out of an issue.
       - >
-        WHEN a decision's entry has reached the shared log, THE SYSTEM
-        SHALL report its outcome on that dataset's ticket whichever
-        route raised it, so that a decision taken in the terminal
-        appears there in the same way one raised on the ticket does -
-        on the push that carries it rather than the instant it is
-        taken.
+        WHEN a decision's entry is committed to the decision log, THE
+        SYSTEM SHALL report its outcome on that dataset's ticket
+        whichever route raised it, so that a decision taken in the
+        terminal appears there in the same way one raised on the
+        ticket does.
       - >
         THE SYSTEM SHALL require explicit confirmation for a re-file
         whether or not its target slot already holds a promoted supply,
@@ -13758,7 +13760,7 @@ requirements:
         THE SYSTEM SHALL NOT add a control to the dashboard for any of
         these operations.
       - >
-        THE SYSTEM SHALL expose the four operations through one
+        THE SYSTEM SHALL expose every filing decision through one
         implementation, with each route as an adapter onto it.
       - >
         THE SYSTEM SHALL accept a filing decision only from an actor
@@ -13771,8 +13773,9 @@ requirements:
         "Promote" in this tool means the supply operation and nothing
         else.
       - >
-        THE SYSTEM SHALL offer the four operations from a standing queue
-        of supplies awaiting a decision, reachable from the main menu
+        THE SYSTEM SHALL offer the supply-scoped filing decisions -
+        promote, reject, demote and re-file - from a standing queue of
+        supplies awaiting a decision, reachable from the main menu
         without doing a QA run first.
       - >
         WHERE a real QA run a person has just done leaves its supply
@@ -13785,9 +13788,9 @@ requirements:
         recorded each of them, and SHALL NOT show only the decisions
         raised through the terminal.
       - >
-        WHERE a route is looking at a copy of the log that is not
-        current, THE SYSTEM SHALL say so rather than presenting a stale
-        state as the current one.
+        IF the decision log is unreachable, THEN THE SYSTEM SHALL say
+        so and SHALL NOT present a committed export, a cached read or
+        any other copy as the current filing state.
       - >
         THE SYSTEM SHALL judge whether a decision is permitted against
         the filing state at the instant its entry is appended, and SHALL
@@ -13817,12 +13820,12 @@ requirements:
         treat it as a refusal or append a duplicate entry.
       - >
         THE SYSTEM SHALL record the PERSON as the actor on every
-        decision a person raises, on either route, and SHALL NOT record
-        the automated system, the workflow or the terminal that carried
-        it.
+        filing decision a person raises, on either route, and SHALL
+        NOT record the automated system, the workflow or the terminal
+        that merely carried it.
       - >
         THE SYSTEM SHALL require an explicit confirmation before
-        applying promote, reject, demote or re-file in the TUI.
+        applying any filing decision in the TUI.
       - >
         THE SYSTEM SHALL require a GitHub username on every person in
         contract/people.yaml who is not marked as a placeholder, SHALL
@@ -13830,9 +13833,33 @@ requirements:
         decision or be assigned a GitHub ticket.
       - >
         THE SYSTEM SHALL have the TUI write its decision to the
-        committed log alone, and SHALL NOT have it call GitHub, so that
-        a decision can be taken with no network and reaches the ticket
-        when the log is pushed.
+        decision log in the database alone, and SHALL NOT have it call
+        GitHub, so that the terminal route needs no GitHub
+        reachability and the ticket is updated by whatever already has
+        it.
+      - >
+        THE SYSTEM SHALL reach substitute, inherit and un-inherit per
+        period and dataset rather than from the supply queue, because
+        none of them answers "what do I do with this arriving supply"
+        - each is a decision about how a period is filled when a
+        supply for it never arrives.
+      - >
+        THE SYSTEM SHALL record substitute, inherit and un-inherit in
+        the decision log on the same terms as every other filing
+        decision - actor, reason, allowlist, refusal, GitHub parity -
+        so that the un-inherit an operator performs to unblock a
+        refused demotion is as accountable as the demotion itself.
+      - >
+        WHERE a period schema is created automatically by an arriving
+        supply, THE SYSTEM SHALL perform the inheritance the cadence
+        permits and SHALL record itself as the actor on those entries,
+        and WHERE an operator creates that schema SHALL record that
+        operator as the actor instead.
+      - >
+        THE SYSTEM SHALL let a reader of the decision log tell an
+        entry whose actor is the automated system from one whose actor
+        is a person, and SHALL NOT present an automatic inheritance as
+        something somebody decided.
     non_functional_requirements:
       - >
         SECURITY, and this was the one needing a real answer before
@@ -13848,16 +13875,19 @@ requirements:
         to either route inherits this exposure and has to say how it is
         closed.
       - >
-        COMPATIBILITY: the TUI route is the only one that works with no
-        network and no GitHub reachability, and criterion 27 is what
-        keeps that true now that a TUI decision has to reach the ticket
-        - the TUI writes the log and nothing else, and a workflow posts
-        the comment when the log is pushed. Had the TUI called GitHub
-        itself it would need gh auth on every operator's machine and
-        would fail exactly where this property matters. On a government
-        network where a third-party domain may not be reachable, this
-        may be the only route, which is a stronger argument for it than
-        convenience.
+        COMPATIBILITY: the TUI route is the MORE AVAILABLE of the two,
+        not an offline one. It needs the database and nothing else;
+        the GitHub route needs the database AND a reachable third-
+        party domain. On a government network where that domain may
+        not be reachable at all, the terminal may be the only route
+        that works, which is a stronger argument for it than
+        convenience. What this NFR no longer claims, deliberately:
+        that a decision can be taken with no network. It cannot, and
+        pretending otherwise was the offline promise dropped when the
+        log moved into the database - no database, no decision (Keith,
+        2026-09-26). Criterion 27 is still what keeps the weaker
+        property true: the TUI writes the log and nothing else, so it
+        needs no gh auth on every operator's machine.
       - >
         MAINTAINABILITY: two surfaces expressing one set of operations
         is two things to keep in step. One implementation with thin
@@ -13876,29 +13906,6 @@ requirements:
         same one-time-setup shape as playwright install chromium, and
         worth documenting where the other one is.
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-076, REQ-GHUB-027]
-    open_questions:
-      - >
-        WHERE criterion 18's "the instant its entry is appended" falls
-        for a TUI decision is NOT settled, and it is the heart of the
-        race this requirement otherwise closes. On GitHub the answer is
-        exact - something inside the environment applies the decision
-        against the current shared log. In the terminal, criterion 27
-        has the TUI write locally and criterion 17 concedes the clone
-        may be stale, so a decision can be permissible when taken and
-        impermissible when it lands. Decision 12 rules out settling it
-        by last-wins, which is for decisions that are each permissible.
-        FOUR OPTIONS WERE PUT TO KEITH AND NONE CHOSEN, because he
-        stepped back to a better question: pending-until-it-lands, so
-        the entry is written and judged only on arrival; judge locally
-        and void on arrival against a recorded precondition; refuse to
-        decide on a stale clone at all; or accept, detect and report.
-        SUPERSEDED IN PRIORITY by the decision-log-in-a-database
-        question (Keith, 2026-09-26) - a database has one serialisation
-        point and a transaction, so this ambiguity does not arise
-        there. See REQ-PIPE-074's own open question and
-        plans/running-thoughts.md #45. This requirement should not be
-        built until that is settled, because the answer changes what
-        criterion 18 means.
     decisions:
       - >
         NEITHER ROUTE IS PRIMARY - BOTH ARE FIRST-CLASS AND BOTH ARE
@@ -14208,6 +14215,49 @@ requirements:
         and this requirement is already unsigned pending the
         decision-log rewrite, so it should be done once, together, when
         that lands rather than twice.
+      - >
+        CRITERION 18'S RACE IS CLOSED BY THE LOG LIVING IN A DATABASE,
+        and this replaces the open question that stood here (Keith,
+        2026-09-26, plans/running-thoughts.md #45). Where "the instant
+        its entry is appended" falls had four candidate answers and
+        none was chosen: pending-until-it-lands, judge-locally-and-
+        void-on-arrival, refuse-to-decide-on-a-stale-clone, or accept-
+        detect-and-report. A database has one serialisation point and
+        a transaction, so that instant is a single well-defined thing
+        and the gap between judging a decision and landing it does not
+        exist. REJECTED with it: last-wins, which decision 12 had
+        already ruled out and which was only ever for decisions each
+        of which is permissible; and any scheme that writes an entry
+        first and validates it afterwards.
+      - >
+        SUBSTITUTE IS PERIOD-SCOPED, NOT SUPPLY-SCOPED (Keith,
+        2026-09-26). It sits with inherit and un-inherit outside
+        criterion 14's standing queue, which holds four operations
+        rather than five. The argument he accepted: substitution
+        points a period at ANOTHER period's supply, so like
+        inheritance it answers how a period gets filled when no supply
+        for it arrives - not what to do with one that has. REJECTED:
+        putting it in the queue alongside promote/reject/demote/re-
+        file (drafted that way first), and offering it from both
+        places, which is two entry points onto one operation to keep
+        consistent.
+      - >
+        AN AUTOMATIC INHERITANCE HAS AN ACTOR, AND IT DEPENDS ON WHO
+        STARTED IT (Keith, 2026-09-26). Where an operator runs the
+        init-schema command, that operator is the actor on everything
+        it creates. Where a period schema is created automatically by
+        an arriving supply there is no person, and the system records
+        ITSELF - which is why criterion 24 had to be widened: it read
+        as an absolute prohibition on recording the automated system,
+        so this would have contradicted a criterion rather than
+        carving out of one. Criterion 31 is the cost of that: with two
+        kinds of actor in one log, a reader must be able to tell them
+        apart, or a system entry looks like a person who is not on
+        criterion 12's allowlist. REJECTED: no automatic inheritance
+        without an operator, which leaves a period looking incomplete
+        until somebody attends to it; and never creating a schema
+        automatically, which means refusing or holding a supply for an
+        un-initialised period.
   - id: REQ-PIPE-083
     title: "An overdue slot becomes a ticket, once, whether or not anything else arrives"
     date_written: "2026-09-26"
