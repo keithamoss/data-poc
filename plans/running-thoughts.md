@@ -2911,5 +2911,82 @@ Belongs with batch 5's check work.
     Aurora 16 behaves identically, so it is a separate compatibility
     question rather than a version number to match.
 
-    **STILL UNREAD:** Aurora's divergences from vanilla PostgreSQL.
-    That domain is now allow-listed.
+    **AURORA, read 2026-09-26 from AWS's own docs.** Tip for whoever
+    reads them next: every page serves a MARKDOWN version at the same
+    URL with `.md` instead of `.html`, which parses cleanly where the
+    rendered HTML does not. Also note `WebFetch` reported
+    `docs.aws.amazon.com` as EGRESS_BLOCKED after Keith had
+    allow-listed it - the stale-tool-check trap CLAUDE.md already
+    warns about. A raw `curl` worked.
+
+    **THE VERSION ANCHOR: AURORA POSTGRESQL 16.8 LTS, and one fact
+    decides it.** Aurora designates long-term-support releases, and the
+    current two are **PostgreSQL 17.7** (released 18 December 2025) and
+    **PostgreSQL 16.8** (7 April 2025). LTS is built for exactly this
+    agency's profile - AWS's own stated criteria are that you cannot
+    afford downtime for upgrades, that your testing cycle per upgrade
+    is long, and that current features suffice - and an LTS minor takes
+    only critical stability and security fixes, patched about once a
+    year. **Staying on one requires auto minor version upgrade to be
+    DISABLED**, which is a setting, not a default.
+
+    **Why 16.8 rather than 17.7**: Ubuntu 24.04 ships ONLY
+    `postgresql-16` - verified, there is no `postgresql-17` package at
+    all - and `apt.postgresql.org`, which carries other majors, is
+    blocked by this session's egress policy. So anchoring on 17 would
+    make the cloud session permanently a major behind, which destroys
+    the alignment agreed above. Anchoring on 16.8 matches what the
+    cloud session (16.13) and the GitHub runner (16.15) already have,
+    and the Dev Container and CI pin `postgres:16.8` exactly. The
+    counter-argument, recorded rather than waved off: 17 buys roughly
+    another year of runway before end of life. If it is ever taken, the
+    cloud-session mismatch becomes a testing inconvenience rather than
+    a production problem - but it does end the all-aligned property.
+
+    **DO NOT HARDCODE A VERSION FROM THE DOCS.** Availability is
+    REGION-SPECIFIC, and AWS's own instruction is to query it:
+    `aws rds describe-db-engine-versions --engine aurora-postgresql
+    --query '*[].[EngineVersion]' --output text --region <region>`.
+    Confirm 16.8 exists in the target region before committing to it.
+
+    **AURORA HAS TWO VERSION NUMBERS**, which matters for the
+    assertion agreed above: the PostgreSQL engine version, and an
+    Aurora version from `aurora_version()`. They align closely from
+    13.3 onward. Gate on `current_setting('server_version_num')`,
+    which exists everywhere; **`aurora_version()` does NOT exist on
+    vanilla PostgreSQL**, so a check must not call it unguarded.
+
+    **THE MOST CONSEQUENTIAL DIVERGENCE IS NOT A FEATURE, IT IS THE
+    TOPOLOGY: THE PRIMARY INSTANCE HANDLES ALL DDL AND DML, AND UP TO
+    15 REPLICAS SERVE READ-ONLY TRAFFIC.** Map that onto this design
+    and every write is on the writer - loading a supply, creating a
+    per-run view schema, `ALTER TABLE ... SET SCHEMA` for promotion and
+    demotion. The reader endpoint looks like free capacity for the
+    CHECKS, and taking it would be a real hazard: the agreed shape is
+    load THEN check, so a check served by a lagging replica can miss
+    rows that were just loaded, or find the per-run view schema not yet
+    there. **That is a FALSE GREEN, the direction this project has
+    already been burned in.** So: everything goes to the cluster
+    (writer) endpoint, and the reader endpoint is explicitly rejected
+    as an optimisation rather than left as an obvious idea for somebody
+    to try. Worth knowing alongside it: the cluster and reader
+    endpoints survive failover where instance endpoints do not, and
+    during a failover the reader endpoint may briefly point at the new
+    primary.
+
+    **NO QUOTA ON SCHEMAS OR TABLES.** Checked because the model
+    creates a schema per period per dataset plus one per run, which at
+    30 datasets over years is a lot of them: Aurora's quotas are all
+    account-level or cluster-level (clusters, instances, endpoints,
+    parameter groups), and nothing limits schema or table COUNT. The
+    size limits are a 32 TiB maximum table for Aurora PostgreSQL. So
+    schema proliferation is a catalogue-performance question to keep an
+    eye on, not a hard ceiling.
+
+    **STILL UNREAD about Aurora, named rather than implied:** the role
+    model (Aurora has no true superuser, `rds_superuser` instead, which
+    may matter for schema ownership and the read-only grants the
+    never-touch-data rule would want), the extension allowlist,
+    Serverless v2, IAM database authentication, and `max_connections`,
+    which on Aurora is tied to instance class and matters at 30
+    datasets checked in parallel.
