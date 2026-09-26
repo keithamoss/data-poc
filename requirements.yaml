@@ -6696,6 +6696,31 @@ requirements:
         about prose that cites one. When a decision on one requirement
         changes, every other requirement naming it has to be re-read by
         hand, and this one was not."
+      - >
+        HELD UNTIL AFTER THE POSTGRESQL SWITCH (Keith, 2026-09-26),
+        and this is a sequencing decision rather than a change of mind
+        about the work. This requirement's whole deliverable is
+        injecting the scenarios into the committed qa_results/
+        history, and REQ-PIPE-089 retires that store - so building it
+        now would populate a tree that is about to stop existing, and
+        the injection itself is what would be done twice. Criterion 9
+        is the clearest case: "within the committed history" needs
+        restating against the database before anyone builds it.
+        Nothing is LOST by waiting, because REQ-GEN-042's own NFR 1
+        already records Keith's position on this history - "I don't
+        care. This is all just fake data. We can nuke it from orbit".
+        What waiting COSTS was accepted with eyes open: this
+        requirement blocks deferred criteria in REQ-GEN-045 and
+        REQ-DASH-046, so those wait on the switch too, and with batch
+        5 unsigned there is now nothing at all ready to build.
+        REJECTED: building it now and accepting the redo, on the
+        argument that the scenarios are the point and the store is
+        incidental - true as far as it goes, but the work here IS the
+        injection, so the redo is the whole job rather than a
+        migration. FOLLOW-UP nobody owns yet: REQ-GEN-045's and
+        REQ-DASH-046's own blocked_by entries name REQ-GEN-044 alone,
+        and now transitively wait on REQ-PIPE-089, which their data
+        does not say.
   - id: REQ-GEN-045
     title: A generated scenario map says where each scenario can be seen
     date_written: "2026-09-22"
@@ -17083,3 +17108,173 @@ requirements:
         Separated from REQ-PIPE-098 on the same grounds REQ-DASH-085
         was separated from REQ-PIPE-084: the database change and the
         labelling have different owners, tests and toolchains.
+  - id: REQ-DOCS-101
+    title: "Every requirement and document still saying the dashboard is built from committed files is brought into line, once"
+    date_written: "2026-09-26"
+    story: >
+      As whoever reads this register to find out what the system does,
+      I want exactly one account of where QA results live and who
+      publishes the dashboard, so that nobody is left choosing between
+      two signed requirements that contradict each other.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-26, choosing "one REQ-DOCS owns the sweep" over
+      amending each contradiction inside the batch that causes it. The
+      inventory below was verified clause by clause against the real
+      register the same evening rather than taken from
+      delivery-scoper's report, which named 7 of the 24 affected
+      clauses and called the total "around twenty".
+    acceptance_criteria:
+      - >
+        ONCE REQ-PIPE-089 and REQ-PIPE-092 are built, THE SYSTEM SHALL
+        leave no requirement asserting that qa_results/ is committed,
+        that the dashboard is rebuilt from committed history, or that
+        only CI can deploy.
+      - >
+        THE SYSTEM SHALL amend the six BUILT requirements whose
+        criteria describe shipped behaviour this switch changes -
+        REQ-PIPE-004 criteria 1 and 2, REQ-PIPE-005 criterion 1,
+        REQ-PIPE-069 criterion 4, REQ-PIPE-060 criterion 20,
+        REQ-PIPE-068 criterion 5, and REQ-GEN-045 criterion 4 - so
+        that none of them can be read as describing current behaviour.
+      - >
+        THE SYSTEM SHALL amend the four signed-but-unbuilt
+        requirements carrying falsified criteria - REQ-PIPE-074
+        criteria 11, 13 and 14, REQ-PIPE-081 criteria 3 and 14,
+        REQ-PIPE-078 criterion 4, and REQ-PIPE-075 NFR 5 - before any
+        of them is built.
+      - >
+        THE SYSTEM SHALL restate rather than delete the ten clauses
+        whose INTENT survives the switch - REQ-DASH-041 NFR 3,
+        REQ-DASH-054 criterion 4, REQ-DASH-056 criterion 5,
+        REQ-DASH-070 NFR 5, REQ-DASH-085 criterion 5, REQ-PIPE-083
+        criterion 3, REQ-DOCS-072 NFR 2, REQ-PIPE-057 criterion 19,
+        REQ-PIPE-077 NFR 2 and REQ-QAC-039 criterion 8 - each of which
+        forbids access to anything under data/ and each of which is
+        protecting something that survives.
+      - >
+        THE SYSTEM SHALL carry forward, in each amendment, what the
+        original clause was protecting, so that a reader can see the
+        rule was preserved rather than quietly dropped.
+      - >
+        THE SYSTEM SHALL bring CLAUDE.md,
+        docs/project-context-for-agents.md and
+        plans/publishing-and-history.md Thread A into line in the same
+        change as the register.
+      - >
+        THE SYSTEM SHALL leave no contradictory copy of the old
+        premise anywhere it has been stated, and SHALL gate that
+        mechanically rather than by review.
+      - >
+        THE SYSTEM SHALL NOT edit any signed requirement's decisions
+        field to make its past reasoning agree with the new design,
+        because a decision records what was known when it was taken.
+      - >
+        THE SYSTEM SHALL record what becomes of REQ-PIPE-081's census
+        - criteria 12, 15 and 16, which compare the decision log
+        against the warehouse catalogue and commit the discrepancies -
+        given that the comparison becomes one query inside one
+        database and there is nothing committed left to hold its
+        answer.
+      - >
+        THE SYSTEM SHALL settle whether REQ-PIPE-038's criteria are
+        retired or restated, that requirement having re-keyed the
+        committed tree per dataset eleven days before this switch
+        retires the tree.
+      - >
+        THE SYSTEM SHALL leave every requirement it amends still
+        readable as a requirement, and SHALL NOT reduce one to a
+        pointer at another.
+    non_functional_requirements:
+      - >
+        CORRECTNESS OVER COMPLETENESS, and this is the real risk
+        rather than effort: a half-done sweep is worse than none,
+        because it leaves the register reading as though it agrees
+        with itself while some clauses still carry the old premise.
+        The mechanical gate in criterion 7 is what makes the
+        difference, and it is the same shape as the check this project
+        uses elsewhere - a scan with an explicit allowlist of the
+        cases that legitimately still mention the old words, so a new
+        contradiction cannot be added silently.
+      - >
+        TRACEABILITY: this touches fifteen signed requirements, six of
+        them describing shipped code. Anyone reading one of them a
+        year from now needs to be able to tell an amendment made by
+        this sweep from the requirement's original text. Whatever form
+        that takes, it must not be a matter of remembering which
+        commit did it.
+      - >
+        SCOPE DISCIPLINE: four requirements matched a scan for the old
+        premise and are NOT affected - REQ-DASH-055 NFR 4 and the
+        notes on REQ-GEN-042 and REQ-GEN-043 merely mention the words.
+        They are named here so a later reader does not amend them for
+        consistency's sake and change what they mean.
+      - >
+        NO BEHAVIOUR CHANGE. This requirement edits text. If applying
+        it appears to require a code change, that is a signal the
+        amendment has gone beyond restating and should be a criterion
+        on the requirement that owns the behaviour instead.
+    dependencies: [REQ-PIPE-089, REQ-PIPE-092, REQ-PIPE-074, REQ-PIPE-081]
+    open_questions:
+      - >
+        ITS SCOPE IS NOT FINAL until question sets B and C are
+        answered. Set B2 decides whether the delivery log, load
+        records, outstanding holds, the processing marker and the
+        scenario map follow qa_results/ into the database - which
+        determines whether REQ-PIPE-069 criterion 4, REQ-PIPE-060
+        criterion 20 and REQ-GEN-045 criterion 4 are falsified at all,
+        or merely lose their stated rationale. Set C decides how the
+        built artifact reaches Pages, which determines what
+        REQ-PIPE-005 criterion 1 is amended TO rather than merely away
+        from.
+      - >
+        Whether criterion 7's gate is a pytest test over the register
+        and the docs, or a tenth mothman check validator. A validator
+        is more visible and runs in the same place as the other nine;
+        a test is cheaper and can assert over prose files without a
+        new command. Either satisfies the criterion.
+    decisions:
+      - >
+        ONE REQUIREMENT OWNS THE WHOLE SWEEP, rather than each
+        contradiction being amended inside the batch that causes it
+        (Keith, 2026-09-26, choosing between three options). What the
+        per-batch route could not cover is what decided it: the ten
+        wording-only clauses belong to no drafted requirement, so
+        nobody would have owned them, and the register would have held
+        contradictory claims about shipped code for as long as the
+        batch took. REJECTED with it: amending only the six built ones
+        now and leaving the rest, which stops the register lying about
+        shipped code soonest but splits one editing job into two with
+        no gate over the whole.
+      - >
+        THE INVENTORY IS 24 CLAUSES ACROSS 24 REQUIREMENTS, verified
+        individually rather than trusted. delivery-scoper named seven
+        and estimated "around twenty"; a scan of the real register for
+        the committed-history premise found the premise in a criterion
+        or an NFR in 24 requirements, and in a decisions field in 14
+        more. Ten of the 24 it had not named at all. Recorded because
+        the estimate was close enough to sound like the answer, and
+        the four false positives in the same scan are why the list is
+        named explicitly rather than regenerated by whoever does the
+        work.
+      - >
+        A DECISIONS FIELD IS NEVER AMENDED TO AGREE WITH THE PRESENT
+        (criterion 8). Two references in REQ-PIPE-074's decisions
+        already point at an open question REQ-GHUB-082 no longer has,
+        and they were deliberately left alone on 2026-09-26: that
+        prose was accurate when written, and 082's replacement
+        decision opens by saying it replaces the open question that
+        stood there. Rewriting a signed requirement's record of what
+        was known at the time would falsify it to tidy a pointer that
+        resolves itself.
+      - >
+        THE TEN WORDING-ONLY CLAUSES GET STRONGER, NOT WEAKER, and
+        that is the argument for restating rather than deleting them.
+        Each forbids the dashboard build from reading anything under
+        data/, which was enforced by convention and by CI having no
+        credentials. Under REQ-PIPE-089 criterion 7 the publisher gets
+        a role that reads the metadata schema and no supply data, so
+        the same rule becomes a database grant. The clause that reads
+        like an obstacle to the switch is actually the thing the
+        switch implements properly.
