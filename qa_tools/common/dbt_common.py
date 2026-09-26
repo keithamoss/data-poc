@@ -15,7 +15,6 @@ import os
 import re
 import subprocess
 
-from psycopg import conninfo
 
 from qa_tools.common import supply_db
 
@@ -57,12 +56,12 @@ def run_dbt(command: str, select: list[str], target_path: str,
     # one DSN, and the three forms that DSN legitimately takes - a URL, a
     # keyword string, and a unix socket as `?host=/tmp` - are exactly
     # where a hand-rolled parser gets one wrong.
-    info = conninfo.conninfo_to_dict(supply_db.supply_db_dsn())
-    env["DBT_PG_HOST"] = info.get("host", "localhost")
-    env["DBT_PG_PORT"] = str(info.get("port", 5432))
-    env["DBT_PG_USER"] = info.get("user", "")
-    env["DBT_PG_PASSWORD"] = info.get("password", "")
-    env["DBT_PG_DBNAME"] = info.get("dbname", "")
+    fields = supply_db.connection_fields()
+    env["DBT_PG_HOST"] = fields["host"]
+    env["DBT_PG_PORT"] = fields["port"]
+    env["DBT_PG_USER"] = fields["user"]
+    env["DBT_PG_PASSWORD"] = fields["password"]
+    env["DBT_PG_DBNAME"] = fields["dbname"]
     env["DBT_PG_SCHEMA"] = supply_db.DBT_SCHEMA
     if run_schema:
         env["DBT_RUN_SCHEMA"] = run_schema

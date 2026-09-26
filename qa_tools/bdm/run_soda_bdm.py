@@ -1,7 +1,7 @@
 """
-Runs REAL Soda Core (soda-core-duckdb) against this project's actual
+Runs REAL Soda Core (soda-core-postgres) against this project's actual
 contract/bdm-birth-registrations-soda-checks.yml, via Soda's own Python
-Scan API (add_duckdb_connection + add_sodacl_yaml_file) - not a
+Scan API (add_configuration_yaml_str + add_sodacl_yaml_file) - not a
 reimplementation, this hands the real SodaCL file to the real soda-core
 engine and reads back its own scan results.
 
@@ -109,20 +109,28 @@ _CUSTOM_CHECK_DIMENSION = {
 def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     from soda.scan import Scan
 
-    # READ-ONLY, and that is load-bearing rather than tidy: DuckDB lets
-    # any number of readers share one database and lets a single writer
-    # exclude all of them, so a reader that opened read-write would lock
-    # out every other worker in the fan-out (REQ-PIPE-068).
+    # READ-ONLY, and it now means what it says rather than protecting
+    # other workers: the retired engine let one writer lock out every
+    # reader, so this flag was load-bearing for the fan-out. PostgreSQL
+    # has no such contention, so it is simply a reader that cannot write
+    # what it is measuring (REQ-PIPE-087).
     conn = supply_db.connect(read_only=True)
-    # Soda's checks file refers to bare table names, so the run's own
-    # view schema goes on the search path - one arrival's rows, resolved
-    # only where exactly one staged table claims the name.
-    conn.execute(f"SET search_path = '{supply_db.run_schema(run_id)}'")
+    # The run's own view schema on the search path - one arrival's rows,
+    # resolved only where exactly one staged table claims the name. `TO`
+    # with a quoted identifier rather than `= '...'`, which was the
+    # retired engine's spelling.
+    conn.execute(f'SET search_path TO "{supply_db.run_schema(run_id)}"')
     n_total = conn.execute("SELECT COUNT(*) FROM birth_registrations").fetchone()[0]
 
     scan = Scan()
     scan.set_data_source_name("birth_registrations")
-    scan.add_duckdb_connection(conn, data_source_name="birth_registrations")
+    # CONFIGURED RATHER THAN HANDED A CONNECTION (REQ-PIPE-087).
+    # soda-core-duckdb took the live connection object this code already
+    # had open; soda-core-postgres has no equivalent, so the run's view
+    # schema reaches Soda as its data source's own `schema` - which is
+    # what the SET search_path above was doing for the shared connection.
+    scan.add_configuration_yaml_str(supply_db.soda_config_yaml(
+        "birth_registrations", supply_db.run_schema(run_id)))
     scan.add_sodacl_yaml_file(SODA_CHECKS_PATH)
     sampler = CaptureSampler()
     scan.sampler = sampler

@@ -31,9 +31,10 @@ from __future__ import annotations
 import os
 
 from . import bdm_common
+from qa_tools.common import supply_db
 from qa_tools.common.datacontract_common import (
     ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
-    run_against_local_server, failing_sample_keys, check_id_from_quality_definition,
+    run_against_warehouse, failing_sample_keys, check_id_from_quality_definition,
     fail_threshold_from_quality_definition,
 )
 from qa_tools.common.check_lifecycle import (
@@ -99,7 +100,14 @@ def _resolve_csv(csv_path: str) -> str:
     return csv_path if os.path.isabs(csv_path) else os.path.join(RAW_DIR, csv_path)
 
 def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str) -> list[dict]:
-    run = run_against_local_server(CONTRACT_PATH, _resolve_csv(csv_filename))
+    # THE WAREHOUSE, NOT THE FILE (REQ-QAC-088). This tool used to read
+    # the supplier's CSV directly, which made it the one tool answering a
+    # different question from the other three - they checked what had
+    # been loaded, it checked what had been sent. `csv_filename` is kept
+    # in the signature because callers pass it and other parts of this
+    # module still use it for reporting, but it no longer decides what is
+    # checked.
+    run = run_against_warehouse(CONTRACT_PATH, supply_db.run_schema(run_id))
 
     results = []
     for c in run.checks:

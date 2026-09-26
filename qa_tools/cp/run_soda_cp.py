@@ -1,5 +1,5 @@
 """
-Runs REAL Soda Core (soda-core-duckdb) against
+Runs REAL Soda Core (soda-core-postgres) against
 contract/child-protection-soda-checks.yml, via Soda's own Python Scan API -
 the Child Protection counterpart to qa_tools/bdm/run_soda_bdm.py.
 Soda's own scan results carry which table each check belongs to
@@ -57,14 +57,20 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
     from soda.scan import Scan
 
     # Read-only, and the run's own view schema on the search path - see
-    # the BDM counterpart for why both matter (REQ-PIPE-068).
+    # the BDM counterpart for what each now means (REQ-PIPE-087).
     conn = supply_db.connect(read_only=True)
-    conn.execute(f"SET search_path = '{supply_db.run_schema(run_id)}'")
+    conn.execute(f'SET search_path TO "{supply_db.run_schema(run_id)}"')
     n_total_by_table = {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in cp_common.TABLES}
 
     scan = Scan()
     scan.set_data_source_name("cp_collection")
-    scan.add_duckdb_connection(conn, data_source_name="cp_collection")
+    # CONFIGURED RATHER THAN HANDED A CONNECTION (REQ-PIPE-087).
+    # soda-core-duckdb took the live connection object this code already
+    # had open; soda-core-postgres has no equivalent, so the run's view
+    # schema reaches Soda as its data source's own `schema` - which is
+    # what the SET search_path above was doing for the shared connection.
+    scan.add_configuration_yaml_str(supply_db.soda_config_yaml(
+        "cp_collection", supply_db.run_schema(run_id)))
     scan.add_sodacl_yaml_file(SODA_CHECKS_PATH)
     sampler = CaptureSampler()
     scan.sampler = sampler

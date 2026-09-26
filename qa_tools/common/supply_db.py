@@ -357,6 +357,58 @@ def load_csv_into(conn: SupplyConnection, schema: str, table: str,
         duck.close()
 
 
+def connection_fields() -> dict[str, str]:
+    """The DSN broken into the discrete fields other tools want.
+
+    ONE PARSE, SEVERAL FORMATS. dbt wants host/port/user/dbname keys in a
+    profile, Soda wants them in its own configuration YAML, and
+    datacontract-cli wants them in environment variables - so the parsing
+    happens once, here, and each tool's module formats what it needs.
+    Three call sites each doing their own is three chances to disagree
+    about what an empty password or a unix socket means.
+
+    psycopg's own conninfo parser rather than a regex, because the DSN
+    legitimately takes three shapes - a URL, a keyword string, and a unix
+    socket expressed as `?host=/tmp` - and a hand-rolled parser gets one
+    of the three wrong.
+    """
+    from psycopg import conninfo
+    info = conninfo.conninfo_to_dict(supply_db_dsn())
+    return {
+        "host": str(info.get("host", "localhost")),
+        "port": str(info.get("port", 5432)),
+        "user": str(info.get("user", "")),
+        "password": str(info.get("password", "")),
+        "dbname": str(info.get("dbname", "")),
+    }
+
+
+def soda_config_yaml(data_source_name: str, schema: str) -> str:
+    """Soda Core's own data-source configuration, for one run's schema.
+
+    REPLACES add_duckdb_connection(), which took a live connection object
+    this code already had open. soda-core-postgres has no equivalent - it
+    is configured rather than handed a connection - so the run's view
+    schema arrives here as the data source's `schema`, which is what the
+    old `SET search_path` on that shared connection was doing.
+
+    The password is written only when there is one. An empty `password:`
+    key is not the same as no key to every driver, and this project's own
+    local and dev-container databases authenticate without one.
+    """
+    f = connection_fields()
+    lines = [f"data_source {data_source_name}:",
+             "  type: postgres",
+             f"  host: {f['host']}",
+             f"  port: {f['port']}",
+             f"  username: {f['user']}",
+             f"  database: {f['dbname']}",
+             f"  schema: {schema}"]
+    if f["password"]:
+        lines.insert(5, f"  password: {f['password']}")
+    return "\n".join(lines) + "\n"
+
+
 def connect_dbt(read_only: bool = True) -> SupplyConnection:
     """A connection whose UNQUALIFIED names are dbt's own models.
 

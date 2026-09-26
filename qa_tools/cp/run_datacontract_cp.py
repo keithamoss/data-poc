@@ -28,9 +28,10 @@ covered by datacontract-cli's include_failed_samples at all.
 from __future__ import annotations
 import os
 
+from qa_tools.common import supply_db
 from qa_tools.common.datacontract_common import (
     ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
-    run_against_local_server, failing_sample_keys, check_id_from_quality_definition,
+    run_against_warehouse, failing_sample_keys, check_id_from_quality_definition,
     fail_threshold_from_quality_definition,
 )
 from qa_tools.common.check_lifecycle import (
@@ -79,7 +80,9 @@ CHECK_NAME_BY_ID = name_by_check_id(parse_contract_check_metadata(CONTRACT_PATH)
 
 
 def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
-    run = run_against_local_server(CONTRACT_PATH, os.path.join(CP_RAW_DIR, run_id, "{model}.csv"))
+    # The warehouse, not the six CSVs - see the BDM counterpart
+    # (REQ-QAC-088).
+    run = run_against_warehouse(CONTRACT_PATH, supply_db.run_schema(run_id))
 
     results = []
     for c in run.checks:
