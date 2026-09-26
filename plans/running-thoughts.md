@@ -3427,6 +3427,91 @@ Belongs with batch 5's check work.
       history, which he has said he will give up, and the public
       dashboard, which production probably does not want.
 
+    **ALL FOUR "HARDER" ITEMS ANSWERED (Keith, 2026-09-26 22:20), so
+    none of them blocks this.** Hosting: in production it is private
+    GitHub Pages on GitHub Enterprise, or an S3 static site behind a
+    security/auth layer, or dumped into SharePoint - and for the PoC he
+    is happy with public Pages as it stands. Chromium for the render
+    gate: built into the requirements and `pyproject.toml`. Build
+    availability coupling to a paused database: fine. Evaluation on
+    someone else's machine: they run their own local or dockerised
+    PostgreSQL.
+
+    **YES, `qa_results/` NEEDS AN EQUIVALENT IN THE DATABASE (Keith's
+    own question).** What it holds today is deliberately two things side
+    by side - `raw_output`, each tool's native payload, and `verified`,
+    the resolved dashboard-ready check records - plus the `dataset_stats`
+    and `tables_read` pseudo-tools and `run_by`/`run_timestamp`. That
+    split maps cleanly onto columns for `verified` and JSONB for
+    `raw_output`, and normalising `verified` buys what a file tree
+    cannot do: "every failure of this check over two years" becomes a
+    `WHERE` clause instead of the tree walk `qa_results_reader.py` does
+    today. **The exact schema is deliberately NOT settled** - Keith's
+    call was to let the scoper put the options properly rather than
+    decide it cold.
+
+    **WHAT STAYS IN THE REPOSITORY EITHER WAY:** code,
+    `contract/*.yaml`, the hand-authored check definitions (dbt `meta:`,
+    Soda `attributes:`, the ODCS `customProperties:`), `plans/*.md`,
+    `CHANGELOG.yaml`, and `dashboard/snapshots/*.html.gz`. The build
+    still needs a checkout. What leaves is `qa_results/` and the
+    decision-log export, and nothing else. One incidental win:
+    `build_results_from_history.py` exists as a SECOND code path
+    reproducing the live run's output, verified byte-identical - with a
+    database the run writes and the reader reads, so the duplication
+    that needed verifying largely stops existing.
+
+    **ONE DATABASE WITH ROLES FOR ISOLATION, NOT A SEPARATE METADATA
+    DATABASE (Keith, 2026-09-26, and he got there by pushing back on an
+    argument this session had overstated).** The claim made first was
+    that a separate metadata database means the dashboard build's
+    credentials "literally cannot" read supply data. **That was
+    overstated - it is a GRANT, not a wall.** Keith's push: "is there
+    really much protection when an automated pipeline will need a lambda
+    that triggers when a file arrives and writes that to the database?"
+    Correct, and the honest reframing is that what separation buys is
+    LEAST PRIVILEGE PER COMPONENT rather than isolation of the data -
+    the loader must have supply-write credentials, and that does not
+    weaken the publisher's lack of them. **But the same least-privilege
+    outcome is available from a ROLE in one database**, so a second
+    database adds only that a coarse boundary is harder to misconfigure
+    than a fine one, which is real (Postgres grants are fiddly - default
+    privileges, the `PUBLIC` schema, role inheritance) and modest.
+    **Against it is something concrete gained hours earlier:**
+    `REQ-PIPE-075` criterion 9's ordering rule collapsed into a single
+    transaction precisely because the log and the tables share a
+    database, and a separate metadata database hands that rule back.
+    Load-bearing cost against a modest benefit, so: one database, its
+    own schema for metadata, a role scoped to it.
+
+    **AND A REQUIREMENT-SHAPED GAP NOTHING OWNS: ENVIRONMENT
+    AWARENESS** (Keith's own question, 2026-09-26: an operator doing
+    local dev against their own PostgreSQL versus being hooked into
+    dev, non-prod or prod Aurora). It is more than a connection string,
+    and FOUR things need it. The connection details, trivially. SAFETY,
+    because an operator promoting or demoting must know whether they are
+    touching prod, which deserves different friction from local. THE
+    DASHBOARD MUST SAY WHICH ENVIRONMENT IT SHOWS, or a screenshot of
+    dev QA is indistinguishable from prod QA - the kind of thing that
+    ends up in a briefing. And the version assertion agreed above
+    (`current_setting('server_version_num')`) is per-environment by
+    definition.
+
+    **THE SHARP PART IS THE DEFAULT, and this project already has the
+    answer to that shape.** Defaulting to prod invites a fat-fingered
+    real change; defaulting to local is WORSE, because an operator runs
+    what they believe is a real operation and nothing tells them it went
+    nowhere. `delivery_boundary.py` treats a source stating nothing as a
+    FAILURE rather than a default, and `git_identity.py` hard-errors on
+    an unset identity rather than substituting a placeholder. Same
+    reasoning: **no default environment, and an unstated one is an
+    error.** `mothman` is the single entry point, so that is where it
+    belongs, with prod requiring something more deliberate than the
+    others. Worth considering alongside it: the decision log carrying
+    the environment on each entry - belt-and-braces where each
+    environment has its own database, but it makes a misrouted decision
+    visible rather than silent.
+
     **SETTLED 2026-09-26, and earlier than planned: THE DECISION LOG
     LIVES IN THE DATABASE, WITH A COMMITTED EXPORT.** Keith's original
     sequencing was Postgres first and this question second, on the
