@@ -12648,7 +12648,21 @@ requirements:
         an oversight. Also rejected a slot-level bar that lapses once a
         person fills the slot, as a third rule to explain for a case the
         first two already cover.
-
+      - >
+        POINTER ADDED 2026-09-26, and it CONSTRAINS criteria 1, 4 and 5
+        rather than merely relating to them. `REQ-PIPE-084` establishes
+        that a later period may STAND ON a promoted supply, through a
+        real view in that period's schema. Because a PostgreSQL view
+        binds to the object rather than the name, every operation this
+        requirement describes that MOVES the physical table - rejection
+        to the rejected schema, demotion back to staging - drags the
+        dependent view with it, leaving a later period silently serving
+        data a person just decided was not in effect. So `REQ-PIPE-084`
+        criterion 11 REFUSES any such decision while a later period
+        stands on the supply, naming the periods that block it, and the
+        operator clears them first. Nothing in this requirement's own
+        wording changes; what changes is that its operations can now be
+        refused for a reason that lives elsewhere.
   - id: REQ-PIPE-077
     title: A delivery whose tables land in different periods runs QA and never auto-promotes
     date_written: "2026-09-26"
@@ -13675,6 +13689,18 @@ requirements:
         CURRENT_IN_PLACE_ON/DEFAULT_IN_PLACE_ON, and openAsOfPanel/
         applyAsOf follow. Not fixed by a criterion, which requires only
         that the names match the label and that no file mixes the two.
+      - >
+        POINTER ADDED 2026-09-26 against criterion 9, which returns a
+        demoted supply's physical table to the staging schema.
+        `REQ-PIPE-084` now allows a later period to stand on a promoted
+        supply via a real view, and a PostgreSQL view binds to the
+        OBJECT - verified on 16.13, where `pg_get_viewdef` after a
+        schema move reads the table's NEW location and the view still
+        returns rows. So this criterion's move is exactly what would
+        carry a dependent view along with it. `REQ-PIPE-084` criterion
+        11 closes that by refusing the demotion while any later period
+        stands on the supply. The move itself is unchanged; its
+        PRECONDITION is not.
   - id: REQ-GHUB-082
     title: "An operator records a filing decision from GitHub or from the terminal, and both write the same entry"
     date_written: "2026-09-26"
@@ -14165,6 +14191,23 @@ requirements:
         acceptable for a PoC with one real user and is not a reason to
         weaken the allowlist; it is a reason for whoever deploys this
         for real to fill the file first.
+      - >
+        THE FOUR OPERATIONS ARE NO LONGER THE WHOLE SET, and this
+        requirement has not caught up (found 2026-09-26 from Keith's
+        own question about whether the TUI can create these views at
+        all). Criteria 1, 2, 11, 24 and 25 all enumerate promote,
+        reject, demote and re-file BY NAME. Since then
+        `REQ-PIPE-084` criterion 10 says its own decision arrives "from
+        the same operator routes as every other filing decision" - and
+        the word substitute appears nowhere here. Keith then settled
+        that INHERIT and UN-INHERIT are operator actions too, the
+        latter being what clears a period so a blocked demotion can
+        proceed. So the real set is SEVEN: promote, reject, demote,
+        re-file, substitute, inherit, un-inherit. **Deliberately NOT
+        edited yet** - widening the enumeration touches five criteria
+        and this requirement is already unsigned pending the
+        decision-log rewrite, so it should be done once, together, when
+        that lands rather than twice.
   - id: REQ-PIPE-083
     title: "An overdue slot becomes a ticket, once, whether or not anything else arrives"
     date_written: "2026-09-26"
@@ -14327,8 +14370,8 @@ requirements:
         routes as every other filing decision.
       - >
         IF any later period stands on a supply, THEN THE SYSTEM SHALL
-        refuse to demote it, and SHALL name every period that blocks
-        the demotion.
+        refuse to demote, reject or re-file it, and SHALL name every
+        period that blocks the decision.
       - >
         THE SYSTEM SHALL NOT change what any period resolves to as a
         side effect of a decision taken about a different period.
@@ -14532,6 +14575,21 @@ requirements:
         demotion itself belongs to `REQ-PIPE-076` criterion 5 and
         `REQ-PIPE-081` criterion 9, both SIGNED, so both may want a
         pointer to this constraint.
+      - >
+        THE REFUSAL COVERS DEMOTE, REJECT AND RE-FILE ALIKE (Keith,
+        2026-09-26, his own catch: "wouldn't re-filing kinda act like
+        demotion?"). It would, and so does rejection. All three MOVE
+        THE PHYSICAL TABLE out of the period it was promoted into -
+        demotion to staging (`REQ-PIPE-081` criterion 9), rejection to
+        the rejected schema (`REQ-PIPE-076` criterion 1), and a re-file
+        to another period's schema - and the dependent view follows the
+        object in every case, by the same binding this session verified.
+        So protecting only demotion would have left two identical holes
+        open. Rejected exempting re-file on the argument that it
+        corrects where a supply belonged, so a period standing on a
+        misfiled supply was wrong anyway: true, and it does not help,
+        because the view still follows the table into its new period and
+        goes on serving it from the wrong place.
   - id: REQ-DASH-085
     title: "A period standing in on an earlier one never reads as an ordinary green"
     date_written: "2026-09-26"

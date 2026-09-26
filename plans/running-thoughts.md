@@ -2904,7 +2904,48 @@ Belongs with batch 5's check work.
        real meaning and this needs NO NEW REASON CODE** - an annual
        dataset standing on February HAS an object in Q3. What is left
        to specify is when the view is created and what it points at,
-       not how to report its absence.
+       not how to report its absence - **and that got
+       settled too, 2026-09-26, from three questions Keith asked about
+       how an operator actually works this.**
+
+       - **INHERIT AND UN-INHERIT ARE REAL OPERATOR ACTIONS.** He was
+         never describing derived state - "a TUI command to create one
+         of these inherited VIEWS in a schema, and then an equivalent
+         to, like, un-inherit". That is what dissolves the deadlock the
+         hard-refuse rule would otherwise have: an automatic view is
+         nothing you can "deal with first", where an un-inherit is.
+       - **CREATION IS AUTOMATIC, BUT ONLY WHERE THE SCHEDULE SAYS THE
+         DATASET DOES NOT PARTICIPATE** (his own qualifier: "ONLY when
+         valid according to the cadence and periods we've set up").
+         That is the line that makes automation safe, because it means
+         inheritance is never a judgement: a dataset that does not
+         participate INHERITS, while one that participates and has not
+         delivered is `awaiting-supply`, then overdue, then possibly
+         SUBSTITUTED by a person. Different states, no overlap.
+       - **TWO TRIGGERS, and his own instinct supplies the one that
+         matters.** Automatic creation falls out naturally when a
+         period schema is materialised, which is the first promotion
+         into it. But a quarter where only annual datasets are due may
+         see NO arrivals, so the schema would never exist and a
+         consumer querying that period gets nothing. Hence his second
+         idea, an explicit command to OPEN a period - which is not a
+         convenience but the only thing covering that case.
+       - **UN-INHERIT NEEDS NO SUPPRESSION FLAG, which this session had
+         flagged as the cost of automatic creation and which turns out
+         not to apply.** The sequence resolves itself: un-inherit the
+         dependent periods, the demotion now succeeds, and the next
+         automatic pass re-inherits them against the PREVIOUS real
+         supply, because the rule is "the most recent real supply at or
+         before this period". The period that actually owned the
+         withdrawn supply correctly becomes overdue. So the un-inherit
+         is transient, existing only to let the withdrawal through.
+       - **AND THE OPERATION COUNT IS NOW SEVEN, not four.** Promote,
+         reject, demote, re-file, substitute, inherit, un-inherit.
+         `REQ-GHUB-082` enumerates the first four by name across five
+         criteria and knows nothing of the rest; recorded there as a
+         decision rather than edited, so the widening happens once,
+         alongside the decision-log rewrite it is already unsigned
+         pending.
 
        **THE DEMOTION QUESTION IS ANSWERED, and the answer reversed
        Keith's own earlier position once the real behaviour was
