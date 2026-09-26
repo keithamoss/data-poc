@@ -13673,6 +13673,42 @@ requirements:
         function name and the committed demo recording, so that
         "Promote" in this tool means the supply operation and nothing
         else.
+      - >
+        THE SYSTEM SHALL offer the four operations from a standing queue
+        of supplies awaiting a decision, reachable from the main menu
+        without doing a QA run first.
+      - >
+        WHERE a real QA run a person has just done leaves its supply
+        awaiting a decision, THE SYSTEM SHALL offer that decision in
+        the run's own flow as well, through the same implementation the
+        standing queue uses.
+      - >
+        THE SYSTEM SHALL show, on either route, the filing state that
+        every recorded decision resolves to, whichever route recorded
+        each of them, and SHALL NOT let a route show only the decisions
+        raised through itself.
+      - >
+        WHERE a route is looking at a copy of the log that is not
+        current, THE SYSTEM SHALL say so rather than presenting a stale
+        state as the current one.
+      - >
+        THE SYSTEM SHALL judge whether a decision is permitted against
+        the filing state at the instant its entry is appended, and SHALL
+        NOT judge it against the state the operator was shown when they
+        raised it.
+      - >
+        IF a decision is not permitted by the filing rules when its
+        entry would be appended, THEN THE SYSTEM SHALL refuse it on the
+        route that raised it, SHALL name the recorded decision that
+        makes it impermissible, and SHALL NOT append an entry.
+      - >
+        THE SYSTEM SHALL apply that same judgement on both routes, from
+        the one implementation, and SHALL NOT let either route permit
+        something the other would refuse.
+      - >
+        WHEN a decision would change nothing because the log already
+        records that outcome, THE SYSTEM SHALL say so and SHALL NOT
+        treat it as a refusal or append a duplicate entry.
     non_functional_requirements:
       - >
         SECURITY, and this is the one that needs a real answer before it
@@ -13707,13 +13743,25 @@ requirements:
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-076, REQ-GHUB-027]
     decisions:
       - >
-        Decided GitHub is the PRIMARY operator surface and the TUI is
-        the second route (Keith, 2026-09-26), correcting Thread B's own
-        earlier paragraph, which read as though the TUI were the main
-        way an operator promotes. Recorded on the requirement and not
-        only in the thread, because a scoper reading Thread B alone
-        would have built the TUI as the primary surface - which is
-        exactly what nearly happened.
+        NEITHER ROUTE IS PRIMARY - BOTH ARE FIRST-CLASS AND BOTH ARE
+        BUILT TO THE SAME BAR (Keith, 2026-09-26, replacing his own
+        earlier framing from the same day). The morning's version said
+        GitHub was the PRIMARY operator surface and the TUI the second
+        route, itself a correction of Thread B, which had read as though
+        the TUI were the main way an operator promotes. That correction
+        then over-shot: later the same day Keith set out how this will
+        actually be used - "data engineers will start by using the TUI
+        for QA and then we'll wire in an automated path later", and "the
+        TUI MUST offer 100% the same functionality end to end as the
+        automated pathway". A scoper reading the morning's wording alone
+        would have built precisely the cut-down second route that
+        describes the wrong thing. So the primary/second framing is
+        dropped rather than reversed: criterion 3's "neither route can
+        do something the other cannot" is the whole rule, and there is
+        no ordering left for anyone to misread in either direction.
+        Rejected recording it as TUI-first-GitHub-eventually, which is
+        the true trajectory but leaves a "second route" reading
+        available to whoever reads at the wrong moment.
       - >
         Decided the dashboard stays READ-ONLY and anything requiring a
         write goes through GitHub Issues (Keith, 2026-09-22, stated as a
@@ -13807,6 +13855,70 @@ requirements:
         disambiguated by context, which is exactly the collision
         plans/supply-model.md's concept inventory warns about for the
         word "delivery".
+      - >
+        THE FOUR OPERATIONS HAVE TWO TUI ENTRY POINTS, NOT ONE (Keith,
+        2026-09-26). A standing queue off the main menu is the general
+        case, because most supplies awaiting a decision are not ones the
+        person just checked - an offer at the end of a QA run only ever
+        reaches the supply in front of you, which at 30 quarterly
+        datasets is a small fraction of what is waiting. But an offer in
+        flow is what stops a person who has JUST seen a red result
+        having to navigate back to a queue to act on it. Both, therefore
+        - with criterion 17 requiring they reach the same
+        implementation, which is what NFR 3's drift warning is about and
+        is the same discipline criterion 11 already applies across the
+        GitHub and TUI routes.
+      - >
+        A DECISION RAISED ON EITHER ROUTE IS VISIBLE ON BOTH (Keith,
+        2026-09-26). Criterion 3 already made the WRITE side identical -
+        the same log entry whichever route raised it - and this is the
+        READ side, which nothing had stated: a person in the terminal
+        must see the decision a colleague took on a ticket, and the
+        ticket must show the decision taken in the terminal. It follows
+        from the single append-only log rather than needing any
+        synchronisation, which is the point of REQ-PIPE-074 criterion 1
+        and of criterion 6 here. WHAT "VISIBLE" HONESTLY MEANS, and why
+        criterion 17 exists: the log is COMMITTED TO THE REPOSITORY
+        (REQ-PIPE-074 criterion 11), so a GitHub-raised decision reaches
+        a terminal only once that clone has pulled, and a TUI-raised one
+        reaches the ticket only once it is pushed. Claiming instant
+        mutual visibility would be false. The requirement is therefore
+        that neither route shows a PARTIAL view - filtered to its own
+        decisions - and that a route reading a stale copy says so,
+        rather than that propagation is immediate. Rejected any
+        route-local record that would need reconciling, which is the
+        second-record REQ-PIPE-074 criterion 1 forbids outright.
+      - >
+        NEITHER ROUTE MAY PERFORM AN IMPERMISSIBLE ACTION, AND
+        PERMISSIBILITY IS JUDGED AT APPEND TIME (Keith, 2026-09-26, with
+        his own worked example: a person comments on GitHub to promote,
+        then goes to the TUI and rejects or promotes it again). Criteria
+        16 and 17 had just established that each route SHOWS what the
+        other did; this is the consequence for WRITING, and the two
+        together are why the race is manageable at all. THE RACE IS
+        REAL AND CANNOT BE DESIGNED AWAY: the log is committed to the
+        repository, so a GitHub decision reaches a terminal only after
+        a pull and a TUI decision reaches the ticket only after a push
+        - meaning the state an operator was SHOWN is routinely not the
+        state at the moment their entry lands. Validating against what
+        they saw is therefore validating against the past. THIS IS NOT
+        THE SAME AS SPRINT 12'S LAST-WINS RULE and the two must not be
+        conflated: last-wins orders decisions that are each permissible,
+        deciding which of two legitimate answers stands. This rule
+        refuses one that is not permissible at all, and a refusal is
+        never resolved by being later. WHAT COUNTS AS IMPERMISSIBLE IS
+        NOT RE-STATED HERE - it is whatever the filing rules already
+        say, chiefly criterion 8's supersede confirmation and
+        REQ-PIPE-075 criteria 4 and 10 - because a second enumeration
+        would be a second source of truth for the same rules. Note the
+        distinction criterion 20 draws, which is the one most easily got
+        wrong: promoting a supply already promoted into the same slot is
+        a NO-OP, not a refusal (REQ-PIPE-075 criterion 10 says change
+        nothing and add no entry), and reporting it as an error would
+        train operators to ignore the errors. Rejected locking a supply
+        while a decision is pending on the other route, which turns a
+        rare race into a permanent coordination cost across two
+        surfaces, one of which is a public issue tracker.
   - id: REQ-PIPE-083
     title: "An overdue slot becomes a ticket, once, whether or not anything else arrives"
     date_written: "2026-09-26"
@@ -14148,3 +14260,203 @@ requirements:
         for readers. They have different owners, different tests and
         different toolchains, and bundling them would hide a UI question
         inside a warehouse requirement.
+  - id: REQ-PIPE-086
+    title: The terminal runs the whole supply lifecycle, using the automated path's own logic
+    date_written: "2026-09-26"
+    story: >
+      As a data engineer who will be running this from a terminal long
+      before any of it is automated, I want the TUI to do everything the
+      automated path does - recognise a delivery, work out which dataset
+      and which slot it belongs to, run QA, and apply the same rules
+      about what gets promoted - so that what I do by hand today is the
+      same thing the automation will do later, rather than a simpler
+      version of it that quietly behaves differently.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, 2026-09-26, mid sign-off of REQ-GHUB-082: "data engineers
+      will start by using the TUI for QA and then we'll wire in an
+      automated path later", so "the TUI MUST offer 100% the same
+      functionality end to end as the automated pathway - deliveries,
+      matching files, running QA, and all of the automation logic around
+      what goes where". Split out of REQ-GHUB-082 the same day at his
+      own call, once folding it in had taken that requirement to 21
+      criteria.
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL drive, from the TUI, every stage of the supply
+        lifecycle the automated path drives - recognising a delivery,
+        matching its files to datasets, staging them, running QA,
+        assigning a slot, and applying the automatic promotion gate.
+      - >
+        THE SYSTEM SHALL do so by invoking the implementation the
+        automated path invokes, and SHALL NOT carry a second
+        implementation of any stage for the terminal.
+      - >
+        THE SYSTEM SHALL NOT reach, from the TUI, an outcome the
+        automated path would not reach from the same inputs.
+      - >
+        WHERE the automatic promotion gate promotes a supply during a
+        TUI run, THE SYSTEM SHALL record the rule as the actor, and
+        SHALL NOT record the operator who started the run.
+      - >
+        THE SYSTEM SHALL tell the operator, at each stage, what the
+        shared logic decided and on what grounds, so that a person
+        running it by hand can see the rule working rather than only
+        its result.
+      - >
+        WHERE a stage would be skipped or would fail, THE SYSTEM SHALL
+        say which stage and why, and SHALL NOT present a partially
+        completed run as a completed one.
+      - >
+        THE SYSTEM SHALL ask, before an interactive QA run begins,
+        whether it is a rehearsal or a real run against a filed
+        delivery, and SHALL say plainly what each one does.
+      - >
+        THE SYSTEM SHALL treat only a real run as a delivery's QA for
+        the purposes of automatic promotion, and SHALL NOT let a
+        rehearsal run file a supply, promote one, or change anything in
+        the warehouse.
+      - >
+        THE SYSTEM SHALL put a file offered to the TUI through the same
+        recognition the automated path uses - the dataset's own declared
+        arrival pattern, the collection's delivery boundary, and the
+        same slot assignment rule - and SHALL NOT accept a file into a
+        real run on the strength of the operator having chosen it.
+      - >
+        IF no dataset claims a file offered to the TUI, or more than one
+        does, THEN THE SYSTEM SHALL report that the way the automated
+        path reports an unplaceable delivery, and SHALL NOT let the
+        operator name the dataset to get past it.
+      - >
+        THE SYSTEM SHALL tell the operator what recognition made of a
+        file in a rehearsal run too, and SHALL NOT block the rehearsal
+        on the answer.
+      - >
+        THE SYSTEM SHALL NOT offer to save a rehearsal run's results
+        into the committed QA history, and SHALL say that is why rather
+        than omitting the step silently.
+    non_functional_requirements:
+      - >
+        CORRECTNESS BY CONSTRUCTION is the whole requirement. "The same
+        functionality" is not a thing a person can verify by reading two
+        code paths; it is a thing that holds because there is one code
+        path. Any criterion here that could be met by a careful
+        reimplementation has been written wrong.
+      - >
+        COMPATIBILITY: this route is the one that works with no network
+        and no GitHub reachability, which on a government network may
+        make it the only route rather than the convenient one - the same
+        point REQ-GHUB-082's own NFR 2 makes about its decision surface.
+      - >
+        MAINTAINABILITY: the automated path does not exist yet, so
+        nothing will catch the two drifting apart by failing. Until it
+        does, the guard is that the shared implementation is the only
+        implementation, not a test comparing two of them.
+      - >
+        OPERABILITY at 30 datasets: a quarterly round driven by hand
+        from a terminal is a long sitting. Whatever the TUI reports at
+        each stage has to stay readable when the answer is the same
+        thirty times running.
+    dependencies: [REQ-GHUB-082, REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-076, REQ-PIPE-057, REQ-PIPE-058, REQ-PIPE-062]
+    decisions:
+      - >
+        THE TERMINAL IS THE FIRST REAL PATH, NOT A REHEARSAL SURFACE
+        (Keith, 2026-09-26). The order of delivery is the terminal
+        first and the automated path afterwards, which makes "the TUI
+        is a convenience over the real pipeline" exactly backwards for
+        the whole period that matters. The consequence recorded here
+        rather than left implicit: for that period the TUI IS the
+        pipeline, so anything it cannot do is something the system
+        cannot do, and any rule it applies differently is the rule as
+        actually operated.
+      - >
+        AN AUTOMATIC PROMOTION DURING A TUI RUN IS LOGGED AGAINST THE
+        RULE, NOT THE OPERATOR, and it is counterintuitive enough to
+        write down. A green supply landing in an empty slot promotes
+        itself (REQ-PIPE-075 criterion 1) whether a workflow or a person
+        started the run; the person invoked the thing that decided, they
+        did not decide. REQ-PIPE-074 criteria 3 and 4 already require
+        an automatic decision to be recorded with the rule as actor and
+        to be distinguishable from a person's - so "I ran it" and "I
+        promoted it" are different claims, and the log must not blur
+        them just because a human was present. Rejected attributing it
+        to the operator on the grounds that they chose to run it, which
+        would make the log unable to answer which promotions anybody
+        actually decided.
+      - >
+        RECORDED AS THE REASON THIS IS SEPARATE FROM REQ-GHUB-082: that
+        requirement is a DECISION CHANNEL - four operations, two routes,
+        one log entry - and this is a LIFECYCLE PATH. They have
+        different tests, and folding this in had already taken 082 to 21
+        criteria with the wizard work inside a requirement about
+        recording decisions. Keith's own call on the split, 2026-09-26.
+      - >
+        AN INTERACTIVE QA RUN DECLARES UP FRONT WHETHER IT IS A
+        REHEARSAL OR THE REAL THING (Keith, 2026-09-26, answering a seam
+        this session found while walking the flow through end to end and
+        which nothing in the register had settled). REQ-PIPE-075
+        criterion 1 fires automatic promotion when "a delivery's QA has
+        completed", and it was not established which runs count. Both
+        implicit readings are bad: if an interactive run counts, an ad
+        hoc check against a CSV on somebody's laptop can promote a real
+        supply into the warehouse; if it silently does not, an engineer
+        who has just checked a delivery in the terminal reasonably
+        believes they have done the real thing and has not. Today's code
+        points at the second reading without saying so - the local-file
+        path builds its run_id from the file PATH
+        (local_run_id_from_path), which is not a supply id, so there is
+        no supply on that path to promote. The mode question costs one
+        prompt in a flow that is already several, and buys a flow where
+        nothing consequential is implicit. Rejected making every
+        interactive run a rehearsal, which is the simplest and matches
+        the code today, but forecloses driving a real delivery from a
+        terminal on a network where GitHub is not reachable - the very
+        case NFR 2 says the TUI exists for. Rejected treating a run
+        against a recognised delivery as automatically real, which makes
+        consequence depend on whether recognition happened to fire.
+      - >
+        THE TUI USES THE SAME RECOGNITION AS THE AUTOMATED PATH, NOT ITS
+        OWN (Keith, 2026-09-26: "obviously the TUI should apply all of
+        the same file type and pattern matching logic as we do for the
+        automated pathway"). It does none of it today: the local-file
+        path takes whatever CSV is pointed at and builds a run_id from
+        the file PATH, so nothing asks which dataset claims that name,
+        nothing applies the arrival pattern REQ-PIPE-058 gates, and
+        nothing consults the collection's delivery boundary. That is
+        harmless while every interactive run is a rehearsal and
+        indefensible once one can be real - an operator would be able to
+        file and promote a supply the automated path would have refused
+        to place, by the single act of choosing the file. The rule is
+        therefore that recognition is the same code in both modes and
+        only its CONSEQUENCE differs: a real run is refused where
+        recognition cannot place the file, a rehearsal says what
+        recognition made of it and proceeds anyway, because a rehearsal
+        against an unrecognised file is a legitimate thing to want -
+        checking a CSV a supplier just emailed is the case the local-
+        file mode was built for. Rejected letting the operator name the
+        dataset when no pattern claims the file, which is the permissive
+        fallback this project refuses elsewhere and would make the
+        pattern gate advisory; the fix for a file nothing claims is the
+        pattern, not an override.
+      - >
+        A REHEARSAL'S RESULTS DO NOT ENTER COMMITTED QA HISTORY (Keith,
+        2026-09-26). qa_results/ is what the dashboard publishes and it
+        is never pruned, so anything saved into it is permanent public
+        record; letting a rehearsal in would mix QA of supplies the
+        system filed with QA of whatever was on somebody's laptop, and
+        nothing downstream could tell them apart. This is a real change
+        from today, where any interactive run can be saved. WHAT IT
+        DOES NOT COST, because the obvious objection is that the wizard
+        can no longer write history at all: the synthetic source mode
+        already picks from arrivals RECOGNISED ON DISK
+        (arrivals.arrivals_for), so in the synthetic world those are
+        real deliveries and such a run can be a real run and save
+        normally. What loses the save is a run against a file
+        recognition cannot place - which is the case this rule is
+        about. Rejected saving rehearsals behind a flag, which keeps the
+        evidence but adds a field to the results format and a question
+        about how the dashboard treats it, for a kind of run whose value
+        is the answer on screen rather than the record; rejected leaving
+        today's behaviour, which is simplest and is what makes the
+        mixing possible.
