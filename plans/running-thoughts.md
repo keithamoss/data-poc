@@ -2914,9 +2914,20 @@ Belongs with batch 5's check work.
          to, like, un-inherit". That is what dissolves the deadlock the
          hard-refuse rule would otherwise have: an automatic view is
          nothing you can "deal with first", where an un-inherit is.
-       - **CREATION IS AUTOMATIC, BUT ONLY WHERE THE SCHEDULE SAYS THE
-         DATASET DOES NOT PARTICIPATE** (his own qualifier: "ONLY when
-         valid according to the cadence and periods we've set up").
+       - **CREATION IS AUTOMATIC ONLY AT THE MOMENT A PERIOD SCHEMA IS
+         BORN, and only where the schedule says the dataset does not
+         participate** (his own qualifier, "ONLY when valid according to
+         the cadence and periods we've set up", NARROWED further the
+         same evening: "it feels like the automatic inheritance should
+         only happen when the schema is first created... any other
+         inheritance would be per-dataset and by operator command").
+         **The narrowing is the better rule and it is worth saying why:
+         "automatic where valid" applied CONTINUOUSLY has no trigger** -
+         something would have to keep re-scanning for newly-valid
+         inheritances, which is a background sweep with the same
+         no-cron problem `REQ-PIPE-083` is stuck on. Pinned to schema
+         birth it is one well-defined moment with complete information,
+         and after that the schema changes only by deliberate act.
          That is the line that makes automation safe, because it means
          inheritance is never a judgement: a dataset that does not
          participate INHERITS, while one that participates and has not
@@ -2930,15 +2941,29 @@ Belongs with batch 5's check work.
          consumer querying that period gets nothing. Hence his second
          idea, an explicit command to OPEN a period - which is not a
          convenience but the only thing covering that case.
-       - **UN-INHERIT NEEDS NO SUPPRESSION FLAG, which this session had
-         flagged as the cost of automatic creation and which turns out
-         not to apply.** The sequence resolves itself: un-inherit the
-         dependent periods, the demotion now succeeds, and the next
-         automatic pass re-inherits them against the PREVIOUS real
-         supply, because the rule is "the most recent real supply at or
-         before this period". The period that actually owned the
-         withdrawn supply correctly becomes overdue. So the un-inherit
-         is transient, existing only to let the withdrawal through.
+       - **UN-INHERIT NEEDS NO SUPPRESSION FLAG - and the FIRST
+         REASONING THIS ENTRY GAVE FOR THAT WAS WRONG, corrected here
+         within the hour.** It first said the next automatic pass would
+         re-inherit the periods against the previous real supply. Under
+         the narrowed rule above THERE IS NO NEXT PASS: automatic
+         creation happens once, at schema birth, and these schemas
+         already exist. The conclusion survives on better ground -
+         nothing re-creates the view, so there is nothing to suppress -
+         but the consequence is different and is real WORK rather than
+         self-healing. Un-inherit the dependent periods, the withdrawal
+         succeeds, and then the operator RE-INHERITS each one by hand,
+         pointing at the previous real supply. The period that actually
+         owned the withdrawn supply correctly becomes overdue on its
+         own. More toil than the self-healing story, and more honest:
+         they chose to un-inherit, so they choose what replaces it.
+       - **A THIRD STATE AT SCHEMA BIRTH, worth stating so it is not
+         read as a fault:** a non-participating dataset may have NO
+         earlier real supply to inherit from at all - a newly-added
+         annual dataset whose first February has not happened yet. Then
+         no view is created and the period legitimately holds nothing
+         for it. That is neither inherited nor missing nor overdue, and
+         whatever the third scoper item ends up specifying should name
+         it rather than leave it to fall through.
        - **AND THE OPERATION COUNT IS NOW SEVEN, not four.** Promote,
          reject, demote, re-file, substitute, inherit, un-inherit.
          `REQ-GHUB-082` enumerates the first four by name across five
