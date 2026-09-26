@@ -2861,6 +2861,40 @@ Belongs with batch 5's check work.
     and prose held to `docs/check-authoring-rules.md`. **To be scoped
     after the Aurora work** (Keith's own ordering).
 
+    **THE SCOPER BATCH IS THEREFORE THREE THINGS, in this order**
+    (agreed 2026-09-26). All three touch what a period resolves to and
+    what the dashboard says about it, so they go to `delivery-scoper`
+    together and through one sign-off session rather than three:
+
+    1. **The PostgreSQL switch itself** - the prerequisite, since sprint
+       11 waits on it and seven sprints wait on sprint 11. Its brief is
+       this whole entry.
+    2. **Load-time file checks reaching the dashboard** - the item
+       above, as its own scope in `qa_results/` rather than folded into
+       the data checks' status.
+    3. **"INHERITED": a dataset that does not participate in a period at
+       all, whose most recent supply is simply still current.** Found
+       2026-09-26 while naming `REQ-PIPE-084`, from Keith's own
+       question about datasets on the quarterly asset that deliver only
+       once a year. **It is a real gap with real evidence.**
+       `schedule.py`'s `delivery_months:` already SUBSETS a calendar -
+       `cp-case-workers` is `[February, August]` today - and
+       `not_expected_periods()` already carries a mandatory reason per
+       such period. **But nothing downstream consumes either.**
+       `period_schema.py`'s reason codes are only `missing-table`,
+       `missing-reference-period` and `no-prior-period`, so an annual
+       dataset's absence from Q3 currently surfaces as
+       **`missing-table`** - indistinguishable from a real fault, when
+       February's data is current and correct. `REQ-PIPE-079`'s
+       unbuilt codes do not cover it either: `awaiting-supply`,
+       `overdue-supply` and `awaiting-decision` are all about a supply
+       that WAS expected. The word `inherited` is reserved for this and
+       deliberately not spent on `REQ-PIPE-084` - see that
+       requirement's own naming decision. Rejected folding it into 084,
+       which would merge an automatic structural state with a
+       deliberate human decision, the very distinction `REQ-DASH-085`
+       exists to keep visible.
+
     **LOCKING THE ENGINE VERSION - what is actually achievable, checked
     rather than assumed (2026-09-26).**
 

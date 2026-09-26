@@ -14356,14 +14356,6 @@ requirements:
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-079, REQ-PIPE-083, REQ-PIPE-035]
     open_questions:
       - >
-        THE NAME IS STILL OPEN and is the one thing blocking the whole
-        requirement's vocabulary. Every id, field name, log action and
-        dashboard chip in this requirement and the one beside it depends
-        on it. backfill is taken, patch and rollback were rejected by
-        Keith himself, carry-forward collides with road-testing item 3.
-        Candidates that survive a repo-wide check: SUBSTITUTED, STAND-
-        IN, INHERITED.
-      - >
         May a substituted period itself be substituted from - i.e. can
         the chain be longer than one hop? Refusing it bounds the reach
         at one period; allowing it matches what a persistent non-
@@ -14417,7 +14409,35 @@ requirements:
         supply", and Thread B itself says "the same composition
         machinery serves backfill". Choosing it would recreate exactly
         the collision sprint 25's own note exists to avoid.
-
+      - >
+        THE NAME IS "SUBSTITUTED" (Keith, 2026-09-26), and the runner-up
+        was ruled out for a reason worth keeping. `backfill` was already
+        taken, he had rejected `patch` and `rollback` himself, and
+        `carry-forward` collides with plans/road-testing.md item 3.
+        That left substituted, stand-in and inherited. HE LEANED TOWARD
+        `inherited` and then found the reason not to: some datasets on
+        the quarterly asset only deliver once a year, and he asked
+        whether that was this same pathway. IT IS NOT, and the code
+        already proves it - `delivery_months:` SUBSETS a calendar
+        (cp-case-workers is already `[February, August]`), so an annual
+        dataset has NO SLOT in the other periods, and
+        schedule.py's `not_expected_periods()` already carries a
+        mandatory reason for them. The distinguishing question is
+        whether a supply was OWED: nothing is owed in a period a
+        dataset does not participate in, so there is no lateness, no
+        decision and no reason, where THIS requirement is entirely
+        about a supply that WAS owed and never came and a person
+        deciding what to do. `inherited` describes the automatic case
+        far better than the decided one - February's data still being
+        current in Q3 is structural and human-free - so spending the
+        word here would name the wrong thing, and would invite exactly
+        the "oh, it's green and it's good" misreading REQ-DASH-085
+        exists to prevent. Rejected `stand-in`, which is the plainest
+        English of the three but reads awkwardly as an identifier
+        (`stand_in_period`) and invites hyphen inconsistency;
+        `substituted` reads as a deliberate act on the PERIOD rather
+        than on the data, works in the passive as a status chip, and
+        gives clean field names.
   - id: REQ-DASH-085
     title: "A period standing in on an earlier one never reads as an ordinary green"
     date_written: "2026-09-26"
@@ -14480,10 +14500,6 @@ requirements:
     dependencies: [REQ-PIPE-084, REQ-DASH-041, REQ-DASH-070]
     open_questions:
       - >
-        The qualifier's WORD depends on the name still open on the
-        requirement beside this one, so this requirement's visible text
-        cannot be settled until that is.
-      - >
         Does the substituted period show its own row of check results,
         or the previous period's? Keith's own open question, and it
         decides whether this is a badge on an existing row or a distinct
@@ -14506,6 +14522,13 @@ requirements:
         for readers. They have different owners, different tests and
         different toolchains, and bundling them would hide a UI question
         inside a warehouse requirement.
+      - >
+        THE QUALIFIER'S WORD IS "SUBSTITUTED" (Keith, 2026-09-26),
+        following the name settled on REQ-PIPE-084 - see that
+        requirement's own decision for why `inherited` was deliberately
+        NOT spent here. It is reserved for a different, automatic state:
+        a dataset that does not participate in this period at all, whose
+        most recent supply is simply still current.
   - id: REQ-PIPE-086
     title: The terminal runs the whole supply lifecycle, using the automated path's own logic
     date_written: "2026-09-26"
