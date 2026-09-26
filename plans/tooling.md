@@ -2647,3 +2647,53 @@ testing before anyone treats it as the easy option.
     `EGRESS_BLOCKED` for it long after `curl` returned 200, exactly as
     `CLAUDE.md`'s own standing lesson describes; the text above was
     read with `curl`.
+
+25. **[todo, 2026-09-26]** **[Testing & dev tooling]** `mothman` never deletes its own temp directories - 4,218 of them, 1.3GB, found while tidying `/tmp`.
+
+**Status:** todo · **Category:** Testing & dev tooling
+
+Found by accident rather than by looking: Keith asked for `/tmp` to be
+tidied, and the bulk of it turned out not to be hand-made scratch at all.
+`/tmp` held **4,218 `mothman-qa-*` and `mothman-s3-*`/`mothman-s3-ref-*`
+directories totalling 1.3GB**, accumulated across a week of real QA runs
+and test runs in this one container. That was 87% of everything under
+`/tmp`; clearing it took the tree from 2.3GB to 135MB and gave back 2GB
+of a disk allowance this environment enforces per session.
+
+**Where it comes from, located rather than guessed.** Five real calls,
+each `tempfile.mkdtemp()` with no matching removal:
+
+- `cli/common.py:194` - `new_tmp_results_dir()`, prefix `mothman-qa-`
+- `cli/cp.py:226` and `:227` - the S3 staging and reference-staging dirs
+- `cli/cp.py:301` and `cli/bdm.py:243` - the same pattern again
+
+`mkdtemp()` is documented as the caller's to clean up, unlike
+`TemporaryDirectory()`, and the only `shutil.rmtree` anywhere in `cli/`
+is `cli/pipeline.py:162`, which is about something else entirely. So
+nothing ever removes these - every real `mothman bdm qa`, `mothman cp qa`
+and `mothman pipeline run` leaves one or more behind permanently.
+
+**Why it is worth fixing rather than shrugging at.** Not the disk, which
+is cheap here and was never close to full. Two better reasons. This
+environment's writable disk is a fixed per-session allowance where
+`df` misleads, and "no space left on device" is a real failure mode that
+would present as an unrelated test failure - a leak that grows with every
+run is exactly how a session hits it without warning. And it is a leak in
+the tool this project tells everyone is the only programmatic access
+point, so an evaluator running the PoC on their own machine inherits it.
+
+**The shape of the fix, and one thing to decide.** Mechanically it is
+`TemporaryDirectory()` as a context manager, or a `try/finally` with
+`shutil.rmtree`. What needs deciding first is whether a FAILED run should
+keep its directory - a staging dir holding the file a load choked on is
+genuinely useful for debugging, which is presumably why nobody removed
+these in the first place. Options: always clean; clean on success and
+keep on failure, saying where it is; or always clean and add a
+`--keep-staging` flag. The middle one matches how the rest of this tool
+behaves.
+
+**This is a bug, so it gets a failing test first** (`CLAUDE.md`'s
+standing rule). A real test can assert the directory a run created is
+gone afterwards, which fails against today's code by construction.
+Worth covering all five call sites rather than the one that produced the
+most litter.
