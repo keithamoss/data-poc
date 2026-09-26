@@ -1517,6 +1517,33 @@ comparisons against the expected-supply sequence.
     is different PERIODS, not different SLOTS - per-table slots mean an
     ordinary six-table delivery already spans six slots.
 
+    **BATCH 4 SCOPING INPUTS, Keith 2026-09-26** - given to
+    `delivery-scoper` alongside Threads B, G and H rather than left in
+    a chat log:
+
+    a. **GitHub is the primary operator surface, the TUI is the second
+       route.** See Thread B's corrected paragraph - a scoper reading
+       that thread's earlier wording would have built the TUI as the
+       main way to promote.
+    b. **Demotion versus "as at T" is the hard one and is NOT
+       settled.** Keith: "we're going to have to work out how demotion
+       fits in and keeps as-at-T stable." Thread B already names the
+       tension; nobody has resolved it. Treat it as a question to
+       answer in scoping, not a detail to discover in build.
+    c. **The content check needs a fresh look.** Thread B keeps it as
+       a DETECTOR, not a decider - "this supply does not look like the
+       period it is filed under" - and records that no requirement
+       owns it. Keith, 2026-09-26: "I don't remember talking about
+       that." So it is either a real gap or a thread that got ahead of
+       the conversation, and the scoper should say which rather than
+       assuming the prose is settled.
+    d. **Sprint 25's carry-forward joins this batch** (Keith,
+       2026-09-26), so the set of dispositions is closed in one go
+       rather than leaving "a supply that never arrives" dangling
+       after promotion and rejection are built. Note it still needs a
+       NAME that sprint 25's own collision note does not rule out -
+       backfill and patch are his own alternatives.
+
     **A third disposition exists and is NOT here**: sprint 25's
     carry-forward, where no supply arrives at all and a human accepts
     it never will. Promotion and rejection both act on a supply that
@@ -2890,8 +2917,19 @@ need a person, so a human waiting on it is the correct output of the
 gate rather than a defect in it. The error was treating "something is
 waiting for a human" as a failure mode when it is the purpose.
 
-**Operators also drive promotion directly, through the TUI** (Keith,
-same conversation) - explicitly promote AND demote, not just a manual
+**Operators drive promotion PRIMARILY FROM GITHUB, with the TUI as a
+second route** (Keith, 2026-09-26, correcting this paragraph's own
+earlier framing). It read as though the TUI were the main way an
+operator promotes; it is not. GitHub Issues is the write channel - the
+same standing principle that keeps the dashboard read-only, and the
+same `ticket_sync.py` mechanism sprint 12 extends - and the TUI is the
+alternative for someone already in the terminal. Both express the same
+four operations and both write the same decision-log entry; neither is
+a privileged path. Recorded here rather than only in sprint 12 because
+a scoper reading Thread B alone would have built the TUI as the
+primary surface.
+
+Either way it is explicitly promote AND demote, not just a manual
 promote for the quarterly asset. That is its own requirement in this
 batch, and it has two consequences worth settling rather than
 discovering:
