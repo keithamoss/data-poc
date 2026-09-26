@@ -1,7 +1,7 @@
 """
 Explicit, contract-driven null handling for every CSV this pipeline
-reads - shared by pipeline/load.py, qa_tools/bdm/build_per_run_warehouses
-.py, qa_tools/bdm/run_evidently_bdm.py, qa_tools/cp/build_cp_warehouses.py,
+reads - shared by qa_tools/bdm/build_per_run_warehouses.py,
+qa_tools/bdm/run_evidently_bdm.py, qa_tools/cp/build_cp_warehouses.py,
 and qa_tools/cp/run_evidently_cp.py.
 
 Built after a real bug (plans/qa-pipeline.md #17): pandas' and DuckDB's
@@ -34,8 +34,8 @@ import yaml
 
 # DuckDB's own read_csv_auto/read_csv only ever sees an already-pandas-
 # written intermediate CSV in this pipeline (every read_csv_auto call
-# site reads a file pipeline/load.py or a build_*_warehouses.py module
-# just wrote via pandas, never a raw generator CSV directly) - so by the
+# site reads a file a build_*_warehouses.py module just wrote via
+# pandas, never a raw generator CSV directly) - so by the
 # time DuckDB reads it, every null has already been resolved down to a
 # genuinely empty field by the pandas read below, and every non-null
 # value is unambiguous literal text. A single explicit empty-string

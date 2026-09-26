@@ -1,25 +1,26 @@
 version: 2
 
-# The raw table this project's pipeline/load.py actually creates
-# (birth_registrations, in data/warehouse.db) - declared as a dbt source
-# so stg_birth_registrations.sql below is a genuine staging-layer model
+# The raw tables one arrival's rows are staged into
+# (qa_tools/bdm/build_per_run_warehouses.py,
+# qa_tools/cp/build_cp_warehouses.py) - declared as a dbt source so
+# stg_birth_registrations.sql below is a genuine staging-layer model
 # (source -> typed/cleaned staging view), not a check running on raw
 # input directly.
 sources:
   - name: raw
     # REQ-PIPE-068. The source keeps its logical name - every model
     # still says `source('raw', ...)` and no SQL changed - but it now
-    # resolves into the ATTACHed supply database, through the view
-    # schema belonging to the run being tested. A bare table name
-    # therefore means exactly one arrival's rows, which is what the
-    # retired per-run database files used to deliver.
+    # resolves through the view schema belonging to the run being
+    # tested. A bare table name therefore means exactly one arrival's
+    # rows, which is what the retired per-run database files used to
+    # deliver.
     #
     # A logical name has a view only where exactly one staged table
     # claims it, so a duplicated or missing supply is ABSENT here
     # rather than silently resolving to whichever version sorted first.
     #
     # NO `database:` KEY ANY MORE (REQ-PIPE-087). It used to say
-    # `supply`, naming the DuckDB database ATTACHed under that alias.
+    # `supply`, naming a DuckDB database ATTACHed under that alias.
     # There is one PostgreSQL database now and dbt connects straight to
     # it, so the source resolves inside the profile's own dbname -
     # leaving the key in, pointing at an alias that no longer exists,
@@ -34,9 +35,10 @@ sources:
       - name: birth_registrations
 
       # Child Protection collection (qa_tools/cp/build_cp_warehouses.py) -
-      # one snapshot's worth of all 6 tables per DuckDB file, same "raw"
-      # schema convention birth_registrations uses. See
-      # generator/generate_cp_runs.py for how these snapshots are built.
+      # one snapshot's worth of all 6 tables, staged and then viewed
+      # through the same run schema birth_registrations resolves through.
+      # See generator/generate_cp_runs.py for how these snapshots are
+      # built.
       - name: cp_clients
       - name: cp_notifications
       - name: cp_investigations

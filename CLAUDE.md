@@ -266,7 +266,7 @@ Rough layout:
 | `contract/` | Real ODCS contract + SodaCL check YAML - the actual source of truth for schema/quality rules. Also holds `data-asset.yaml` - genuinely data-asset-level (not per-dataset) config, `data_asset_id`, the asset's own `timezone`, the named delivery `calendars` (quarterly/daily, versioned, with their claim windows) and the `hierarchy` of agencies/collections/datasets. It used to hold `as_of_offset_days` too - Thread C's flat global "as of" staleness offset - which was removed 2026-09-17 when per-dataset cadence (`slaProperties:` in each ODCS contract, `pipeline/cadence.py`) replaced it; that key no longer exists anywhere in the system, so a reference to it in older prose is history, not config |
 | `generator/` | Synthetic data generation (`daily_batch.py`, `generate_runs.py`, `resupply.py`, `dirty.py`, `names_au.py`, `presentation.py`) - Birth Registrations only; deliberately separate from `synthetic_data_generator/`'s population-scale generator, though the two share `dirty.py`/`names_au.py`/`presentation.py` (canonical here, imported from there - see `plans/publishing-and-history.md` #3). A real package (`generator/__init__.py`), invoked via `mothman bdm generate-synthetic-data`/`mothman cp generate-synthetic-data` (`cli/`'s own modules use `-m`-style absolute imports internally, never a bare `python3 generator/<module>.py` - that can't resolve the absolute imports this needs) - nothing outside `mothman`'s own implementation should invoke it directly. |
 | `synthetic_data_generator/` | A separate, population-scale (millions), cross-agency-identity-linked synthetic data generator - not currently wired into the pipeline (see `plans/data-generation.md` #3). Also a real package, invoked via `mothman population` (Tier 4, explicitly exploratory - `plans/tooling.md` #1 Phase 5, never a bare `python3 -m synthetic_data_generator.<module>`). |
-| `pipeline/` | `orchestrate.py` generates + loads the combined DuckDB warehouse - used locally (`mothman bdm generate-synthetic-data`, which `mothman pipeline run` also calls) and by `qa_tools.bdm.orchestrate_bdm`, never by CI (see `qa_results/`'s own entry). `build_dashboard_data.py`/`build_cp_dashboard_data.py` reshape `reports/results_bdm.json`/`results_cp.json` (check results + `dataset_stats`, both from committed `qa_results/` history) into dashboard JSON - pure functions of that one file since Phase 3, no DuckDB import or live query of their own any more. Also a real package - invoked via `mothman dashboard build-data`/`mothman pipeline run` (`cli/`'s own modules), never bare. |
+| `pipeline/` | Dashboard-data reshaping and the cadence/label helpers around it - **nothing here touches a warehouse any more**. It used to hold `orchestrate.py`/`load.py`, which generated the synthetic runs and loaded every one of them into one combined DuckDB file at `data/warehouse.duckdb`; that file's only reader was the dashboard build's own direct chart queries, and it lost that reader in Phase 3 of `plans/publishing-and-history.md` when the build became a pure function of committed results. It kept being written with nothing reading it until REQ-PIPE-087 criterion 1 (2026-09-27) deleted both modules - all supply data is in the one PostgreSQL database and none of it in a DuckDB file, and staging happens per arrival as QA runs (REQ-PIPE-068). `mothman bdm generate-synthetic-data` now calls the generator directly, exactly as `mothman cp generate-synthetic-data` always did. `build_dashboard_data.py`/`build_cp_dashboard_data.py` reshape `reports/results_bdm.json`/`results_cp.json` (check results + `dataset_stats`, both from committed `qa_results/` history) into dashboard JSON - pure functions of that one file since Phase 3, no DuckDB import or live query of their own any more. Also a real package - invoked via `mothman dashboard build-data`/`mothman pipeline run` (`cli/`'s own modules), never bare. |
 | `qa_tools/` | The actual dbt-core/Soda Core/datacontract-cli/Evidently runs - the only pipeline path now (no more "_real" suffix on any of this - see `plans/qa-pipeline.md` #84's follow-up for why it dropped, once `engines/` was gone there was nothing left to distinguish it from). A proper Python package: `bdm/` and `cp/` (one per dataset, invoked via `mothman pipeline run`/`mothman bdm qa`/`mothman cp qa`/`mothman debug run-*` - `cli/`'s own modules, never a bare `python3 -m qa_tools.bdm.orchestrate_bdm` from outside them) plus `common/` (tool-generic subprocess/API invocation shared between them, including `qa_results_writer.py`, `qa_results_reader.py`, `check_lifecycle.py`, `git_identity.py`, and `changelog.py` - see the `qa_results/` entry below). `bdm/build_results_from_history.py`/`cp/build_results_from_history.py` rebuild `reports/results_bdm.json`/`results_cp.json` purely from committed `qa_results/` history, no real tool re-run needed - the Phase 2 counterpart to `orchestrate_bdm.py`/`orchestrate_cp.py`'s live-run path, same output shape either way (verified byte-identical, `generated_at` aside). (An earlier `engines/` directory of hand-written Python/DuckDB stand-ins, from before real tool access existed, was removed once it had drifted out of sync - see `plans/qa-pipeline.md` #83. Git history holds it if ever needed.) |
 | `qa_results/` | Committed per-run tool output, written by every `qa_tools/*/run_*.py` module via `qa_tools/common/qa_results_writer.py`. **Keyed per DATASET since REQ-PIPE-038 (2026-09-26)**, in three scopes under a collection: `qa_results/<agency>/<collection>/<dataset>/<run_id>/<tool>.json` holds that dataset's own `verified` records; `<collection>/_cross-table/<run_id>/` holds the records that span datasets (REQ-QAC-037); and `<collection>/_raw/<run_id>/<tool>.json` holds the one genuinely-unmodified `raw_output` per tool invocation, plus the two pseudo-tools (`dataset_stats`, `tables_read`) that describe a RUN rather than a dataset. One `write_qa_result()` call therefore writes several files - a Child Protection Soda scan is one `Scan()` over six tables, and its 50 results fan out to six dataset files while its scan document is recorded once. A leading underscore is a RESERVED name the hierarchy gate refuses for any agency, collection or dataset id, which is what keeps every child of a collection unambiguously a scope. Before this both collections wrote one file per tool per run at collection level, so finding one table's history meant filtering a collection-level file through a map maintained by hand. Committed to git, not gitignored - unlike `reports/*.json` (still gitignored/ephemeral - a reshaped VIEW of this data, not the source of it), this is the real, permanent source of truth for QA history, potentially spanning years - see `plans/publishing-and-history.md` Thread B. Each file holds two things side by side: `raw_output` (that tool's native, genuinely unmodified output - a real dbt `run_results.json`, a real Soda `scan_results` dict, etc.) and `verified` (the same fully-resolved, dashboard-ready check-result records `evaluate_*()` builds in memory every run, captured here too so reading this history back later - `qa_tools/common/qa_results_reader.py`, Phase 2 - needs no live per-run DuckDB/CSV access; dbt's two known-bad-failure-count bugs (dbt-labs/dbt-core#11312, plus a second still-unexplained one - `plans/qa-pipeline.md` items 34/38) and Soda's missing row-count totals only resolve correctly via such a live connection, which won't exist once the run is over - see `qa_results_writer.py`'s own docstring for the full account). A 5th pseudo-tool file per run, `dataset_stats.json` (written the same way, `tool="dataset_stats"`, not a real QA tool), holds the presentation-layer data the dashboard needs (value-count distributions, arrival-lag stats, per-check failing-value aggregates, and that run's own manifest entry) - computed once by `orchestrate_bdm.py`/`orchestrate_cp.py` at the one point with a legitimate live warehouse connection (`qa_tools/bdm/dataset_stats.py`/`qa_tools/cp/dataset_stats.py`), so nothing downstream ever needs one - Phase 3, Keith's hard rule: CI must never touch data, real or (in this PoC) synthetic-standing-in-for-real. Every file also carries a top-level `run_by` field alongside `run_timestamp` (only the `dataset_stats` write passes it - one value per run is all the changelog feature below needs) - `qa_tools/common/git_identity.py`'s `get_run_by()` (the local `git config user.email`, read once per `orchestrate_bdm.py`/`orchestrate_cp.py` invocation, hard error if unset - never falls back to a placeholder). `qa_tools/common/changelog.py`'s `build_changelog(agency, dataset)` reshapes this into "who QA'd what, when" feed events - Phase 3's changelog/activity-feed DATA logic (its own UI is Phase 5): `run_by`/`run_timestamp` come straight from file content (grouped by `run_timestamp`, not by git commit, since one commit can legitimately bundle multiple datasets' events); `committed_at`/`commit_sha` are resolved by a single walk of that dataset's own git history (never self-recorded pre-push - see the module's own docstring for why a commit made locally can still be rebased before it reaches the shared branch, rewriting its SHA and committer date). Every check across all 4 tools also carries hand-authored lifecycle metadata (`check_id`/`introduced_date`/`description`/`changelog`) directly in its own definition (dbt's `meta:`, Soda's `attributes:`, the ODCS contract's `customProperties:`, a plain dict for Evidently) - parsed and validated by `qa_tools/common/check_lifecycle.py` (globally-unique `check_id`, no undocumented config changes) - see that file's own docstring and `plans/publishing-and-history.md` Thread D. |
 | `dashboard/qa-reporting-dashboard.template.html` | The single-file static dashboard's real, committed source - hand-authored UI (HTML/CSS/JS), edited directly, with placeholder consts (`REAL_BIRTH_REG_DATA`/`REAL_CP_DATA`/`SNAPSHOT_MANIFEST`/`AS_OF_OFFSET_DAYS`/`CHANGELOG_FEED`/`RELEASE_NOTES` - `null`/`[]`/`null` here, never real data). **`dashboard/qa-reporting-dashboard.html` (no `.template`) is the BUILD OUTPUT - gitignored, never committed** (2026-09-16, Keith's call, `plans/publishing-and-history.md` Phase 3): `dashboard/embed_dashboard_data.py` reads the template, embeds real data from `reports/birth_registrations_dashboard.json`/`child_protection_dashboard.json` into the two `REAL_*` consts, `contract/data-asset.yaml` into `AS_OF_OFFSET_DAYS`, (Phase 5a, 2026-09-17) `qa_tools/common/changelog.py`'s `build_changelog()` output - merged across both real dataset scopes, newest-published-first, capped to 30 entries - into `CHANGELOG_FEED`, and the repo-root `CHANGELOG.yaml` - the hand-maintained "What's New" feed tracking the PoC/tool's own development history (a genuinely different feed from `CHANGELOG_FEED`'s QA-publish activity), parsed by `dashboard/changelog_yaml.py`'s `parse_changelog()` - into `RELEASE_NOTES`. Rewritten 2026-09-20 (REQ-DOCS-028) from hand-written Keep-a-Changelog Markdown into structured YAML written for READERS rather than maintainers: grouped by day with a one-sentence summary per day, each item a headline plus one or two second-person sentences, tagged with the same 7-part component taxonomy `plans/*.md` items use. The Release Notes panel renders those tags WITHOUT the per-component emoji (dropped the same day, Keith's call - the Plans tab's own filter chips keep theirs, which is why `COMPONENT_ICON` still exists). `mothman dashboard validate-changelog` gates the schema and the component tags in CI. Then writes the result to that gitignored path - what CI deploys to Pages and what `mothman pipeline run`/`mothman dashboard embed` builds for local viewing. Since `CHANGELOG_FEED` needs `qa_tools.common.changelog` importable, `embed_dashboard_data.py` is always invoked via `mothman dashboard embed`/`mothman pipeline run` (`cli/dashboard.py`'s own `_embed()`, itself calling `python3 -m dashboard.embed_dashboard_data`'s real module import path - never a bare script path like `python3 dashboard/embed_dashboard_data.py`, which only puts `dashboard/` on `sys.path`, not the repo root, so cross-package imports fail) - matches how `dashboard/check_dashboard_renders.py`/`dashboard/snapshot_dashboard.py` are invoked (`mothman dashboard check-renders`/`mothman dashboard snapshot`). `dashboard/snapshot_dashboard.py` separately re-embeds `SNAPSHOT_MANIFEST` into that same built file from the real, committed `dashboard/snapshots/manifest.json`. Since this split (previously one hybrid file holding both hand-authored UI AND embedded real data, with the real-data half either committed directly or, briefly, committed back by CI - see `plans/publishing-and-history.md` Phase 3 for that full history) git can never see a diff on the build output to accidentally stage or commit - the earlier problem ("don't commit a local rebuild") is now structurally impossible rather than something to remember or a pre-commit hook has to catch. `.github/workflows/deploy-pages.yml` rebuilds the whole dashboard from committed `qa_results/` history on every relevant push (no real tool re-run - CI is the only publish path, per Thread A), gates the result (structural + check-lifecycle + real-browser render checks - see `qa_tools/common/validate_check_lifecycle.py`/`dashboard/check_dashboard_renders.py`), and only then deploys - it doesn't commit anything back to git either. "What was published when" is a deterministic rebuild from `qa_results/` (same pipeline CI runs) or GitHub Pages' own deployment history (tied to the exact commit SHA each deployment was built from) - `qa_results/` itself (the real source of truth, Thread B) is untouched by any of this. `dashboard/snapshots/*.html.gz` below remains the separate, unaffected point-in-time archive mechanism. Also (`plans/running-thoughts.md` #10, 2026-09-18 evening, `plans/dashboard.md` #7): a `const PLANS` - this project's own `plans/*.md` planning memory, parsed by the new `dashboard/plans_md.py`'s `parse_plans()` straight from the committed `plans/` directory - powers a genuinely new top-level tab (`STATE.tier==="plans"`, a real `/plans` URL), not another header side-panel, with search and status/component/file filter chips. Also (`plans/tooling.md` #1 Phase 6, 2026-09-19, scoped via AskUserQuestion): a `const DEMO_CAST` - the real asciinema recording at `dashboard/demos/qa_wizard.cast`, embedded as a raw string by `embed_dashboard_data.py` - powers another genuinely new top-level tab (`STATE.tier==="demo"`, a real `/demo` URL, same not-a-side-panel treatment as Plans), rendering the vendored `dashboard/vendor/asciinema-player.min.js` widget lazily (only once the tab is actually opened) against that embedded recording via its `data:`-style source option (never the player's own `url:`/`fetch()` option - see the template's own const comment for why). |
@@ -323,7 +323,49 @@ Rough layout:
   subcommand in the same change that adds it, not left as a bare
   invocation to be swept up later - the same discipline this bullet
   itself has been asking for since before Phase 4 shipped.
-- `data/raw/`, `data/warehouse.duckdb`, `reports/*.json` etc. are
+- **THE REPOSITORY HOLDS CONFIGURATION, NOT STATE.** Keith's own
+  standing instruction, 2026-09-27, in his own words: "the repository
+  only contains configuration, not actual state, no state at all. If
+  there are things that still commit state, then they should be in the
+  database." He gave it as a design goal to work towards and permission
+  to get there - "you have permission to nuke things from orbit and
+  clean up the repository" - not as a description of today's tree.
+
+  **The line, because it is the part that takes judgement.** Both of
+  these are files this repo commits, and only one of them is state:
+  - CONFIGURATION is what declares how the system should behave -
+    contracts, check definitions, calendars, the hierarchy, the
+    generator's scenario map, workflows, this file. Two people with the
+    same configuration and no data should get the same behaviour. It is
+    authored, reviewed, and belongs in git.
+  - STATE is what the system produced by running - QA results, staged
+    rows, run manifests, decision logs, arrival records. It accumulates,
+    nobody reviews it, and a second person running the pipeline
+    legitimately produces different bytes. It belongs in the database.
+
+  `REQ-GEN-045`'s scenario map is the worked example of the first, and
+  its criterion 4 says so explicitly for exactly this reason: it is a
+  committed file on purpose, so a later sweep for "committed state" does
+  not delete it.
+
+  **What still breaks the rule, so nobody has to re-derive the list.**
+  `qa_results/` is the big one - the whole committed per-run QA history,
+  still in the tree as of 2026-09-27. `qa_tools/common/qa_store.py` is
+  the metadata schema that replaces it and
+  `qa_tools/common/qa_results_migrate.py` migrates the tree into it, but
+  nothing is wired to either yet, so the table entry below still
+  describes committed files because committed files are still what is
+  there. **Do not describe the destination as the present.** When it
+  lands, it takes `deploy-pages.yml` with it: the dashboard cannot be
+  built in GitHub Actions from a database GitHub cannot reach, so the
+  build moves to the environment that can - which is Keith's own answer
+  to the same question about the decision log, 2026-09-26.
+
+  `dashboard/snapshots/*.html.gz` is the deliberate exception and stays:
+  a snapshot's whole purpose is to be openable years later with nothing
+  but a browser, which a row in a database it cannot reach is not.
+
+- `data/raw/`, `reports/*.json` etc. are
   gitignored and fully regenerated - never hand-edit or try to commit
   them. `dashboard/snapshots/*.html.gz` and `qa_results/` are the
   deliberate exceptions - both ARE committed, on purpose (see each
@@ -332,6 +374,12 @@ Rough layout:
   real per-run tool output history (plans/publishing-and-history.md
   Thread B) - every real pipeline run adds to it, nothing in it should
   ever be deleted or regenerated away the way `reports/*.json` is.
+  **Read that last sentence with the rule above, not against it**: what
+  it protects is the HISTORY, never the file format. Deleting
+  `qa_results/` once it has been migrated into the database is the rule
+  above being carried out; deleting a run's results because they look
+  like generated cruft is the thing this sentence forbids, and always
+  was.
   Regenerate via `mothman pipeline run` (the whole pipeline end to end
   for both datasets by default, ~45s+ - `--collection bdm`/`--collection cp`
   to scope to one; `--sequential` if debugging one specific run, since
@@ -610,10 +658,13 @@ Rough layout:
   -> **~171s/1438 tests (2026-09-25, REQ-PIPE-068)**. Flat against the
   entry above on 31 more tests. Worth knowing for the next fresh
   sandbox: the per-run DuckDB files under `data/duckdb_runs/` and
-  `data/cp_duckdb_runs/` are gone, replaced by one `data/supply.duckdb`
+  `data/cp_duckdb_runs/` are gone, replaced by one supply database
   and one database per TEST WORKER - so a stale pair of those
   directories in an old checkout is dead weight rather than state
-  anything reads.
+  anything reads. (That one supply database was `data/supply.duckdb`
+  when this entry was written; REQ-PIPE-087 moved it to PostgreSQL
+  two days later, so the shape of the fix is what this entry is
+  about, not the engine.)
 
 
   -> **~180s/1734 tests (2026-09-25, REQ-DASH-070)**. Up ~9s on 296
@@ -762,7 +813,30 @@ Rough layout:
   which this file already documented. Every remote session starts from
   a freshly-cloned container with none of the gitignored build
   artifacts present, so assume they're missing rather than checking
-  after the fact. The three, all one-liners:
+  after the fact. The four:
+  - **A RUNNING POSTGRESQL, and the two DSNs pointed at it** - added
+    2026-09-27 with REQ-PIPE-087, and the one on this list that is not a
+    build artifact but a SERVER. The warehouse is a PostgreSQL database
+    now, so without it the suite does not fail partially, it refuses to
+    start: `conftest.py` raises `pytest.UsageError` by design rather than
+    skipping, because a suite that silently skips its warehouse tests is
+    a suite that reports green having checked nothing. In this sandbox:
+    ```
+    sudo pg_ctlcluster 16 main start
+    sudo -u postgres psql -c "CREATE ROLE \"user\" LOGIN SUPERUSER CREATEDB PASSWORD 'password';"
+    sudo -u postgres psql -c "CREATE DATABASE supply OWNER \"user\";"
+    export MOTHMAN_SUPPLY_DSN="postgresql://user:password@localhost:5432/supply"
+    export MOTHMAN_TEST_DSN="postgresql://user:password@localhost:5432/postgres"
+    ```
+    **The cluster does not survive the container, and neither does the
+    role.** Hit for real the same night this was written: a resumed
+    session found `pg_isready` reporting "no response", started the
+    cluster, and then got `password authentication failed for user
+    "user"` - which reads like a wrong password and actually means the
+    role does not exist, because PostgreSQL deliberately does not
+    distinguish the two. `sudo -u postgres psql -c "\du"` is what
+    answers it in one line. So run all of the above on a fresh
+    container, not just the first one.
   - `uv run dbt deps --project-dir dbt_project --profiles-dir
     qa_tools/dbt_profiles` (installs `dbt_utils`, whose macros several
     real dbt checks need - without it 8 real tests fail)
@@ -1103,8 +1177,13 @@ Rough layout:
   must never depend on live data access, real or synthetic.** Not "must
   avoid touching real data" - the actual rule is narrower and stricter:
   no regenerating, opening, or querying `data/`/`data/raw/`/`data/
-  cp_raw/`/any DuckDB warehouse, full stop, even though this PoC's data
-  is fake and harmless to regenerate. The reasoning (Keith's own words,
+  cp_raw/`/**the supply database**, full stop, even though this PoC's
+  data is fake and harmless to regenerate. (It used to say "any DuckDB
+  warehouse", which named the engine rather than the thing - since
+  REQ-PIPE-087 the warehouse is a PostgreSQL database reachable over
+  the network, which makes the rule matter MORE rather than less: a
+  file CI does not have is a rule enforced by accident, a DSN in an
+  environment variable is not.) The reasoning (Keith's own words,
   2026-09-16, after finding `deploy-pages.yml` was still regenerating
   synthetic warehouses so the dashboard's chart queries had something
   to query): a pipeline that's only safe because today's data happens
@@ -1285,7 +1364,8 @@ Rough layout:
     a connection failure rather than a proxy 403, so it is very likely
     the wrong hostname rather than a policy decision. Find the real
     one before asking for it to be allow-listed.
-  - **`duckdb.org`** - the warehouse this whole pipeline runs on.
+  - **`duckdb.org`** - the reader for every arriving file, and the
+    warehouse this whole pipeline ran on until REQ-PIPE-087.
     Allow-listed by Keith 2026-09-25 and re-verified with a real `curl`
     (200). It paid for itself the same hour: `REQ-PIPE-068`'s design
     turns on DuckDB's cross-process locking, which had been established

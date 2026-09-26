@@ -6438,7 +6438,6 @@ requirements:
       - tests/test_fixture_ids.py
       - tests/test_asset_time_semantics.py
       - tests/test_orchestrate_single_run.py
-      - tests/test_pipeline_load.py
       - tests/test_cli_bdm.py
       - tests/test_cli_cp.py
       - tests/test_dataset_stats.py
@@ -6460,7 +6459,6 @@ requirements:
       - qa_tools/bdm/dataset_stats.py::_arrival_record
       - qa_tools/bdm/build_per_run_warehouses.py::build_all
       - qa_tools/cp/build_cp_warehouses.py::build_all
-      - pipeline/load.py::load_all
       - cli/bdm.py::load_manifest
       - cli/cp.py::load_manifest
       - cli/debug.py::capture_arrival_golden_command

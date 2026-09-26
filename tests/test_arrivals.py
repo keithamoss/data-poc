@@ -261,11 +261,17 @@ class TestTheGeneratorsBookkeepingIsWalledOff:
     # delivery.py DEFINES the constant so the generator has one name to
     # write to, and defining it is not reading it.
     DEFINES_THE_NAME = "qa_tools/common/delivery.py"
-    # The two modules whose job is to RUN the generator - `mothman bdm
-    # generate-synthetic-data` and the pipeline entry point it goes
-    # through. Invoking the generator is not reading its bookkeeping,
-    # and a rule that forbade it would forbid generating data at all.
-    MAY_RUN_THE_GENERATOR = ("cli/", "pipeline/orchestrate.py")
+    # The modules whose job is to RUN the generator - `mothman bdm
+    # generate-synthetic-data` and `mothman cp generate-synthetic-data`.
+    # Invoking the generator is not reading its bookkeeping, and a rule
+    # that forbade it would forbid generating data at all.
+    #
+    # pipeline/orchestrate.py used to be listed here too, as the entry
+    # point `mothman bdm generate-synthetic-data` went through. It was
+    # deleted with the combined DuckDB warehouse it existed to build
+    # (REQ-PIPE-087 criterion 1), and the CLI now calls the generator
+    # directly, so cli/ is the whole of the exception again.
+    MAY_RUN_THE_GENERATOR = ("cli/",)
 
     def _modules(self):
         for pkg in self.WALLED:

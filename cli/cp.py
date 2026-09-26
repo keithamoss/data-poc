@@ -59,12 +59,15 @@ def raw_dir() -> str:
 
 
 def generate_synthetic_data() -> None:
-    """Runs the real generator directly - unlike Birth Registrations,
-    there's no pipeline.orchestrate equivalent that also builds the
-    combined warehouse for CP; build_cp_warehouses.build_all() (called
-    inside run_check() below, via add_table_to_run() per table) is CP's
-    own per-run-warehouse step, done lazily per run rather than eagerly
-    for the whole manifest here."""
+    """Runs the real generator directly - the same shape as cli/bdm.py's
+    own generate_synthetic_data().
+
+    THE TWO USED TO DIFFER. Birth Registrations went through
+    pipeline.orchestrate, which also built a combined DuckDB warehouse of
+    every run; Child Protection never had one. That warehouse is gone
+    (REQ-PIPE-087 criterion 1), so both datasets now do the same thing
+    here: generate, and let staging happen per arrival as QA runs
+    (REQ-PIPE-068)."""
     from generator import generate_cp_runs
     generate_cp_runs.main()
     # THE MAP IS REBUILT IN THE SAME ACT (REQ-GEN-045 criterion 3).

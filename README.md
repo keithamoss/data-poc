@@ -46,7 +46,7 @@ dashboard rebuild/embed/validate/snapshot chain, Tier 2), `github`
 (GitHub Issues ticket/acceptance/leaderboard sync, Tier 2), `debug`
 (per-tool debug runners against a run already on disk - `run-dbt`/
 `run-soda`/`run-datacontract`/`run-evidently`/`build-warehouses`/
-`load-warehouse`/`changelog`, Tier 3), `pipeline` (the full real-tool
+`changelog`, Tier 3), `pipeline` (the full real-tool
 batch run this section just ran, Tier 2), and `population` (a
 population-scale, cross-agency-identity-linked synthetic dataset via
 the separate `synthetic_data_generator/` package - Tier 4, explicitly

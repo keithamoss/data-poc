@@ -54,7 +54,6 @@ from qa_tools.common import asset_time
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 MANIFEST_PATH = os.path.join(ROOT, "data", "raw", "manifest.json")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
-WAREHOUSE_DB_PATH = os.path.join(ROOT, "data", "warehouse.duckdb")
 
 AGENCY_ID = bdm_common.AGENCY_ID
 COLLECTION_ID = bdm_common.COLLECTION_ID
@@ -244,12 +243,12 @@ def run_single(run_id: str, csv_path: str, run_date: str, reference_run_id: str,
     #
     # THE GLOBAL THAT USED TO LIVE HERE IS GONE. _run_one()'s
     # dataset_stats step connected to a module-level WAREHOUSE_DB_PATH -
-    # the combined all-runs warehouse in the batch path, which does not
-    # exist at all in a single-arrival Lambda world - so this function
-    # rebound that global to the run's own database file before calling
-    # it. With one supply database there is nothing to rebind: both
-    # paths open the same database and read through the run's own view
-    # schema, which is what scoped the rows all along.
+    # the combined all-runs DuckDB warehouse in the batch path, which
+    # does not exist at all in a single-arrival Lambda world - so this
+    # function rebound that global to the run's own database file before
+    # calling it. With one supply database there is nothing to rebind:
+    # both paths open the same database and read through the run's own
+    # view schema, which is what scoped the rows all along.
     build_per_run_warehouses.build_one(run_id, dest_path, run_date)
 
     return _run_one(entry, run_timestamp, run_by, reference_run_id, reference_csv, on_step=on_step)

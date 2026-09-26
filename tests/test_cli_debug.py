@@ -208,18 +208,6 @@ def test_build_warehouses_cp_calls_build_cp_warehouses(monkeypatch):
     assert called == ["cp"]
 
 
-def test_load_warehouse_calls_pipeline_load_all(monkeypatch):
-    import pipeline.load as load_mod
-
-    called = []
-    monkeypatch.setattr(load_mod, "load_all", lambda: called.append(True))
-
-    result = _runner.invoke(debug_cli.debug_group, ["load-warehouse"])
-
-    assert result.exit_code == 0, result.output
-    assert called == [True]
-
-
 def test_changelog_prints_real_build_changelog_output_as_json(monkeypatch):
     import qa_tools.common.changelog as changelog
 

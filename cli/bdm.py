@@ -60,14 +60,27 @@ def raw_dir() -> str:
 
 
 def generate_synthetic_data() -> None:
-    """Wraps pipeline.orchestrate.prepare_warehouse(regenerate=True) -
-    already fuses "generate the synthetic runs" and "build the combined
-    warehouse" into one deterministic, idempotent call (confirmed by
-    reading that module directly, not assumed - plans/tooling.md #1),
-    including the real resupply-chain/dirty-severity simulation
-    unmodified."""
-    from pipeline import orchestrate
-    orchestrate.prepare_warehouse(regenerate=True)
+    """Runs the real generator directly - the same shape as cli/cp.py's
+    own generate_synthetic_data(), which is new.
+
+    IT USED TO BUILD A DUCKDB WAREHOUSE TOO. This wrapped
+    pipeline.orchestrate.prepare_warehouse(), which generated the runs
+    and then loaded every one of them into one combined DuckDB file at
+    data/warehouse.duckdb. That file had exactly one reader - the
+    dashboard build's own direct chart queries - and it lost that reader
+    in Phase 3 of plans/publishing-and-history.md, when the build became
+    a pure function of committed results. It kept being written for
+    another year of project time with nothing reading it, which is the
+    quiet kind of legacy: no error, no failing test, just a generator
+    step paying for a warehouse nobody opens.
+
+    REQ-PIPE-087 criterion 1 is what finally removed it - all supply data
+    lives in the one PostgreSQL database and none of it in a DuckDB file -
+    and staging now happens where it belongs, per arrival, as QA runs
+    (REQ-PIPE-068). Generating synthetic data is generating synthetic
+    data again."""
+    from generator import generate_runs
+    generate_runs.main()
     # THE MAP IS REBUILT IN THE SAME ACT (REQ-GEN-045 criterion 3).
     # A map regenerated separately is a map that disagrees with the
     # history the first time somebody regenerates one and not the

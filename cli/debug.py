@@ -143,13 +143,6 @@ def build_warehouses_command(collection: str) -> None:
     console.print("Built.", style="green")
 
 
-@debug_group.command("load-warehouse")
-def load_warehouse_command() -> None:
-    """Load the combined BDM warehouse (data/warehouse.duckdb) from data/raw/."""
-    from pipeline.load import load_all
-    load_all()
-
-
 @debug_group.command("changelog")
 @click.option("--agency", required=True, help="e.g. registry-services")
 @click.option("--dataset", required=True, help="e.g. birth-registrations")
