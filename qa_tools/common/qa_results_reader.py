@@ -309,16 +309,28 @@ def canonical_order(results: list[dict]) -> list[dict]:
     rebuild against a live run is how several behaviour-preserving
     refactors were actually verified.
 
-    A STABLE sort on (run, tool, dataset) rather than a total one: the
-    order of checks WITHIN one tool's output for one dataset is the
-    tool's own, it carries real meaning, and it is identical down both
-    paths already.
+    A TOTAL order, ending in check_id, and the first version got this
+    wrong in a way worth recording. It sorted stably on (run, tool,
+    dataset) and left ties to the input order, reasoning that a tool's
+    own order for one table is identical down both paths. It is not:
+    a live run holds a collection's cross-table records interleaved
+    where the tool emitted them, while a rebuild appends them after
+    every dataset file it read. Same 3,204 records, 1,494 of them in a
+    different position - measured, not predicted.
+
+    (run_id, check_id) is unique in both collections, which is what
+    makes a total order available at all: one run produces one result
+    per check. Sorting the tail by check_id costs the tool's own
+    ordering within one table, which is arbitrary anyway - dbt emits in
+    dependency-graph order - and buys an ordering that cannot depend on
+    which path assembled the list.
     """
     order = {tool: i for i, tool in enumerate(TOOL_ORDER)}
     return sorted(results, key=lambda r: (
         _natural_sort_key(str(r.get("run_id") or "")),
         order.get(_TOOL_OF_CHECK(str(r.get("check_id") or "")), len(order)),
         str(r.get("dataset_id") or ""),
+        str(r.get("check_id") or ""),
     ))
 
 

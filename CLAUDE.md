@@ -629,6 +629,9 @@ Rough layout:
   Up ~15s on 42 more tests since the entry above - no new hot spot. JS
   suite 346 tests in ~24s.
 
+  -> **~220s/1905 tests (2026-09-26, REQ-PIPE-038's re-key)**. Flat
+  against the entry above on 33 more tests. JS suite 346 tests in ~24s.
+
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.

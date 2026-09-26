@@ -210,13 +210,39 @@ class TestOneAgreedOrdering:
         assert [r["run_id"] for r in reader.canonical_order(records)] == [
             "cp_run_9", "cp_run_11", "cp_run_100"]
 
-    def test_it_is_stable_within_one_tool_and_dataset(self):
-        """A tool's own order for one table carries real meaning and is
-        identical down both paths already, so it must not be touched."""
+    def test_it_is_a_TOTAL_order_and_not_merely_a_stable_one(self):
+        """The first version left ties to the input order, on the
+        reasoning that a tool's own order for one table is identical
+        down both paths. It is not - a live run holds cross-table
+        records interleaved where the tool emitted them, a rebuild
+        appends them after the dataset files. 1,494 of 3,204 records
+        landed in a different position, which is what this catches.
+        """
         records = [{"run_id": "r1", "dataset_id": "a", "check_id": f"x.y.{n}_dbt"}
                     for n in ("zebra", "apple", "mango")]
+
         assert [r["check_id"] for r in reader.canonical_order(records)] == [
-            r["check_id"] for r in records]
+            "x.y.apple_dbt", "x.y.mango_dbt", "x.y.zebra_dbt"]
+        # The property that actually matters: the SAME records shuffled
+        # into any order come out identical.
+        assert reader.canonical_order(records) == reader.canonical_order(records[::-1])
+
+    def test_the_real_committed_history_has_a_unique_key_to_sort_on(self):
+        """A total order is only available because one run produces one
+        result per check. If that ever stops being true the ordering
+        silently goes back to depending on input order."""
+        import json as _json
+        from collections import Counter
+        from pathlib import Path as _Path
+
+        for name in ("cp", "bdm"):
+            built = _Path(f"reports/results_{name}.json")
+            if not built.is_file():
+                pytest.skip("the results have not been built in this checkout")
+            results = _json.loads(built.read_text())["results"]
+            keys = Counter((r["run_id"], r["check_id"]) for r in results)
+            assert len(keys) == len(results), (
+                f"{name}: {len(results) - len(keys)} duplicate (run_id, check_id) pairs")
 
     def test_both_orchestrators_and_both_rebuilds_apply_it(self):
         """Asserted structurally. A path that skipped it would produce

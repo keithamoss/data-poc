@@ -178,8 +178,13 @@ class TestTheRealCommittedHistoryStillPasses:
 
     def _recorded_tool_verdicts(self) -> set[str]:
         seen = set()
-        for path in sorted((self.ROOT / "qa_results").glob("*/*/*/*.json")):
-            if path.name == "dataset_stats.json":
+        # <agency>/<collection>/<scope>/<run_id>/<tool>.json since
+        # REQ-PIPE-038 - one level deeper than before, because a result
+        # is now keyed by the dataset it describes. The glob depth is
+        # why test_the_history_is_actually_there_to_check exists: a
+        # stale pattern finds nothing and every assertion below passes.
+        for path in sorted((self.ROOT / "qa_results").glob("*/*/*/*/*.json")):
+            if path.name in ("dataset_stats.json", "tables_read.json"):
                 continue
             for record in json.loads(path.read_text()).get("verified") or []:
                 seen.add(record.get("status"))

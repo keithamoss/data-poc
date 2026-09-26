@@ -1565,9 +1565,13 @@ comparisons against the expected-supply sequence.
     between the two halves is only survivable while nothing runs QA in
     it.
 
-14. **[todo, 2026-09-21]** **[Pipeline & publishing]** **`qa_results/`
-    keyed per dataset.** `REQ-PIPE-038`, including regenerating today's
-    history under Keith's one-off exception.
+14. **[done, 2026-09-26]** **[Pipeline & publishing]** **`qa_results/`
+    keyed per dataset.** `REQ-PIPE-038`, BUILT 2026-09-26 - three
+    scopes under a collection (`<dataset>/`, `_cross-table/`, `_raw/`),
+    regenerated from scratch under Keith's one-off exception, with the
+    old collection-level shape gone rather than emptied. Everything
+    this entry knew is on the requirement; the surrounding sprint list
+    stays whole until its last dependent batch is built.
 
 15. **[todo, 2026-09-21]** **[Pipeline & publishing]** **Delivery-
     triggered QA.** `REQ-PIPE-036` - QA runs once per DELIVERY, per

@@ -11,7 +11,6 @@ match it" reasoning tests/test_github_links.py already uses."""
 from __future__ import annotations
 
 from datetime import date
-from pathlib import Path
 
 from qa_tools.common import acceptance_sync as acc
 
@@ -153,9 +152,12 @@ class TestRunWindowsAgainstRealCommittedHistory:
         # this failed for a reason unrelated to what it tests. What the
         # assertion actually means is "every committed run produced a
         # window" - so count the runs and say that.
-        committed_runs = len(list(
-            (Path(__file__).resolve().parent.parent / "qa_results"
-             / "registry-services" / "civil-registration").iterdir()))
+        # Counted from the `_raw` scope since REQ-PIPE-038, which is
+        # the one scope every run writes to. Counting the collection's
+        # own children now counts DATASETS, which gave a ceiling of 2.
+        from qa_tools.common.qa_results_reader import list_run_ids
+
+        committed_runs = len(list_run_ids("registry-services", "civil-registration"))
         windows = acc._run_windows_for_dataset("birth-registrations")
         assert len(windows) > 0, "no windows at all - committed history missing?"
         assert len(windows) <= committed_runs, (

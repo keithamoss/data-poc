@@ -4301,7 +4301,85 @@ requirements:
       arrived, and when, is still answerable long after the warehouse
       that held it was rebuilt.
     moscow: must
-    status: not_started
+    status: built
+    linked_tests:
+      - tests/test_history_rekey.py
+      - tests/test_qa_results_writer.py
+      - tests/test_tables_read.py
+      - tests/test_build_results_from_history.py
+      - tests/test_cli_common.py
+    implemented_by:
+      - qa_tools/common/tables_read.py::RAW_SCOPE
+      - qa_tools/common/qa_results_writer.py::write_qa_result
+      - qa_tools/common/qa_results_reader.py::expected_tools_for
+      - qa_tools/common/qa_results_reader.py::canonical_order
+      - qa_tools/common/qa_results_reader.py::read_raw
+      - cli/pipeline.py::regenerate_history_command
+      - cli/common.py::promote
+    evidence:
+      - >
+        2026-09-26: regenerated from scratch, both collections, and the
+        old shape is gone rather than emptied - every child of a
+        collection is now a dataset or a reserved scope, which is
+        criterion 5 and is asserted against the real tree rather than
+        taken on trust. 3,359 Birth Registrations results across 42
+        runs and 3,204 Child Protection across 18, the same totals the
+        collection-level tree carried, so the re-key moved everything
+        and lost nothing.
+      - >
+        2026-09-26: A REAL DEFECT IN THIS REQUIREMENT'S OWN WORK, found
+        by measurement rather than predicted. Splitting results per
+        dataset made a live run and a rebuild disagree on ORDER: a live
+        scan holds a collection's cross-table records interleaved where
+        the tool emitted them, a rebuild appends them after every
+        dataset file it read. canonical_order() was written for exactly
+        this and got it wrong - a STABLE sort on (run, tool, dataset),
+        which leaves ties to the input order, so it inherited the very
+        difference it existed to remove. Measured: same 3,204 records,
+        1,494 in a different position. Fixed by making the order TOTAL,
+        ending in check_id, which is available because (run_id,
+        check_id) is unique - asserted by its own test, since a
+        duplicate would silently return the ordering to depending on
+        input order. Both collections then compared byte-identical
+        between the live run and the rebuild.
+      - >
+        2026-09-26: raw output is recorded ONCE. A Child Protection
+        Soda run is one Scan() over six tables, so 50 results fan out
+        to six dataset files while the scan document stays in `_raw` -
+        neither copied six times nor filtered, both of which this
+        requirement had already rejected and neither of which
+        regeneration makes more honest.
+      - >
+        2026-09-26: completeness is derived from the check definitions.
+        Evidently defines one check in the whole Child Protection
+        collection, so the fixed six-file rule would have called five
+        of six datasets permanently incomplete - a signal that is
+        always true says nothing. Verified against the real
+        definitions: cp-notifications owes an Evidently file and the
+        other five do not.
+      - >
+        2026-09-26: FOUR STALE PATH ASSUMPTIONS IN THE TEST SUITE, and
+        the shape is worth recording because two of them were caught by
+        guards written for exactly this. A status-parity glob went one
+        level too shallow and found NOTHING, which would have made
+        every assertion under it pass - its own
+        "is the history actually there" test caught that. An
+        acceptance-sync ceiling counted the collection's children,
+        which now counts datasets, giving a ceiling of 2 against 32
+        windows. The other two were fixture builders writing the old
+        shape. A test that asserts on a tree shape is as subject to a
+        re-key as the code is.
+      - >
+        2026-09-26: the regeneration was blocked by this sandbox's
+        safety classifier and was NOT worked around. Keith suggested
+        deleting in batches; that is the same act in smaller pieces, so
+        it was declined and the work was split instead - the additive
+        half (writing the new tree) ran under the existing permissions,
+        and the deletion waited for him to add a real
+        `permissions.allow` rule. Recorded because the precedent
+        matters more than this one command: a control that yields to
+        "we did this last time" is not a control.
+      - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     source: >
       Keith, plans/publishing-and-history.md item 6, 2026-09-20 -
       "qa_results/ keyed per dataset, which is where this item started".
