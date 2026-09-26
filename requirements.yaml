@@ -3956,9 +3956,10 @@ requirements:
     date_written: "2026-09-21"
     story: >
       As a data engineer looking at carers, I want a check about the
-      relationship between placements and carers filed with the checks
-      that span tables, so that I never see a check change on my
-      dataset's history on a day my dataset did not change.
+      relationship between placements and carers recorded once against
+      the tables it spans and counted against every one of them, so
+      that a broken relationship cannot read as somebody else's problem
+      just because the check happened to be filed under their table.
     moscow: must
     status: not_started
     source: >
@@ -3987,8 +3988,16 @@ requirements:
       - WHEN a cross-table check's result changes without the dataset a
         viewer is looking at having changed, THE SYSTEM SHALL name the
         arrival that caused the re-evaluation.
-      - THE SYSTEM SHALL continue to present cross-table checks in the
-        section of their own that REQ-DASH-033 gives them.
+      - THE SYSTEM SHALL present cross-table checks in a section of
+        their own on the collection page, following the pattern
+        REQ-DASH-033 established for supply-level and table-level
+        checks, and SHALL ALSO present each cross-table check on the
+        page of every dataset it reads - rendering the one recorded
+        result in both places rather than recording it twice.
+      - THE SYSTEM SHALL fold a cross-table check's verdict into the
+        status of every dataset it reads, whether that check failed or
+        could not run, and SHALL NOT leave a participating dataset
+        reading green while a check that reads it reads red.
     non_functional_requirements:
       - A cross-table result stops being a pure function of one arrival.
         Its record must carry enough to reconstruct which versions it
@@ -4000,6 +4009,71 @@ requirements:
         green data layer hid a false green in the render layer.
     dependencies: [REQ-PIPE-035, REQ-PIPE-036, REQ-QAC-039]
     decisions:
+      - >
+        SETTLED 2026-09-26 (Keith), resolving this requirement's one
+        open question. The cross-table scope is a RESERVED FOLDER at
+        collection level: qa_results/<agency>/<collection>/_cross-table/<run_id>/.
+        Two things it buys over the alternative of leaving cross-table
+        results where every result sits today and moving the
+        per-dataset ones beneath them. The level stays HOMOGENEOUS -
+        every child of a collection is a scope, one of them reserved -
+        rather than mixing run directories and dataset directories at
+        one level, where a reader cannot tell whether 'cp-clients' is a
+        dataset or a run id. And nothing already committed has to move,
+        which makes this requirement INDEPENDENT of REQ-PIPE-038 rather
+        than waiting on its re-key. Keith's own framing: "so then
+        dataset checks don't have to move in the folder structure."
+      - >
+        Rejected a named scope ABOVE AGENCY: it buys generality for a
+        case that has no instance - all 24 real cross-table checks sit
+        inside one collection - and costs the one-subtree-per-agency
+        shape every reader walks. Rejected a scope NAMED FROM ITS
+        PARTICIPANTS: precise, but the directory name changes when a
+        check's participants change, which renames committed history -
+        the exact failure REQ-PIPE-057 criteria 18 and 19 exist to
+        prevent. A cross-agency check would need promoting to asset
+        level, which is a re-key and REQ-PIPE-038's job.
+      - >
+        THE LEADING UNDERSCORE IS RESERVED BY A GATE, not by convention
+        (Keith's own ask, 2026-09-26: "a guard against it ever being
+        used"). No dataset id may begin with one. Enforced in the
+        hierarchy validator, so `mothman check` and CI both refuse it,
+        with a pre-commit hook for the local version. A reserved name
+        that is only reserved in a comment is a name somebody takes.
+      - >
+        SETTLED 2026-09-26 (Keith), and it SUPERSEDES plans/supply-model.md
+        Thread I, which had settled the opposite on 2026-09-21. A
+        cross-table check's verdict FOLDS INTO THE STATUS OF EVERY
+        DATASET IT READS, whether the check failed or could not run.
+        Thread I's rule was that the red lands at collection level
+        while a participating dataset "keeps its own green status and
+        carries only an informational pointer".
+      - >
+        THREAD I'S ARGUMENT AGAINST FOLDING, kept because it is the
+        clearest statement of what this costs and should not have to be
+        re-derived: a failed table should not drag its healthy
+        neighbours down, and under folding a dataset's status changes
+        on a day nothing about that dataset changed. Measured before
+        deciding: 86 failing cross-table results across committed
+        history, and folding newly pushes five of Child Protection's
+        six datasets to a non-green verdict in at least some runs.
+        Keith took that cost knowingly, on the ground that nobody
+        looking at carers should be able to miss that something about
+        carers is broken.
+      - >
+        A MIDDLE OPTION WAS OFFERED AND DECLINED, recorded so it is not
+        re-proposed as though it were new: fold a check that RAN AND
+        FAILED, since that is a real defect in the relationship and
+        both tables are implicated, but do not fold one that COULD NOT
+        RUN because a neighbour never arrived. Keith chose the simpler
+        uniform rule over the two-case one.
+      - >
+        THE STORY WAS REWRITTEN 2026-09-26, not just the criteria. Its
+        "so that" clause read "so that I never see a check change on my
+        dataset's history on a day my dataset did not change", which is
+        the precise opposite of what folding does. A requirement whose
+        story argues against its own criteria is one a later reader
+        resolves in whichever direction they happen to prefer.
       - Decided a cross-table result belongs to its own scope (Keith,
         2026-09-20). Rejected recording it against the triggering
         dataset, since a viewer of carers would never see a check
@@ -4043,17 +4117,17 @@ requirements:
         reference", renders as an ordinary COLUMN check on cp_client_id
         with scope None across notifications, investigations and
         placements. Worse, REQ-DASH-033 folds those checks into the
-        dataset's own status, which is exactly what Thread I settled
-        against. The real requirement is Thread I's table - blocked
-        table red with a chip, healthy neighbour green with a pointer
-        NAMING the blocker, the red landing at COLLECTION level - which
-        is new behaviour, not a "continue to". The error came from
+        dataset's own status, which is what Thread I settled against at
+        the time. SUPERSEDED 2026-09-26 (Keith): folding is now what
+        this requirement asks for, at every participating dataset
+        rather than at the one a check happens to be filed under - see
+        the folding decision above. What survives of Thread I's table
+        is the CHIP, since a check that could not run must still say
+        so, and the red landing at COLLECTION level as well. What does
+        not survive is "healthy neighbour green" - the neighbour is no
+        longer green. The error came from
         publishing-and-history item 6 answer 2 and propagated unchecked
         into a signed criterion.
-    open_questions:
-      - Where the cross-table scope physically lives in qa_results/ and
-        what it is called. Left for delivery-architect - a storage-shape
-        question, with the thing that matters already settled.
 
   - id: REQ-PIPE-038
     title: Committed history is keyed per dataset, logs deliveries beside it,

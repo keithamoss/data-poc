@@ -4367,6 +4367,26 @@ green.
 
 #### A check that could not run is RED, with a qualifying chip
 
+> **HALF OF THIS WAS SUPERSEDED ON 2026-09-26 (Keith), and the half
+> that went is "healthy neighbour green".** A cross-table check's
+> verdict now FOLDS INTO THE STATUS OF EVERY DATASET IT READS, whether
+> it failed or could not run - so `cp_notifications` no longer keeps
+> its own green status with an informational pointer, it goes red
+> alongside `cp_clients`. `REQ-QAC-037` criterion 7 owns that rule and
+> its `decisions:` carry the reasoning, the measured cost (86 failing
+> cross-table results across committed history; five of Child
+> Protection's six datasets newly non-green in some runs) and the
+> middle option that was offered and declined.
+>
+> **What still stands, and is why this section is not simply deleted:**
+> red rather than `nodata` for a check that could not run, the
+> qualifying chip saying the cause is missing data, the red landing at
+> collection level as well, and the owed-but-absent versus
+> nothing-was-owed boundary below. **The argument AGAINST folding that
+> this section makes is deliberately left intact** - it is the clearest
+> statement of what the new rule costs, and `REQ-QAC-037` points back
+> at it rather than restating it.
+
 **Keith's proposal, 2026-09-21, and it SUPERSEDES the exclude-from-
 worst-of-plus-a-count approach first drafted here** (that version:
 nodata leaves the quality worst-of, and an "18 of 24 checks

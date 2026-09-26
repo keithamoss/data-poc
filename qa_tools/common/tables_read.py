@@ -40,6 +40,29 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 #: The key a check's result carries. Logical name -> physical table.
 RESULT_FIELD = "tables_read"
 
+#: Where a cross-table check's result is recorded (REQ-QAC-037
+#: criterion 1): a RESERVED FOLDER at collection level, beside the
+#: datasets rather than inside one of them -
+#: qa_results/<agency>/<collection>/_cross-table/<run_id>/.
+#:
+#: A reserved NAME rather than a level of its own, so every child of a
+#: collection is a scope and the tree stays readable: without it a
+#: reader walking `<collection>/` cannot tell whether `cp-clients` is a
+#: dataset or a run id. It also means nothing already committed has to
+#: move, which is what makes this independent of REQ-PIPE-038's re-key.
+CROSS_TABLE_SCOPE = "_cross-table"
+
+#: What makes the name above safe to reserve. No dataset id may begin
+#: with it, and that is enforced by the hierarchy gate rather than left
+#: as a convention - a reserved name that is only reserved in a comment
+#: is a name somebody eventually takes (Keith, 2026-09-26).
+RESERVED_SCOPE_PREFIX = "_"
+
+
+def is_reserved_scope(name: str) -> bool:
+    """Whether this name belongs to the tool rather than to a dataset."""
+    return bool(name) and name.startswith(RESERVED_SCOPE_PREFIX)
+
 
 def declared_by_check_id(checks: Iterable) -> dict[str, list[str]]:
     """`check_id` -> the logical tables that check declares it reads.

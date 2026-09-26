@@ -55,7 +55,7 @@ from pathlib import Path
 
 import yaml
 
-from qa_tools.common import hierarchy
+from qa_tools.common import hierarchy, tables_read
 
 CONTRACT_DIR = Path(__file__).resolve().parent.parent.parent / "contract"
 
@@ -131,8 +131,45 @@ def _arrival_pattern_errors(filename: str, doc: dict) -> list[str]:
     return errors
 
 
+def reserved_name_errors(tree) -> list[str]:
+    """Every id in the tree that takes a name the tool has reserved
+    (REQ-QAC-037).
+
+    `tree` is (agency_id, collection_id, dataset_id) triples, passed in
+    rather than read here so this can be exercised against a tree that
+    breaks the rule - a validator only ever run against a corpus that
+    satisfies it is a validator nobody has seen work.
+
+    WHY A GATE AND NOT A COMMENT. A cross-table result is recorded at
+    <collection>/_cross-table/<run_id>/, beside the datasets. That name
+    is only unambiguous while nothing else can be called it, and "we
+    agreed not to" is not a mechanism - Keith's own ask, 2026-09-26,
+    was for "a guard against it ever being used". The cost of the rule
+    is nothing: no real id starts with an underscore, and none would.
+
+    Widened past dataset ids to collections and agencies too. Neither
+    could collide with the scope today, since the scope sits under a
+    collection - but both would make the same tree unreadable in the
+    same way, and narrowing a free rule to exactly today's collision is
+    how the next one gets through.
+    """
+    errors = []
+    for agency_id, collection_id, dataset_id in tree:
+        for kind, value in (("agency", agency_id), ("collection", collection_id),
+                             ("dataset", dataset_id)):
+            if tables_read.is_reserved_scope(value):
+                errors.append(
+                    f"contract/data-asset.yaml: {kind} id {value!r} begins with "
+                    f"{tables_read.RESERVED_SCOPE_PREFIX!r}, which is reserved for the "
+                    f"tool's own scopes under qa_results/ - "
+                    f"{tables_read.CROSS_TABLE_SCOPE!r} is one. Rename it.")
+    return errors
+
+
 def validate() -> list[str]:
     errors: list[str] = []
+    errors.extend(reserved_name_errors(
+        [(d.agency_id, d.collection_id, d.dataset_id) for d in hierarchy.all_datasets()]))
     named = contracts()
     # A CONTRACT NOTHING NAMES is the one thing deriving the list could
     # have lost - and it was never checked before either, because

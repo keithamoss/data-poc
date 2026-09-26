@@ -74,3 +74,24 @@ repos:
         language: system
         files: ^contract/.*\.ya?ml$
         pass_filenames: false
+  # The hierarchy gate, at commit time for one specific reason beyond
+  # the general one (Keith's own ask, 2026-09-26: "a guard against it
+  # ever being used"). A cross-table check's result is recorded at
+  # qa_results/<agency>/<collection>/_cross-table/<run_id>/, beside the
+  # datasets - and that name is only unambiguous while no dataset,
+  # collection or agency can be called it. The gate refuses any id
+  # beginning with an underscore.
+  #
+  # Worth having locally rather than only in CI because the failure it
+  # prevents is not a red build, it is a directory tree where nobody
+  # can tell a scope from a run id - and by the time that is committed
+  # and regenerated against, renaming it is a re-key of committed
+  # history rather than an edit.
+  - repo: local
+    hooks:
+      - id: mothman-check-hierarchy
+        name: no id takes a reserved scope name
+        entry: uv run mothman check --only hierarchy
+        language: system
+        files: ^contract/.*\.ya?ml$
+        pass_filenames: false

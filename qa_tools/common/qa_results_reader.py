@@ -60,6 +60,21 @@ TOOL_ORDER = ["dbt", "soda", "datacontract", "evidently"]
 EXPECTED_TOOLS = tuple(TOOL_ORDER) + ("dataset_stats", "tables_read")
 
 
+def _run_dirs(dataset_dir: Path):
+    """Every RUN directory under a dataset or collection.
+
+    A RESERVED SCOPE IS A SIBLING OF THESE, not one of them
+    (REQ-QAC-037). qa_results/<agency>/<collection>/_cross-table/ holds
+    run directories of its own, so anything walking this level has to
+    skip it or it reads a scope as a run - which shows up as a run
+    called "_cross-table" that is missing four of its six files.
+    """
+    from qa_tools.common import tables_read as tables_read_mod
+
+    return [d for d in dataset_dir.iterdir()
+            if d.is_dir() and not tables_read_mod.is_reserved_scope(d.name)]
+
+
 class PartialRunError(RuntimeError):
     """A run whose results are on disk but incomplete."""
 
@@ -84,7 +99,7 @@ def incomplete_runs(agency: str, dataset: str,
     if not dataset_dir.is_dir():
         return {}
     out = {}
-    for run_dir in sorted(p for p in dataset_dir.iterdir() if p.is_dir()):
+    for run_dir in sorted(_run_dirs(dataset_dir)):
         missing = missing_tools(agency, dataset, run_dir.name, qa_results_dir)
         if missing:
             out[run_dir.name] = missing
@@ -114,7 +129,7 @@ def list_run_ids(agency: str, dataset: str, qa_results_dir: Path | str = QA_RESU
     dataset_dir = Path(qa_results_dir) / agency / dataset
     if not dataset_dir.is_dir():
         return []
-    return sorted((p.name for p in dataset_dir.iterdir() if p.is_dir()), key=_natural_sort_key)
+    return sorted((p.name for p in _run_dirs(dataset_dir)), key=_natural_sort_key)
 
 
 def read_dataset_stats(agency: str, dataset: str, run_id: str,
@@ -172,7 +187,40 @@ def read_qa_results(agency: str, dataset: str, qa_results_dir: Path | str = QA_R
     if not dataset_dir.is_dir():
         return []
     all_results: list[dict] = []
-    for run_dir in sorted((p for p in dataset_dir.iterdir() if p.is_dir()), key=lambda p: _natural_sort_key(p.name)):
+    for run_dir in sorted(_run_dirs(dataset_dir), key=lambda p: _natural_sort_key(p.name)):
         for tool in TOOL_ORDER:
             all_results.extend(read_one(agency, dataset, run_dir.name, tool, qa_results_dir))
     return all_results
+
+
+def read_cross_table_results(agency: str, collection: str,
+                              qa_results_dir: Path | str = QA_RESULTS_DIR) -> list[dict]:
+    """Every committed cross-table check result for one collection
+    (REQ-QAC-037 criterion 1).
+
+    Read from the reserved scope beside the datasets rather than from
+    any one of them, which is the whole point: a referential check
+    between placements and carers is not cp-placements' result because
+    cp-placements is where it happened to be declared.
+
+    Empty where the scope does not exist, which is the ordinary state
+    for a collection with no cross-table checks - and for every
+    collection until the first run after this landed.
+    """
+    from qa_tools.common import tables_read as tables_read_mod
+
+    scope_dir = Path(qa_results_dir) / agency / collection / tables_read_mod.CROSS_TABLE_SCOPE
+    if not scope_dir.is_dir():
+        return []
+    out: list[dict] = []
+    for run_dir in sorted((d for d in scope_dir.iterdir() if d.is_dir()),
+                           key=lambda d: _natural_sort_key(d.name)):
+        for tool in TOOL_ORDER:
+            path = run_dir / f"{tool}.json"
+            if not path.exists():
+                continue
+            try:
+                out.extend(json.loads(path.read_text()).get("verified") or [])
+            except (OSError, json.JSONDecodeError):
+                continue
+    return out

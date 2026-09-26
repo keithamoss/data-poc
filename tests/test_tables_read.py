@@ -168,7 +168,15 @@ class TestItReachesTheCommittedFile:
             "2026-09-25T22:00:00+08:00", "dbt", {"raw": True},
             verified=[_result(check_id)], results_dir=tmp_path / "qa_results")
 
-        written = json.loads(Path(path).read_text())
+        # THE RECORD FOLLOWED THE CHECK. REQ-QAC-037 moved cross-table
+        # results out of the dataset file and into the reserved scope
+        # beside it, so this asserts where the check actually is rather
+        # than where it used to be - and asserts it LEFT, which is that
+        # requirement's criterion 2.
+        assert json.loads(Path(path).read_text())["verified"] == []
+        cross = (Path(path).parent.parent / tr.CROSS_TABLE_SCOPE
+                  / "cp_run_001" / "dbt.json")
+        written = json.loads(cross.read_text())
         assert written["verified"][0][tr.RESULT_FIELD] == {
             "cp_carers": "cp_carers__20260801010000"}
 
@@ -257,3 +265,73 @@ class TestTheFailureNamesTheDatasetAndTheTool:
 
         mod = importlib.import_module(module)
         assert mod._run_step("c", "t", "r", lambda: ["a result"]) == ["a result"]
+
+
+class TestTheReservedScope:
+    """REQ-QAC-037 criterion 1's cross-table scope, and the guard that
+    makes reserving a name mean something.
+
+    Keith's own ask, 2026-09-26: "have tests covering the reserved name
+    not being used, and also a guard against it ever being used." Both,
+    because the two catch different things - the test catches today's
+    tree, the gate catches the dataset somebody adds next year.
+    """
+
+    def test_no_real_dataset_id_begins_with_the_reserved_prefix(self):
+        from qa_tools.common import hierarchy
+
+        taken = [d.dataset_id for d in hierarchy.all_datasets()
+                  if tr.is_reserved_scope(d.dataset_id)]
+        assert taken == [], (
+            f"these dataset ids collide with the reserved scope prefix: {taken}")
+
+    def test_no_real_collection_or_agency_id_does_either(self):
+        """The scope sits beside datasets under a collection, so a
+        collection or agency taking the prefix would not collide
+        today - but it would make the tree unreadable in the same way,
+        and the cost of widening the rule is nothing."""
+        from qa_tools.common import hierarchy
+
+        ids = {d.collection_id for d in hierarchy.all_datasets()}
+        ids |= {d.agency_id for d in hierarchy.all_datasets()}
+        assert not [i for i in ids if tr.is_reserved_scope(i)]
+
+    def test_the_scope_name_is_itself_reserved(self):
+        """A guard that does not cover the one name it exists for is a
+        guard somebody has misread."""
+        assert tr.is_reserved_scope(tr.CROSS_TABLE_SCOPE)
+
+    def test_an_ordinary_dataset_id_is_not_reserved(self):
+        assert not tr.is_reserved_scope("cp-clients")
+        assert not tr.is_reserved_scope("")
+
+
+class TestTheGateRefusesAReservedDatasetId:
+    """The half a test over today's tree cannot cover: the dataset
+    somebody adds next year."""
+
+    def test_the_hierarchy_gate_rejects_a_dataset_id_using_the_prefix(self):
+        from qa_tools.common import validate_hierarchy
+
+        errors = validate_hierarchy.reserved_name_errors(
+            [("registry-services", "civil-registration", "_cross-table")])
+
+        assert errors, "the gate accepted a dataset id using the reserved prefix"
+        assert "_cross-table" in errors[0]
+
+    def test_it_accepts_the_real_tree(self):
+        from qa_tools.common import hierarchy, validate_hierarchy
+
+        real = [(d.agency_id, d.collection_id, d.dataset_id)
+                 for d in hierarchy.all_datasets()]
+        assert validate_hierarchy.reserved_name_errors(real) == []
+
+    def test_the_gate_runs_as_part_of_the_real_hierarchy_validation(self):
+        """Wired in, not merely written. A validator function nothing
+        calls is the shape of guard that passes review and catches
+        nothing."""
+        import inspect
+
+        from qa_tools.common import validate_hierarchy
+
+        assert "reserved_name_errors" in inspect.getsource(validate_hierarchy.validate)

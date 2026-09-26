@@ -28,6 +28,7 @@ import json
 import os
 
 from qa_tools.common import hierarchy
+from qa_tools.common.qa_results_reader import read_cross_table_results  # noqa: F401
 from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats, read_one, TOOL_ORDER
 from . import cp_common
 from qa_tools.common import asset_time
@@ -54,6 +55,16 @@ def build_results_from_history() -> dict:
         run_id = entry["run_id"]
         for tool in TOOL_ORDER:
             all_results.extend(read_one(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, tool))
+    # THE CROSS-TABLE SCOPE IS A SIBLING OF THE RUN DIRECTORIES, so a
+    # walk of the run ids does not reach it (REQ-QAC-037 criterion 1).
+    # Missing this is not a visible failure: the live run assembles its
+    # results in memory and looks perfectly correct, while THIS path -
+    # the one CI rebuilds the published dashboard from - quietly drops
+    # every cross-table check. Measured when it happened: 3,204 results
+    # live against 2,772 rebuilt, with all 126 relationships_soda and
+    # 126 relationships_dbt gone and nothing anywhere saying so.
+    all_results.extend(read_cross_table_results(
+        cp_common.AGENCY_ID, cp_common.COLLECTION_ID))
 
     n_pass = sum(1 for r in all_results if r["status"] == "pass")
     n_warn = sum(1 for r in all_results if r["status"] == "warn")

@@ -170,13 +170,53 @@ def write_qa_result(agency: str, dataset: str, run_id: str, run_timestamp: str,
     Wraps the raw output with `run_timestamp` (and `run_by`) alongside
     it (not inside it - never mutates what the tool actually produced)
     so the file carries real provenance without touching the tool's own
-    payload. Returns the path written."""
+    payload. Returns the path written - the DATASET-SCOPED one, which
+    is the file every existing caller means by "the file this wrote".
+    A cross-table sibling, where there is one, is written beside it."""
+    from qa_tools.common import tables_read as tables_read_mod
+
+    records = _with_tables_read(verified or [], run_id)
+    # THE CALLER'S OWN RECORDS ARE BROUGHT UP TO DATE, and that is not
+    # tidiness. The orchestrator keeps the list it passed here and
+    # writes it to reports/results_*.json, which is what a LOCAL
+    # dashboard build reads - while CI rebuilds from the committed
+    # files instead. Enriching only the copy written to disk left the
+    # two build paths producing different dashboards from the same run:
+    # measured at 432 results carrying tables_read from committed
+    # history and none from the live run. Nothing rendered it yet, so
+    # nothing failed; the next thing to read it would have seen one
+    # answer locally and another in CI.
+    for original, enriched in zip(verified or [], records):
+        original.update(enriched)
+    # CRITERION 1: a check spanning more than one dataset is recorded
+    # against a scope of its own, never against one of the datasets it
+    # touches - which one it got filed under was arbitrary, and the
+    # arbitrariness is the whole defect. CRITERION 2: it moves, it is
+    # not copied; a record kept in two places is two records to keep in
+    # step.
+    declared = _declared_reads_tables()
+    spanning = [r for r in records if r.get("check_id") in declared]
+    own = [r for r in records if r.get("check_id") not in declared]
+
     run_dir = results_dir / agency / dataset / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     out_path = run_dir / f"{tool}.json"
     payload = {"run_timestamp": run_timestamp, "run_by": run_by,
-               "raw_output": raw_output,
-               "verified": _with_tables_read(verified or [], run_id)}
+               "raw_output": raw_output, "verified": own}
     with open(out_path, "w") as f:
         json.dump(payload, f, indent=2, default=str)
+
+    if spanning:
+        # THE RAW OUTPUT STAYS WITH THE DATASET FILE and is not copied
+        # here. It is one tool invocation's native output covering the
+        # whole collection, so duplicating it would double the bulk of
+        # committed history - raw_output is already 61% of it - to say
+        # the same thing twice. The cross-table file carries the
+        # verified records, which is what a reader of this scope wants.
+        cross_dir = results_dir / agency / dataset / tables_read_mod.CROSS_TABLE_SCOPE / run_id
+        cross_dir.mkdir(parents=True, exist_ok=True)
+        with open(cross_dir / f"{tool}.json", "w") as f:
+            json.dump({"run_timestamp": run_timestamp, "run_by": run_by,
+                        "raw_output": None, "verified": spanning},
+                       f, indent=2, default=str)
     return out_path

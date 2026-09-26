@@ -28,7 +28,8 @@ import json
 import os
 
 from . import bdm_common
-from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats, read_qa_results
+from qa_tools.common.qa_results_reader import (list_run_ids, read_cross_table_results,
+                                               read_dataset_stats, read_qa_results)
 from qa_tools.common import asset_time
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -56,6 +57,11 @@ def build_results_from_history() -> dict:
     manifest.sort(key=lambda m: m["run_index"])
 
     all_results = read_qa_results(AGENCY_ID, COLLECTION_ID)
+    # Symmetric with the Child Protection rebuild - see its own comment.
+    # Birth Registrations declares no cross-table check today, so this
+    # reads nothing; written anyway, because the collection that gets
+    # one later must not be the thing that discovers the omission.
+    all_results += read_cross_table_results(AGENCY_ID, COLLECTION_ID)
 
     n_pass = sum(1 for r in all_results if r["status"] == "pass")
     n_warn = sum(1 for r in all_results if r["status"] == "warn")
