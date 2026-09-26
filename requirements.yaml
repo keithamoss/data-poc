@@ -12644,6 +12644,23 @@ requirements:
     dependencies: [REQ-PIPE-075, REQ-PIPE-035]
     decisions:
       - >
+        THIS GATE IS INERT UNDER A BOUNDARY-LESS TRANSPORT, noted
+        2026-09-26 while settling the flat-S3 question on
+        REQ-PIPE-057, so that nobody later finds a gate that never
+        fires and reads it as a defect. Where a transport expresses no
+        delivery boundary, each object is its own arrival and its own
+        supply, so a delivery carries exactly one supply and therefore
+        exactly one period - and "filed to slots in MORE THAN ONE
+        PERIOD" can never be true. The gate is not broken and is not
+        withdrawn: it stays correct and useful for any transport that
+        DOES express a boundary, which is every transport this PoC
+        implements today. What replaces its protection for the
+        boundary-less case is REQ-PIPE-079's distinction between the
+        reasons a table is absent - an open slot that is not yet due
+        reads `awaiting-supply` and is not red - which is what stops
+        six sequential uploads flapping without needing a delivery to
+        group them.
+      - >
         Decided the condition is different PERIODS, not different SLOTS,
         and the wording is load-bearing rather than pedantic (Thread H,
         2026-09-22). Per-table slots mean a normal six-table delivery
@@ -12789,3 +12806,265 @@ requirements:
         zero: every other dataset in the delivery is processed normally,
         and any cross-table check reading a held table reads RED naming
         it.
+
+  - id: REQ-PIPE-079
+    title: QA runs against the period a supply is filed to, not against staging alone
+    date_written: "2026-09-26"
+    story: >
+      As a data engineer operating this pipeline, I want each QA run
+      scoped to one period, with that period promoted state underneath
+      the staged candidate, so that a cross-table check compares tables
+      that actually belong together rather than whatever happens to be
+      sitting in staging.
+    moscow: must
+    status: not_started
+    source: >
+      The wiring REQ-PIPE-035, REQ-PIPE-036 and REQ-QAC-037 each
+      deferred to the promotion sprint - ten unmet acceptance criteria
+      between them, all blocked on nothing filing a supply. Scoped by
+      delivery-scoper, batch 4, 2026-09-26.
+    signed_off:
+      by: Keith
+      date: "2026-09-26"
+    acceptance_criteria:
+      - >
+        WHEN QA runs for a delivery, THE SYSTEM SHALL run it once per
+        PERIOD that delivery's supplies are filed to.
+      - >
+        THE SYSTEM SHALL evaluate each run against that period's schema
+        with that delivery's own staged supplies overlaid.
+      - >
+        THE SYSTEM SHALL resolve a check's declared temporal reference
+        to a reference PERIOD, and SHALL NOT compare against a fixed
+        reference run.
+      - >
+        WHERE a check cannot run because a table it depends on has no
+        promoted supply for the period, and none of the more specific
+        cases in this requirement applies, THE SYSTEM SHALL report it
+        red, SHALL name the table responsible, and SHALL say that table
+        has no filled slot in this period and is not in the delivery
+        under test.
+      - >
+        WHERE a dataset has no prior period at all, THE SYSTEM SHALL
+        report a drift or trend check as nodata rather than red.
+      - >
+        WHEN a table arrives that a cross-table check reads, THE SYSTEM
+        SHALL re-evaluate that check within the same period only.
+      - >
+        THE SYSTEM SHALL name, on a re-evaluated result, the arrival
+        that caused the re-evaluation.
+      - >
+        THE SYSTEM SHALL NOT read across period schemas other than
+        through a declared temporal reference.
+      - >
+        IF a supply has no filing, THEN THE SYSTEM SHALL NOT invent a
+        period for it and SHALL NOT include it in any period-scoped run.
+      - >
+        THE SYSTEM SHALL overlay only the tables of the delivery under
+        test, and SHALL NOT draw a staged supply belonging to any other
+        delivery into the run, even for the same dataset and the same
+        period.
+      - >
+        WHERE a logical table resolves to more than one staged
+        candidate, THE SYSTEM SHALL treat the staged candidates as
+        offering nothing, and SHALL NOT choose between them for any
+        purpose.
+      - >
+        WHERE the staged candidates for a table are ambiguous AND that
+        period has a promoted supply for it, THE SYSTEM SHALL resolve a
+        check that merely READS that table against the promoted version,
+        on the same terms as any table the delivery did not bring.
+      - >
+        WHERE the staged candidates for a table are ambiguous, THE
+        SYSTEM SHALL NOT run that table's OWN checks and SHALL NOT
+        promote it, whatever the period holds.
+      - >
+        WHERE a table a check reads has no promoted supply for the
+        period and that period's slot for it is neither past due nor
+        closed, THE SYSTEM SHALL NOT report the check red, and SHALL say
+        the table has not been supplied for this period yet and is not
+        yet overdue.
+      - >
+        IF a table a check reads has no promoted supply and its slot for
+        that period is PAST DUE, THEN THE SYSTEM SHALL report the check
+        red and SHALL say the table is overdue for the period.
+      - >
+        IF a table a check reads has no promoted supply WHILE a supply
+        for it is staged awaiting a decision, THEN THE SYSTEM SHALL
+        report the check red and SHALL say a supply is staged awaiting a
+        decision, distinctly from the case where no supply exists at
+        all.
+    non_functional_requirements:
+      - >
+        Everything this needs is BUILT and unwired - fan_out(),
+        create_overlay_views(), reference_view() and the red-for-unrun
+        decision function all exist with their own tests against the
+        real rule. The work is the wiring and the verification that the
+        real pipeline's output is what those units promised, not new
+        machinery.
+      - >
+        This legitimately changes committed QA history's shape, so the
+        seeded regenerate-and-diff correctness check this project relies
+        on will show a real diff. Say so before the run rather than
+        after, and decide deliberately what the new baseline is.
+      - >
+        A mixed-period delivery produces several runs from one arrival,
+        so run identity and receipt ordering have to hold up - the same
+        consequence REQ-PIPE-057 accepted for a delivery spanning two
+        collections.
+      - >
+        Fan-out multiplies real tool invocations per delivery. At ~30
+        datasets this is the one place in the batch where runtime could
+        grow noticeably; a pytest --durations profile after wiring is
+        the diagnostic, per CLAUDE.md's standing practice.
+    dependencies: [REQ-PIPE-075, REQ-PIPE-035, REQ-PIPE-036, REQ-QAC-037]
+    decisions:
+      - >
+        Decided a mixed-period delivery FANS OUT, one QA run per period,
+        rather than composing tables from different periods into one
+        run. Keith's own first instinct was table-by-table composition
+        picking a different period schema per table; he changed to fan-
+        out on the argument that the composed run produces a meaningless
+        comparison - August's clients against November's notifications.
+        His words: "we don't want to be munging things across period
+        schemas".
+      - >
+        Decided a STAGED table shadows a PROMOTED one of the same name,
+        which is what "the candidate under test alongside the tables
+        already promoted" means: the delivery being QA'd wins for its
+        own tables, and every other table the check needs is read as
+        that period currently stands.
+      - >
+        Decided ONE schema per period holds the WHOLE data asset across
+        agencies and collections, so a cross-agency check is an ordinary
+        same-schema query. Rejected fencing per collection, which would
+        have covered every cross-table check that exists today and kept
+        the sensitive surface smallest - a cross-agency check is
+        arguably the point of a multi-agency data asset.
+      - >
+        Decided red-for-unrun is what made cross-period assembly
+        unnecessary: a cross-table check only runs when every
+        participating table has a filled slot for the period, so the
+        query reads ONE schema.
+      - >
+        Decided the nodata carve-out for a brand-new dataset stays, and
+        it is the part most likely to be re-derived wrongly - without it
+        every new dataset starts life red on all its drift checks, which
+        is how people learn to ignore a signal.
+      - >
+        Recorded because it was already almost lost once: the
+        alternative of inventing a placeholder period so something runs
+        is the plausible-looking default this project keeps deleting,
+        and it would put a fabricated period into committed QA history.
+      - >
+        THE OVERLAY IS THE DELIVERY'S OWN TABLES, AND NOTHING ELSE IN
+        STAGING (Keith, 2026-09-26). create_overlay_views() already
+        takes `staged` as a mapping the caller supplies, and its
+        docstring says "the staged delivery's own tables" - but staging
+        is ONE GLOBAL SCHEMA holding every undecided supply, so a
+        builder wiring this up who reasonably reads "the staged supplies
+        for this period" and queries that schema would sweep in a held
+        or demoted supply from an earlier delivery. Criterion 2 carried
+        the contract in a phrase that is easy to paraphrase away, so it
+        is now a criterion of its own. The safety net below means the
+        bad case fails loudly rather than silently, which is why this is
+        a clarification rather than a defect.
+      - >
+        AMBIGUITY IN STAGING IS ABSENCE, NEVER A FALLBACK TO THE
+        PROMOTED TABLE, promoted here from a docstring to a criterion.
+        Two candidates for one logical name mean nobody has said which
+        is the candidate, so the table is unreadable for the run;
+        falling back to the promoted version would silently QA the
+        delivery against data it did not contain, which reads green and
+        means nothing. Worth stating in the requirement because it is
+        what stops the held-supply case from quietly picking the wrong
+        version.
+      - >
+        "NOT DUE YET" IS THE EARLY WINDOW AND NOTHING ELSE (Keith,
+        2026-09-26), correcting this session's first draft of the state
+        set. "Not due yet" describes the window BEFORE a period opens,
+        when an early supply may arrive; it is the wrong name for the
+        ordinary state where the period is open and a dataset simply has
+        not been seen. That state had no name at all, which is why it
+        was being reported as a missing table. It is now `awaiting-
+        supply`, chosen to pair against "awaiting a decision" so an
+        operator can see which side the ball is on - waiting on the
+        supplier, or waiting on us. Rejected `not-yet-supplied` (loses
+        that pairing), `supply-outstanding` ("outstanding" already means
+        needs-action in outstanding.py) and `slot-open` (says nothing
+        about who is expected to act).
+      - >
+        TWO NEAR-COLLISIONS FLAGGED AT SIGN-OFF rather than discovered
+        later, neither of them an actual clash today. `awaiting-
+        decision` sits beside outstanding.py's own phrase "an obligation
+        awaiting a decision", which describes a CLOSED unfilled slot - a
+        different situation. And `overdue-supply` sits beside
+        arrival_classification's `late`, which describes a supply that
+        DID arrive, after its due time. Anyone adding to either
+        vocabulary should check both.
+      - >
+        ABSENCE IS NOT ONE THING, AND THE READER IS TOLD WHICH (Keith,
+        2026-09-26; wording settled against a table of every candidate,
+        and consolidated here from three decisions written as the
+        picture developed). `missing-table` was carrying at least four
+        situations behind one red and one deliberately hedged sentence -
+        "has no filled slot in this period and is not in the delivery
+        under test" - literally true of all of them while they need
+        opposite actions: wait, chase the supplier, go and make a
+        decision, investigate. FOUND BY KEITH'S OWN WORKED CASE: an
+        amber cp_clients sits in staging never promoted for Q3,
+        cp_notifications then arrives alone, and its cross-table checks
+        go red naming cp_clients. The VERDICT was right - judging
+        notifications against a supply nobody accepted into Q3 would
+        record a green that becomes retroactively meaningless if that
+        supply is later rejected - and the MESSAGE was wrong. Three
+        codes are added: `awaiting-supply` (NOT red), `overdue-supply`
+        and `awaiting-decision`; `missing-table` narrows to the genuine
+        residual and is explicitly a CATCH-ALL rather than a competing
+        rule, since the original wording and `awaiting-supply` both
+        applied to an open slot that is not yet due. THE PRECEDENT IS
+        THIS MODULE'S OWN: `missing-reference-period` versus `no-prior-
+        period` already draws this distinction on the TIME axis, for the
+        reason its docstring gives - "Without that carve-out every new
+        dataset starts life red on all its drift checks, which is how
+        people learn to ignore a signal." Rejected making the unpromoted
+        case NOT red, which turns a real blocker into a quiet amber
+        nobody chases; rejected keeping one code; rejected deleting the
+        catch-all and trusting the named cases to be exhaustive, since a
+        fifth situation nobody named would then have no stated
+        behaviour, which is how a silent pass gets in.
+      - >
+        AMBIGUITY BLOCKS THE TABLE, NOT ITS READERS (Keith, 2026-09-26),
+        REVISING BEHAVIOUR ALREADY BUILT under REQ-PIPE-068 criterion 4.
+        create_overlay_views() refuses outright today - two staged
+        candidates for one logical name create no view at all -
+        justified by its docstring as "falling back to the promoted
+        table would silently QA the delivery against data it did not
+        contain". KEITH'S OWN ARGUMENT IS WHY THAT NO LONGER HOLDS, and
+        it is better than the one this session first offered: that
+        sentence was carrying an unstated implication - data FROM
+        ANOTHER PERIOD, Q3 checked against Q2 - and period scoping makes
+        that structurally impossible. Criterion 8 forbids reading across
+        period schemas except through a declared temporal reference, so
+        the promoted table being fallen back to IS this period's. There
+        is no other period in the overlay to be contaminated by. What
+        remains of "data it did not contain" is the trivial reading,
+        that the delivery did not bring it - equally true of every other
+        table the delivery did not bring, all of which are read from the
+        period without objection. A second reason it has expired: REQ-
+        PIPE-078 means an ambiguous table is held and not checked either
+        way, so the rule's only surviving effect was on cross-table
+        checks that READ it, where refusing treated "brought two" as
+        worse than "brought none". The block stays where it belongs -
+        the ambiguous table is not a candidate for anything, its own
+        checks do not run, and it cannot be promoted. Rejected keeping
+        the refusal, whose defence (that recording "notifications is
+        green" overstates what was verified) is answered by criterion 6
+        re-evaluating once the clients resolves; rejected restricting
+        the fall-through to a supply promoted into this same period,
+        which criterion 8 already guarantees and which would be a third
+        rule where two suffice. NOTE FOR WHOEVER BUILDS THIS: a real
+        change to tested code, not a restatement. REQ-PIPE-068's own
+        decision and create_overlay_views()'s docstring currently say
+        the opposite and need updating rather than being left to
+        contradict this.
