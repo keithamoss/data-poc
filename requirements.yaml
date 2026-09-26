@@ -11656,20 +11656,27 @@ requirements:
       point at requirements that have since been built, so the register
       understates its own progress and nothing says so.
     acceptance_criteria:
-      - THE SYSTEM SHALL record, for each entry in unmet_criteria, what that
-        criterion waits on, in a form that resolves to a requirement or a
-        sprint rather than to free prose alone.
-      - THE SYSTEM SHALL report a deferral whose blocker is now built, so that
-        a criterion deferred to work that has since landed is re-tested rather
-        than left standing.
+      - THE SYSTEM SHALL record, for each entry in unmet_criteria, what
+        that criterion waits on, as a list of sprint numbers and/or a
+        list of requirement ids, rather than as free prose alone.
+      - WHERE a deferral waits on a sprint that owns no requirement yet,
+        THE SYSTEM SHALL accept the sprint alone as its blocker.
+      - THE SYSTEM SHALL report, as a WARNING that does not fail the
+        build, a deferral whose blocker is now built, so that a
+        criterion deferred to work that has since landed is re-tested
+        rather than left standing.
       - THE SYSTEM SHALL NOT treat such a deferral as automatically met - it
         SHALL report it for a person to check, because a blocker shipping is
         evidence the criterion can now be met, not that it has been.
-      - THE SYSTEM SHALL present the deferrals as a dependency view - what each
-        sprint is waiting on, and what is waiting on it - rather than only as a
-        field on individual requirements.
-      - THE SYSTEM SHALL refuse a deferral naming a requirement that does not
-        exist.
+      - THE SYSTEM SHALL present the deferrals as a dependency view in
+        the mothman CLI - what each sprint is waiting on, and what is
+        waiting on it - rather than only as a field on individual
+        requirements.
+      - THE SYSTEM SHALL present that same dependency view in the
+        dashboard's Plans tab, so it can be browsed rather than only
+        run.
+      - THE SYSTEM SHALL refuse a deferral naming a requirement or a
+        sprint that does not exist.
     non_functional_requirements:
       - Extends the existing unmet_criteria field rather than adding a
         parallel structure, so there is one record of a deferral, not two
@@ -11679,6 +11686,35 @@ requirements:
     dependencies: [REQ-DOCS-072]
     decisions:
       - >
+        THE BLOCKER IS A LIST OF SPRINT NUMBERS AND/OR A LIST OF
+        REQUIREMENT IDS (Keith, 2026-09-26), not one or the other.
+        Requirement ids alone cannot express the commonest case in the
+        register today: seventeen of twenty-eight deferrals wait on the
+        promotion sprint, which owns no requirement yet, so there is no
+        id to point at. Sprints alone would lose the precision the
+        existing text already has, where a deferral names REQ-PIPE-062
+        specifically rather than the sprint containing it. Both, with
+        either optional, keeps each deferral as precise as it can
+        honestly be.
+      - >
+        THE DEPENDENCY VIEW GOES IN BOTH THE CLI AND THE DASHBOARD
+        (Keith, 2026-09-26), asked as an explicit fork rather than
+        assumed, because it is the largest piece of scope here. The CLI
+        is where it sits next to the sprint gate that produces the
+        counts; the Plans tab is where it can be browsed rather than
+        run. Rejected doing the CLI first and the dashboard later - the
+        second half is the one that gets dropped, and a dependency view
+        nobody browses is the half with less value.
+      - >
+        THE STALE-DEFERRAL REPORT IS A WARNING, NOT A GATE FAILURE
+        (Keith, 2026-09-26). A stale deferral is not wrong the way a
+        mismatched sprint tag is - it is a prompt to go and look, and
+        the looking needs a person. Failing the build for it would
+        make a red build mean two different things, and would put
+        pressure on whoever hits it to clear the deferral to get
+        green, which is precisely the auto-clearing this requirement
+        rejects, arrived at by the back door.
+      - >
         THE DEPENDENCY DATA ALREADY EXISTS, half-formed. unmet_criteria
         entries already carry an `owner`, and it is already doing the job
         of a dependency edge - "the promotion sprint (batch 4)",
@@ -11686,12 +11722,14 @@ requirements:
         nothing can resolve it. This requirement is about making an
         existing field machine-readable rather than inventing a graph.
       - >
-        Measured on 2026-09-26, and the numbers are the argument: 29
+        Measured on 2026-09-26, and the numbers are the argument: 28
         deferred criteria across 17 requirements, of which 17 wait on the
         promotion sprint alone - so promotion closes remainders in six
         other sprints at once, which the sprint list gave no way to see.
-        Seven more point at REQ-PIPE-062, REQ-PIPE-038 and REQ-DASH-070,
-        all now built.
+        Eleven name a requirement id outright and nine of those name one
+        that is already BUILT. (Re-counted the same afternoon, after
+        REQ-PIPE-036's superseded deferral was withdrawn; the first
+        count of this was 29.)
       - >
         Rejected auto-clearing a deferral when its blocker ships. A
         criterion is met when something demonstrates it, not when its
