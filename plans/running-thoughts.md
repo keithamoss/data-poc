@@ -2956,14 +2956,56 @@ Belongs with batch 5's check work.
          owned the withdrawn supply correctly becomes overdue on its
          own. More toil than the self-healing story, and more honest:
          they chose to un-inherit, so they choose what replaces it.
-       - **A THIRD STATE AT SCHEMA BIRTH, worth stating so it is not
-         read as a fault:** a non-participating dataset may have NO
-         earlier real supply to inherit from at all - a newly-added
-         annual dataset whose first February has not happened yet. Then
-         no view is created and the period legitimately holds nothing
-         for it. That is neither inherited nor missing nor overdue, and
-         whatever the third scoper item ends up specifying should name
-         it rather than leave it to fall through.
+       - **WHAT LOOKED LIKE A THIRD STATE AT SCHEMA BIRTH IS ACTUALLY A
+         MISSING LIFECYCLE STAGE OF A DATASET** (Keith, 2026-09-26, and
+         his reframing is much better than the edge case this entry was
+         about to name). The case raised was a non-participating dataset
+         with NO earlier real supply to inherit from - a newly-added
+         annual dataset whose first February has not happened. His first
+         answer was the practical one and stands as the rule: **you
+         would not add it to config until you knew a supply was about to
+         arrive**, because config is the statement of what is OWED.
+         Asked what should happen if you did anyway, he considered "red
+         and no data" and then landed somewhere better: **the
+         `placeholder:` route, "or something like it, that maps to
+         operational reality where we'd have sample data to start
+         building and testing QA against before we'd agreed a supply".**
+
+         **That is a PRE-AGREEMENT STAGE, and nothing in this model has
+         one.** You get sample data from a prospective supplier, you
+         author checks against it, you run QA to develop those checks -
+         and there is no agreed cadence, so there are no slots, no
+         lateness, no overdue, no substitution and no inheritance,
+         because nothing is owed yet. None of that machinery applies. It
+         is a property of the DATASET's lifecycle rather than a state of
+         a period, which is why trying to express it as a period-level
+         reason code kept feeling wrong.
+
+         **AND IT COLLAPSES WITH SOMETHING ALREADY EXPECTED.**
+         `CLAUDE.md` names a coming fourth asset shape - "QA of one-off
+         data extractions for individual projects, which has supplies
+         but no cadence at all". A pre-agreement dataset has exactly
+         that shape: supplies, no cadence. So this is not a new concept
+         to invent, it is the same one appearing in a different guise,
+         and whatever serves one should serve both. `plans/
+         running-thoughts.md` #23/#29 (the file-per-dataset shape,
+         triggered by adding more datasets) is the adjacent piece.
+
+         **THE PRECEDENT KEITH NAMED IS REAL AND WORTH COPYING.**
+         `contract/people.yaml` already carries `placeholder: true` for
+         a row that has to exist before the real thing does - marked
+         explicitly rather than left ambiguous, and barred from acting
+         or being assigned. Exactly the same problem, already solved
+         once in this repo.
+
+         **NOT YET SCOPED, and deliberately not designed further
+         tonight.** What it needs at minimum: a dataset may exist
+         without a calendar; its supplies may be QA'd without being
+         filed to a period; the dashboard says plainly that it is in
+         development rather than green-and-good or red; and there is a
+         graduation - the moment it gains a calendar and starts owing
+         supplies. Whether it joins the three-item scoper batch or goes
+         with the project-extraction asset shape is Keith's call.
        - **AND THE OPERATION COUNT IS NOW SEVEN, not four.** Promote,
          reject, demote, re-file, substitute, inherit, un-inherit.
          `REQ-GHUB-082` enumerates the first four by name across five

@@ -443,7 +443,7 @@ one when this line suggests it matters.
 - **#43** `todo` 2026-09-25 - Extract-to-receipt lag, as a CHECK rather than a committed statistic.
 - **#44** `investigate` 2026-09-25 - A MORE ELEGANT MECHANISM FOR THE IMMUTABLE HISTORY OF CHECKS - Keith's own ask, raised while approving the check-seal...
 - **#45** `todo` 2026-09-26 - Add PostgreSQL to this PoC, so the warehouse can be tested like for like with production.
-  - *touches:* `qa_tools/common/supply_db.py`, `qa_tools/common/asset_time.py`, `qa_tools/cp/run_datacontract_cp.py`, `pipeline/load.py`, `pipeline/aggregate_values.py`, `qa_tools/dbt_profiles/profiles.yml`
+  - *touches:* `qa_tools/common/supply_db.py`, `qa_tools/common/asset_time.py`, `qa_tools/cp/run_datacontract_cp.py`, `pipeline/load.py`, `pipeline/aggregate_values.py`, `qa_tools/dbt_profiles/profiles.yml` +1 more
 
 ## plans/post-build-review.md
 
