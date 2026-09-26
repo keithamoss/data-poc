@@ -2762,5 +2762,46 @@ Belongs with batch 5's check work.
     Same shape as `PLAYWRIGHT_CHROMIUM_PATH`, which this repo already
     uses for exactly this reason.
 
+    **CAN GITHUB ACTIONS RUN DOCKER, OR IS IT RAW POSTGRES THERE TOO?
+    BOTH - AND THAT DISSOLVES THE TENSION** (Keith's own question,
+    2026-09-26; answered from the runner image's own manifest rather
+    than from prose). All four of this repo's workflows use
+    `ubuntu-latest`, which resolves to Ubuntu 24.04, and that image
+    ships:
+
+    - **Docker Server 28.0.4**, plus Compose 2.38.2 and Buildx - a
+      REAL daemon. So Actions can absolutely run containers; a
+      `services:` block IS a Docker container, and Testcontainers
+      would work there too.
+    - **PostgreSQL 16.15**, user `postgres`, and in the image's own
+      words "PostgreSQL service is disabled by default. Use the
+      following command as a part of your job to start the service:
+      `sudo systemctl start postgresql.service`".
+
+    So CI is unlike a Claude Code session in having Docker, and LIKE
+    it in already having a PostgreSQL that only needs starting. Note
+    how close the versions are: 16.15 on the runner against the 16.13
+    this session's experiments ran on.
+
+    **WHICH MAKES ONE STRATEGY WORK IN EVERY ENVIRONMENT.** The test
+    suite takes a CONNECTION STRING and never starts anything: the Dev
+    Container's compose `db` service supplies it, CI supplies it, a
+    developer's local install supplies it, and a cloud session starts
+    its own with `initdb`/`pg_ctl` as this one did. No Docker anywhere
+    in the test path, and no environment-specific branch in the suite.
+
+    **THE ONE REAL TRADE-OFF, named rather than glossed: PINNING.** A
+    service container pins the exact image (`postgres:16.6`), where
+    the runner's preinstalled PostgreSQL is whatever GitHub ships and
+    moves when they refresh runner images. Since the entire point of
+    this exercise is testing against the engine production runs, that
+    matters. **Recommended shape: a pinned service container in CI,
+    and a connection string everywhere including CI** - pinning where
+    it counts, zero dependencies everywhere else, and a suite that
+    cannot tell the difference. Worth knowing for the CI half: a job
+    running directly on the runner, which `test.yml` does, reaches a
+    service container through a mapped port on `localhost` rather than
+    by its label.
+
     **STILL UNREAD:** Aurora's divergences from vanilla PostgreSQL.
     That domain is now allow-listed.
