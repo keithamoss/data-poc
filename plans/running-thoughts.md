@@ -2974,19 +2974,95 @@ Belongs with batch 5's check work.
     during a failover the reader endpoint may briefly point at the new
     primary.
 
-    **NO QUOTA ON SCHEMAS OR TABLES.** Checked because the model
-    creates a schema per period per dataset plus one per run, which at
-    30 datasets over years is a lot of them: Aurora's quotas are all
+    **NO QUOTA ON SCHEMAS OR TABLES.** Aurora's quotas are all
     account-level or cluster-level (clusters, instances, endpoints,
     parameter groups), and nothing limits schema or table COUNT. The
-    size limits are a 32 TiB maximum table for Aurora PostgreSQL. So
-    schema proliferation is a catalogue-performance question to keep an
-    eye on, not a hard ceiling.
+    size limit is a 32 TiB maximum table for Aurora PostgreSQL.
 
-    **STILL UNREAD about Aurora, named rather than implied:** the role
-    model (Aurora has no true superuser, `rds_superuser` instead, which
-    may matter for schema ownership and the read-only grants the
-    never-touch-data rule would want), the extension allowlist,
-    Serverless v2, IAM database authentication, and `max_connections`,
-    which on Aurora is tied to instance class and matters at 30
-    datasets checked in parallel.
+    **AND THE SCALE WORRY IS MEASURED AND DISMISSED - see the next
+    section.** Correcting this entry's own first draft while I am here:
+    it said a schema per period PER DATASET. It is not. `period_schema.py`'s
+    own docstring says "in a real deployment one period schema holds
+    Birth Registrations and Child Protection", so it is ONE SCHEMA PER
+    PERIOD, shared across datasets. The pressure therefore comes from
+    CADENCE rather than from dataset count: a quarterly asset needs 4
+    period schemas a year whatever it holds, and a DAILY dataset needs
+    365.
+
+    **THOUSANDS OF PERIOD SCHEMAS COST NOTHING WORTH WORRYING ABOUT -
+    MEASURED, not reasoned (2026-09-26, real PostgreSQL 16.13).** Built
+    a decade of daily periods - **3,650 schemas, each with a table and
+    its primary key**, 15,013 relations in total - and then measured
+    what actually degrades:
+
+    | | |
+    |---|---|
+    | creating all 3,650 schemas and tables | **11.4 s** |
+    | counting them in `pg_namespace` | 2 ms |
+    | `SELECT count(*) FROM information_schema.tables` | 18 ms |
+    | `pg_tables` filtered to period schemas | 4 ms |
+    | querying one period's own table | 0.5 ms |
+    | `pg_dump` of the whole database | **3.5 s**, a 3 MB dump |
+    | database size with ZERO rows in it | **94 MB, of which ~50 MB is catalogue** |
+
+    So there is no cliff anywhere near this design's scale, and the only
+    real cost is catalogue weight - roughly 14 KB per schema-plus-table
+    before a single row exists. Worth re-measuring if a dataset ever
+    needs a period per HOUR, but a decade of daily is fine.
+
+    **A GENUINELY USEFUL ACCIDENT ALONG THE WAY: `max_locks_per_transaction`.**
+    The first attempt created the schemas inside one `DO` block, which
+    is ONE TRANSACTION, and it died after about 380 of them with `out
+    of shared memory / You might need to increase
+    max_locks_per_transaction`. Nothing to do with schema counts - it
+    is a bound on how many objects a SINGLE TRANSACTION may touch. That
+    matters here because promotion is transactional by design: six
+    tables is nowhere near it, but any future "do the whole delivery in
+    one transaction" idea at 30 datasets with several versions each
+    should know the ceiling exists.
+
+    **THE PREVIOUSLY-UNREAD AURORA TOPICS, now read.**
+
+    - **THERE IS NO TRUE SUPERUSER.** `rds_superuser` is the most
+      privileged role, created automatically and granted to the master
+      user (`postgres` by default). Everything this design does -
+      `CREATE SCHEMA`, `ALTER TABLE ... SET SCHEMA`, `CREATE VIEW`,
+      `GRANT` - is within that. What is NOT is anything needing real
+      superuser, and one of those is on our load path.
+    - **THE LOADER MUST USE CLIENT-SIDE `COPY`, NOT A SERVER PATH.**
+      Verified by experiment rather than cited: as a plain role,
+      `COPY staging.t FROM '/path/file.csv'` fails with "permission
+      denied to COPY from a file ... Only roles with privileges of the
+      pg_read_server_files role may COPY from a file", while `\copy` /
+      `COPY ... FROM STDIN` succeeds. On Aurora it is moot anyway,
+      because there is no server filesystem to put a file on. So the
+      DuckDB-reads-then-`COPY` path has to stream over the connection,
+      which it does naturally.
+    - **IAM DATABASE AUTHENTICATION IS A ROTATING PASSWORD, and that
+      shapes the credential question this entry already raised.** The
+      token IS the password, is at least ~1 KB and can be larger, and
+      **has a lifetime of 15 minutes**. It is only used at connection
+      time - "doesn't affect the session after it is established" - so
+      long runs are fine, but every NEW connection needs a freshly
+      minted token. dbt, Soda and datacontract-cli each open their own,
+      so a static environment variable cannot serve them; something has
+      to mint per connection. Also flagged by AWS: a driver or tool
+      that truncates a ~1 KB password breaks authentication.
+    - **`max_connections` VARIES BY DB INSTANCE CLASS** rather than
+      being a fixed Aurora number, so it is a sizing decision. Relevant
+      because 30 datasets checked in parallel, each tool opening its
+      own connection, is a real concurrency figure to size against.
+    - **SERVERLESS V2 FITS THIS WORKLOAD'S SHAPE.** It scales in
+      half-ACU steps and can **pause to zero**, and AWS names
+      development and testing explicitly as a use case with a low
+      minimum capacity. A quarterly asset is idle for most of every
+      quarter, so a provisioned instance sitting at idle between
+      deliveries is the wrong shape and this is the right one.
+    - **EXTENSIONS** are an allowlist published per Aurora version in
+      the Release Notes guide rather than "install anything". Nothing
+      in this design needs one today; worth a check before anything
+      starts depending on one.
+
+    **STILL GENUINELY UNREAD:** the specific extension list for 16.8,
+    and Aurora's major-version support timeline (how long 16 remains
+    available), which bears on the 16-versus-17 choice above.
