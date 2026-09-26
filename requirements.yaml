@@ -13234,13 +13234,19 @@ requirements:
         and SHALL NOT claim to answer it for a consumer querying a
         period schema directly in SQL.
       - >
-        THE SYSTEM SHALL record, at the point a run holds a live
-        warehouse connection, which physical tables each period schema
-        actually holds, and SHALL commit that census to history
-        alongside that run's results.
+        WHENEVER the system holds a live warehouse connection, THE
+        SYSTEM SHALL compare the physical tables the decision log names
+        against those the warehouse actually holds, and SHALL commit the
+        DISCREPANCIES - normally none - rather than an inventory of what
+        is present.
       - >
-        THE SYSTEM SHALL check each "as at T" answer against that
-        committed census, and SHALL NOT read the warehouse to do so.
+        THE SYSTEM SHALL make that comparison wherever a table is moved
+        as well as on a QA run, so that a decision taken between runs is
+        checked when it is taken.
+      - >
+        THE SYSTEM SHALL report an "as at T" answer against those
+        committed discrepancies, and SHALL NOT read the warehouse to do
+        so.
       - >
         IF the decision log names a physical table the census does not
         hold, THEN THE SYSTEM SHALL report it prominently to a reader of
@@ -13422,27 +13428,42 @@ requirements:
         keeping both while forbidding them to differ, which adds a rule
         to enforce for a case nothing can currently produce.
       - >
-        THE LOG'S ANSWER IS CHECKED AGAINST THE WAREHOUSE, VIA A
-        COMMITTED CENSUS (Keith, 2026-09-26, his own proposal). The log
-        is authoritative for WHICH table a period resolves to, and
-        nothing verifies that the table is still there - so a table
-        dropped by a botched migration, a schema rebuilt from a stale
-        backup or a manual clean-up would leave the log confidently
-        naming it and every as-at answer quietly wrong, which is
-        precisely the "wrong in a way nobody notices for months" failure
-        this requirement's own NFR warns about. Keith reasoned to the
-        shape himself, including the constraint that made it non-
-        obvious: the dashboard never talks to the warehouse, so the
-        census has to be embedded. That is this project's established
-        pattern rather than a new one - the same rule that produced
-        dataset_stats.json, where anything needing a live connection is
-        computed once by whichever orchestrator already holds one and
-        committed to history. THIS DOES NOT CONTRADICT CRITERION 3: that
-        forbids DERIVING the answer from the warehouse's contents, and
-        this VERIFIES an answer the log derived. Note the near
-        neighbour: REQ-PIPE-068 criterion 5 records which physical table
-        each RUN read, which is per-run provenance and cannot answer a
-        per-period census.
+        THE LOG'S ANSWER IS CHECKED AGAINST THE WAREHOUSE, AND ONLY THE
+        DISCREPANCIES ARE COMMITTED (Keith, 2026-09-26, his own proposal
+        and then his own correction of this session's first shape for
+        it). THE PROBLEM: the log is authoritative for which table a
+        period resolves to, and nothing verifies the table is still
+        there - so a table dropped by a botched migration, a schema
+        rebuilt from a stale backup or a manual clean-up would leave the
+        log confidently naming it and every as-at answer quietly wrong,
+        which is exactly the "wrong in a way nobody notices for months"
+        failure this requirement's NFR warns about. Keith reasoned to
+        the shape himself including the constraint that made it non-
+        obvious - the dashboard never talks to the warehouse, so the
+        check cannot happen at render time. FIRST DRAFTED AS A FULL
+        CENSUS of every physical table per period, embedded for the
+        dashboard to compare against. He corrected that: "it just needs
+        to know where the system thinks a table should exist somewhere
+        and it isn't actually there". The comparison happens where the
+        connection already is, and only the DISCREPANCY is committed -
+        normally an empty list, a handful of strings at worst, rather
+        than an inventory that grows with every period and every
+        version. Same pattern as dataset_stats.json: compute where the
+        connection is, commit the conclusion rather than the raw
+        material. THE FRESHNESS OBJECTION AND WHY IT DISSOLVES: a
+        committed conclusion is only as current as the run that produced
+        it, where a census would let the dashboard build re-compare
+        against today's log. That gap closes because the check runs
+        wherever a table MOVES, not only on a QA run - and every
+        decision that changes what the log names is itself a warehouse
+        operation, since promotion and demotion both move a table. So
+        there is no decision that can create a discrepancy without
+        passing through the place that checks for one. THIS DOES NOT
+        CONTRADICT CRITERION 3, which forbids DERIVING the answer from
+        the warehouse's contents; this VERIFIES an answer the log
+        derived. Note the near neighbour: REQ-PIPE-068 criterion 5
+        records which physical table each RUN read, which is per-run
+        provenance and cannot answer this.
       - >
         A MISMATCH IS SHOUTED ON THE PAGE AND WARNS IN CI, RATHER THAN
         FAILING THE BUILD (Keith, 2026-09-26, and he found the flaw in
