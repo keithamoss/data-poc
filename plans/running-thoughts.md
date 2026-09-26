@@ -2624,15 +2624,24 @@ Belongs with batch 5's check work.
     file, so this is an existing inconsistency with something marked
     `built` rather than a new question.
 
-    **THE BOUNDARY TO KEEP INSIDE THAT MODEL.** A class of checks can
-    only be made on the FILE and is destroyed by loading: encoding,
-    delimiter, header row, column order, ragged or malformed rows,
-    duplicate headers. And a genuinely bad file fails the load
-    outright, which is itself a QA signal already modelled by
-    `REQ-PIPE-060` and `mothman supply failures`. So: load first, all
-    four tools check the warehouse, plus a small explicit set of
-    file-shape checks at load time that never pretend to be data
-    checks.
+    **THE AGREED SHAPE (Keith, 2026-09-26, agreeing with this
+    session's proposal): LOAD FIRST, ALL FOUR TOOLS CHECK THE
+    WAREHOUSE, PLUS A SMALL EXPLICIT SET OF FILE-SHAPE CHECKS AT LOAD
+    TIME THAT NEVER PRETEND TO BE DATA CHECKS.**
+
+    The boundary is what makes it work, and it is not a hedge. A class
+    of checks can only be made on the FILE and is destroyed by loading
+    - encoding, delimiter, header row, column order, ragged or
+    malformed rows, duplicate headers. Once the rows are in Postgres
+    those questions are either already answered or gone, so "check
+    everything in the warehouse" on its own would silently drop them.
+    They stay, at load time, and they are labelled as what they are:
+    statements about the FILE, not about the data. A reader must never
+    have to work out which subject a check was about.
+
+    A genuinely bad file fails the load outright, which is itself a QA
+    signal and one already modelled - `REQ-PIPE-060` and `mothman
+    supply failures` carry it, so this needs no new mechanism.
 
     **CORRECTION TO THE SURFACE ESTIMATE ABOVE**, recorded rather than
     quietly edited: this entry first said datacontract-cli and
@@ -2640,6 +2649,93 @@ Belongs with batch 5's check work.
     the warehouse. Keith's decision puts them back in. It is four tools
     to repoint, not two.
 
-    **STILL UNREAD:** Aurora's divergences from vanilla PostgreSQL, and
-    the Dev Container PostgreSQL feature. Both domains are now
-    allow-listed.
+    **HOW POSTGRES ACTUALLY GETS THERE, read 2026-09-26 from the Dev
+    Container spec and GitHub's own docs rather than recalled.** Three
+    environments, and they use three different mechanisms - worth
+    knowing before anyone tries to make one config serve all of them.
+
+    **DEVELOPMENT - a Dev Container, and the route is DOCKER COMPOSE,
+    not a Feature.** A community Feature exists
+    (`ghcr.io/itsmechlark/features/postgresql:1`) but it is
+    third-party; every template the spec maintainers publish uses
+    compose with two services, `app` and `db`. Note there is NO plain
+    `python-postgres` template - `ghcr.io/devcontainers/templates/
+    postgres` IS the Python one, titled "Python 3 & PostgreSQL". Four
+    details in that template worth carrying over deliberately:
+
+    - It sets `network_mode: service:db` on the app service, so the
+      app shares the database's network namespace and **Postgres is at
+      `localhost:5432`, not `db:5432`**. Non-obvious, and the first
+      thing to get wrong.
+    - Port forwarding belongs in `devcontainer.json`'s `forwardPorts`,
+      NOT compose's `ports` - the template says in as many words that
+      adding `ports` there will not forward from a Codespace.
+    - It uses `image: postgres:latest`, which we should PIN. The whole
+      point of this exercise is testing against the engine production
+      runs, and production is a specific Aurora PostgreSQL version.
+    - It mounts the volume at `/var/lib/postgresql` where the
+      conventional path is `/var/lib/postgresql/data`. A known wart in
+      that template; do not copy it without thinking.
+
+    **This repo has NO `.devcontainer/` at all today**, so that is a
+    new file set rather than an edit.
+
+    **CI - a GitHub Actions SERVICE CONTAINER, a different mechanism
+    entirely**, and the choice between its two forms is decided by
+    something `test.yml` already does. A job running INSIDE a
+    container reaches the service by its label (`postgres:5432`); a
+    job running DIRECTLY ON THE RUNNER must map the port (`ports: -
+    5432:5432`) and connect via `localhost`. **`test.yml` runs
+    directly on the runner**, so it is the second form. Either way the
+    service needs `POSTGRES_PASSWORD` and a health check - `--health-cmd
+    pg_isready --health-interval 10s --health-timeout 5s
+    --health-retries 5` - or the suite starts before the database is
+    accepting connections.
+
+    **NON-PRODUCTION is a locally installed PostgreSQL running as the
+    developer's own user, and PRODUCTION is AWS Aurora PostgreSQL**
+    (Keith, 2026-09-26). Three environments, three ways of getting a
+    connection, which is the argument for the connection details being
+    configuration read at runtime rather than anything committed.
+
+    **WHICH BREAKS SOMETHING CURRENTLY TRUE, and it should be said
+    plainly:** `qa_tools/dbt_profiles/profiles.yml` is COMMITTED today,
+    and its own header explains why - "no secrets, just a local file
+    path, so this is committed rather than gitignored like a normal
+    profiles.yml with credentials would be". With Postgres there are
+    credentials, so that reasoning expires. Something has to own how
+    they reach dbt, Soda and datacontract-cli in each of the three
+    environments, and datacontract-cli has already shown its hand: it
+    reads `DATACONTRACT_POSTGRES_USERNAME`/`_PASSWORD` from the
+    environment rather than from the contract, and treats an empty
+    password as unset.
+
+    **A DEV CONTAINER CANNOT BE THE ONLY SUPPORTED PATH, and the
+    reason is this project's own development environment.** Keith
+    asked whether a Claude Code session could use one. Dev Containers
+    are NOT VS Code only - the spec at containers.dev has a reference
+    CLI (`@devcontainers/cli`, `devcontainer up`/`exec`) and Codespaces
+    and JetBrains implement it. But a Claude Code cloud session CANNOT
+    run one: the Docker CLI is installed and there is no daemon and no
+    socket (`dial unix /var/run/docker.sock: connect: no such file or
+    directory`, tested 2026-09-26). No containers at all.
+
+    **WHICH RULES OUT TESTCONTAINERS**, and that is the finding that
+    matters, because it was one of the two candidates for per-worker
+    test isolation. It needs Docker, so it would work in a Dev
+    Container and on a GitHub runner and fail in the environment a
+    real share of this project's development actually happens in.
+
+    **The alternative is already proven here**: a natively installed
+    PostgreSQL 16, started with `initdb` plus `pg_ctl` on a spare
+    port, needing no container and no privileges. Everything measured
+    in this entry was run against exactly that. So the test strategy
+    should take a CONNECTION STRING for a Postgres that already
+    exists, rather than assuming it can start one - the Dev Container
+    supplies it in one environment, a service container in CI, a local
+    install in another, and a session like this one starts its own.
+    Same shape as `PLAYWRIGHT_CHROMIUM_PATH`, which this repo already
+    uses for exactly this reason.
+
+    **STILL UNREAD:** Aurora's divergences from vanilla PostgreSQL.
+    That domain is now allow-listed.
