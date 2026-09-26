@@ -1532,7 +1532,8 @@ comparisons against the expected-supply sequence.
     delivery gate** - a delivery whose tables land in different PERIODS
     runs QA but never auto-promotes (Thread H, TS-33).
 
-    **Owns:** nothing yet - this sprint is unscoped.
+    **Owns:** `REQ-PIPE-075`, `REQ-PIPE-076`, `REQ-PIPE-077`, `REQ-PIPE-079`,
+    `REQ-PIPE-080`, `REQ-PIPE-081`, `REQ-GHUB-082`, `REQ-PIPE-086`
 
     *Scope grew 2026-09-22*: the mixed-period gate is a promotion rule
     rather than an assignment one, so it lives here. Note its condition
@@ -1580,7 +1581,7 @@ comparisons against the expected-supply sequence.
     scope); and the log **refusing to record a decision with no
     identity** (Thread G).
 
-    **Owns:** nothing yet - this sprint is unscoped.
+    **Owns:** `REQ-PIPE-074`, `REQ-PIPE-076`, `REQ-PIPE-078`, `REQ-GHUB-082`
 
     *Scope grew 2026-09-22*: the write path is GitHub Issues, from the
     standing principle that the dashboard is read-only. It extends
@@ -1767,7 +1768,7 @@ comparisons against the expected-supply sequence.
     concept, adjacent to promotion and rejection (sprint 11) rather than
     part of either, and it has no requirement anywhere yet.
 
-    **Owns:** nothing yet - this sprint is unscoped.
+    **Owns:** `REQ-PIPE-083`, `REQ-PIPE-084`, `REQ-DASH-085`
 
     **NAME COLLISION, FLAGGED FIRST because this file has been bitten
     by exactly this before** (see "The collision: delivery already means

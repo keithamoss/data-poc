@@ -1,9 +1,12 @@
 """REQ-DOCS-073 - `mothman plans` (the CLI half of the dependency view)."""
 from __future__ import annotations
 
+import re
+
 from click.testing import CliRunner
 
 from cli.app import cli
+from qa_tools.common import sprint_state
 
 
 def _run(*args):
@@ -19,10 +22,23 @@ class TestTheDependencyView:
         """A REAL BUG, found by running it rather than by reading it.
         The view writes a sprint's state in square brackets, which Rich
         reads as a style tag - `[blocked]` is not a style, so it was
-        dropped and every row rendered with its status missing."""
+        dropped and every row rendered with its status missing.
+
+        ASSERTED AGAINST THE DATA, NOT AGAINST A LIST OF STATUS WORDS.
+        This used to name `[blocked]`, `[in-progress]` and `[unscoped]`
+        literally, and went red the moment sprint 11 stopped being
+        unscoped - a real, correct change to plans/supply-model.md
+        breaking a test about Rich markup. Which statuses appear is a
+        property of today's register; that none of them is swallowed is
+        the property this test is for.
+        """
+        rows = sprint_state.dependency_view()
+        expected = {m.group(0) for row in rows
+                    for m in re.finditer(r"\[[a-z-]+\]", row)}
+        assert expected, "no sprint heading carried a bracketed status at all"
         out = _run("plans", "dependencies").output
-        assert "[blocked]" in out or "[in-progress]" in out
-        assert "[unscoped]" in out
+        missing = sorted(s for s in expected if s not in out)
+        assert not missing, f"Rich swallowed these statuses: {missing}"
 
     def test_it_exits_cleanly(self):
         assert _run("plans", "dependencies").exit_code == 0
