@@ -12492,6 +12492,23 @@ requirements:
         rejected forbidding it outright, which would have left no single
         act meaning what the operator means.
       - >
+        A SUPPLY WHOSE SLOT IS LATER FILLED BY SOMETHING ELSE STAYS IN
+        STAGING, AND THAT IS THE OPERATOR'S TO CLEAR (Keith,
+        2026-09-26). Raised while scoping REQ-PIPE-079: because
+        stickiness attaches to the supply, a demoted cp_clients stays
+        staged while a corrected resupply promotes over its slot, so
+        it sits there awaiting a decision nobody needs to make any
+        more. His call is to leave it - the supply genuinely does
+        still await a decision, someone should reject it, and the
+        queue is small enough that this is not yet a real problem.
+        Rejected adding a criterion to mark such a supply
+        "overtaken". Recorded rather than left in conversation
+        because it is the one direction the global-rejected-schema
+        decision above does NOT cover: that decision keeps decided
+        supplies out of the work queue, and this leaves an undecided
+        one in it indefinitely. If the queue stops being workable at
+        thirty datasets, this is the decision to revisit.
+      - >
         STICKINESS ATTACHES TO THE SUPPLY, NOT TO THE SLOT (Keith,
         2026-09-26). The question was first put as "does stickiness
         lapse", which was the wrong framing and produced two options
