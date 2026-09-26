@@ -140,13 +140,20 @@ releases:
               both be right. They now look at the same thing.
       - category: Fixed
         items:
+          - headline: Soda no longer leaves a connection behind after every scan
+            components: ["QA checks & contract"]
+            description: >
+              Each scan quietly left one database connection open, still
+              inside a transaction, holding the tables it had just read.
+              After forty of them a run could no longer tidy up after
+              itself and gave up waiting. Scans now close what they
+              opened.
           - headline: A load can no longer wait forever for a lock
             components: ["Pipeline & publishing"]
             description: >
-              A QA tool could leave a connection open in a way that
-              blocked the next load indefinitely, with nothing in the log
-              to say why. It now gives up after thirty seconds and tells
-              you what it was waiting for.
+              If something does hold a table open, a load now gives up
+              after thirty seconds and tells you what it was waiting for,
+              rather than hanging with nothing in the log to say why.
       - category: New
         items:
           - headline: You need a PostgreSQL to run this

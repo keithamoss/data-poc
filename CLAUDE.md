@@ -1223,6 +1223,37 @@ Rough layout:
   yes, it belongs in `orchestrate_bdm.py`'s/`orchestrate_cp.py`'s own
   run step and a recorded result, not in `pipeline/build_*_dashboard_
   data.py`.
+- **When something hangs on the database, make PostgreSQL name the
+  blocker - do not sample for it.** Written 2026-09-27 after spending
+  four reproductions on a lock that the server could have identified on
+  the first one.
+
+  ```
+  ALTER SYSTEM SET log_lock_waits = on;
+  ALTER SYSTEM SET deadlock_timeout = '1s';
+  SELECT pg_reload_conf();
+  ```
+
+  The log then carries `process N still waiting for AccessExclusiveLock
+  ... Process holding the lock: M`, with the waiting statement, and no
+  sampling race. Sampling `pg_stat_activity` in a loop is the obvious
+  first move and it is worse: the window is easy to miss (the first
+  attempt caught nothing at all, because the hang happened after the
+  sampler's own loop had finished), and it tells you what a connection
+  is doing rather than who is blocking whom.
+
+  **Every connection this project opens sets `application_name`**
+  (`supply_db.connect(label=...)`, default `mothman`), and that is what
+  makes the log line usable - dbt sets its own, so an UNLABELLED
+  connection in `pg_stat_activity` is a tool's, which narrows it
+  immediately. Keep setting it. The one hunt that needed all four
+  reproductions was the one where every row read `[unknown]`.
+
+  To go from a blocking PID to a culprit: take its last query from
+  `pg_stat_activity` and grep the repo for it. That identified Soda
+  exactly - the SQL was a line of
+  `contract/bdm-birth-registrations-soda-checks.yml`, verbatim.
+
 - **When you change the SHAPE of a value (making it nullable, adding a
   field, changing what's authoritative), enumerate every consumer
   mechanically, and verify at the LAST transform before the user - not

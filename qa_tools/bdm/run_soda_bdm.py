@@ -39,6 +39,7 @@ from . import bdm_common
 from qa_tools.common import supply_db
 from qa_tools.common.soda_common import (
     ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys, check_id_from_resource_attributes,
+    close_scan_connections,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
 
@@ -135,8 +136,18 @@ def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     sampler = CaptureSampler()
     scan.sampler = sampler
     scan.disable_telemetry()
-    scan.execute()
-    scan_results = scan.get_scan_results()
+    # CLOSE WHAT SODA'S OWN TEARDOWN MISSES (2026-09-27). Its
+    # `_close()` closes an empty dict, so each scan otherwise leaves a
+    # backend sitting `idle in transaction` holding ACCESS SHARE on
+    # every table it read - which blocked the orchestrator's own
+    # `DROP SCHEMA ... CASCADE` until that timed out. In a `finally`
+    # because a scan that raises leaks exactly the same way, and that
+    # is the case nobody is watching.
+    try:
+        scan.execute()
+        scan_results = scan.get_scan_results()
+    finally:
+        close_scan_connections(scan)
     metric_name_by_id = {m["identity"]: m["metricName"] for m in scan_results["metrics"]}
 
     results = []

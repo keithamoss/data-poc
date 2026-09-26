@@ -86,3 +86,55 @@ def threshold(spec: dict | None) -> float | None:
     # side) - "upper bound wins for a single scalar" convention, same one
     # the now-removed equivalent engine's _numeric_threshold() used.
     return next(iter(spec.values()), None)
+
+
+def close_scan_connections(scan) -> int:
+    """Close the database connections a finished Soda scan leaves open.
+    Returns how many were closed, so a caller or a test can assert on it.
+
+    SODA'S OWN TEARDOWN MISSES THEM, and this is a real leak rather than
+    tidiness (2026-09-27). `Scan.execute()` ends with `self._close()`,
+    which calls `DataSourceManager.close_all_connections()`, which
+    iterates `manager.connections` - and on this code path that dict is
+    EMPTY. The live connection is held on the data source itself,
+    `manager.data_sources[name].connection`, so the loop closes nothing
+    and every scan leaves one PostgreSQL backend open. Verified directly:
+    a single scan against a real server takes the count of unlabelled
+    backends from 0 to 1, and it survives `del scan` and `gc.collect()`.
+
+    WHAT THAT LEAK ACTUALLY BROKE, because "a spare connection" sounds
+    harmless. Soda's connection is not autocommit, so the leaked backend
+    sits `idle in transaction` holding ACCESS SHARE on every table the
+    scan read. `DROP SCHEMA ... CASCADE` needs ACCESS EXCLUSIVE, so the
+    orchestrator's own tidy-up of a run's view schema queued behind it -
+    for thirty seconds, and then failed with a lock timeout. A pipeline
+    run over ~40 arrivals accumulated ~40 such backends. Under the
+    retired DuckDB engine none of this was visible: the tools shared one
+    in-process file and the per-run database was discarded whole.
+
+    WHY REACHING INTO `_data_source_manager` IS THE RIGHT FIX HERE
+    rather than a workaround. The connection exists because we asked
+    Soda to open it, so closing it is ours to do; the public API for
+    that is `_close()` and it demonstrably does not work. The guard
+    against Soda changing its internals is not defensive code here - it
+    is tests/test_soda_leaves_no_connection.py, which asserts the
+    OUTCOME (a completed scan leaves no open backend) rather than the
+    mechanism. If a future Soda release fixes this or moves it, that
+    test still says whether the invariant holds.
+    """
+    manager = getattr(scan, "_data_source_manager", None)
+    closed = 0
+    for data_source in getattr(manager, "data_sources", {}).values():
+        connection = getattr(data_source, "connection", None)
+        if connection is None or getattr(connection, "closed", False):
+            continue
+        try:
+            connection.close()
+            closed += 1
+        except Exception:
+            # A connection we cannot close is not worth failing a scan
+            # whose results are already in hand - the backend will go
+            # when the process does, and the test above is what notices
+            # if this starts happening.
+            pass
+    return closed

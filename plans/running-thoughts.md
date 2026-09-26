@@ -3621,33 +3621,84 @@ Belongs with batch 5's check work.
     encoding safe rather than merely tidier. Verified by removing the
     guard and confirming both new tests fail.
 
-47. **[todo, 2026-09-27]** **[Pipeline & publishing]** Keith: the idle-in-transaction lock needs a ROOT-CAUSE fix, not the timeout that is there now.
+47. **[done, 2026-09-27]** **[Pipeline & publishing]** The idle-in-transaction lock, root-caused: every Soda scan leaked a backend, because Soda's own teardown closes an empty dict.
 
-    His words: "make sure that stuff that addresses the lock issue is
+    Keith: "make sure that stuff that addresses the lock issue is
     robust. Like I don't want a hacky patch. I want something that
-    resolves the root cause of the transaction being idle forever.
-    Investigate further if you need to."
+    resolves the root cause of the transaction being idle forever."
 
-    **What happened, and why what is there now is not enough.** A six
-    minute hang during the PostgreSQL switch: a tool left a connection
-    `idle in transaction` holding a lock, and PostgreSQL's default
-    `lock_timeout` is wait-forever, so everything behind it stopped. The
-    response was `SET lock_timeout` per connection plus a
-    database-level `idle_in_transaction_session_timeout`.
+    **It is a real bug in Soda Core, and it is one line to see once you
+    look in the right place.** `Scan.execute()` ends by calling
+    `self._close()`, which calls
+    `DataSourceManager.close_all_connections()`, which iterates
+    `manager.connections` - and on this code path that dict is EMPTY.
+    The live connection is held at
+    `manager.data_sources[<name>].connection`. So the loop closes
+    nothing, and every scan leaves one PostgreSQL backend open. Proven
+    directly rather than inferred: a single scan takes the count of
+    unlabelled backends from 0 to 1, and it survives `del scan` and
+    `gc.collect()`.
 
-    Both of those are BLAST-RADIUS LIMITERS. They turn an infinite hang
-    into a bounded error, which is worth having and is not the fix - the
-    question they do not answer is why a transaction was open with
-    nobody in it. That is a connection-lifecycle bug somewhere in our
-    own code or in how a tool is invoked, and it needs finding rather
-    than capping.
+    **Why a spare connection was not harmless.** Soda's connection is
+    not autocommit, so the leaked backend sits `idle in transaction`
+    holding ACCESS SHARE on every table the scan read. The
+    orchestrator's own `DROP SCHEMA ... CASCADE` needs ACCESS EXCLUSIVE,
+    queued behind it, and failed after thirty seconds. A pipeline over
+    ~40 arrivals accumulated ~40 such backends.
 
-    Where to look first: `SupplyConnection` is `autocommit=True`, so an
-    open transaction means something started one and did not finish it -
-    a DDL path, a `COPY`, a tool holding its own connection, or an
-    exception path that never closes. Worth reproducing deliberately and
-    reading `pg_stat_activity.state`/`xact_start` while it happens,
-    rather than reasoning about it.
+    **How it was actually found, because the method transfers.** Four
+    reproductions, each narrowing:
+    1. `mothman pipeline run --collection bdm --sequential` failed the
+       same way every time - so it was deterministic, not a flake.
+    2. Sampling `pg_stat_activity` showed a sawtooth of unlabelled
+       `idle in transaction` backends, which said "accumulating" but not
+       who.
+    3. `log_lock_waits = on` with `deadlock_timeout = '1s'` made
+       PostgreSQL name the blocking PID itself, with no sampling race -
+       this is the step that should come FIRST next time.
+    4. The blocker had no `application_name`, so it could not be told
+       from any other tool. Giving every connection this project opens
+       one (`supply_db.connect(label=...)`) turned the next log line
+       into an answer. That labelling is kept: it cost nothing and it is
+       the difference between a four-reproduction hunt and reading one
+       line.
+
+    Matching the blocker's last query against the repo identified Soda
+    exactly - it was `contract/bdm-birth-registrations-soda-checks.yml`
+    line 520, verbatim.
+
+    **The fix** is `qa_tools/common/soda_common.py`'s
+    `close_scan_connections()`, called in a `finally` by both
+    `run_soda_bdm.py` and `run_soda_cp.py`. It closes the connection
+    through the object that actually owns it. That reaches into a
+    private attribute, which is justified here because the connection
+    exists only because we asked Soda to open it and the public API for
+    closing it demonstrably does not work - but the guard against Soda
+    changing its internals is not defensive code, it is
+    `tests/test_soda_leaves_no_connection.py`, which asserts the
+    OUTCOME. One of its tests pins the leak itself, so if a future Soda
+    release fixes this the test fails and tells us the workaround can
+    go, rather than it being carried forever unexamined.
+
+    **Verified end to end**: the pipeline that had failed four times in
+    a row completed with exit 0 and not one lock wait in PostgreSQL's
+    log.
+
+    **The timeouts stay, as a net rather than the fix** - `lock_timeout`
+    turns an indefinite hang into a bounded, named error, which is worth
+    having whatever else is true. Worth knowing separately, and NOT
+    fixed here: `idle_in_transaction_session_timeout` is set on the test
+    databases but is `0` on a real supply database, so that net has a
+    hole in it in production. A server setting rather than repo state,
+    so it belongs in deployment config.
+
+    **One real gap left open, deliberately.** All four of our own
+    long-lived `supply_db.connect()` call sites DO close (I briefly
+    thought otherwise from too short a grep window), but they close on
+    the happy path rather than in a `finally`, so an exception between
+    open and close leaks the same way. Fixing it properly means
+    re-indenting four long function bodies under `with`, which is not a
+    4am change - it is small, real, and should be its own commit.
 
 48. **[todo, 2026-09-27]** **[Testing & dev tooling]** Keith: a real command that takes a fresh checkout to a populated, QA'd warehouse.
 

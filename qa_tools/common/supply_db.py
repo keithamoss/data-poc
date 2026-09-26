@@ -251,7 +251,8 @@ class SupplyConnection:
         self.close()
 
 
-def connect(read_only: bool = False, dsn: str | None = None) -> SupplyConnection:
+def connect(read_only: bool = False, dsn: str | None = None,
+            label: str = "mothman") -> SupplyConnection:
     """Open the supply database.
 
     `read_only` NOW MEANS WHAT IT SAYS. Under the retired engine it was
@@ -266,10 +267,19 @@ def connect(read_only: bool = False, dsn: str | None = None) -> SupplyConnection
     criterion 12). It never falls back to another database, a cached
     copy, or a file - all three were available under the old engine and
     all three would hide the one thing worth knowing.
+
+    EVERY CONNECTION SAYS WHO IT IS (`label`, 2026-09-27). PostgreSQL
+    reports `application_name` in pg_stat_activity and in its own
+    lock-wait log, and without it every row reads `[unknown]` - so
+    "which of these is ours and which belongs to dbt or Soda" cannot be
+    answered while a hang is actually happening, which is exactly when
+    it needs answering. dbt sets its own; this is how ours become just
+    as identifiable. Cheap, and it turns a diagnosis that took three
+    reproductions into reading one line.
     """
     target = dsn if dsn is not None else supply_db_dsn()
     try:
-        raw = psycopg.connect(target, autocommit=True)
+        raw = psycopg.connect(target, autocommit=True, application_name=label)
     except psycopg.Error as exc:
         raise SupplyDbError(
             f"cannot reach the supply database at {_redact(target)}: {exc}") from exc
@@ -484,7 +494,7 @@ def connect_dbt(read_only: bool = True) -> SupplyConnection:
     is reading dbt's output to evaluate it, and a reader that can write
     is a reader that can corrupt what it is measuring.
     """
-    conn = connect(read_only=read_only)
+    conn = connect(read_only=read_only, label="mothman:read-dbt-output")
     # SET is allowed inside a read-only session; it changes name
     # resolution, not data.
     conn.raw.execute(f'SET search_path TO "{DBT_SCHEMA}", public')
