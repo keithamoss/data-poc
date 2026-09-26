@@ -5,6 +5,8 @@ generator output, not hand-crafted rows), and drives the Click commands
 through click.testing.CliRunner, same as that file."""
 from __future__ import annotations
 import json
+
+from qa_tools.common import tables_read
 import os
 import re
 from unittest.mock import MagicMock
@@ -239,7 +241,8 @@ def test_qa_command_flag_mode_commit_promotes_into_the_patched_qa_results_dir(
     assert result.exit_code == 0, result.output
     assert "Promoted" in result.output
     dataset_stats_path = (fake_qa_results / bdm.AGENCY_ID / bdm.COLLECTION_ID
-                           / _ARRIVAL_REF_RUN_ID / "dataset_stats.json")
+                           / tables_read.RAW_SCOPE / _ARRIVAL_REF_RUN_ID
+                           / "dataset_stats.json")
     assert dataset_stats_path.exists()
     with open(dataset_stats_path) as f:
         assert json.load(f)["run_by"] == "test@example.com"
@@ -352,7 +355,8 @@ def test_qa_command_local_file_commit_promotes_into_the_patched_qa_results_dir(
 
     assert result.exit_code == 0, result.output
     assert "Promoted" in result.output
-    matches = list(fake_qa_results.glob(f"{bdm.AGENCY_ID}/{bdm.COLLECTION_ID}/*/dataset_stats.json"))
+    matches = list(fake_qa_results.glob(
+        f"{bdm.AGENCY_ID}/{bdm.COLLECTION_ID}/{tables_read.RAW_SCOPE}/*/dataset_stats.json"))
     assert len(matches) == 1
     with open(matches[0]) as f:
         assert json.load(f)["run_by"] == "test@example.com"

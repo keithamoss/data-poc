@@ -108,22 +108,41 @@ def test_confirm_without_yes_asks_and_returns_the_real_answer(monkeypatch):
     assert common.confirm("Promote?", yes=False) is True
 
 
-def test_promote_copies_the_tmp_run_into_the_real_qa_results_tree(tmp_path):
+def test_promote_copies_every_scope_of_the_run_into_the_real_tree(tmp_path):
+    """A run is SEVERAL directories since REQ-PIPE-038 - one per
+    dataset it wrote a result for, plus `_raw`. Copying one of them
+    promotes a run that looks complete and is missing most of itself.
+    """
+    from qa_tools.common import tables_read
+
     tmp_root = tmp_path / "tmp_qa_results"
-    run_dir = tmp_root / "agency-x" / "dataset-y" / "run_001"
-    run_dir.mkdir(parents=True)
-    (run_dir / "dataset_stats.json").write_text('{"raw_output": {}}')
+    collection = tmp_root / "agency-x" / "collection-y"
+    for scope, filename in [(tables_read.RAW_SCOPE, "dataset_stats.json"),
+                             ("dataset-a", "soda.json"),
+                             ("dataset-b", "soda.json"),
+                             (tables_read.CROSS_TABLE_SCOPE, "soda.json")]:
+        run_dir = collection / scope / "run_001"
+        run_dir.mkdir(parents=True)
+        (run_dir / filename).write_text('{"raw_output": {}}')
+    # Another run's directory, which must NOT be dragged along.
+    (collection / "dataset-a" / "run_002").mkdir(parents=True)
+    (collection / "dataset-a" / "run_002" / "soda.json").write_text("{}")
 
     fake_real_qa_results = tmp_path / "real_qa_results"
     common_module_qa_results = common.QA_RESULTS_DIR
     try:
         common.QA_RESULTS_DIR = fake_real_qa_results
-        dst = common.promote(str(tmp_root), "agency-x", "dataset-y", "run_001")
+        dst = common.promote(str(tmp_root), "agency-x", "collection-y", "run_001")
     finally:
         common.QA_RESULTS_DIR = common_module_qa_results
 
-    assert dst == fake_real_qa_results / "agency-x" / "dataset-y" / "run_001"
+    promoted = fake_real_qa_results / "agency-x" / "collection-y"
+    assert dst == promoted / tables_read.RAW_SCOPE / "run_001"
     assert (dst / "dataset_stats.json").exists()
+    assert (promoted / "dataset-a" / "run_001" / "soda.json").exists()
+    assert (promoted / "dataset-b" / "run_001" / "soda.json").exists()
+    assert (promoted / tables_read.CROSS_TABLE_SCOPE / "run_001" / "soda.json").exists()
+    assert not (promoted / "dataset-a" / "run_002").exists()
 
 
 def test_new_tmp_results_dir_returns_a_real_fresh_empty_directory():

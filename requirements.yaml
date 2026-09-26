@@ -4290,8 +4290,7 @@ requirements:
         into a signed criterion.
 
   - id: REQ-PIPE-038
-    title: Committed history is keyed per dataset, logs deliveries beside it,
-      and is regenerated from scratch
+    title: Committed history is keyed per dataset and regenerated from scratch
     date_written: "2026-09-21"
     story: >
       As whoever reads this history years from now, I want every run's
@@ -4358,17 +4357,56 @@ requirements:
       - Seeded and deterministic, so regenerating twice produces the
         same history and a diff stays a real correctness check.
     dependencies: [REQ-PIPE-034, REQ-PIPE-036, REQ-QAC-037]
-    open_questions:
-      - >
-        BLOCKED, 2026-09-26. Criterion 2 stores a cross-table result
-        under its own cross-table scope, and where that scope lives and
-        what it is called is REQ-QAC-037's own unresolved open question
-        - so this cannot be built without answering it there first.
-        Criterion 4's regeneration from scratch is also a large,
-        one-way change to every committed file and wants a person
-        watching it rather than an unattended run.
-
+    open_questions: []
     decisions:
+      - >
+        THE TREE, SETTLED 2026-09-26 (Keith), and it is three scopes
+        under a collection rather than one:
+        <agency>/<collection>/<dataset>/<run_id>/<tool>.json holds that
+        dataset's own `verified` records;
+        <collection>/_cross-table/<run_id>/ holds the spanning ones
+        (REQ-QAC-037); and <collection>/_raw/<run_id>/<tool>.json holds
+        the one genuinely-unmodified `raw_output` per tool invocation,
+        plus the two pseudo-tools (`dataset_stats`, `tables_read`) that
+        describe a RUN rather than a dataset.
+      - >
+        RAW OUTPUT IS RECORDED ONCE, IN ITS OWN SCOPE, rather than
+        copied into each dataset or filtered per dataset - both of
+        which this requirement's own earlier decisions had already
+        rejected, and neither of which regeneration makes any more
+        honest. A CP Soda run is ONE Scan() covering all six tables,
+        and its scanStartTimestamp/hasErrors/hasFailures describe that
+        invocation, not any one table. Keith chose this over running
+        each tool once per dataset, which would have made each raw
+        output genuinely its own at the cost of six times the
+        invocations AND of breaking every cross-table check, since a
+        check joining two tables cannot run inside a single-dataset
+        scan. Precedent: the cross-table file already carries
+        `raw_output: null` for exactly this reason.
+      - >
+        A RUN IS COMPLETE WHEN IT HAS THE TOOLS THAT APPLY TO THAT
+        DATASET, derived from the check definitions rather than from a
+        fixed list (Keith, 2026-09-26). Evidently defines one check in
+        the whole Child Protection collection, on cp-notifications, so
+        a fixed six-file rule would report five of six datasets
+        permanently incomplete - REQ-PIPE-036's completeness check
+        would go from meaning "this run died partway" to meaning
+        nothing. Rejected writing an empty evidently.json under the
+        other five: a file that exists asserts the tool ran, and it did
+        not.
+      - >
+        `_raw` IS A RESERVED NAME on the same terms as `_cross-table`,
+        and the gate that reserves the leading underscore already
+        covers it - no agency, collection or dataset id may begin with
+        one. Named for the field it holds rather than for the level it
+        sits at, because `_collection` would suggest it holds
+        collection-scoped RESULTS, which is what `_cross-table` is for.
+      - >
+        BIRTH REGISTRATIONS IS RE-KEYED TOO, though its collection has
+        exactly one dataset and the move buys that collection nothing.
+        Criterion 3 is explicit that both are keyed by the same rule
+        with no per-dataset special case, and the one-dataset case is
+        precisely where a special case would look harmless.
       - >
         SCOPE NARROWED 2026-09-24 (Keith), in a requirement already
         signed on 2026-09-23, and for the same reason as REQ-PIPE-035's

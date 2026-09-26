@@ -52,13 +52,18 @@ class TestItIsRecordedInItsOwnScope:
         monkeypatch.setenv("MOTHMAN_SUPPLY_DB", str(tmp_path / "absent.duckdb"))
         writer._declared_reads_tables.cache_clear()
 
-        path = writer.write_qa_result(
+        writer.write_qa_result(
             AGENCY, COLLECTION, "run_1", "2026-09-26T09:00:00+08:00", "dbt", {},
             verified=[{"check_id": _a_real_cross_table_check_id(),
                         "dataset_id": "cp-placements", "status": "fail"}],
             results_dir=tmp_path / "qa_results")
 
-        assert json.loads(path.read_text())["verified"] == []
+        # cp-placements is the dataset the check was DECLARED under, so
+        # that is the file the record would have landed in. Since
+        # REQ-PIPE-038 a dataset with nothing to record gets no file at
+        # all, which is a stronger form of "it left" than an empty one.
+        dataset_dir = tmp_path / "qa_results" / AGENCY / COLLECTION / "cp-placements"
+        assert not dataset_dir.exists(), "the record was copied rather than moved"
 
     def test_an_ordinary_check_stays_where_it_was(self, tmp_path, monkeypatch):
         """The change must not sweep up single-table checks - 235 of the
@@ -66,14 +71,16 @@ class TestItIsRecordedInItsOwnScope:
         monkeypatch.setenv("MOTHMAN_SUPPLY_DB", str(tmp_path / "absent.duckdb"))
         writer._declared_reads_tables.cache_clear()
 
-        path = writer.write_qa_result(
+        writer.write_qa_result(
             AGENCY, COLLECTION, "run_1", "2026-09-26T09:00:00+08:00", "dbt", {},
             verified=[{"check_id": "not-a-cross-table-check",
                         "dataset_id": "cp-placements", "status": "pass"}],
             results_dir=tmp_path / "qa_results")
 
-        assert len(json.loads(path.read_text())["verified"]) == 1
-        assert not (path.parent.parent / tr.CROSS_TABLE_SCOPE).exists()
+        collection_dir = tmp_path / "qa_results" / AGENCY / COLLECTION
+        own = collection_dir / "cp-placements" / "run_1" / "dbt.json"
+        assert len(json.loads(own.read_text())["verified"]) == 1
+        assert not (collection_dir / tr.CROSS_TABLE_SCOPE).exists()
 
     def test_the_raw_output_is_not_duplicated_into_the_scope(self, tmp_path, monkeypatch):
         """One tool invocation's native output covers the whole

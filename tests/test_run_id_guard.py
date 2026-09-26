@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from qa_tools.common import run_id_guard
+from qa_tools.common import run_id_guard, tables_read
 
 
 @dataclass
@@ -23,7 +23,9 @@ class _Arrival:
 
 
 def _history(tmp_path, runs: dict[str, str]):
-    base = tmp_path / "ag" / "col"
+    # The `_raw` scope, where REQ-PIPE-038 put dataset_stats - it
+    # describes a RUN, and the collection's other children are datasets.
+    base = tmp_path / "ag" / "col" / tables_read.RAW_SCOPE
     for run_id, delivery_name in runs.items():
         run_dir = base / run_id
         run_dir.mkdir(parents=True)
@@ -79,13 +81,13 @@ class TestItDoesNotGuessAtProvenance:
         """An unknown provenance cannot be compared against anything,
         and inventing one is how a guard starts reporting confidently
         on nothing."""
-        base = tmp_path / "ag" / "col" / "run_001"
+        base = tmp_path / "ag" / "col" / tables_read.RAW_SCOPE / "run_001"
         base.mkdir(parents=True)
         (base / "dataset_stats.json").write_text(json.dumps({"raw_output": {}}))
         assert run_id_guard.committed_deliveries("ag", "col", tmp_path) == {}
 
     def test_unreadable_history_is_skipped_rather_than_fatal(self, tmp_path):
-        base = tmp_path / "ag" / "col" / "run_001"
+        base = tmp_path / "ag" / "col" / tables_read.RAW_SCOPE / "run_001"
         base.mkdir(parents=True)
         (base / "dataset_stats.json").write_text("{not json")
         assert run_id_guard.committed_deliveries("ag", "col", tmp_path) == {}

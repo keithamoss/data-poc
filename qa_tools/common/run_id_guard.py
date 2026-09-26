@@ -62,7 +62,13 @@ def committed_deliveries(agency_id: str, collection_id: str,
     anything, and inventing one is how a guard starts reporting
     confidently on nothing.
     """
-    base = Path(results_dir or QA_RESULTS_DIR) / agency_id / collection_id
+    # The `_raw` scope, not the collection directory (REQ-PIPE-038):
+    # dataset_stats describes a RUN, so that is where it lives, and the
+    # collection's other children are datasets rather than runs.
+    from qa_tools.common import tables_read as tables_read_mod
+
+    base = (Path(results_dir or QA_RESULTS_DIR) / agency_id / collection_id
+            / tables_read_mod.RAW_SCOPE)
     if not base.is_dir():
         return {}
     out: dict[str, str] = {}

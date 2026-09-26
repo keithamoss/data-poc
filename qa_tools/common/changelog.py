@@ -93,8 +93,15 @@ def _committed_at_by_run_timestamp(agency: str, dataset: str, repo_root: Path) -
     generate) vs. 1.7MB/56K lines narrowed to dataset_stats.json alone
     (~0.7s) - a ~13x reduction, (1) alone barely moved the needle
     against a diff already this large."""
+    # REQ-PIPE-038 moved dataset_stats into the `_raw` scope, because
+    # it describes a RUN rather than a dataset. The pathspec follows it
+    # rather than widening to `**`: the narrowing is what makes this
+    # function fast (see the paragraph above), and a `**` would put the
+    # real dbt and Soda output back into the diff it reads.
+    from qa_tools.common import tables_read as tables_read_mod
+
     rel_path = f"qa_results/{agency}/{dataset}/"
-    dataset_stats_pathspec = f"{rel_path}*/dataset_stats.json"
+    dataset_stats_pathspec = f"{rel_path}{tables_read_mod.RAW_SCOPE}/*/dataset_stats.json"
     log = subprocess.run(
         ["git", "log", "-p", "--reverse", f"--format={_COMMIT_BOUNDARY_PREFIX}%H|%cI", "--", dataset_stats_pathspec],
         cwd=repo_root, capture_output=True, text=True, check=True,

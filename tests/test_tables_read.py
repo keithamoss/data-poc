@@ -163,7 +163,7 @@ class TestItReachesTheCommittedFile:
         check_id = declaring[0].check_id
 
         qa_results_writer._declared_reads_tables.cache_clear()
-        path = qa_results_writer.write_qa_result(
+        qa_results_writer.write_qa_result(
             "child-protection-family-support", "child-protection", "cp_run_001",
             "2026-09-25T22:00:00+08:00", "dbt", {"raw": True},
             verified=[_result(check_id)], results_dir=tmp_path / "qa_results")
@@ -173,9 +173,9 @@ class TestItReachesTheCommittedFile:
         # beside it, so this asserts where the check actually is rather
         # than where it used to be - and asserts it LEFT, which is that
         # requirement's criterion 2.
-        assert json.loads(Path(path).read_text())["verified"] == []
-        cross = (Path(path).parent.parent / tr.CROSS_TABLE_SCOPE
-                  / "cp_run_001" / "dbt.json")
+        collection_dir = tmp_path / "qa_results" / "child-protection-family-support" / "child-protection"
+        assert not (collection_dir / "cp-placements").exists(), "the record did not leave"
+        cross = collection_dir / tr.CROSS_TABLE_SCOPE / "cp_run_001" / "dbt.json"
         written = json.loads(cross.read_text())
         assert written["verified"][0][tr.RESULT_FIELD] == {
             "cp_carers": "cp_carers__20260801010000"}
@@ -189,11 +189,12 @@ class TestItReachesTheCommittedFile:
         monkeypatch.setenv(supply_db.SUPPLY_DB_ENV, str(tmp_path / "missing.duckdb"))
         qa_results_writer._declared_reads_tables.cache_clear()
 
-        path = qa_results_writer.write_qa_result(
+        qa_results_writer.write_qa_result(
             "a", "b", "run_1", "2026-09-25T22:00:00+08:00", "dbt", {},
             verified=[_result("anything")], results_dir=tmp_path / "qa_results")
 
-        assert tr.RESULT_FIELD not in json.loads(Path(path).read_text())["verified"][0]
+        written = tmp_path / "qa_results" / "a" / "b" / "cp-placements" / "run_1" / "dbt.json"
+        assert tr.RESULT_FIELD not in json.loads(written.read_text())["verified"][0]
 
 
 class TestAPartialRunIsNotRecordedAsACompleteOne:
@@ -203,7 +204,9 @@ class TestAPartialRunIsNotRecordedAsACompleteOne:
     said so."""
 
     def _run(self, root, run_id, tools):
-        d = root / "a" / "b" / run_id
+        """A run's RAW scope, which is where REQ-PIPE-038 put the file
+        every invocation writes whatever its records say."""
+        d = root / "a" / "b" / tr.RAW_SCOPE / run_id
         d.mkdir(parents=True)
         for tool in tools:
             (d / f"{tool}.json").write_text("{}")
@@ -213,7 +216,7 @@ class TestAPartialRunIsNotRecordedAsACompleteOne:
         self._run(tmp_path, "run_1", ["dbt", "soda"])
         assert not qa_results_reader.run_is_complete("a", "b", "run_1", tmp_path)
         assert qa_results_reader.missing_tools("a", "b", "run_1", tmp_path) == [
-            "datacontract", "evidently", "dataset_stats", "tables_read"]
+            "_raw/datacontract", "_raw/evidently", "_raw/dataset_stats", "_raw/tables_read"]
 
     def test_a_run_with_every_expected_file_is_complete(self, tmp_path):
         self._run(tmp_path, "run_1", qa_results_reader.EXPECTED_TOOLS)
@@ -225,12 +228,25 @@ class TestAPartialRunIsNotRecordedAsACompleteOne:
         found = qa_results_reader.incomplete_runs("a", "b", tmp_path)
         assert list(found) == ["run_2"]
 
+    def test_a_dataset_owing_a_tool_it_never_wrote_is_named_too(self, tmp_path):
+        """The other half of completeness since REQ-PIPE-038: `_raw`
+        catches a run that died between tools, and the dataset
+        directories catch a tool that ran and wrote nothing."""
+        self._run(tmp_path, "run_1", qa_results_reader.EXPECTED_TOOLS)
+        (tmp_path / "a" / "b" / "cp-carers" / "run_1").mkdir(parents=True)
+
+        missing = qa_results_reader.missing_tools("a", "b", "run_1", tmp_path)
+
+        assert "cp-carers/dbt" in missing
+        assert "cp-carers/evidently" not in missing, (
+            "no Evidently check is defined against cp-carers, so it owes no file")
+
     def test_every_real_committed_run_is_complete(self, real_committed_history):
-        """The corpus this rule was derived from - 60 runs, six files
-        each. A regression here means something stopped writing."""
-        for agency, dataset in (("registry-services", "civil-registration"),
-                                 ("child-protection-family-support", "child-protection")):
-            assert qa_results_reader.incomplete_runs(agency, dataset) == {}
+        """The corpus this rule was derived from. A regression here
+        means something stopped writing."""
+        for agency, collection in (("registry-services", "civil-registration"),
+                                    ("child-protection-family-support", "child-protection")):
+            assert qa_results_reader.incomplete_runs(agency, collection) == {}
 
 
 class TestTheFailureNamesTheDatasetAndTheTool:

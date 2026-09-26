@@ -41,6 +41,7 @@ from qa_tools.common import backlog
 from qa_tools.common import parallel_orchestrate
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
+from qa_tools.common.qa_results_reader import canonical_order
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import build_per_run_warehouses
 from . import dataset_stats
@@ -369,6 +370,12 @@ def run_pipeline(sequential: bool = False) -> dict:
         if stats is not None:
             dataset_stats_by_run[entry["run_id"]] = stats
 
+    # ONE AGREED ORDERING down both paths (REQ-PIPE-038). A live run
+    # emits a collection's tables interleaved; a rebuild reads them as
+    # per-dataset files one after another. Same records either way, so
+    # this is what keeps a diff between the two a real correctness
+    # check rather than noise.
+    all_results = canonical_order(all_results)
     n_pass = sum(1 for r in all_results if r["status"] == "pass")
     n_warn = sum(1 for r in all_results if r["status"] == "warn")
     n_fail = sum(1 for r in all_results if r["status"] == "fail")

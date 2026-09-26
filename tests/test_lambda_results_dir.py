@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import qa_tools.bdm.run_dbt_bdm as run_dbt_bdm
 import qa_tools.cp.run_dbt_cp as run_dbt_cp
+from qa_tools.common.tables_read import RAW_SCOPE
 from qa_tools.common.lambda_results_dir import patch_write_qa_result_for_lambda
 
 
@@ -30,8 +31,8 @@ def test_patch_write_qa_result_for_lambda_can_target_multiple_modules_independen
         run_dbt_bdm.write_qa_result("a", "d", "run_01", "2026-01-01T00:00:00Z", "dbt", {})
         run_dbt_cp.write_qa_result("a", "d", "cp_run_01", "2026-01-01T00:00:00Z", "dbt", {})
 
-        assert (tmp_path / "a" / "d" / "run_01" / "dbt.json").exists()
-        assert (tmp_path / "a" / "d" / "cp_run_01" / "dbt.json").exists()
+        assert (tmp_path / "a" / "d" / RAW_SCOPE / "run_01" / "dbt.json").exists()
+        assert (tmp_path / "a" / "d" / RAW_SCOPE / "cp_run_01" / "dbt.json").exists()
     finally:
         run_dbt_bdm.write_qa_result = original_bdm
         run_dbt_cp.write_qa_result = original_cp

@@ -52,6 +52,31 @@ RESULT_FIELD = "tables_read"
 #: move, which is what makes this independent of REQ-PIPE-038's re-key.
 CROSS_TABLE_SCOPE = "_cross-table"
 
+#: Where a tool invocation's own native output is recorded
+#: (REQ-PIPE-038): qa_results/<agency>/<collection>/_raw/<run_id>/.
+#:
+#: A THIRD scope beside the datasets and the cross-table one, because
+#: raw_output describes an INVOCATION and a Child Protection scan is
+#: one Scan() over all six tables - its scanStartTimestamp, hasErrors
+#: and hasFailures are facts about the run, not about any one table.
+#: Copying it into six dataset files would have each claim a raw output
+#: that is not its own, and filtering it would break the
+#: genuinely-unmodified guarantee that makes keeping it worthwhile. So
+#: it is recorded once, where it is true.
+#:
+#: Also holds the two PSEUDO-TOOLS - `dataset_stats` and `tables_read`
+#: - for the same reason: both describe a run rather than a dataset.
+#:
+#: Named for what it holds rather than for the level it sits at.
+#: `_collection` would read as "collection-scoped RESULTS", which is
+#: what `_cross-table` already is.
+RAW_SCOPE = "_raw"
+
+#: The pseudo-tools that describe a RUN. Neither is a real QA tool;
+#: both reuse write_qa_result()'s file shape, and both belong in
+#: RAW_SCOPE rather than under any one dataset.
+RUN_SCOPED_TOOLS = ("dataset_stats", "tables_read")
+
 #: What makes the name above safe to reserve. No dataset id may begin
 #: with it, and that is enforced by the hierarchy gate rather than left
 #: as a convention - a reserved name that is only reserved in a comment

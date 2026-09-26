@@ -28,6 +28,7 @@ import json
 import os
 
 from . import bdm_common
+from qa_tools.common.qa_results_reader import canonical_order
 from qa_tools.common.qa_results_reader import (list_run_ids, read_cross_table_results,
                                                read_dataset_stats, read_qa_results)
 from qa_tools.common import asset_time
@@ -63,6 +64,12 @@ def build_results_from_history() -> dict:
     # one later must not be the thing that discovers the omission.
     all_results += read_cross_table_results(AGENCY_ID, COLLECTION_ID)
 
+    # ONE AGREED ORDERING down both paths (REQ-PIPE-038). A live run
+    # emits a collection's tables interleaved; a rebuild reads them as
+    # per-dataset files one after another. Same records either way, so
+    # this is what keeps a diff between the two a real correctness
+    # check rather than noise.
+    all_results = canonical_order(all_results)
     n_pass = sum(1 for r in all_results if r["status"] == "pass")
     n_warn = sum(1 for r in all_results if r["status"] == "warn")
     n_fail = sum(1 for r in all_results if r["status"] == "fail")

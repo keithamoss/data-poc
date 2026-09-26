@@ -113,3 +113,80 @@ def run_command(collection: str, sequential: bool, snapshot: bool) -> None:
         console.print(f"Dashboard snapshot written -> {out_path}", style="green")
 
     console.print("Pipeline run complete -> dashboard/qa-reporting-dashboard.html", style="green")
+
+
+@pipeline_group.command("regenerate-history")
+@click.option("--collection", type=click.Choice(["bdm", "cp", "all"]), default="all",
+              help="Which collection's committed history to delete and rebuild. Default: both.")
+@click.option("--sequential", is_flag=True,
+              help="Run the manifest's checks one at a time instead of in parallel.")
+@click.option("--yes", is_flag=True,
+              help="Skip the confirmation prompt. For a scripted or unattended run.")
+def regenerate_history_command(collection: str, sequential: bool, yes: bool) -> None:
+    """Delete this collection's committed qa_results/ history and write it again from scratch.
+
+    REQ-PIPE-038 criteria 4-7. DELETES rather than migrates, which is Keith's own call
+    (2026-09-21): the data is synthetic, so re-running is honest where reshaping committed
+    files in place would not be. Runs locally and only locally - CI never regenerates,
+    opens or queries anything under data/.
+    """
+    import shutil
+
+    from qa_tools.common.qa_results_writer import QA_RESULTS_DIR
+
+    scopes = []
+    if collection in ("bdm", "all"):
+        scopes.append(("registry-services", "civil-registration"))
+    if collection in ("cp", "all"):
+        scopes.append(("child-protection-family-support", "child-protection"))
+
+    targets = [QA_RESULTS_DIR / agency / coll for agency, coll in scopes]
+    existing = [t for t in targets if t.is_dir()]
+    n_files = sum(len(list(t.rglob("*.json"))) for t in existing)
+
+    console.print(f"About to DELETE {n_files} committed result file(s) across "
+                   f"{len(existing)} collection(s) and write them again from the real tools.",
+                   style="yellow")
+    for target in existing:
+        console.print(f"  {target.relative_to(QA_RESULTS_DIR.parent)}", style="dim")
+    # WHY A PROMPT AT ALL, when every other mothman command just runs.
+    # This is the one command whose whole job is destroying committed
+    # history, and it is a one-way change to thousands of tracked
+    # files. Git holds the old tree, so it is recoverable - but
+    # recoverable is not the same as intended.
+    if not yes and not click.confirm("Delete and regenerate?", default=False):
+        console.print("Nothing deleted.", style="dim")
+        return
+
+    for target in existing:
+        shutil.rmtree(target)
+    console.print(f"Deleted {n_files} file(s). Regenerating...", style="dim")
+
+    if collection in ("bdm", "all"):
+        _run_bdm(sequential)
+    if collection in ("cp", "all"):
+        _run_cp(sequential)
+
+    # CRITERION 5: nothing may be left in the old shape. Asserted here
+    # rather than trusted, because the failure is silent - a stale run
+    # directory at collection level reads as a dataset called
+    # `run_014`, and every reader that walks the collection picks it up
+    # as one.
+    from qa_tools.common import tables_read as tables_read_mod
+    from qa_tools.common.hierarchy import datasets_in_collection
+
+    for agency, coll in scopes:
+        known = {d.dataset_id for d in datasets_in_collection(coll)}
+        base = QA_RESULTS_DIR / agency / coll
+        if not base.is_dir():
+            continue
+        strays = sorted(d.name for d in base.iterdir()
+                         if d.is_dir()
+                         and not tables_read_mod.is_reserved_scope(d.name)
+                         and d.name not in known)
+        if strays:
+            raise click.ClickException(
+                f"{agency}/{coll} still holds {len(strays)} scope(s) that are neither a "
+                f"dataset nor a reserved name: {', '.join(strays)}")
+
+    console.print("Committed history regenerated under the per-dataset model.", style="green")

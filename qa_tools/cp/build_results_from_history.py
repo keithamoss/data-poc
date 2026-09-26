@@ -5,17 +5,17 @@ qa_tools/bdm/build_results_from_history.py (see that file's own
 docstring for the full rationale). Runs no real tool, touches no local
 data of any kind.
 
-Reads every tool's output from the same qa_results/ dataset segment per
-run - cp_common.COLLECTION_ID. All 5 files (dbt/soda/datacontract/
-evidently/dataset_stats) live together under one run_id directory now;
-Evidently briefly wrote under its own table-scoped dataset id
-(hierarchy.dataset_for_table("cp_notifications").dataset_id) instead, a real bug
-fixed 2026-09-16 (run_evidently_cp.py's own comment on the write side)
-- Evidently's own per-result "dataset_id" field still correctly says
-"cp-notifications" for dashboard per-table grouping, only the file
-location was wrong. Interleaved per run_id (not two separate
-concatenated blocks) to match orchestrate_cp.py's own _run_one() order
-exactly.
+Reads per DATASET since REQ-PIPE-038 - qa_results/<agency>/<collection>/
+<dataset>/<run_id>/<tool>.json - with the raw output in `_raw/` and the
+spanning records in `_cross-table/`. read_one() walks every dataset
+under the collection and concatenates, so this module asks for "this
+run's dbt results" exactly as it did when they lived in one file.
+
+Interleaved per run_id (not two separate concatenated blocks) to match
+orchestrate_cp.py's own _run_one() order, and then put through
+canonical_order() so the two paths produce the identical file - see
+that function's own docstring for why they stopped agreeing on their
+own.
 
 "runs" used to come from local data/cp_raw/manifest.json - changed
 2026-09-16, Keith's hard rule: CI must never touch data, only committed
@@ -28,6 +28,7 @@ import json
 import os
 
 from qa_tools.common import hierarchy
+from qa_tools.common.qa_results_reader import canonical_order
 from qa_tools.common.qa_results_reader import read_cross_table_results  # noqa: F401
 from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats, read_one, TOOL_ORDER
 from . import cp_common
@@ -66,6 +67,12 @@ def build_results_from_history() -> dict:
     all_results.extend(read_cross_table_results(
         cp_common.AGENCY_ID, cp_common.COLLECTION_ID))
 
+    # ONE AGREED ORDERING down both paths (REQ-PIPE-038). A live run
+    # emits a collection's tables interleaved; a rebuild reads them as
+    # per-dataset files one after another. Same records either way, so
+    # this is what keeps a diff between the two a real correctness
+    # check rather than noise.
+    all_results = canonical_order(all_results)
     n_pass = sum(1 for r in all_results if r["status"] == "pass")
     n_warn = sum(1 for r in all_results if r["status"] == "warn")
     n_fail = sum(1 for r in all_results if r["status"] == "fail")

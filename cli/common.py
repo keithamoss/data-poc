@@ -122,18 +122,34 @@ def confirm(message: str, *, yes: bool, default: bool = False) -> bool:
     return bool(answer)
 
 
-def promote(tmp_root: str, agency: str, dataset: str, run_id: str) -> Path:
+def promote(tmp_root: str, agency: str, collection: str, run_id: str) -> Path:
     """Copies one run's real tool output from the throwaway tmp_root a QA
     flow already wrote into (via qa_tools.common.lambda_results_dir's
     patch_write_qa_result_for_lambda) into the real, permanent, committed
     qa_results/ tree - the actual meaning of "Promote". Never re-runs the
     real tool chain a second time just to change where its output lands;
-    the tools already ran once, for real, into tmp_root."""
-    src = Path(tmp_root) / agency / dataset / run_id
-    dst = QA_RESULTS_DIR / agency / dataset / run_id
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(src, dst, dirs_exist_ok=True)
-    return dst
+    the tools already ran once, for real, into tmp_root.
+
+    ONE RUN IS SEVERAL DIRECTORIES since REQ-PIPE-038 - one per dataset
+    it wrote a result for, plus `_raw` and possibly `_cross-table` - so
+    this walks the collection's scopes rather than copying a single
+    run directory. Copying only one of them would promote a run that
+    looks complete and is missing most of itself.
+
+    Returns the `_raw` path, which is the one scope every run writes.
+    """
+    src_collection = Path(tmp_root) / agency / collection
+    dst_collection = QA_RESULTS_DIR / agency / collection
+    for scope_dir in sorted(p for p in src_collection.iterdir() if p.is_dir()):
+        src = scope_dir / run_id
+        if not src.is_dir():
+            continue
+        dst = dst_collection / scope_dir.name / run_id
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(src, dst, dirs_exist_ok=True)
+    from qa_tools.common import tables_read as tables_read_mod
+
+    return dst_collection / tables_read_mod.RAW_SCOPE / run_id
 
 
 def report_promoted(dst: Path) -> None:
