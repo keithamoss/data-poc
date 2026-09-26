@@ -13612,7 +13612,7 @@ requirements:
     title: "An operator records a filing decision from GitHub or from the terminal, and both write the same entry"
     date_written: "2026-09-26"
     story: >
-      As an operator deciding what goes into a quarter, I want to
+      As a data engineer deciding what goes into a period, I want to
       promote, reject, demote or re-file from the GitHub ticket I am
       already working, and from the terminal when I am already there, so
       that a decision is a comment rather than a deployment and neither
@@ -13649,14 +13649,16 @@ requirements:
         state back out of an issue.
       - >
         WHEN a decision has been applied, THE SYSTEM SHALL report its
-        outcome on the ticket that raised it.
+        outcome on that dataset's ticket, whichever route raised it, so
+        that a decision taken in the terminal appears on the ticket in
+        the same way one raised there does.
       - >
-        WHEN the target slot of a re-file already holds a promoted
-        supply, THE SYSTEM SHALL require explicit confirmation and SHALL
-        supersede what is there.
+        THE SYSTEM SHALL require explicit confirmation for a re-file
+        whether or not its target slot already holds a promoted supply,
+        and WHERE the slot is occupied SHALL supersede what is there.
       - >
-        THE SYSTEM SHALL collect a reason at the point a decision is
-        raised, wherever the log requires one.
+        THE SYSTEM SHALL collect a reason at the point a PERSON raises
+        a decision, and SHALL refuse the decision without one.
       - >
         THE SYSTEM SHALL NOT add a control to the dashboard for any of
         these operations.
@@ -13702,6 +13704,10 @@ requirements:
         route that raised it, SHALL name the recorded decision that
         makes it impermissible, and SHALL NOT append an entry.
       - >
+        WHERE a decision raised on GitHub is refused, or fails for any
+        other reason, THE SYSTEM SHALL post the reason as a comment on
+        the ticket that raised it, and SHALL NOT fail silently.
+      - >
         THE SYSTEM SHALL apply that same judgement on both routes, from
         the one implementation, and SHALL NOT let either route permit
         something the other would refuse.
@@ -13709,6 +13715,24 @@ requirements:
         WHEN a decision would change nothing because the log already
         records that outcome, THE SYSTEM SHALL say so and SHALL NOT
         treat it as a refusal or append a duplicate entry.
+      - >
+        THE SYSTEM SHALL record the PERSON as the actor on every
+        decision a person raises, on either route, and SHALL NOT record
+        the automated system, the workflow or the terminal that carried
+        it.
+      - >
+        THE SYSTEM SHALL require an explicit confirmation before
+        applying promote, reject, demote or re-file in the TUI.
+      - >
+        THE SYSTEM SHALL require a GitHub username on every person in
+        contract/people.yaml who is not marked as a placeholder, SHALL
+        gate that in CI, and SHALL NOT let a placeholder entry act or
+        be assigned.
+      - >
+        THE SYSTEM SHALL have the TUI write its decision to the
+        committed log alone, and SHALL NOT have it call GitHub, so that
+        a decision can be taken with no network and reaches the ticket
+        when the log is pushed.
     non_functional_requirements:
       - >
         SECURITY, and this was the one needing a real answer before
@@ -13725,8 +13749,13 @@ requirements:
         closed.
       - >
         COMPATIBILITY: the TUI route is the only one that works with no
-        network and no GitHub reachability. On a government network
-        where a third-party domain may not be reachable, "second route"
+        network and no GitHub reachability, and criterion 26 is what
+        keeps that true now that a TUI decision has to reach the ticket
+        - the TUI writes the log and nothing else, and a workflow posts
+        the comment when the log is pushed. Had the TUI called GitHub
+        itself it would need gh auth on every operator's machine and
+        would fail exactly where this property matters. On a government
+        network where a third-party domain may not be reachable, this
         may be the only route, which is a stronger argument for it than
         convenience.
       - >
@@ -13920,7 +13949,7 @@ requirements:
         say, chiefly criterion 8's supersede confirmation and
         REQ-PIPE-075 criteria 4 and 10 - because a second enumeration
         would be a second source of truth for the same rules. Note the
-        distinction criterion 21 draws, which is the one most easily got
+        distinction criterion 22 draws, which is the one most easily got
         wrong: promoting a supply already promoted into the same slot is
         a NO-OP, not a refusal (REQ-PIPE-075 criterion 10 says change
         nothing and add no entry), and reporting it as an error would
@@ -13928,6 +13957,70 @@ requirements:
         while a decision is pending on the other route, which turns a
         rare race into a permanent coordination cost across two
         surfaces, one of which is a public issue tracker.
+      - >
+        EVERY DECISION A PERSON MAKES CARRIES A REASON; THE AUTOMATIC
+        GATE'S DOES NOT (Keith, 2026-09-26, correcting his own first
+        wording of it - "if no reason is given, reject the action" -
+        once shown that it reversed REQ-PIPE-074 criterion 7, which he
+        had signed the same morning). THE READING THAT MAKES THEM
+        AGREE, written down so nobody finds a contradiction here later:
+        074 criterion 7's "routine promotion that carries no reason" is
+        the AUTOMATIC one - green or amber into an empty slot, with the
+        rule as actor and no person to ask. It permits the LOG to
+        accept such an entry; it does not permit a person to omit one.
+        So this requirement's criterion 9 is narrower than 074's
+        criterion 6 rather than in conflict with it: 074 names three
+        cases where a reason is mandatory, and a person acting
+        deliberately now always gives one whatever the case. Rejected
+        requiring a reason on every decision including the rule's,
+        which would have meant a machine inventing prose for the most
+        routine event in the system.
+      - >
+        A PERSON IS THE ACTOR ON ANYTHING A PERSON DECIDES, WHICHEVER
+        ROUTE CARRIED IT (Keith, 2026-09-26). The workflow that applies
+        a GitHub-raised decision and the terminal that applies a
+        TUI-raised one are TRANSPORT, and neither belongs in the actor
+        field. NOTE THE LINE THIS DRAWS AGAINST REQ-PIPE-086's own
+        decision 2, which says the opposite for a different case and is
+        not in conflict: an automatic promotion firing DURING a TUI run
+        is logged against the RULE, because nobody decided it - the
+        person invoked the thing that decided. The test is who made the
+        decision, never who was present or what carried it.
+      - >
+        contract/people.yaml GAINS A MANDATORY GitHub USERNAME, WITH
+        PLACEHOLDERS EXPLICITLY MARKED (Keith, 2026-09-26, after being
+        shown the collision). The field is optional today and that is
+        load-bearing: the Monty Python entries standing in for
+        colleagues not yet named have no `github:` precisely so they
+        can never be assigned a real ticket, which making the field
+        mandatory would have quietly undone by requiring fictional
+        people to carry real-looking handles. A `placeholder: true`
+        entry may omit the handle and may neither act nor be assigned;
+        everyone else must have one, gated in CI. That turns
+        unassignability from a side effect of a missing field into a
+        stated property, which is the better end state regardless of
+        this requirement. Rejected dropping the placeholders, which
+        costs the dashboard's "Owned by" badge its stand-ins; rejected
+        requiring the handle only of people who may act, which is the
+        status quo restated and lets a real person be added without one
+        and silently be unable to act.
+      - >
+        THE TUI NEVER CALLS GITHUB; IT WRITES THE LOG AND A WORKFLOW
+        POSTS THE COMMENT (Keith's own question, 2026-09-26: "the TUI
+        will need to work with GitHub access, right? ... or is that
+        taken care of in GitHub Actions already?"). Criterion 7 now
+        requires a TUI decision to appear on the ticket, which looks
+        like it forces the terminal online and would gut NFR 2. It does
+        not, because the log is committed to the repository: the TUI
+        appends the entry, the operator pushes, and a workflow seeing
+        the new entry posts the comment. The decision can therefore be
+        taken on a disconnected network and the comment appears when
+        the push lands - the same git-propagation story decision 11
+        already tells about visibility, and consistent with criterion
+        6's "GitHub is the channel, the log is the record". Rejected
+        having the TUI call gh directly, which needs authentication on
+        every operator's machine and fails in exactly the environment
+        NFR 2 exists to protect.
   - id: REQ-PIPE-083
     title: "An overdue slot becomes a ticket, once, whether or not anything else arrives"
     date_written: "2026-09-26"
