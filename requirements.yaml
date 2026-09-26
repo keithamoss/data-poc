@@ -447,9 +447,24 @@ requirements:
       durable and shared, and how several people running QA across ~30
       datasets avoid stepping on each other.
     acceptance_criteria:
-      - qa_results/ is committed to git, never gitignored or pruned.
-      - The dashboard can be rebuilt purely from that committed history,
-        with no live tool re-run required.
+      - >
+        QA results are durable and are never pruned - held in the
+        database's own metadata schema since REQ-PIPE-089, not as
+        committed files. AMENDED 2026-09-27 (Keith): this criterion
+        used to require the opposite, that qa_results/ be committed
+        and never gitignored, and it was met for months. What it
+        protects survives intact - this history may span years and
+        nothing may quietly throw it away - and what changed is where
+        it lives, because a repository holds configuration and a
+        database holds state.
+      - >
+        The dashboard can be rebuilt purely from recorded QA history,
+        with no live tool re-run required. AMENDED 2026-09-27: "that
+        committed history" became the metadata schema. The property
+        that matters is unchanged and is the whole point - publishing
+        must never depend on re-running a tool against data, because a
+        publisher that can re-run is a publisher that can produce a
+        different answer from the one being published.
     linked_tests:
       - tests/test_qa_results_writer.py
       - tests/test_qa_results_reader.py
@@ -493,9 +508,20 @@ requirements:
       session. Keith's own call that there be no manual local-publish
       path at all, rather than a discouraged one.
     acceptance_criteria:
-      - There is no local "publish" command - only CI can deploy.
-      - A structurally invalid or check-lifecycle-violating build never
-        reaches the published site.
+      - >
+        There is no ad-hoc publish path - the one publisher is the
+        dashboard build that runs where the data is, and GitHub is
+        transport rather than the thing that decides. AMENDED
+        2026-09-27 (Keith): this used to read "only CI can deploy",
+        which was the same intent expressed through the only publisher
+        that existed at the time. The intent - nobody publishes from
+        their own machine on a whim - is preserved. What changed is
+        that CI can no longer BE the publisher, because the results
+        live in a database and Actions is the wrong place for
+        warehouse credentials.
+      - >
+        A structurally invalid or check-lifecycle-violating build
+        never reaches the published site.
     linked_tests:
       - tests/test_check_dashboard_renders.py
       - tests/test_dashboard_e2e.py::TestBuiltDashboardRenders
@@ -927,29 +953,40 @@ requirements:
       of that split named it. See plans/supply-model.md, "Batch 3's
       pre-build review".
     acceptance_criteria:
-      - THE SYSTEM SHALL resolve each logical table name a check uses to
-        exactly one physical table, through a per-run schema containing
-        only views, and SHALL discard that schema once the run
-        completes.
-      - THE SYSTEM SHALL route every read of supply data through that
+      - >
+        THE SYSTEM SHALL resolve each logical table name a check uses
+        to exactly one physical table, through a per-run schema
+        containing only views, and SHALL discard that schema once the
+        run completes.
+      - >
+        THE SYSTEM SHALL route every read of supply data through that
         per-run schema, and SHALL NOT query a physical table directly
         from any check, tool invocation or downstream reader.
-      - WHERE a logical name has more than one candidate physical table
-        and no basis on which to choose, THE SYSTEM SHALL NOT create a
-        view for it, and SHALL treat that name as absent for the run
-        rather than selecting one of the candidates.
-      - THE SYSTEM SHALL treat a table as present for the run only where
-        it resolves to exactly one version, and SHALL NOT treat the mere
-        existence of files claiming that name as presence.
-      - THE SYSTEM SHALL record, for every QA run, which physical
-        version of each table it read, in committed history that
-        outlives the discarded per-run schema.
-      - THE SYSTEM SHALL name a per-run schema so that one left behind
+      - >
+        WHERE a logical name has more than one candidate physical
+        table and no basis on which to choose, THE SYSTEM SHALL NOT
+        create a view for it, and SHALL treat that name as absent for
+        the run rather than selecting one of the candidates.
+      - >
+        THE SYSTEM SHALL treat a table as present for the run only
+        where it resolves to exactly one version, and SHALL NOT treat
+        the mere existence of files claiming that name as presence.
+      - >
+        THE SYSTEM SHALL record, for every QA run, which physical
+        version of each table it read, durably enough to outlive the
+        discarded per-run schema. AMENDED 2026-09-27: the store
+        changed from committed files to the metadata schema. The
+        requirement is the OUTLIVING - the view schema is dropped when
+        the run ends and "which version did that run read" is asked
+        years later - and that is untouched.
+      - >
+        THE SYSTEM SHALL name a per-run schema so that one left behind
         by an interrupted run is identifiable and removable without
         reference to any other record.
-      - THE SYSTEM SHALL hold all period schemas, the staging schema and
-        the rejected schema in one database, and SHALL NOT create a
-        database per run.
+      - >
+        THE SYSTEM SHALL hold all period schemas, the staging schema
+        and the rejected schema in one database, and SHALL NOT create
+        a database per run.
     non_functional_requirements:
       - >
         This is what delivery sprint 8 cannot start without. Staging has
@@ -1156,26 +1193,36 @@ requirements:
       plans/supply-model.md, "Blocker 2 resolved - the delivery log is
       the corpus".
     acceptance_criteria:
-      - THE SYSTEM SHALL record every delivery as its own committed
+      - >
+        THE SYSTEM SHALL record every delivery as its own committed
         file, written once when the delivery is recognised, and SHALL
         NOT append to, edit or re-write a delivery's file afterwards.
-      - THE SYSTEM SHALL store those files outside the per-dataset QA
+      - >
+        THE SYSTEM SHALL store those files outside the per-dataset QA
         results, in a location of their own, because a delivery spans
         datasets and is not a QA result.
-      - THE SYSTEM SHALL record, in a delivery's own file, every file it
-        carried by the name it arrived under, and the dataset each was
-        attributed to where one was, and SHALL NOT record in it any
-        outcome that is not known at recognition time.
-      - THE SYSTEM SHALL make the delivery record queryable as SQL
-        directly from the committed files, and SHALL NOT maintain a
-        second copy of it in the warehouse.
-      - THE SYSTEM SHALL preserve the recorded offset of every instant
+      - >
+        THE SYSTEM SHALL record, in a delivery's own file, every file
+        it carried by the name it arrived under, and the dataset each
+        was attributed to where one was, and SHALL NOT record in it
+        any outcome that is not known at recognition time.
+      - >
+        THE SYSTEM SHALL make the delivery record queryable as SQL,
+        and SHALL NOT maintain a second copy of it anywhere. AMENDED
+        2026-09-27 (Keith): the original said "directly from the
+        committed files" and forbade a copy "in the warehouse" - the
+        right rule pointing the wrong way round, now that the
+        warehouse is where the record lives. ONE COPY is the point;
+        which side is the original is what moved.
+      - >
+        THE SYSTEM SHALL preserve the recorded offset of every instant
         read back out of a delivery file, and SHALL NOT let it be
         inferred as a naive or UTC-normalised value.
-      - THE SYSTEM SHALL regenerate the delivery log from scratch
+      - >
+        THE SYSTEM SHALL regenerate the delivery log from scratch
         alongside the QA results, under the same delete-and-regenerate
-        rule, and SHALL NOT leave delivery records describing a history
-        that no longer exists.
+        rule, and SHALL NOT leave delivery records describing a
+        history that no longer exists.
     non_functional_requirements:
       - >
         This is REQ-PIPE-058 criterion 8's corpus. That criterion gates
@@ -6741,29 +6788,43 @@ requirements:
       by: Keith
       date: "2026-09-22"
     acceptance_criteria:
-      - THE SYSTEM SHALL generate a map naming, for each injected
-        scenario, the dataset, the supplies it produced, the period and
-        the as-of date at which that scenario can be seen.
-      - THE SYSTEM SHALL generate the map from the generator's own
+      - >
+        THE SYSTEM SHALL generate a map naming, for each injected
+        scenario, the dataset, the supplies it produced, the period
+        and the as-of date at which that scenario can be seen.
+      - >
+        THE SYSTEM SHALL generate the map from the generator's own
         record of where each scenario actually landed, and SHALL NOT
         require anyone to maintain it by hand.
-      - WHEN the synthetic history is regenerated, THE SYSTEM SHALL
+      - >
+        WHEN the synthetic history is regenerated, THE SYSTEM SHALL
         regenerate the map in the same act, so that the two cannot
         disagree.
-      - THE SYSTEM SHALL commit the map as markdown, so that anything
-        reading it reads a committed file and never touches data/.
-      - THE SYSTEM SHALL emit coordinates only, and SHALL NOT emit a
+      - >
+        THE SYSTEM SHALL keep the map as committed markdown, and SHALL
+        NOT require a reader of it to reach any supply data. AMENDED
+        2026-09-27: this one genuinely STAYS a committed file, because
+        a scenario map is configuration - a statement of which red
+        results were put there on purpose - rather than state a run
+        produces. The clause is restated only because `data/` is no
+        longer where supply data lives.
+      - >
+        THE SYSTEM SHALL emit coordinates only, and SHALL NOT emit a
         dashboard URL or anything that encodes the dashboard's routing
         scheme.
-      - WHERE a scenario has no generated data behind it, THE SYSTEM
+      - >
+        WHERE a scenario has no generated data behind it, THE SYSTEM
         SHALL say so rather than emitting a coordinate that leads
         nowhere.
-      - THE SYSTEM SHALL expose map regeneration as a mothman
+      - >
+        THE SYSTEM SHALL expose map regeneration as a mothman
         subcommand.
-      - THE SYSTEM SHALL write the map so that it reads as a complete,
+      - >
+        THE SYSTEM SHALL write the map so that it reads as a complete,
         self-explanatory document on its own, without a dashboard to
         render it.
-      - THE SYSTEM SHALL state, for each entry, what the scenario is
+      - >
+        THE SYSTEM SHALL state, for each entry, what the scenario is
         meant to demonstrate, not only where it landed.
     non_functional_requirements:
       - The map is committed and read by the dashboard build, so it must
@@ -10006,27 +10067,87 @@ requirements:
         next file in the same delivery still stages.
       - 'Full Python suite: SEE COMMIT. JS suite: SEE COMMIT.'
     acceptance_criteria:
-      - "WHEN a delivery is recognised, THE SYSTEM SHALL load every file it attributed to a dataset into one global staging schema, before any check runs over that delivery."
-      - "THE SYSTEM SHALL record, for a staged table, only facts observed at arrival - which delivery carried it, which dataset it was attributed to, and when we received it."
-      - "THE SYSTEM SHALL NOT record a period, a slot or a supersession relationship at load time."
-      - "THE SYSTEM SHALL name each staged table uniquely per arrival, carrying that arrival's instant, and SHALL NOT overwrite a table staged from an earlier arrival of the same dataset."
-      - "IF a file cannot be loaded at all, THEN THE SYSTEM SHALL create no table for it, SHALL record the arrival and the reason it could not be loaded, and SHALL report that dataset's supply as red."
-      - "WHERE one file in a delivery cannot be loaded, THE SYSTEM SHALL still stage every other file in that delivery."
-      - "THE SYSTEM SHALL make a staged table visible to a check only once that table's load record exists, so that an interrupted load leaves nothing a check can read."
-      - "IF a load is interrupted, THEN THE SYSTEM SHALL leave that delivery in a state the next run can process from the beginning, and SHALL NOT treat a partially-staged delivery as staged."
-      - "THE SYSTEM SHALL NOT run two writing processes against one database file at the same time, and WHERE staging would otherwise fan out across parallel workers, THE SYSTEM SHALL stage sequentially."
-      - "THE SYSTEM SHALL trigger checks from the arrival of a delivery, and SHALL NOT trigger them from a promotion."
-      - "THE SYSTEM SHALL use only our own receipt instant as a supply's arrival time, and SHALL NOT use a timestamp inside the supplier's files, a column in their data or a file modification time."
-      - "THE SYSTEM SHALL expose the staging load as a subcommand of the mothman supply group."
-
-      - "THE SYSTEM SHALL record each table's load outcome as its own committed record, written only after that table's load is durable."
-      - "THE SYSTEM SHALL NOT write a table's load record before its load is durable."
-      - "THE SYSTEM SHALL treat a table with no load record as unloaded, and SHALL replace whatever is present for it rather than trusting it."
-      - "THE SYSTEM SHALL consider a delivery processed only where every file attributed to a dataset has a load record."
-      - "THE SYSTEM SHALL NOT automatically retry a load recorded as failed."
-      - "WHERE a load is recorded as failed, THE SYSTEM SHALL surface it as needing human action, resolvable either by rejecting that supply or by reprocessing it after a fix."
-      - "WHEN a failed load is reprocessed, THE SYSTEM SHALL write a new load record rather than editing the failed one, and SHALL take the latest record for that table as current."
-      - "THE SYSTEM SHALL store load records in committed history alongside the delivery log, outside the per-dataset QA results."
+      - >
+        WHEN a delivery is recognised, THE SYSTEM SHALL load every
+        file it attributed to a dataset into one global staging
+        schema, before any check runs over that delivery.
+      - >
+        THE SYSTEM SHALL record, for a staged table, only facts
+        observed at arrival - which delivery carried it, which dataset
+        it was attributed to, and when we received it.
+      - >
+        THE SYSTEM SHALL NOT record a period, a slot or a supersession
+        relationship at load time.
+      - >
+        THE SYSTEM SHALL name each staged table uniquely per arrival,
+        carrying that arrival's instant, and SHALL NOT overwrite a
+        table staged from an earlier arrival of the same dataset.
+      - >
+        IF a file cannot be loaded at all, THEN THE SYSTEM SHALL
+        create no table for it, SHALL record the arrival and the
+        reason it could not be loaded, and SHALL report that dataset's
+        supply as red.
+      - >
+        WHERE one file in a delivery cannot be loaded, THE SYSTEM
+        SHALL still stage every other file in that delivery.
+      - >
+        THE SYSTEM SHALL make a staged table visible to a check only
+        once that table's load record exists, so that an interrupted
+        load leaves nothing a check can read.
+      - >
+        IF a load is interrupted, THEN THE SYSTEM SHALL leave that
+        delivery in a state the next run can process from the
+        beginning, and SHALL NOT treat a partially-staged delivery as
+        staged.
+      - >
+        THE SYSTEM SHALL NOT run two writing processes against one
+        database file at the same time, and WHERE staging would
+        otherwise fan out across parallel workers, THE SYSTEM SHALL
+        stage sequentially.
+      - >
+        THE SYSTEM SHALL trigger checks from the arrival of a
+        delivery, and SHALL NOT trigger them from a promotion.
+      - >
+        THE SYSTEM SHALL use only our own receipt instant as a
+        supply's arrival time, and SHALL NOT use a timestamp inside
+        the supplier's files, a column in their data or a file
+        modification time.
+      - >
+        THE SYSTEM SHALL expose the staging load as a subcommand of
+        the mothman supply group.
+      - >
+        THE SYSTEM SHALL record each table's load outcome as its own
+        committed record, written only after that table's load is
+        durable.
+      - >
+        THE SYSTEM SHALL NOT write a table's load record before its
+        load is durable.
+      - >
+        THE SYSTEM SHALL treat a table with no load record as
+        unloaded, and SHALL replace whatever is present for it rather
+        than trusting it.
+      - >
+        THE SYSTEM SHALL consider a delivery processed only where
+        every file attributed to a dataset has a load record.
+      - >
+        THE SYSTEM SHALL NOT automatically retry a load recorded as
+        failed.
+      - >
+        WHERE a load is recorded as failed, THE SYSTEM SHALL surface
+        it as needing human action, resolvable either by rejecting
+        that supply or by reprocessing it after a fix.
+      - >
+        WHEN a failed load is reprocessed, THE SYSTEM SHALL write a
+        new load record rather than editing the failed one, and SHALL
+        take the latest record for that table as current.
+      - >
+        THE SYSTEM SHALL store load records durably alongside the
+        delivery record, outside the per-dataset QA results. AMENDED
+        2026-09-27 (Keith): "in committed history" became "durably".
+        The separation from QA results, which is what this criterion
+        is actually for, is unchanged - a load record is a fact about
+        a delivery, not a verdict about data, and conflating the two
+        is what it prevents.
     non_functional_requirements:
       - "A crash between the staging load and QA currently has no defined behaviour, and the failure is silent in the worst direction: a truncated table in a global staging schema is indistinguishable from a real short supply and would be checked as real data. Loading must be all-or-nothing per table, and a partially-processed delivery must be recognisable as such."
       - "DuckDB permits one PROCESS per database file - verified: while one holds a read-write connection a second writer fails AND a read-only reader fails with 'IO Error: Could not set lock on file'. mothman pipeline run fans out over a ProcessPoolExecutor and is parallel by default, and the per-run databases that provide isolation for free today are removed by REQ-PIPE-035 - so from this sprint on, two workers of a SINGLE invocation would collide on the file lock. Staging therefore runs sequentially, which is sufficient here and costs a flag that already exists. The concurrency problem this NFR used to call a hard blocker lands at sprint 15, with dbt as a second writing process, and belongs there."
