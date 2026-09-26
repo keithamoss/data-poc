@@ -12101,3 +12101,230 @@ requirements:
         have built the wrong tree. qa_results/ under REQ-PIPE-038 is the
         model; filings/ is the counter-example, and re-keying it is left
         to whichever requirement owns that tree.
+
+  - id: REQ-PIPE-075
+    title: A slot is filled only by a recorded promotion, and green or amber promotes itself into an empty one
+    date_written: "2026-09-26"
+    story: >
+      As manager of the data team, I want a good supply to reach the
+      period schema without waiting on me, and a bad one to wait for a
+      person, so that automation handles the ordinary case and the queue
+      I actually look at contains only the decisions that need me.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/supply-model.md delivery sprint 11 and Thread B's QA-
+      gates-promotion decision (settled 2026-09-21). Scoped by delivery-
+      scoper, batch 4, 2026-09-26.
+    signed_off:
+      by: Keith
+      date: "2026-09-26"
+    acceptance_criteria:
+      - >
+        WHEN a delivery's QA has completed and a supply's status is
+        green or amber and its assigned slot is unfilled, THE SYSTEM
+        SHALL promote that supply into its period's schema.
+      - >
+        THE SYSTEM SHALL take the status this gate reads from EVERY
+        check that contributes to that dataset's status - its own table-
+        level and column-level checks, the cross-table checks it
+        participates in whether or not it is the dataset they are filed
+        under, and any other scope that folds into the dataset's status
+        - and SHALL NOT gate on a subset of them.
+      - >
+        IF a supply's status is red, THEN THE SYSTEM SHALL NOT promote
+        it automatically, and SHALL leave it staged awaiting a person.
+      - >
+        IF a supply's assigned slot is already filled, THEN THE SYSTEM
+        SHALL NOT promote it automatically, whatever its status.
+      - >
+        IF a supply is held because no slot could be confidently
+        claimed, THEN THE SYSTEM SHALL NOT promote it and SHALL NOT
+        arrival-classify it.
+      - >
+        THE SYSTEM SHALL treat a slot as filled only where a supply has
+        been promoted into it, and SHALL derive the set of filled slots
+        from the decision log rather than from the warehouse catalogue.
+      - >
+        THE SYSTEM SHALL record every arrival's filing before any check
+        runs over it.
+      - >
+        THE SYSTEM SHALL promote a supply into exactly the period its
+        filing names, and SHALL NOT re-derive that period at promotion
+        time.
+      - >
+        WHEN promoting, THE SYSTEM SHALL write the decision-log entry
+        only after that supply's tables are durably present in the
+        period schema, so that an interrupted promotion is repeated
+        rather than skipped.
+      - >
+        WHEN asked to promote a supply already promoted into the same
+        slot, THE SYSTEM SHALL change nothing and SHALL add no entry.
+      - >
+        IF promoting one dataset's supply fails, THEN THE SYSTEM SHALL
+        continue promoting every other dataset's supplies in that run,
+        and SHALL report the failure.
+      - >
+        THE SYSTEM SHALL NOT promote a supply on the strength of a
+        check-free table, and SHALL treat a table with zero ACTIVE
+        checks as ineligible for automatic promotion.
+      - >
+        THE SYSTEM SHALL promote as a step that follows the QA run
+        rather than as part of it, such that a promotion that fails can
+        be retried without re-running QA.
+      - >
+        THE SYSTEM SHALL require a decision of its own, with its own
+        reason where the log requires one, for each supply a person
+        promotes, and SHALL NOT offer an operation that promotes several
+        supplies on one decision.
+    non_functional_requirements:
+      - >
+        This is the keystone of the batch and it turns on two things
+        that have been deliberately dark: filing.file_arrivals() and
+        filing.filled_slots(). Expect the first real run to file
+        supplies that have never been filed, so plan a one-off review of
+        what the first run writes BEFORE it is committed - a filing is
+        write-once by REQ-PIPE-062 criterion 10, so a bad first pass
+        bakes itself into permanent history.
+      - >
+        Keith's measured evidence from 2026-09-25 is the specific risk:
+        with filled_slots() empty a real run filed 102 of 108 supplies
+        against 2023-Q1. That was the reason filing was left unwired,
+        and it is exactly what this requirement changes.
+      - >
+        SENSITIVITY: promotion is the act that puts data into a period
+        schema, and one period schema holds the WHOLE data asset across
+        agencies - Birth Registrations and Child Protection side by side
+        (REQ-PIPE-035's own note calls this the most sensitive artefact
+        the design creates). Promotion is therefore the narrowest place
+        to put any access constraint a real deployment would want.
+      - >
+        Blast radius: one dataset's failure must never stop the other
+        29, the same rule filing.py already applies to a dataset whose
+        schedule cannot be built.
+      - >
+        CI must never touch data/, and this one legitimately does - so
+        it belongs in the orchestrator's own run step, beside
+        dataset_stats, never in the dashboard build or any read-
+        committed-history path.
+      - >
+        Verify at the layer a reader sees, not just at the data layer.
+        CLAUDE.md's shape-change rule was written after a status change
+        was verified in reports/*.json and rendered a 14-violation check
+        GREEN two transforms downstream.
+    dependencies: [REQ-PIPE-074, REQ-PIPE-062, REQ-PIPE-035, REQ-PIPE-064]
+    decisions:
+      - >
+        Decided QA GATES promotion on STATUS, settled 2026-09-21
+        (Keith): amber and green auto-promote, red never does. A supply
+        that cannot be loaded at all is already red, so the failed-to-
+        load case needs no extra rule.
+      - >
+        Decided a queue of red supplies waiting on a person is the
+        CORRECT OUTPUT of the gate, not an obstruction. Thread B records
+        the opposite recommendation and its reasoning as WRONG - it
+        argued that holding red in staging "recreates the manual
+        bottleneck the automation exists to avoid", which mistook
+        "something is waiting for a human" for a failure mode when it is
+        the purpose.
+      - >
+        Decided assignment and promotion are TWO steps, not one (Thread
+        D correction 1). The period was originally assigned at
+        promotion, but QA runs BEFORE promotion, so at check time there
+        would have been no slot to classify against. Assignment is a
+        derivation with no human in it; promotion is a decision. There
+        is still exactly one place the slot is decided - it just happens
+        earlier.
+      - >
+        Decided a supply landing in a FILLED slot never auto-promotes
+        whatever its status, carried forward from REQ-PIPE-066's own
+        explicit hand-off. Without the carve-out the amber-or-green rule
+        would let a supplier's accidental duplicate send silently
+        supersede data already accepted, with the only trace a
+        superseded table nobody looked at. Filling an empty slot is
+        routine; replacing accepted data is a decision.
+      - >
+        Decided the log, not the warehouse catalogue, is the authority
+        on whether a slot is filled. REQ-PIPE-034's own decision 8 found
+        the identical defect after sign-off - a derivation reading the
+        catalogue where the committed record was the real source - and
+        TS-40 shows why: a crash during the last of six loads leaves six
+        tables present with one truncated, which a catalogue check reads
+        as complete.
+      - >
+        Decided the durable move happens BEFORE its log entry, so an
+        interrupted promotion is repeated rather than skipped. TS-40
+        settled the same ordering for loads, with the same reasoning:
+        the opposite order looks equally correct in review and silently
+        skips work that never happened.
+      - >
+        Rejected promoting a losing supply into the period schema as a
+        non-current version (Thread B, rejected 2026-09-23). It is
+        tempting because a period schema already holds a supply plus its
+        resupplies, so it needs no new concept - and it is wrong because
+        promotion is a DECISION, and this would put data nobody approved
+        into the promoted schema to avoid modelling a state that does
+        not exist.
+      - >
+        Rejected a "rejected" or "not promoted" LABEL inside the period
+        schema, in favour of isolation by schema (Thread B). Schema-per-
+        period beat the per-run databases precisely because dbt and Soda
+        have no run_id-scoped WHERE; they equally have no "and not
+        rejected". A filter every query must remember to apply is a
+        false-green generator.
+      - >
+        THE GATE READS THE DATASET'S WHOLE STATUS, NOT ITS TABLE-LEVEL
+        CHECKS (Keith, 2026-09-26, at read-out). The drafted criterion 1
+        said "status" without saying what composes it, which is exactly
+        the ambiguity that ships as a subset: REQ-QAC-037 landed the
+        same morning and makes a cross-table check fold into the status
+        of EVERY dataset it reads, not only the one it is filed under. A
+        gate reading table-level checks alone would therefore auto-
+        promote a supply while a cross-table check about it was failing
+        - a false green in the dangerous direction, and the same shape
+        as the defect CLAUDE.md's own status-rollup rule was written
+        after. Stated as "every check that contributes" rather than as a
+        list of the scopes that exist today, so a scope added later is
+        included by default instead of being silently left out.
+      - >
+        PROMOTION IS A SEPARATE STEP AFTER QA, NOT PART OF THE RUN
+        (Keith, 2026-09-26). The case that decides it is a run whose QA
+        succeeded and whose promotion failed: as a separate step that is
+        retried on its own, and inside the run it means re-running QA to
+        recover work that already succeeded. It is also where sprint
+        12's drain of human decisions naturally sits, so the seam is
+        needed regardless. Rejected folding it into the run, which is
+        simpler and is what "auto-promotes on green" reads like, on the
+        grounds that the simpler shape has no way to resume.
+      - >
+        NO BULK PROMOTE - EACH SUPPLY GETS ITS OWN DECISION AND ITS OWN
+        REASON (Keith, 2026-09-26), asked specifically because ~30
+        datasets on a quarterly asset means a promotion round is up to
+        thirty human decisions in a short window. Rejected a "promote
+        everything green in this period" operation: it is humane at
+        thirty, and it is weaker evidence that anybody looked, which
+        defeats the point of a log whose story is a year-later reader
+        asking why. Rejected deferring the question until the quarterly
+        asset is real, because the answer shapes the operator surface
+        REQ-GHUB-082 builds now. The known cost is decision fatigue at
+        thirty, which is how people start clicking through without
+        reading - if that bites, it is a reason to revisit this decision
+        explicitly rather than to add a bulk path quietly.
+      - >
+        AUTO-PROMOTION IS UNCONDITIONAL ACROSS BOTH ASSETS (Keith,
+        2026-09-26), settling a contradiction Thread B carried in two
+        places without anyone noticing. Its staging/promotion table gave
+        the QUARTERLY asset a human trigger and the daily one an
+        automatic trigger, with "one policy flag per asset, same
+        machinery"; a later paragraph in the same thread made green and
+        amber auto-promotion unconditional for everything. Both read as
+        settled. The answer is the second: green or amber promotes
+        itself on either asset, and only red waits for a person.
+        Rejected the per-asset flag, which matches how the team works
+        today and would have cost ~30 separate approvals a quarter now
+        that bulk promote is ruled out; rejected a per-dataset flag, on
+        the grounds that at thirty datasets a setting like that is set
+        once and forgotten, and it fails quietly. CONSEQUENCE TO APPLY
+        rather than assume: Thread B's staging/promotion table is now
+        wrong on its quarterly row and has to be corrected, not left to
+        contradict this.
