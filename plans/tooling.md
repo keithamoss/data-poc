@@ -2438,6 +2438,49 @@ somewhere shared. Option 3 would need it moved to a temporary output
 or given the opt-in, and that choice is the interesting part of the
 work rather than an implementation detail.
 
+**THE INVERSE QUESTION, audited 2026-09-26 and CLEAN.** Everything
+above measures what the suite WRITES to real trees. The other half is
+what it ASSUMES ALREADY EXISTS, which is a different failure mode
+entirely: it passes locally and fails on a freshly-cloned runner, and
+`CLAUDE.md` records two real incidents of it - a test asserting a
+gitignored path exists, and one asserting on `HEAD~2` where
+`actions/checkout@v4`'s default depth is 1. Both were fixed at the
+source; this checks whether the pattern spread. It has not:
+
+- **No test asserts a gitignored path EXISTS.** Six candidates matched
+  the grep and all six are sound: three assert a CONFIG STRING
+  (`config["local_source"] == "data/raw"`), and three assert the
+  NEGATIVE - `assert not [p for p in opened if "/data/" in p ...]` in
+  `test_runway.py`, `test_slots.py` and `test_validate_schedule.py`,
+  which is the never-touch-data rule being PROVEN rather than a
+  dependency on the tree.
+- **No test depends on git history beyond depth 1.** Every git-using
+  module (`test_changelog.py`, `test_git_identity.py`,
+  `test_github_links.py`, `test_pre_commit_hooks.py`,
+  `test_validate_check_lifecycle.py`, `test_validate_schedule.py`)
+  builds its own repository in `tmp_path` via `_init_repo` and
+  monkeypatches `ROOT`, so a `HEAD~1` reference resolves to a commit
+  the test itself made.
+- **`conftest.py` is already explicitly careful** - its own comments
+  name the fresh-clone case ("on this machine `data/deliveries/` exists
+  so nothing is pruned; on a freshly-cloned CI runner there is no
+  `data/`").
+- **One real-tree read of a gitignored path exists and is handled**:
+  `test_asset_time_semantics.py` reads `reports/` from the repo root
+  and `pytest.skip`s with an actionable message when absent. And it no
+  longer silently skips in CI either - `test.yml` now runs
+  `mothman dashboard rebuild-results` and `build-data` before pytest
+  (added 2026-09-26, `plans/post-build-review.md` #62).
+- `test_scenario_map.py` matched the grep by asserting on SOURCE TEXT
+  (`'ROOT / "data" / ...' in source`) rather than reading the path.
+
+**So there is nothing to fix on this half**, which is itself the useful
+result: both documented incidents were fixed at the source and neither
+pattern recurred. Re-run the two greps rather than the reasoning if it
+needs checking again - assertions naming `data/`/`reports/`, and any
+reference to `HEAD~`, `rev-parse` or `--depth` outside a `tmp_path`
+repository.
+
 
 23. **[investigate, 2026-09-25]** **[Testing & dev tooling]** Making a duplicate YAML key loud at READ time - researched, built, and reverted unbuilt.
 
