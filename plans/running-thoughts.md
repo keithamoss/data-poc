@@ -3066,3 +3066,94 @@ Belongs with batch 5's check work.
     **STILL GENUINELY UNREAD:** the specific extension list for 16.8,
     and Aurora's major-version support timeline (how long 16 remains
     available), which bears on the 16-versus-17 choice above.
+
+    **SETTLED 2026-09-26, and earlier than planned: THE DECISION LOG
+    LIVES IN THE DATABASE, WITH A COMMITTED EXPORT.** Keith's original
+    sequencing was Postgres first and this question second, on the
+    grounds that DuckDB could not exercise the properties it turns on.
+    An evening of real measurement removed that reason, and the
+    question turned out to need answering BEFORE the scoper rather than
+    before the build: the switch's requirements will describe "the
+    warehouse", and whether the log is inside that is a scope boundary
+    a scoper cannot draw for itself.
+
+    **WHAT DECIDED IT: the log has two consumers with different needs,
+    and one artifact was never going to serve both.** The SYSTEM,
+    deciding what is promoted, needs atomicity and currency - a
+    database wins outright, because judging permissibility and
+    appending become one act. The AUDIT TRAIL - "why is this supply in
+    Q3", asked a year later, possibly by somebody external - needs
+    permanence and readability WITHOUT CREDENTIALS, and survival of the
+    database being restored from backup; files win outright. So
+    Postgres is the operational system of record and whatever writes it
+    also exports the full history to committed files, which the
+    dashboard reads and which stand as the audit record. Same shape as
+    `dataset_stats.json`: compute where the connection legitimately is,
+    commit the conclusion.
+
+    Rejected keeping committed files as the system of record, which is
+    simpler and offline-capable but leaves `REQ-GHUB-082` criterion
+    18's ambiguity needing one of four unsatisfying workarounds.
+    Rejected a database-only log with the dashboard reading it, which
+    reverses the never-touch-data rule Keith had reaffirmed hours
+    earlier and makes history die with the database.
+
+    **THE OFFLINE PROMISE IS DROPPED, DELIBERATELY** (Keith, same
+    conversation): no database, no decision. His reasoning is sound -
+    a filing decision acts on the warehouse, and in production the
+    engineer is inside the network where Aurora lives, so Aurora is
+    plausibly MORE reachable than GitHub. Rejected queueing a decision
+    locally and applying it on reconnect, which is the
+    pending-until-it-lands workaround under another name and carries
+    the same "not final until it lands" property.
+
+    **WHAT THIS BREAKS OR CHANGES, enumerated now rather than
+    discovered one at a time. Nothing below is amended yet.**
+
+    - **`REQ-PIPE-074` criterion 11** ("commit the log, and SHALL NOT
+      hold it only in the warehouse") is still literally satisfied -
+      the log is not held ONLY in the warehouse. But it was written to
+      make the REPOSITORY the system of record, and now the repository
+      holds a derived export. Its meaning shifts even though its words
+      hold. **074 is SIGNED, so this needs Keith's eyes.**
+    - **`REQ-PIPE-074` criterion 1** ("SHALL NOT keep a second record
+      of any of them anywhere else") needs an explicit reconciliation:
+      the export is a DERIVED PUBLICATION, regenerated and never
+      hand-edited, with the database authoritative. Without that
+      sentence somebody will correctly read the export as the second
+      record the criterion forbids.
+    - **`REQ-PIPE-074`'s one-file-per-decision decision** was argued
+      from git merge conflicts between two write routes. Nothing
+      appends concurrently to a regenerated export, so the layout may
+      still be sensible but its REASONING is gone and should not be
+      cited as though it still applies.
+    - **`REQ-GHUB-082` criterion 18's open question RESOLVES.** A
+      database has one serialisation point, so "the instant its entry
+      is appended" is unambiguous and the four workarounds are moot.
+      This was one of the two things holding 082 unsigned.
+    - **`REQ-GHUB-082` criterion 26 BREAKS.** It says the TUI writes to
+      the committed log alone and never calls GitHub, "so that a
+      decision can be taken with no network". The first half survives
+      in spirit - the TUI still must not call GitHub - but it now
+      writes to the DATABASE, and the offline justification is gone.
+      Needs rewriting.
+    - **`REQ-GHUB-082` NFR 2** claimed the TUI is the route that works
+      with no network. Half true now: it still needs no GitHub, but it
+      does need the database.
+    - **`REQ-GHUB-082` criterion 7** gets SIMPLER and more immediate.
+      It currently reports the outcome on the ticket "on the push that
+      carries it"; the entry now reaches the shared log the moment the
+      transaction commits, so the outbound comment can follow directly
+      rather than waiting for a push.
+    - **`REQ-GHUB-082` criterion 17** (say so when reading a
+      non-current copy of the log) is moot for the database path, since
+      there is one copy - but still applies to anything reading the
+      committed export.
+    - **`REQ-PIPE-075` criterion 9** stays true and its mechanism
+      collapses: "write the entry only after the tables are durably
+      present" is automatic inside one transaction rather than an
+      ordering rule to implement.
+    - **A NEW REQUIREMENT IS IMPLIED** and nothing owns it: the export
+      itself - when it runs, what it contains (the full history, since
+      `REQ-PIPE-081`'s "as at T" needs it), where it lands, and the
+      rule that it is regenerated rather than edited.
