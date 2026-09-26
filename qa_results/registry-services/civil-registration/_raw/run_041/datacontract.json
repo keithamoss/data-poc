@@ -1,0 +1,2333 @@
+{
+  "run_timestamp": "2026-09-26T10:31:45.379769+08:00",
+  "run_by": null,
+  "raw_output": {
+    "runId": "9a1f6a8d-f83c-4f4e-8af6-0dbf5567498d",
+    "datacontractCliVersion": "1.2.0",
+    "dataContractId": "birth-registrations",
+    "dataContractVersion": "1.0.0",
+    "dataProductId": null,
+    "outputPortId": null,
+    "server": "local_test",
+    "filters": null,
+    "timestampStart": "2026-09-26 02:33:42.164255+00:00",
+    "timestampEnd": "2026-09-26 02:33:45.926860+00:00",
+    "result": "failed",
+    "dryRun": false,
+    "checks": [
+      {
+        "id": "51326fc8-8f7d-4a6f-a697-396bc73ebafd",
+        "key": "birth_registrations__registration_number__field_is_present",
+        "category": "schema",
+        "type": "field_is_present",
+        "name": "Check that field 'registration_number' is present",
+        "model": "birth_registrations",
+        "field": "registration_number",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "introspection",
+        "implementation": "column 'registration_number' exists in birth_registrations__raw__",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "field_present",
+          "field": "registration_number",
+          "present": true
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "2837d493-5a35-42fd-8efb-2c1a60839514",
+        "key": "birth_registrations__registration_number__field_required",
+        "category": "schema",
+        "type": "field_required",
+        "name": "Check that field registration_number has no missing values",
+        "model": "birth_registrations",
+        "field": "registration_number",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"registration_number\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__registration_number__field_required\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual missing_count(registration_number) was 11, expected = 0",
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "registration_number",
+          "value": 11,
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.009649
+        },
+        "failedSamples": [
+          {
+            "registration_number": null
+          },
+          {
+            "registration_number": null
+          },
+          {
+            "registration_number": null
+          },
+          {
+            "registration_number": null
+          },
+          {
+            "registration_number": null
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": null
+          },
+          {
+            "registration_number": null
+          },
+          {
+            "registration_number": null
+          },
+          {
+            "registration_number": null
+          },
+          {
+            "registration_number": null
+          }
+        ]
+      },
+      {
+        "id": "f227a82b-c221-4954-8351-062c7166bd27",
+        "key": "birth_registrations__registration_number__field_unique",
+        "category": "schema",
+        "type": "field_unique",
+        "name": "Check that unique field registration_number has no duplicate values",
+        "model": "birth_registrations",
+        "field": "registration_number",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "uniqueness",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"registration_number\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"birth_registrations\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
+        "result": "failed",
+        "reason": "Actual duplicate_count(registration_number) was 24, expected = 0",
+        "diagnostics": {
+          "metric": "duplicate_count",
+          "field": "registration_number",
+          "value": 24,
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_rows": 57
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-426674223",
+            "duplicate_count": 2
+          },
+          {
+            "registration_number": "BDM-026496334",
+            "duplicate_count": 2
+          },
+          {
+            "registration_number": "BDM-871430859",
+            "duplicate_count": 2
+          },
+          {
+            "registration_number": "BDM-159945266",
+            "duplicate_count": 2
+          },
+          {
+            "registration_number": "BDM-009646757",
+            "duplicate_count": 2
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-426674223",
+            "duplicate_count": 2
+          },
+          {
+            "registration_number": "BDM-026496334",
+            "duplicate_count": 2
+          },
+          {
+            "registration_number": "BDM-871430859",
+            "duplicate_count": 2
+          },
+          {
+            "registration_number": "BDM-159945266",
+            "duplicate_count": 2
+          },
+          {
+            "registration_number": "BDM-009646757",
+            "duplicate_count": 2
+          }
+        ]
+      },
+      {
+        "id": "7f98fb19-e5f4-4ad2-a95c-10d7e3b95b2f",
+        "key": "birth_registrations__registration_number__field_null_values",
+        "category": "quality",
+        "type": "field_null_values",
+        "name": "Check that field registration_number has missing_count = 0",
+        "model": "birth_registrations",
+        "field": "registration_number",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.registration_number.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndescription: |\n  This value must never be empty.\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"registration_number\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__registration_number__field_null_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual missing_count(registration_number) was 11, expected = 0",
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "registration_number",
+          "value": 11,
+          "severity": "error",
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.009649
+        },
+        "failedSamples": [
+          {
+            "registration_number": null
+          },
+          {
+            "registration_number": null
+          },
+          {
+            "registration_number": null
+          },
+          {
+            "registration_number": null
+          },
+          {
+            "registration_number": null
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": null
+          },
+          {
+            "registration_number": null
+          },
+          {
+            "registration_number": null
+          },
+          {
+            "registration_number": null
+          },
+          {
+            "registration_number": null
+          }
+        ]
+      },
+      {
+        "id": "86b01b13-3a9c-43ca-9c06-11b1454bd4ac",
+        "key": "birth_registrations__registration_number__field_invalid_values",
+        "category": "quality",
+        "type": "field_invalid_values",
+        "name": "Check that field registration_number has invalid_count = 0",
+        "model": "birth_registrations",
+        "field": "registration_number",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.registration_number.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndescription: |\n  This value must be in the expected format.\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  pattern: ^BDM-[0-9]{9}$\nmustBe: 0\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"registration_number\" IS NULL\n      )\n      AND NOT (\n        REGEXP_MATCHES(\"t0\".\"registration_number\", '^BDM-[0-9]{9}$')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"birth_registrations__registration_number__field_invalid_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "invalid_count",
+          "field": "registration_number",
+          "value": 0,
+          "severity": "error",
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.0,
+          "constraint": {
+            "pattern": "^BDM-[0-9]{9}$"
+          }
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "2bda08bf-29e9-4c6a-b14c-ae1c8d6ab209",
+        "key": "birth_registrations__registration_number__field_duplicate_values",
+        "category": "quality",
+        "type": "field_duplicate_values",
+        "name": "Check that field registration_number has duplicate_count = 0",
+        "model": "birth_registrations",
+        "field": "registration_number",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "uniqueness",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.registration_number.duplicateValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndescription: |\n  This value must be unique.\ndimension: uniqueness\nseverity: error\nmetric: duplicateValues\nmustBe: 0\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"registration_number\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"birth_registrations\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
+        "result": "failed",
+        "reason": "Actual duplicate_count(registration_number) was 24, expected = 0",
+        "diagnostics": {
+          "metric": "duplicate_count",
+          "field": "registration_number",
+          "value": 24,
+          "severity": "error",
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_rows": 57
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-426674223",
+            "duplicate_count": 2
+          },
+          {
+            "registration_number": "BDM-026496334",
+            "duplicate_count": 2
+          },
+          {
+            "registration_number": "BDM-871430859",
+            "duplicate_count": 2
+          },
+          {
+            "registration_number": "BDM-159945266",
+            "duplicate_count": 2
+          },
+          {
+            "registration_number": null,
+            "duplicate_count": 11
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-426674223",
+            "duplicate_count": 2
+          },
+          {
+            "registration_number": "BDM-026496334",
+            "duplicate_count": 2
+          },
+          {
+            "registration_number": "BDM-871430859",
+            "duplicate_count": 2
+          },
+          {
+            "registration_number": "BDM-159945266",
+            "duplicate_count": 2
+          },
+          {
+            "registration_number": null,
+            "duplicate_count": 11
+          }
+        ]
+      },
+      {
+        "id": "585274e8-1aff-4836-91ef-029d75877b48",
+        "key": "birth_registrations__child_given_names__field_is_present",
+        "category": "schema",
+        "type": "field_is_present",
+        "name": "Check that field 'child_given_names' is present",
+        "model": "birth_registrations",
+        "field": "child_given_names",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "introspection",
+        "implementation": "column 'child_given_names' exists in birth_registrations__raw__",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "field_present",
+          "field": "child_given_names",
+          "present": true
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "041a1bee-93e9-40d6-a738-4bacfcc6413c",
+        "key": "birth_registrations__child_given_names__field_required",
+        "category": "schema",
+        "type": "field_required",
+        "name": "Check that field child_given_names has no missing values",
+        "model": "birth_registrations",
+        "field": "child_given_names",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"child_given_names\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__child_given_names__field_required\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "child_given_names",
+          "value": 0,
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.0
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "7cfcf13f-1d01-401f-a6d6-26ea2e7dc605",
+        "key": "birth_registrations__child_given_names__field_null_values",
+        "category": "quality",
+        "type": "field_null_values",
+        "name": "Check that field child_given_names has missing_count < 1",
+        "model": "birth_registrations",
+        "field": "child_given_names",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.child_given_names.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndescription: |\n  This value must never be empty.\ndimension: completeness\nseverity: error\nunit: percent\nmetric: nullValues\nmustBeLessThan: 1\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"child_given_names\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__child_given_names__field_null_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "child_given_names",
+          "value": 0,
+          "unit": "percent",
+          "severity": "error",
+          "threshold": "< 1",
+          "row_count": 1140,
+          "failed_fraction": 0.0,
+          "percent": 0.0
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "127770dc-d351-4156-89b1-d4d8e8a37ac3",
+        "key": "birth_registrations__child_given_names__field_invalid_values",
+        "category": "quality",
+        "type": "field_invalid_values",
+        "name": "Check that field child_given_names has invalid_count = 0",
+        "model": "birth_registrations",
+        "field": "child_given_names",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.child_given_names.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-09-15'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndescription: |\n  This value must be in the expected format.\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  pattern: ^[A-Za-z][A-Za-z. -]*$\nmustBe: 0\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"child_given_names\" IS NULL\n      )\n      AND NOT (\n        REGEXP_MATCHES(\"t0\".\"child_given_names\", '^[A-Za-z][A-Za-z. -]*$')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"birth_registrations__child_given_names__field_invalid_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual invalid_count(child_given_names) was 32, expected = 0",
+        "diagnostics": {
+          "metric": "invalid_count",
+          "field": "child_given_names",
+          "value": 32,
+          "severity": "error",
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.02807,
+          "constraint": {
+            "pattern": "^[A-Za-z][A-Za-z. -]*$"
+          }
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-558236192"
+          },
+          {
+            "registration_number": "BDM-698326235"
+          },
+          {
+            "registration_number": "BDM-260360275"
+          },
+          {
+            "registration_number": "BDM-969759805"
+          },
+          {
+            "registration_number": "BDM-725848309"
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-558236192"
+          },
+          {
+            "registration_number": "BDM-698326235"
+          },
+          {
+            "registration_number": "BDM-260360275"
+          },
+          {
+            "registration_number": "BDM-969759805"
+          },
+          {
+            "registration_number": "BDM-725848309"
+          }
+        ]
+      },
+      {
+        "id": "9bcdfdf8-28be-492f-b30f-edde302f7fa6",
+        "key": "birth_registrations__child_family_name__field_is_present",
+        "category": "schema",
+        "type": "field_is_present",
+        "name": "Check that field 'child_family_name' is present",
+        "model": "birth_registrations",
+        "field": "child_family_name",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "introspection",
+        "implementation": "column 'child_family_name' exists in birth_registrations__raw__",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "field_present",
+          "field": "child_family_name",
+          "present": true
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "08838fcd-e890-422a-974a-906a8853d86c",
+        "key": "birth_registrations__child_family_name__field_required",
+        "category": "schema",
+        "type": "field_required",
+        "name": "Check that field child_family_name has no missing values",
+        "model": "birth_registrations",
+        "field": "child_family_name",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"child_family_name\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__child_family_name__field_required\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "child_family_name",
+          "value": 0,
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.0
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "315133d0-be71-4ca3-81c8-f4f86f144f06",
+        "key": "birth_registrations__child_family_name__field_null_values",
+        "category": "quality",
+        "type": "field_null_values",
+        "name": "Check that field child_family_name has missing_count < 1",
+        "model": "birth_registrations",
+        "field": "child_family_name",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.child_family_name.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: |\n    This value must never be empty.\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndimension: completeness\nseverity: error\nunit: percent\nmetric: nullValues\nmustBeLessThan: 1\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"child_family_name\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__child_family_name__field_null_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "child_family_name",
+          "value": 0,
+          "unit": "percent",
+          "severity": "error",
+          "threshold": "< 1",
+          "row_count": 1140,
+          "failed_fraction": 0.0,
+          "percent": 0.0
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "caa156e7-7299-44a9-b3b0-c80d8a8f434e",
+        "key": "birth_registrations__child_family_name__field_invalid_values",
+        "category": "quality",
+        "type": "field_invalid_values",
+        "name": "Check that field child_family_name has invalid_count = 0",
+        "model": "birth_registrations",
+        "field": "child_family_name",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.child_family_name.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-09-15'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndescription: |\n  This value must be in the expected format.\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  pattern: ^[A-Za-z][A-Za-z. -]*$\nmustBe: 0\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"child_family_name\" IS NULL\n      )\n      AND NOT (\n        REGEXP_MATCHES(\"t0\".\"child_family_name\", '^[A-Za-z][A-Za-z. -]*$')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"birth_registrations__child_family_name__field_invalid_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual invalid_count(child_family_name) was 32, expected = 0",
+        "diagnostics": {
+          "metric": "invalid_count",
+          "field": "child_family_name",
+          "value": 32,
+          "severity": "error",
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.02807,
+          "constraint": {
+            "pattern": "^[A-Za-z][A-Za-z. -]*$"
+          }
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-567521427"
+          },
+          {
+            "registration_number": "BDM-242194959"
+          },
+          {
+            "registration_number": "BDM-906343597"
+          },
+          {
+            "registration_number": "BDM-893138291"
+          },
+          {
+            "registration_number": "BDM-348163618"
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-567521427"
+          },
+          {
+            "registration_number": "BDM-242194959"
+          },
+          {
+            "registration_number": "BDM-906343597"
+          },
+          {
+            "registration_number": "BDM-893138291"
+          },
+          {
+            "registration_number": "BDM-348163618"
+          }
+        ]
+      },
+      {
+        "id": "116b6590-91e9-4e8d-8942-0d0fc6161afb",
+        "key": "birth_registrations__date_of_birth__field_is_present",
+        "category": "schema",
+        "type": "field_is_present",
+        "name": "Check that field 'date_of_birth' is present",
+        "model": "birth_registrations",
+        "field": "date_of_birth",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "introspection",
+        "implementation": "column 'date_of_birth' exists in birth_registrations__raw__",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "field_present",
+          "field": "date_of_birth",
+          "present": true
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "79a236c9-5e0d-4efb-aeaa-390515c4dbd3",
+        "key": "birth_registrations__date_of_birth__field_required",
+        "category": "schema",
+        "type": "field_required",
+        "name": "Check that field date_of_birth has no missing values",
+        "model": "birth_registrations",
+        "field": "date_of_birth",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"date_of_birth\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__date_of_birth__field_required\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual missing_count(date_of_birth) was 5, expected = 0",
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "date_of_birth",
+          "value": 5,
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.004386
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-140367054",
+            "date_of_birth": null
+          },
+          {
+            "registration_number": "BDM-501644698",
+            "date_of_birth": null
+          },
+          {
+            "registration_number": "BDM-875014167",
+            "date_of_birth": null
+          },
+          {
+            "registration_number": "BDM-164095614",
+            "date_of_birth": null
+          },
+          {
+            "registration_number": "BDM-418443871",
+            "date_of_birth": null
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-140367054",
+            "date_of_birth": null
+          },
+          {
+            "registration_number": "BDM-501644698",
+            "date_of_birth": null
+          },
+          {
+            "registration_number": "BDM-875014167",
+            "date_of_birth": null
+          },
+          {
+            "registration_number": "BDM-164095614",
+            "date_of_birth": null
+          },
+          {
+            "registration_number": "BDM-418443871",
+            "date_of_birth": null
+          }
+        ]
+      },
+      {
+        "id": "99b59784-7d73-4c23-97b2-d8fa1edf7d40",
+        "key": "birth_registrations__date_of_birth__field_null_values",
+        "category": "quality",
+        "type": "field_null_values",
+        "name": "Check that field date_of_birth has missing_count = 0",
+        "model": "birth_registrations",
+        "field": "date_of_birth",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.date_of_birth.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: |\n    This value must never be empty.\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"date_of_birth\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__date_of_birth__field_null_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual missing_count(date_of_birth) was 5, expected = 0",
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "date_of_birth",
+          "value": 5,
+          "severity": "error",
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.004386
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-140367054",
+            "date_of_birth": null
+          },
+          {
+            "registration_number": "BDM-501644698",
+            "date_of_birth": null
+          },
+          {
+            "registration_number": "BDM-875014167",
+            "date_of_birth": null
+          },
+          {
+            "registration_number": "BDM-164095614",
+            "date_of_birth": null
+          },
+          {
+            "registration_number": "BDM-418443871",
+            "date_of_birth": null
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-140367054",
+            "date_of_birth": null
+          },
+          {
+            "registration_number": "BDM-501644698",
+            "date_of_birth": null
+          },
+          {
+            "registration_number": "BDM-875014167",
+            "date_of_birth": null
+          },
+          {
+            "registration_number": "BDM-164095614",
+            "date_of_birth": null
+          },
+          {
+            "registration_number": "BDM-418443871",
+            "date_of_birth": null
+          }
+        ]
+      },
+      {
+        "id": "6bd28c12-d691-4ea9-b925-67a5b5b2b5fa",
+        "key": "birth_registrations__date_of_birth__quality_sql_1",
+        "category": "quality",
+        "type": "field_quality_sql",
+        "name": "This value must be a plausible real date, neither in the future nor absurdly old.\n",
+        "model": "birth_registrations",
+        "field": "date_of_birth",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.date_of_birth.range_check_datacontract\n- property: name\n  value: Date of birth in a plausible range\n- property: introduced_date\n  value: '2026-09-13'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndescription: |\n  This value must be a plausible real date, neither in the future nor absurdly old.\ndimension: conformity\nseverity: error\ntype: sql\nmustBe: 0\nquery: SELECT COUNT(*) FROM {model} WHERE {field} < DATE '1900-01-01' OR {field} >\n  CURRENT_DATE\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT COUNT(*) FROM birth_registrations WHERE date_of_birth < DATE '1900-01-01' OR date_of_birth > CURRENT_DATE",
+        "result": "failed",
+        "reason": "Actual custom_sql(date_of_birth) was 20, expected = 0",
+        "diagnostics": {
+          "metric": "custom_sql",
+          "field": "date_of_birth",
+          "value": 20,
+          "severity": "error",
+          "threshold": "= 0"
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "c3a5077b-5e1c-4b92-b949-877ee16f9cde",
+        "key": "birth_registrations__date_of_birth__quality_sql_2",
+        "category": "quality",
+        "type": "field_quality_sql",
+        "name": "Each supply must contain recent records rather than only old ones.\n",
+        "model": "birth_registrations",
+        "field": "date_of_birth",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "timeliness",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.date_of_birth.freshness_datacontract\n- property: name\n  value: Recent births present\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[{\"date\": \"2026-09-17T00:00:00Z\", \"description\": \"Anchored to this run''s\n    own date_registered instead of real wall-clock CURRENT_DATE, which is why this\n    check was permanently red. Paired with a new inject_stale_delivery generator defect\n    so the check has something genuine to catch.\", \"author\": \"Keith Moss\", \"breaking\":\n    true}]'\n- property: failure_indicates\n  value: |\n    self-evident\ndescription: |\n  Each supply must contain recent records rather than only old ones.\ndimension: timeliness\nseverity: error\ntype: sql\nmustBe: 0\nquery: |\n  SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END FROM {model} WHERE {field} >= date_registered - INTERVAL 7 DAY\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END FROM birth_registrations WHERE date_of_birth >= date_registered - INTERVAL 7 DAY\n",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "custom_sql",
+          "field": "date_of_birth",
+          "value": 0,
+          "severity": "error",
+          "threshold": "= 0"
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "b57a04e7-23b4-47fb-aff1-965deee83f61",
+        "key": "birth_registrations__sex__field_is_present",
+        "category": "schema",
+        "type": "field_is_present",
+        "name": "Check that field 'sex' is present",
+        "model": "birth_registrations",
+        "field": "sex",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "introspection",
+        "implementation": "column 'sex' exists in birth_registrations__raw__",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "field_present",
+          "field": "sex",
+          "present": true
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "610a910b-1ee3-459d-9763-d0909d9c8eb1",
+        "key": "birth_registrations__sex__field_required",
+        "category": "schema",
+        "type": "field_required",
+        "name": "Check that field sex has no missing values",
+        "model": "birth_registrations",
+        "field": "sex",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"sex\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__sex__field_required\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "sex",
+          "value": 0,
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.0
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "dc6ea6a2-5b76-4ebc-8fbe-4297d2506e84",
+        "key": "birth_registrations__sex__field_invalid_values",
+        "category": "quality",
+        "type": "field_invalid_values",
+        "name": "Check that field sex has invalid_count = 0",
+        "model": "birth_registrations",
+        "field": "sex",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.sex.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.\ndescription: |\n  A single unrecognised value fails.\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - M\n  - F\n  - X\nmustBe: 0\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"sex\" IS NULL\n      ) AND NOT (\n        \"t0\".\"sex\" IN ('M', 'F', 'X')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"birth_registrations__sex__field_invalid_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual invalid_count(sex) was 53, expected = 0",
+        "diagnostics": {
+          "metric": "invalid_count",
+          "field": "sex",
+          "value": 53,
+          "severity": "error",
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.046491,
+          "constraint": {
+            "valid_values": [
+              "M",
+              "F",
+              "X"
+            ]
+          }
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-038852642",
+            "sex": "O"
+          },
+          {
+            "registration_number": "BDM-947234868",
+            "sex": "O"
+          },
+          {
+            "registration_number": "BDM-507004819",
+            "sex": "9"
+          },
+          {
+            "registration_number": "BDM-852507886",
+            "sex": "U"
+          },
+          {
+            "registration_number": "BDM-523621224",
+            "sex": "9"
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-038852642",
+            "sex": "O"
+          },
+          {
+            "registration_number": "BDM-947234868",
+            "sex": "O"
+          },
+          {
+            "registration_number": "BDM-507004819",
+            "sex": "9"
+          },
+          {
+            "registration_number": "BDM-852507886",
+            "sex": "U"
+          },
+          {
+            "registration_number": "BDM-523621224",
+            "sex": "9"
+          }
+        ]
+      },
+      {
+        "id": "4f4cbb28-d206-43e5-ac6c-f9c054fe7670",
+        "key": "birth_registrations__place_of_birth_suburb__field_is_present",
+        "category": "schema",
+        "type": "field_is_present",
+        "name": "Check that field 'place_of_birth_suburb' is present",
+        "model": "birth_registrations",
+        "field": "place_of_birth_suburb",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "introspection",
+        "implementation": "column 'place_of_birth_suburb' exists in birth_registrations__raw__",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "field_present",
+          "field": "place_of_birth_suburb",
+          "present": true
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "a130a493-082a-468e-a740-74e66c2f6edb",
+        "key": "birth_registrations__place_of_birth_suburb__field_required",
+        "category": "schema",
+        "type": "field_required",
+        "name": "Check that field place_of_birth_suburb has no missing values",
+        "model": "birth_registrations",
+        "field": "place_of_birth_suburb",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"place_of_birth_suburb\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__place_of_birth_suburb__field_required\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "place_of_birth_suburb",
+          "value": 0,
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.0
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "bcc3f36f-e70d-43d8-8080-d1525c70d28b",
+        "key": "birth_registrations__place_of_birth_suburb__field_null_values",
+        "category": "quality",
+        "type": "field_null_values",
+        "name": "Check that field place_of_birth_suburb has missing_count < 2",
+        "model": "birth_registrations",
+        "field": "place_of_birth_suburb",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.place_of_birth_suburb.nullValues_datacontract\n- property: introduced_date\n  value: '2026-09-15'\n- property: description\n  value: |\n    A few empty values are tolerated; a sustained rise fails.\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndimension: completeness\nseverity: warning\nunit: percent\nmetric: nullValues\nmustBeLessThan: 2\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"place_of_birth_suburb\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__place_of_birth_suburb__field_null_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "place_of_birth_suburb",
+          "value": 0,
+          "unit": "percent",
+          "severity": "warning",
+          "threshold": "< 2",
+          "row_count": 1140,
+          "failed_fraction": 0.0,
+          "percent": 0.0
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "557dff76-e3e0-435a-83df-a62ad7d0d4b9",
+        "key": "birth_registrations__place_of_birth_suburb__field_invalid_values",
+        "category": "quality",
+        "type": "field_invalid_values",
+        "name": "Check that field place_of_birth_suburb has invalid_count = 0",
+        "model": "birth_registrations",
+        "field": "place_of_birth_suburb",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.place_of_birth_suburb.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.\ndescription: |\n  A single unrecognised value fails.\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  validValues:\n  - Fremantle\n  - Subiaco\n  - Joondalup\n  - Rockingham\n  - Mandurah\n  - Midland\n  - Armadale\n  - Cannington\n  - Morley\n  - Cockburn Central\n  - Scarborough\n  - Victoria Park\n  - Bunbury\n  - Albany\n  - Geraldton\n  - Kalgoorlie\n  - Broome\n  - Karratha\n  - Port Hedland\n  - Busselton\n  - Northam\n  - Narrogin\n  - Esperance\n  - Collie\n  - Mount Lawley\n  - Leederville\n  - Wembley\n  - Innaloo\n  - Success\n  - Baldivis\n  - Ellenbrook\n  - Butler\n  - Balga\n  - Girrawheen\n  - Maddington\n  - Gosnells\n  - Kwinana\n  - Hamilton Hill\n  - Beaconsfield\n  - South Perth\n  - Bentley\n  - Willetton\n  - Riverton\n  - Karrinyup\n  - Currambine\n  - Clarkson\n  - Yanchep\n  - Byford\n  - Waroona\n  - Manjimup\n  - Margaret River\nmustBe: 0\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"place_of_birth_suburb\" IS NULL\n      )\n      AND NOT (\n        \"t0\".\"place_of_birth_suburb\" IN (\n          'Fremantle',\n          'Subiaco',\n          'Joondalup',\n          'Rockingham',\n          'Mandurah',\n          'Midland',\n          'Armadale',\n          'Cannington',\n          'Morley',\n          'Cockburn Central',\n          'Scarborough',\n          'Victoria Park',\n          'Bunbury',\n          'Albany',\n          'Geraldton',\n          'Kalgoorlie',\n          'Broome',\n          'Karratha',\n          'Port Hedland',\n          'Busselton',\n          'Northam',\n          'Narrogin',\n          'Esperance',\n          'Collie',\n          'Mount Lawley',\n          'Leederville',\n          'Wembley',\n          'Innaloo',\n          'Success',\n          'Baldivis',\n          'Ellenbrook',\n          'Butler',\n          'Balga',\n          'Girrawheen',\n          'Maddington',\n          'Gosnells',\n          'Kwinana',\n          'Hamilton Hill',\n          'Beaconsfield',\n          'South Perth',\n          'Bentley',\n          'Willetton',\n          'Riverton',\n          'Karrinyup',\n          'Currambine',\n          'Clarkson',\n          'Yanchep',\n          'Byford',\n          'Waroona',\n          'Manjimup',\n          'Margaret River'\n        )\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"birth_registrations__place_of_birth_suburb__field_invalid_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual invalid_count(place_of_birth_suburb) was 36, expected = 0",
+        "diagnostics": {
+          "metric": "invalid_count",
+          "field": "place_of_birth_suburb",
+          "value": 36,
+          "severity": "error",
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.031579,
+          "constraint": {
+            "valid_values": [
+              "Fremantle",
+              "Subiaco",
+              "Joondalup",
+              "Rockingham",
+              "Mandurah",
+              "Midland",
+              "Armadale",
+              "Cannington",
+              "Morley",
+              "Cockburn Central",
+              "Scarborough",
+              "Victoria Park",
+              "Bunbury",
+              "Albany",
+              "Geraldton",
+              "Kalgoorlie",
+              "Broome",
+              "Karratha",
+              "Port Hedland",
+              "Busselton",
+              "Northam",
+              "Narrogin",
+              "Esperance",
+              "Collie",
+              "Mount Lawley",
+              "Leederville",
+              "Wembley",
+              "Innaloo",
+              "Success",
+              "Baldivis",
+              "Ellenbrook",
+              "Butler",
+              "Balga",
+              "Girrawheen",
+              "Maddington",
+              "Gosnells",
+              "Kwinana",
+              "Hamilton Hill",
+              "Beaconsfield",
+              "South Perth",
+              "Bentley",
+              "Willetton",
+              "Riverton",
+              "Karrinyup",
+              "Currambine",
+              "Clarkson",
+              "Yanchep",
+              "Byford",
+              "Waroona",
+              "Manjimup",
+              "Margaret River"
+            ]
+          }
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-266969671",
+            "place_of_birth_suburb": "Unknown"
+          },
+          {
+            "registration_number": "BDM-479568118",
+            "place_of_birth_suburb": "Freemantle"
+          },
+          {
+            "registration_number": "BDM-656014398",
+            "place_of_birth_suburb": "Not stated"
+          },
+          {
+            "registration_number": "BDM-426605027",
+            "place_of_birth_suburb": "Freemantle"
+          },
+          {
+            "registration_number": "BDM-534953818",
+            "place_of_birth_suburb": "Freemantle"
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-266969671",
+            "place_of_birth_suburb": "Unknown"
+          },
+          {
+            "registration_number": "BDM-479568118",
+            "place_of_birth_suburb": "Freemantle"
+          },
+          {
+            "registration_number": "BDM-656014398",
+            "place_of_birth_suburb": "Not stated"
+          },
+          {
+            "registration_number": "BDM-426605027",
+            "place_of_birth_suburb": "Freemantle"
+          },
+          {
+            "registration_number": "BDM-534953818",
+            "place_of_birth_suburb": "Freemantle"
+          }
+        ]
+      },
+      {
+        "id": "2ae87f50-af3d-4b90-890a-fb4f5e59e70f",
+        "key": "birth_registrations__place_of_birth_facility__field_is_present",
+        "category": "schema",
+        "type": "field_is_present",
+        "name": "Check that field 'place_of_birth_facility' is present",
+        "model": "birth_registrations",
+        "field": "place_of_birth_facility",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "introspection",
+        "implementation": "column 'place_of_birth_facility' exists in birth_registrations__raw__",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "field_present",
+          "field": "place_of_birth_facility",
+          "present": true
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "5625f95b-4ff6-416e-8b4c-1513d36027c1",
+        "key": "birth_registrations__place_of_birth_facility__field_null_values",
+        "category": "quality",
+        "type": "field_null_values",
+        "name": "Check that field place_of_birth_facility has missing_count < 35",
+        "model": "birth_registrations",
+        "field": "place_of_birth_facility",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.place_of_birth_facility.nullValues_datacontract\n- property: introduced_date\n  value: '2026-09-15'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndescription: |\n  This value is often empty for good reason; the check only fails if that becomes much more common.\ndimension: completeness\nseverity: error\nunit: percent\nmetric: nullValues\nmustBeLessThan: 35\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"place_of_birth_facility\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__place_of_birth_facility__field_null_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual missing_count(place_of_birth_facility) was 55.263158% (630 of 1140 rows), expected < 35%",
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "place_of_birth_facility",
+          "value": 630,
+          "unit": "percent",
+          "severity": "error",
+          "threshold": "< 35",
+          "row_count": 1140,
+          "failed_fraction": 0.552632,
+          "percent": 55.263158
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-652958623",
+            "place_of_birth_facility": null
+          },
+          {
+            "registration_number": "BDM-798153073",
+            "place_of_birth_facility": null
+          },
+          {
+            "registration_number": "BDM-479568118",
+            "place_of_birth_facility": null
+          },
+          {
+            "registration_number": "BDM-670022049",
+            "place_of_birth_facility": null
+          },
+          {
+            "registration_number": "BDM-135803723",
+            "place_of_birth_facility": null
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-652958623",
+            "place_of_birth_facility": null
+          },
+          {
+            "registration_number": "BDM-798153073",
+            "place_of_birth_facility": null
+          },
+          {
+            "registration_number": "BDM-479568118",
+            "place_of_birth_facility": null
+          },
+          {
+            "registration_number": "BDM-670022049",
+            "place_of_birth_facility": null
+          },
+          {
+            "registration_number": "BDM-135803723",
+            "place_of_birth_facility": null
+          }
+        ]
+      },
+      {
+        "id": "5bec2ecb-f59d-4d82-8db5-6edea7e02c59",
+        "key": "birth_registrations__date_registered__field_is_present",
+        "category": "schema",
+        "type": "field_is_present",
+        "name": "Check that field 'date_registered' is present",
+        "model": "birth_registrations",
+        "field": "date_registered",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "introspection",
+        "implementation": "column 'date_registered' exists in birth_registrations__raw__",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "field_present",
+          "field": "date_registered",
+          "present": true
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "cde55bc5-3710-46d9-8c42-8aebdc2104c3",
+        "key": "birth_registrations__date_registered__field_required",
+        "category": "schema",
+        "type": "field_required",
+        "name": "Check that field date_registered has no missing values",
+        "model": "birth_registrations",
+        "field": "date_registered",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"date_registered\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__date_registered__field_required\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual missing_count(date_registered) was 6, expected = 0",
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "date_registered",
+          "value": 6,
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.005263
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-033042269",
+            "date_registered": null
+          },
+          {
+            "registration_number": "BDM-805489008",
+            "date_registered": null
+          },
+          {
+            "registration_number": "BDM-530393361",
+            "date_registered": null
+          },
+          {
+            "registration_number": "BDM-888943705",
+            "date_registered": null
+          },
+          {
+            "registration_number": "BDM-822269276",
+            "date_registered": null
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-033042269",
+            "date_registered": null
+          },
+          {
+            "registration_number": "BDM-805489008",
+            "date_registered": null
+          },
+          {
+            "registration_number": "BDM-530393361",
+            "date_registered": null
+          },
+          {
+            "registration_number": "BDM-888943705",
+            "date_registered": null
+          },
+          {
+            "registration_number": "BDM-822269276",
+            "date_registered": null
+          }
+        ]
+      },
+      {
+        "id": "a284e528-9322-4d74-a58c-b17a247dd48e",
+        "key": "birth_registrations__date_registered__field_null_values",
+        "category": "quality",
+        "type": "field_null_values",
+        "name": "Check that field date_registered has missing_count = 0",
+        "model": "birth_registrations",
+        "field": "date_registered",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.date_registered.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: |\n    This value must never be empty.\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"date_registered\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__date_registered__field_null_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual missing_count(date_registered) was 6, expected = 0",
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "date_registered",
+          "value": 6,
+          "severity": "error",
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.005263
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-033042269",
+            "date_registered": null
+          },
+          {
+            "registration_number": "BDM-805489008",
+            "date_registered": null
+          },
+          {
+            "registration_number": "BDM-530393361",
+            "date_registered": null
+          },
+          {
+            "registration_number": "BDM-888943705",
+            "date_registered": null
+          },
+          {
+            "registration_number": "BDM-822269276",
+            "date_registered": null
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-033042269",
+            "date_registered": null
+          },
+          {
+            "registration_number": "BDM-805489008",
+            "date_registered": null
+          },
+          {
+            "registration_number": "BDM-530393361",
+            "date_registered": null
+          },
+          {
+            "registration_number": "BDM-888943705",
+            "date_registered": null
+          },
+          {
+            "registration_number": "BDM-822269276",
+            "date_registered": null
+          }
+        ]
+      },
+      {
+        "id": "f36b1fa4-cc21-4182-9d2d-e01b54f5e5b4",
+        "key": "birth_registrations__date_registered__quality_sql_1",
+        "category": "quality",
+        "type": "field_quality_sql",
+        "name": "A registration must not be dated earlier than the birth it records.\n",
+        "model": "birth_registrations",
+        "field": "date_registered",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "consistency",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.date_registered.date_ordering_datacontract\n- property: name\n  value: Registered on or after birth\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    The record is corrupt, or two different registrations have been joined together into one.\ndescription: |\n  A registration must not be dated earlier than the birth it records.\ndimension: consistency\nseverity: error\ntype: sql\nmustBe: 0\nquery: SELECT COUNT(*) FROM {model} WHERE date_registered < date_of_birth\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT COUNT(*) FROM birth_registrations WHERE date_registered < date_of_birth",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "custom_sql",
+          "field": "date_registered",
+          "value": 0,
+          "severity": "error",
+          "threshold": "= 0"
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "e598ed76-293d-48cb-84a1-1099d9a68150",
+        "key": "birth_registrations__registering_parent_1_name__field_is_present",
+        "category": "schema",
+        "type": "field_is_present",
+        "name": "Check that field 'registering_parent_1_name' is present",
+        "model": "birth_registrations",
+        "field": "registering_parent_1_name",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "introspection",
+        "implementation": "column 'registering_parent_1_name' exists in birth_registrations__raw__",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "field_present",
+          "field": "registering_parent_1_name",
+          "present": true
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "0a69d0bb-bf19-4a2c-8fd2-62a785a721e2",
+        "key": "birth_registrations__registering_parent_1_name__field_null_values",
+        "category": "quality",
+        "type": "field_null_values",
+        "name": "Check that field registering_parent_1_name has missing_count < 15",
+        "model": "birth_registrations",
+        "field": "registering_parent_1_name",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.registering_parent_1_name.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: |\n    This value is often empty for good reason; the check only fails if that becomes much more common.\n- property: changelog\n  value: '[{\"date\": \"2026-09-18T00:00:00Z\", \"description\": \"Bumped severity warning->error\n    with a real mustBeLessThan:15 (was mustBeLessThan:5, warning) - item 74 (plans/qa-pipeline.md):\n    a warning/info-severity rule always has warn_threshold=None (ODCS is single-tier)\n    AND, before this, fail_threshold=None too, which the dashboard silently defaulted\n    to 0 - making this check read red on almost every run despite datacontract-cli\n    itself correctly reporting pass. Matches place_of_birth_facility''s own established\n    pattern (severity:error + a real non-zero mustBeLessThan) and this same real-world\n    check''s own Soda copy, already fixed the same way.\", \"author\": \"Keith Moss\",\n    \"breaking\": true}]'\n- property: failure_indicates\n  value: |\n    self-evident\ndimension: completeness\nseverity: error\nunit: percent\nmetric: nullValues\nmustBeLessThan: 15\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"registering_parent_1_name\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__registering_parent_1_name__field_null_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "registering_parent_1_name",
+          "value": 36,
+          "unit": "percent",
+          "severity": "error",
+          "threshold": "< 15",
+          "row_count": 1140,
+          "failed_fraction": 0.031579,
+          "percent": 3.157895
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "8c6e4923-b97f-479b-9373-38aabed489d9",
+        "key": "birth_registrations__registering_parent_1_name__field_invalid_values",
+        "category": "quality",
+        "type": "field_invalid_values",
+        "name": "Check that field registering_parent_1_name has invalid_count = 0",
+        "model": "birth_registrations",
+        "field": "registering_parent_1_name",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.registering_parent_1_name.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-09-15'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndescription: |\n  This value must be in the expected format.\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  pattern: ^[A-Za-z][A-Za-z. -]*$\nmustBe: 0\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"registering_parent_1_name\" IS NULL\n      )\n      AND NOT (\n        REGEXP_MATCHES(\"t0\".\"registering_parent_1_name\", '^[A-Za-z][A-Za-z. -]*$')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"birth_registrations__registering_parent_1_name__field_invalid_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual invalid_count(registering_parent_1_name) was 30, expected = 0",
+        "diagnostics": {
+          "metric": "invalid_count",
+          "field": "registering_parent_1_name",
+          "value": 30,
+          "severity": "error",
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.026316,
+          "constraint": {
+            "pattern": "^[A-Za-z][A-Za-z. -]*$"
+          }
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-181840508"
+          },
+          {
+            "registration_number": "BDM-110174448"
+          },
+          {
+            "registration_number": "BDM-823098720"
+          },
+          {
+            "registration_number": "BDM-586035580"
+          },
+          {
+            "registration_number": "BDM-026496334"
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-181840508"
+          },
+          {
+            "registration_number": "BDM-110174448"
+          },
+          {
+            "registration_number": "BDM-823098720"
+          },
+          {
+            "registration_number": "BDM-586035580"
+          },
+          {
+            "registration_number": "BDM-026496334"
+          }
+        ]
+      },
+      {
+        "id": "4d8e1838-b4e0-460e-ad5c-fcd8cdcd6426",
+        "key": "birth_registrations__registering_parent_2_name__field_is_present",
+        "category": "schema",
+        "type": "field_is_present",
+        "name": "Check that field 'registering_parent_2_name' is present",
+        "model": "birth_registrations",
+        "field": "registering_parent_2_name",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "introspection",
+        "implementation": "column 'registering_parent_2_name' exists in birth_registrations__raw__",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "field_present",
+          "field": "registering_parent_2_name",
+          "present": true
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "9c17401e-72d8-4cd7-909a-da7a3645c969",
+        "key": "birth_registrations__registering_parent_2_name__field_null_values",
+        "category": "quality",
+        "type": "field_null_values",
+        "name": "Check that field registering_parent_2_name has missing_count < 50",
+        "model": "birth_registrations",
+        "field": "registering_parent_2_name",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.registering_parent_2_name.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[{\"date\": \"2026-09-18T00:00:00Z\", \"description\": \"Bumped severity info->error\n    with a real mustBeLessThan:50 (was mustBeLessThan:30, info) - item 74 (plans/qa-pipeline.md):\n    an info-severity rule always has warn_threshold=None (ODCS is single-tier) AND,\n    before this, fail_threshold=None too, which the dashboard silently defaulted to\n    0 - making this check read red on almost every run despite datacontract-cli itself\n    correctly reporting pass. Matches place_of_birth_facility''s own established pattern\n    (severity:error + a real non-zero mustBeLessThan) and this same real-world check''s\n    own Soda copy, already fixed the same way.\", \"author\": \"Keith Moss\", \"breaking\":\n    true}]'\n- property: failure_indicates\n  value: |\n    self-evident\ndescription: |\n  This value is often empty for good reason; the check only fails if that becomes much more common.\ndimension: completeness\nseverity: error\nunit: percent\nmetric: nullValues\nmustBeLessThan: 50\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"registering_parent_2_name\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__registering_parent_2_name__field_null_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "registering_parent_2_name",
+          "value": 277,
+          "unit": "percent",
+          "severity": "error",
+          "threshold": "< 50",
+          "row_count": 1140,
+          "failed_fraction": 0.242982,
+          "percent": 24.298246
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "d5677ebd-336b-4712-be8d-8a4b0bfd38eb",
+        "key": "birth_registrations__registering_parent_2_name__field_invalid_values",
+        "category": "quality",
+        "type": "field_invalid_values",
+        "name": "Check that field registering_parent_2_name has invalid_count = 0",
+        "model": "birth_registrations",
+        "field": "registering_parent_2_name",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.registering_parent_2_name.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-09-15'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndescription: |\n  This value must be in the expected format.\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  pattern: ^[A-Za-z][A-Za-z. -]*$\nmustBe: 0\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"registering_parent_2_name\" IS NULL\n      )\n      AND NOT (\n        REGEXP_MATCHES(\"t0\".\"registering_parent_2_name\", '^[A-Za-z][A-Za-z. -]*$')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"birth_registrations__registering_parent_2_name__field_invalid_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual invalid_count(registering_parent_2_name) was 26, expected = 0",
+        "diagnostics": {
+          "metric": "invalid_count",
+          "field": "registering_parent_2_name",
+          "value": 26,
+          "severity": "error",
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.022807,
+          "constraint": {
+            "pattern": "^[A-Za-z][A-Za-z. -]*$"
+          }
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-670022049"
+          },
+          {
+            "registration_number": "BDM-479181861"
+          },
+          {
+            "registration_number": "BDM-858562005"
+          },
+          {
+            "registration_number": "BDM-805489008"
+          },
+          {
+            "registration_number": "BDM-988478099"
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-670022049"
+          },
+          {
+            "registration_number": "BDM-479181861"
+          },
+          {
+            "registration_number": "BDM-858562005"
+          },
+          {
+            "registration_number": "BDM-805489008"
+          },
+          {
+            "registration_number": "BDM-988478099"
+          }
+        ]
+      },
+      {
+        "id": "5143548a-7c36-400a-ba0b-de95145197be",
+        "key": "birth_registrations__is_multiple_birth__field_is_present",
+        "category": "schema",
+        "type": "field_is_present",
+        "name": "Check that field 'is_multiple_birth' is present",
+        "model": "birth_registrations",
+        "field": "is_multiple_birth",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "introspection",
+        "implementation": "column 'is_multiple_birth' exists in birth_registrations__raw__",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "field_present",
+          "field": "is_multiple_birth",
+          "present": true
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "317118a5-5ea9-486e-b6f4-2ef582df10cf",
+        "key": "birth_registrations__is_multiple_birth__field_required",
+        "category": "schema",
+        "type": "field_required",
+        "name": "Check that field is_multiple_birth has no missing values",
+        "model": "birth_registrations",
+        "field": "is_multiple_birth",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"is_multiple_birth\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__is_multiple_birth__field_required\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual missing_count(is_multiple_birth) was 2, expected = 0",
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "is_multiple_birth",
+          "value": 2,
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.001754
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-435739797",
+            "is_multiple_birth": null
+          },
+          {
+            "registration_number": "BDM-612229521",
+            "is_multiple_birth": null
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-435739797",
+            "is_multiple_birth": null
+          },
+          {
+            "registration_number": "BDM-612229521",
+            "is_multiple_birth": null
+          }
+        ]
+      },
+      {
+        "id": "0c8ee2f2-11a7-487c-aef7-6f8a9b384b46",
+        "key": "birth_registrations__is_multiple_birth__field_null_values",
+        "category": "quality",
+        "type": "field_null_values",
+        "name": "Check that field is_multiple_birth has missing_count = 0",
+        "model": "birth_registrations",
+        "field": "is_multiple_birth",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.is_multiple_birth.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: |\n    This value must never be empty.\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"is_multiple_birth\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__is_multiple_birth__field_null_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual missing_count(is_multiple_birth) was 2, expected = 0",
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "is_multiple_birth",
+          "value": 2,
+          "severity": "error",
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.001754
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-435739797",
+            "is_multiple_birth": null
+          },
+          {
+            "registration_number": "BDM-612229521",
+            "is_multiple_birth": null
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-435739797",
+            "is_multiple_birth": null
+          },
+          {
+            "registration_number": "BDM-612229521",
+            "is_multiple_birth": null
+          }
+        ]
+      },
+      {
+        "id": "5ab66ae2-507f-4dc4-ab97-e842479fd83b",
+        "key": "birth_registrations__is_multiple_birth__quality_sql_1",
+        "category": "quality",
+        "type": "field_quality_sql",
+        "name": "Every record flagged as a multiple birth must have a matching sibling in the same supply.\n",
+        "model": "birth_registrations",
+        "field": "is_multiple_birth",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "consistency",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.is_multiple_birth.sibling_match_datacontract\n- property: name\n  value: Multiple-birth sibling match\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndescription: |\n  Every record flagged as a multiple birth must have a matching sibling in the same supply.\ndimension: consistency\nseverity: error\ntype: sql\nmustBe: 0\nquery: |\n  SELECT COUNT(*) FROM {model} a WHERE a.is_multiple_birth = true\n    AND NOT EXISTS (\n      SELECT 1 FROM {model} b\n      WHERE b.is_multiple_birth = true\n        AND b.registration_number != a.registration_number\n        AND b.date_of_birth = a.date_of_birth\n        AND b.place_of_birth_facility IS NOT DISTINCT FROM a.place_of_birth_facility\n        AND b.registering_parent_1_name IS NOT DISTINCT FROM a.registering_parent_1_name\n    )\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT COUNT(*) FROM birth_registrations a WHERE a.is_multiple_birth = true\n  AND NOT EXISTS (\n    SELECT 1 FROM birth_registrations b\n    WHERE b.is_multiple_birth = true\n      AND b.registration_number != a.registration_number\n      AND b.date_of_birth = a.date_of_birth\n      AND b.place_of_birth_facility IS NOT DISTINCT FROM a.place_of_birth_facility\n      AND b.registering_parent_1_name IS NOT DISTINCT FROM a.registering_parent_1_name\n  )\n",
+        "result": "failed",
+        "reason": "Actual custom_sql(is_multiple_birth) was 32, expected = 0",
+        "diagnostics": {
+          "metric": "custom_sql",
+          "field": "is_multiple_birth",
+          "value": 32,
+          "severity": "error",
+          "threshold": "= 0"
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "bb8ead3b-ab3a-4f6b-a6bc-8c4832b71d84",
+        "key": "birth_registrations__source_system_record_id__field_is_present",
+        "category": "schema",
+        "type": "field_is_present",
+        "name": "Check that field 'source_system_record_id' is present",
+        "model": "birth_registrations",
+        "field": "source_system_record_id",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "introspection",
+        "implementation": "column 'source_system_record_id' exists in birth_registrations__raw__",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "field_present",
+          "field": "source_system_record_id",
+          "present": true
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "071d5592-811f-4333-bae3-c14bc3278d6e",
+        "key": "birth_registrations__source_system_record_id__field_required",
+        "category": "schema",
+        "type": "field_required",
+        "name": "Check that field source_system_record_id has no missing values",
+        "model": "birth_registrations",
+        "field": "source_system_record_id",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"source_system_record_id\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__source_system_record_id__field_required\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual missing_count(source_system_record_id) was 4, expected = 0",
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "source_system_record_id",
+          "value": 4,
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.003509
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-989330671",
+            "source_system_record_id": null
+          },
+          {
+            "registration_number": "BDM-040271623",
+            "source_system_record_id": null
+          },
+          {
+            "registration_number": "BDM-338689382",
+            "source_system_record_id": null
+          },
+          {
+            "registration_number": "BDM-364348418",
+            "source_system_record_id": null
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-989330671",
+            "source_system_record_id": null
+          },
+          {
+            "registration_number": "BDM-040271623",
+            "source_system_record_id": null
+          },
+          {
+            "registration_number": "BDM-338689382",
+            "source_system_record_id": null
+          },
+          {
+            "registration_number": "BDM-364348418",
+            "source_system_record_id": null
+          }
+        ]
+      },
+      {
+        "id": "74542685-dba2-4d19-8b1f-abe110b5ca67",
+        "key": "birth_registrations__source_system_record_id__field_duplicate_values",
+        "category": "quality",
+        "type": "field_duplicate_values",
+        "name": "Check that field source_system_record_id has duplicate_count = 0",
+        "model": "birth_registrations",
+        "field": "source_system_record_id",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "uniqueness",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.source_system_record_id.duplicateValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndescription: |\n  This value must be unique.\ndimension: uniqueness\nseverity: error\nmetric: duplicateValues\nmustBe: 0\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  *\nFROM (\n  SELECT\n    \"t0\".\"source_system_record_id\",\n    COUNT(*) AS \"_dup_n\"\n  FROM \"birth_registrations\" AS \"t0\"\n  GROUP BY\n    1\n) AS \"t1\"\nWHERE\n  \"t1\".\"_dup_n\" > 1",
+        "result": "failed",
+        "reason": "Actual duplicate_count(source_system_record_id) was 26, expected = 0",
+        "diagnostics": {
+          "metric": "duplicate_count",
+          "field": "source_system_record_id",
+          "value": 26,
+          "severity": "error",
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_rows": 67
+        },
+        "failedSamples": [
+          {
+            "source_system_record_id": "SRC-737754218",
+            "duplicate_count": 2
+          },
+          {
+            "source_system_record_id": "SRCX-123456789",
+            "duplicate_count": 5
+          },
+          {
+            "source_system_record_id": "SRC-654031888",
+            "duplicate_count": 2
+          },
+          {
+            "source_system_record_id": "SRC-525363796",
+            "duplicate_count": 2
+          },
+          {
+            "source_system_record_id": "SRC12345678",
+            "duplicate_count": 3
+          }
+        ],
+        "failed_samples": [
+          {
+            "source_system_record_id": "SRC-737754218",
+            "duplicate_count": 2
+          },
+          {
+            "source_system_record_id": "SRCX-123456789",
+            "duplicate_count": 5
+          },
+          {
+            "source_system_record_id": "SRC-654031888",
+            "duplicate_count": 2
+          },
+          {
+            "source_system_record_id": "SRC-525363796",
+            "duplicate_count": 2
+          },
+          {
+            "source_system_record_id": "SRC12345678",
+            "duplicate_count": 3
+          }
+        ]
+      },
+      {
+        "id": "74ff7111-650c-4468-a5f4-7eb6ea7c9c82",
+        "key": "birth_registrations__source_system_record_id__field_invalid_values",
+        "category": "quality",
+        "type": "field_invalid_values",
+        "name": "Check that field source_system_record_id has invalid_count = 0",
+        "model": "birth_registrations",
+        "field": "source_system_record_id",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.source_system_record_id.invalidValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndescription: |\n  This value must be in the expected format.\ndimension: conformity\nseverity: error\nmetric: invalidValues\narguments:\n  pattern: ^SRC-[0-9]{9}$\nmustBe: 0\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(\n    CASE\n      WHEN NOT (\n        \"t0\".\"source_system_record_id\" IS NULL\n      )\n      AND NOT (\n        REGEXP_MATCHES(\"t0\".\"source_system_record_id\", '^SRC-[0-9]{9}$')\n      )\n      THEN 1\n      ELSE 0\n    END\n  ) AS \"birth_registrations__source_system_record_id__field_invalid_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual invalid_count(source_system_record_id) was 22, expected = 0",
+        "diagnostics": {
+          "metric": "invalid_count",
+          "field": "source_system_record_id",
+          "value": 22,
+          "severity": "error",
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.019298,
+          "constraint": {
+            "pattern": "^SRC-[0-9]{9}$"
+          }
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-479568118",
+            "source_system_record_id": "SRC-1234567890"
+          },
+          {
+            "registration_number": "BDM-180926377",
+            "source_system_record_id": "SRC-1234567890"
+          },
+          {
+            "registration_number": "BDM-348375128",
+            "source_system_record_id": "SRCX-123456789"
+          },
+          {
+            "registration_number": "BDM-043437941",
+            "source_system_record_id": "SRCX-123456789"
+          },
+          {
+            "registration_number": "BDM-134577503",
+            "source_system_record_id": "SRC-ABCDEFGHI"
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-479568118",
+            "source_system_record_id": "SRC-1234567890"
+          },
+          {
+            "registration_number": "BDM-180926377",
+            "source_system_record_id": "SRC-1234567890"
+          },
+          {
+            "registration_number": "BDM-348375128",
+            "source_system_record_id": "SRCX-123456789"
+          },
+          {
+            "registration_number": "BDM-043437941",
+            "source_system_record_id": "SRCX-123456789"
+          },
+          {
+            "registration_number": "BDM-134577503",
+            "source_system_record_id": "SRC-ABCDEFGHI"
+          }
+        ]
+      },
+      {
+        "id": "715b3fab-57c7-4ccf-a2da-27c92722d7d9",
+        "key": "birth_registrations__extract_timestamp__field_is_present",
+        "category": "schema",
+        "type": "field_is_present",
+        "name": "Check that field 'extract_timestamp' is present",
+        "model": "birth_registrations",
+        "field": "extract_timestamp",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "conformity",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "introspection",
+        "implementation": "column 'extract_timestamp' exists in birth_registrations__raw__",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "field_present",
+          "field": "extract_timestamp",
+          "present": true
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "9f6c5b19-9e10-436c-a44b-09508b96bac6",
+        "key": "birth_registrations__extract_timestamp__field_required",
+        "category": "schema",
+        "type": "field_required",
+        "name": "Check that field extract_timestamp has no missing values",
+        "model": "birth_registrations",
+        "field": "extract_timestamp",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": null,
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"extract_timestamp\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__extract_timestamp__field_required\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual missing_count(extract_timestamp) was 7, expected = 0",
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "extract_timestamp",
+          "value": 7,
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.00614
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-445008825",
+            "extract_timestamp": null
+          },
+          {
+            "registration_number": "BDM-610664704",
+            "extract_timestamp": null
+          },
+          {
+            "registration_number": "BDM-767306203",
+            "extract_timestamp": null
+          },
+          {
+            "registration_number": "BDM-108097509",
+            "extract_timestamp": null
+          },
+          {
+            "registration_number": "BDM-818374988",
+            "extract_timestamp": null
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-445008825",
+            "extract_timestamp": null
+          },
+          {
+            "registration_number": "BDM-610664704",
+            "extract_timestamp": null
+          },
+          {
+            "registration_number": "BDM-767306203",
+            "extract_timestamp": null
+          },
+          {
+            "registration_number": "BDM-108097509",
+            "extract_timestamp": null
+          },
+          {
+            "registration_number": "BDM-818374988",
+            "extract_timestamp": null
+          }
+        ]
+      },
+      {
+        "id": "7684fa52-8840-4884-83bb-73d2bdecbac6",
+        "key": "birth_registrations__extract_timestamp__field_null_values",
+        "category": "quality",
+        "type": "field_null_values",
+        "name": "Check that field extract_timestamp has missing_count = 0",
+        "model": "birth_registrations",
+        "field": "extract_timestamp",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.extract_timestamp.nullValues_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: description\n  value: |\n    This value must never be empty.\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndimension: completeness\nseverity: error\nmetric: nullValues\nmustBe: 0\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  SUM(CASE WHEN \"t0\".\"extract_timestamp\" IS NULL THEN 1 ELSE 0 END) AS \"birth_registrations__extract_timestamp__field_null_values\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "failed",
+        "reason": "Actual missing_count(extract_timestamp) was 7, expected = 0",
+        "diagnostics": {
+          "metric": "missing_count",
+          "field": "extract_timestamp",
+          "value": 7,
+          "severity": "error",
+          "threshold": "= 0",
+          "row_count": 1140,
+          "failed_fraction": 0.00614
+        },
+        "failedSamples": [
+          {
+            "registration_number": "BDM-445008825",
+            "extract_timestamp": null
+          },
+          {
+            "registration_number": "BDM-610664704",
+            "extract_timestamp": null
+          },
+          {
+            "registration_number": "BDM-767306203",
+            "extract_timestamp": null
+          },
+          {
+            "registration_number": "BDM-108097509",
+            "extract_timestamp": null
+          },
+          {
+            "registration_number": "BDM-818374988",
+            "extract_timestamp": null
+          }
+        ],
+        "failed_samples": [
+          {
+            "registration_number": "BDM-445008825",
+            "extract_timestamp": null
+          },
+          {
+            "registration_number": "BDM-610664704",
+            "extract_timestamp": null
+          },
+          {
+            "registration_number": "BDM-767306203",
+            "extract_timestamp": null
+          },
+          {
+            "registration_number": "BDM-108097509",
+            "extract_timestamp": null
+          },
+          {
+            "registration_number": "BDM-818374988",
+            "extract_timestamp": null
+          }
+        ]
+      },
+      {
+        "id": "eba01762-9cc8-4ee4-900e-1339840f1a64",
+        "key": "birth_registrations__extract_timestamp__quality_sql_1",
+        "category": "quality",
+        "type": "field_quality_sql",
+        "name": "A record must be timestamped on or after the registration it describes, and delivered inside the agreed window.\n",
+        "model": "birth_registrations",
+        "field": "extract_timestamp",
+        "qualityId": null,
+        "tags": null,
+        "dimension": "consistency",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.extract_timestamp.timestamp_ordering_datacontract\n- property: name\n  value: Supply timestamp ordering\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndescription: |\n  A record must be timestamped on or after the registration it describes, and delivered inside the agreed window.\ndimension: consistency\nseverity: error\ntype: sql\nmustBe: 0\nquery: SELECT COUNT(*) FROM {model} WHERE extract_timestamp < date_registered OR extract_timestamp\n  > date_registered + INTERVAL 1 DAY\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT COUNT(*) FROM birth_registrations WHERE extract_timestamp < date_registered OR extract_timestamp > date_registered + INTERVAL 1 DAY",
+        "result": "failed",
+        "reason": "Actual custom_sql(extract_timestamp) was 36, expected = 0",
+        "diagnostics": {
+          "metric": "custom_sql",
+          "field": "extract_timestamp",
+          "value": 36,
+          "severity": "error",
+          "threshold": "= 0"
+        },
+        "failedSamples": null
+      },
+      {
+        "id": "e26fb690-80fa-4d52-a191-d1bfc2df3533",
+        "key": "birth_registrations__row_count",
+        "category": "quality",
+        "type": "row_count",
+        "name": "Check that model birth_registrations has row_count between 500 and 20000",
+        "model": "birth_registrations",
+        "field": null,
+        "qualityId": null,
+        "tags": null,
+        "dimension": "completeness",
+        "qualityDefinition": "customProperties:\n- property: check_id\n  value: data-asset-1.registry-services.civil-registration.birth-registrations.rowCount_datacontract\n- property: introduced_date\n  value: '2026-01-15'\n- property: changelog\n  value: '[]'\n- property: failure_indicates\n  value: |\n    self-evident\ndescription: |\n  The number of rows in the supply must fall inside the expected band.\ndimension: completeness\nseverity: warning\nmetric: rowCount\nmustBeBetween:\n- 500\n- 20000\n",
+        "engine": "datacontract-cli",
+        "language": "sql",
+        "implementation": "SELECT\n  COUNT(*) AS \"birth_registrations__row_count\"\nFROM \"birth_registrations\" AS \"t0\"",
+        "result": "passed",
+        "reason": null,
+        "diagnostics": {
+          "metric": "row_count",
+          "value": 1140,
+          "severity": "warning",
+          "threshold": "between 500 and 20000",
+          "row_count": 1140
+        },
+        "failedSamples": null
+      }
+    ],
+    "logs": [
+      {
+        "level": "INFO",
+        "message": "Testing data contract",
+        "timestamp": "2026-09-26 02:33:42.164312+00:00"
+      },
+      {
+        "level": "INFO",
+        "message": "Data Contract CLI 1.2.0 running as CLI locally",
+        "timestamp": "2026-09-26 02:33:42.165496+00:00"
+      },
+      {
+        "level": "INFO",
+        "message": "Running tests for data contract birth-registrations with server local_test",
+        "timestamp": "2026-09-26 02:33:42.421566+00:00"
+      },
+      {
+        "level": "INFO",
+        "message": "Running checks with ibis",
+        "timestamp": "2026-09-26 02:33:42.442234+00:00"
+      },
+      {
+        "level": "INFO",
+        "message": "Connecting to local csv via duckdb",
+        "timestamp": "2026-09-26 02:33:42.442259+00:00"
+      },
+      {
+        "level": "INFO",
+        "message": "Creating table birth_registrations for /home/user/data-poc/data/deliveries/3a51886e2fe3/birth_registrations_2026-09-24.csv",
+        "timestamp": "2026-09-26 02:33:42.457252+00:00"
+      },
+      {
+        "level": "INFO",
+        "message": "DuckDB Table Info: [(0, 'registration_number', 'VARCHAR', False, None, False), (1, 'child_given_names', 'VARCHAR', False, None, False), (2, 'child_family_name', 'VARCHAR', False, None, False), (3, 'date_of_birth', 'DATE', False, None, False), (4, 'sex', 'VARCHAR', False, None, False), (5, 'place_of_birth_suburb', 'VARCHAR', False, None, False), (6, 'place_of_birth_facility', 'VARCHAR', False, None, False), (7, 'date_registered', 'DATE', False, None, False), (8, 'registering_parent_1_name', 'VARCHAR', False, None, False), (9, 'registering_parent_2_name', 'VARCHAR', False, None, False), (10, 'is_multiple_birth', 'BOOLEAN', False, None, False), (11, 'source_system_record_id', 'VARCHAR', False, None, False), (12, 'extract_timestamp', 'DATE', False, None, False)]",
+        "timestamp": "2026-09-26 02:33:42.872175+00:00"
+      }
+    ]
+  },
+  "verified": null
+}

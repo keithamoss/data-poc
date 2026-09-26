@@ -1,0 +1,116 @@
+{
+  "run_timestamp": "2026-09-26T10:31:45.379769+08:00",
+  "run_by": "noreply@anthropic.com",
+  "raw_output": {
+    "arrival_record": {
+      "run_id": "run_017",
+      "run_index": 17,
+      "received_at": "2026-09-06T06:23:45.582172+00:00",
+      "delivery": "06092026_AGENCY"
+    },
+    "row_count": 1256,
+    "value_counts": {
+      "sex": [
+        [
+          "M",
+          621
+        ],
+        [
+          "F",
+          606
+        ],
+        [
+          "X",
+          16
+        ],
+        [
+          "(invalid code)",
+          13
+        ]
+      ]
+    },
+    "arrival": {
+      "earliest_extract": "2026-09-06T06:23:45.582172+00:00"
+    },
+    "check_aggregates": {
+      "sex": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 13,
+        "values": [
+          {
+            "value": "O",
+            "count": 5
+          },
+          {
+            "value": "9",
+            "count": 4
+          },
+          {
+            "value": "U",
+            "count": 4
+          }
+        ]
+      },
+      "place_of_birth_suburb": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 6,
+        "values": [
+          {
+            "value": "Not stated",
+            "count": 2
+          },
+          {
+            "value": "TBC",
+            "count": 2
+          },
+          {
+            "value": "Perth Metro",
+            "count": 1
+          },
+          {
+            "value": "Unknown",
+            "count": 1
+          }
+        ]
+      },
+      "date_of_birth": {
+        "type": "numeric_date",
+        "suppressed": false,
+        "total_invalid": 4,
+        "min": "1750-01-01",
+        "max": "1899-01-01",
+        "values": [
+          {
+            "value": "1750-01-01",
+            "count": 2
+          },
+          {
+            "value": "1820-11-30",
+            "count": 1
+          },
+          {
+            "value": "1899-01-01",
+            "count": 1
+          }
+        ],
+        "histogram": [
+          {
+            "bucket": "1750-01-01 to 1774-11-01",
+            "count": 2
+          },
+          {
+            "bucket": "1799-09-01 to 1824-07-02",
+            "count": 1
+          },
+          {
+            "bucket": "1874-03-02 to 1899-01-01",
+            "count": 1
+          }
+        ]
+      }
+    }
+  },
+  "verified": null
+}

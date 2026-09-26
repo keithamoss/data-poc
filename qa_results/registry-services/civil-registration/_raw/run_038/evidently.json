@@ -1,0 +1,52 @@
+{
+  "run_timestamp": "2026-09-26T10:31:45.379769+08:00",
+  "run_by": null,
+  "raw_output": {
+    "psi": {
+      "metrics": [
+        {
+          "id": "a814ffd645489cb42f31405a5f17b1c6",
+          "metric_name": "DriftedColumnsCount(columns=sex,drift_share=0.5,cat_method=psi)",
+          "config": {
+            "type": "evidently:metric_v2:DriftedColumnsCount",
+            "columns": [
+              "sex"
+            ],
+            "drift_share": 0.5,
+            "cat_method": "psi"
+          },
+          "value": {
+            "count": 0.0,
+            "share": 0.0
+          }
+        },
+        {
+          "id": "4b0e5b4d08198ed2d9149d0ae031020a",
+          "metric_name": "ValueDrift(column=sex,method=psi,threshold=0.1)",
+          "config": {
+            "type": "evidently:metric_v2:ValueDrift",
+            "column": "sex",
+            "method": "psi",
+            "threshold": 0.1
+          },
+          "value": 0.0010143004781160386
+        }
+      ],
+      "tests": []
+    },
+    "row_count": {
+      "metrics": [
+        {
+          "id": "00404ffe284d7862baa4095093452630",
+          "metric_name": "RowCount()",
+          "config": {
+            "type": "evidently:metric_v2:RowCount"
+          },
+          "value": 1801.0
+        }
+      ],
+      "tests": []
+    }
+  },
+  "verified": null
+}

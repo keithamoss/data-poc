@@ -1,0 +1,128 @@
+{
+  "run_timestamp": "2026-09-26T10:31:45.379769+08:00",
+  "run_by": "noreply@anthropic.com",
+  "raw_output": {
+    "arrival_record": {
+      "run_id": "run_009",
+      "run_index": 9,
+      "received_at": "2026-09-01T06:35:08.528299+00:00",
+      "delivery": "upload-8553"
+    },
+    "row_count": 1262,
+    "value_counts": {
+      "sex": [
+        [
+          "M",
+          612
+        ],
+        [
+          "F",
+          571
+        ],
+        [
+          "X",
+          26
+        ],
+        [
+          "(invalid code)",
+          53
+        ]
+      ]
+    },
+    "arrival": {
+      "earliest_extract": "2026-09-01T06:35:08.528299+00:00"
+    },
+    "check_aggregates": {
+      "sex": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 53,
+        "values": [
+          {
+            "value": "9",
+            "count": 20
+          },
+          {
+            "value": "U",
+            "count": 17
+          },
+          {
+            "value": "O",
+            "count": 16
+          }
+        ]
+      },
+      "place_of_birth_suburb": {
+        "type": "categorical",
+        "suppressed": false,
+        "total_invalid": 36,
+        "values": [
+          {
+            "value": "Perth Metro",
+            "count": 12
+          },
+          {
+            "value": "Freemantle",
+            "count": 8
+          },
+          {
+            "value": "TBC",
+            "count": 6
+          },
+          {
+            "value": "Unknown",
+            "count": 6
+          },
+          {
+            "value": "Not stated",
+            "count": 4
+          }
+        ]
+      },
+      "date_of_birth": {
+        "type": "numeric_date",
+        "suppressed": false,
+        "total_invalid": 18,
+        "min": "1750-01-01",
+        "max": "1899-01-01",
+        "values": [
+          {
+            "value": "1820-11-30",
+            "count": 7
+          },
+          {
+            "value": "1750-01-01",
+            "count": 6
+          },
+          {
+            "value": "1850-06-15",
+            "count": 3
+          },
+          {
+            "value": "1899-01-01",
+            "count": 2
+          }
+        ],
+        "histogram": [
+          {
+            "bucket": "1750-01-01 to 1774-11-01",
+            "count": 6
+          },
+          {
+            "bucket": "1799-09-01 to 1824-07-02",
+            "count": 7
+          },
+          {
+            "bucket": "1849-05-02 to 1874-03-02",
+            "count": 3
+          },
+          {
+            "bucket": "1874-03-02 to 1899-01-01",
+            "count": 2
+          }
+        ]
+      }
+    }
+  },
+  "verified": null
+}
