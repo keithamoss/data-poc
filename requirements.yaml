@@ -14354,18 +14354,6 @@ requirements:
         substituted period is a real question, and an unbounded chain
         means a query silently reaching years back.
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-079, REQ-PIPE-083, REQ-PIPE-035]
-    open_questions:
-      - >
-        May a substituted period itself be substituted from - i.e. can
-        the chain be longer than one hop? Refusing it bounds the reach
-        at one period; allowing it matches what a persistent non-
-        supplier actually produces.
-      - >
-        Does the substituted period get its own row of check results, or
-        borrow the previous period's? Keith's own open question,
-        2026-09-24. Physically it is a real view with real check results
-        against it, which argues for its own row; but its own row of
-        green results is the reading he specifically warned about.
     decisions:
       - >
         Decided this is a DATABASE action rather than a QA one - Keith's
@@ -14438,6 +14426,64 @@ requirements:
         `substituted` reads as a deliberate act on the PERIOD rather
         than on the data, works in the passive as a status chip, and
         gives clean field names.
+      - >
+        A SUBSTITUTED PERIOD REFERENCES THE ORIGINAL RUN'S CHECK
+        RESULTS RATHER THAN RE-RUNNING (Keith, 2026-09-26, closing his
+        own question of 2026-09-24). The bytes are identical, so a
+        re-run would record duplicate results in committed history that
+        grows forever, and would put a row of green results under a
+        period where nothing arrived - the reading REQ-DASH-085 exists
+        to prevent. The period points at the results already recorded
+        against the supply it stands on, and the dashboard says which
+        run the verdict came from. THE COST, recorded rather than
+        glossed: this introduces a period whose results live elsewhere,
+        which is a new concept for every reader of qa_results/ and for
+        "as at T". Rejected its own row re-run against the period,
+        which keeps every period uniform and "as at T" simple but
+        re-checks identical bytes each cycle; rejected showing the
+        previous period's row with no record of its own, which is
+        cheapest to build and weakest for audit, since nothing would
+        record that this period was ever considered.
+      - >
+        A SUBSTITUTION MAY REACH ANY EARLIER PERIOD THAT RECEIVED A
+        REAL SUPPLY, SO CHAINS NEVER FORM BY CONSTRUCTION (Keith,
+        2026-09-26). Q3 may stand on Q1 directly even where Q2 is
+        itself substituted, because nothing ever targets a substituted
+        period - there is no traversal to implement and no cycle to
+        prevent. WHAT SETTLED IT was the inherited case: an annual
+        dataset delivering in February needs Q4 to stand on Q1, three
+        periods back but a single hop to something real, and a rule
+        bounded to the immediately preceding period would break it
+        after one quarter. Rejected exactly that bound, which is the
+        hardest and forces a person to act again rather than letting
+        absence compound, but which leaves a persistent non-supplier
+        with no answer; rejected allowing genuine chains (Q3 on Q2 on
+        Q1), which matches what repeated non-supply literally produces
+        but makes every reader traverse and needs a depth cap.
+        Recorded because this session first offered the rule with a
+        label and a consequence that did not match each other, and the
+        ambiguity was only caught by re-reading it.
+      - >
+        THE STANDING-IN TABLE IS A REAL VIEW IN THE PERIOD SCHEMA, NOT
+        A RESOLUTION PERFORMED AT READ TIME (Keith, 2026-09-26, his own
+        lean and his own reasoning: a complete set of tables and views
+        in each period schema is nicer for a human looking at the
+        database directly and easier for machines). EVERY PERIOD SCHEMA
+        THEREFORE HOLDS A COMPLETE SET, one object per dataset,
+        pointing at whichever physical table applies. THE BONUS WORTH
+        NAMING: this means `missing-table` recovers its real meaning,
+        because a dataset standing on an earlier supply HAS an object
+        in the period - so the gap found while naming this requirement
+        (an annual dataset reading as missing-table in Q3) needs no new
+        reason code at all. Object count is not a concern: 3,650
+        schemas with tables measured in milliseconds on real PostgreSQL
+        16.13 (plans/running-thoughts.md #45). Rejected assembling
+        virtually at read time, which reflects demotion automatically
+        with no dangling references but leaves a human browsing the
+        database seeing an incomplete period and every consumer needing
+        the resolver; rejected closing the dangling problem by
+        REFUSING demotion while a view depends on it, which is a strong
+        invariant but makes one period's decision constrain another's.
   - id: REQ-DASH-085
     title: "A period standing in on an earlier one never reads as an ordinary green"
     date_written: "2026-09-26"
@@ -14498,12 +14544,6 @@ requirements:
         toolchains, per this project's standing rule for anything
         touching the template.
     dependencies: [REQ-PIPE-084, REQ-DASH-041, REQ-DASH-070]
-    open_questions:
-      - >
-        Does the substituted period show its own row of check results,
-        or the previous period's? Keith's own open question, and it
-        decides whether this is a badge on an existing row or a distinct
-        row shape.
     decisions:
       - >
         Decided this is a QUALIFIER on an existing status, not a new
@@ -14529,6 +14569,13 @@ requirements:
         NOT spent here. It is reserved for a different, automatic state:
         a dataset that does not participate in this period at all, whose
         most recent supply is simply still current.
+      - >
+        THE SUBSTITUTED PERIOD SHOWS THE ORIGINAL RUN'S RESULTS,
+        ATTRIBUTED (Keith, 2026-09-26, closing his own question and
+        deciding it on REQ-PIPE-084 at the same time). So this is a
+        QUALIFIER ON AN EXISTING ROW rather than a distinct row shape,
+        and the row must say which run the verdict came from - the
+        results are real, they were simply earned in another period.
   - id: REQ-PIPE-086
     title: The terminal runs the whole supply lifecycle, using the automated path's own logic
     date_written: "2026-09-26"

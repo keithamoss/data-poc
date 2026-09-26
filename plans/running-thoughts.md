@@ -2895,6 +2895,29 @@ Belongs with batch 5's check work.
        deliberate human decision, the very distinction `REQ-DASH-085`
        exists to keep visible.
 
+       **ITS SHAPE CHANGED THE SAME EVENING, and it is now SMALLER
+       than when it was found.** Keith settled that a standing-in
+       table is a REAL VIEW in the period schema rather than a
+       resolution performed at read time (`REQ-PIPE-084`'s own
+       decision), so every period schema holds a complete set, one
+       object per dataset. **That means `missing-table` recovers its
+       real meaning and this needs NO NEW REASON CODE** - an annual
+       dataset standing on February HAS an object in Q3. What is left
+       to specify is when the view is created and what it points at,
+       not how to report its absence.
+
+       **AND IT LEAVES ONE REAL OPEN QUESTION, recorded rather than
+       assumed: what happens to an inherited view when the supply it
+       points at is DEMOTED?** Keith chose real views over both
+       virtual assembly (which reflects demotion for free) and over
+       refusing demotion while a view depends on it, so neither of
+       those answers is available. The rule the rest of his choices
+       IMPLY is re-resolution - resolution is "the last real supply at
+       or before this period", so when one stops being real the views
+       aimed at it follow the same rule to the next one back - but
+       that is an inference from the shape rather than something he
+       has said, and it should be put to him rather than built.
+
     **LOCKING THE ENGINE VERSION - what is actually achievable, checked
     rather than assumed (2026-09-26).**
 
