@@ -76,11 +76,21 @@ check_lifecycle.py`'s own `check_id` convention.
 
 ## Action items
 
-1. **[todo, 2026-09-18]** **[Pipeline & publishing]** Try Postgres as the
-   warehouse instead of DuckDB (the original HANDOFF suggested it as an
+1. **[superseded, 2026-09-26]** **[Pipeline & publishing]** Try Postgres as
+   the warehouse instead of DuckDB (the original HANDOFF suggested it as an
    alternative). Would tell us whether the dbt-duckdb reliability bug is
    DuckDB-specific or a more general dbt-core issue — useful signal for
    `plans/qa-pipeline.md` #1 even if Postgres itself isn't adopted.
+
+   **Answered and overtaken.** PostgreSQL is now the one warehouse engine,
+   scoped as delivery sprint 26 (`REQ-PIPE-087` and the eight requirements
+   beside it) and switched over on 2026-09-26/27; DuckDB keeps only the job
+   of reading arriving files. The real measurements and the dbt/Soda/
+   datacontract-cli/Evidently verification are in
+   `plans/running-thoughts.md` #45. The dbt-duckdb signal this item was
+   originally after is now a by-product rather than the reason — the switch
+   happened because the storage and decision-log design rests on properties
+   a single-writer file cannot provide, not to diagnose one bug.
 
 2. **[investigate, 2026-09-18]** **[Pipeline & publishing]** Data pipeline
    observability — flagged as a tangent, not yet scoped. Distinct from

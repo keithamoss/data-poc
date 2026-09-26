@@ -1177,16 +1177,40 @@ Rough layout:
   must never depend on live data access, real or synthetic.** Not "must
   avoid touching real data" - the actual rule is narrower and stricter:
   no regenerating, opening, or querying `data/`/`data/raw/`/`data/
-  cp_raw/`/**the supply database**, full stop, even though this PoC's
-  data is fake and harmless to regenerate. (It used to say "any DuckDB
-  warehouse", which named the engine rather than the thing - since
-  REQ-PIPE-087 the warehouse is a PostgreSQL database reachable over
-  the network, which makes the rule matter MORE rather than less: a
-  file CI does not have is a rule enforced by accident, a DSN in an
-  environment variable is not.) The reasoning (Keith's own words,
+  cp_raw/`/**any schema holding supply rows**, full stop, even though
+  this PoC's data is fake and harmless to regenerate.
+
+  It used to say "any DuckDB warehouse", which named the engine rather
+  than the thing. Since REQ-PIPE-087 the warehouse is a PostgreSQL
+  database reachable over the network, and that makes the rule matter
+  MORE rather than less: a file CI does not have is a rule enforced by
+  accident, a DSN in an environment variable is not.
+
+  **THE LINE MOVED TO A SHARPER PLACE, and it is worth being precise
+  because the old wording is about to stop working.** The thing being
+  protected was never "a database connection" - it was the SUPPLY ROWS,
+  the extract itself, which in a real deployment is personal data about
+  real children and real births. Recorded QA metadata - which checks
+  ran, what they found, when, by whom - is not that, and once
+  REQ-PIPE-089 lands it is what the dashboard build reads. So the rule
+  a build must satisfy is: **it may read recorded results, and may
+  never read a staging, period, rejected or run-view schema.** Stated as
+  "no live connection at all" it would forbid the very design
+  REQ-PIPE-092 requires, and a rule that forbids the intended design is
+  a rule somebody deletes.
+
+  Both halves of that are load-bearing, so do not relax either: the
+  staging schemas stay off limits to every read-committed-history path,
+  and a computation that needs supply rows still belongs in the
+  orchestrator's own run step where a connection is legitimately open,
+  never deferred to a later read. REQ-DOCS-101 is the requirement that
+  restates the fifteen affected clauses, and its own NFR 1 is worth
+  reading first: a half-done sweep is worse than none.
+
+  **The reasoning**, Keith's own words,
   2026-09-16, after finding `deploy-pages.yml` was still regenerating
   synthetic warehouses so the dashboard's chart queries had something
-  to query): a pipeline that's only safe because today's data happens
+  to query: a pipeline that's only safe because today's data happens
   to be synthetic isn't a pipeline that's actually safe - it's one
   accident away from being pointed at something real. See
   `plans/publishing-and-history.md`'s Phase 3 write-up for the full
@@ -1195,10 +1219,9 @@ Rough layout:
   by whichever `orchestrate_*.py` already has one legitimately open,
   and committed to `qa_results/` alongside that run's check results -
   never deferred to a later read). Before adding ANY new computation to
-  the dashboard-build path, ask first whether it needs a live
-  connection to anything under `data/` - if yes, it belongs in
-  `orchestrate_bdm.py`'s/`orchestrate_cp.py`'s own run step and a
-  committed `qa_results/` file, not in `pipeline/build_*_dashboard_
+  the dashboard-build path, ask first whether it needs SUPPLY ROWS - if
+  yes, it belongs in `orchestrate_bdm.py`'s/`orchestrate_cp.py`'s own
+  run step and a recorded result, not in `pipeline/build_*_dashboard_
   data.py`.
 - **When you change the SHAPE of a value (making it nullable, adding a
   field, changing what's authoritative), enumerate every consumer

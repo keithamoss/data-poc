@@ -1926,11 +1926,311 @@ which is how `clipDatasetToAsOf()` ended up filtering on arrival rather
 than promotion (Thread H), correct only because promotion did not yet
 exist.
 
+26. **[todo, 2026-09-26]** **[Pipeline & publishing]** **PostgreSQL is the
+    warehouse, and the publisher moves inside the environment.** One engine
+    holding staging, rejected, the period schemas and a `sample` schema, with
+    DuckDB kept only as a reader of arriving files; all four QA tools checking
+    what landed rather than two of them checking the file; QA results and the
+    decision log moving into a metadata schema reached by its own role; the
+    dashboard built where the data is and never in GitHub Actions; no default
+    environment; and one test strategy that takes a connection string in all
+    four environments.
+
+    **Owns:** `REQ-PIPE-087`, `REQ-QAC-088`, `REQ-PIPE-089`, `REQ-PIPE-090`,
+    `REQ-PIPE-091`, `REQ-PIPE-092`, `REQ-PIPE-093`, `REQ-DASH-094`,
+    `REQ-TEST-095`
+
+    **This sequences BEFORE sprint 11, not after sprint 25.** Sprint 11 is
+    what seven other sprints are blocked on, and it now waits on this: every
+    property the storage and decision-log design rests on is one DuckDB, a
+    single-writer file, cannot exercise. The brief is
+    `plans/running-thoughts.md` #45 in full, and it stays until the last batch
+    drafted from it is built.
+
+    **Two things here are NOT just an engine swap**, and both were settled
+    late on 2026-09-26 after the first scoper pass had already been stopped
+    mid-batch: `qa_results/` and the decision log stop being committed, and
+    the dashboard build moves inside the environment so GitHub never reaches
+    the database. That retires Thread A's "CI is the only publish path" as
+    worded, and `REQ-PIPE-005` criterion 1 is the signed requirement that
+    actually carries it.
+
+    **PART OF IT IS ALREADY BUILT, and the register does not say so yet -
+    read this before trusting either.** Overnight on 2026-09-26/27 the engine
+    switch itself was carried out under a waiver Keith gave explicitly
+    ("really push through with the Postgres change... I know it's risky
+    because I'm not reviewing the requirements"): PostgreSQL is the warehouse,
+    dbt, Soda Core and datacontract-cli all genuinely read it, the suite and
+    CI run against a real server, and the legacy combined DuckDB warehouse is
+    deleted. The full `mothman check` is green and so is CI. But
+    `REQ-PIPE-087`, `REQ-QAC-088` and `REQ-TEST-095` still read `not_started`,
+    because moving a requirement off that status requires a `signed_off`
+    record and Keith has not signed them - the waiver covered BUILDING, not
+    the record of having read them. So the gap between this sprint's counted
+    status and what the code does is the sign-off gate working, not drift.
+    Two known exceptions to "built": Evidently still reads CSVs
+    (`plans/qa-pipeline.md` item 87 - genuinely blocked), and `qa_results/` is
+    still a committed tree, so `REQ-PIPE-089` onwards is untouched.
+
+27. **[todo, 2026-09-26]** **[QA checks & contract]** **Load-time file checks,
+    and where their results go.** The small explicit set of checks that can
+    only be made on the file as delivered - encoding, delimiter, header row,
+    column order, ragged rows, duplicate headers - as a fifth tool with real
+    check ids, lifecycle metadata and authored prose, reaching the dashboard
+    as its own scope and never folded into the data checks' status.
+
+    **Owns:** `REQ-QAC-096`, `REQ-DASH-097`
+
+    Exists because the load-first decision in sprint 26 would otherwise
+    silently drop a whole class of QA: those questions are answered or
+    destroyed by loading. Keith spotted the gap himself - today a failed load
+    surfaces only in `mothman supply failures`, so the dashboard shows a
+    dataset quietly holding no data with no explanation.
+
+    **Keith's own answer on what a failure GATES, 2026-09-26**: a failed
+    load-time file check gates promotion, "possibly even QA". The second half
+    is deliberately tentative and is his to settle when this is built.
+
+28. **[todo, 2026-09-26]** **[Pipeline & publishing]** **"Inherited": a dataset
+    that does not participate in a period at all.** A view created when a
+    period schema is born, pointing at the supply that is still current, for
+    the datasets the schedule says owe nothing that period - plus inherit and
+    un-inherit as operator actions, which is what frees a withdrawal blocked
+    by a later period.
+
+    **Owns:** `REQ-PIPE-098`, `REQ-PIPE-099`, `REQ-DASH-100`
+
+    A real gap with real evidence: `delivery_months:` already subsets a
+    calendar and `not_expected_periods()` already carries a mandatory reason,
+    and the only reader of either in the whole repository is one test
+    assertion - so an annual dataset's absence from Q3 currently surfaces as
+    `missing-table`, indistinguishable from a real fault. Distinct from sprint
+    25's `substituted`, which is a person's decision about a supply that was
+    owed and never came; the word `inherited` was reserved for this
+    deliberately.
+
+    **Keith's own answer on what it points at, 2026-09-26**: inheritance
+    stands on the most recently PROMOTED supply, not the most recent arrival.
+    An arrival nobody has promoted is not yet the dataset's current truth, so
+    inheriting it would let an unchecked supply become a period's answer by
+    default.
+
 **Not in these sprints, deliberately.** Adding two more datasets and
 making the data-asset level concrete (`plans/running-thoughts.md` #23)
 is sequenced AFTER this work - it is what makes the file-architecture
 question in `plans/publishing-and-history.md` item 6 answerable, and it
 needs the model here to be real first.
+
+## Sign-off pack for sprint 26 (2026-09-27)
+
+**Status:** blocked (2026-09-27) · **Category:** Pipeline & publishing
+
+Delete this section once the three signatures are given and the two
+questions at the end are answered - it is working material for one
+conversation, not a record. What it knows that the requirements do not
+is the per-criterion audit below, which is the thing that makes signing
+cheap; move anything still live into the requirements before deleting.
+
+Written 2026-09-27, overnight. Read this instead of `requirements.yaml`
+directly - it is the sign-off presentation `CLAUDE.md` asks for, in prose
+you can react to, with an honest per-criterion account of what is already
+built underneath each one.
+
+### Why these three are still `not_started` when the code is done
+
+You waived reviewing the requirements before I built ("I know it's risky
+because I'm not reviewing the requirements, but honestly, it's all synth
+data here"). I built. But the register's `signed_off` field records a
+different fact - that you read the requirement and agreed it - and the
+validator refuses to move a requirement off `not_started` without one. I
+am not going to write your name into a field saying you read something
+you have not read.
+
+So the gap between "the code does this" and "the register says
+not_started" is the gate working, not drift. Three signatures close it.
+Everything below is the reading that makes them cheap.
+
+---
+
+### REQ-PIPE-087 - PostgreSQL is the one warehouse engine
+
+**The story.** All supply data lives in one PostgreSQL database.
+DuckDB keeps exactly one job: reading the CSV or Parquet a supplier
+sends and saying what is in it. Rows then stream into PostgreSQL over
+the connection. It is never a warehouse again.
+
+**Built, and verified by running it rather than by reading config:**
+
+- **c1** one database, none of it in a DuckDB file. This closed tonight -
+  the legacy combined `data/warehouse.duckdb` was still being written by
+  `mothman bdm generate-synthetic-data` with nothing reading it since
+  Phase 3, and `pipeline/load.py`/`orchestrate.py` are now deleted.
+- **c4** an arrival is loaded into staging before any tool runs.
+- **c5** DuckDB reads arriving files and is not a warehouse.
+- **c6** rows stream over the connection - `COPY ... FROM STDIN`, never a
+  server-side file read. This one is not just tidiness: `COPY FROM
+  '<path>'` is refused to a non-superuser, so the streaming form is what
+  works against a managed cluster at all.
+- **c10** connection details from configuration at run time, no
+  credential committed. A DSN is redacted in every error message,
+  because errors from here reach a PUBLIC repository's Actions pages.
+- **c11** dbt gets its own `dbt` schema in the same database, no attached
+  scratch database.
+
+**Partly built, and I would defer these rather than claim them:**
+
+- **c2** wants four kinds of schema - staging, rejected, one per period,
+  and a `sample` schema for data received before any supply is agreed.
+  Three exist. **`sample` does not exist at all.**
+- **c3** wants `sample` excluded from every period, slot, lateness,
+  promotion and rollup computation *by construction*. Cannot be met
+  before c2.
+- **c7** wants a vendored DuckDB extension file for formats needing one.
+  Nothing is vendored, because nothing but CSV is read yet. The reason to
+  keep the criterion is real and is in `CLAUDE.md`: this sandbox's proxy
+  allows `extensions.duckdb.org` over HTTPS only while DuckDB downloads
+  over plain HTTP, so the default path 403s - and a government network
+  may not reach the host at all.
+- **c8** wants every read, write and schema operation sent to the
+  writer endpoint. Trivially true today because there is no reader
+  endpoint, which is not the same as having declared it.
+- **c9** wants the engine's ability to move a table between schemas
+  declared as a capability, so REQ-PIPE-081's move is chosen rather than
+  attempted and caught. Not declared; nothing moves tables yet.
+- **c12** wants an unreachable database to fail loudly naming the
+  environment AND the host. It names the host. There is no environment
+  concept yet - that is REQ-PIPE-093.
+
+**What I would ask you to agree**, if you agree with the split: sign it,
+and let me record c2, c3, c7, c8, c9 and c12 as `unmet_criteria` with
+`blocked_by` pointing at sprint 11 and REQ-PIPE-093. Then the sprint
+counter tells the truth and `REQ-PIPE-087` reads `in_progress` rather
+than either lie.
+
+---
+
+### REQ-QAC-088 - every QA tool checks the warehouse, not the file
+
+**The story.** All four tools check the rows that actually landed, so two
+tools can never quietly disagree about their subject.
+
+**Built.** dbt, Soda Core and datacontract-cli all genuinely read the
+warehouse through the run's own view schema. datacontract-cli is the
+interesting one: it used to read the supplier's CSV, which made it the
+one tool answering a different question from the other three.
+
+**Not built, and genuinely blocked rather than unfinished.** Evidently
+still reads CSVs - criterion 2 and 3. The reason is worth your attention
+because the naive fix produces a false green, which is the dangerous
+direction: Evidently needs rows from three runs (current, the fixed PSI
+reference, and the previous run), and a past run's view schema is dropped
+when its run ends. So it has to find a past run's rows by their staged
+table - and once promotion exists those rows are in a period schema, not
+staging. Today everything is still in staging because nothing promotes,
+so a version written now would pass its tests, pass CI, and silently
+start comparing against the wrong baseline the day promotion lands. A
+drift check reading the wrong baseline does not fail; it reports no
+drift.
+
+It needs a "where are run X's rows now" lookup, which is promotion's
+business. Either that gets built in sprint 11 and Evidently follows, or
+this requirement accepts a narrower criterion. **That is a fork for you**,
+and it is written up at `plans/qa-pipeline.md` item 87.
+
+**One thing worth knowing that came out of this**, separately: moving
+datacontract-cli onto the warehouse made the contracts' `physicalType`
+declarations checkable for the first time in this project's life, and
+they immediately reported a real mismatch. I tried the obvious fix -
+build the staged table to the contract - and it was WRONG in an
+instructive way. Three readings for you to pick from at
+`plans/conceptual-design.md` Thread B. Nothing is blocked on it.
+
+---
+
+### REQ-TEST-095 - the suite connects to a PostgreSQL somebody else started
+
+**The story.** The tests use whatever PostgreSQL is already reachable, so
+one strategy works on a laptop, in a dev container, on a GitHub runner,
+and in a cloud session with no Docker at all.
+
+**Built:**
+
+- **c1** takes a connection string; starts nothing.
+- **c2** no connection string means a loud `pytest.UsageError` naming what
+  to set - deliberately never a silent skip, because a suite that skips
+  its warehouse tests reports green having checked nothing.
+- **c3** parallel workers isolated - one database per worker, plus a
+  throwaway scratch database per test that needs an empty one. This is
+  where I wrote and then caught a real bug of my own: the first design
+  had each such test drop every schema in the worker's shared database,
+  which destroyed the session fixtures' data. It passed 1,973 tests twice
+  when run in halves and failed six when run whole.
+- **c5, c6** CI gets a pinned `postgres:16` service container on a mapped
+  localhost port, with a health check - not the runner's preinstalled
+  server, whose version is GitHub's to change. **Verified green**: the
+  full suite on a real runner against that container.
+- **c7** no Docker anywhere in the test path.
+- **c8** documented in `README.md` and `CLAUDE.md`'s fresh-session list.
+
+**Not built:**
+
+- **c4** wants a development container supplying a pinned PostgreSQL.
+  There is no `.devcontainer/` at all. Worth doing and not done.
+- **c9** wants every test's assertions true whether or not a gitignored
+  artifact exists. Two were fixed this way on 2026-09-23; the rest of the
+  suite has not been audited against it, so I would not claim it.
+
+---
+
+### THE QUESTION THAT GATES THE REST, and I need your answer
+
+`REQ-DOCS-101` is the sweep that brings fifteen requirements into line
+with the switch. I deliberately did NOT run it tonight, because its own
+non-functional requirement says a half-done sweep is worse than none, and
+it turns on something only you can settle.
+
+Ten of those fifteen clauses say some version of *"the dashboard build
+may not access anything under `data/`"*. Your answer about the decision
+log was that the dashboard is built in the environment where the database
+IS reachable. Both of those cannot be restated as-is, so the rule has to
+be redrawn, and there is a right place to draw it:
+
+> **The build may read recorded QA results. It may never read supply
+> rows** - no staging, period, rejected or run-view schema.
+
+That keeps what the rule was actually protecting (the extract itself,
+which in a real deployment is data about real children and real births)
+and drops what was only ever a proxy for it (the fact that CI had no
+file). Stated the old way - "no live connection at all" - it would forbid
+the very design `REQ-PIPE-092` requires, and a rule that forbids the
+intended design is one somebody deletes.
+
+**I have written that line into `CLAUDE.md` already**, because a
+contradiction sitting in that file is worse than a provisional answer in
+it. But it changes what ten signed clauses mean, so it is yours to
+confirm or correct before I touch them.
+
+The second half of the same question, which I have not answered at all:
+**if GitHub Actions no longer builds the dashboard, how does the built
+artifact reach Pages?** `REQ-PIPE-092` asserts the move; nothing says the
+mechanism. That is the real remaining fork in the whole switchover, and
+`REQ-DOCS-101`'s criterion 4 cannot be written until it is settled.
+
+---
+
+### Where things actually stand
+
+- **PostgreSQL switchover: functionally complete and verified.** Full
+  `mothman check` exit 0, all eleven gates, 1,968 pytest, 351 npm. CI
+  green on a real runner with the service container. Both workflows green.
+- **Repository still holds state.** `qa_results/` is still a committed
+  tree. `qa_tools/common/qa_store.py` (the metadata schema - my call, per
+  your delegation) and `qa_results_migrate.py` both exist and are tested,
+  but nothing is wired to either, and wiring them is what forces the
+  publishing question above. So I stopped there rather than half-move it.
+- **Two things I did NOT do** and would rather you saw first: the
+  `REQ-DOCS-101` sweep, and anything that changes how the dashboard is
+  published.
 
 ## Test scenario register
 **Status:** todo (2026-09-22) · **Category:** Testing & dev tooling

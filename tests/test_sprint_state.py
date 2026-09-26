@@ -425,14 +425,31 @@ class TestTheRealFiles:
     def test_every_owned_id_exists(self):
         assert ss.unknown_requirements() == []
 
-    def test_all_twenty_five_sprints_declare_ownership(self):
+    def test_every_sprint_declares_ownership(self):
+        """Declaring nothing is a valid declaration; NOT having the line
+        at all is what this catches, since a missing line silently reads
+        as unscoped.
+
+        THE TWO COUNTS ARE COMPARED TO EACH OTHER, not to a literal.
+        This asserted `== 25` twice until 2026-09-27, when sprints 26-28
+        were added and it failed on the number rather than on anything
+        being wrong. A literal only catches a missing `**Owns:**` line
+        while the sprint count happens to match it, and says nothing at
+        all the moment a sprint is added - which is exactly when a line
+        is most likely to be forgotten.
+        """
         parsed = ss.parse_sprints()
-        assert len(parsed) == 25
-        # Declaring nothing is a valid declaration; NOT having the line
-        # at all is what this catches, since a missing line silently
-        # reads as unscoped.
         text = ss.SPRINTS_FILE.read_text()
-        assert text.count("**Owns:**") == 25
+        assert text.count("**Owns:**") == len(parsed), (
+            f"{len(parsed)} sprints but {text.count('**Owns:**')} Owns lines - "
+            f"one of them is missing its declaration and reads as unscoped")
+
+    def test_the_sprints_are_numbered_without_a_gap(self):
+        """A skipped or repeated number means one sprint's requirements
+        are attributed to another, or to nothing. The old count-literal
+        above could not see this at all."""
+        numbers = [n for n, _, _ in ss.parse_sprints()]
+        assert numbers == list(range(1, len(numbers) + 1)), numbers
 
     def test_the_counts_are_not_vacuous(self):
         """Guards the guard: if every sprint owned nothing, everything

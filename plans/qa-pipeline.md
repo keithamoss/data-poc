@@ -5339,6 +5339,37 @@ relative, not a schedule — this is weeks of work, not months.
     already covered against real committed history by this project's
     existing `TestRunWindowsAgainstRealCommittedHistory` tests).
 
+87. **[blocked, 2026-09-27]** **[QA checks & contract]** Evidently is the
+    one tool still reading the supplier's CSV rather than the warehouse -
+    the remaining half of `REQ-QAC-088` criterion 2 - and it is blocked on
+    a real question rather than on effort. Found while finishing the
+    PostgreSQL switch, and worth writing down precisely because the naive
+    version of the fix produces a FALSE GREEN, which is the dangerous
+    direction.
+
+    `qa_tools/bdm/run_evidently_bdm.py` needs rows from THREE runs, not
+    one: the current run, the fixed PSI reference run (`run_01`), and the
+    immediately preceding run for the row-count-growth check. The current
+    run is easy - its own view schema is open while it is being checked.
+    The other two are the problem. A run's view schema is transient and
+    dropped when the run ends, so a past run's rows have to be found by
+    their STAGED table - and once promotion exists (`REQ-PIPE-081`,
+    `REQ-PIPE-098`) a past run's rows are no longer in `staging` at all,
+    they are in whichever period schema they were promoted into.
+
+    Today every run happens to still be in `staging`, because nothing
+    promotes yet. So a version of this written now would pass its tests,
+    pass CI, and silently start comparing against the wrong rows - or
+    against nothing - the day promotion lands. A drift check that reads
+    the wrong baseline does not fail; it reports no drift.
+
+    What it actually needs first is a way to ask "where are run X's rows
+    now", which is promotion's business, not Evidently's. Either that
+    locator is built as part of the promotion sprints and Evidently
+    follows it, or `REQ-QAC-088` accepts a narrower criterion saying
+    Evidently compares only supplies in the same schema. Not something to
+    settle at 2am on the strength of what happens to be true today.
+
 ## Held over from the original (equivalent-only) build
 
 Lower priority — these were already documented as deliberate, honest
