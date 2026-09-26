@@ -3008,12 +3008,39 @@ Belongs with batch 5's check work.
          warehouse has FOUR kinds of schema, not three - `staging`,
          `rejected`, the period schemas, and `sample`.
 
-         **ONE ECHO TO SETTLE, not decided: does sample-data QA write to
-         `qa_results/`?** It is the same tension as this evening's
-         rehearsal-run decision, where a rehearsal is NOT offered the
-         save because `qa_results/` is what the dashboard publishes. A
-         record of check development may well be worth keeping, and it
-         must not appear in any rollup.
+         **SETTLED (Keith, 2026-09-26): SAMPLE QA IS COMMITTED TO THE
+         REPO, IN ITS OWN TOP-LEVEL TREE, AND NEVER IN `qa_results/`.**
+         Not in `qa_results/` for his own reason - "that pollutes the
+         results of actual data we expected to get through the refresh
+         process". In the repo because CHECK DEVELOPMENT IS REAL WORK:
+         when a dataset graduates you want evidence of what those checks
+         did before any real supply arrived, and more than one person
+         may work on them.
+
+         **A SEPARATE TOP-LEVEL TREE rather than a reserved scope inside
+         `qa_results/`**, mirroring that tree's own
+         agency/collection/dataset layout. The argument is the one Keith
+         had just applied to the `sample` SCHEMA, and it holds
+         identically here: a separate tree makes pollution
+         STRUCTURALLY IMPOSSIBLE, where a reserved scope would put
+         sample results inside the very tree the dashboard builds from
+         and leave every reader having to remember to skip them - the
+         flag-not-structure problem. Nothing that reads `qa_results/`
+         changes at all. It also gives the warehouse and the repo the
+         same shape: a `sample` schema over there, a sample tree over
+         here. Rejected the reserved-scope route even though its
+         machinery already exists and is proven (`_raw`,
+         `_cross-table`, and a hierarchy gate that already refuses a
+         leading underscore as a dataset id) - those are genuinely part
+         of a RUN's results, and sample QA is not. **The tree's NAME is
+         not fixed** - `qa_sample/` is this session's suggestion only,
+         and this project has been bitten by names before.
+
+         **SAMPLE RESULTS SURVIVE GRADUATION** (Keith, same
+         conversation): they stay as the record of what the checks did
+         before any real supply existed, which is what an auditor or a
+         new team member would want. Costs only space, and neither tree
+         shrinks anyway.
 
          **THE PRECEDENT KEITH NAMED IS REAL AND WORTH COPYING.**
          `contract/people.yaml` already carries `placeholder: true` for
