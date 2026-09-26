@@ -12328,3 +12328,185 @@ requirements:
         rather than assume: Thread B's staging/promotion table is now
         wrong on its quarterly row and has to be corrected, not left to
         contradict this.
+
+  - id: REQ-PIPE-076
+    title: Rejection and un-decide are a person's decisions, and automation defers to a person permanently
+    date_written: "2026-09-26"
+    story: >
+      As an operator working a quarter's supplies, I want a supply I
+      have decided against to leave the queue and stay out of it, and a
+      supply I have pulled back to come to me rather than to the next
+      automatic run, so that staging is a work list rather than a
+      graveyard and nothing I decided gets undone behind me.
+    moscow: must
+    status: not_started
+    source: >
+      Keith, plans/supply-model.md Thread B (rejected is a decision
+      state, the four-version scenario, no SUPERSEDED state) and Thread
+      E's demotion-stickiness refinement, 2026-09-21/22. Scoped by
+      delivery-scoper, batch 4, 2026-09-26.
+    signed_off:
+      by: Keith
+      date: "2026-09-26"
+    acceptance_criteria:
+      - >
+        WHEN a person rejects a supply, THE SYSTEM SHALL move it to the
+        rejected schema and SHALL record the decision.
+      - >
+        THE SYSTEM SHALL allow a supply of any status, including green,
+        to be rejected.
+      - >
+        THE SYSTEM SHALL NOT reject a supply by any automatic rule.
+      - >
+        WHEN a person rejects a supply that is currently promoted, THE
+        SYSTEM SHALL leave its slot unfilled, move the supply to the
+        rejected schema and record ONE decision, and SHALL NOT require
+        the person to demote it first.
+      - >
+        WHEN a person demotes a promoted supply back to staging, THE
+        SYSTEM SHALL leave its slot unfilled, return the supply to the
+        queue awaiting a decision, and record the decision.
+      - >
+        THE SYSTEM SHALL distinguish, among staged supplies, one nobody
+        has decided on from one a person has looked at and returned.
+      - >
+        WHERE any decision has been recorded against a supply by a
+        person, THE SYSTEM SHALL NOT promote that supply automatically
+        thereafter.
+      - >
+        THE SYSTEM SHALL leave a red supply nobody has decided on in
+        staging, and SHALL NOT move it to the rejected schema.
+      - >
+        THE SYSTEM SHALL allow a rejection to be reversed by a later
+        recorded decision, and SHALL keep both entries.
+      - >
+        THE SYSTEM SHALL hold rejected supplies in one global schema
+        rather than one per period.
+      - >
+        THE SYSTEM SHALL attach the bar on automatic promotion to the
+        SUPPLY a person decided on, and SHALL NOT extend it to the slot,
+        the period or the dataset - so a later supply carrying no
+        decision of its own remains eligible for automatic promotion
+        even into a slot a person emptied.
+      - >
+        THE SYSTEM SHALL keep that bar for the life of the supply it was
+        recorded against, and SHALL NOT clear it on a later run, on a
+        resupply, or with time.
+    non_functional_requirements:
+      - >
+        Staging and rejected only grow, and that is accepted for the PoC
+        (Keith, 2026-09-23) - recorded as a deliberate no rather than an
+        unasked question. The future question he named is not just
+        dropping data but whether QA history is kept alongside it, kept
+        after it, or dropped with it.
+      - >
+        The stickiness rule has to be checkable from the log rather than
+        from a flag, or it becomes a piece of state that can disagree
+        with the decisions it is derived from.
+      - >
+        At 30 datasets the difference between "nobody has looked" and
+        "someone looked and put it back" is the difference between a
+        queue an operator can work and one they stop trusting. This is a
+        presentation consequence as much as a data one, and REQ-
+        DASH-070's aggregated element is where it lands.
+    dependencies: [REQ-PIPE-074, REQ-PIPE-075]
+    decisions:
+      - >
+        Decided REJECTED means A PERSON DECIDED AGAINST THIS SUPPLY, not
+        "this was bad" (Thread B, 2026-09-23), and WIDENED at sign-off
+        (Keith, 2026-09-26) to carry both of the situations it actually
+        covers: a person deciding against promoting a staged supply, AND
+        a person deciding to reject one that had already been promoted.
+        Thread B defined only the first, and that definition stopped
+        being complete the moment rejecting a promoted supply became one
+        act rather than demote-then-reject. Quoting the narrow version
+        later would make the second case look like a misuse of the word
+        when it is the word working as intended. What both share, and
+        what the term really means, is that a PERSON made the call -
+        which is also why it is broader than it first reads in a third
+        way: a perfectly good supply that simply lost to a better one is
+        rejected, and nothing is mislabelled, because the log carries
+        the actual reason.
+      - >
+        Decided there is NO SUPERSEDED state, and the reason is worth
+        keeping (Keith, 2026-09-23, correcting the session). Reading the
+        four-version scenario it looks as though the third version is
+        orphaned once the fourth is promoted, and a fourth terminal
+        state was proposed to close that. It is not needed, because the
+        premise is wrong - a person always makes the call on the third
+        version. Staging drains because people drain it, not because of
+        an automatic rule, and the queue is small enough for that to
+        work.
+      - >
+        Decided a GLOBAL rejected schema, departing from Keith's own
+        operational system where rejected tables just stay in staging
+        (Thread B, 2026-09-23). The argument is not correctness - a red
+        supply never promoted already has a home - it is that staging
+        otherwise becomes a work queue and a graveyard at once, and
+        "awaiting a decision" stops being distinguishable from "decided
+        against six months ago". Keith confirmed this is a real problem
+        in his own system. Global rather than period-mirrored because
+        nothing queries rejected data, so layout follows what reads it,
+        and a supply rejected before assignment may have no slot to name
+        at all.
+      - >
+        Decided UN-DECIDE is a real operation (Keith, 2026-09-22, in his
+        own words: "I think undecide is an operation"). Demote-to-
+        staging means "put this back in the queue for someone to look at
+        again", which is genuinely different from rejecting it.
+      - >
+        Decided the stickiness rule is therefore REQUIRED rather than
+        optional, and this is the direct consequence of the line above.
+        The trap - a person demotes a green supply and the next run
+        auto-promotes it straight back - is only reachable BECAUSE
+        demote-to-staging exists. Had un-decide been answered no, demote
+        would go to rejected only, rejected is inherently sticky, and no
+        rule would have been needed.
+      - >
+        Decided the rule is "automation only ever acts on a supply no
+        human has touched", chosen over a per-supply sticky flag because
+        it needs no new state and generalises past the case that
+        motivated it - an operator's deliberate promotion into an
+        unusual period should not be second-guessed on the next run
+        either. Keith's own refinement, 2026-09-21: the DESTINATION
+        STATE carries the stickiness, so demote-to-rejected needed no
+        rule at all.
+      - >
+        Decided staging therefore holds supplies in two distinguishable
+        situations - never decided, and decided-then-undecided. They
+        look identical in the table and are not the same to an operator;
+        without showing the difference, un-decide silently loses the
+        very information it exists to capture.
+      - >
+        A PROMOTED SUPPLY IS REJECTED IN ONE ACT (Keith, 2026-09-26).
+        Rejecting something already in a period is what an operator
+        means by "this should never have gone in", and making them
+        demote first turns one intention into two entries a later reader
+        has to recognise as one act - the same argument that made a re-
+        file atomic in REQ-PIPE-074. The cost, accepted knowingly:
+        "reject" now covers two situations rather than one, refusing
+        something staged and pulling something back out of a period, so
+        Thread B's narrower definition - decided against promoting
+        something NOT currently promoted - no longer holds and should
+        not be quoted as if it did. Rejected demote-then-reject, and
+        rejected forbidding it outright, which would have left no single
+        act meaning what the operator means.
+      - >
+        STICKINESS ATTACHES TO THE SUPPLY, NOT TO THE SLOT (Keith,
+        2026-09-26). The question was first put as "does stickiness
+        lapse", which was the wrong framing and produced two options
+        that behaved identically - the real fork is what it binds to.
+        Worked case: a Q3 supply auto-promotes, a person demotes it, the
+        slot empties, and a CORRECTED resupply for Q3 arrives. Under
+        this decision that resupply carries no decision of its own, so
+        it auto-promotes on the ordinary green-or-amber rule. Rejected
+        slot-level stickiness, where any human decision would make that
+        slot wait for a person forever afterwards. THE ACCEPTED COST,
+        stated plainly because it is the reason the alternative was
+        tempting: the corrected replacement for data a person rejected
+        can reach the period schema without that person seeing it. What
+        makes it acceptable is that the resupply is genuinely a
+        different supply and is gated by its own QA; what it is NOT is
+        an oversight. Also rejected a slot-level bar that lapses once a
+        person fills the slot, as a third rule to explain for a case the
+        first two already cover.
