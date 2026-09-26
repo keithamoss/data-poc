@@ -109,6 +109,53 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-09-27"
+    summary: >
+      The warehouse is now PostgreSQL, and every QA tool checks what was
+      loaded into it rather than the file that arrived.
+    changes:
+      - category: Improved
+        items:
+          - headline: One database, and it is the one production runs
+            components: ["Pipeline & publishing"]
+            description: >
+              Staging, rejected supplies, each period and each run's views
+              now live in PostgreSQL instead of a DuckDB file. Every
+              property this design leans on is exercised by the engine a
+              real deployment would use, rather than read from
+              documentation and hoped for.
+          - headline: DuckDB now reads what arrives, and nothing else
+            components: ["Pipeline & publishing"]
+            description: >
+              It still reads the CSV or Parquet a supplier sends and works
+              out what is in it, which is the job it is best at. The rows
+              then stream into PostgreSQL. It is never a warehouse.
+          - headline: datacontract-cli checks the warehouse, not the file
+            components: ["QA checks & contract"]
+            description: >
+              It used to read the supplier's CSV directly, which made it
+              the one tool answering a different question from the other
+              three - they checked what had been loaded, it checked what
+              had been sent. Two tools could disagree about a dataset and
+              both be right. They now look at the same thing.
+      - category: Fixed
+        items:
+          - headline: A load can no longer wait forever for a lock
+            components: ["Pipeline & publishing"]
+            description: >
+              A QA tool could leave a connection open in a way that
+              blocked the next load indefinitely, with nothing in the log
+              to say why. It now gives up after thirty seconds and tells
+              you what it was waiting for.
+      - category: New
+        items:
+          - headline: You need a PostgreSQL to run this
+            components: ["Testing & dev tooling"]
+            description: >
+              There is no database file in the repository to open any
+              more, so setting this up means pointing it at a real
+              server. The README says how, including one trap worth
+              knowing: the database needs a password even locally.
   - date: "2026-09-26"
     summary: >
       Birth Registrations no longer looks like it missed three and a half

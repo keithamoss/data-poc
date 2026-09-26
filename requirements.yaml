@@ -1087,7 +1087,7 @@ requirements:
       - qa_tools/common/supply_db.py::candidates_in
       - qa_tools/common/supply_db.py::record_resolution
       - qa_tools/common/supply_db.py::drop_orphan_run_schemas
-      - qa_tools/common/supply_db.py::connect_dbt_scratch
+      - qa_tools/common/supply_db.py::connect_dbt
       - qa_tools/bdm/build_per_run_warehouses.py::build_one
       - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
     evidence:

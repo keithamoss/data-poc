@@ -106,6 +106,45 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # A REAL PostgreSQL, because the suite needs one and deliberately does
+    # not start its own (REQ-TEST-095 criterion 1): a suite that starts its
+    # own server tests a server nobody deploys.
+    #
+    # A SERVICE CONTAINER RATHER THAN THE RUNNER'S PREINSTALLED PostgreSQL,
+    # which also exists on ubuntu-latest and is the wrong choice: its
+    # version is GitHub's to change, so the day they bump the image the
+    # suite would quietly start testing a different engine than the dev
+    # container and production run. Pinning it here is what makes all
+    # three agree.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          # Real, and deliberately not a secret: it authenticates a
+          # throwaway container that exists for the length of one job and
+          # is reachable only from it. Written inline rather than pulled
+          # from GitHub secrets because a reader who finds a secrets
+          # reference reasonably assumes it guards something.
+          #
+          # It cannot be EMPTY: datacontract-cli treats an empty password
+          # as missing and refuses to run at all - see
+          # qa_tools/common/datacontract_common.py's run_against_warehouse.
+          POSTGRES_PASSWORD: ci-not-a-secret
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        # The health check is load-bearing, not boilerplate: the container
+        # is reported started before PostgreSQL accepts connections, so
+        # without it the first test races the server and fails
+        # intermittently - which is worse than failing outright, because it
+        # reads as a flake.
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MOTHMAN_TEST_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/postgres
     steps:
       - name: Checkout
         uses: actions/checkout@v4

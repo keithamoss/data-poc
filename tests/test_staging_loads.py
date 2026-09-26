@@ -25,7 +25,7 @@ _LATER = "2026-11-01T09:00:00+08:00"
 def staging(tmp_path, monkeypatch):
     # An EMPTY database on this worker's PostgreSQL, which is what a
     # fresh file used to give (REQ-TEST-095).
-    dbsupport.reset_supply_db()
+    dbsupport.use_empty_supply_db(monkeypatch)
     return tmp_path
 
 

@@ -1,44 +1,65 @@
-"""Helpers for tests that need the supply database in a known state.
+"""Give a test an EMPTY supply database without destroying anybody else's.
 
-NOT A FIXTURE MODULE and deliberately not conftest.py: these are called
-from inside existing fixtures and helper functions across two dozen test
-modules, which is a plain function call rather than a fixture
-dependency. conftest.py owns the per-worker database itself
-(REQ-TEST-095); this owns putting it back to empty.
+WHAT WENT WRONG, because the fix only makes sense against it. The first
+version of this reset the WORKER'S OWN database - dropping every schema -
+and that quietly destroyed the data the session-scoped staging fixtures
+(bdm_duckdb_dir, cp_duckdb_dir) had loaded once for the whole worker. Any
+test file that ran after one of these on the same worker then failed on
+missing tables.
 
-WHY RESETTING BEATS A DATABASE PER TEST. Creating a PostgreSQL database
-costs real time - enough that doing it for each of ~1900 tests would
-dominate the suite - while dropping the schemas the code under test
-creates is a catalogue operation and costs almost nothing. The isolation
-is the same either way, because every name this pipeline uses lives
-inside one of those schemas.
+It was invisible in the obvious way: running the suite in two halves put
+the files on different workers and everything passed, 1973 tests, twice.
+Running it whole put a reset-calling file and a staged-data-reading file on
+one worker and six tests failed. A green result is about a particular run,
+not about the code - which is this project's own standing lesson, met here
+by my own harness.
+
+SO EACH SUCH TEST GETS ITS OWN DATABASE, not a cleared version of the
+shared one. Dropped and recreated per call, which costs about a tenth of a
+second and buys isolation nothing can undo - no ordering rule to remember,
+no fixture to depend on in the right order.
 """
 from __future__ import annotations
 
+import os
+
+import psycopg
+
 from qa_tools.common import supply_db
 
-#: Schemas PostgreSQL itself owns, which must survive a reset. `public`
-#: is included because dropping it breaks extensions and search_path
-#: defaults for everything afterwards, and nothing in this project puts
-#: supply data there - the four-kinds-of-schema design is what makes that
-#: true (REQ-PIPE-087).
-_KEEP = frozenset({"information_schema", "public"})
 
+def use_empty_supply_db(monkeypatch) -> str:
+    """Point this test at an empty database of its own. Returns its DSN.
 
-def reset_supply_db() -> None:
-    """Drop every schema this pipeline creates, leaving an empty database.
-
-    Covers staging, rejected, dbt's own, every period schema and every
-    per-run view schema - found by ASKING THE CATALOGUE rather than by
-    listing the names here, so a schema kind added later is reset without
-    anybody remembering to update this.
+    Takes `monkeypatch` rather than setting the environment directly so
+    the redirection is undone when the test ends - otherwise it would
+    leak into every test after it, which is the same class of bug this
+    function exists to fix.
     """
-    conn = supply_db.connect()
-    try:
-        rows = conn.execute("SELECT schema_name FROM information_schema.schemata").fetchall()
-        for (schema,) in rows:
-            if schema in _KEEP or schema.startswith("pg_"):
-                continue
-            conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
-    finally:
-        conn.close()
+    base = os.environ.get(supply_db.SUPPLY_DSN_ENV)
+    if not base:
+        raise RuntimeError(
+            f"{supply_db.SUPPLY_DSN_ENV} is not set - conftest's supply_dsn "
+            f"fixture is autouse and should have set it")
+
+    info = psycopg.conninfo.conninfo_to_dict(base)
+    scratch = f"{info['dbname']}_scratch"
+
+    # Connected to the worker's own database in order to create the
+    # scratch one: PostgreSQL will not let a session create the database
+    # it is connected to, so this needs somewhere else to stand.
+    with psycopg.connect(base, autocommit=True) as conn:
+        # FORCE, because a previous test's leaked connection would
+        # otherwise block the drop and fail this test for something it
+        # did not do.
+        conn.execute(f'DROP DATABASE IF EXISTS "{scratch}" WITH (FORCE)')
+        conn.execute(f'CREATE DATABASE "{scratch}"')
+        # Reap a QA tool's connection left idle in a transaction - see
+        # conftest's own note for the real incident behind this.
+        conn.execute(f'ALTER DATABASE "{scratch}" '
+                     "SET idle_in_transaction_session_timeout = '15s'")
+
+    info["dbname"] = scratch
+    dsn = psycopg.conninfo.make_conninfo(**info)
+    monkeypatch.setenv(supply_db.SUPPLY_DSN_ENV, dsn)
+    return dsn

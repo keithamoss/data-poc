@@ -149,7 +149,7 @@ class TestItReachesTheCommittedFile:
         # wrong is invisible: resetting after the resolution was written
         # simply deleted it, and the test then failed reporting a missing
         # table rather than a missing setup step.
-        dbsupport.reset_supply_db()
+        dbsupport.use_empty_supply_db(monkeypatch)
         conn = supply_db.connect()
         try:
             supply_db.ensure_schemas(conn)
@@ -194,7 +194,7 @@ class TestItReachesTheCommittedFile:
         written."""
         # An EMPTY database on this worker's PostgreSQL, which is what a
         # fresh file used to give (REQ-TEST-095).
-        dbsupport.reset_supply_db()
+        dbsupport.use_empty_supply_db(monkeypatch)
         qa_results_writer._declared_reads_tables.cache_clear()
 
         qa_results_writer.write_qa_result(

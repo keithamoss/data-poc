@@ -24,14 +24,15 @@ from qa_tools.common import supply_db
 
 
 @pytest.fixture
-def db(supply_dsn):
-    """An empty supply database, on this worker's own PostgreSQL.
+def db(supply_dsn, monkeypatch):
+    """An empty supply database of this test's OWN.
 
-    `supply_dsn` is conftest's session fixture, so the environment is
-    already pointing here; what each test needs is the schemas back to
-    empty, which is what a fresh file used to provide.
+    Not a cleared version of the worker's shared one, which is what the
+    first attempt did and what silently destroyed the session-staged
+    fixtures' data for every file that ran after this one on the same
+    worker - see tests/dbsupport.py for that incident in full.
     """
-    dbsupport.reset_supply_db()
+    dbsupport.use_empty_supply_db(monkeypatch)
     conn = supply_db.connect()
     supply_db.ensure_schemas(conn)
     yield conn

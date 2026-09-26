@@ -134,7 +134,7 @@ class TestBothFilesAreStagedAndNeitherIsReadable:
     def test_neither_resolves_to_the_logical_name(self, tmp_path, monkeypatch):
         # An EMPTY database on this worker's PostgreSQL, which is what a
         # fresh file used to give (REQ-TEST-095).
-        dbsupport.reset_supply_db()
+        dbsupport.use_empty_supply_db(monkeypatch)
         conn = supply_db.connect()
         supply_db.ensure_schemas(conn)
         for ordinal in (1, 2):
@@ -156,7 +156,7 @@ class TestBothFilesAreStagedAndNeitherIsReadable:
         and the hold has nothing left to resolve WITH."""
         # An EMPTY database on this worker's PostgreSQL, which is what a
         # fresh file used to give (REQ-TEST-095).
-        dbsupport.reset_supply_db()
+        dbsupport.use_empty_supply_db(monkeypatch)
         conn = supply_db.connect()
         supply_db.ensure_schemas(conn)
         for ordinal, rows in ((1, 1), (2, 7)):

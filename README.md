@@ -233,11 +233,34 @@ tests/                         pytest smoke tests - generator and dashboard-buil
 
 ## Development
 
+This project needs a **PostgreSQL 16** to talk to (REQ-PIPE-087), and that
+is a real change to what it costs to evaluate the PoC rather than a detail:
+there is no longer a database file in the repository to open, so `uv sync
+--dev` is no longer the whole of setup.
+
+**A password is not optional, even locally.** datacontract-cli requires
+`DATACONTRACT_POSTGRES_PASSWORD` and treats an empty value as missing, so
+it refuses to run at all against a trust-authenticated database. The
+pipeline checks for this and says so rather than letting the tool fail
+obscurely.
+
 ```bash
 uv sync --dev              # installs everything, including dev tooling
 uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
                             # one-time: installs dbt_utils (see the top of this
                             # README for why a real-tool dbt build needs it)
+
+# Where the pipeline's own warehouse lives. NO DEFAULT, on purpose: there is
+# no local file to fall back to, so a default would have to name somebody's
+# database - and the one thing worse than failing to connect is connecting
+# to the wrong environment.
+export MOTHMAN_SUPPLY_DSN="postgresql://user:password@localhost:5432/supply"
+
+# Where the TEST SUITE connects. It creates a database per test worker and
+# never starts a server itself - a suite that starts its own server tests a
+# server nobody deploys. Point it at a maintenance database.
+export MOTHMAN_TEST_DSN="postgresql://user:password@localhost:5432/postgres"
+
 uv run pytest              # smoke tests - generator layer (real, seeded runs) +
                             # dashboard-builder layer (fixture-based, no slow real-tool run needed)
 uv run ruff check .        # lint - a lean rule set (real bugs: unused imports/vars,
@@ -257,9 +280,19 @@ a system-installed Python or any package installed outside `.venv`
 (Playwright's browser binary included, via `uv run playwright install
 chromium` above). This matters more than usual for this repo specifically:
 it's meant to be checked out and run by other people evaluating the PoC,
-on their own machines, not just the one it was built on — `uv sync --dev`
-plus the one-time `playwright install` should be the entire setup, with no
-implicit "also have X on your PATH already" assumptions anywhere.
+on their own machines, not just the one it was built on.
+
+**That claim used to be stronger and is now honestly weaker** (REQ-PIPE-087,
+2026-09-27). It used to read "`uv sync --dev` plus the one-time `playwright
+install` should be the entire setup, with no implicit 'also have X on your
+PATH already' assumptions anywhere". A PostgreSQL is exactly such an
+assumption, and the trade was made deliberately: a warehouse that only
+works because it is a file in the repository is not the warehouse
+production runs, so every property this design leans on was being read from
+documentation rather than exercised. What remains true is the narrower
+claim — nothing depends on a system Python, an activated `.venv`, or any
+package installed outside it; the one external dependency is a database,
+and it is named in the Development section above rather than discovered.
 
 ## On-demand checks against a file you already have
 

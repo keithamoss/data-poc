@@ -58,7 +58,7 @@ class TestAnUnrecordedTableIsUnloaded:
     def test_a_staged_table_with_no_record_is_not_a_candidate(self, tmp_path, monkeypatch, log_dir):
         # An EMPTY database on this worker's PostgreSQL, which is what a
         # fresh file used to give (REQ-TEST-095).
-        dbsupport.reset_supply_db()
+        dbsupport.use_empty_supply_db(monkeypatch)
         conn = supply_db.connect()
         supply_db.ensure_schemas(conn)
         physical = supply_db.staged_table("cp_clients", "2026-09-25T09:00:00+08:00")
