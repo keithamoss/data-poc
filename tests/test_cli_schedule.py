@@ -80,7 +80,18 @@ class TestShow:
         # cell carries. It used to count "+0800" - the offset the
         # display standard stopped printing (REQ-DASH-071 criterion 6:
         # one clock, so nothing to distinguish it from).
-        assert everything.output.count("2:00pm") > windowed.output.count("2:00pm") * 10
+        #
+        # ASSERTED AS "THE WINDOW IS GONE", not as a multiple. This used
+        # to require ten times as many rows, which was a proxy for
+        # "lots" calibrated against a daily calendar that owed 1,365
+        # slots - and it broke the day that calendar was corrected to
+        # start when the feed does, without anything being wrong. What
+        # the escape hatch actually promises is that nothing is left
+        # out, and the command already says so in words when something
+        # is.
+        assert everything.output.count("2:00pm") > windowed.output.count("2:00pm")
+        assert "not shown" in windowed.output, "the default is no longer windowed at all"
+        assert "not shown" not in everything.output, "`--all` still trimmed something"
 
     def test_the_window_says_how_much_it_left_out(self):
         """A trimmed list that does not admit it is trimmed is the same
@@ -100,11 +111,22 @@ class TestShow:
         assert "->" in result.output
 
     def test_a_daily_dataset_with_until_lists_its_periods(self):
+        """`--until` is asked for a date the calendar actually covers,
+        derived from the calendar rather than written here. It used to
+        name 2023-01-05, which stopped existing the day the daily
+        calendar was corrected to start when the feed does - a test
+        that hardcodes a date inside a config range rots the moment the
+        range moves, and says nothing true while it does."""
+        from datetime import timedelta
+
+        from qa_tools.common import schedule as schedule_mod
+
+        fourth_day = schedule_mod.calendar("daily").current.effective_from + timedelta(days=3)
         result = _runner.invoke(schedule_cli.schedule_group,
                                  ["show", "--dataset", "birth-registrations",
-                                  "--until", "2023-01-05"])
+                                  "--until", fourth_day.isoformat()])
         assert result.exit_code == 0, result.output
-        assert "2023-01-05" in result.output
+        assert fourth_day.isoformat() in result.output
 
 
 class TestCandidateDates:

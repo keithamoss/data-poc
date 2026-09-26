@@ -166,11 +166,22 @@ class TestFilingRealArrivals:
         """Criterion 11. A supply never promoted still carries where it
         was filed - "arrived three weeks late AND was bad" is what
         belongs on the record."""
-        from qa_tools.common import arrivals
+        from datetime import timedelta
 
+        from qa_tools.common import arrivals
+        from qa_tools.common import schedule as schedule_mod
+
+        # THE DATE COMES FROM THE CALENDAR, not from this file. It used
+        # to be a hardcoded 2026-02-01, which fell outside the daily
+        # calendar the day that calendar was corrected to start when the
+        # feed does - and the failure read as "a supply cannot be filed"
+        # when the truth was that the fixture described a delivery
+        # arriving before Birth Registrations existed. The rule was
+        # right; the scenario had rotted.
+        day = schedule_mod.calendar("daily").current.effective_from + timedelta(days=3)
         deliveries, receipts = self._delivery(
-            tmp_path, "bdm-drop", ["birth_registrations_2026-02-01.csv"],
-            "2026-02-01T09:00:00+08:00", 1)
+            tmp_path, "bdm-drop", [f"birth_registrations_{day.isoformat()}.csv"],
+            f"{day.isoformat()}T09:00:00+08:00", 1)
         found = arrivals.arrivals_for("civil-registration", "run_", deliveries, receipts)
         assert found, "the fixture must actually produce an arrival"
         written = filing.file_arrivals(found, filings)

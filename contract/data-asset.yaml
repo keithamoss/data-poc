@@ -171,9 +171,17 @@ calendars:
       365 authored dates a year would be absurd, and the agreement
       genuinely IS "every day". Birth Registrations' real cadence.
     versions:
-      - effective_from: "2023-01-01"
+      - effective_from: "2026-08-24"
         changelog:
-          - "2023-01-01: Initial daily calendar."
+          - "2026-08-24: Daily supply begins."
+          - "2026-09-26: Start date corrected from 2023-01-01, which predated the
+            first real supply by three and a half years. A cadence rule generates
+            periods from its own effective_from, so that gap was 1,333 owed slots
+            nothing had ever delivered against - and because 'oldest claimable
+            unfilled slot' is a real branch of the assignment rule, a supply not
+            on time for its own day filed to 2023-01-01 rather than to the day it
+            was for. Keith's call, over generating three and a half years of
+            daily history instead."
         claim_window: 4h
         cadence:
           rule: daily

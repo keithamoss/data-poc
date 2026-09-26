@@ -19,7 +19,7 @@ from datetime import date, timedelta
 import pytest
 import yaml
 
-from qa_tools.common import hierarchy, schedule
+from qa_tools.common import asset_time, hierarchy, schedule, slots
 
 
 def _clear():
@@ -96,6 +96,82 @@ class TestTheRealCalendars:
         for year in (2023, 2024, 2025, 2026):
             for month in (2, 5, 8, 11):
                 assert date(year, month, 1) in periods
+
+
+class TestTheDailyCalendarStartsWhereTheFeedDoes:
+    """A cadence rule generates periods from its own effective_from, so
+    that date is the whole of what says when the feed began.
+
+    Set too early it is not a harmless overcount. "Oldest claimable
+    unfilled slot" is one of the assignment rule's real branches, so
+    every supply that is not on time for its own current day files
+    against the earliest unfilled slot in the calendar - which, with a
+    start date years before the data, is the very first one. Measured
+    before this was fixed: the daily calendar owed 1,365 slots against
+    32 real supply days, and a supply meant for a Monday in August 2026
+    filed to 2023-01-01.
+
+    It reaches past assignment too: monotonic filling closes every slot
+    behind the newest filled one, so those 1,333 unfilled slots become
+    1,333 closed-and-unfilled obligations in REQ-DASH-070's queue the
+    moment promotion lands, and a dashboard saying Birth Registrations
+    missed 1,333 deliveries.
+    """
+
+    def _generator_first_period(self):
+        """The first day the generator actually plans a supply for.
+
+        Derived from the generator's own two constants rather than
+        restated here - the point of the test is that the calendar and
+        the generator agree, and a test carrying its own third copy of
+        the date could not detect them disagreeing.
+        """
+        from generator.anchor_date import get_anchor_date
+        from generator.generate_runs import N_DELIVERIES
+
+        return get_anchor_date() - timedelta(days=N_DELIVERIES - 1)
+
+    def test_the_calendar_starts_no_earlier_than_the_generator_supplies(self):
+        """THE GUARD THAT SURVIVES A RE-ANCHOR. Pinning ANCHOR_DATE made
+        the history deliberate rather than floating, and bumping it is
+        the documented way to refresh the fixture - at which point the
+        30 planned deliveries move forward and a calendar start left
+        behind grows a front tail of slots nothing ever supplied. The
+        failure is silent and looks like a supplier who stopped
+        delivering.
+        """
+        start = schedule.calendar("daily").current.effective_from
+        assert start <= self._generator_first_period(), (
+            "the daily calendar starts before the generator supplies anything")
+        gap = (self._generator_first_period() - start).days
+        assert gap <= 31, (
+            f"the daily calendar starts {gap} days before the first supply the "
+            f"generator plans - every unfilled slot in that gap is claimable, so "
+            f"a late supply files to the earliest of them instead of its own day. "
+            f"Bump the calendar's effective_from alongside ANCHOR_DATE.")
+
+    def test_a_late_supply_files_to_its_own_day_not_to_the_dawn_of_the_calendar(self):
+        """The consequence, asserted through the real assignment rule
+        rather than through the slot count - a count can look wrong and
+        be harmless, and this is the thing that is actually harmful."""
+        from qa_tools.common import assignment
+
+        first = self._generator_first_period()
+        due = first + timedelta(days=10)
+        all_slots = slots.slots_for_dataset("birth-registrations", until=due)
+        # Nothing filled, and a supply arriving the morning after its
+        # own slot's grace ran out. It is late, so it takes the oldest
+        # claimable unfilled slot - which must be its own recent one.
+        arrived = asset_time.wall_clock(due, "09:00") + timedelta(days=1)
+        decided = assignment.assign("birth-registrations", "a-late-supply", arrived,
+                                     all_slots, filled=frozenset())
+
+        assert decided.slot is not None
+        filed = date.fromisoformat(decided.slot)
+        assert (due - filed).days <= 31, (
+            f"a supply arriving {arrived.date()} filed to {filed}, "
+            f"{(due - filed).days} days earlier - the oldest-claimable branch is "
+            f"reaching back to the start of the calendar")
 
 
 class TestParticipation:

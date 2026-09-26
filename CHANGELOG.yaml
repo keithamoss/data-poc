@@ -109,6 +109,28 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-09-26"
+    summary: >
+      Birth Registrations no longer looks like it missed three and a half
+      years of deliveries, and a late supply is filed to the day it was
+      actually for.
+    changes:
+      - category: Fixed
+        items:
+          - headline: 1,333 deliveries that were never owed
+            components: ["Pipeline & publishing"]
+            description: >
+              The daily delivery calendar was set to start in January 2023,
+              years before Birth Registrations first supplied anything, so
+              every day in between counted as a delivery that never arrived.
+              It now starts when the feed does.
+          - headline: Late supplies land on the right day
+            components: ["Pipeline & publishing"]
+            description: >
+              Because those empty days counted as still waiting to be filled,
+              a supply arriving late was filed against the oldest of them
+              rather than the day it was for - in one case three and a half
+              years earlier.
   - date: "2026-09-25"
     summary: >
       Every date and time now reads the same way, supplies are kept in
