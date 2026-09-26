@@ -1211,7 +1211,10 @@ Rough layout:
   `<title>` rather than just the status code.
 
   **Still genuinely blocked** (re-confirmed 2026-09-19, all `403`):
-  - **`docs.getdbt.com`**, **`docs.soda.io`** - two of the three tools
+  - ~~**`docs.getdbt.com`**, **`docs.soda.io`**~~ - ALLOW-LISTED since,
+    and re-verified with a real `curl` 2026-09-26 (both 200). Kept here
+    with the account below because a `plans/*.md` entry may still refer
+    to them as blocked. They were two of the three tools
     this pipeline actually runs on. (`duckdb.org`, the third, was
     allow-listed 2026-09-25 and has moved to the reachable list below.)
     Hit 2026-09-23 when Keith asked for confirmation that dbt and Soda
@@ -1254,6 +1257,25 @@ Rough layout:
   **Now reachable** (allow-listed by Keith; kept here rather than
   deleted so a future session reading an old `plans/*.md` reference to
   "the blocked X" can see it has since been resolved):
+  - **`www.postgresql.org`**, **`docs.aws.amazon.com`**,
+    **`containers.dev`**, **`code.visualstudio.com`**,
+    **`datacontract.com`**, **`extensions.duckdb.org`** - allow-listed
+    2026-09-26 for the PostgreSQL switch (`plans/running-thoughts.md`
+    #45), all re-verified with a real `curl`. **One real gotcha on the
+    last of those**: the host is allowed over HTTPS only, and DuckDB
+    downloads extensions over PLAIN HTTP by default, so
+    `http://extensions.duckdb.org/...` still returns 403 while the
+    identical `https://` URL returns 200. Setting
+    `custom_extension_repository` to the https host does not fix it -
+    DuckDB then asks for the un-gzipped filename, which 404s. The way
+    through is to fetch the `.gz` with `curl`, decompress it, and
+    `INSTALL '/path/to/<name>.duckdb_extension'` from the local file,
+    which works and is also the answer for a government network that
+    cannot reach the host at all.
+  - **`python.testcontainers.org`** is NOT a blocked host - it returns
+    a connection failure rather than a proxy 403, so it is very likely
+    the wrong hostname rather than a policy decision. Find the real
+    one before asking for it to be allow-listed.
   - **`duckdb.org`** - the warehouse this whole pipeline runs on.
     Allow-listed by Keith 2026-09-25 and re-verified with a real `curl`
     (200). It paid for itself the same hour: `REQ-PIPE-068`'s design

@@ -2470,3 +2470,83 @@ Belongs with batch 5's check work.
     question carries the same account from the register's side, and
     `REQ-GHUB-082` should not be built until it is settled, because
     the answer changes what its criterion 18 means.
+
+    **DECIDED THE SAME EVENING (Keith, 2026-09-26): ONE ENGINE, AND IT
+    IS POSTGRESQL.** Staging, rejected and the period schemas all live
+    there - splitting them across two engines is worse than either end
+    state, since cross-engine views do not exist and `REQ-PIPE-068`
+    criterion 7 already requires one database. DuckDB KEEPS A ROLE, but
+    not as a warehouse: reading arriving deliveries in CSV, Parquet and
+    whatever else turns up. Where the PoC runs: a GitHub Dev Container
+    for development, a locally installed PostgreSQL for non-production,
+    and AWS Aurora PostgreSQL in production.
+
+    **MEASURED AGAINST A REAL POSTGRESQL 16.13 STOOD UP IN THE SESSION
+    SANDBOX, 2026-09-26**, rather than read from documentation - the
+    same preference this project already applies to dbt and Soda
+    questions. Every property the supply model leans on holds:
+
+    - `ALTER TABLE ... SET SCHEMA` is CATALOGUE-ONLY, now proven rather
+      than cited: relfilenode `16404` and `pg_relation_size`
+      `1,818,624` identical before and after moving a 50,000-row table,
+      and its index moved with it.
+    - DDL is TRANSACTIONAL: a `SET SCHEMA` inside `BEGIN`/`ROLLBACK`
+      left the table in the schema it started in.
+    - A PER-RUN SCHEMA OF VIEWS over physical tables in other schemas
+      works, and `DROP SCHEMA ... CASCADE` discards the views while the
+      physical rows survive - `REQ-PIPE-068` criteria 1, 2 and 5.
+    - CROSS-SCHEMA JOINS work, so Child Protection's cross-table checks
+      are fine.
+    - CONCURRENT WRITERS: two sessions wrote at once with no lock wait
+      and both rows landed. **DuckDB's single-writer lock is gone**,
+      which is the constraint `REQ-PIPE-068` was shaped around and the
+      reason tests pin one database per worker.
+
+    **PACKAGING, resolved for real with `uv lock` rather than
+    estimated.** All four tools have a Postgres path and NOTHING NEEDS
+    UPDATING - `dbt-core 1.12.5`, `dbt-postgres 1.11.0`,
+    `soda-core-postgres 3.5.6`, `datacontract-cli[postgres] 1.2.2`,
+    `evidently 0.7.23`. Two things worth knowing:
+
+    - **The resolution is SMALLER and cleaner: 160 packages against the
+      current lock's 190, and `pyproject.toml`'s
+      `override-dependencies = ["duckdb>=1.5"]` is NOT needed.** Both
+      follow from the same cause - that override exists only because
+      `soda-core-duckdb` declares `duckdb<1.1.0` while
+      `datacontract-cli[duckdb]` needs newer. Dropping both DuckDB
+      extras removes the conflict; plain `duckdb`, kept for file
+      reading, carries no such pin.
+    - **TWO DRIVERS, not one.** `dbt-postgres` and `soda-core-postgres`
+      use `psycopg2-binary`; `datacontract-cli[postgres]` uses
+      `psycopg` 3. They coexist - different package and import names -
+      but that is two connection-string dialects to keep straight.
+
+    **DuckDB's new role works, verified both ways.** `read_csv_auto`
+    inferred `BIGINT`/`VARCHAR`/`DATE` correctly, and the load path is
+    DuckDB to a typed frame to Postgres `COPY`, which needs no
+    extension. The `ATTACH`-to-Postgres route also works and writes a
+    CSV straight into a Postgres table with types preserved, but it
+    needs DuckDB's `postgres` extension. **That extension can be
+    installed from a LOCAL FILE** (`INSTALL '/path/to/
+    postgres_scanner.duckdb_extension'`, after `httpfs`), which is the
+    finding that matters beyond this sandbox: a government network
+    that cannot reach `extensions.duckdb.org` can still use it if the
+    extension is vendored, the same treatment `dashboard/vendor/`
+    already gives the asciinema player.
+
+    **A proxy gotcha worth recording so nobody re-diagnoses it.**
+    DuckDB downloads extensions over PLAIN HTTP by default, and this
+    session's proxy allows the host over https only - `http://
+    extensions.duckdb.org/...` returns 403 while the identical https
+    URL returns 200. Setting `custom_extension_repository` to the https
+    host does not fix it either: DuckDB then requests the UN-GZIPPED
+    filename, which 404s, where the default path requests `.gz`, which
+    exists. Hence the local-file install above.
+
+    **STILL UNVERIFIED, and the next thing to do:** no tool has
+    actually been RUN against Postgres here - the evidence above is
+    engine behaviour and dependency resolution, not a real `dbt build`,
+    `soda scan` or `datacontract test`. That is the biggest remaining
+    unknown and should come before scoping. Aurora's divergences from
+    vanilla PostgreSQL and the Dev Container PostgreSQL feature are
+    also unread; both domains are now allow-listed.
