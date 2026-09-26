@@ -2528,3 +2528,79 @@ duplicate keys by default and needs no custom loader, at the cost of a
 new dependency and a different API across those 29 sites. It is not
 installed here, so its merge-override behaviour is UNVERIFIED - worth
 testing before anyone treats it as the easy option.
+
+24. **[todo, 2026-09-26]** **[Testing & dev tooling]** The e2e module is 85% of the gate, and a third of it is deliberate sleeping - profiled, with three fixes ranked and none applied.
+
+    **Measured 2026-09-26** (Keith's own question: "anything we can
+    do to speed up the e2e tests? is running them via pytest the
+    best?"), and the whole point of the entry is that the numbers are
+    real rather than estimated - this session had been asserting "about
+    ten minutes" for the full gate all afternoon without ever timing it.
+
+    **The full `mothman check` is ~295s.** `tests/test_dashboard_e2e.py`
+    alone is 148 tests in **249.66s**, and `--dist loadfile` pins that
+    one file to a single worker, so it IS the critical path while three
+    cores idle. `npm test` is ~24s, the nine validators ~20s combined.
+    `mothman check --no-pytest` is ~42s.
+
+    **Where the 250s goes:**
+
+    - **≥63s of unconditional sleeping.** `_goto()` ends with
+      `page.wait_for_timeout(500)` and has 126 call sites - more
+      executions than that, since several are parametrised. A further
+      41 explicit `wait_for_timeout` calls add 15s.
+    - **~42s rebuilding the dashboard per test.**
+      `dashboard_html_with_ticket`,
+      `dashboard_html_with_amber_decisions` and
+      `dashboard_html_with_divergent_arrivals` are FUNCTION-scoped, so
+      each rebuilds a second HTML for every test that asks - the ~4.2s
+      setup appearing ten times in the profile.
+    - **15.86s in one test, and it is correct.** The masthead test
+      waits fifteen seconds to prove the clock does NOT tick
+      (`REQ-DASH-071`). Leave it.
+    - **9.45s** for the session build fixture, paid once.
+
+    **Three fixes, ranked by value against risk. None applied** -
+    Keith parked this 2026-09-26 to scope delivery sprint 11 first.
+
+    1. **Replace `_goto`'s fixed sleep with a real wait condition.**
+       Playwright's own docs: it "performs a range of actionability
+       checks on the elements before making actions… auto-waits for
+       all the relevant checks to pass", and web-first assertions
+       retry. A fixed sleep is simultaneously too slow locally and too
+       short on a loaded runner, which is also how time-dependent
+       flakes are born. Biggest win, lowest risk, and it makes the
+       suite more reliable rather than less.
+    2. **Widen those three fixtures to class scope.** ~42s -> ~13s.
+       Needs `tmp_path_factory` and a `pytest.MonkeyPatch.context()`,
+       since `tmp_path`/`monkeypatch` are function-scoped.
+    3. **Let the module parallelise.** Playwright's Pytest plugin
+       reference recommends xdist directly - "you can speed up the
+       overall execution time of your test suite by using
+       pytest-xdist… `pytest --numprocesses auto`". The blocker is not
+       the browser: each test already gets its own context and page.
+       It is our own session build fixture racing workers
+       (item #10 above). Biggest gain, ~150s -> ~50s on four cores,
+       and the highest risk - the fixture has to be made worker-safe
+       first.
+
+    1+2 together are ~250s -> ~160s, taking the whole gate from ~5min
+    to ~3.5. 3 could roughly halve it again.
+
+    **On the runner itself: keep pytest.** Playwright's Python docs
+    document the pytest plugin as the supported path and recommend
+    xdist for parallelism, so this project is already on the sanctioned
+    route. Switching to Playwright's JS runner would split the Python
+    suite in two and lose the fixtures that build real data from
+    committed history. The cost here is sleeps and worker pinning, both
+    fixable in place.
+
+    **Worth knowing for whoever picks this up:** `playwright.dev` was
+    blocked by this session's egress proxy and Keith allow-listed it
+    the same afternoon, so the primary source is reachable now. Note
+    `/python/docs/best-practices` 404s into the Node docs - the pages
+    that answered this were `/python/docs/test-runners` and
+    `/python/docs/actionability`. And `WebFetch` kept reporting
+    `EGRESS_BLOCKED` for it long after `curl` returned 200, exactly as
+    `CLAUDE.md`'s own standing lesson describes; the text above was
+    read with `curl`.
