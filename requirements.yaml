@@ -3851,7 +3851,21 @@ requirements:
           budget and store the same bytes in six places, which is the
           opposite of what the criterion asks for. Measured today:
           25.88 MB committed, 15.68 MB of it raw output (61%).
-        owner: REQ-PIPE-038
+        owner: >
+          nobody - re-checked 2026-09-26 and this one is DIFFERENT from
+          the other stale deferrals. REQ-PIPE-038 shipped, so the
+          payoff this waited for is collected: qa_results/ is keyed per
+          dataset and raw output is stored once without duplicating or
+          filtering it. But it got there by deciding AGAINST what this
+          criterion asks. Splitting a Child Protection scan into six
+          per-dataset invocations would multiply tool runs sixfold and
+          break every cross-table check, since a check joining two
+          tables cannot run inside a single-dataset scan - so REQ-
+          PIPE-038 records raw output once in its own `_raw` scope
+          instead. This criterion is therefore not deferred, it is
+          superseded, and it needs Keith rather than a builder: either
+          it is withdrawn or it means something narrower than it
+          says.
     decisions:
       - Decided the trigger is the DELIVERY, not the table (Keith,
         2026-09-22), which is why this requirement was revised rather
@@ -8285,15 +8299,39 @@ requirements:
         why: >-
           Describes a filing layer that does not exist yet. Nothing files a
           supply against a slot, so there is nothing to fail at.
-        owner: REQ-PIPE-062 (slot assignment), batch 3
+        owner: >
+          unowned - needs a requirement. Re-checked 2026-09-26 and the
+          blocker has SHIPPED: REQ-PIPE-062 is built, so the filing
+          layer these were waiting on exists and the original reason
+          ("there is no filing step to fail before") no longer holds.
+          They are still unmet, for a different reason - filing.py
+          NOTES a dataset with no slots and carries on where these
+          require it to FAIL for that dataset, and assign() raises
+          nothing on an empty slot list.
       - criterion: THE SYSTEM SHALL fail at filing, before QA runs for that dataset.
         why: Same filing layer - there is no filing step to fail before.
-        owner: REQ-PIPE-062 (slot assignment), batch 3
+        owner: >
+          unowned - needs a requirement. Re-checked 2026-09-26 and the
+          blocker has SHIPPED: REQ-PIPE-062 is built, so the filing
+          layer these were waiting on exists and the original reason
+          ("there is no filing step to fail before") no longer holds.
+          They are still unmet, for a different reason - filing.py
+          NOTES a dataset with no slots and carries on where these
+          require it to FAIL for that dataset, and assign() raises
+          nothing on an empty slot list.
       - criterion: >-
           THE SYSTEM SHALL scope that failure to the affected dataset, and SHALL
           NOT stop processing any other dataset.
         why: Scopes a failure that cannot occur yet.
-        owner: REQ-PIPE-062 (slot assignment), batch 3
+        owner: >
+          unowned - needs a requirement. Re-checked 2026-09-26 and the
+          blocker has SHIPPED: REQ-PIPE-062 is built, so the filing
+          layer these were waiting on exists and the original reason
+          ("there is no filing step to fail before") no longer holds.
+          They are still unmet, for a different reason - filing.py
+          NOTES a dataset with no slots and carries on where these
+          require it to FAIL for that dataset, and assign() raises
+          nothing on an empty slot list.
       - criterion: >-
           THE SYSTEM SHALL state, in that message, how many supplies are waiting
           and since when, and SHALL NOT state how many days have elapsed.
@@ -8301,13 +8339,29 @@ requirements:
           The exhausted notice says how many datasets cannot be processed and
           never what is piling up, because nothing tracks a backlog yet. Raised
           independently as post-build-review #7.
-        owner: REQ-PIPE-062 (slot assignment), batch 3
+        owner: >
+          unowned - needs a requirement. Re-checked 2026-09-26 and the
+          blocker has SHIPPED: REQ-PIPE-062 is built, so the filing
+          layer these were waiting on exists and the original reason
+          ("there is no filing step to fail before") no longer holds.
+          They are still unmet, for a different reason - filing.py
+          NOTES a dataset with no slots and carries on where these
+          require it to FAIL for that dataset, and assign() raises
+          nothing on an empty slot list.
       - criterion: >-
           WHEN a run skips a dataset because its schedule is exhausted, THE
           SYSTEM SHALL state in that run's own summary how many datasets were
           processed and how many were skipped.
         why: No run currently skips a dataset for this reason, so no summary says so.
-        owner: REQ-PIPE-062 (slot assignment), batch 3
+        owner: >
+          unowned - needs a requirement. Re-checked 2026-09-26 and the
+          blocker has SHIPPED: REQ-PIPE-062 is built, so the filing
+          layer these were waiting on exists and the original reason
+          ("there is no filing step to fail before") no longer holds.
+          They are still unmet, for a different reason - filing.py
+          NOTES a dataset with no slots and carries on where these
+          require it to FAIL for that dataset, and assign() raises
+          nothing on an empty slot list.
     source: >
       Keith, 2026-09-21, plans/supply-model.md Thread C - "exhausted
       schedule - hard failure, scoped per dataset", stronger than the
@@ -9205,7 +9259,14 @@ requirements:
           effect. Criterion 19's guard IS built, so the fragile
           derivation now fails loudly rather than silently renaming
           history.
-        owner: REQ-PIPE-069, where a delivery gets a committed identity
+        owner: >
+          the next session to pick it up - re-checked 2026-09-26 and
+          this is now ACTIONABLE. REQ-PIPE-069 is built, so a delivery
+          has the durable committed record this was waiting for. Still
+          unmet: arrivals.py line 266 derives run_id from list position
+          (`f"{run_id_prefix}{index:03d}"`) exactly as criterion 18
+          forbids. The replacement the deferral said it lacked now
+          exists.
     linked_tests:
       - tests/test_arrivals.py
       - tests/test_cli_supply.py
@@ -9855,7 +9916,13 @@ requirements:
           Building a second, different red for it here would be the
           thing that requirement exists to prevent. Flagged rather than
           quietly counted as done.
-        owner: REQ-DASH-070, this same batch
+        owner: >
+          the promotion sprint (batch 4). Re-checked 2026-09-26: naming
+          REQ-DASH-070 was WRONG, not merely imprecise - 070 is built
+          and this is no closer to met, because what it actually waits
+          on is a filing to present, and REQ-PIPE-062's filings are not
+          recorded until promotion exists. The dashboard was never the
+          blocker.
     decisions:
       - "Decided staging is a SCHEMA IN THE WAREHOUSE (Keith, 2026-09-23). Thread B said 'everything lands in staging on arrival' without saying where staging physically is, and the natural reading of 'promotion moves it into a period schema' is that staging sits somewhere else. It does not. Data is loaded as soon as it can be, checks run on it there, and the only thing not loaded is a file that cannot be read at all."
       - "Decided ONE GLOBAL staging schema rather than one mirroring slots or periods, and the REASON is recorded here because REQ-PIPE-034 records the departure from Keith's operational system without it - which is the worst combination, since a later session sees the difference, finds no argument, and corrects it back. A supply's slot is not known when it lands, and deferring that is the whole point of staging. A slot-mirrored staging schema forces the slot to be named at LOAD time. Three cases have no slot to name at all: an early supply not yet inside its claim window, a supply held because nothing is confidently claimable, and a mixed-period delivery. A mirror would need an unassigned schema alongside it, ending up with global AND mirrors. Keith's own summary on agreeing: we don't know where it should go, or indeed we need a human to make a decision."
@@ -11622,4 +11689,16 @@ requirements:
         criterion is met when something demonstrates it, not when its
         blocker's status changes - auto-clearing would manufacture
         evidence, which is the failure this project guards against
-        everywhere else.
+        everywhere else. Proved by the 2026-09-26 re-check: seven
+        deferrals had blockers that shipped and NOT ONE of them turned
+        out to be met.
+      - >
+        A REGEX OVER THE PROSE CANNOT DO THIS, which is why criterion 1
+        asks for a resolvable field rather than better parsing.
+        Demonstrated rather than argued: after the seven stale
+        deferrals were corrected on 2026-09-26, a prototype detector
+        scanning `owner` for REQ- ids still flagged all ten - because
+        the corrected text NAMES the blocker that shipped, in a
+        sentence saying it shipped. "Waiting on X" and "was waiting on
+        X, which has since landed" are indistinguishable to anything
+        reading prose.
