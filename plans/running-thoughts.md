@@ -2715,16 +2715,41 @@ Belongs with batch 5's check work.
     asked whether a Claude Code session could use one. Dev Containers
     are NOT VS Code only - the spec at containers.dev has a reference
     CLI (`@devcontainers/cli`, `devcontainer up`/`exec`) and Codespaces
-    and JetBrains implement it. But a Claude Code cloud session CANNOT
-    run one: the Docker CLI is installed and there is no daemon and no
-    socket (`dial unix /var/run/docker.sock: connect: no such file or
-    directory`, tested 2026-09-26). No containers at all.
+    and JetBrains implement it.
 
-    **WHICH RULES OUT TESTCONTAINERS**, and that is the finding that
-    matters, because it was one of the two candidates for per-worker
-    test isolation. It needs Docker, so it would work in a Dev
-    Container and on a GitHub runner and fail in the environment a
-    real share of this project's development actually happens in.
+    **A CLAUDE CODE CLOUD SESSION CANNOT RUN ONE BY DEFAULT, and the
+    reason is a POLICY boundary rather than a missing capability -
+    corrected 2026-09-26 the same evening, at Keith's own ask to verify
+    it rather than assert it.** This entry first said flatly that there
+    is no daemon and no socket, so there are no containers at all. The
+    observation was right and the inference was not.
+
+    - `docker info` fails - nothing is running.
+    - Attempting to start a daemon is refused by Claude Code's own
+      safety classifier. That is a deliberate sandbox policy, and its
+      own message says a user can permit it if they choose to.
+    - Anthropic's published docs settle it neither way. The
+      "Limitations" section of the Claude Code on the web page names
+      rate limits, time limits, repository authentication, platform
+      restrictions and IP allowlisting, and says nothing about Docker
+      or containers at all; it describes a session only as running in
+      "an isolated, Anthropic-managed VM".
+
+    So the accurate statement is: **no Docker in a default cloud
+    session, by policy** - not because the product documents it as
+    unsupported, and not something to design around as though it were
+    a permanent property.
+
+    **THE CONCLUSION SURVIVES THE CORRECTION, and it is worth being
+    clear WHY, because the reasoning changed underneath it.**
+    Testcontainers needs a Docker daemon, so it would work in a Dev
+    Container and on a GitHub runner and not in a default session
+    here. "Impossible" became "withheld by default", which is a weaker
+    claim, and a recommendation resting on it would have been weaker
+    too. It rests on better ground instead: a test strategy that uses
+    whatever Postgres is already reachable works in every one of the
+    four environments, where one that insists on starting its own
+    works in two and turns on a permission decision in the third.
 
     **The alternative is already proven here**: a natively installed
     PostgreSQL 16, started with `initdb` plus `pg_ctl` on a spare
