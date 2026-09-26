@@ -206,6 +206,33 @@ class TestCalendarIntegrity:
         errors = _run(mutate)
         assert any("not a date" in e.problem for e in errors), _messages(errors)
 
+    def test_two_period_names_that_would_share_one_schema_are_rejected(self):
+        """THE CHECK THAT LET THE HEX ENCODING GO (2026-09-27). A period's
+        schema is its name normalised, so "2026-Q3" and "2026_Q3" both
+        become period_2026_q3 - and two periods in one schema means
+        promoted data merged with nothing downstream able to notice.
+
+        This has to be caught HERE, in the calendar somebody just edited,
+        because the alternative - encoding the name so the collision is
+        impossible - cost every real schema name its legibility. It is
+        distinct from the duplicate-period check above: these are two
+        DIFFERENT authored names, so that check sees nothing wrong."""
+        def mutate(doc):
+            dates = _calendar(doc, "quarterly")["versions"][0]["dates"]
+            first = dates[0]["period"]
+            dates.append({"period": first.replace("-", "_"), "date": "2028-02-01"})
+        errors = _run(mutate)
+        assert any("would share one schema" in e.problem for e in errors), _messages(errors)
+
+    def test_a_name_differing_by_case_alone_is_rejected_too(self):
+        """The case half matters as much as the punctuation half, and is
+        easier to miss reading a diff."""
+        def mutate(doc):
+            dates = _calendar(doc, "quarterly")["versions"][0]["dates"]
+            dates.append({"period": dates[0]["period"].lower(), "date": "2028-02-01"})
+        errors = _run(mutate)
+        assert any("would share one schema" in e.problem for e in errors), _messages(errors)
+
 
 class TestDurationsAreNeverCoerced:
     @pytest.mark.parametrize("value", ["14", "14 days", "P14D", "fortnight"])

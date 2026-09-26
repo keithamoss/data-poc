@@ -50,16 +50,53 @@ class TestAPeriodNameIsNotAnIdentifier:
     "2026-Q3", "Nov-Jan window" - so it is not a SQL identifier and must
     never be pasted into one."""
 
-    @pytest.mark.parametrize("name", ["2026-Q3", "2026_Q3", "2026-08-24",
-                                       "Nov-Jan window", "FY26/27"])
-    def test_the_round_trip_is_lossless(self, name):
-        assert ps.period_of(ps.period_schema(name)) == name
+    @pytest.mark.parametrize("name,schema", [
+        ("2026-Q3", "period_2026_q3"),
+        ("2026-08-24", "period_2026_08_24"),
+        ("Nov-Jan window", "period_nov_jan_window"),
+        ("FY26/27", "period_fy26_27"),
+    ])
+    def test_the_schema_is_the_name_normalised_and_readable(self, name, schema):
+        """Asserted as literal strings rather than a round trip, because
+        being READABLE is the property that matters and a round trip
+        cannot see it. These same names used to produce
+        `period_2026_2d_51_33`, which satisfied a round-trip assertion
+        perfectly."""
+        assert ps.period_schema(name) == schema
 
-    def test_two_names_a_naive_substitution_would_collapse_stay_distinct(self):
-        """The failure worth preventing is not an error, it is a MERGE:
-        two periods sharing one schema silently combines their promoted
-        data, and nothing downstream could notice."""
-        assert ps.period_schema("2026-Q3") != ps.period_schema("2026_Q3")
+    def test_it_is_lowercase_whatever_the_name_was(self):
+        """The load-bearing half. PostgreSQL folds an unquoted identifier
+        to lower case and both dbt and Soda write these names unquoted,
+        so a surviving capital is a schema those tools cannot see - which
+        surfaces as every check in the run failing on a missing
+        relation."""
+        assert ps.period_schema("FY26/27").islower()
+
+    def test_the_period_is_recoverable_enough_to_name(self):
+        """NOT an exact inverse any more, deliberately - see
+        period_of()'s own docstring. It identifies the period to a
+        person, which is all any caller here needed; the authored name
+        lives in contract/data-asset.yaml."""
+        assert ps.period_of(ps.period_schema("2026-Q3")) == "2026_q3"
+
+    def test_two_names_that_would_share_a_schema_are_reported(self):
+        """THE GUARD THAT REPLACED THE HEX ENCODING. The failure worth
+        preventing is not an error, it is a MERGE: two periods sharing
+        one schema silently combines their promoted data and nothing
+        downstream could notice. Normalising cannot keep them apart, so
+        the collision is refused where the calendar is authored instead."""
+        assert ps.collisions_in(["2026-Q3", "2026_Q3"]) == {
+            "period_2026_q3": ["2026-Q3", "2026_Q3"]}
+
+    def test_names_that_differ_by_more_than_punctuation_are_fine(self):
+        assert ps.collisions_in(["2026-Q3", "2026-Q4", "FY26/27"]) == {}
+
+    def test_the_same_name_twice_is_not_a_collision(self):
+        """A duplicate is a different config error, caught by the
+        schedule validator's own repeated-period check. Reporting it here
+        too would send a reader looking for a second period that does not
+        exist."""
+        assert ps.collisions_in(["2026-Q3", "2026-Q3"]) == {}
 
     def test_the_empty_name_is_refused(self):
         """The only one refused. A stricter rule would be this module
@@ -69,8 +106,13 @@ class TestAPeriodNameIsNotAnIdentifier:
         with pytest.raises(ps.PeriodSchemaError):
             ps.period_schema("")
 
-    def test_an_oddly_punctuated_name_still_round_trips(self):
-        assert ps.period_of(ps.period_schema("---")) == "---"
+    def test_a_name_that_normalises_to_nothing_is_refused(self):
+        """`---` has no usable characters at all. It used to round-trip
+        as `period__2d__2d__2d_`; now there is nothing left to build a
+        name from, which is a real config error rather than a schema
+        nobody can read."""
+        with pytest.raises(ValueError):
+            ps.period_schema("---")
 
     def test_a_schema_that_is_not_a_period_schema_reads_as_none(self):
         assert ps.period_of(supply_db.STAGING_SCHEMA) is None

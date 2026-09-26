@@ -36,6 +36,8 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 
+from qa_tools.common.supply_db import normalise_ident_part
+
 
 def run_id_from_path(path: str, prefix: str = "adhoc") -> str:
     """A real, sortable, collision-resistant run_id for an ad hoc local
@@ -43,10 +45,33 @@ def run_id_from_path(path: str, prefix: str = "adhoc") -> str:
     run_id to reuse. Includes the source file/folder's own name (for a
     human skimming qa_results/ later, if --commit was used) and a real
     UTC timestamp (collision-resistant across repeat runs against the
-    same file, e.g. re-checking after a fix)."""
+    same file, e.g. re-checking after a fix).
+
+    NORMALISED HERE, because this is the one place an unsafe name can
+    enter the system (2026-09-27). Everywhere else a run id is minted
+    `run_001`-style and is a safe identifier by construction; this one
+    is built from a filename a person chose, so it can carry anything -
+    `Births Jan.csv`, an accented character, a hyphen - and the
+    timestamp format contributes an uppercase `T` and `Z` of its own.
+
+    A run id becomes a PostgreSQL schema name (supply_db.run_schema),
+    and dbt and Soda write that name into their own SQL unquoted while
+    PostgreSQL folds an unquoted identifier to lower case. So an unsafe
+    id produces a schema those tools cannot see, which surfaces as every
+    check in the run failing on a missing relation.
+
+    Normalising at the source rather than encoding at the point of use
+    is what keeps the schema name readable and exactly reversible -
+    `adhoc_births_jan_20260927t024200z`, not
+    `adhoc_births_5f_jan_...`. supply_db._ident() refuses anything
+    unsafe, so if this normalisation is ever wrong the failure is loud
+    and names this function.
+    """
     stem = os.path.splitext(os.path.basename(path.rstrip("/")))[0]
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    return f"{prefix}_{stem}_{timestamp}"
+    return normalise_ident_part(f"{prefix}_{stem}_{timestamp}")
+
+
 
 
 def copy_into(src_path: str, dest_dir: str, dest_filename: str) -> str:

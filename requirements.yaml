@@ -15320,6 +15320,51 @@ requirements:
         other sprints are blocked on, and sprint 11 waits on this.
         Nothing in the supply sprints is built, so changing
         requirements now costs requirement edits rather than code.
+      - >
+        SCHEMA NAMES ARE NORMALISED, NOT ENCODED, and the collision that
+        makes normalising unsafe is REFUSED where the names are authored
+        (Keith, 2026-09-27: "why do you need to encode the schema names
+        like that? Why don't we just rename the schemas so they're valid
+        Postgres schemas? Like use underscores rather than hyphens").
+        Recorded because the rejected approach was already built, and is
+        the one a future session would re-derive from the same premise.
+      - >
+        The premise is real: PostgreSQL folds an UNQUOTED identifier to
+        lower case, and dbt and Soda both write a schema name into their
+        own SQL unquoted, so any uppercase in a run id or period name
+        produces a schema those tools cannot see - surfacing as every
+        check in the run failing on a missing relation. The first fix
+        hex-encoded every uppercase or non-alphanumeric character, which
+        kept the name REVERSIBLE so two names differing only in case
+        could not collapse into one schema and silently merge two
+        periods' promoted data.
+      - >
+        Rejected because it bought protection against a hypothetical
+        authoring mistake by making every real name unreadable -
+        `qa_run_run_5f_001` and `period_2026_2d_51_33` are what a person
+        then reads in psql, in a log, and in every error message. The
+        merge risk it guarded is real and needs no encoding to manage:
+        refuse the collision where the names are DEFINED. Two different
+        answers for two different kinds of id, each correct for its kind.
+        A RUN ID is generated, so it is normalised at mint
+        (local_check.run_id_from_path, the one place a user-supplied
+        filename can enter) and supply_db._ident() then REFUSES anything
+        unsafe - leaving run_schema() an exact, readable identity and
+        making a future caller inventing `Run-001` fail at its source. A
+        PERIOD NAME is authored config that should stay human ("2026-Q3",
+        "FY26/27"), so it cannot be normalised at mint; it is normalised
+        at the boundary, and period_schema.collisions_in(), wired into
+        the schedule validator, refuses two names in one calendar that
+        would share a schema.
+      - >
+        What it costs, checked rather than assumed: period_of() stops
+        being an exact inverse and returns the normalised form, which its
+        own docstring now says. Nothing in the repository needed the
+        authored name back - it lives in contract/data-asset.yaml - and
+        the only real use is naming a period or an orphan schema for a
+        person to act on, which the normalised name does. All 60 run ids
+        in committed history were already safe lowercase, so there was no
+        migration.
   - id: REQ-QAC-088
     title: "Every QA tool checks what is in the warehouse, not the file that arrived"
     date_written: "2026-09-26"

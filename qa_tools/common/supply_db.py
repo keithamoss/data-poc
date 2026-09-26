@@ -137,11 +137,23 @@ REJECTED_SCHEMA = "rejected"
 #: operational cost rather than untidiness.
 RUN_SCHEMA_PREFIX = "qa_run_"
 
-#: DuckDB identifiers are quoted everywhere below, so this is not what
-#: keeps the SQL safe - it is what keeps a schema name READABLE and
-#: reversible back to the run it belongs to. A run id that cannot
-#: survive the round trip is a bug in whoever minted it.
-_SAFE_ID = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
+#: Identifiers are quoted everywhere below, so this is not what keeps
+#: the SQL safe - it is what keeps a schema or table name READABLE, and
+#: identical whether a tool writes it quoted or not.
+#:
+#: LOWERCASE, DIGITS AND UNDERSCORE ONLY, tightened 2026-09-27 from a
+#: pattern that also allowed uppercase, dots and hyphens. PostgreSQL
+#: folds an unquoted identifier to lower case, and dbt and Soda both
+#: write these names into their own SQL unquoted, so anything outside
+#: this set produces a name that exists when quoted and cannot be found
+#: when it is not. Refusing it here is the whole mechanism that lets
+#: run_schema() be a readable identity instead of a hex encoding: a name
+#: that would need encoding is now a bug reported at its source, and
+#: whoever mints one normalises first (see
+#: local_check.run_id_from_path). A period name is the deliberate
+#: exception and is normalised rather than refused, because it is
+#: authored config that should stay human - see period_schema.py.
+_SAFE_ID = re.compile(r"^[a-z0-9_]+$")
 
 
 class SupplyDbError(RuntimeError):
@@ -492,11 +504,18 @@ def _redact(dsn: str) -> str:
 
 def _ident(name: str, what: str) -> str:
     if not _SAFE_ID.match(name or ""):
-        raise SupplyDbError(f"{what} is not a usable identifier: {name!r}")
+        raise SupplyDbError(
+            f"{what} is not a usable identifier: {name!r} - only lowercase "
+            f"letters, digits and underscore, because dbt and Soda write this "
+            f"name into their own SQL unquoted and PostgreSQL folds an "
+            f"unquoted identifier to lower case. Normalise it where it is "
+            f"minted rather than encoding it here")
     # POSTGRES TRUNCATES SILENTLY past 63 bytes, so this is the one real
     # portability trap in the move off the old engine - see
     # MAX_IDENTIFIER. Checked on the encoded length rather than the
-    # character count, because the limit is bytes.
+    # character count, because the limit is bytes. (With the pattern
+    # above every character is one byte, so the two agree - the byte
+    # check stays because it is the limit PostgreSQL actually applies.)
     if len(name.encode("utf-8")) > MAX_IDENTIFIER:
         raise SupplyDbError(
             f"{what} is {len(name.encode('utf-8'))} bytes, over PostgreSQL's "
@@ -505,41 +524,77 @@ def _ident(name: str, what: str) -> str:
     return name
 
 
-def _encode_ident(value: str) -> str:
-    """A run id as a lowercase, lossless, reversible SQL identifier.
+def normalise_ident_part(value: str) -> str:
+    """Any string as a safe, lowercase identifier COMPONENT.
 
-    ENTIRELY LOWERCASE, and this is the fix for a real failure rather
-    than a style choice (REQ-PIPE-087). PostgreSQL folds an UNQUOTED
-    identifier to lower case, and while this module always quotes, dbt
-    and Soda write the schema name into their own SQL unquoted. A run id
-    carrying uppercase - every ad-hoc run id does, e.g.
-    `adhoc_..._20260926T164339Z` - therefore produced a schema those
-    tools could not see, and reported it as every check in the run
-    failing because the relation does not exist.
+    A COMPONENT rather than a whole identifier, and the name says so on
+    purpose: the result can begin with a digit, which PostgreSQL will
+    not accept unquoted on its own. Both callers prefix it - a run id
+    with `adhoc_`, a period schema with `period_` - so the letter is
+    always there by the time it is a real name. An earlier draft
+    prefixed a bare `n` to make the guarantee unconditional and that was
+    worse: `n2026_q3` is a name nobody can explain, solving a problem
+    neither caller has.
 
-    Reversible rather than simply lowercased, so two run ids differing
-    only in case cannot collide - the same reasoning period_schema's own
-    encoder already had for "2026-Q3" versus "2026_Q3".
+    Deliberately NOT reversible. The round trip is exactly what the
+    retired hex encoding was buying, at the cost of legibility, and the
+    legibility is the point.
+
+    Two different strings CAN normalise to the same component, so this
+    is only used where something else makes the result unique - here, a
+    UTC timestamp to the second. Where the inputs are AUTHORED rather
+    than generated the collision has to be refused instead, because
+    silently merging two periods' promoted data is not a legibility
+    problem: see period_schema.py.
     """
-    return "".join(c if (c.isalnum() and not c.isupper()) else f"_{ord(c):02x}_"
-                   for c in value)
-
-
-def _decode_ident(value: str) -> str:
-    return re.sub(r"_([0-9a-f]{2})_", lambda m: chr(int(m.group(1), 16)), value)
-
+    # Underscore is itself a separator here, not a kept character, which
+    # is what collapses a RUN of them: `weird--name!!.csv` would
+    # otherwise leave `weird_name__...` because the unsafe run becomes
+    # one underscore and the caller's own separator adds another. A
+    # single underscore survives unchanged, so `run_001` is untouched.
+    safe = re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
+    if not safe:
+        raise ValueError(f"nothing usable as an identifier in {value!r}")
+    return safe
 
 def run_schema(run_id: str) -> str:
-    """The view schema for one QA run."""
-    return RUN_SCHEMA_PREFIX + _encode_ident(_ident(run_id, "run id"))
+    """The view schema for one QA run - the run id, prefixed, unchanged.
+
+    NO ENCODING, and the history is worth keeping because the thing it
+    was solving is real. PostgreSQL folds an UNQUOTED identifier to
+    lower case. This module always quotes, but dbt and Soda write the
+    schema name into their own SQL unquoted, so a run id carrying
+    uppercase produced a schema those tools could not see - reported as
+    every check in the run failing because the relation does not exist,
+    which is a brutal symptom to read back to a missing capital letter.
+
+    The first fix hex-encoded every uppercase or non-alphanumeric
+    character, to keep the name reversible so two run ids differing only
+    in case could not collide. It worked and it was the wrong trade
+    (Keith, 2026-09-27: "why do you need to encode the schema names like
+    that?"). The collision it prevented was hypothetical; the cost was
+    certain and daily, because `qa_run_run_5f_001` is what a person then
+    reads in psql, in a log, and in every error message.
+
+    So the invariant moved to where the id is BORN instead.
+    `_ident()` refuses a run id that is not already a safe lowercase
+    identifier, and `local_check.run_id_from_path()` - the one place an
+    unsafe name can enter, since it builds an id from a user-supplied
+    filename - normalises before returning. Every other run id is minted
+    `run_001`-style and was always safe: all 60 in committed history
+    check out. That leaves this function an exact, readable identity,
+    and a future caller inventing `Run-001` fails loudly at the source
+    rather than quietly getting a hex-encoded schema.
+    """
+    return RUN_SCHEMA_PREFIX + _ident(run_id, "run id")
 
 
 def run_id_of(schema: str) -> str | None:
-    """The inverse, for reporting an orphan in terms a person can act
-    on. Returns None for a schema that is not a run schema at all."""
+    """The exact inverse, for reporting an orphan in terms a person can
+    act on. Returns None for a schema that is not a run schema at all."""
     if not schema.startswith(RUN_SCHEMA_PREFIX):
         return None
-    return _decode_ident(schema[len(RUN_SCHEMA_PREFIX):])
+    return schema[len(RUN_SCHEMA_PREFIX):]
 
 
 def staged_table(table: str, received_at, ordinal: int = 0) -> str:

@@ -3602,3 +3602,74 @@ Belongs with batch 5's check work.
       itself - when it runs, what it contains (the full history, since
       `REQ-PIPE-081`'s "as at T" needs it), where it lands, and the
       rule that it is regenerated rather than edited.
+
+46. **[done, 2026-09-27]** **[Pipeline & publishing]** Keith: stop encoding schema names - normalise them instead, and refuse a collision where the names are defined.
+
+    Built the same night it was raised. `qa_run_run_5f_001` is now
+    `qa_run_run_001` and `period_2026_2d_51_33` is `period_2026_q3`.
+
+    **The reasoning lives on `REQ-PIPE-087`'s own `decisions:`** - four
+    entries covering why the encoding existed, why it was the wrong
+    trade, why a run id and a period name get DIFFERENT answers, and
+    what dropping exact reversibility cost. Not repeated here, because
+    the register is the permanent artifact and two copies can disagree.
+
+    The one thing worth keeping in a plans file rather than a
+    requirement, because it is about this repo's own tooling: the
+    collision guard is `period_schema.collisions_in()`, wired into
+    `mothman check`'s `schedule` gate, and it is what made deleting the
+    encoding safe rather than merely tidier. Verified by removing the
+    guard and confirming both new tests fail.
+
+47. **[todo, 2026-09-27]** **[Pipeline & publishing]** Keith: the idle-in-transaction lock needs a ROOT-CAUSE fix, not the timeout that is there now.
+
+    His words: "make sure that stuff that addresses the lock issue is
+    robust. Like I don't want a hacky patch. I want something that
+    resolves the root cause of the transaction being idle forever.
+    Investigate further if you need to."
+
+    **What happened, and why what is there now is not enough.** A six
+    minute hang during the PostgreSQL switch: a tool left a connection
+    `idle in transaction` holding a lock, and PostgreSQL's default
+    `lock_timeout` is wait-forever, so everything behind it stopped. The
+    response was `SET lock_timeout` per connection plus a
+    database-level `idle_in_transaction_session_timeout`.
+
+    Both of those are BLAST-RADIUS LIMITERS. They turn an infinite hang
+    into a bounded error, which is worth having and is not the fix - the
+    question they do not answer is why a transaction was open with
+    nobody in it. That is a connection-lifecycle bug somewhere in our
+    own code or in how a tool is invoked, and it needs finding rather
+    than capping.
+
+    Where to look first: `SupplyConnection` is `autocommit=True`, so an
+    open transaction means something started one and did not finish it -
+    a DDL path, a `COPY`, a tool holding its own connection, or an
+    exception path that never closes. Worth reproducing deliberately and
+    reading `pg_stat_activity.state`/`xact_start` while it happens,
+    rather than reasoning about it.
+
+48. **[todo, 2026-09-27]** **[Testing & dev tooling]** Keith: a real command that takes a fresh checkout to a populated, QA'd warehouse.
+
+    His words: "when we start a new Claude code session, or indeed when
+    a human checks out the repository and starts a new dev container or
+    uses it locally, we have a way to generate the synth data and run a
+    command to populate the warehouse with something with QA checks -
+    the stuff we're doing now through tests, but doing it at startup or
+    when a human chooses to run a command, via the TUI."
+
+    Today a fresh checkout has an empty database and the only thing that
+    puts real rows in it is the test suite, as a side effect. That is
+    backwards: the tests should exercise the same path a person uses,
+    not BE the path.
+
+    Two entry points for one piece of work, and they should share an
+    implementation rather than drift: a `mothman` command a human runs
+    (and reaches from the TUI), and something that runs at session or
+    dev-container start. Related: `plans/tooling.md` #11 already scopes
+    a `.claude/settings.json` SessionStart hook for the other setup
+    steps, and this belongs with it rather than beside it.
+
+    Worth deciding when it is built: whether "populate" is idempotent
+    and cheap enough to run unconditionally at startup, or whether it
+    detects an already-populated database and does nothing.

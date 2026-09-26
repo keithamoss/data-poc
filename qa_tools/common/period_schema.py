@@ -48,9 +48,8 @@ real rule so it lights up on its own.
 """
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
-from typing import Mapping, Sequence
+from typing import Iterable, Mapping, Sequence
 
 from qa_tools.common import supply_db
 
@@ -70,30 +69,57 @@ class PeriodSchemaError(RuntimeError):
 
 
 def _encode(period_name: str) -> str:
-    """Lossless, reversible, SQL-safe, and ENTIRELY LOWERCASE.
+    """A period name as a readable, lowercase schema suffix.
 
-    Every character that is not a lowercase letter or a digit becomes
-    `_<hex>_`, so "2026-Q3" and "2026_Q3" - two names a naive
-    substitution would collapse into one schema - stay distinct.
-    Collapsing them would merge two periods' promoted data with nothing
-    to notice it.
+    LOWERCASE IS THE LOAD-BEARING PART (REQ-PIPE-087), and it is the
+    half to keep if this is ever revisited. PostgreSQL folds an UNQUOTED
+    identifier to lower case, and while this module always quotes, dbt
+    and Soda write the schema name into their own SQL unquoted. A schema
+    created as "period_2026_Q3" (quoted, so the Q survives) is then
+    invisible to those tools, and the symptom is brutal to read back to
+    a capital letter: every check in the run reporting that the relation
+    does not exist.
 
-    UPPERCASE IS ENCODED TOO, which the retired engine did not need
-    (REQ-PIPE-087). PostgreSQL folds an UNQUOTED identifier to lower
-    case: a schema created as "2026_2d_Q3" (quoted, so the Q survives)
-    is then invisible to any tool that writes the name unquoted, and dbt
-    and Soda both do. The symptom is brutal to read - every check in the
-    run reporting that the relation does not exist - so the fix is to
-    mint names that are the same quoted or not. Encoding rather than
-    lowercasing keeps "2026-Q3" and "2026-q3" distinct, which
-    lowercasing would not.
+    IT USED TO HEX-ENCODE, and that was the wrong trade (Keith,
+    2026-09-27: "why don't we just rename the schemas so they're valid
+    Postgres schemas? Like use underscores rather than hyphens").
+    Encoding every uppercase or non-alphanumeric character kept the name
+    reversible, so "2026-Q3" and "2026-q3" could not collapse into one
+    schema and silently merge two periods' promoted data. That risk is
+    real and the encoding was not the way to manage it: it bought
+    protection against a hypothetical authoring mistake by making every
+    real schema name unreadable - `period_2026_2d_51_33` is what a
+    person then sees in psql, in a log, and in every error message.
+
+    So the collision is REFUSED where the names are authored instead -
+    see collisions_in(), wired into the schedule validator. A calendar
+    declaring both "2026-Q3" and "2026-q3" is a config error with a
+    message naming both, which is a far better outcome than two schemas
+    nobody can read. `2026-Q3` is now `period_2026_q3`.
     """
-    return "".join(c if (c.isalnum() and not c.isupper()) else f"_{ord(c):02x}_"
-                   for c in period_name)
+    return supply_db.normalise_ident_part(period_name)
 
 
-def _decode(encoded: str) -> str:
-    return re.sub(r"_([0-9a-f]{2})_", lambda m: chr(int(m.group(1), 16)), encoded)
+def collisions_in(period_names: Iterable[str]) -> dict[str, list[str]]:
+    """Authored period names that would share one schema, keyed by that
+    schema - `{}` when every name is distinct.
+
+    THIS IS THE GUARD THAT REPLACED THE HEX ENCODING. Normalising is not
+    injective: "2026-Q3", "2026 q3" and "2026_Q3" all become
+    `period_2026_q3`. For a GENERATED id that is acceptable, because
+    something else makes it unique; for an AUTHORED calendar it is not,
+    because two periods sharing a schema means promoted data merged with
+    nothing to notice.
+
+    Refusing it here rather than encoding around it also puts the error
+    where a person can fix it - in the calendar they just edited, named
+    in the message - instead of at the far end of a QA run.
+    """
+    by_schema: dict[str, list[str]] = {}
+    for name in period_names:
+        by_schema.setdefault(period_schema(name), []).append(name)
+    return {schema: sorted(names) for schema, names in sorted(by_schema.items())
+            if len(set(names)) > 1}
 
 
 def period_schema(period_name: str) -> str:
@@ -114,10 +140,21 @@ def period_schema(period_name: str) -> str:
 
 
 def period_of(schema: str) -> str | None:
-    """The inverse. None for a schema that is not a period schema."""
+    """This schema's period, NORMALISED - not necessarily the authored
+    name. None for a schema that is not a period schema at all.
+
+    NO LONGER AN EXACT INVERSE, said plainly because it used to be and a
+    caller could reasonably assume it still is. `period_schema("2026-Q3")`
+    is `period_2026_q3`, and this returns `2026_q3` - close enough to
+    identify the period to a person, not the string the calendar
+    declared. Whoever needs the authored name reads it from
+    contract/data-asset.yaml, which is where it lives; nothing in this
+    repository needed the round trip, and buying it back cost every real
+    schema name its legibility (see _encode).
+    """
     if not schema.startswith(PERIOD_SCHEMA_PREFIX):
         return None
-    return _decode(schema[len(PERIOD_SCHEMA_PREFIX):])
+    return schema[len(PERIOD_SCHEMA_PREFIX):]
 
 
 def ensure_period_schema(conn, period_name: str) -> str:

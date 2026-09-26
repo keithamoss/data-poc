@@ -49,7 +49,7 @@ from pathlib import Path
 
 import yaml
 
-from qa_tools.common import asset_time, schedule
+from qa_tools.common import asset_time, period_schema, schedule
 from qa_tools.common.diff_base import diff_base
 from qa_tools.common.schemas import DataAsset
 
@@ -403,6 +403,23 @@ def _version_date_errors(scope: str, index: int, version: dict, src: Source) -> 
                 f"version {index} carries the date {day} {count} times.",
                 "Remove the duplicate - two periods due the same day cannot be told apart "
                 "by an arrival."))
+
+    # TWO NAMES, ONE SCHEMA. A period's schema is its name normalised
+    # (period_schema.py), which is not injective: "2026-Q3", "2026 q3"
+    # and "2026_Q3" all become period_2026_q3. That used to be
+    # impossible because the name was hex-encoded, and the encoding was
+    # dropped on 2026-09-27 for legibility - this check is what replaced
+    # it, and it is the reason dropping it was safe. Caught here, in the
+    # calendar somebody just edited; missed here, it merges two periods'
+    # promoted data with nothing to notice.
+    for schema, names in period_schema.collisions_in(periods).items():
+        out.append(ConfigError(
+            src.name, scope,
+            f"version {index} names {' and '.join(repr(n) for n in names)}, "
+            f"which would share one schema ({schema}).",
+            "Rename one so they differ by more than case or punctuation - two "
+            "periods in one schema means promoted data merged with nothing to "
+            "notice."))
     return out
 
 

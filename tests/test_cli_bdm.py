@@ -569,4 +569,8 @@ def test_qa_command_s3_key_flag_mode_downloads_and_runs_real_checks(monkeypatch)
     assert captured["key"] == "bdm/birth_registrations_2026-01-02.csv"
     assert captured["reference_key"] == "bdm/birth_registrations_2026-01-01.csv"
     assert captured["run_by"] == "local-check:not-persisted"
-    assert captured["run_id"].startswith("s3_birth_registrations_2026-01-02_")
+    # Hyphens become underscores (2026-09-27): a run id is a PostgreSQL
+    # schema name, and run_id_from_path normalises at mint rather than the
+    # schema being hex-encoded at the point of use. The S3 key's own date
+    # is still readable in it.
+    assert captured["run_id"].startswith("s3_birth_registrations_2026_01_02_")

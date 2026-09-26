@@ -156,6 +156,22 @@ releases:
               more, so setting this up means pointing it at a real
               server. The README says how, including one trap worth
               knowing: the database needs a password even locally.
+      - category: Improved
+        items:
+          - headline: Schema names you can actually read
+            components: ["Pipeline & publishing"]
+            description: >
+              A quarter's schema is now `period_2026_q3` rather than
+              `period_2026_2d_51_33`, and a run's is `qa_run_run_001`.
+              What you see in the database is what you would have
+              guessed.
+          - headline: Two periods can no longer share one schema by accident
+            components: ["QA checks & contract"]
+            description: >
+              A calendar naming both "2026-Q3" and "2026_Q3" is now
+              refused, naming both, when you validate the schedule.
+              Previously they were two periods whose promoted data would
+              have quietly ended up together.
   - date: "2026-09-26"
     summary: >
       Birth Registrations no longer looks like it missed three and a half

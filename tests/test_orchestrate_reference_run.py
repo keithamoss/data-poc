@@ -76,7 +76,14 @@ def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypat
 
     # An arrival record's own shape (REQ-GEN-043) - `csv_path` is the
     # real file inside the delivery, not a name built from the run_id.
-    entry = {"run_id": "run_05_2099-01-05",
+    # NO HYPHEN IN THE RUN ID (2026-09-27). It used to read
+    # "run_05_2099-01-05", which nothing in this system actually mints -
+    # a real run id is `run_005` - and supply_db now REFUSES a run id
+    # that is not a usable identifier, because it becomes a PostgreSQL
+    # schema name and dbt and Soda write that name unquoted. The date
+    # here was flavour; the property this fixture needs is that the run
+    # id is unrelated to csv_path, which still holds.
+    entry = {"run_id": "run_005",
              "csv_path": "/x/2099-01-drop/birth_registrations_2099-01-05.csv"}
     # A reference deliberately different from run_evidently_bdm's own
     # hardcoded REFERENCE_RUN_ID default - the whole point being that
@@ -107,7 +114,7 @@ def test_cp_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatc
     # run's view schema on it (REQ-PIPE-068).
     monkeypatch.setattr(orchestrate_cp.supply_db, "connect", lambda *a, **k: _FakeConn())
 
-    entry = {"run_id": "cp_run_05_2099-02-02"}
+    entry = {"run_id": "cp_run_005"}  # see the BDM fixture above on the hyphen
     orchestrate_cp._run_one(entry, "2099-02-02T00:00:00Z", "test@example.com", "cp_run_01_2099-01-01")
 
     assert captured["reference_run_id"] == "cp_run_01_2099-01-01"
