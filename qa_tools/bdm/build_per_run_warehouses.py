@@ -27,7 +27,8 @@ scratch file.
 from __future__ import annotations
 import os
 
-from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
+from qa_tools.common.csv_io import (DUCKDB_NULLSTR, load_null_values_by_column,
+                                    load_physical_types_by_column, read_csv_explicit_nulls)
 from qa_tools.common import arrivals, asset_time, load_log, supply_db
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -109,7 +110,8 @@ def build_one(run_id: str, csv_path: str, run_date: str, dsn: str | None = None,
                 # the storage are two engines.
                 supply_db.load_csv_into(
                     conn, supply_db.STAGING_SCHEMA, physical,
-                    staging_csv, DUCKDB_NULLSTR)
+                    staging_csv, DUCKDB_NULLSTR,
+                    column_types=load_physical_types_by_column(contract_path).get(TABLE, {}))
             finally:
                 os.remove(staging_csv)
             # CREATE OR REPLACE on the PHYSICAL name above is not the

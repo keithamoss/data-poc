@@ -337,7 +337,8 @@ def _pg_type(duck_type: str) -> str:
 
 
 def load_csv_into(conn: SupplyConnection, schema: str, table: str,
-                  csv_path: str | os.PathLike, nullstr: str) -> int:
+                  csv_path: str | os.PathLike, nullstr: str,
+                  column_types: Mapping[str, str] | None = None) -> int:
     """Read a CSV with DuckDB and land it in PostgreSQL. Returns the row count.
 
     REPLACES WHAT IS THERE, which is not the overwrite this design
@@ -368,8 +369,14 @@ def load_csv_into(conn: SupplyConnection, schema: str, table: str,
             "CREATE TEMP TABLE arriving AS "
             "SELECT * FROM read_csv_auto(?, header=true, nullstr=?)",
             [str(csv_path), nullstr])
-        columns = [(name, _pg_type(dtype)) for name, dtype, *_ in
-                   duck.execute("DESCRIBE arriving").fetchall()]
+        # THE CONTRACT WINS OVER INFERENCE where it declares a type.
+        # DuckDB's inference says what the FILE happens to contain; the
+        # contract says what the column IS. Building the table to the
+        # contract is what makes datacontract-cli's physicalType checks
+        # mean something - see csv_io.load_physical_types_by_column().
+        declared = dict(column_types or {})
+        columns = [(name, declared.get(name) or _pg_type(dtype))
+                   for name, dtype, *_ in duck.execute("DESCRIBE arriving").fetchall()]
         if not columns:
             raise SupplyDbError(f"{csv_path} produced no columns")
         ddl = ", ".join(f'"{name}" {dtype}' for name, dtype in columns)
