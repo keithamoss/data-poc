@@ -12076,6 +12076,42 @@ requirements:
         and may never change or vanish, which is a diff against the
         previous commit rather than a parse of a file's interior.
     dependencies: [REQ-PIPE-062, REQ-PIPE-034]
+    open_questions:
+      - >
+        WHETHER THE LOG LIVES IN THE REPOSITORY OR IN THE WAREHOUSE
+        DATABASE IS REOPENED (Keith, 2026-09-26, stepping back from a
+        narrower question about a stale terminal clone). Criterion 11
+        says commit it and do not hold it only in the warehouse, and
+        that was settled against GITHUB ISSUES being editable rather
+        than against a database, which is a different comparison. In
+        production the warehouse is PostgreSQL, and a database gives
+        one serialisation point and a transaction - so judging a
+        decision permissible and appending it become a single atomic
+        act, which is exactly what REQ-GHUB-082's own open question
+        cannot achieve over a git-propagated file. It would also
+        collapse REQ-PIPE-075 criterion 9's ordering rule (write the
+        entry only after the tables are durably present) into one
+        transaction, since the log and the tables would share a
+        database. WHAT IS ALREADY SETTLED ABOUT IT, from the same
+        conversation: the never-touch-data rule is UNCHANGED, so the
+        dashboard build still reads committed files alone and a
+        database log would have to be exported to them by whatever
+        writes it - the dataset_stats.json pattern, compute where the
+        connection legitimately is and commit the conclusion. Note
+        that export needs stating against criterion 1's "no second
+        record", which was aimed at issues-plus-log rather than at a
+        machine-written derived view, or someone will read it as a
+        violation. There must be NO INBOUND CONNECTION from GitHub to
+        the database, but the environment DOES have outbound access,
+        so the GitHub route inverts: something inside polls the ticket
+        and applies the decision, rather than a workflow applying it.
+        SEQUENCING, Keith's own call: bring PostgreSQL into the PoC
+        first (plans/running-thoughts.md #45), then decide this
+        against something real rather than by reasoning - every
+        property the choice rests on is one DuckDB, a single-writer
+        file, cannot exercise. Nothing in the supply sprints is built,
+        so the cost of changing later is requirement edits rather than
+        code.
     decisions:
       - >
         Decided the committed log is the SYSTEM OF RECORD and any input
@@ -13718,10 +13754,10 @@ requirements:
         the run's own flow as well, through the same implementation the
         standing queue uses.
       - >
-        THE SYSTEM SHALL show, on either route, the filing state that
-        every recorded decision resolves to, whichever route recorded
-        each of them, and SHALL NOT let a route show only the decisions
-        raised through itself.
+        THE SYSTEM SHALL let a person in the TUI find the filing state
+        that every recorded decision resolves to, whichever route
+        recorded each of them, and SHALL NOT show only the decisions
+        raised through the terminal.
       - >
         WHERE a route is looking at a copy of the log that is not
         current, THE SYSTEM SHALL say so rather than presenting a stale
@@ -13737,11 +13773,14 @@ requirements:
         route that raised it, SHALL name the recorded decision that
         makes it impermissible, and SHALL NOT append an entry.
       - >
-        WHERE a decision raised on GitHub is refused for ANY reason -
-        an unidentified actor, one outside the allowlist, a missing
-        reason, a rule that forbids it - or fails for any other reason,
-        THE SYSTEM SHALL post that reason as a comment on the ticket
-        that raised it, and SHALL NOT fail silently.
+        WHERE a decision is refused for ANY reason - an unidentified
+        actor, one outside the allowlist, a missing reason, a rule that
+        forbids it - or fails for any other reason, THE SYSTEM SHALL
+        tell the person who raised it why, on the route they raised it
+        on, and SHALL NOT fail silently.
+      - >
+        WHERE that decision was raised on GitHub, THE SYSTEM SHALL
+        give that reason as a comment on the ticket that raised it.
       - >
         THE SYSTEM SHALL apply that same judgement on both routes, from
         the one implementation, and SHALL NOT let either route permit
@@ -13761,8 +13800,8 @@ requirements:
       - >
         THE SYSTEM SHALL require a GitHub username on every person in
         contract/people.yaml who is not marked as a placeholder, SHALL
-        gate that in CI, and SHALL NOT let a placeholder entry act or
-        be assigned.
+        gate that in CI, and SHALL NOT let a placeholder entry raise a
+        decision or be assigned a GitHub ticket.
       - >
         THE SYSTEM SHALL have the TUI write its decision to the
         committed log alone, and SHALL NOT have it call GitHub, so that
@@ -13784,7 +13823,7 @@ requirements:
         closed.
       - >
         COMPATIBILITY: the TUI route is the only one that works with no
-        network and no GitHub reachability, and criterion 26 is what
+        network and no GitHub reachability, and criterion 27 is what
         keeps that true now that a TUI decision has to reach the ticket
         - the TUI writes the log and nothing else, and a workflow posts
         the comment when the log is pushed. Had the TUI called GitHub
@@ -13811,6 +13850,29 @@ requirements:
         same one-time-setup shape as playwright install chromium, and
         worth documenting where the other one is.
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-076, REQ-GHUB-027]
+    open_questions:
+      - >
+        WHERE criterion 18's "the instant its entry is appended" falls
+        for a TUI decision is NOT settled, and it is the heart of the
+        race this requirement otherwise closes. On GitHub the answer is
+        exact - something inside the environment applies the decision
+        against the current shared log. In the terminal, criterion 27
+        has the TUI write locally and criterion 17 concedes the clone
+        may be stale, so a decision can be permissible when taken and
+        impermissible when it lands. Decision 12 rules out settling it
+        by last-wins, which is for decisions that are each permissible.
+        FOUR OPTIONS WERE PUT TO KEITH AND NONE CHOSEN, because he
+        stepped back to a better question: pending-until-it-lands, so
+        the entry is written and judged only on arrival; judge locally
+        and void on arrival against a recorded precondition; refuse to
+        decide on a stale clone at all; or accept, detect and report.
+        SUPERSEDED IN PRIORITY by the decision-log-in-a-database
+        question (Keith, 2026-09-26) - a database has one serialisation
+        point and a transaction, so this ambiguity does not arise
+        there. See REQ-PIPE-074's own open question and
+        plans/running-thoughts.md #45. This requirement should not be
+        built until that is settled, because the answer changes what
+        criterion 18 means.
     decisions:
       - >
         NEITHER ROUTE IS PRIMARY - BOTH ARE FIRST-CLASS AND BOTH ARE
@@ -13947,7 +14009,15 @@ requirements:
         the same log entry whichever route raised it - and this is the
         READ side, which nothing had stated: a person in the terminal
         must see the decision a colleague took on a ticket, and the
-        ticket must show the decision taken in the terminal. It follows
+        ticket must carry the decision taken in the terminal. NARROWED 2026-09-26
+        (Keith): the two sides are not symmetrical in FORM. The terminal
+        is where a person goes to find out what the filing state now
+        is, so criterion 16 is a TUI capability. The ticket does not
+        have to render that state - its side of the bargain is
+        criterion 7's outcome comment, an event as it happens. Rejected
+        maintaining a current-state comment on the ticket, which is a
+        second rendering of the log to keep correct for no reader who
+        cannot get it from the terminal. It follows
         from the single append-only log rather than needing any
         synchronisation, which is the point of REQ-PIPE-074 criterion 1
         and of criterion 6 here. WHAT "VISIBLE" HONESTLY MEANS, and why
@@ -13984,7 +14054,7 @@ requirements:
         say, chiefly criterion 8's supersede confirmation and
         REQ-PIPE-075 criteria 4 and 10 - because a second enumeration
         would be a second source of truth for the same rules. Note the
-        distinction criterion 22 draws, which is the one most easily got
+        distinction criterion 23 draws, which is the one most easily got
         wrong: promoting a supply already promoted into the same slot is
         a NO-OP, not a refusal (REQ-PIPE-075 criterion 10 says change
         nothing and add no entry), and reporting it as an error would
@@ -14062,7 +14132,7 @@ requirements:
         is that the two routes identify a person by different keys:
         GitHub authenticates a HANDLE, and the terminal has
         git_identity.py's run_by, a git config user.email. So
-        criterion 25's "everyone who may act needs a GitHub username"
+        criterion 26's "everyone who may act needs a GitHub username"
         looks wrong for a terminal-only operator, especially under NFR
         2's premise that the terminal must work where GitHub is not
         reachable. IT IS NOT WRONG, and criterion 3 is why: neither

@@ -2420,3 +2420,53 @@ Belongs with batch 5's check work.
     design leans on DuckDB behaviour - the single-writer lock, the
     view-over-physical-tables resolution, schema-per-period itself -
     is currently unverified against the engine it will actually meet.
+
+    **THE SCOPE GREW THE SAME EVENING, and this item is now a
+    PREREQUISITE rather than a nice-to-have (Keith, 2026-09-26).** It
+    was raised over one engine difference in a demotion. Hours later,
+    working through how a filing decision taken in a terminal reaches
+    a shared log, he stepped back and asked the bigger question: in
+    production the changes land in a real PostgreSQL database, so
+    **should the decision log live in the database rather than in the
+    repository?**
+
+    Why that question is not idle. `REQ-GHUB-082` had reached an
+    ambiguity nothing could close: its criterion 18 judges a decision
+    permissible "at the instant its entry is appended", which is exact
+    for a server-side write and undefined for a terminal appending to
+    a possibly-stale clone that is pushed later. Four workarounds were
+    drafted - pending-until-it-lands, judge-and-void-on-arrival,
+    refuse-on-a-stale-clone, accept-and-detect - and every one of them
+    is a way of coping with the absence of a serialisation point. A
+    database has one, plus a transaction, so the ambiguity does not
+    arise there. It would also collapse `REQ-PIPE-075` criterion 9's
+    ordering rule into a single transaction, since the log and the
+    tables would share a database.
+
+    **Three things Keith settled about it straight away**, recorded so
+    they are not re-asked:
+
+    - **The never-touch-data rule is UNCHANGED.** The dashboard build
+      still reads committed files alone. A database log would have to
+      be exported to committed files by whatever writes it - the
+      `dataset_stats.json` pattern, compute where the connection
+      legitimately is and commit the conclusion.
+    - **No inbound connection from GitHub to the database, ever - but
+      the environment DOES have outbound access.** So the GitHub route
+      inverts: something inside the secure environment polls the
+      ticket and applies the decision, rather than a workflow reaching
+      in. Posting the outcome comment back is outbound too, so it is
+      the same channel.
+    - **Sequencing: this item FIRST, then the design change.** His own
+      call, over changing the requirements now. Every property the
+      choice rests on is one DuckDB - a single-writer file - cannot
+      exercise, so deciding now would be reasoning where experiment is
+      available. Nothing in the supply sprints is built, so changing
+      later costs requirement edits rather than code.
+
+    **What that costs on the schedule, stated plainly rather than
+    discovered:** sprint 11 is what seven other sprints are blocked
+    on, and sprint 11 now waits on this. `REQ-PIPE-074`'s own open
+    question carries the same account from the register's side, and
+    `REQ-GHUB-082` should not be built until it is settled, because
+    the answer changes what its criterion 18 means.
