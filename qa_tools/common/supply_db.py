@@ -337,8 +337,7 @@ def _pg_type(duck_type: str) -> str:
 
 
 def load_csv_into(conn: SupplyConnection, schema: str, table: str,
-                  csv_path: str | os.PathLike, nullstr: str,
-                  column_types: Mapping[str, str] | None = None) -> int:
+                  csv_path: str | os.PathLike, nullstr: str) -> int:
     """Read a CSV with DuckDB and land it in PostgreSQL. Returns the row count.
 
     REPLACES WHAT IS THERE, which is not the overwrite this design
@@ -369,14 +368,18 @@ def load_csv_into(conn: SupplyConnection, schema: str, table: str,
             "CREATE TEMP TABLE arriving AS "
             "SELECT * FROM read_csv_auto(?, header=true, nullstr=?)",
             [str(csv_path), nullstr])
-        # THE CONTRACT WINS OVER INFERENCE where it declares a type.
-        # DuckDB's inference says what the FILE happens to contain; the
-        # contract says what the column IS. Building the table to the
-        # contract is what makes datacontract-cli's physicalType checks
-        # mean something - see csv_io.load_physical_types_by_column().
-        declared = dict(column_types or {})
-        columns = [(name, declared.get(name) or _pg_type(dtype))
-                   for name, dtype, *_ in duck.execute("DESCRIBE arriving").fetchall()]
+        # INFERRED FROM THE FILE, deliberately, and this was tried the
+        # other way first. Building the staged table to the contract's
+        # own `physicalType` declarations looked more correct - the
+        # contract is the source of truth for schema - and it is wrong
+        # here for a reason worth keeping: dirty data that violates a
+        # declared length then fails to LOAD, so a dataset reports "no
+        # table" instead of "these values are too long". That converts
+        # rich information into poverty, which is the opposite of what a
+        # QA pipeline is for. The checks report the discrepancy; the
+        # loader takes what arrived.
+        columns = [(name, _pg_type(dtype)) for name, dtype, *_ in
+                   duck.execute("DESCRIBE arriving").fetchall()]
         if not columns:
             raise SupplyDbError(f"{csv_path} produced no columns")
         ddl = ", ".join(f'"{name}" {dtype}' for name, dtype in columns)
@@ -502,9 +505,33 @@ def _ident(name: str, what: str) -> str:
     return name
 
 
+def _encode_ident(value: str) -> str:
+    """A run id as a lowercase, lossless, reversible SQL identifier.
+
+    ENTIRELY LOWERCASE, and this is the fix for a real failure rather
+    than a style choice (REQ-PIPE-087). PostgreSQL folds an UNQUOTED
+    identifier to lower case, and while this module always quotes, dbt
+    and Soda write the schema name into their own SQL unquoted. A run id
+    carrying uppercase - every ad-hoc run id does, e.g.
+    `adhoc_..._20260926T164339Z` - therefore produced a schema those
+    tools could not see, and reported it as every check in the run
+    failing because the relation does not exist.
+
+    Reversible rather than simply lowercased, so two run ids differing
+    only in case cannot collide - the same reasoning period_schema's own
+    encoder already had for "2026-Q3" versus "2026_Q3".
+    """
+    return "".join(c if (c.isalnum() and not c.isupper()) else f"_{ord(c):02x}_"
+                   for c in value)
+
+
+def _decode_ident(value: str) -> str:
+    return re.sub(r"_([0-9a-f]{2})_", lambda m: chr(int(m.group(1), 16)), value)
+
+
 def run_schema(run_id: str) -> str:
     """The view schema for one QA run."""
-    return RUN_SCHEMA_PREFIX + _ident(run_id, "run id").replace(".", "_").replace("-", "_")
+    return RUN_SCHEMA_PREFIX + _encode_ident(_ident(run_id, "run id"))
 
 
 def run_id_of(schema: str) -> str | None:
@@ -512,7 +539,7 @@ def run_id_of(schema: str) -> str | None:
     on. Returns None for a schema that is not a run schema at all."""
     if not schema.startswith(RUN_SCHEMA_PREFIX):
         return None
-    return schema[len(RUN_SCHEMA_PREFIX):]
+    return _decode_ident(schema[len(RUN_SCHEMA_PREFIX):])
 
 
 def staged_table(table: str, received_at, ordinal: int = 0) -> str:

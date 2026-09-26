@@ -78,39 +78,3 @@ def read_csv_explicit_nulls(path: str, extra_null_values: dict[str, list[str]] |
     columns = list(pd.read_csv(path, nrows=0, **kwargs).columns)
     na_values = {col: [""] + extra_null_values.get(col, []) for col in columns}
     return pd.read_csv(path, keep_default_na=False, na_values=na_values, **kwargs)
-
-
-def load_physical_types_by_column(contract_path: str) -> dict[str, dict[str, str]]:
-    """table name -> column name -> the contract's declared `physicalType`.
-
-    WHY THE LOADER NEEDS THIS (REQ-QAC-088). Until the warehouse became
-    PostgreSQL, datacontract-cli read the supplier's CSV, and a CSV has no
-    physical types at all - so the contract's own `physicalType:`
-    declarations were checked against nothing. Reading the warehouse makes
-    them real checks, and they immediately reported the truth: the
-    contract says varchar(20) and the staged table had unbounded
-    character varying, because its columns came from DuckDB's inference
-    rather than from the contract.
-
-    The contract is the source of truth for schema, so the staged table is
-    built to it. That also gives the physical-type check something
-    meaningful to say: a supplier sending a value too long for a declared
-    column is a real contract breach, and it now surfaces as a failed load
-    with a reason rather than as data silently widening the warehouse.
-
-    A column the contract does not mention is not an error here - it falls
-    back to inference, because a supplier adding a column is a schema
-    check's business, not a loader's.
-    """
-    with open(contract_path) as f:
-        contract = yaml.safe_load(f)
-    out: dict[str, dict[str, str]] = {}
-    for table in contract.get("schema", []):
-        columns = {}
-        for prop in table.get("properties", []):
-            declared = prop.get("physicalType")
-            if declared:
-                columns[prop["name"]] = declared
-        if columns:
-            out[table["name"]] = columns
-    return out

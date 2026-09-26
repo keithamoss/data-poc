@@ -162,7 +162,8 @@ def _table_for_test(node: dict) -> str | None:
     return table if table in cp_common.TABLES else None
 
 
-def _failing_sample_keys(conn, test_name: str, column: str, table: str, node: dict, status: str) -> list[str]:
+def _failing_sample_keys(conn, test_name: str, column: str, table: str, node: dict,
+                          status: str, built: frozenset[str] = frozenset()) -> list[str]:
     """Up to 5 example failing rows' own primary keys, via dbt's
     --store-failures audit table (see dbt_common.py) - identifiers only,
     never full row content, per plans/qa-pipeline.md #15. `relationships`
@@ -178,6 +179,13 @@ def _failing_sample_keys(conn, test_name: str, column: str, table: str, node: di
         return []
     pk_column = cp_common.TABLE_PK[table]
     model = f"stg_{table}"
+    # NO MODEL, NO SAMPLE. A logical name with no view - two staged
+    # tables claiming it, or nothing arrived - has no staging model, so
+    # any query naming it raises. A missing sample is a small loss; a
+    # raised exception here abandons the whole run's results, which is
+    # the opposite of what a QA pipeline is for (REQ-PIPE-087).
+    if built and model not in built:
+        return []
     if (test_name in ("not_null", "accepted_range")
             or test_name in cp_common.BUSINESS_RULE_HOME_TABLE):
         # not_null/accepted_range's audit tables keep every column
@@ -244,7 +252,25 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
 
     # Unqualified names resolve to dbt's own schema - see connect_dbt().
     conn = supply_db.connect_dbt()
-    n_total_by_table = {t: conn.execute(f"SELECT COUNT(*) FROM stg_{t}").fetchone()[0] for t in cp_common.TABLES}
+    # AN ABSENT STAGING MODEL IS A LEGITIMATE STATE, not a reason to
+    # abandon the run. A logical name has no view where two staged
+    # tables claim it (REQ-PIPE-059's held supply) or where nothing
+    # arrived, so dbt cannot build that table's staging model - and the
+    # OTHER five tables' results are still real and still wanted. The
+    # unguarded version raised UndefinedTable and took the whole run
+    # down, turning one ambiguous table into no results at all, which is
+    # the opposite of what a QA pipeline is for.
+    #
+    # Asked of the catalogue in one query rather than by try/except per
+    # table, because a failed statement inside a transaction would have
+    # to be recovered from as well as caught.
+    built = {row[0] for row in conn.execute(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = ?",
+        [supply_db.DBT_SCHEMA]).fetchall()}
+    n_total_by_table = {
+        t: (conn.execute(f"SELECT COUNT(*) FROM stg_{t}").fetchone()[0]
+            if f"stg_{t}" in built else None)
+        for t in cp_common.TABLES}
 
     results = []
     for r in run_results["results"]:
@@ -265,7 +291,17 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
         fail_t = parse_threshold(config.get("error_if"))
 
         relation_name = node.get("relation_name")
-        if test_name in _AUDIT_AGGREGATE_SQL and relation_name and status != "error":
+        # A SKIPPED TEST HAS NO AUDIT TABLE, and `status != "error"` does
+        # not cover it. Where a table has no staging model - two staged
+        # tables claiming one logical name, or nothing arrived - dbt
+        # SKIPS its tests, so --store-failures never creates their audit
+        # tables. Their names are still in the manifest, which is why
+        # reading relation_name and querying it looked safe: the manifest
+        # describes what WOULD run, not what did. Querying one abandoned
+        # the whole run over a table that was legitimately absent.
+        model_built = table is None or f"stg_{table}" in built
+        if (test_name in _AUDIT_AGGREGATE_SQL and relation_name
+                and status not in ("error", "skipped") and model_built):
             sql = _AUDIT_AGGREGATE_SQL[test_name].format(relation=relation_name)
             # int(), and this is load-bearing rather than defensive.
             # PostgreSQL's SUM() over a bigint returns NUMERIC, which
@@ -290,7 +326,8 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
                 # run_dbt_bdm.py's own mechanism already needed).
                 status = "fail" if verified_count > 0 else "pass"
 
-        failing_sample_keys = _failing_sample_keys(conn, test_name, column, table, node, status)
+        failing_sample_keys = _failing_sample_keys(
+            conn, test_name, column, table, node, status, built=frozenset(built))
 
         # Model+column are None for a singular test (no test_metadata,
         # and schema.yml's own tests: block has no model association -

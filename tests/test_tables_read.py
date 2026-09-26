@@ -12,7 +12,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import duckdb
 import pytest
 
 import dbsupport
@@ -146,17 +145,20 @@ class TestItReachesTheCommittedFile:
 
     def test_a_cross_table_checks_committed_result_carries_what_it_read(
             self, tmp_path, monkeypatch):
-        db = tmp_path / "supply.duckdb"
-        conn = duckdb.connect(str(db))
-        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.STAGING_SCHEMA}"')
-        supply_db.record_resolution(conn, supply_db.Resolution(
-            run_id="cp_run_001", schema="qa_run_cp_run_001",
-            resolved={"cp_placements": "cp_placements__20260801010000",
-                       "cp_carers": "cp_carers__20260801010000"}))
-        conn.close()
-        # An EMPTY database on this worker's PostgreSQL, which is what a
-        # fresh file used to give (REQ-TEST-095).
+        # EMPTY FIRST, then record - the order matters and getting it
+        # wrong is invisible: resetting after the resolution was written
+        # simply deleted it, and the test then failed reporting a missing
+        # table rather than a missing setup step.
         dbsupport.reset_supply_db()
+        conn = supply_db.connect()
+        try:
+            supply_db.ensure_schemas(conn)
+            supply_db.record_resolution(conn, supply_db.Resolution(
+                run_id="cp_run_001", schema=supply_db.run_schema("cp_run_001"),
+                resolved={"cp_placements": "cp_placements__20260801010000",
+                           "cp_carers": "cp_carers__20260801010000"}))
+        finally:
+            conn.close()
 
         # A REAL check_id from this repo's own sources, so this cannot
         # pass against a declaration that no longer exists.

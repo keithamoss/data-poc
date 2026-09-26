@@ -23,8 +23,7 @@ from qa_tools.common import asset_time
 from qa_tools.common import hierarchy
 from qa_tools.common import load_log
 from qa_tools.common import supply_db
-from qa_tools.common.csv_io import (DUCKDB_NULLSTR, load_null_values_by_column,
-                                    load_physical_types_by_column, read_csv_explicit_nulls)
+from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CP_RAW_DIR = os.path.join(ROOT, "data", "cp_raw")
@@ -117,8 +116,7 @@ def add_table_to_run(run_id: str, table: str, csv_path: str, dsn: str | None = N
                 # the storage are two engines.
                 supply_db.load_csv_into(
                     conn, supply_db.STAGING_SCHEMA, physical,
-                    staging_csv, DUCKDB_NULLSTR,
-                    column_types=load_physical_types_by_column(contract_path).get(table, {}))
+                    staging_csv, DUCKDB_NULLSTR)
             finally:
                 os.remove(staging_csv)
             rows = len(df)

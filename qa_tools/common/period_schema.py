@@ -70,14 +70,26 @@ class PeriodSchemaError(RuntimeError):
 
 
 def _encode(period_name: str) -> str:
-    """Lossless, reversible, and SQL-safe.
+    """Lossless, reversible, SQL-safe, and ENTIRELY LOWERCASE.
 
-    Every character that is not alphanumeric becomes `_<hex>_`, so
-    "2026-Q3" and "2026_Q3" - two names a naive substitution would
-    collapse into one schema - stay distinct. Collapsing them would
-    merge two periods' promoted data with nothing to notice it.
+    Every character that is not a lowercase letter or a digit becomes
+    `_<hex>_`, so "2026-Q3" and "2026_Q3" - two names a naive
+    substitution would collapse into one schema - stay distinct.
+    Collapsing them would merge two periods' promoted data with nothing
+    to notice it.
+
+    UPPERCASE IS ENCODED TOO, which the retired engine did not need
+    (REQ-PIPE-087). PostgreSQL folds an UNQUOTED identifier to lower
+    case: a schema created as "2026_2d_Q3" (quoted, so the Q survives)
+    is then invisible to any tool that writes the name unquoted, and dbt
+    and Soda both do. The symptom is brutal to read - every check in the
+    run reporting that the relation does not exist - so the fix is to
+    mint names that are the same quoted or not. Encoding rather than
+    lowercasing keeps "2026-Q3" and "2026-q3" distinct, which
+    lowercasing would not.
     """
-    return "".join(c if c.isalnum() else f"_{ord(c):02x}_" for c in period_name)
+    return "".join(c if (c.isalnum() and not c.isupper()) else f"_{ord(c):02x}_"
+                   for c in period_name)
 
 
 def _decode(encoded: str) -> str:
