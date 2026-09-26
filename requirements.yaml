@@ -13068,3 +13068,109 @@ requirements:
         decision and create_overlay_views()'s docstring currently say
         the opposite and need updating rather than being left to
         contradict this.
+
+  - id: REQ-PIPE-080
+    title: The recorded arrival classification replaces the one derived from the arrival date
+    date_written: "2026-09-26"
+    story: >
+      As manager of the data team, I want "was this on time?" answered
+      once, against the period the data was actually filed for, so a
+      supply that is on time for Q3 is never shown as late for Q2 just
+      because something worked it out a different way.
+    moscow: must
+    status: not_started
+    source: >
+      REQ-PIPE-066's four unmet criteria (9, 10, 11 and 12) and REQ-
+      PIPE-067's criterion 4, all deferred to the promotion sprint
+      because the classifier had no filings to measure against. Scoped
+      by delivery-scoper, batch 4, 2026-09-26.
+    signed_off:
+      by: Keith
+      date: "2026-09-26"
+    acceptance_criteria:
+      - >
+        THE SYSTEM SHALL record each supply's arrival classification
+        against the slot it is filed to, so every consumer reads it
+        rather than recomputing it.
+      - >
+        THE SYSTEM SHALL remove the derivation that infers a cycle from
+        the arrival date.
+      - >
+        THE SYSTEM SHALL remove the path that blanks a resupply's
+        recorded classification in the dashboard.
+      - >
+        THE SYSTEM SHALL use our own receipt instant as a supply's
+        arrival time, and SHALL remove the supplier-derived extract
+        instant from that role.
+      - >
+        THE SYSTEM SHALL present a classification computed from the
+        supply's CURRENT filing, and SHALL state, where a reader meets
+        one, that it follows that filing.
+      - >
+        IF a supply has no filing, THEN THE SYSTEM SHALL present its
+        classification as unfiled rather than as a punctuality verdict.
+      - >
+        THE SYSTEM SHALL make these retirements in the same change that
+        turns on recording, and SHALL NOT retire the old derivation
+        before the new one produces a real answer.
+    non_functional_requirements:
+      - >
+        This legitimately CHANGES PUBLISHED NUMBERS. Today's history
+        measures 0 early / 240 on time / 112 late; the new derivation
+        will produce different numbers and the seeded regenerate-and-
+        diff proves nothing here. REQ-PIPE-066 flagged this before the
+        work started, and it should be said to Keith again at sign-off
+        rather than discovered in a diff.
+      - >
+        Keith's own measured reason for the ordering, 2026-09-25:
+        retiring the old derivation early would replace the dashboard's
+        current answer with 352 supplies reading "unfiled". The
+        retirements are one change WITH the recording, not before it.
+      - >
+        Enumerate every consumer mechanically before changing the shape
+        - CLAUDE.md's own rule, written after a nullable threshold left
+        two readers behind and rendered a 14-violation check green.
+        earliest_extract alone feeds lastArrival.arrivedAt, which the
+        template renders in eight places.
+      - >
+        Assert at the render layer in a real browser, both toolchains,
+        not just at the data layer.
+    dependencies: [REQ-PIPE-075, REQ-PIPE-066, REQ-PIPE-067]
+    decisions:
+      - >
+        Decided classification measures against the period the supply
+        was FILED to rather than one inferred from its arrival date
+        (settled 2026-09-21). Deriving the period a second time here
+        creates two implementations of one concept that can disagree -
+        the plans/qa-pipeline.md item 74 failure mode - with "filed to
+        Q3, reported late for Q2" as the visible symptom.
+      - >
+        Decided this REMOVES a property rather than adding one: once the
+        slot is known, "early" is just arrival < due_at, so the
+        earliness window is a filing parameter rather than a cadence
+        one.
+      - >
+        Decided the verdict stops being a frozen historical fact and
+        becomes a function of the CURRENT filing. This contradicts
+        pipeline/cadence.py's own docstring, which states the verdict is
+        computed once and committed. The arrival TIME still never
+        changes; the VERDICT follows the filing, because a supply
+        reported late purely because it was misfiled was never actually
+        late, and leaving a known-wrong verdict in place for the sake of
+        immutability is the one place this design would knowingly say
+        something untrue.
+      - >
+        Decided recomputation is LOCAL to the supply that moved - a re-
+        file changes one supply's verdict and nothing replays a history,
+        because a design that needed to would stop being usable once a
+        daily feed has years behind it.
+      - >
+        Decided the blanking of a resupply's classification stays until
+        the new derivation is live, because its own justification - that
+        the old derivation's answer for a resupply is meaningless -
+        still holds until then.
+      - >
+        Recorded as an upside worth keeping: since the verdict travels
+        with the supply, the dashboard's JS never recomputes
+        classification, so the duplicated-logic surface shrinks rather
+        than grows.
