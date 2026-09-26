@@ -11414,3 +11414,144 @@ requirements:
         suite gained 171 tests and about 42 seconds against the last
         recorded full run the same day; the new ones are mostly
         real-browser, which costs far more per test than the rest.
+
+  - id: REQ-DOCS-072
+    title: A sprint's status is counted from its criteria, never hand-maintained
+    date_written: "2026-09-26"
+    story: >
+      As Keith, reading the delivery plan to decide what to do next, I
+      want each sprint to say how many of its acceptance criteria are
+      actually met, so that "done" means done rather than "done apart
+      from the bits somebody deferred" - and so the plan cannot drift
+      away from the register while nobody is looking.
+    moscow: should
+    status: not_started
+    source: >
+      Keith, 2026-09-26, after asking whether the sprints scoped a few
+      days earlier were finished. Checking properly found 11 of 25
+      sprint tags disagreed with the register, and a claim repeated
+      twice that morning - "sprints 7-10 have no requirement at all" -
+      was three days stale. His own framing of the fix: "I would rather
+      the overall status truly reflect its actual state rather than
+      falsely saying it's done. My dream is going, all right, we've
+      built X of Y in this sprint, therefore it's in progress, or it's
+      all done, or it's not started."
+    acceptance_criteria:
+      - THE SYSTEM SHALL record, for each delivery sprint, the requirements
+        that sprint owns, in a form a program can read without parsing prose.
+      - THE SYSTEM SHALL derive a sprint's status by counting acceptance
+        criteria across the requirements it owns - done where every criterion
+        is met, not-started where none are, and in-progress otherwise.
+      - THE SYSTEM SHALL count a criterion recorded in unmet_criteria as NOT
+        met, whoever owns it, so that a requirement built with deferrals never
+        reports its sprint as done.
+      - THE SYSTEM SHALL report the count itself alongside the status, so a
+        reader sees how much of a sprint remains rather than only that
+        something does.
+      - WHERE a sprint owns no requirement, THE SYSTEM SHALL report it as
+        not-started rather than as done, and SHALL say that it is unscoped
+        rather than merely unstarted.
+      - THE SYSTEM SHALL fail `mothman check` where a sprint's written status
+        disagrees with the derived one, naming the sprint and both values.
+      - THE SYSTEM SHALL distinguish the requirements a sprint OWNS from those
+        its prose merely mentions, and SHALL NOT infer ownership from any
+        requirement id appearing in a sprint's text.
+    non_functional_requirements:
+      - Adds no new status vocabulary - done, in-progress and not-started
+        are already in the closed set every plans file uses.
+      - Runs in the existing `mothman check`, with no network and no access
+        to anything under data/.
+    dependencies: []
+    decisions:
+      - >
+        COUNT CRITERIA, NOT REQUIREMENTS (Keith, 2026-09-26). Counting
+        requirements was the obvious unit and it is wrong: a requirement
+        can be `built` and still carry deferred criteria, which is how
+        sprint 10 came to read `done` while owing four. Criteria are the
+        finer unit and they make the deferral case fall out for free.
+      - >
+        Rejected a new status such as `partial`. The vocabulary already
+        has `in-progress`, the plans files and the dashboard's own filter
+        chips already parse it, and a fourth value would need adding to
+        both for no gain.
+      - >
+        Rejected deriving ownership by scanning each sprint's prose for
+        REQ- ids, which is what this session's first pass did. It
+        conflates owned with mentioned: sprint 25 mentions eleven
+        requirements and owns none, sprint 6 mentions REQ-DASH-041 and
+        does not own it. That overcounting reported three sprints as
+        wrong when only one was.
+      - >
+        Rejected making the gate rewrite the tag automatically. A tag that
+        fixes itself records nothing; the point is that a disagreement is
+        visible and somebody looks at why.
+    open_questions:
+      - >
+        Whether a sprint whose remainder is owned ENTIRELY by a later
+        sprint should read `done` or `in-progress`. Sprint 10 is the case:
+        it delivered everything it owns and its four deferrals all belong
+        to promotion. Keith leaned toward the honest reading - never
+        falsely say done - which is what the criteria above encode, and
+        the cost is that most sprints read in-progress for a while. Worth
+        confirming once he has seen the real numbers.
+
+  - id: REQ-DOCS-073
+    title: A deferred criterion names what it waits on, and says when that has shipped
+    date_written: "2026-09-26"
+    story: >
+      As Keith, wanting to see how the bits of one sprint depend on the
+      bits of another, I want every deferred criterion to name what it
+      is waiting for in a form the tooling can resolve, so that when the
+      blocker ships I am told the deferral is now worth re-testing
+      instead of it sitting there being quietly wrong.
+    moscow: should
+    status: not_started
+    source: >
+      Keith, 2026-09-26 - "I'm keen to be able to better track
+      dependencies between sprints, well, between the bits of sprints."
+      Prompted by finding that seven deferrals in the register already
+      point at requirements that have since been built, so the register
+      understates its own progress and nothing says so.
+    acceptance_criteria:
+      - THE SYSTEM SHALL record, for each entry in unmet_criteria, what that
+        criterion waits on, in a form that resolves to a requirement or a
+        sprint rather than to free prose alone.
+      - THE SYSTEM SHALL report a deferral whose blocker is now built, so that
+        a criterion deferred to work that has since landed is re-tested rather
+        than left standing.
+      - THE SYSTEM SHALL NOT treat such a deferral as automatically met - it
+        SHALL report it for a person to check, because a blocker shipping is
+        evidence the criterion can now be met, not that it has been.
+      - THE SYSTEM SHALL present the deferrals as a dependency view - what each
+        sprint is waiting on, and what is waiting on it - rather than only as a
+        field on individual requirements.
+      - THE SYSTEM SHALL refuse a deferral naming a requirement that does not
+        exist.
+    non_functional_requirements:
+      - Extends the existing unmet_criteria field rather than adding a
+        parallel structure, so there is one record of a deferral, not two
+        that can disagree.
+      - The existing free-text reasoning on each deferral is kept - it
+        carries WHY, which a resolvable id does not.
+    dependencies: [REQ-DOCS-072]
+    decisions:
+      - >
+        THE DEPENDENCY DATA ALREADY EXISTS, half-formed. unmet_criteria
+        entries already carry an `owner`, and it is already doing the job
+        of a dependency edge - "the promotion sprint (batch 4)",
+        "REQ-PIPE-062 (slot assignment), batch 3". It is free text, so
+        nothing can resolve it. This requirement is about making an
+        existing field machine-readable rather than inventing a graph.
+      - >
+        Measured on 2026-09-26, and the numbers are the argument: 29
+        deferred criteria across 17 requirements, of which 17 wait on the
+        promotion sprint alone - so promotion closes remainders in six
+        other sprints at once, which the sprint list gave no way to see.
+        Seven more point at REQ-PIPE-062, REQ-PIPE-038 and REQ-DASH-070,
+        all now built.
+      - >
+        Rejected auto-clearing a deferral when its blocker ships. A
+        criterion is met when something demonstrates it, not when its
+        blocker's status changes - auto-clearing would manufacture
+        evidence, which is the failure this project guards against
+        everywhere else.
