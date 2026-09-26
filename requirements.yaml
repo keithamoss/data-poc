@@ -11442,6 +11442,11 @@ requirements:
       - THE SYSTEM SHALL derive a sprint's status by counting acceptance
         criteria across the requirements it owns - done where every criterion
         is met, not-started where none are, and in-progress otherwise.
+      - WHERE every unmet criterion in a sprint is owned by a DIFFERENT sprint,
+        THE SYSTEM SHALL report that sprint as blocked rather than as
+        in-progress or done, so that "this has built everything it owns" is
+        distinguishable at a glance from "this still has work left in it".
+      - THE SYSTEM SHALL name, for a blocked sprint, what it is waiting on.
       - THE SYSTEM SHALL count a criterion recorded in unmet_criteria as NOT
         met, whoever owns it, so that a requirement built with deferrals never
         reports its sprint as done.
@@ -11470,10 +11475,24 @@ requirements:
         sprint 10 came to read `done` while owing four. Criteria are the
         finer unit and they make the deferral case fall out for free.
       - >
-        Rejected a new status such as `partial`. The vocabulary already
-        has `in-progress`, the plans files and the dashboard's own filter
-        chips already parse it, and a fourth value would need adding to
-        both for no gain.
+        A SEVENTH STATUS, `blocked`, IS ADDED - and this requirement's own
+        first draft rejected exactly that, so the distinction matters.
+        What was rejected was `partial`, which carries nothing
+        `in-progress` does not. `blocked` carries something neither
+        `in-progress` nor `done` can say: this sprint has built
+        everything it owns, and what remains belongs to another sprint.
+        Keith, 2026-09-26, on sprint 10's case - a sprint that has "built
+        all of its stuff and it's waiting on someone else... maybe
+        blocked or waiting would be the word".
+      - >
+        `blocked` over `waiting`, his other candidate. It is the term an
+        engineer scans fastest, and it sits unambiguously against
+        `parked`, which already means deliberately set aside rather than
+        sequenced behind something. The cost was measured rather than
+        assumed: `dashboard/plans_md.py` parses whatever status string it
+        finds, so the closed set lives in three constants in the
+        dashboard template (PLANS_STATUS_LABEL, PLANS_STATUS_CLASS,
+        PLANS_ALL_STATUSES) plus CLAUDE.md's own documented vocabulary.
       - >
         Rejected deriving ownership by scanning each sprint's prose for
         REQ- ids, which is what this session's first pass did. It
@@ -11487,13 +11506,12 @@ requirements:
         visible and somebody looks at why.
     open_questions:
       - >
-        Whether a sprint whose remainder is owned ENTIRELY by a later
-        sprint should read `done` or `in-progress`. Sprint 10 is the case:
-        it delivered everything it owns and its four deferrals all belong
-        to promotion. Keith leaned toward the honest reading - never
-        falsely say done - which is what the criteria above encode, and
-        the cost is that most sprints read in-progress for a while. Worth
-        confirming once he has seen the real numbers.
+        What COLOUR a blocked sprint's pill takes. `parked` and
+        `superseded` are grey (`nodata`), `in-progress` and `investigate`
+        are amber. Grey is the proposal: nothing is happening inside a
+        blocked sprint and the action belongs to its blocker, so amber
+        would compete with the sprints that genuinely want attention
+        now. Not settled, and cheap to change either way.
 
   - id: REQ-DOCS-073
     title: A deferred criterion names what it waits on, and says when that has shipped
